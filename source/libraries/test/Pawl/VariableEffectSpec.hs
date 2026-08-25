@@ -7,6 +7,7 @@
 module Pawl.VariableEffectSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -31,11 +32,13 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
@@ -663,6 +666,98 @@ blightingFor :: [(PlayerId.PlayerId, ObjectId.ObjectId)] -> Prompt.Prompt r -> r
 blightingFor pins p = case p of
   Prompt.ChooseBlight _ pid _ _ | Just oid <- List.lookup pid pins -> oid
   _ -> S.identityAnswer p
+
+-- CR 101.4's LAST sentence, blightPlayerSpec above having proved its first:
+-- "then the actions happen simultaneously". Two seats blight off one trigger, and
+-- the question this group asks is whether that is one event or two.
+--
+-- Only a CR 603.2c batch condition can tell -- "whenever one or more counters are
+-- put on one or more permanents", which reads the whole event group where every
+-- other counter condition reads one placement. Nothing printed carries that
+-- reading of a -1/-1 counter, so the producer is a synthetic:
+--
+--   * Synthetic Wilting Census {1}{B} Enchantment
+--     (data/cards/synthetic-wilting-census.json): "Whenever one or more -1/-1
+--     counters are put on one or more creatures, draw a card."
+--
+-- WHY A SYNTHETIC, in two queries. Scryfall o:"counters are put on one or more",
+-- 2026-08-25, matches one printing: Cloaked Cadet, whose batch spans creatures but
+-- counts +1/+1 counters on Humans, and rule 701.68a puts only -1/-1 counters --
+-- so it can watch nothing blight does. Scryfall o:"one or more -1/-1 counters are
+-- put", same date, matches Wickersmith's Tools and Auntie Ool, Cursewretch, whose
+-- kind is right and whose batch is scoped to "A CREATURE" -- one creature, so they
+-- fire once per creature however the placements are grouped, and two seats blight
+-- them twice under either reading. A printing refuting the synthetic is one whose
+-- batch spans creatures AND whose kind is -1/-1.
+--
+-- The COUNTERS are the same either way, which is why the card drawn is what the
+-- cases read: one card for the batch, where a seat-at-a-time placement draws two.
+blightSimultaneitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+blightSimultaneitySpec s registry =
+  let -- The distinct EventGroups the log's -1/-1 placements carry. The
+      -- precondition the batch case rests on, asserted rather than assumed: were
+      -- the two placements not one group, "once for the batch" would be proving
+      -- nothing about rule 101.4.
+      placementGroups gs =
+        List.nub
+          ( Maybe.mapMaybe
+              ( \logged -> case LoggedEvent.event logged of
+                  GameEvent.CountersPut change
+                    | CounterChange.kind change == CounterKind.MinusOneMinusOne -> Just (LoggedEvent.group logged)
+                  _ -> Nothing
+              )
+              (Foldable.toList (GameState.events gs))
+          )
+      -- alice's Synthetic Wilting Census and her High Perfect Morcant entering
+      -- with its CR 603.6a trigger settled onto the stack, plus ONE Wall of Stone
+      -- for each opponent. A single candidate per seat, so rule 701.68a's choice
+      -- raises no prompt and nothing about the answerer is load-bearing here --
+      -- which seat was asked in which order is blightPlayerSpec's question.
+      --
+      -- A Wall of Stone is an 0/8, so a -1/-1 counter is nowhere near CR 704.5f
+      -- and every blighted creature is still standing when the counters are read.
+      --
+      -- Three Swamps in alice's library, so the Census can draw twice over without
+      -- CR 104.3c deciding the case for it: a board that could not answer TWO
+      -- cards would pass the batch assertion for the wrong reason.
+      censusBoard opponents game = do
+        census <- S.printingOf s registry "Synthetic Wilting Census"
+        morcant <- S.printingOf s registry "High Perfect Morcant"
+        wall <- S.printingOf s registry "Wall of Stone"
+        swamp <- S.printingOf s registry "Swamp"
+        let stocked = foldr (\_ g -> snd (S.addLibraryCard swamp S.alice g)) game [1 .. 3 :: Int]
+            withCensus = snd (S.addCreature census S.alice stocked)
+            (walls, withWalls) = List.foldl' (\(acc, g) pid -> let (oid, g') = S.addCreature wall pid g in (acc <> [oid], g')) ([], withCensus) opponents
+            (_, entered) = S.entersWithTrigger morcant S.alice withWalls
+        pure (walls, snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority))
+      -- Settle and resolve until the stack is empty: the Morcant's trigger puts the
+      -- counters, and the Census's own trigger only reaches the stack at the CR
+      -- 117.5 scan after it. Resolving the top alone would leave the card undrawn.
+      resolveEverything gs =
+        let settled = S.runPure S.identityAnswer gs Engine.settleForPriority
+         in if null (GameState.stack settled)
+              then settled
+              else resolveEverything (S.runPure S.identityAnswer settled Stack.resolveTop)
+   in Spec.describe s "BlightSimultaneity" $ do
+        -- The proving case. bob and carol both blight, both Walls take a counter,
+        -- and alice draws ONE card -- 2 is the seat-at-a-time reading and 0 is
+        -- silence.
+        Spec.it s "CR 101.4 two seats blighting are one event, so the Census draws one card" $ do
+          (walls, board) <- censusBoard [S.bob, S.carol] S.threePlayerGame
+          let after = resolveEverything board
+          Spec.assertEqWith s "alice drew one card for the whole batch" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "both opponents' Walls took a counter" (fmap (\oid -> minusCountersOn oid after) walls) [Just 1, Just 1]
+          Spec.assertEqWith s "and the two placements were one event group" (length (placementGroups after)) 1
+          Spec.assertEqWith s "alice held nothing before" (S.handSize S.alice board) 0
+        -- The same card with ONE blighter, which is what says the condition fires
+        -- at all rather than the batch case passing because nothing triggered: one
+        -- placement, one group, one card -- the reading both implementations share.
+        Spec.it s "CR 603.2c one seat blighting draws one card too" $ do
+          (walls, board) <- censusBoard [S.bob] (Setup.emptyGame S.bothPlayers)
+          let after = resolveEverything board
+          Spec.assertEqWith s "alice drew her card" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "bob's Wall took the counter" (fmap (\oid -> minusCountersOn oid after) walls) [Just 1]
+          Spec.assertEqWith s "one placement, one group" (length (placementGroups after)) 1
 
 -- CR 701.68 blight as a COST (CostComponent.Blight), which is the position most of
 -- the pool prints it in and the one CR 701.68b's "they can't choose to blight"
@@ -1529,6 +1624,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   amassSpec s registry
   blightSpec s registry
   blightPlayerSpec s registry
+  blightSimultaneitySpec s registry
   blightCostSpec s registry
   soulfireEruptionSpec s registry
   payAnyEnergySpec s registry

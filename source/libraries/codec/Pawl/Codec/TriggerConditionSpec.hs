@@ -19,6 +19,7 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PermanentsGetCounters as PermanentsGetCounters
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -524,6 +525,21 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfCountersRemoved CounterKind.Loyalty)
       " {\"type\":\"SelfCountersRemoved\",\"value\":{\"type\":\"Loyalty\"}} "
+  -- CR 603.2c's batch placement, whose payload is an OBJECT rather than a bare
+  -- kind: a third counter kind and a Filter, so a codec that crossed this arm
+  -- with either mirror above could not pass all three cases.
+  Spec.it s "PermanentsGetCounters round-trips its kind and its Filter" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      ( TriggerCondition.PermanentsGetCounters
+          ( PermanentsGetCounters.MkPermanentsGetCounters
+              { PermanentsGetCounters.kind = CounterKind.MinusOneMinusOne,
+                PermanentsGetCounters.permanents = Filter.HasCardType CardType.Creature
+              }
+          )
+      )
+      " {\"type\":\"PermanentsGetCounters\",\"value\":{\"kind\":{\"type\":\"MinusOneMinusOne\"},\"permanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- CR 601.2i. A PAIR: a Filter over the SPELL, holding Young Pyromancer's two
   -- printed narrowings -- who cast it and what it was -- plus the TurnScope,
   -- which is the axis the Filter cannot carry. Young Pyromancer prints no turn,

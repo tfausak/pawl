@@ -10,6 +10,7 @@ import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBl
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PermanentsGetCounters as PermanentsGetCounters
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -809,6 +810,28 @@ data TriggerCondition
     -- carries into it: one batch of combat damage removing three counters is one
     -- trigger for three, not three for one.
     SelfCountersRemoved (CounterKind.CounterKind Keyword.Keyword)
+  | -- | CR 603.2c's batch reading of a CR 122.6 placement: "whenever one or more
+    -- [kind] counters are put on one or more [permanents]". The arm above's
+    -- placement mirror scoped to the BATCH and to a FILTER rather than to the
+    -- bearer -- CR 704.3 and CR 608.2f make a whole sweep one event, so that event
+    -- contains one occurrence of this trigger however many permanents it put
+    -- counters on.
+    --
+    -- PermanentsDie's twin, built the same way and for the same reason: the
+    -- matcher answers per placement, and what makes the whole group one trigger is
+    -- the Pawl.Types.EventGroup the log stamps, read in
+    -- Pawl.Engine.Event.eventTriggers.
+    --
+    -- The batch spans OBJECTS, which is what separates this from the printed
+    -- "whenever one or more -1/-1 counters are put on A CREATURE" (Wickersmith's
+    -- Tools, Auntie Ool, Cursewretch). Those name one creature and so fire once
+    -- per creature however the placements are grouped; this names a set and fires
+    -- once for the set. A card printing the narrower form would want a sibling
+    -- constructor rather than this one.
+    --
+    -- Binds nothing, for PermanentsDie's reason: a batch may cover several
+    -- permanents, so one slot could not name them all.
+    PermanentsGetCounters PermanentsGetCounters.PermanentsGetCounters
   | -- | CR 601.2i: "whenever you cast a [type] spell" (Young Pyromancer). That
     -- rule's second sentence is the trigger event in as many words. Matched
     -- against GameEvent.SpellCast.

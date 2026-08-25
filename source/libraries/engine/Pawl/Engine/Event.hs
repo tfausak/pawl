@@ -137,6 +137,7 @@ import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
+import qualified Pawl.Types.PermanentsGetCounters as PermanentsGetCounters
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
@@ -7709,6 +7710,75 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- No "one or more" conjunct either, and for the arm above's reason: the record
   -- exists only where something came off.
   TriggerCondition.SelfCountersRemoved wanted -> Maybe.isJust (countersRemovedFrom bearer wanted event)
+  -- CR 603.2c's batch placement, read ONE MEMBER at a time: counters of this kind
+  -- landed on a permanent the Filter admits. What makes it fire once for the whole
+  -- batch is not here -- `batchScoped` below marks the condition and eventTriggers
+  -- keeps the first pending trigger per (bearer, ability) within each
+  -- Pawl.Types.EventGroup -- so this arm answering True for every placement in the
+  -- group is deliberate, PermanentsDie's posture above.
+  --
+  -- No "one or more" conjunct: GameEvent.CountersPut is recorded only where the
+  -- before/after pair grew, an invariant stated on the constructor, so a placement
+  -- of nothing is not in the log to match.
+  --
+  -- viewWithLastKnown rather than viewOfObject, PermanentTurnedFaceUp's posture: a
+  -- permanent that took counters and was gone before the CR 117.5 boundary is
+  -- still read as it stood (CR 608.2h) instead of dropping out of the match --
+  -- which is exactly the CR 704.5f victim a -1/-1 counter made.
+  --
+  -- The bearer frames the match rather than being it: it is the Filter.Context's
+  -- source, and its controller is the perspective CR 109.5 gives "you".
+  TriggerCondition.PermanentsGetCounters (PermanentsGetCounters.MkPermanentsGetCounters wanted f) -> case event of
+    GameEvent.CountersPut (CounterChange.MkCounterChange oid kind _ _)
+      | kind == wanted -> case Projection.viewWithLastKnown oid gs oid of
+          Nothing -> False
+          Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
   -- CR 601.2i's "any abilities that trigger when a spell is cast": a spell the
   -- Filter admits became cast. The bearer frames the match rather than being it,
   -- as for PermanentEnters -- it is the Filter.Context's source, and its
@@ -9380,6 +9450,9 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfBecomesClassLevel _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
   TriggerCondition.SelfCountersRemoved _ -> False
+  -- CR 603.3b's first pass: a batch of counters landing is a CR 122.6 placement,
+  -- not an ability triggering.
+  TriggerCondition.PermanentsGetCounters {} -> False
   TriggerCondition.SpellCast {} -> False
   TriggerCondition.SelfCast -> False
   TriggerCondition.SelfBecomesTargeted _ -> False
@@ -10269,6 +10342,13 @@ eventBindingSlots cond = case cond of
   -- sibling does: Chandra, Fire Artisan reads the number of counters that came
   -- off. The bearer needs no slot, CR 113.7a's source slot already naming it.
   TriggerCondition.SelfCountersRemoved _ -> Set.singleton Binding.eventAmount
+  -- Nothing, PermanentsDie's answer and for its reason: the trigger event is a
+  -- whole CR 704.3 / CR 608.2f batch, which may have put counters on several
+  -- permanents, and one slot cannot name them all. Cloaked Cadet, the only
+  -- printing of this written form (Scryfall o:"counters are put on one or more",
+  -- 2026-08-25), draws a card and names none of them; a printing whose payload
+  -- said "it" would refute this, and the lint would reject it (#505).
+  TriggerCondition.PermanentsGetCounters {} -> Set.empty
   -- CR 709.5h names the permanent and the half, and CR 113.7a's source slot
   -- already names the permanent. The HALF is not bound: no printing says "that
   -- door", so there is nothing for a payload to read it as.
@@ -10605,6 +10685,10 @@ looksBack condition = case condition of
   TriggerCondition.SelfBecomesClassLevel _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
   TriggerCondition.SelfCountersRemoved _ -> False
+  -- CR 603.10a's list does not name counter placements, so the normal reading
+  -- applies: the abilities checked are the ones existing immediately after the
+  -- event. Both counter mirrors above answer alike.
+  TriggerCondition.PermanentsGetCounters {} -> False
   TriggerCondition.SpellCast {} -> False
   TriggerCondition.SelfCast -> False
   TriggerCondition.SelfBecomesTargeted _ -> False
@@ -10743,6 +10827,10 @@ batchScoped condition = case condition of
   TriggerCondition.SelfBecomesClassLevel _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
   TriggerCondition.SelfCountersRemoved _ -> False
+  -- The one True beside PermanentsDie: CR 603.2c's second sentence is what this
+  -- constructor exists for -- "one or more counters ... on one or more
+  -- permanents" names the whole group as the trigger event.
+  TriggerCondition.PermanentsGetCounters {} -> True
   TriggerCondition.SpellCast {} -> False
   TriggerCondition.SelfCast -> False
   TriggerCondition.SelfBecomesTargeted _ -> False
@@ -11958,6 +12046,9 @@ zonesTriggeredFrom cond = case cond of
   TriggerCondition.SelfBecomesClassLevel _ -> battlefield
   TriggerCondition.SelfLastCounterRemoved _ -> battlefield
   TriggerCondition.SelfCountersRemoved _ -> battlefield
+  -- The battlefield, both counter mirrors' answer: a permanent takes CR 122.6
+  -- counters there, and this condition's bearer is a bystander watching from it.
+  TriggerCondition.PermanentsGetCounters {} -> battlefield
   -- CR 113.6's default: Young Pyromancer watches the stack from the battlefield,
   -- and a card in a graveyard sees nothing cast.
   TriggerCondition.SpellCast {} -> battlefield
@@ -12178,6 +12269,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfBecomesClassLevel _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
   TriggerCondition.SelfCountersRemoved _ -> False
+  TriggerCondition.PermanentsGetCounters {} -> False
   -- CR 601.2i says nothing about whose turn it is and CR 117.1a lets an instant
   -- be cast on anybody's, so the answer is the condition's own TurnScope --
   -- StepBegins' arms one more time, and for its reason (CR 603.3a, CR 109.5).
@@ -12421,6 +12513,7 @@ stateTriggers gs
               TriggerCondition.SelfBecomesClassLevel _ -> False
               TriggerCondition.SelfLastCounterRemoved _ -> False
               TriggerCondition.SelfCountersRemoved _ -> False
+              TriggerCondition.PermanentsGetCounters {} -> False
               TriggerCondition.SpellCast {} -> False
               TriggerCondition.SelfCast -> False
               TriggerCondition.SelfBecomesTargeted _ -> False

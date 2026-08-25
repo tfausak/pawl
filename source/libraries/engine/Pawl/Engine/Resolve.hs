@@ -5816,8 +5816,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- (CR 608.2b), blights nothing. APNAP for the order (CR 101.4). Targetless: no
   -- CR 608.2b legality to re-check.
   --
-  -- Not implemented: rule 101.4's actions happen SIMULTANEOUSLY, and each
-  -- blighter's counters are placed before the next is asked instead (#1651).
+  -- Rule 101.4's last sentence -- "then the actions happen simultaneously" -- is
+  -- the Event.simultaneously bracket: every blighter's counters share one
+  -- Pawl.Types.EventGroup, so a CR 603.2c batch condition watching placements
+  -- across permanents sees one trigger event and not one per seat. The bracket
+  -- does not touch the DECISION order, which stays the APNAP walk above it: the
+  -- prompts are raised inside it, one seat at a time, which is what rule 101.4's
+  -- first sentence asks for.
   --
   -- Not implemented: nothing records which creature was blighted, so CR 701.68c's
   -- "blighted creature" and CR 701.68d's trigger have nothing to read (#1492).
@@ -5827,7 +5832,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         context = effectContext controller source legal (slotGroups resolving gs)
         named = playerRefPlayers legal controller gs ref
         blighters = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
-    Monad.forM_ blighters $ \pid ->
+    Event.simultaneously . Monad.forM_ blighters $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
         Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
         Just n -> Monad.void (Blight.blight (CounterCause.ByEffect pid) resolving (Integer.toNaturalSaturating n))
