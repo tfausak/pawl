@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 -- Covers CR 701.27 transform end to end: Pawl.Types.Layout's Transforming arm
 -- and the three Pawl.Engine.Card functions that read it (CR 712.8a/712.8d's
 -- combined view, CR 712.11's castable half, CR 701.27a's turnedOver), the
@@ -39,6 +41,7 @@
 module Pawl.TransformSpec where
 
 import qualified Control.Monad as Monad
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -79,9 +82,11 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
@@ -695,6 +700,11 @@ thallidFront = CardName.MkCardName (Text.pack "Blightreaper Thallid")
 thallidBack = CardName.MkCardName (Text.pack "Blightsower Thallid")
 saprolingToken = CardName.MkCardName (Text.pack "Phyrexian Saproling Token")
 
+-- The face Howlpack Piper turns INTO at nightfall, which is also the name its own
+-- printed trigger condition asks about.
+howlerName :: CardName.CardName
+howlerName = CardName.MkCardName (Text.pack "Wildsong Howler")
+
 -- alice's board for CR 701.27e: one Blightreaper Thallid and `n` Forests, in her
 -- own precombat main phase with priority, since CR 307.5 is what the card's
 -- "Activate only as a sorcery" rider asks for.
@@ -730,6 +740,39 @@ resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
 resolveStack :: GameState.GameState -> GameState.GameState
 resolveStack gs = foldr (\_ g -> resolveTop g) gs (GameState.stack gs)
 
+-- Wildsong Howler's payload prints a "may" -- "You may reveal a creature card
+-- from among them" -- so its fixture has to take it. A FIXED decision rather than
+-- one read off the offer, Pawl.LibraryOrderSpec's `wildsAnswer` posture and for
+-- its reason: an answerer deriving its answer from the prompt would still answer
+-- legally after a mutation broke which cards were looked at.
+takesTheMay :: Prompt.Prompt r -> r
+takesTheMay p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+-- `gather` and `resolveStack` under that answerer. Separate functions rather than
+-- a parameter on those two: the answerer is a rank-2 argument, and this module
+-- takes no language pragma to say so.
+gatherTakingTheMay :: GameState.GameState -> GameState.GameState
+gatherTakingTheMay gs = S.runPure takesTheMay gs Engine.settleForPriority
+
+resolveStackTakingTheMay :: GameState.GameState -> GameState.GameState
+resolveStackTakingTheMay gs = foldr (\_ g -> S.runPure takesTheMay g Stack.resolveTop) gs (GameState.stack gs)
+
+-- alice's library, stocked from the TOP DOWN: S.addLibraryCard puts its card on
+-- top, so the deepest is stocked first (Pawl.LibraryOrderSpec's wildsBoard).
+stockLibrary :: [Printing.Printing] -> GameState.GameState -> GameState.GameState
+stockLibrary printings gs = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) gs (reverse printings)
+
+-- The names of alice's cards in a zone, in that zone's own order --
+-- Pawl.LibraryOrderSpec's zoneNames, which this module keeps its own copy of
+-- rather than hoisting to Pawl.Support.
+zoneNames :: Zone.Zone -> GameState.GameState -> [String]
+zoneNames zone gs =
+  fmap
+    (\oid -> maybe "?" (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid gs))
+    (Game.zoneMembers zone S.alice gs)
+
 -- CR 701.27e, "transforms into", the phrase a CARD asks: Blightreaper Thallid //
 -- Blightsower Thallid, {1}{B} 2/2 Creature -- Fungus with "{3}{G/P}: Transform
 -- this creature. Activate only as a sorcery.", whose back face is a 3/3 Creature
@@ -752,10 +795,11 @@ resolveStack gs = foldr (\_ g -> resolveTop g) gs (GameState.stack gs)
 -- one here, CR 700.4's ordinary SelfDies in the last case. Without that pair a
 -- condition that fired on the wrong limb would pass.
 --
--- NOT covered: the CR 702.145c/f road to the same event (Pawl.Engine.Daytime's
--- sweep, which records through the same Event.recordTransformed). No daybound
--- card in data/cards prints a "transforms into" trigger, so the record on that
--- road is a regression fence rather than a proved behaviour (#2051).
+-- The CR 702.145c/f road to the same event -- Pawl.Engine.Daytime's sweep, which
+-- records through the same Event.recordTransformed -- reaches it too, on its own
+-- fixture, since the Thallid is neither daybound nor nightbound: see the
+-- nightfall case at the foot of this group, which is what proves the record on
+-- that road rather than fencing it.
 transformTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
   -- CR 701.27e's own case: the permanent turns over, and the ability printed on
@@ -853,6 +897,47 @@ transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
         Spec.assertEqWith s "the transform limb made one" (S.countOnBattlefieldByName saprolingToken S.alice fromTransform) 1
         Spec.assertEqWith s "and the death limb makes a second" (S.countOnBattlefieldByName saprolingToken S.alice fromDeath) 2
         Spec.assertEqWith s "the Thallid itself is gone" (faceNameOf oid fromDeath) Nothing
+  -- CR 702.145c's road to the same event, and the reason this group needs a
+  -- second fixture: no spell and no activated ability turns this permanent over.
+  -- NIGHTFALL does, through Pawl.Engine.Daytime's sweep, which reaches
+  -- Game.turnFaceOver directly and records CR 701.27a's event through the same
+  -- Event.recordTransformed. Howlpack Piper // Wildsong Howler is the pool's only
+  -- card that watches it: a {3}{G} 2/2 Creature -- Human Werewolf with daybound
+  -- whose back face is a 4/4 Creature -- Werewolf with nightbound reading
+  -- "Whenever this creature enters or transforms into Wildsong Howler, look at
+  -- the top six cards of your library. You may reveal a creature card from among
+  -- them and put it into your hand. Put the rest on the bottom of your library in
+  -- a random order."
+  --
+  -- The Piper is PLACED rather than cast, so no enters event exists and the
+  -- printed "or" cannot be firing on its SelfEnters limb -- the board proves the
+  -- transform limb specifically. A later reader who "simplifies" this by casting
+  -- the card destroys that.
+  --
+  -- Nine cards in the library, not six: the top six are what the trigger looks
+  -- at, and the three beneath them are what makes "on the BOTTOM" observable --
+  -- with a six-card library the bottom and the top are the same set. Exactly one
+  -- of the six is a creature card, so the reveal has one legal answer and the
+  -- case is about the trigger rather than about who picks.
+  Spec.it s "CR 702.145c/701.27e nightfall turns the Piper over and the back face's trigger fires" $ do
+    piper <- S.printingOf s registry "Howlpack Piper"
+    deck <- mapM (S.printingOf s registry) ["Forest", "Mountain", "Goblin Piker", "Island", "Swamp", "Plains", "Lightning Bolt", "Ancestral Recall", "Giant Growth"]
+    let (piperId, placed) = S.addCreature piper S.alice emptyBoard
+        -- CR 702.145d: alice controls a daybound permanent and it is neither day
+        -- nor night, so the settle makes it day.
+        day = settleDaytime (stockLibrary deck placed)
+        -- CR 502.2: day, and no spells last turn, so it becomes night -- and CR
+        -- 702.145c turns the Piper over as it does.
+        night = untapStepAfter 0 day
+        after = resolveStackTakingTheMay (gatherTakingTheMay night)
+    Spec.assertEqWith s "the one creature card among the top six is in alice's hand" (zoneNames Zone.Hand after) ["Goblin Piker"]
+    Spec.assertEqWith s "the three cards under the looked-at six are now the top three" (take 3 (zoneNames Zone.Library after)) ["Lightning Bolt", "Ancestral Recall", "Giant Growth"]
+    -- CR 401.4 taken back by the printed "in a random order": the five arrive as
+    -- a batch whose order no rule lets a player read, so this asserts the SET.
+    Spec.assertEqWith s "and the other five went to the bottom" (Set.fromList (drop 3 (zoneNames Zone.Library after))) (Set.fromList ["Forest", "Mountain", "Island", "Swamp", "Plains"])
+    Spec.assertEqWith s "the permanent really did turn over" (faceNameOf piperId after) (Just howlerName)
+    Spec.assertEqWith s "it really is night" (GameState.daytime after) (Just Daytime.Night)
+    Spec.assertEqWith s "and it was day before the untap step, so CR 502.2 had a designation to change" (GameState.daytime day) (Just Daytime.Day)
 
 -- "Destroy each Fungus", which on this board is the Thallid alone -- the
 -- Saproling the transform limb made is a Phyrexian Saproling and not one.
