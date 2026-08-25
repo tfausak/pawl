@@ -16,7 +16,8 @@
 -- gates the next bar on it, and Pawl.Engine.Projection.gatherStatic gates the
 -- section's continuous effect on it.
 --
--- Paladin Class, AFR 29, is the card under test throughout, and it was picked
+-- Paladin Class, AFR 29, is the card under test for every group but the last,
+-- and it was picked
 -- for what its level-2 section is: "Creatures you control get +1/+1", a plain
 -- layer 7c modification, so nothing but the level gate is under test. Its TOP
 -- section -- "Spells your opponents cast during your turn cost {1} more to cast",
@@ -34,16 +35,22 @@
 -- What is NOT proven here, because Paladin Class cannot reach it:
 --
 --   * CR 716.2c's "to gain a Class level", which only Sorcerer Class prints (gap
---     #1948), and CR 716's "when this Class becomes level N" triggers (gap
---     #1944).
+--     #1948).
+--
+-- CR 716's "when this Class becomes level N" trigger needs a second card, and
+-- becomesLevelSpec below is what proves it: Stormchaser's Talent, BLB, joins
+-- Paladin Class for that one group.
 module Pawl.ClassSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -53,6 +60,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
@@ -72,6 +80,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Class" $ do
@@ -80,6 +89,7 @@ spec s registry = Spec.describe s "Class" $ do
   levelThreeSpec s registry
   ladderSpec s registry
   designationSpec s registry
+  becomesLevelSpec s registry
 
 -- CR 716.3: the text above the first class level bar is an ability the Class has
 -- at ALL times -- no bar precedes it, so no level gates it. Paladin Class prints
@@ -369,9 +379,10 @@ ladderSpec s registry = Spec.describe s "Level bar activation" $ do
 -- The retention is observable across the ROUND TRIP rather than during it, and
 -- that is a rules fact rather than a shortcut: the same Aura's SetLandSubtype
 -- fires CR 305.7, which strips the permanent's abilities, so while the Song is on
--- it the level-2 section is off no matter what the level says, and Paladin Class
--- is the only card in data/cards/ whose text measures a level at all (grep
--- ClassLevel over the corpus). So the case asserts the strip too --
+-- it the level-2 section is off no matter what the level says, and no Class in
+-- data/cards/ measures a level except through its own sections (grep ClassLevel
+-- over the corpus: Paladin Class and Stormchaser's Talent, each reading only
+-- itself). So the case asserts the strip too --
 -- the Piker is 2/1 while the Class is a Forest land, for rule 305.7's reason and
 -- not for rule 716.2b's, which the level assertion beside it is what shows.
 --
@@ -512,3 +523,148 @@ designationSpec s registry = Spec.describe s "Level designation" $ do
         Spec.assertEqWith s "the Piker is 3/2, not 4/3" (S.powerToughnessOf pikerId copied) (Just (3, 2))
       _ -> Spec.assertFailure s "the Copy Enchantment did not enter the battlefield as the one new permanent"
     Spec.assertEqWith s "before the copy: the levelled Class alone already makes the Piker 3/2" (S.powerToughnessOf pikerId levelled) (Just (3, 2))
+
+-- CR 716.2a's static half at a section that grants a TRIGGERED ability watching
+-- the very level change that turned the section on: "When this Class becomes
+-- level 2, return target instant or sorcery card from your graveyard to your
+-- hand" (Stormchaser's Talent, BLB).
+--
+-- CR 603.10 is what makes the section see its own arrival. That rule's exception
+-- list is exhaustive -- leaves-the-battlefield, sacrifice, a card leaving a
+-- graveyard, a public object put into a hand or library, phasing out, becoming
+-- unattached, losing control, a countered spell, a player losing, planeswalking
+-- away -- and "becomes level N" is on none of it. So the abilities checked
+-- against the event are the ones existing immediately AFTER it, which is after
+-- CR 716.2a's static half has granted this one.
+--
+-- Stormchaser's Talent rather than Paladin Class because Paladin Class prints no
+-- such trigger. Its whole text is transcribed in
+-- data/cards/stormchasers-talent.json: the top section's enters trigger, both
+-- bars, the level-2 trigger under test, and the level-3 section's "whenever you
+-- cast an instant or sorcery spell".
+--
+-- The Class is PLACED rather than cast, so its CR 716.3 enters trigger never
+-- fires and no Otter token is on the board -- one moving part fewer, and nothing
+-- below reads a creature count.
+--
+-- Lightning Bolt in ALICE's graveyard and Raise Dead in BOB's. Two different
+-- cards, both admitted by the slot's own filter (instant, sorcery), so the pool's
+-- GraveyardScope is the only thing that can tell them apart. With alice's
+-- graveyard alone, "from your graveyard" and "from any graveyard" put the same
+-- card in the same hand and the case would prove nothing about CR 400.1's
+-- per-player zone; with an EMPTY graveyard the trigger has no legal target, CR
+-- 603.3d removes it, and "did not trigger" would be indistinguishable from "had
+-- nothing to do".
+--
+-- Twelve Islands: more than both bars together cost ({3}{U} then {5}{U}), so no
+-- assertion here can turn on affordability.
+--
+-- A SECOND Stormchaser's Talent under bob, already at level 2, is what makes the
+-- condition's "oid == bearer" observable. Its level-2 section is on, so it really
+-- holds the granted trigger throughout; a condition that matched any Class's level
+-- change would fire bob's copy off alice's activation and pull bob's Raise Dead
+-- out of bob's graveyard. Without it the bearer is the only object on the board
+-- with a class level and the identity check has no observer at all.
+talentBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+talentBoard talent island bolt raiseDead =
+  let (classId, withClass) = S.addCreature talent S.alice (S.landsInPlay island 12)
+      (mineId, withMine) = S.addGraveyardCard bolt S.alice withClass
+      (_, withTheirs) = S.addGraveyardCard raiseDead S.bob withMine
+      (theirClassId, withTheirClass) = S.addCreature talent S.bob withTheirs
+   in ( classId,
+        mineId,
+        atLevel
+          theirClassId
+          2
+          withTheirClass
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+      )
+
+-- The names of the cards in a zone of pid's, in zone order. Identity AND zone in
+-- one reading, which a size would not give: CR 400.7 mints a new object as the
+-- card moves, so the id the trigger targeted cannot be looked up in the hand
+-- afterwards, and a count alone cannot say WHICH card arrived.
+namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
+namesIn zone pid gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs)
+
+-- Activate the first bar offered on the Class and drain the stack. The priority
+-- loop rather than Stack.resolveTop, and that is load-bearing: resolving only the
+-- top object leaves the level set and the granted trigger not yet placed, which
+-- reads exactly like a trigger that never fired.
+--
+-- The target is FILTERED out of what the engine offered rather than hand-built --
+-- a Recipient of the right card in the wrong shape is dropped at CR 608.2b with
+-- no error -- and pinned by id, so an answerer cannot repair a mutation by
+-- reaching for the other graveyard's card instead.
+--
+-- Where the pin is NOT on offer, ONE candidate is answered -- the least, so the
+-- choice is deterministic, and one because every slot here wants one target. That
+-- is what keeps a trigger raised by bob's Class observable: an answerer that
+-- filtered every prompt down to alice's card would hand bob's trigger an empty
+-- set, CR 603.3d would drop it for want of a legal target, and a condition
+-- matching the wrong bearer would look exactly like one that never matched.
+climbAiming :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+climbAiming classId aim gs =
+  let pinned = Recipient.ToObject aim
+      answering :: Prompt.Prompt r -> r
+      answering p = case p of
+        Prompt.ChooseTargets _ _ _ sets ->
+          fmap
+            ( \(_, candidates) ->
+                if Set.member pinned candidates
+                  then Set.singleton pinned
+                  else maybe Set.empty (Set.singleton . fst) (Set.minView candidates)
+            )
+            sets
+        _ -> S.aggressiveAnswer p
+   in case Activate.abilitiesFor classId gs of
+        [] -> gs
+        ability : _ ->
+          let activated = S.runPure answering gs (Activate.activateAbility S.alice classId ability)
+           in S.runPure answering activated Engine.priorityLoop
+
+becomesLevelSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+becomesLevelSpec s registry = Spec.describe s "Becomes level trigger" $ do
+  Spec.it s "CR 716.2a / CR 603.10 the level-2 section's trigger fires on the very activation that grants it" $ do
+    talent <- S.printingOf s registry "Stormchaser's Talent"
+    island <- S.printingOf s registry "Island"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    raiseDead <- S.printingOf s registry "Raise Dead"
+    let (classId, mineId, gs) = talentBoard talent island bolt raiseDead
+        after = climbAiming classId mineId gs
+    -- The gameplay-level assertion the whole unit exists for, and it is first.
+    -- An engine that records no level change, or one whose condition never
+    -- matches, leaves this hand empty.
+    Spec.assertEqWith s "alice's hand holds the Lightning Bolt the trigger returned" (namesIn Zone.Hand S.alice after) [CardName.MkCardName (Text.pack "Lightning Bolt")]
+    Spec.assertEqWith s "and her graveyard is empty" (namesIn Zone.Graveyard S.alice after) []
+    -- CR 400.1's per-player zone. Bob's card is admitted by the slot's filter and
+    -- excluded only by "your graveyard", so a trigger that reached any graveyard
+    -- could have taken this one.
+    Spec.assertEqWith s "CR 400.1 bob's Raise Dead never left bob's graveyard" (namesIn Zone.Graveyard S.bob after) [CardName.MkCardName (Text.pack "Raise Dead")]
+    -- The preconditions the readings above rest on: the level really moved, and
+    -- the id the trigger targeted really is gone from the graveyard (CR 400.7
+    -- minted a new object in the hand).
+    Spec.assertEqWith s "CR 716.2a the level BECAME 2" (levelOf classId after) (Just (ClassLevel.MkClassLevel 2))
+    Spec.assertBool s (notElem mineId (Game.zoneMembers Zone.Graveyard S.alice after)) "CR 400.7 the object it was targeted under is gone from the graveyard"
+  -- The crossing, on the same board with the level as the only difference. CR
+  -- 716.2a's ladder takes a Class from 2 to 3 here, and "becomes level 2" must
+  -- not fire again: the condition asks whether the level was BELOW 2 and reached
+  -- 2, which an equality on the resulting level cannot answer and a bare
+  -- "reached at least 2" gets wrong.
+  --
+  -- The level-2 section is still ON at level 3 (its gate is "2 or greater"), so
+  -- the granted trigger exists throughout -- which is what makes this a statement
+  -- about the crossing rather than about the section.
+  Spec.it s "CR 716.2a the level-2 trigger does not fire again when the Class goes from 2 to 3" $ do
+    talent <- S.printingOf s registry "Stormchaser's Talent"
+    island <- S.printingOf s registry "Island"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    raiseDead <- S.printingOf s registry "Raise Dead"
+    let (classId, mineId, gs) = talentBoard talent island bolt raiseDead
+        after = climbAiming classId mineId (atLevel classId 2 gs)
+    Spec.assertEqWith s "the Lightning Bolt is still in alice's graveyard" (namesIn Zone.Graveyard S.alice after) [CardName.MkCardName (Text.pack "Lightning Bolt")]
+    Spec.assertEqWith s "and her hand is empty" (namesIn Zone.Hand S.alice after) []
+    Spec.assertEqWith s "CR 716.2a the level really did move on to 3" (levelOf classId after) (Just (ClassLevel.MkClassLevel 3))

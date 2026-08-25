@@ -202,6 +202,8 @@ library codec
     Pawl.Codec.ChosenCardInHand
     Pawl.Codec.ChosenCardInHandSpec
     Pawl.Codec.ClassLevel
+    Pawl.Codec.ClassLevelChange
+    Pawl.Codec.ClassLevelChangeSpec
     Pawl.Codec.ClassLevelSpec
     Pawl.Codec.Clause
     Pawl.Codec.ClauseIndex
@@ -1260,6 +1262,7 @@ library types
     Pawl.Types.Claim
     Pawl.Types.ClaimAxis
     Pawl.Types.ClassLevel
+    Pawl.Types.ClassLevelChange
     Pawl.Types.Clause
     Pawl.Types.ClauseIndex
     Pawl.Types.CoinFace

@@ -18,6 +18,8 @@ import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.ClassLevel as ClassLevel
+import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -395,6 +397,16 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.DiceRolled (PlayerId.MkPlayerId 3))
       " {\"type\":\"DiceRolled\",\"value\":3} "
+  -- CR 716.2a. The object then the level BEFORE then the level AFTER, and the two
+  -- levels deliberately differ by more than one: a level bar can only step N-1 to
+  -- N, so a fixture crossing one threshold would round-trip a codec that dropped
+  -- `before` entirely.
+  Spec.it s "ClassLevelSet" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.ClassLevelSet (ClassLevelChange.MkClassLevelChange (ObjectId.MkObjectId 4) (ClassLevel.MkClassLevel 1) (ClassLevel.MkClassLevel 3)))
+      " {\"type\":\"ClassLevelSet\",\"value\":{\"object\":4,\"before\":1,\"after\":3}} "
   -- CR 702.170a. The id is the CR 400.7 incarnation in exile, not the one that
   -- was in the hand.
   Spec.it s "Plotted" $

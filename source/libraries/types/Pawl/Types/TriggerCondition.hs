@@ -2,6 +2,7 @@ module Pawl.Types.TriggerCondition where
 
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -660,6 +661,26 @@ data TriggerCondition
     -- Not restricted to Sagas or to lore counters: the shape is the counter
     -- kind's, and Pawl.Engine.Saga is where the subtype is read.
     SelfCountersReached SelfCountersReached.SelfCountersReached
+  | -- | CR 716.2a: "when this Class becomes level N" (Stormchaser's Talent),
+    -- against a GameEvent.ClassLevelSet naming the BEARER. SelfCountersReached's
+    -- shape over a class level instead of a counter tally, and bearer-scoped
+    -- alike.
+    --
+    -- The ClassLevel is N, the number printed on the level bar the ability sits
+    -- under. One field and self-scoped, so the payload rides on the constructor
+    -- rather than in a record of its own.
+    --
+    -- A CROSSING, not an equality -- `before < N && N <= after`, exactly
+    -- SelfCountersReached's reading of CR 714.2b. CR 716.2a's ladder means a bar
+    -- can only step N-1 to N, so the two readings coincide for every printing;
+    -- an effect setting a level directly should still fire "becomes level 2" when
+    -- it takes a Class from 1 to 3, and an equality would silently skip it.
+    --
+    -- CR 603.10 is what makes this reachable at all. Its exception list is
+    -- exhaustive and "becomes level N" is not on it, so the abilities checked
+    -- against this event are the ones that exist immediately AFTER it -- which is
+    -- when CR 716.2a's static half has granted the level-N section's trigger.
+    SelfBecomesClassLevel ClassLevel.ClassLevel
   | -- | CR 310.12b generalized over the counter kind: "when the LAST [kind]
     -- counter is removed from this permanent". SelfCountersReached's mirror,
     -- against a GameEvent.CountersRemoved going from one or more to none, and

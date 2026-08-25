@@ -1,6 +1,7 @@
 module Pawl.Codec.TriggerCondition where
 
 import qualified Pawl.Codec.CardName as CardName
+import qualified Pawl.Codec.ClassLevel as ClassLevel
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Codec.CounterKind as CounterKind
@@ -80,6 +81,7 @@ codec =
       Arm.payload "PlayerGainsLife" PlayerRelation.codec TriggerCondition.PlayerGainsLife (\x -> case x of TriggerCondition.PlayerGainsLife y -> Just y; _ -> Nothing),
       Arm.payload "PlayerLosesLife" PlayerRelation.codec TriggerCondition.PlayerLosesLife (\x -> case x of TriggerCondition.PlayerLosesLife y -> Just y; _ -> Nothing),
       Arm.payload "SelfCountersReached" SelfCountersReached.codec TriggerCondition.SelfCountersReached (\x -> case x of TriggerCondition.SelfCountersReached y -> Just y; _ -> Nothing),
+      Arm.payload "SelfBecomesClassLevel" ClassLevel.codec TriggerCondition.SelfBecomesClassLevel (\x -> case x of TriggerCondition.SelfBecomesClassLevel y -> Just y; _ -> Nothing),
       Arm.payload "SelfLastCounterRemoved" counterKindCodec TriggerCondition.SelfLastCounterRemoved (\x -> case x of TriggerCondition.SelfLastCounterRemoved y -> Just y; _ -> Nothing),
       Arm.payload "SelfCountersRemoved" counterKindCodec TriggerCondition.SelfCountersRemoved (\x -> case x of TriggerCondition.SelfCountersRemoved y -> Just y; _ -> Nothing),
       Arm.payload "SpellCast" SpellCast.codec TriggerCondition.SpellCast (\x -> case x of TriggerCondition.SpellCast y -> Just y; _ -> Nothing),
