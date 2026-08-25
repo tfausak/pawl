@@ -149,6 +149,12 @@ attachmentFor src destination gs
 -- search that names it looks for an Aura. An Equipment answers False here, which
 -- is the direction that finds LESS than printed rather than more.
 --
+-- No AttachRestriction gate, where attachmentFor asks one first: CR 613.11 makes
+-- a destination's "can't be enchanted" a continuous effect IN FORCE, and a host
+-- that has left the battlefield has no static ability in force and no Aura still
+-- attached to it granting one. There is nothing to consult rather than something
+-- skipped.
+--
 -- The subtype, the CR 303.4d creature test and the enchant ability are all read
 -- off `src`, which is a card in the library and is very much still there; only
 -- the HOST is read through rule 608.2h. So this is attachmentFor's Aura branch

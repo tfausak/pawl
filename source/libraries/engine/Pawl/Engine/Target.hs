@@ -315,15 +315,15 @@ slotContext pcs perspective bindings source gs =
 -- reader gives an id it has no record of.
 lastKnownAdmits :: Maybe PlayerId -> ObjectId -> TargetSlot -> ObjectId -> GameState -> Bool
 lastKnownAdmits perspective source slot host gs =
-  let pcs = Projection.projectAll gs
-      context = slotContext pcs perspective Map.empty source gs
-   in case Projection.lastKnownOf host gs of
-        Nothing -> False
-        Just _ -> case Projection.viewWithLastKnownAnywhere gs host of
-          Nothing -> False
-          Just view ->
-            poolHeldLastKnown (TargetSlot.pool slot) view
-              && Maybe.maybe True (Filter.matches context view) (TargetSlot.filter slot)
+  let context = slotContext (Projection.projectAll gs) perspective Map.empty source gs
+      admits view =
+        poolHeldLastKnown (TargetSlot.pool slot) view
+          && Maybe.maybe True (Filter.matches context view) (TargetSlot.filter slot)
+   in -- lastKnownOf first, so a host that is still on the board falls to False
+      -- here rather than being answered off the live view viewWithLastKnownAnywhere
+      -- would hand back: that board is attachmentFor's question, not this one.
+      Maybe.isJust (Projection.lastKnownOf host gs)
+        && Maybe.maybe False admits (Projection.viewWithLastKnownAnywhere gs host)
 
 -- Which pools could have held an object that no longer exists, judged from its
 -- last known card types. The POOL half of lastKnownAdmits above, and it is not

@@ -2146,9 +2146,9 @@ couldEnchantSpec s registry = Spec.describe s "CouldEnchant" $ do
         named = fmap (Maybe.mapMaybe (fmap Face.name . flip Game.faceOf gs))
     -- THE gameplay-level assertion, and FIRST: the card the searcher may now cast
     -- is in their hand. Under the live-board reading the search offers nothing at
-    -- all and this is 0; under a fix that found the card but had nowhere to put it
-    -- this is 0 as well. Hand-scoped rather than S.countByName, which sums the
-    -- hand with the library and so cannot tell the two zones apart.
+    -- all and this is empty; under a fix that found the card but left it with
+    -- nowhere to go it is empty too. Hand-scoped rather than S.countByName, which
+    -- sums the hand with the library and so cannot tell the two zones apart.
     Spec.assertEqWith s "CR 608.2h: the Aura the dead Mage could have hosted is in alice's hand" (filter (== strengthName) (handNames S.alice after)) [strengthName]
     -- The preconditions the assertion above rests on, and the act that separates
     -- this board from the case above's.
