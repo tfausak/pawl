@@ -6024,6 +6024,12 @@ tamiyoSpec s registry = Spec.describe s "Tamiyo, Compleated Sage" $ do
   -- so neither compleated nor Doubling Season's entry-level row is applicable and
   -- CR 306.5b's is the lone candidate, applied unprompted. The other two become
   -- applicable together only once it has placed something.
+  --
+  -- The mana route is the SAME BOARD with one answer different, and is the
+  -- negative that proves rule 702.150a's "chose to pay life": no compleated row
+  -- is minted at all, so the multiplier races nothing and no order is asked. A
+  -- row minted for zero symbols would subtract nothing and still cost the
+  -- controller a prompt the rules do not owe.
   Spec.it s "CR 616.1e compleated and Doubling Season are ordered against each other" $ do
     forest <- S.printingOf s registry "Forest"
     island <- S.printingOf s registry "Island"
@@ -6033,9 +6039,12 @@ tamiyoSpec s registry = Spec.describe s "Tamiyo, Compleated Sage" $ do
         (gs, tamiyoId) = S.handOne tamiyo board
         (askedFirst, compleatedFirst) = castAndResolveRecording (racesCompleated True seasonId) gs tamiyoId
         (_, doubledFirst) = castAndResolveRecording (racesCompleated False seasonId) gs tamiyoId
+        (askedMana, manaRoute) = castAndResolveRecording (announcesBoth PhyrexianPayment.PaysMana greenMana) gs tamiyoId
     Spec.assertEqWith s "CR 702.150a then CR 614.16: 5 less two is 3, doubled is 6" (S.counterOf CounterKind.Loyalty (tamiyoOn compleatedFirst) compleatedFirst) 6
     Spec.assertEqWith s "CR 614.16 then CR 702.150a: 5 doubled is 10, less two is 8" (S.counterOf CounterKind.Loyalty (tamiyoOn doubledFirst) doubledFirst) 8
     Spec.assertEqWith s "CR 306.5b's row had no rival on the first pass, so exactly one order was asked" (length (filter wasReplacementChoice askedFirst)) 1
+    Spec.assertEqWith s "the same board paying MANA: rule 702.150a never applies, so 5 doubled is 10" (S.counterOf CounterKind.Loyalty (tamiyoOn manaRoute) manaRoute) 10
+    Spec.assertEqWith s "and nothing raced the multiplier, so no order was asked at all" (length (filter wasReplacementChoice askedMana)) 0
 
 -- castAndResolve with the RESOLUTION recorded too. The entry loop runs while the
 -- permanent spell resolves (CR 608.3), which is after the transcript
