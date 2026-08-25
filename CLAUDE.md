@@ -66,7 +66,10 @@ to agents as written. What it doesn't say:
   run corrupts it (a `pkill`, or a tool timeout reaping a backgrounded `cabal`);
   the symptom is `semWait: invalid argument`, and `cabal test --no-semaphore
   -j4` gets through. Never `pkill -f 'cabal test'` --- it reaches other agents'
-  worktrees. Match your own worktree path, or wait.
+  worktrees. Match your own worktree path, or wait --- but waiting is not a
+  strategy for THIS: cabal prints that line and then HANGS instead of exiting,
+  so a run stuck with no output for many minutes is the same fault, and the
+  flags are the only way out.
 
 - Derive against `origin/main`, not the working checkout, which drifts:
   `git fetch`, then `git show origin/main:<path>` or a worktree cut from it.
@@ -211,7 +214,9 @@ to agents as written. What it doesn't say:
     *fails*, put it back. Read WHICH assertion failed: if it is not the
     gameplay-level one, an assertion ahead of it absorbed the mutation and the
     behaviour is unproven. If nothing fails, say so in the PR rather than
-    implying coverage. `docs/agents/implementing.md` lists the traps.
+    implying coverage. `script/mutate.sh` runs one mutation and prints the
+    assertion, without judging whether it is the gameplay-level one;
+    `docs/agents/implementing.md` lists the traps.
 
 4.  Find the sites `-Werror` won't. A `{}` or `_` pattern absorbs a new
     constructor or field silently; the recurring ones are
