@@ -15,7 +15,9 @@ import qualified Pawl.Codec.Defense as Defense
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
+import qualified Pawl.Codec.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Codec.PrintedReplacement as PrintedReplacement
+import qualified Pawl.Codec.StaticAbility as StaticAbility
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
 import qualified Pawl.Codec.TargetSlot as TargetSlot
@@ -41,6 +43,8 @@ codec = Fields.object $ do
   characteristicPT <- Fields.defaulted "characteristicPT" Nothing (Common.maybe CharacteristicPT.codec) PC.characteristicPT
   cardTypes <- Fields.required "cardTypes" (Common.set CardType.codec) PC.cardTypes
   subtypes <- Fields.defaulted "subtypes" Set.empty (Common.set Subtype.codec) PC.subtypes
+  staticAbilities <- Fields.defaulted "staticAbilities" [] (Common.list (StaticAbility.codec Card.codec)) PC.staticAbilities
+  playerAbilities <- Fields.defaulted "playerAbilities" [] (Common.list PlayerStaticAbility.codec) PC.playerAbilities
   activatedAbilities <- Fields.defaulted "activatedAbilities" [] (Common.list (ActivatedAbility.codec Card.codec)) PC.activatedAbilities
   replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (PrintedReplacement.codec (Effect.codec Card.codec))) PC.replacementEffects
   triggeredAbilities <- Fields.defaulted "triggeredAbilities" [] (Common.list (TriggeredAbility.codec Card.codec)) PC.triggeredAbilities
@@ -60,6 +64,8 @@ codec = Fields.object $ do
         PC.characteristicPT = characteristicPT,
         PC.cardTypes = cardTypes,
         PC.subtypes = subtypes,
+        PC.staticAbilities = staticAbilities,
+        PC.playerAbilities = playerAbilities,
         PC.activatedAbilities = activatedAbilities,
         PC.replacementEffects = replacementEffects,
         PC.triggeredAbilities = triggeredAbilities,

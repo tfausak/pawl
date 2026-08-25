@@ -102,6 +102,13 @@ newest = Maybe.listToMaybe . List.sortOn Ord.Down
 -- the lying interpreter. legalCopyTargets is the ONLY thing enforcing CR
 -- 614.12a's same-batch exclusion, so an unchecked answer would let a Clone copy
 -- something it may not.
+-- CR 601.2c's target, pinned to one named permanent -- copyNamed's posture for
+-- copyNamed's reason.
+aimingAt :: ObjectId -> Prompt.Prompt r -> r
+aimingAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
+  _ -> S.identityAnswer p
+
 copyNamed :: ObjectId -> Prompt.Prompt r -> r
 copyNamed wanted p = case p of
   Prompt.ChooseCopyTarget {} -> Just wanted
@@ -887,6 +894,54 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         -- would tap for nothing at all.
         Spec.assertEqWith s "and it taps for red as a Mountain" (Mana.manaTypesOf vesuvaId played) [ManaType.Colored Color.Red]
         Spec.assertBool s (elem Subtype.Mountain (Set.toList (Projection.subtypesOf vesuvaId played))) "Blood Moon made it a Mountain"
+
+  -- CR 707.2a from the OTHER side of the same rule: the Blood Moon is the COPY.
+  -- Copy Enchantment enters as a copy of a Blood Moon, the original is exiled,
+  -- and CR 305.7 has to go on applying from the copy alone -- which it can only
+  -- do if Pawl.Engine.Projection's set-subtype scan reads the copy's static
+  -- abilities rather than Copy Enchantment's printed face.
+  --
+  -- The original must go, and to EXILE: with two Blood Moons out the original
+  -- answers for both, and every other zone is one the projection still reads a
+  -- card's static abilities from. Angelic Edict ({4}{W} Sorcery, "Exile target
+  -- creature or enchantment") is the only pooled way an enchantment leaves.
+  --
+  -- TWO victims, because CR 305.7's strip has two readers that must agree.
+  -- Mutavault's printed ACTIVATED abilities go inside the layer fold, and Urborg,
+  -- Tomb of Yawgmoth's printed STATIC one goes through the hoisted set-subtype
+  -- scan that gates a land's own abilities from outside it -- so the Plains that
+  -- Urborg would otherwise make a Swamp is what says the scan saw the copy.
+  --
+  -- Plains pay for the Edict, and being basic they are untouched by either Blood
+  -- Moon.
+  Spec.it s "CR 707.2a a copy of Blood Moon goes on setting land subtypes once the original is exiled" $ do
+    plains <- S.printingOf s registry "Plains"
+    mutavault <- S.printingOf s registry "Mutavault"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    angelicEdict <- S.printingOf s registry "Angelic Edict"
+    let (plainsId, g0) = S.addCreature plains S.alice (S.landsInPlay plains 6)
+        (mutavaultId, g1) = S.addCreature mutavault S.alice g0
+        (_, moonless) = S.addCreature urborg S.alice g1
+        (moonId, g2) = S.addCreature bloodMoon S.alice moonless
+        (_, g3) = S.spellOnStack copyEnchantment S.alice g2
+        copied = S.settleSba (S.runPure (copyNamed moonId) g3 Stack.resolveTop)
+        (g4, edictId) = S.handOne angelicEdict copied
+        cast = S.runPure (aimingAt moonId) g4 (S.cast S.alice edictId)
+        exiled = S.settleSba (S.runPure (aimingAt moonId) cast Stack.resolveTop)
+        swampy gs = elem Subtype.Swamp (Set.toList (Projection.subtypesOf plainsId gs))
+    -- The gameplay-level assertions the case exists for, first: both halves of
+    -- CR 305.7 still apply with only the copy left.
+    Spec.assertBool s (not (swampy exiled)) "CR 707.2a the copy alone still strips Urborg, so the Plains is no Swamp"
+    Spec.assertBool s (elem Subtype.Mountain (Set.toList (Projection.subtypesOf mutavaultId exiled))) "and still makes Mutavault a Mountain"
+    Spec.assertEqWith s "CR 305.7 with Mutavault's printed abilities stripped, so it taps for red alone (CR 305.6)" (Mana.manaTypesOf mutavaultId exiled) [ManaType.Colored Color.Red]
+    Spec.assertEqWith s "and no activated ability of its own left" (Projection.abilitiesOf mutavaultId exiled) []
+    -- The preconditions: the original really is gone, and both victims really had
+    -- something to lose before any Blood Moon arrived.
+    Spec.assertEqWith s "the original Blood Moon was exiled" (Game.lookupObject moonId exiled) Nothing
+    Spec.assertBool s (swampy moonless) "with no Blood Moon out, Urborg makes the Plains a Swamp"
+    Spec.assertEqWith s "and Mutavault prints two activated abilities" (length (Projection.abilitiesOf mutavaultId moonless)) 2
 
 -- Append one card of `printing` to `pid`'s hand -- S.handOne overwrites alice's
 -- hand, so a second card in it must be appended. Group-local rather than in

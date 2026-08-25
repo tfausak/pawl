@@ -436,14 +436,12 @@ retentionBoards paladinClass plains piker mountain song =
 -- level 3. On an UNLEVELLED original both readings say the same thing, which is
 -- why the level is written before the copy is made.
 --
--- Not implemented: a copy does not acquire the copied object's STATIC abilities
--- (CR 707.2a) -- Pawl.Types.ProjectedCharacteristics carries the other three
--- ability lists and no static one, so Pawl.Engine.Projection.permanentParts reads
--- Face.staticAbilities off the PRINTED face (#2177). That is why the level-2
--- section's +1/+1 is not what this case reads: the copy grants nothing whatever
--- its level says. The Piker's P/T is asserted anyway, as a fence rather than as
--- coverage -- it is the right answer for rule 716.2b's reason as well, and it
--- becomes load-bearing the moment #2177 lands.
+-- CR 707.2a's half rides the same fixture, in the two cases after this one: the
+-- copy DOES acquire the copied object's static and player abilities, which is
+-- what makes a second level-2 section reachable at all. The Piker's 3/2 in the
+-- case below is still rule 716.2b's answer and not rule 707.2a's -- the copy
+-- enters at CR 716.2d's level 1, so its level-2 section is off however the
+-- abilities are read -- so it is the LEVELLED copy that tells the two apart.
 
 -- CR 707.5's copy choice, pinned to one named permanent rather than searched --
 -- Pawl.CopySpec's copyNamed. An answerer that hunted for a legal enchantment
@@ -518,11 +516,117 @@ designationSpec s registry = Spec.describe s "Level designation" $ do
         -- Enchantment that copied NOTHING would read the same way.
         Spec.assertEqWith s "the copy IS an Enchantment -- Class (CR 205.3h)" (Projection.cardTypesOf copyId copied, Projection.subtypesOf copyId copied) (Set.singleton CardType.Enchantment, Set.singleton Subtype.Class)
         Spec.assertEqWith s "and exactly one bar is offered on it" (barsOffered copyId copied) 1
-        -- The fence #2177 will make load-bearing; see the note above. One
-        -- level-2 section is granting +1/+1 here, not two.
+        -- One level-2 section is granting +1/+1 here, not two -- the copy's is
+        -- off at CR 716.2d's level 1, not absent. The case below levels the
+        -- copy, which is what separates those two readings.
         Spec.assertEqWith s "the Piker is 3/2, not 4/3" (S.powerToughnessOf pikerId copied) (Just (3, 2))
       _ -> Spec.assertFailure s "the Copy Enchantment did not enter the battlefield as the one new permanent"
     Spec.assertEqWith s "before the copy: the levelled Class alone already makes the Piker 3/2" (S.powerToughnessOf pikerId levelled) (Just (3, 2))
+  -- CR 707.2a: "A copy acquires the abilities of the object it's copying because
+  -- those values are derived from its rules text." The observable is the copy's
+  -- OWN level-2 section, and nothing else on this board could produce it: Copy
+  -- Enchantment's printed face grants nothing to anything, so a copy reading its
+  -- statics off that face leaves the Piker on the original's single +1/+1.
+  --
+  -- The copy is LEVELLED first, which is the whole of why this case discriminates
+  -- where the one above cannot: at CR 716.2d's default level 1 the copy's
+  -- level-2 section is off under both readings, so both say 3/2. At level 2 the
+  -- two readings are 3/2 and 4/3.
+  --
+  -- The Piker's printed 2/1 carries different numbers on the two axes, so a
+  -- second grant that landed on only one of them could not read as 4/3.
+  Spec.it s "CR 707.2a a copy acquires the copied object's static abilities" $ do
+    paladinClass <- S.printingOf s registry "Paladin Class"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    let (classId, pikerId, entered, _, copied) = copyBoards paladinClass plains piker copyEnchantment
+    case entered of
+      [copyId] -> do
+        let bothLevelled = gainLevel copyId copied
+        -- The gameplay-level assertion the case exists for, first.
+        Spec.assertEqWith s "CR 707.2a two level-2 sections grant +1/+1 each, so the 2/1 Piker is 4/3" (S.powerToughnessOf pikerId bothLevelled) (Just (4, 3))
+        -- The preconditions it rests on: both sections are switched ON, so a 3/2
+        -- here would be rule 707.2a's answer rather than rule 716.2a's.
+        Spec.assertEqWith s "CR 716.2a both Classes really are level 2" (levelOf classId bothLevelled, levelOf copyId bothLevelled) (Just (ClassLevel.MkClassLevel 2), Just (ClassLevel.MkClassLevel 2))
+        Spec.assertEqWith s "and the copy is still an Enchantment -- Class" (Projection.cardTypesOf copyId bothLevelled, Projection.subtypesOf copyId bothLevelled) (Set.singleton CardType.Enchantment, Set.singleton Subtype.Class)
+      _ -> Spec.assertFailure s "the Copy Enchantment did not enter the battlefield as the one new permanent"
+  -- CR 707.2a again, on the OTHER ability list a copy has to acquire: the
+  -- player-facing static carrier (CR 613.10), which Paladin Class prints as
+  -- "Spells your opponents cast during your turn cost {1} more to cast". No level
+  -- gates it, so the copy taxes at CR 716.2d's default level 1 and nothing has to
+  -- be levelled to see it.
+  --
+  -- A PAIR of boards differing in exactly one thing -- whether the Copy
+  -- Enchantment resolved -- so the {2} cannot come from somewhere else on the
+  -- board. bob's Bolt rather than alice's: CR 716.3's scope is "your opponents",
+  -- and it is alice's turn on both.
+  Spec.it s "CR 707.2a a copy acquires the copied object's player abilities" $ do
+    paladinClass <- S.printingOf s registry "Paladin Class"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    let (_, _, _, levelled, copied) = copyBoards paladinClass plains piker copyEnchantment
+        (oneBolt, oneClass) = S.addHandCard lightningBolt S.bob levelled
+        (twoBolt, twoClasses) = S.addHandCard lightningBolt S.bob copied
+    -- The gameplay-level assertion first: two carriers, so CR 601.2f applies both
+    -- increases and bob's {R} Bolt costs {2}{R}.
+    Spec.assertEqWith
+      s
+      "CR 707.2a the copy taxes bob's {R} Bolt too, so it costs {2}{R}"
+      (totalManaCost S.bob twoBolt (ManaCost.MkManaCost [red]) twoClasses)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, red]))
+    -- The same board without the copy, which is what makes the {2} above a second
+    -- carrier rather than one carrier read twice.
+    Spec.assertEqWith
+      s
+      "before the copy the original alone taxes it to {1}{R}"
+      (totalManaCost S.bob oneBolt (ManaCost.MkManaCost [red]) oneClass)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
+  -- CR 604.2's "as long as" clause on a COPY's static ability, which is a
+  -- separate question from whether the copy has the ability at all: the gather's
+  -- cheap precondition (Pawl.Engine.Projection.anyConditional) decides whether
+  -- the real gate is paid for, and answering it off printed faces would leave
+  -- every clause on this board wired open.
+  --
+  -- The ORIGINAL has to be gone from every zone that precondition walks --
+  -- battlefield, command, stack, graveyard, hand and library -- or it answers the
+  -- question itself and the copy's clause is gated for the wrong reason. Exile is
+  -- the one zone it does not walk, so Angelic Edict ({4}{W} Sorcery, "Exile
+  -- target creature or enchantment") is the producer; no card in the pool
+  -- destroys an enchantment.
+  --
+  -- The copy is left at CR 716.2d's level 1, where its own clause is FALSE. So
+  -- an ungated read grants the Piker +1/+1 and a gated one does not: 3/2 against
+  -- the printed 2/1.
+  Spec.it s "CR 604.2 a copy's own as-long-as clause is still gated once the original is exiled" $ do
+    paladinClass <- S.printingOf s registry "Paladin Class"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    angelicEdict <- S.printingOf s registry "Angelic Edict"
+    let (classId, pikerId, entered, _, copied) = copyBoards paladinClass plains piker copyEnchantment
+        (staged, edictId) = S.handOne angelicEdict copied
+        cast = S.runPure (aimAtObject classId) staged (S.cast S.alice edictId)
+        exiled = S.settleSba (S.runPure (aimAtObject classId) cast Stack.resolveTop)
+    case entered of
+      [copyId] -> do
+        -- The gameplay-level assertion the case exists for, first.
+        Spec.assertEqWith s "CR 604.2 the level-1 copy's level-2 section is off, so the Piker is its printed 2/1" (S.powerToughnessOf pikerId exiled) (Just (2, 1))
+        -- The preconditions it rests on. Without the first the clause is gated
+        -- by the ORIGINAL's own printed face and the case proves nothing; without
+        -- the second there is no copy left to ask about.
+        Spec.assertEqWith s "the original Class really is gone from every zone the precondition walks" (Game.lookupObject classId exiled) Nothing
+        Spec.assertEqWith s "and the copy is still an Enchantment -- Class at level 1" (Projection.cardTypesOf copyId exiled, Projection.subtypesOf copyId exiled, levelOf copyId exiled) (Set.singleton CardType.Enchantment, Set.singleton Subtype.Class, Nothing)
+      _ -> Spec.assertFailure s "the Copy Enchantment did not enter the battlefield as the one new permanent"
+
+-- CR 601.2c's target, pinned to one named permanent. ExpirySpec's aimAtObject,
+-- duplicated rather than hoisted: Pawl.Support rebuilds every spec in the tree.
+aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
+  _ -> S.identityAnswer p
 
 -- CR 716.2a's static half at a section that grants a TRIGGERED ability watching
 -- the very level change that turned the section on: "When this Class becomes

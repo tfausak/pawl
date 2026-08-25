@@ -1294,6 +1294,63 @@ lingeringSpec s registry = Spec.describe s "TitaniasSong" $ do
     Spec.assertEqWith s "CR 604.2 and the Maiden is a 1/2 again at once" (S.powerToughnessOf birdId exiled) (Just (1, 2))
     Spec.assertBool s (Projection.hasKeyword Keyword.Flying birdId exiled) "with its flying back"
     Spec.assertEqWith s "nothing was handed over" (GameState.continuousEffects exiled) []
+  -- CR 707.2a on the lingering carrier: a COPY of Titania's Song hands its own
+  -- effect over as it leaves, which it can only do if the departure walk reads
+  -- the copy's static abilities rather than Copy Enchantment's printed face.
+  -- Pawl.Engine.Projection.permanentParts and Pawl.Engine.Event.lingeringHandover
+  -- index the same list by CR 613.6's `n`, so the two must agree about which list
+  -- that is.
+  --
+  -- Jade Statue is the probe, and it is what separates the copy's handover from
+  -- the ORIGINAL's: it enters AFTER the original was exiled, so CR 611.2c had
+  -- already frozen the original's effect to a set that cannot hold it (the case
+  -- above proves that freeze). Only the copy's own handover reaches it.
+  --
+  -- Both Songs have to go, and in that order: Copy Enchantment's own text names
+  -- an enchantment on the battlefield, so the original has to still be there when
+  -- the copy enters (CR 707.5), and a Song still in play would animate the Statue
+  -- live and prove nothing about the handover.
+  Spec.it s "CR 707.2a a copy of Titania's Song hands over its own effect" $ do
+    plains <- S.printingOf s registry "Plains"
+    titaniasSong <- S.printingOf s registry "Titania's Song"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    jadeStatue <- S.printingOf s registry "Jade Statue"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    angelicEdict <- S.printingOf s registry "Angelic Edict"
+    let (songId, g1) = S.addCreature titaniasSong S.alice (S.landsInPlay plains 12)
+        (axeId, g2) = S.addCreature bonesplitter S.alice g1
+        (_, g3) = S.spellOnStack copyEnchantment S.alice g2
+        copied = S.settleSba (S.runPure (copyingNamed songId) g3 Stack.resolveTop)
+    case Set.toList (Set.difference (GameState.battlefield copied) (GameState.battlefield g2)) of
+      [copyId] -> do
+        let (g4, edict1) = S.handOne angelicEdict copied
+            cast1 = S.runPure (aimAtObject songId) g4 (S.cast S.alice edict1)
+            originalGone = S.settleSba (S.runPure (aimAtObject songId) cast1 Stack.resolveTop)
+            (statueId, withStatue) = S.addCreature jadeStatue S.alice originalGone
+            (g5, edict2) = S.handOne angelicEdict withStatue
+            cast2 = S.runPure (aimAtObject copyId) g5 (S.cast S.alice edict2)
+            copyGone = S.settleSba (S.runPure (aimAtObject copyId) cast2 Stack.resolveTop)
+        -- The gameplay-level assertion the case exists for, first.
+        Spec.assertBool s (Projection.isCreatureOf statueId copyGone) "CR 611.2a the copy's own animation continues after the copy leaves"
+        Spec.assertEqWith s "CR 613.4b and it is a 4/4, its mana value" (S.powerToughnessOf statueId copyGone) (Just (4, 4))
+        -- The preconditions it rests on: the copy really was a Titania's Song
+        -- while it was there, and neither Song is on the battlefield any more.
+        Spec.assertBool s (Projection.isCreatureOf statueId withStatue) "CR 707.2a the copy animated the Statue while it was on the battlefield"
+        Spec.assertEqWith s "the original Song was exiled first" (Game.lookupObject songId copyGone) Nothing
+        Spec.assertEqWith s "and the copy after it" (Game.lookupObject copyId copyGone) Nothing
+        -- Both departures handed over, rather than one of them twice: two
+        -- modifications each (CR 613.6), stored as one effect per part.
+        Spec.assertEqWith s "CR 613.6 each departure stored the Song's four parts, so the copy's doubled the store" (length (GameState.continuousEffects originalGone), length (GameState.continuousEffects copyGone)) (4, 8)
+        Spec.assertBool s (Projection.isCreatureOf axeId copyGone) "and the Bonesplitter, which both sets hold, is animated too"
+      _ -> Spec.assertFailure s "the Copy Enchantment did not enter the battlefield as the one new permanent"
+
+-- CR 707.5's copy choice, pinned to one named permanent rather than searched --
+-- Pawl.ClassSpec's copyNamed. An answerer that hunted for a legal enchantment
+-- would find the Song again after a mutation and repair the assertion.
+copyingNamed :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+copyingNamed wanted p = case p of
+  Prompt.ChooseCopyTarget {} -> Just wanted
+  _ -> S.identityAnswer p
 
 -- CR 601.2c: Soulfire Eruption's target slot allows none, so a fixture that
 -- wants a card exiled has to say how many. One target, aimed by S.identityAnswer.
