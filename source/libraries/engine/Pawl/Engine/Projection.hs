@@ -2150,7 +2150,7 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
 -- need two keyword counters both naming a quality the swap maps to the same word
 -- -- no printing this pool holds does. Quantity has no principled combiner to
 -- give 'mapKeysWith' if that ever changes (Pawl.Types.Quantity is deliberately
--- Num-free), so a printing that does collide is unimplemented (#N).
+-- Num-free), so a printing that does collide is unimplemented (#2318).
 rewriteWithCounters :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> WithCounters.WithCounters -> WithCounters.WithCounters
 rewriteWithCounters pairs w =
   WithCounters.MkWithCounters
