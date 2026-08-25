@@ -279,8 +279,9 @@ data View = MkView
     -- it is: the answer needs the candidate's enchant ability (CR 702.5a) AND the
     -- fixed host's projected characteristics, so it differs per candidate.
     -- Pawl.Engine.Resolve's Effect.Search arm is the only site that fills it,
-    -- from Pawl.Engine.Attach.attachmentFor -- the same function that performs
-    -- the move.
+    -- from Pawl.Engine.Attach.attachableWithLastKnown -- whose live half is the
+    -- same function that performs the move, and whose other half is CR 608.2h's
+    -- reading of a host that has left the battlefield.
     --
     -- LAZY, for attachedToView's cost reason: filling it projects the candidate
     -- and sweeps the battlefield for the fixed host's admission, so a search

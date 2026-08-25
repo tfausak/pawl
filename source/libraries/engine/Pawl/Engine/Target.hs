@@ -7,6 +7,7 @@ import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Defender as Defender
 import qualified Pawl.Engine.Filter as Filter
@@ -15,6 +16,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.Card (Card)
+import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Decider (Decider)
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
@@ -192,69 +194,7 @@ admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.Control
 admittedGiven pcs grants pools perspective bindings source slot gs =
   let pool = TargetSlot.pool slot
       narrowing = TargetSlot.filter slot
-      -- THE one site that fills Filter.sourcePower, and one of the two that fill
-      -- Filter.defendingPlayer, because it is the one site that matches a TARGET
-      -- SLOT's Filter -- both of CR 115's moments (CR 601.2c's choosing and CR
-      -- 608.2b's re-check) reach those atoms through here, and CR 702.134a and CR
-      -- 702.39a are the only clauses that write them in a slot. CR 508.1c's gate
-      -- is where the other defending-player read is
-      -- (Pawl.Engine.CombatRestriction.inForce, Armored Galleon), and no target
-      -- slot can reach it. Both are thunks, like `pcs` above: a slot whose
-      -- filter never names an atom pays for neither the source's projection nor
-      -- the combat lookup.
-      context =
-        Filter.MkContext
-          { Filter.perspective = perspective,
-            Filter.source = Just source,
-            Filter.sourcePower = Projection.powerWithLastKnownGiven pcs source gs,
-            -- CR 508.5, asked of the SOURCE: rule 702.39a's clause is on an
-            -- attacking creature, and `source` is the object CR 113.7 says the
-            -- ability came from.
-            Filter.defendingPlayer = Defender.playerOfAttacker source gs,
-            -- Nothing: a target slot is judged before the effect names anyone, so
-            -- there is no recipient it could have reached yet. CR 119.5's atom
-            -- lives in an effect's QUANTITY, which is evaluated later and
-            -- elsewhere.
-            Filter.recipient = Nothing,
-            -- Empty: a slot's own filter is matched while the slots are still
-            -- being CHOSEN (CR 601.2c), so there is no resolution's slot map to
-            -- hand over yet, and IsBound is vacuously False here.
-            Filter.slotObjects = Map.empty,
-            -- THE one site that fills it, alongside sourcePower and
-            -- defendingPlayer above and for the same reason: SameNameAsBound
-            -- lives in a target slot's Filter, and this is where one is matched.
-            --
-            -- Off `bindings`, which is what the announcement already holds --
-            -- CR 603.2's own bindings for a triggered ability (Harness the Storm's
-            -- cast spell) plus whatever sibling slots the first pass answered.
-            -- A slot holding several recipients contributes all of their names,
-            -- which is CR 709.4a's membership read once more: the candidate has
-            -- "the same name as" the slot if it shares a name with any of them.
-            --
-            -- Through CR 608.2h's last-known reader rather than a live
-            -- projection, because the bound object is NOT the target and the two
-            -- rules differ: CR 608.2b blanks a departed TARGET, while "that
-            -- spell" is a reference the ability already made and rule 608.2h
-            -- keeps answerable. Harness the Storm whose spell was countered in
-            -- response still knows the name it named.
-            --
-            -- A THUNK, like the two above: one projection per bound object, paid
-            -- for only by a filter that names the atom.
-            Filter.slotNames = fmap (foldMap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) bindings,
-            -- Nothing: CR 303.4b's atom names what the SOURCE enchants, and no
-            -- printing puts that in a target slot -- "enchanted creature" is a
-            -- reference the card already made rather than a choice CR 601.2c
-            -- leaves open. Pawl.CardSpec's position lint is what keeps that true,
-            -- and widening it here would be a capability no card asks for.
-            Filter.sourceAttachedTo = Nothing,
-            -- Empty, sourceAttachedTo's reason one atom over: CR 201.4's name is
-            -- chosen while the spell RESOLVES (CR 608.2c), and a target slot is
-            -- matched at CR 601.2c, before any of that has happened. So there is
-            -- no chosen name here even for a source that will have one, and
-            -- HasChosenName is vacuously False. Pawl.CardSpec's position lint is
-            -- what keeps a card out of the slot.
-            Filter.sourceChosenNames = Set.empty
-          }
+      context = slotContext pcs perspective bindings source gs
       -- ONE whole-board projection and ONE control-grant walk for the whole
       -- slot: both the base pool's creature test and the Filter's per-candidate
       -- view are asked of every object on the battlefield, and each was a fresh
@@ -287,6 +227,147 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
         Nothing -> True
         Just f -> Filter.matches context view f
    in Set.filter keep (basePoolGiven pools context bindings pool gs)
+
+-- THE Filter.Context a target SLOT's own filter is matched against. Extracted
+-- from admittedGiven so that CR 608.2h's departed host (lastKnownAdmits below)
+-- is judged against the same context a live candidate is, rather than against a
+-- bare Filter.contextFor that would answer differently for the three atoms
+-- filled here.
+--
+-- THE one site that fills Filter.sourcePower, and one of the two that fill
+-- Filter.defendingPlayer, because it is the one site that matches a TARGET
+-- SLOT's Filter -- both of CR 115's moments (CR 601.2c's choosing and CR
+-- 608.2b's re-check) reach those atoms through here, and CR 702.134a and CR
+-- 702.39a are the only clauses that write them in a slot. CR 508.1c's gate
+-- is where the other defending-player read is
+-- (Pawl.Engine.CombatRestriction.inForce, Armored Galleon), and no target
+-- slot can reach it. Both are thunks, like the caller's `pcs`: a slot whose
+-- filter never names an atom pays for neither the source's projection nor
+-- the combat lookup.
+slotContext :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> GameState -> Filter.Context
+slotContext pcs perspective bindings source gs =
+  Filter.MkContext
+    { Filter.perspective = perspective,
+      Filter.source = Just source,
+      Filter.sourcePower = Projection.powerWithLastKnownGiven pcs source gs,
+      -- CR 508.5, asked of the SOURCE: rule 702.39a's clause is on an
+      -- attacking creature, and `source` is the object CR 113.7 says the
+      -- ability came from.
+      Filter.defendingPlayer = Defender.playerOfAttacker source gs,
+      -- Nothing: a target slot is judged before the effect names anyone, so
+      -- there is no recipient it could have reached yet. CR 119.5's atom
+      -- lives in an effect's QUANTITY, which is evaluated later and
+      -- elsewhere.
+      Filter.recipient = Nothing,
+      -- Empty: a slot's own filter is matched while the slots are still
+      -- being CHOSEN (CR 601.2c), so there is no resolution's slot map to
+      -- hand over yet, and IsBound is vacuously False here.
+      Filter.slotObjects = Map.empty,
+      -- THE one site that fills it, alongside sourcePower and
+      -- defendingPlayer above and for the same reason: SameNameAsBound
+      -- lives in a target slot's Filter, and this is where one is matched.
+      --
+      -- Off `bindings`, which is what the announcement already holds --
+      -- CR 603.2's own bindings for a triggered ability (Harness the Storm's
+      -- cast spell) plus whatever sibling slots the first pass answered.
+      -- A slot holding several recipients contributes all of their names,
+      -- which is CR 709.4a's membership read once more: the candidate has
+      -- "the same name as" the slot if it shares a name with any of them.
+      --
+      -- Through CR 608.2h's last-known reader rather than a live
+      -- projection, because the bound object is NOT the target and the two
+      -- rules differ: CR 608.2b blanks a departed TARGET, while "that
+      -- spell" is a reference the ability already made and rule 608.2h
+      -- keeps answerable. Harness the Storm whose spell was countered in
+      -- response still knows the name it named.
+      --
+      -- A THUNK, like the two above: one projection per bound object, paid
+      -- for only by a filter that names the atom.
+      Filter.slotNames = fmap (foldMap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) bindings,
+      -- Nothing: CR 303.4b's atom names what the SOURCE enchants, and no
+      -- printing puts that in a target slot -- "enchanted creature" is a
+      -- reference the card already made rather than a choice CR 601.2c
+      -- leaves open. Pawl.CardSpec's position lint is what keeps that true,
+      -- and widening it here would be a capability no card asks for.
+      Filter.sourceAttachedTo = Nothing,
+      -- Empty, sourceAttachedTo's reason one atom over: CR 201.4's name is
+      -- chosen while the spell RESOLVES (CR 608.2c), and a target slot is
+      -- matched at CR 601.2c, before any of that has happened. So there is
+      -- no chosen name here even for a source that will have one, and
+      -- HasChosenName is vacuously False. Pawl.CardSpec's position lint is
+      -- what keeps a card out of the slot.
+      Filter.sourceChosenNames = Set.empty
+    }
+
+-- CR 608.2h asked of a target SLOT: would it admit `host` as that object MOST
+-- RECENTLY existed, once `host` no longer exists at all? The counterpart of
+-- admittedGiven above for a departed object, and NOT a widening of it: an
+-- enumeration over a pool can only ever offer what a zone holds now, so an
+-- object the game has already forgotten has to be asked about by id.
+--
+-- The one caller is Pawl.Engine.Attach.attachableWithLastKnown, which is itself
+-- called only from CR 701.3a's search-side question (Auratouched Mage's "an Aura
+-- card that could enchant it", with the Mage killed in response to its own
+-- trigger). It answers a BOOL rather than a Recipient because there is no live
+-- recipient to hand back: nothing will be attached to a host that is gone.
+--
+-- False when nothing was filed, which is the same no-op every other CR 608.2h
+-- reader gives an id it has no record of.
+lastKnownAdmits :: Maybe PlayerId -> ObjectId -> TargetSlot -> ObjectId -> GameState -> Bool
+lastKnownAdmits perspective source slot host gs =
+  let context = slotContext (Projection.projectAll gs) perspective Map.empty source gs
+      admits view =
+        poolHeldLastKnown (TargetSlot.pool slot) view
+          && Maybe.maybe True (Filter.matches context view) (TargetSlot.filter slot)
+   in -- lastKnownOf first, so a host that is still on the board falls to False
+      -- here rather than being answered off the live view viewWithLastKnownAnywhere
+      -- would hand back: that board is attachmentFor's question, not this one.
+      Maybe.isJust (Projection.lastKnownOf host gs)
+        && Maybe.maybe False admits (Projection.viewWithLastKnownAnywhere gs host)
+
+-- Which pools could have held an object that no longer exists, judged from its
+-- last known card types. The POOL half of lastKnownAdmits above, and it is not
+-- optional: an enchant ability keeps its "creature" in the POOL rather than in
+-- the Filter (Unholy Strength's slot is Pool.Creatures with no filter at all),
+-- so a last-known check that matched only the filter would let a departed LAND
+-- be enchanted by "enchant creature".
+--
+-- A total case for basePoolGiven's reason: a new Pool constructor must break the
+-- build here rather than default to an answer.
+--
+-- Every battlefield pool reads the last known CARD TYPES, since CR 110.1 makes
+-- being a permanent a fact about the object's types. The record carries no zone
+-- of its own, so what is read is what the object WAS rather than where it was;
+-- the caller only ever asks about an ability's source, which was a permanent
+-- while it existed.
+--
+-- A REGRESSION FENCE in one direction only. Answering False for every pool
+-- reddens Pawl.AuraSpec's "the Aura the dead Mage could have hosted is in
+-- alice's hand", so the creature test is paid for; answering True for every pool
+-- reddens nothing, because the one card that asks this question is a CREATURE
+-- and Pool.Creatures is what its Aura's slot names. A card searching for an Aura
+-- from a noncreature source would be the observer.
+--
+-- The other pools answer False. CR 400.7 makes an object that changed zones a
+-- new object, so the id this is asked about names nothing in a graveyard, in
+-- exile or on the stack -- and Pool.Players is not even asked, its candidates
+-- being players, which have no last known information and are looked up by
+-- PlayerId rather than by ObjectId.
+poolHeldLastKnown :: Pool.Pool -> Filter.View -> Bool
+poolHeldLastKnown pool view =
+  let types = Filter.cardTypes view
+      hasType t = Set.member t types
+   in case pool of
+        Pool.Creatures -> hasType CardType.Creature
+        Pool.Permanents -> any Card.isPermanentType (Set.toList types)
+        Pool.AnyTarget -> hasType CardType.Creature || hasType CardType.Planeswalker || hasType CardType.Battle
+        Pool.SpellsAndPermanents -> any Card.isPermanentType (Set.toList types)
+        Pool.Players -> False
+        Pool.Spells -> False
+        Pool.Abilities -> False
+        Pool.CardsInGraveyard _ -> False
+        Pool.CardsInExile -> False
+        Pool.CreaturesAndCardsInGraveyard _ -> hasType CardType.Creature
 
 -- CR 702.18a (shroud), CR 702.11b/702.11d (hexproof) and CR 702.16b
 -- (protection): THE targeting-restriction gate, the one every restriction rule
