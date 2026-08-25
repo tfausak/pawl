@@ -58,20 +58,27 @@ Re-read it whenever a merged PR touches it. Derive everything against
 ## Procedure
 
 **Dispatch.** Pick an unassigned issue with no `blocked` label, preferring
-`priority-high`, then the issue with the most open dependents (`gh api
-repos/tfausak/pawl/issues/N/dependencies/blocking`) --- a capability that
-unblocks three issues outranks a leaf. Dispatch an implementation agent, with
-`isolation: "worktree"`, to work it end to end and open a PR. Its brief must
-open with: read `docs/agents/implementing.md` first, then `CLAUDE.md` and
-`CONTRIBUTING.md`. Everything else is specific to the unit.
+`priority-high`. **Do not rank by open dependents.** The dependency graph is a
+shallow forest, not a tree: the overwhelming majority of merged units report
+`dependencies/blocking` empty and unblock nothing, so "a capability that
+unblocks three issues" describes almost no issue in the backlog. Rank by
+`priority-high`, then by whatever is file-disjoint from the build.
+
+`blocked` now covers two things: an issue-to-issue blocker, and an issue
+awaiting a design call from the owner (#146, #1828, #2167 carry the label with
+no linked blocker). Neither is dispatchable unattended.
+
+Dispatch an implementation agent, with `isolation: "worktree"`, to work it end
+to end and open a PR. Its brief must open with: read
+`docs/agents/implementing.md` first, then `CLAUDE.md` and `CONTRIBUTING.md`.
+Everything else is specific to the unit.
 
 **Dispatch on ready, not on merge.** The moment a unit's PR is marked ready,
 dispatch the next one. Two guards make this safe: the next brief must be
-FILE-DISJOINT from the PR still in flight (the researcher annotates every brief
-with the files it touches), and it derives against `origin/main`, so a later
-`git merge origin/main` brings the in-flight PR in cleanly. If the in-flight PR
-goes red, send its agent back; the two builds share the semaphore and that is
-fine.
+FILE-DISJOINT from the PR still in flight (see "Scheduling"), and it derives
+against `origin/main`, so a later `git merge origin/main` brings the in-flight
+PR in cleanly. If the in-flight PR goes red, send its agent back; the two
+builds share the semaphore and that is fine.
 
 **When nothing is file-disjoint, stack rather than idle.** Dispatch the next
 unit off the in-flight PR's branch as a draft, and have it rebase `--onto main`
@@ -80,10 +87,13 @@ mutations against the merged state. This worked twice in one run on
 `Projection.hs` and on `Game.hs`. Prefer a disjoint issue where one exists;
 stack when the alternative is an idle lane.
 
-**Dispatch clusters, not only issues.** Ask the researcher for clusters (see
-the role file). A cluster is one dispatch, one worktree, one PR closing every
-issue in it; the per-unit fixed cost is the same as for a leaf and the issues
-cannot conflict if one agent holds them all. Do not force one.
+**Dispatch a cluster only when one issue's edit sites contain the others'.**
+A cluster is one dispatch, one worktree, one PR closing every issue in it, and
+when it is real the per-unit fixed cost is paid once. But a shared TOPIC is not
+a cluster: the eleven topic trackers #2190--#2200 each assert shared machinery
+in the body, and every one of them split into unrelated units under triage.
+Require the researcher to name the function or constructor every issue in the
+cluster edits; without that, dispatch them separately.
 
 **Research one unit ahead, not more.** The in-flight implementation rewrites
 the files the next brief is derived against, so research further ahead than one
@@ -97,8 +107,10 @@ Standing assignments, in order of yield:
 
 - turn the NEXT issue (or cluster) into a dispatch-ready brief carrying what
   the implementer would otherwise re-derive --- see "Writing a brief" in the
-  role file
-- the **staleness sweep** the role file describes
+  role file, which now says which fields to carry and which to stop writing
+- the **staleness sweep** the role file describes, against the TREE. Sweeping
+  card names for fired `expires:card-driven` triggers is a closed seam: two
+  independent passes over every open card-driven issue found none
 - check whether a claimed missing capability still is missing
 
 **Expect research to change the unit, not just describe it.** In one nine-unit
@@ -108,8 +120,28 @@ as blocked on framings that were stale, one would have shipped a fix that
 introduced a rules violation. Read the brief's verdict before dispatching, and
 be willing to relabel, retitle or close instead of building.
 
+**But expect the implementer to change it again.** Over a day's brief-driven
+units, re-derivation survived contact and prediction did not: the issue body
+was the most frequently corrected artefact in the run, and no drafted wire
+spelling, and almost no drafted board or predicted mutation, survived. Treat a
+brief's predictions as leads for the implementer, never as decisions the
+dispatcher has already made.
+
 **Relay briefs by path.** A researcher writes its brief to a file and returns
 the path. Pass the path to the implementation agent; do not retype it.
+
+**The scratchpad is shared, so give every agent a subdirectory named for its
+unit.** Concurrent lanes write to one directory. One agent's backup file was
+overwritten by another's, and restoring it injected a different unit's
+in-flight code into the tree --- a corruption no build catches, because both
+sides compile.
+
+**The GHC job semaphore breaks under concurrency.** `CLAUDE.md` describes the
+symptom and the escape (`cabal test --no-semaphore -j4`); what the loop adds is
+frequency. With several lanes live it is a recurring event, not a rare one, and
+the commonest cause is a tool timeout reaping a backgrounded `cabal`. Tell
+agents to run `cabal` in the foreground with a generous timeout, and never to
+`pkill` by pattern.
 
 **Merging.** Arm auto-merge (squash) on each PR. The ruleset requires branches
 be up to date, so an armed auto-merge silently stalls at `BEHIND` --- poll
@@ -118,10 +150,16 @@ the agent's branch, which is why agents must not force-push. On a conflict,
 send the agent back to merge `origin/main`, resolve by taking both sides, and
 **re-run its mutations**.
 
-**Scheduling.** Never have two units in flight that edit the same file, unless
-they are deliberately stacked; `Event.hs` and `CardSpec.hs` are where conflicts
-cluster. The researcher's files-touched annotation is what dispatch-on-ready
-leans on.
+**Scheduling, by subsystem rather than by a predicted file list.** Never have
+two units in flight that edit the same file, unless they are deliberately
+stacked; `Event.hs` and `CardSpec.hs` are where conflicts cluster. But a
+researcher's precise files-touched list was wrong every time a PR reported on
+it --- naming modules that do not exist, the wrong spec file, a placement that
+turns out to be an import cycle --- where a coarse "this unit is in the mana
+subsystem" would have been right each time. Ask for the subsystem plus the one
+or two files the unit certainly rewrites, and treat anything finer as a guess.
+A predicted collision is a guess too: verify one before you let it stall a
+dispatch.
 
 **Before dispatching any fix to CI, read the failing job log.** A job that died
 in `Set up job` looks like a real failure and is not. Retry logic must handle
@@ -132,4 +170,6 @@ in `Set up job` looks like a real failure and is not. Retry logic must handle
 
 **Blocked is a good outcome.** If a unit cannot land unattended, the agent
 should add the `blocked` label, link the blocker as a GitHub dependency the way
-`CLAUDE.md` says, and report that. A decomposition beats a half-landed unit.
+`CLAUDE.md` says, and report that. Where the blocker is a decision rather than
+an issue, the label goes on with no link and the report names the question for
+the owner. A decomposition beats a half-landed unit.

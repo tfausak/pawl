@@ -28,23 +28,33 @@ ref you derived against so a stale derivation is visible.
 
 ## Findings, not predictions
 
-Split what you write by whether reading can settle it.
+Split what you write by whether reading can settle it. Measured over a day's
+run of brief-driven units, the split is stark: what the researcher could settle
+by reading survived in most of the PRs that reported on it, and what the
+researcher could only guess at was corrected in nearly every one.
 
-**Reading settles these, and they are where your value is.** Producer hunts,
+**Reading settles these, and they are where your value is.** Whether the issue
+body is still true --- the loop's highest-yield research act, and the thing
+that day's PRs corrected more often than anything else. Producer hunts and
 Oracle text, whether a stated blocker has landed, edit-site enumeration,
-cross-file greps, CR citations, which half of a split issue you are aiming at.
-In one nine-unit run this class changed the scope or the verdict of every issue
-researched: two would have been declined as blocked, one would have been built
-in a form `design.md` §4 forbids, one would have shipped a fix that introduced
-a rules violation.
+cross-file greps, elision and census sweeps, CR citations, which half of a
+split issue you are aiming at.
 
-**Reading cannot settle these, and in that same run every brief got at least
-one wrong.** Which assertion a mutation reddens (three predicted-red came back
-green). Wire spellings (two would not have compiled). Line numbers (stale in
-every brief). Draft them anyway --- drafting the mutation is what forces the
-discrimination argument --- but mark them unverified, and never phrase them as
-instructions. The implementer re-derives this class regardless; a confident
-wrong prediction costs them a test redesign mid-unit.
+**Reading cannot settle these.** Wire spellings: not one drafted spelling in
+that run was right as written. Drafted test boards: one in eleven survived.
+Falsifying mutations: wrong more often than right, and wrong in BOTH directions
+--- predicted-red came back green (#2258, #2219, #2238), predicted-green came
+back red (#2256, #2232, #2227). Which files a unit touches. Line numbers.
+
+Draft only the ones that force an argument --- drafting the mutation is what
+forces the discrimination argument --- and mark them unverified in the HEADING,
+not a footnote. The one robust meta-signal in that run: where a brief flagged
+something unverified, the flag itself was almost always right.
+
+**Never tell the implementer not to chase something.** #2227's brief predicted
+a mutation green and wrote "do not add a third seat to chase them"; a fourth
+board reddened it, so the prediction nearly bought a fenced line where a proof
+existed. A prediction that argues for weaker coverage is worse than none.
 
 Cite identifiers to grep for, never line numbers.
 
@@ -95,15 +105,26 @@ Verdicts are **still open**, **closed by PR #N** (name it), **superseded by
 #N**, or **narrowed** (say what remains). A close by re-derivation is the
 cheapest close there is.
 
+**Sweep the tree, not the card pool.** Re-checking whether an
+`expires:card-driven` issue's producer has arrived in `data/cards/` is a closed
+seam: two independent passes over every open card-driven issue found no fired
+trigger. That label does not mean wait --- it means the unit is "add the card",
+and the sweep will not find it for you. The open seam is engine-internal:
+issues whose stated gap, blocker or carrier is stale against the tree.
+
 ## Clusters
 
-The dispatcher wants clusters as well as single briefs: two to four open issues
-in the same area touching the same files that one person would work in one
-sitting. One dispatch, one PR closing them all.
+A cluster is two to four open issues that one person would work in one sitting:
+one dispatch, one PR closing them all. It needs a shared producer and edit-site
+list, and a per-issue proving test. Name the issues it closes and the order to
+work them.
 
-A cluster brief has a shared producer and edit-site list, and a per-issue
-proving test and mutation. Name the issues it closes and the order to work
-them. Do not force one.
+**A shared TOPIC is not a cluster, and topic is what a body's claim of shared
+machinery usually turns out to mean.** Every one of the eleven topic trackers
+#2190--#2200 asserts shared machinery in its body; every one of them split into
+unrelated units under triage. Before proposing a cluster, name the function or
+constructor all its issues edit. If you cannot, you have found a topic, and the
+issues dispatch separately.
 
 ## What a finding is
 
@@ -127,41 +148,79 @@ why" is a useful answer.
 citation errors enter.
 
 Everything you settle here costs the same tokens on your lane as on theirs, and
-only theirs is the critical path. A brief is dispatch-ready when it carries:
+only theirs is the critical path. But a field that gets corrected is not free
+either: it costs the implementer a mid-unit redesign. Carry the fields below at
+the strength stated and no higher.
+
+**At full strength.** These are what pays for the brief.
 
 - the **verdict**: dispatchable, or blocked with the missing capability named
-- the **ref you derived against**
+- the **re-derivation of the issue body and its blockers** against the tree ---
+  say which of its claims are false, not only that it is stale
 - the **blocker's issue number and the capability it holds**, when blocked. You
   may not link the dependency yourself --- name it for the dispatcher. If it
   has no issue, say so: that is an untracked deficiency
-- the **producer**, with Oracle text fetched this session, whether it is
-  already in `data/cards/`, and a clause-by-clause expressibility check naming
-  the opcode for each. If a clause must be omitted, say whether the omission
-  runs stricter or weaker than printed
-- the **composition check**: for each opcode, the engine path the producer
-  reaches it by and what that path supplies. See below
-- the **card JSON** when the producer is not in `data/cards/`, transcribed from
-  the Oracle text you fetched and in a neighbouring card's wire spelling ---
-  flagged unverified, since wire shapes are the class you cannot check
-- the **edit sites**, `-Werror`-forced ones enumerated by grepping a sibling,
-  every `{}` or `_` site flagged separately
-- the **proving test** at gameplay level, drafted against `Pawl.Support`'s
-  fixtures and the spec module it belongs in
-- the **discrimination argument** for that test --- the buggy trace and the
-  correct trace walked over the exact board, and the quantity where they
-  diverge. "It fails today" is not this argument
-- the **files it touches** --- the dispatcher schedules by this
-- the **falsifying mutation** for each site, flagged unverified. If you cannot
-  name one that goes red, say the site is unproven rather than proposing a
-  vacuous test
+- the **producer**, with Oracle text fetched THIS SESSION, never copied from
+  the body --- #2261's brief inherited the body's wrong mana cost by copying
+  it. Say whether the card is already in `data/cards/`, and give a
+  clause-by-clause expressibility check naming the opcode for each. If a clause
+  must be omitted, say whether the omission runs stricter or weaker than
+  printed
+- the **edit sites**, `-Werror`-forced ones enumerated by grepping a named
+  sibling constructor, every `{}` or `_` site flagged separately. The
+  highest-volume field and the best survival rate of any non-trivial one; a
+  miss costs a compile error and a phantom costs reading time, both cheap
+- the **elision and census sweep** by bare issue number
 - the **vacuity traps** that apply, from `docs/agents/implementing.md`
-- the **CR citations**, quoted from `docs/rules.txt` and grepped by number
+- the **design call**, when derived from the CR and a named carrier
+- the **ref you derived against**, one line
+
+**Flagged unverified, in the heading.**
+
+- the **composition check** --- as a question, not an answer. See below
+- the **CR citations**, grepped by number from `docs/rules.txt`. Right about as
+  often as wrong, and a CR number must never stand in for a code pointer:
+  #2227's brief pointed at `Combat.attackers` where CR 508.4 wants
+  `declaredAttackers`, a rules error dressed as a code pointer
+- the **discrimination argument**, and only its NEGATIVE half. See below
+
+**Do not write these.** Each was wrong essentially every time it was reported
+on, and each has a cheaper substitute that was right every time.
+
+- *Card JSON and Haskell wire spellings.* Substitute: "spell it after
+  `data/cards/<neighbour>.json`, which writes the same payload", plus the
+  Oracle text. A neighbour existed in every case; the transcription was wrong
+  in every case.
+- *The drafted board.* Substitute: the asserted quantity and its value under
+  each competing reading. That is the half implementers kept and used; the
+  fixture calls, seat counts and helper names are the half they threw away.
+- *A files-touched list, as a scheduling artefact.* Substitute: the subsystem
+  name and the one or two files the unit certainly rewrites. The precise list
+  named modules that do not exist (#2206), the wrong spec file (#2215) and a
+  module placement that is an import cycle (#2247).
+- *A falsifying mutation as a prediction.* Substitute, per site, either "I
+  found no observer in `data/cards/` --- expect green" or silence. Never name
+  the expected colour, never name the assertion, never advise against chasing
+  one.
 
 ## Discriminating power
 
 A drafted test is a claim about TWO implementations, and is worth dispatching
 only if the buggy one fails it. Deriving that the code is wrong is not deriving
 that your board can see it wrong.
+
+**Your negative claims land; your positive ones do not.** Over that day's run,
+every surviving discrimination claim was the researcher saying a board *will
+not* work --- #2242's "the obvious one-leg board cannot discriminate, which is
+why legs two and three exist", #2218's flagged collapsing case. Every claim
+that a board *would* work was corrected. So: state which boards collapse and
+why, name the quantity and its value under each reading, and stop there. The
+board itself is the implementer's to build.
+
+Handing over a board that cannot discriminate is the expensive failure, not a
+neutral one: #2255's brief planted the spell with `S.spellOnStack`, which never
+chooses a mode, so the spell resolved to nothing and every leg of the test read
+identically.
 
 - Name the asserted quantity and give its value under each implementation.
   Equal values mean the board cannot discriminate: change the BOARD, never the
@@ -184,12 +243,25 @@ two answers apart. When no board separates them, say so --- that is a finding.
 
 ## Composition, not just existence
 
+**Write this section as a question.** It is the field this file argues hardest
+for, and the field the day's implementers corrected most often: proposed call
+shapes were wrong (#2225, #2247), a claimed existing proof turned out to be a
+card no spec plays (#2263), and the run's one real composition defect ---
+`Effect.Search` building `Filter.contextFor Nothing Nothing`, so a new
+context-relative atom would be vacuously False --- was found by the
+implementer, not the brief (#2234). What worked was flagging it as open and
+naming the first function to read (#2241, #2225). Do the trace below to find
+the question; hand over the question and the function, not a verdict.
+
 The expressibility check passes on cards whose opcodes are inert TOGETHER,
 because what an atom answers depends on the path it is reached by. Showstopping
 Surprise needed five opcodes; all existed, but the sweep reaching them built
 its `Filter.Context` through `Filter.contextFor`, whose slot map is empty ---
 so "each OTHER creature" was `Not (IsBound "target")` against nothing, and the
-card damaged its own target to death (#1876).
+card damaged its own target to death (see #1876, the PR that fixed it). The
+live issue for the remaining callers is **#2141** --- cite that, not the PR
+number. A brief copying #1876 out of this file cited a merged PR at the
+implementer (#2225).
 
 The symptom is a VACUOUS ATOM: one that cannot be false, or cannot be true,
 because the field it reads was never filled on this path. It compiles, the
