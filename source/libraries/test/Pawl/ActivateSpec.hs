@@ -1019,6 +1019,29 @@ equipSpec s registry = Spec.describe s "Equip" $ do
         Spec.assertEqWith s "where the same board one Headmaster short cannot pay the printed {1}" (length (activationsOf withoutId (Action.legalActions S.alice without))) 0
       abilities -> Spec.assertFailure s ("expected exactly one equip ability, got " <> show (length abilities))
 
+  -- CR 702.6a's "target creature YOU CONTROL", which CR 115.4 makes part of
+  -- target legality rather than decoration. TWO runs on one board differing only
+  -- in which creature the slot is aimed at: bob's War Mammoth is not in the
+  -- offered set, so the activation finds no target and the Equipment never
+  -- moves, while alice's own Piker on that same board takes the +2/+0. A 3/3
+  -- Mammoth against a 2/1 Piker, so an equip that landed on the wrong one is
+  -- visible in the power either way.
+  Spec.it s "CR 702.6a equip cannot target a creature you do not control" $ do
+    (splitterId, _, pikerId, gs) <- equipBoard s registry True
+    mammoth <- S.printingOf s registry "War Mammoth"
+    let (mammothId, board) = S.addCreature mammoth S.bob gs
+    case Projection.abilitiesOf splitterId board of
+      [ability] -> do
+        let run victim =
+              let activated = S.runPure (aimAtOffered victim) board (Activate.activateAbility S.alice splitterId ability)
+               in S.runPure (aimAtOffered victim) activated Stack.resolveTop
+            ontoMammoth = run mammothId
+            ontoPiker = run pikerId
+        Spec.assertEqWith s "bob's Mammoth is still a plain 3/3" (S.powerToughnessOf mammothId ontoMammoth) (Just (3, 3))
+        Spec.assertEqWith s "and the Bonesplitter never moved" (fmap Object.attachedTo (Game.lookupObject splitterId ontoMammoth)) (Just Nothing)
+        Spec.assertEqWith s "while alice's own Piker, aimed at from the same board, is a 4/1" (S.powerToughnessOf pikerId ontoPiker) (Just (4, 1))
+      abilities -> Spec.assertFailure s ("expected exactly one equip ability, got " <> show (length abilities))
+
   -- The criterion, from the other side, and the case that fails if `grantedBy`
   -- is ignored: Withered Wretch's "{1}: Exile target card from a graveyard" is a
   -- PRINTED activated ability, so rule 702.6a minted nothing and Bureau
