@@ -111,7 +111,7 @@ data Clause card = MkClause
     -- Independent of `optionality`, which is the pair of constraints two printed
     -- cards impose: Twiddle's "you MAY tap or untap" is one "may" wrapping an
     -- either-or, and Keys to the House's "lock or unlock a door of target Room
-    -- you control" is an either-or with no "may" (#924).
+    -- you control" is an either-or with no "may" -- see #924.
     orElse :: Maybe ClauseIndex.ClauseIndex,
     -- | CR 603.5's printed "may", covering this clause's effects, and WHO it
     -- asks -- see Pawl.Types.Optionality for why the rider rides a carrier
