@@ -3871,9 +3871,11 @@ comeBackWrongSpec s registry =
         -- The second discriminating twin, differing from the first case in
         -- exactly one thing: the victim is a TOKEN of the same card rather than a
         -- card. CR 111.6 says a token is not a card, so "if a CREATURE CARD is
-        -- put into a graveyard this way" is false and nothing returns. That is
-        -- also what keeps CR 111.8 ("a token that has left the battlefield can't
-        -- come back onto the battlefield") out of reach here (gap #1950).
+        -- put into a graveyard this way" is false and nothing returns. CR 111.8
+        -- ("a token that has left the battlefield can't come back onto the
+        -- battlefield") would refuse the same return one step later; this case
+        -- is about the card's own filter, and Pawl.ZoneChangeSpec's Flicker of
+        -- Fate pair is where the rule itself is proved.
         Spec.it s "CR 111.6 a destroyed token is not a card put into a graveyard, so nothing returns" $ do
           comeBackWrong <- S.printingOf s registry "Come Back Wrong"
           swamp <- S.printingOf s registry "Swamp"
