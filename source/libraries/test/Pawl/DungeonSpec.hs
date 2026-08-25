@@ -16,9 +16,11 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
@@ -31,15 +33,19 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Zone as Zone
 
@@ -246,6 +252,68 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
     Spec.assertEqWith s "and the dungeon left the game" (dungeonsOf S.alice finished) []
     Spec.assertEqWith s "venturing again enters a dungeon" (length (dungeonsOf S.alice again)) 1
     Spec.assertEqWith s "at the topmost room" (markerOf S.alice again) (Just RoomIndex.topmost)
+  -- CR 309.7: "a player completes a dungeon as that dungeon card is removed from
+  -- the game." Read at gameplay level through Gloom Stalker, whose "as long as
+  -- you've completed a dungeon, this creature has double strike" is a CR 604.2
+  -- static whose condition is Quantity.DungeonsCompleted compared to 1.
+  --
+  -- The board is the case above's -- four ventures down the FIRST arrow each time
+  -- (Cave Entrance, Goblin Lair, Storeroom, Temple of Dumathoin), which that case
+  -- already proves ends with the dungeon removed from the game. Nothing on that
+  -- path touches a life total; Dark Pool, on the last-arrow path, does, which is
+  -- the other reason for the first arrow.
+  --
+  -- What discriminates is CR 702.4b's SECOND combat damage step. Gloom Stalker is
+  -- 2/3 and the only attacker -- Secret Door has defender (CR 702.3b) and the
+  -- Goblin Lair token was created this turn and is sick (CR 302.6) -- so bob ends
+  -- on 18 without the double strike and on 16 with it. No other object on the
+  -- board can move his life, and only a second combat damage step reaches 16.
+  Spec.it s "CR 309.7 / 702.4b completing a dungeon is remembered, and Gloom Stalker's double strike reads it" $ do
+    island <- S.printingOf s registry "Island"
+    door <- S.printingOf s registry "Secret Door"
+    lostMine <- S.printingOf s registry "Lost Mine of Phandelver"
+    stalker <- S.printingOf s registry "Gloom Stalker"
+    let (doorId, base) = dungeonBoard island door lostMine 30
+        (stalkerId, gs) = S.addCreature stalker S.alice base
+        -- Storeroom's "put a +1/+1 counter on target creature" is the one prompt
+        -- on this path with a choice worth pinning: a counter landing on Gloom
+        -- Stalker would make it 3/4 and shift both asserted life totals, so the
+        -- board would stop being checkable by hand. FILTERED out of the offered
+        -- set rather than hand-built, so the recipient is the engine's own.
+        onTheDoor :: Prompt.Prompt r -> r
+        onTheDoor p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, cands) -> Set.filter ((== Just doorId) . Recipient.objectOf) cands) sets
+          _ -> paying p
+        finished = ventureTimes 4 onTheDoor (ventureAbility door) doorId gs
+        -- CR 506.2: alice is active, so bob defends. Stated rather than derived,
+        -- for S.combatBoardOf's reason -- a board assembled by direct calls never
+        -- ran CR 703.4h's turn-based action.
+        staged =
+          finished
+            { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+              GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.bob},
+              GameState.remaining =
+                Seq.fromList
+                  [ Phase.Combat CombatStep.DeclareBlockers,
+                    Phase.Combat CombatStep.CombatDamage,
+                    Phase.Combat CombatStep.EndOfCombat,
+                    Phase.PostcombatMain
+                  ]
+            }
+        after = S.runCombat (S.attackTo S.bob) staged
+    -- The gameplay-level assertion, and FIRST, so no fence below can absorb a
+    -- mutation ahead of it.
+    Spec.assertEqWith s "bob took 2 twice" (S.lifeOf S.bob after) (Just 16)
+    -- The dungeon really did leave the game, so the case is not green because
+    -- nothing happened.
+    Spec.assertEqWith s "and the dungeon had left the game" (dungeonsOf S.alice finished) []
+    -- Count AND identity, so a Goblin that wandered into combat is visible.
+    Spec.assertEqWith s "Gloom Stalker was the only attacker" (S.attackerDeclarationsOf after) [stalkerId]
+    Spec.assertEqWith
+      s
+      "and alice has one dungeon completed"
+      (fmap Player.completedDungeons (Map.lookup S.alice (GameState.players after)))
+      (Just 1)
   -- CR 309.2: the dungeon a player owns comes from their DECK definition, which is
   -- the one path the boards above skip by writing Player.dungeon directly.
   Spec.it s "CR 309.2 a deck's dungeon card is recorded on its player and minted into no zone" $ do
