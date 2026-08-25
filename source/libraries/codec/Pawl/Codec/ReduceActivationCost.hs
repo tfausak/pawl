@@ -17,16 +17,22 @@ import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 -- `grantedBy` is DEFAULTED to Nothing, which is "every activated ability of a
 -- matching source" -- the shape Heartstone and Blossoming Tortoise print, so
 -- neither card file says it.
+--
+-- `whichTargets` is defaulted the same way and for the same reason: Nothing is a
+-- sentence that names no target, which is every reducer in the pool but Dwarven
+-- Mauler's, so no other card file writes the key.
 codec :: Codec.Codec ReduceActivationCost.ReduceActivationCost
 codec = Fields.object $ do
   whichAbilities <- Fields.required "whichAbilities" (Filter.codec Keyword.codec) ReduceActivationCost.whichAbilities
   grantedBy <- Fields.defaulted "grantedBy" Nothing (Common.maybe KeywordFamily.codec) ReduceActivationCost.grantedBy
+  whichTargets <- Fields.defaulted "whichTargets" Nothing (Common.maybe (Filter.codec Keyword.codec)) ReduceActivationCost.whichTargets
   reduction <- Fields.required "reduction" ManaCost.codec ReduceActivationCost.reduction
   floor_ <- Fields.required "floor" Common.natural ReduceActivationCost.floor
   pure
     ReduceActivationCost.MkReduceActivationCost
       { ReduceActivationCost.whichAbilities = whichAbilities,
         ReduceActivationCost.grantedBy = grantedBy,
+        ReduceActivationCost.whichTargets = whichTargets,
         ReduceActivationCost.reduction = reduction,
         ReduceActivationCost.floor = floor_
       }

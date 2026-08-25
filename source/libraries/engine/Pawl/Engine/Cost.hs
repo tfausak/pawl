@@ -336,7 +336,12 @@ selfReductions pid oid gs =
 --
 -- The KeywordFamily is the ability's PROVENANCE, threaded from the caller that
 -- has the ability in hand; see activationCostAdjustments for what it narrows.
-activationAdjustments :: Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
+--
+-- The ObjectIds beside it are CR 601.2c's ANNOUNCED TARGETS, threaded the same
+-- way and read by the same gather -- empty for every caller standing before CR
+-- 601.2c, which is where a reducer naming a target (Dwarven Mauler) simply does
+-- not apply.
+activationAdjustments :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
 activationAdjustments = PlayerEffect.activationCostAdjustments
 
 -- Every way CR 118.7e's choice could resolve the reductions that apply --
@@ -1355,6 +1360,10 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
 -- CR 601.2f's adjustments for a MANA ability's activation cost, gathered where
 -- CR 605.3b leaves no stack window for Pawl.Engine.Activate to gather them in.
 --
+-- NO TARGETS either, and CR 605.1a is why there can be none: a mana ability
+-- "doesn't target", so the set a reducer would be asked about is empty by the
+-- rule rather than by this caller's position.
+--
 -- NO KeywordFamily: a mana route (Mana.manaRoutesOfGiven) carries no record of
 -- which rule-702 keyword minted it, so a reducer that names a family --
 -- Fluctuator's "cycling abilities" -- never matches one. Exact rather than
@@ -1365,7 +1374,7 @@ manaActivationAdjustments pid oid gs = manaActivationAdjustmentsGiven (PlayerEff
 
 -- The same gather off a hoisted effect list; see manaActivationsGiven.
 manaActivationAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
-manaActivationAdjustmentsGiven effects = PlayerEffect.activationCostAdjustmentsGiven effects Nothing
+manaActivationAdjustmentsGiven effects = PlayerEffect.activationCostAdjustmentsGiven effects Set.empty Nothing
 
 -- CR 118.3 asked of a mana ability's own MANA part, and the one read
 -- manaActivations makes that could ask itself. Nothing is CR 118.6's unpayable
