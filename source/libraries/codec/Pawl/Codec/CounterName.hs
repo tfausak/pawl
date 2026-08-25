@@ -67,7 +67,7 @@ make text
 --
 -- Not implemented: CR 122.1b's "as well as any variants of those keywords" is
 -- not a closed list, so 'spellings' reserves the fifteen the rule spells out and
--- a variant spelling -- "hexproof from black" -- is not fenced (#2062).
+-- a variant spelling -- "hexproof from black" -- is not fenced (#2334).
 reserved :: Set.Set Text.Text
 reserved = foldMap spellings [minBound .. maxBound]
 
