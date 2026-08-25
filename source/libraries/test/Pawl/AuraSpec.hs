@@ -67,12 +67,15 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
@@ -2000,6 +2003,12 @@ battlefieldNamed wanted gs =
     (\oid -> fmap Face.name (Game.faceOf oid gs) == Just wanted)
     (Game.zoneMembers Zone.Battlefield S.alice gs)
 
+-- The names of the cards in a player's HAND. Where a destination assertion has to
+-- go, because S.countByName sums the hand with the library and a search that
+-- moves a card from one to the other leaves that sum unchanged.
+handNames :: PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
+handNames pid gs = Maybe.mapMaybe (fmap S.nameOf . flip Game.cardOf gs) (Game.zoneMembers Zone.Hand pid gs)
+
 -- Records every search's candidate list, takes what the search offers off the
 -- HEAD of it, and would put a CR 303.4f host choice on `other`.
 --
@@ -2027,7 +2036,7 @@ mageAnswer other p = case p of
 -- it", where the host is fixed for the whole evaluation and the Aura varies per
 -- candidate. Filter.CanHostSubject is the same rule with the two roles swapped,
 -- and auraGraftSpec above is its case.
-couldEnchantSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+couldEnchantSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 couldEnchantSpec s registry = Spec.describe s "CouldEnchant" $ do
   -- The gameplay-level proof design.md section 4 asks for: cast the Mage, let
   -- its CR 603.2 trigger resolve, and see which Aura the search could reach.
@@ -2086,6 +2095,74 @@ couldEnchantSpec s registry = Spec.describe s "CouldEnchant" $ do
     -- CR 701.23b: a search stating a quality may find fewer, so the rejected Aura
     -- stayed where it was rather than being found and refused at the move.
     Spec.assertEqWith s "and the Aura it rejected is still in the library" (S.countByName consecrateName S.alice after) 1
+    -- The rejected Aura is not in the HAND either, which is the half
+    -- S.countByName above cannot see: it sums the library and the hand, so a card
+    -- that moved between the two leaves its count at 1. The case below turns on
+    -- exactly that move, and this is what keeps the CR 303.4i reading (the Aura a
+    -- live host cannot hold stays in the library) apart from CR 608.2h's (the
+    -- Aura whose host is gone goes to the hand).
+    Spec.assertEqWith s "and it is not in alice's hand" (filter (== consecrateName) (handNames S.alice after)) []
+
+  -- THE PROVING CASE for #2027, CR 608.2h. The board above with ONE act added:
+  -- the Mage is shrunk to death while its own ETB trigger is on the stack, so the
+  -- ability resolves (CR 113.7a) with its source already gone. Both halves of the
+  -- card that only that board can reach are here -- the search still finds the
+  -- Aura, because "could enchant it" is asked of the Mage as it MOST RECENTLY
+  -- existed, and the found card is revealed to the hand rather than attached to
+  -- nothing.
+  --
+  -- A PAIR of boards differing in exactly one thing: this fixture is the case
+  -- above's, line for line, plus the S.withEffect that kills the Mage. So the
+  -- destination the Aura reaches is the only thing the two runs disagree about,
+  -- and neither reading can be produced by the other board.
+  Spec.it s "CR 608.2h whole card: an Auratouched Mage killed in response still finds the Aura and reveals it to hand" $ do
+    plains <- S.printingOf s registry "Plains"
+    mage <- S.printingOf s registry "Auratouched Mage"
+    strength <- S.printingOf s registry "Unholy Strength"
+    consecrate <- S.printingOf s registry "Consecrate Land"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base0 = S.landsInPlay plains 6
+        (pikerId, base1) = S.addCreature piker S.alice base0
+        (_, base2) = S.addLibraryCard piker S.alice base1
+        (_, base3) = S.addLibraryCard strength S.alice base2
+        (_, base4) = S.addLibraryCard consecrate S.alice base3
+        (gs, spell) = S.handOne mage base4
+        mageName = S.nameOf (Printing.card mage)
+        strengthName = S.nameOf (Printing.card strength)
+        consecrateName = S.nameOf (Printing.card consecrate)
+        -- CopySpec's Radstag shape: -5/-5 takes the printed 3/3 to -2/-2 and CR
+        -- 704.5f buries it at the next settle, with the trigger left on the stack.
+        shrink oid = S.withEffect oid (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal (-5)) (Quantity.Type.Literal (-5))))
+        run = do
+          -- Cast the Mage, resolve it, and settle so that CR 603.3b puts its
+          -- "when this creature enters" onto the stack -- and stop there.
+          (_, triggered) <- Engine.runGame (mageAnswer pikerId) gs (do S.cast S.alice spell; Stack.resolveTop; Engine.settleForPriority)
+          let shrunk = Maybe.maybe triggered (\mageId -> shrink mageId triggered) (battlefieldNamed mageName triggered)
+          (_, buried) <- Engine.runGame (mageAnswer pikerId) shrunk Engine.settleForPriority
+          (_, resolved) <- Engine.runGame (mageAnswer pikerId) buried Engine.priorityLoop
+          pure (triggered, buried, resolved)
+        ((onStack, dead, after), searches) = State.runState run []
+        -- Read off `gs`, the PRE-run board, for the case above's reason.
+        named = fmap (Maybe.mapMaybe (fmap Face.name . flip Game.faceOf gs))
+    -- THE gameplay-level assertion, and FIRST: the card the searcher may now cast
+    -- is in their hand. Under the live-board reading the search offers nothing at
+    -- all and this is empty; under a fix that found the card but left it with
+    -- nowhere to go it is empty too. Hand-scoped rather than S.countByName, which
+    -- sums the hand with the library and so cannot tell the two zones apart.
+    Spec.assertEqWith s "CR 608.2h: the Aura the dead Mage could have hosted is in alice's hand" (filter (== strengthName) (handNames S.alice after)) [strengthName]
+    -- The preconditions the assertion above rests on, and the act that separates
+    -- this board from the case above's.
+    Spec.assertBool s (not (null (GameState.stack onStack))) "the Mage's own trigger really was on the stack"
+    Spec.assertEqWith s "and the Mage was gone before it resolved" (battlefieldNamed mageName dead) Nothing
+    -- CR 303.4i is not what happened: there is no host, so nothing was attached
+    -- and no Aura reached the battlefield.
+    Spec.assertEqWith s "the Aura did not enter the battlefield" (S.countOnBattlefieldByName strengthName S.alice after) 0
+    -- CR 701.3a still asked, of the Mage as it most recently existed: Consecrate
+    -- Land's "enchant land" admits no creature, live or last known, and it sits at
+    -- the HEAD of the library so a fallback that stopped asking would hand it back
+    -- first.
+    Spec.assertEqWith s "the search offered exactly the Aura that could have enchanted the Mage" (named searches) [[strengthName]]
+    Spec.assertEqWith s "and the rejected Aura never reached alice's hand" (filter (== consecrateName) (handNames S.alice after)) []
 
 -- CR 613.1f / 702.5a: an enchant ability that arrives from an EFFECT rather than
 -- from a printing (Modification.GainEnchant), which is what a "becomes an Aura

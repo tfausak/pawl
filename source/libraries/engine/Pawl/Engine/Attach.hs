@@ -129,6 +129,50 @@ attachmentFor src destination gs
       (Nothing, Nothing) -> a == b
       _ -> False
 
+-- CR 701.3a through CR 608.2h: could `src` be attached to `host` -- as `host` is
+-- now, or, once `host` no longer exists, as it MOST RECENTLY existed? Auratouched
+-- Mage's "an Aura card that could enchant it" asked of a Mage that was killed
+-- while its own trigger was on the stack, which rule 608.2h answers with the last
+-- known information of the object the ability names.
+--
+-- NOT folded into attachmentFor above, and that is the whole shape of this
+-- function. Rule 608.2h is scoped to an EFFECT that requires information about a
+-- specific object; attachmentFor's other callers are not that -- CR 704.5m's
+-- state-based re-check, CR 701.3b's move, CR 303.4k's face-up rewrite and CR
+-- 303.4f's host choice all ask what is legal ON THE BOARD, and a dead host is not
+-- a place a permanent may be attached under any of them. A fallback inside
+-- attachmentFor would make one legal for every one of them.
+--
+-- The Aura branch alone, where attachmentFor has an Equipment branch beside it:
+-- the only reader is CR 701.3a's search-side question, Pawl.CardSpec's position
+-- lint keeps Filter.CanAttachToSubject inside a search's filter, and the one
+-- search that names it looks for an Aura. An Equipment answers False here, which
+-- is the direction that finds LESS than printed rather than more.
+--
+-- No AttachRestriction gate, where attachmentFor asks one first: CR 613.11 makes
+-- a destination's "can't be enchanted" a continuous effect IN FORCE, and a host
+-- that has left the battlefield has no static ability in force and no Aura still
+-- attached to it granting one. There is nothing to consult rather than something
+-- skipped.
+--
+-- The subtype, the CR 303.4d creature test and the enchant ability are all read
+-- off `src`, which is a card in the library and is very much still there; only
+-- the HOST is read through rule 608.2h. So this is attachmentFor's Aura branch
+-- with its last step -- membership of a live slot's candidate set -- replaced by
+-- Target.lastKnownAdmits, which asks the same slot the same question about an
+-- object it can no longer enumerate.
+attachableWithLastKnown :: ObjectId -> ObjectId -> GameState -> Bool
+attachableWithLastKnown src host gs = case Projection.lastKnownOf host gs of
+  Nothing -> Maybe.isJust (attachmentFor src (Recipient.ToObject host) gs)
+  Just _ ->
+    src /= host
+      && Set.member Subtype.Aura (Projection.subtypesOf src gs)
+      && not (Projection.isCreatureOf src gs)
+      && Maybe.maybe
+        False
+        (\slot -> Target.lastKnownAdmits (Projection.controllerOf src gs) src slot host gs)
+        (Card.foldEnchant (Projection.enchantOf src gs))
+
 -- The destinations a Filter admits for a permanent being attached: battlefield
 -- permanents matching it, ascending, less the one the subject already holds.
 --

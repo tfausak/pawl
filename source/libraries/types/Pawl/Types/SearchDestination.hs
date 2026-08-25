@@ -34,8 +34,14 @@ data SearchDestination
     -- card the fixed host can't legally hold; CR 303.4i then leaves it in the
     -- library, which is what Pawl.Engine.Resolve.putFound does.
     --
-    -- Not implemented: Auratouched Mage's "Otherwise, reveal the Aura card and
-    -- put it into your hand", the branch for a source that has left the
-    -- battlefield by the time the ability resolves (#2027).
+    -- The WHOLE of the card's two sentences, not just the first: "If this
+    -- creature is still on the battlefield, put that Aura card onto the
+    -- battlefield attached to it. Otherwise, reveal the Aura card and put it into
+    -- your hand." One arm rather than two, because a search has one destination
+    -- and the card prints one instruction -- which of its branches runs is a fact
+    -- about the board at resolution (CR 608.2h), not a second thing a card could
+    -- ask for. Pawl.AuraSpec's pair of Auratouched Mage cases, alike but for
+    -- whether the Mage was killed in response to its own trigger, is what proves
+    -- both branches.
     BattlefieldAttachedToSource
   deriving (Bounded, Enum, Eq, Ord, Show)
