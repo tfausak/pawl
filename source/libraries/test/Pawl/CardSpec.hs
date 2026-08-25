@@ -95,6 +95,7 @@ import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -1802,6 +1803,46 @@ isDamageR replacement = case replacement of
   ReplacementEffect.DamageR {} -> True
   _ -> False
 
+-- Every modal one face carries, in the four scopes cardSlotNamesCollide sweeps
+-- plus its rooms -- the list that lint spells out inline, hoisted because the
+-- either-or lint below needs the same one and a second copy would drift.
+faceModals :: Face.Face Card.Type.Card -> [Modal.Modal Card.Type.Card]
+faceModals card =
+  Face.spell card
+    : fmap ActivatedAbility.modal (Face.activatedAbilities card)
+      <> fmap TriggeredAbility.modal (Face.triggeredAbilities card)
+      <> fmap TriggeredAbility.modal (Map.elems (Face.delayedAbilities card))
+      <> fmap DungeonRoom.ability (Foldable.toList (Face.rooms card))
+
+-- CR 608.2d: does any clause's either-or name a sibling that does not name it
+-- back? Clause.orElse is SYMMETRIC by design -- the announcement is made at
+-- whichever branch the resolution reaches first, so that one has to know the
+-- pair exists -- and nothing in Pawl.Engine.Resolve enforces it.
+--
+-- What an asymmetric pair does silently, which is why this is a lint and not an
+-- elision: a clause naming nobody is never excluded, so it runs whatever the
+-- controller announced, and the pair becomes "always the first, and maybe the
+-- second too". A clause naming an ordinal no clause has fares worse -- both
+-- branches then lose, and the mode does nothing at all.
+--
+-- Per MODE (CR 700.2d), like every other clause-ordinal reader: Clause.ifTaken
+-- is read against the clauses of one mode instance, and an ordinal means nothing
+-- across modes.
+cardBranchesAreAsymmetric :: Face.Face Card.Type.Card -> Bool
+cardBranchesAreAsymmetric = any (any modeBranchesOffend . Modal.modes) . faceModals
+
+-- One mode's half of that lint: a clause naming ITSELF offends (there is no pair
+-- to choose between), and so does one whose named sibling is missing or names
+-- somebody else.
+modeBranchesOffend :: Mode.Mode Card.Type.Card -> Bool
+modeBranchesOffend mode =
+  let indexed = zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode))
+      byIndex = Map.fromList indexed
+      offends (cIdx, clause) = case Clause.orElse clause of
+        Nothing -> False
+        Just other -> other == cIdx || fmap Clause.orElse (Map.lookup other byIndex) /= Just (Just cIdx)
+   in any offends indexed
+
 -- Do these slot-name sets overlap? True when any name appears in more than one
 -- of them, which is exactly what a Map.unions over them would silently collapse.
 slotNamesCollide :: [Set.Set SlotName.SlotName] -> Bool
@@ -2037,7 +2078,7 @@ oneEffectTrigger condition effect =
     { TriggeredAbility.condition = condition,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -2061,7 +2102,7 @@ oneEffectActivated mana effect =
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = mana, Cost.Type.components = []},
       ActivatedAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [],
       ActivatedAbility.condition = Nothing,
@@ -2073,7 +2114,7 @@ oneEffectActivated mana effect =
 lintMode :: [Effect.Effect Card.Type.Card] -> [SlotName.SlotName] -> Mode.Mode Card.Type.Card
 lintMode effects slots =
   Mode.MkMode
-    (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects)))
+    (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects)))
     (Map.fromList (fmap (\slot -> (slot, TargetSlot.required Pool.AnyTarget Nothing)) slots))
 
 -- oneEffectActivated widened to SEVERAL modes, free, under CR 700.2's
@@ -4422,6 +4463,38 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (cardSlotNamesCollide (face {Face.activatedAbilities = [distinct]}))) "and two modes naming distinct slots are accepted"
     Spec.assertBool s (cardSlotNamesCollide fused) "Dream's Grip with both modes on one slot is rejected"
     Spec.assertBool s (not (collides dreamsGrip)) "and the real card, naming them 'tapped' and 'untapped', is accepted"
+  -- CR 608.2d's either-or, whose two branches must name each other: the corpus
+  -- half, with the same shape the slot-name pair above has.
+  Spec.it s "no card's either-or names a sibling that does not name it back" $ do
+    ps <- S.allPrintings s
+    let branching = any (any (Maybe.isJust . Clause.orElse) . Mode.clauses) . Modal.modes
+        offenders = filter (anyFace cardBranchesAreAsymmetric . Printing.card) ps
+    -- Guards against passing vacuously: a pool where no clause branches at all
+    -- could not offend whatever the lint said. Twiddle and Teardrop Kami are the
+    -- two that make it real, one on a spell and one on an activated ability.
+    Spec.assertBool s (any (anyFace (any branching . faceModals) . Printing.card) ps) "the pool has a clause carrying an either-or"
+    Spec.assertEqWith s "no half-named branch" (fmap (S.nameOf . Printing.card) offenders) []
+  -- And the rejecting direction, against Twiddle misauthored on purpose -- never
+  -- a card file, since a card that offends a lint must not be loadable.
+  Spec.it s "the lint itself catches an either-or whose sibling does not name it back" $ do
+    twiddle <- S.printingOf s registry "Twiddle"
+    let face = S.combinedFace twiddle
+        -- Every offender is built by rewriting BOTH clauses where the defect is
+        -- symmetric, so that each assertion fails for the arm it names: leaving
+        -- one clause pointing at a healthy sibling would make the OTHER clause
+        -- the offender and the assertion pass without the arm under test.
+        rewrite :: [(Int, Maybe ClauseIndex.ClauseIndex)] -> Face.Face Card.Type.Card
+        rewrite edits =
+          let overClauses clauses = foldr (\(i, orElse) -> Seq.adjust' (\clause -> clause {Clause.orElse = orElse}) i) clauses edits
+              overMode mode = mode {Mode.clauses = overClauses (Mode.clauses mode)}
+           in face {Face.spell = (Face.spell face) {Modal.modes = fmap overMode (Modal.modes (Face.spell face))}}
+        selfNaming, dangling :: [(Int, Maybe ClauseIndex.ClauseIndex)]
+        selfNaming = [(0, Just (ClauseIndex.MkClauseIndex 0)), (1, Just (ClauseIndex.MkClauseIndex 1))]
+        dangling = [(0, Just (ClauseIndex.MkClauseIndex 7)), (1, Just (ClauseIndex.MkClauseIndex 7))]
+    Spec.assertBool s (not (cardBranchesAreAsymmetric face)) "Twiddle's tap and untap name each other, and are accepted"
+    Spec.assertBool s (cardBranchesAreAsymmetric (rewrite [(1, Nothing)])) "a branch whose sibling names nobody back is rejected"
+    Spec.assertBool s (cardBranchesAreAsymmetric (rewrite selfNaming)) "two branches each naming themselves are rejected"
+    Spec.assertBool s (cardBranchesAreAsymmetric (rewrite dangling)) "and branches naming an ordinal no clause has are rejected"
   -- The filing convention, now that no lookup enforces it (#649): a file's stem
   -- must be the slug Registry.filedAs derives from the card inside it.
   --
@@ -4737,7 +4810,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 Modal.MkModal
                   ( Seq.singleton
                       ( Mode.MkMode
-                          (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount) Nothing Nothing)))))
+                          (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount) Nothing Nothing)))))
                           (Map.singleton Binding.you (TargetSlot.required Pool.AnyTarget Nothing))
                       )
                   )
@@ -5103,7 +5176,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let target = SlotName.MkSlotName (Text.pack "target")
         narrowed =
           Mode.MkMode
-            (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Tap (ObjectRef.InSlot target)))))
+            (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Tap (ObjectRef.InSlot target)))))
             (Map.singleton target (TargetSlot.required Pool.Permanents (Just (Filter.Type.ControlledByBound Binding.triggerPlayer))))
     Spec.assertBool
       s
@@ -5156,7 +5229,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let slot = SlotName.MkSlotName (Text.pack "creature")
         modeWith targetSlot reader =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton reader))) (Map.singleton slot targetSlot)))
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton reader))) (Map.singleton slot targetSlot)))
             (ModeSelection.ChooseExactly 1)
         two = TargetSlot.upTo 2 Pool.Creatures Nothing
     Spec.assertBool
@@ -6381,7 +6454,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           (S.combinedFace piker)
             { Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried)))))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried)))))
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "a planted atom is an offence" (hostOfSourceCounts planted) (0, 1)
@@ -6412,7 +6485,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           (S.combinedFace piker)
             { Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
@@ -6421,7 +6494,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           planted
             { Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buriedGreater)))))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buriedGreater)))))
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "and so is its sibling" (greater plantedGreater) 1
@@ -6460,7 +6533,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           (S.combinedFace piker)
             { Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
@@ -6487,7 +6560,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           (S.combinedFace piker)
             { Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
@@ -6519,7 +6592,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 Modal.MkModal
                   ( Seq.singleton
                       ( Mode.MkMode
-                          (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.GainControl (DurationRef.MkDurationRef (Duration.ForAsLongAs crowned) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))))))
+                          (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.GainControl (DurationRef.MkDurationRef (Duration.ForAsLongAs crowned) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))))))
                           (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures Nothing))
                       )
                   )
@@ -6550,7 +6623,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- clauses and its targetSlots at once.
         spellOf effects slots =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots))
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots))
             (ModeSelection.ChooseExactly 1)
         boostedBy quantity =
           StaticAbility.MkStaticAbility
@@ -6778,7 +6851,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not atom]]
         spellOf effects slots =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots))
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots))
             (ModeSelection.ChooseExactly 1)
         boostedBy quantity =
           StaticAbility.MkStaticAbility
@@ -6929,7 +7002,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not atom]]
         spellOf effects slots =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots))
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots))
             (ModeSelection.ChooseExactly 1)
         searchFor f = Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = f, Search.upTo = False, Search.destination = SearchDestination.Exile}
         planted =

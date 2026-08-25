@@ -82,6 +82,37 @@ data Clause card = MkClause
     -- installed row, while this one gates whether the clause's instructions run
     -- at all.
     condition :: Maybe Condition.Condition,
+    -- | CR 608.2d's "or": the sibling clause of this mode that this one is
+    -- exclusive with, so exactly one of the two happens. Twiddle's "you may tap
+    -- or untap target artifact, creature, or land" is the witness -- the tap and
+    -- the untap are two clauses of one mode reading one target slot, and the
+    -- controller announces which of them "while applying the effect". Nothing is
+    -- the unmarked case every other card in the corpus takes.
+    --
+    -- NOT modality (CR 700.2), which needs "two or more options in a bulleted
+    -- list preceded by instructions for a player to choose a number of those
+    -- options", and whose modes CR 601.2b fixes as the spell is cast. Twiddle
+    -- prints no list and no "choose one", so a Pawl.Types.Modal payload would
+    -- announce this choice a whole cast too early.
+    --
+    -- Named by CR 608.2e's ordinal, the way `ifTaken` names one, and for that
+    -- rider's reason: a branch carrying its own effect list would have to sit
+    -- inside a Pawl.Types.Effect, which is first-order and non-recursive by
+    -- design. SYMMETRIC -- each of the pair names the other -- because the
+    -- announcement happens at whichever of them the resolution reaches first,
+    -- and that one has to know the pair exists. Pawl.CardSpec's
+    -- cardBranchesAreAsymmetric is what holds the corpus to it.
+    --
+    -- Binary rather than n-ary because nothing in print offers three branches
+    -- this way; widening means a Set here and a longer offer in
+    -- Pawl.Types.Prompt.ChooseClause, and no change to where the question is
+    -- asked.
+    --
+    -- Independent of `optionality`, which is the pair of constraints two printed
+    -- cards impose: Twiddle's "you MAY tap or untap" is one "may" wrapping an
+    -- either-or, and Keys to the House's "lock or unlock a door of target Room
+    -- you control" is an either-or with no "may" -- see #924.
+    orElse :: Maybe ClauseIndex.ClauseIndex,
     -- | CR 603.5's printed "may", covering this clause's effects, and WHO it
     -- asks -- see Pawl.Types.Optionality for why the rider rides a carrier
     -- rather than wrapping each effect and why the asker rides the rider, and
@@ -107,12 +138,14 @@ data Clause card = MkClause
     -- hang off one {2} -- see Pawl.Types.PayGate.offeredAt. Stymied Hopes is the
     -- other end of the same question, a gate over one clause of two.
     --
-    -- The four riders are independent, and Pawl.Engine.Resolve asks them in
+    -- The five riders are independent, and Pawl.Engine.Resolve asks them in
     -- printed order: `ifTaken` first (CR 608.2c's "If you do" prefixes the
     -- sentence, and a clause whose predecessor was declined is no question to
     -- ask), then `condition` (CR 701.46a prints its "if" ahead of the
-    -- instructions), then the "may", then this -- a declined clause has no
-    -- instruction left for a payment to qualify.
+    -- instructions), then `orElse` (a branch the controller did not pick has no
+    -- "may" left to offer -- Twiddle prints one "may" over the pair, not one per
+    -- branch), then the "may", then this -- a declined clause has no instruction
+    -- left for a payment to qualify.
     payGate :: Maybe PayGate.PayGate,
     effects :: Seq.Seq (Effect.Effect card)
   }
