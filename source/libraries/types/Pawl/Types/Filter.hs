@@ -708,9 +708,11 @@ data Filter keyword
     -- Writing it into any other Filter position is a FAILING TEST rather than a
     -- quiet False, exactly as CanHostSubject's misuse is: Pawl.CardSpec walks
     -- every Filter position a card has and rejects the atom in all but a
-    -- search's. Answered by Pawl.Engine.Attach.attachmentFor, the same function
-    -- that performs the move, so CR 303.4's other limits on what a permanent can
-    -- be enchanted by arrive with the candidate's own enchant ability.
+    -- search's. Answered by Pawl.Engine.Attach.attachableWithLastKnown, whose
+    -- live half is the same function that performs the move, so CR 303.4's other
+    -- limits on what a permanent can be enchanted by arrive with the candidate's
+    -- own enchant ability -- and whose other half is CR 608.2h, the fixed host
+    -- read as it most recently existed once it has left the battlefield.
     --
     -- Not implemented: the same question with the host fixed by anything but the
     -- searching ability's source -- Sovereigns of Lost Alara's bound creature,

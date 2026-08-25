@@ -3275,7 +3275,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Filter.CanAttachToSubject pays nothing for it.
     --
     -- No recursion to bound: this is called from a resolution rather than from
-    -- inside a CR 613 fold, so the projections attachmentFor reaches start fresh.
+    -- inside a CR 613 fold, so the projections that question reaches start fresh.
     --
     -- CR 201.4: the ONE field the context does fill is the SOURCE's chosen names,
     -- which is what Filter.HasChosenName reads (Ancient Vendetta's "cards with
