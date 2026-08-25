@@ -1379,6 +1379,10 @@ rewriteKeyword pairs keyword = case keyword of
 -- payment: the ability on the stack "has the text of the ability that created
 -- it", so it pays the cost this rewrite produced.
 --
+-- A CR 118.12 cost offered as a clause resolves is printed in that same text box
+-- and takes the same descent -- Lithophage's "unless you sacrifice a Mountain",
+-- through Pawl.Engine.Projection.rewritePayGate.
+--
 -- Here rather than in Pawl.Engine.Projection beside the ability rewriters, because
 -- rewriteKeyword above needs it too and Pawl.Engine.Filter cannot import
 -- Pawl.Engine.Projection. One descent, so the keyword carrier and the ability
