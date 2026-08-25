@@ -647,13 +647,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
+      (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue))
       " {\"type\":\"CreateCopy\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying))))
+      (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying)) EntryRiders.defaultValue))
       " {\"type\":\"CreateCopy\",\"value\":{\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasKeyword\",\"value\":{\"type\":\"Flying\"}}}}} "
   -- Kicked Rite of Replication's five. Before #1305 this was a second payload
   -- SHAPE told apart by length; it is now the same shape with the defaulted key
@@ -663,7 +663,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 5) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
+      (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 5) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue))
       " {\"type\":\"CreateCopy\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":5},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
   -- Twincast, both sentences. CR 707.10c's offer is elided when absent, so the
   -- two fixtures differ in exactly the key that carries it.
