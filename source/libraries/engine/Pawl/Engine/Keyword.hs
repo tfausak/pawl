@@ -710,11 +710,15 @@ outlast cost =
 -- nor anything else, so CR 302.6 never reaches this ability and an Equipment that
 -- arrived this turn can equip.
 --
--- "TARGET CREATURE YOU CONTROL" is the pool plus a Filter and not the pool alone:
--- CR 115.4 makes the control question part of target legality, so it is re-asked
--- at resolution (CR 608.2b) and an Equipment whose host changed hands fizzles.
--- CR 301.5b's separate restriction -- that an Equipment may only be attached to a
--- creature at all -- is Pawl.Engine.Attach's and is not restated here.
+-- "TARGET CREATURE YOU CONTROL" comes from the RULE and not from the card, which
+-- CR 115.1e says outright: "some keyword abilities, such as equip and modular,
+-- represent targeted activated or triggered abilities ... the phrase 'target
+-- [something]' appears in the rule for that keyword ability rather than in the
+-- ability itself." A Filter beside the pool, so the control question is part of
+-- target legality and is re-asked at resolution (CR 608.2b): an Equipment whose
+-- host changed hands in between fizzles. CR 301.5b's separate restriction -- that
+-- an Equipment may only be attached to a creature at all -- is
+-- Pawl.Engine.Attach's and is not restated here.
 --
 -- Not implemented: CR 702.6c's "equip [quality] creature" and CR 702.6e's "equip
 -- planeswalker", neither of which Pawl.Types.Keyword's bare Cost can say (#2291).

@@ -941,9 +941,9 @@ aimAtOffered oid p = case p of
 -- you cast cost {1} less to cast." / "Equip abilities you activate cost {1} less
 -- to activate", checked against Scryfall on 2026-08-25) is the producer.
 -- Fluctuator above is the same shape one keyword over; what this group adds is
--- the keyword itself, since the six Equipment in data/cards/ produce a
--- byte-identical ActivatedAbility whether the equip is printed or minted, and
--- nothing else in the pool asks which.
+-- the keyword itself, since an Equipment produces a byte-identical
+-- ActivatedAbility whether the equip is printed or minted, and nothing else in
+-- the pool asks which.
 --
 -- alice's board: a Bonesplitter (equip {1}), a Goblin Piker to equip, a Withered
 -- Wretch ("{1}: Exile target card from a graveyard"), a Goblin Piker in bob's
@@ -1019,8 +1019,10 @@ equipSpec s registry = Spec.describe s "Equip" $ do
         Spec.assertEqWith s "where the same board one Headmaster short cannot pay the printed {1}" (length (activationsOf withoutId (Action.legalActions S.alice without))) 0
       abilities -> Spec.assertFailure s ("expected exactly one equip ability, got " <> show (length abilities))
 
-  -- CR 702.6a's "target creature YOU CONTROL", which CR 115.4 makes part of
-  -- target legality rather than decoration. TWO runs on one board differing only
+  -- CR 702.6a's "target creature YOU CONTROL", which is the RULE's phrase and
+  -- not the card's (CR 115.1e names equip by name for exactly this), and which
+  -- is part of target legality rather than decoration. TWO runs on one board
+  -- differing only
   -- in which creature the slot is aimed at: bob's War Mammoth is not in the
   -- offered set, so the activation finds no target and the Equipment never
   -- moves, while alice's own Piker on that same board takes the +2/+0. A 3/3
@@ -1088,16 +1090,20 @@ equipSpec s registry = Spec.describe s "Equip" $ do
     headmaster <- S.printingOf s registry "Bureau Headmaster"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     sextant <- S.printingOf s registry "Braidwood Sextant"
+    swamp <- S.printingOf s registry "Swamp"
     let (handOnly, splitterId) = S.handOne bonesplitter (Setup.emptyGame S.bothPlayers)
         (sextantId, withBoth) = S.addHandCard sextant S.alice handOnly
         (headmasterId, gs) = S.addCreature headmaster S.alice withBoth
         cast = S.runPure S.identityAnswer gs (S.cast S.alice splitterId)
         resolved = S.runPure S.identityAnswer cast Stack.resolveTop
     Spec.assertBool s (S.castable S.alice splitterId gs) "the Equipment spell is castable with no land in the game"
-    -- BY NAME, since a resolving spell becomes a new object (CR 608.3) and the
-    -- hand's id does not follow it onto the battlefield.
+    -- BY NAME, since a permanent spell resolving onto the battlefield (CR 608.3a)
+    -- becomes a new object (CR 400.7) and the hand's id does not follow it.
     Spec.assertEqWith s "and it resolves onto the battlefield" (S.countOnBattlefieldByName (S.printingName bonesplitter) S.alice resolved) 1
     Spec.assertBool s (not (S.castable S.alice sextantId gs)) "where a {1} artifact that is not an Equipment is not reduced"
+    -- The Sextant's control: one land and it casts, so the refusal above is the
+    -- reduction not reaching it and not something else about the card.
+    Spec.assertBool s (S.castable S.alice sextantId (S.landsFor swamp S.alice 1 gs)) "and one Swamp does cast it, so nothing else was refusing"
     Spec.assertBool s (not (S.castable S.alice splitterId withBoth)) "and without the Headmaster the Equipment's own {1} is unpayable"
     Spec.assertBool s (elem headmasterId (GameState.battlefield gs)) "setup: the Headmaster really is on the battlefield"
 
