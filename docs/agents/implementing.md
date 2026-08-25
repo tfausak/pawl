@@ -124,12 +124,15 @@ opcode's arm alone would have missed the day/night road entirely.
 
 `CLAUDE.md` requires mutating the change away and re-running. How:
 
-`script/mutate.sh FILE SED_EXPR PATTERN` runs one, and is the shape the rest of
-this section describes: it backs the file up outside the tree, applies the
-mutation, runs the tasty subtree `PATTERN` selects, prints the first failing
-assertion with its group path, and restores the file from a `trap`. Its exit
-status is the outcome --- red, nothing red, did not compile, or pattern matched
-nothing, which tasty otherwise reports as a pass. `--help` has the codes.
+`script/mutate.sh FILE SED_EXPR PATTERN [CABAL_ARG...]` runs one, and is the
+shape the rest of this section describes: it backs the file up outside the tree,
+applies the mutation, runs the tasty subtree `PATTERN` selects, prints the first
+failing assertion with its group path, and restores the file from a `trap`. Its
+exit status is the outcome --- red, nothing red, did not compile, or pattern
+matched nothing, which tasty otherwise reports as a pass. `--help` has the codes.
+Pass `--no-semaphore -j4` through it when the shared GHC semaphore is corrupt;
+cabal can HANG on that rather than fail, which the script's own retry, keyed on
+cabal exiting, cannot reach.
 
 What it does **not** do is the judgement the next two bullets ask for: it names
 the assertion that went red, and says nothing about whether that assertion is

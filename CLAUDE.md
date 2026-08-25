@@ -66,7 +66,10 @@ to agents as written. What it doesn't say:
   run corrupts it (a `pkill`, or a tool timeout reaping a backgrounded `cabal`);
   the symptom is `semWait: invalid argument`, and `cabal test --no-semaphore
   -j4` gets through. Never `pkill -f 'cabal test'` --- it reaches other agents'
-  worktrees. Match your own worktree path, or wait.
+  worktrees. Match your own worktree path, or wait --- but waiting is not a
+  strategy for THIS: cabal prints that line and then HANGS instead of exiting,
+  so a run stuck with no output for many minutes is the same fault, and the
+  flags are the only way out.
 
 - Derive against `origin/main`, not the working checkout, which drifts:
   `git fetch`, then `git show origin/main:<path>` or a worktree cut from it.
