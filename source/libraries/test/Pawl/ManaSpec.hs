@@ -6066,7 +6066,10 @@ castAndResolveRecording answer gs oid =
 racesCompleated :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 racesCompleated wantCompleated seasonId p = case p of
   Prompt.ChooseReplacement _ _ entries ->
-    maybe 0 Int.toNaturalSaturating (List.findIndex ((== wantCompleated) . (/= seasonId) . ReplacementEntry.source) entries)
+    maybe
+      (error "Pawl.ManaSpec.racesCompleated: no matching row offered")
+      Int.toNaturalSaturating
+      (List.findIndex ((== wantCompleated) . (/= seasonId) . ReplacementEntry.source) entries)
   _ -> announcesBoth PhyrexianPayment.PaysLife greenMana p
 
 -- Was this recorded answer a CR 616.1 ordering choice?

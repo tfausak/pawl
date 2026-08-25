@@ -1449,10 +1449,11 @@ apply batch candidate event =
       -- The only entry arm that PERFORMS a game action rather than stamping a
       -- value, which is why this module and not Pawl.Engine.Replacement holds
       -- `apply`: the sacrifice is `sacrifice` below, CR 701.21a's one funnel, and
-      -- the counters go through `putCounters`, CR 122.6's. Both are the ordinary
-      -- doors, so Rest in Peace redirects a sacrificed permanent and Doubling
-      -- Season (CR 614.16) doubles the counters, with nothing written here to
-      -- make either happen.
+      -- the counters go through addEnteringCounters into the pending map, so CR
+      -- 614.16 applies to them in this same loop. Both are the ordinary doors, so
+      -- Rest in Peace redirects a sacrificed permanent and Doubling Season sees
+      -- these counters as it sees riot's, with nothing written here to make
+      -- either happen.
       --
       -- THE ENTERING OBJECT IS NOT A CANDIDATE, nor is a permanent entering
       -- beside it. CR 614.13a states it outright -- "you can't choose the object
@@ -3460,9 +3461,11 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                 -- loop's whole duration, so a row reading them would answer
                 -- differently at every iteration rather than only before the first.
                 -- Checked when the pending map landed: Filter.HasCounters and
-                -- Replacement.admitsEntry are the two readers a row could reach a
-                -- counter through, and neither is fed by an entering permanent's own
-                -- pending counters today.
+                -- Replacement.admitsEntry are two readers a row could reach a
+                -- counter through, and a filter naming power or toughness is a
+                -- third, via Projection.counterGathered (CR 614.12); none of the
+                -- three is fed by an entering permanent's own pending counters
+                -- today.
                 Monad.mapM_ (uncurry (addEnteringCounters newId)) (Map.toAscList entering)
                 runEntry batch newId
               -- CR 709.5h: an ability that triggers on a door opening fires "regardless

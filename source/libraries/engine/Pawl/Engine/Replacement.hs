@@ -434,11 +434,11 @@ applies gs event candidate =
         -- every other row modifying the same entry. What it scales is the PENDING
         -- count; see GameState.enteringCounters.
         --
-        -- The cause is synthesized as the one the flush will place under -- CR
-        -- 122.6a's default putter, the object's controller -- so matchesPutter
-        -- still parts Vorinclex's "if you would put" from CR 614.16's "if an
-        -- effect would put" (#847). Reading it off the flush rather than off the
-        -- event is what keeps the two levels answering alike.
+        -- The cause is synthesized as the one the entry counters WOULD have been
+        -- placed under -- CR 122.6a's default putter, the object's controller --
+        -- so matchesPutter still parts Vorinclex's "if you would put" from CR
+        -- 614.16's "if an effect would put" (#847). Reading it off the flush
+        -- rather than off the event is what keeps the two levels answering alike.
         (ReplacementEffect.CounterR (CounterR.MkCounterR pat _), ProposedEvent.WouldEnter oid) ->
           case Projection.controllerOf oid gs of
             Nothing -> False
