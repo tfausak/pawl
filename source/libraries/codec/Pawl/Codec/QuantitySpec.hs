@@ -322,6 +322,21 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.SpellsCastLastTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"SpellsCastLastTurn\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  -- CR 309.7, on CardsDiscardedThisTurn's terms again: a PlayerRef and nothing
+  -- else. Gloom Stalker writes the Relative You arm, which is the only spelling
+  -- any printing uses -- "as long as YOU'VE completed a dungeon"; the InSlot arm
+  -- beside it is the recursive-decoder pair the cases above make.
+  Spec.it s "DungeonsCompleted, relative and from a slot" $ do
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.DungeonsCompleted (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"DungeonsCompleted\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.DungeonsCompleted (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      " {\"type\":\"DungeonsCompleted\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- CR 400.7 with NOTHING on the wire either: the object is the one the quantity
   -- is evaluated against, and "this turn" is the event log's own extent.
   Spec.it s "EnteredThisTurn is nullary" $

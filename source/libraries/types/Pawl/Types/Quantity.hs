@@ -525,6 +525,31 @@ data Quantity
     --
     -- A LEAF, like LifeTotal and CardsDiscardedThisTurn: it holds no Quantity.
     SpellsCastLastTurn PlayerRef.PlayerRef
+  | -- | CR 309.7: how many dungeons that player has completed -- Gloom Stalker's
+    -- "as long as you've completed a dungeon", which is this compared to 1.
+    --
+    -- LifeTotal's shape and not PlayersDealtDamageThisTurn's: this is ONE player's
+    -- tally, so a reference naming several answers "whose?" rather than a sum.
+    -- Every printing that reads it says "you", so the reference is
+    -- PlayerRef.Relative You and the arity never bites; the aggregate shape, if a
+    -- card ever wants one, is Aggregation.Greatest over Scope.OverPlayers reading
+    -- each candidate through PlayerRef.Candidate, as SpellsCastLastTurn above does.
+    --
+    -- A COUNT and not a set of dungeon names: CR 309.7 states only the fact of
+    -- completion, and Player.completedDungeons argues why the names wait for
+    -- Acererak the Archlich. Not implemented: the named read (#2259).
+    --
+    -- Read straight off Player.completedDungeons rather than folded from
+    -- GameState.events, for the reason LifeTotal is read off the player: nothing
+    -- logs the removal, and the log is cleared at every turn handoff while
+    -- completion outlives the game's turns.
+    --
+    -- An ABSENT player answers 0 rather than Nothing, as SpellsCastLastTurn's
+    -- absent entry does: nobody having completed a dungeon is an answered
+    -- question. Nothing is reserved for a reference that could not be resolved.
+    --
+    -- A LEAF, like LifeTotal and SpellsCastLastTurn: it holds no Quantity.
+    DungeonsCompleted PlayerRef.PlayerRef
   | -- | CR 400.7 / 608.2i: did the object this quantity is evaluated against ENTER
     -- THE BATTLEFIELD this turn? 1 if so and 0 if not -- Thrasta, Tempest's Roar's
     -- "Thrasta has hexproof as long as it entered this turn", a CR 604.1 static

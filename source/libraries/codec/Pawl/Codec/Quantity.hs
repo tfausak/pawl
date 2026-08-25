@@ -88,6 +88,12 @@ codec =
       -- from. The thresholds that turn the count into "no spells were cast" and
       -- "a player cast two or more" are the Comparison's, not this arm's.
       Arm.payload "SpellsCastLastTurn" PlayerRef.codec Quantity.SpellsCastLastTurn (\x -> case x of Quantity.SpellsCastLastTurn y -> Just y; _ -> Nothing),
+      -- CR 309.7's tally, with only a PlayerRef on the wire for
+      -- CardsDiscardedThisTurn's reason above -- read off the player rather than
+      -- the log, since a completion outlives the turn it happened in. The
+      -- threshold that turns the count into "you've completed a dungeon" is the
+      -- Comparison's, not this arm's.
+      Arm.payload "DungeonsCompleted" PlayerRef.codec Quantity.DungeonsCompleted (\x -> case x of Quantity.DungeonsCompleted y -> Just y; _ -> Nothing),
       -- CR 400.7's entry read against the object the quantity is aimed at, so
       -- there is nothing on the wire: the turn is the log's extent rather than a
       -- window a card could state, as for CardsDiscardedThisTurn above.

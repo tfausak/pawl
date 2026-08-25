@@ -440,6 +440,22 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.SpellsCastLastTurn ref -> case playersOf ref of
     Just [pid] -> Just (toInteger (Map.findWithDefault 0 pid (GameState.castsLastTurn gs)))
     _ -> Nothing
+  -- CR 309.7: how many dungeons that player has completed. LifeTotal's arm in
+  -- ARITY -- one player's tally, so a reference naming several answers "whose?"
+  -- rather than a sum -- and in SOURCE: read straight off the player, because
+  -- Dungeon.remove writes it there and nothing logs the removal.
+  --
+  -- LIVE, which is what CR 604.2 needs: Gloom Stalker's "as long as you've
+  -- completed a dungeon" is re-asked by Projection.conditionHolds on every
+  -- projection, so the double strike appears in the same settle that CR 704.5t
+  -- removed the dungeon in.
+  --
+  -- An ABSENT player answers 0 rather than Nothing, as SpellsCastLastTurn's absent
+  -- entry does: having completed none is an answered question. What is unanswered
+  -- is only the reference.
+  Quantity.DungeonsCompleted ref -> case playersOf ref of
+    Just [pid] -> Just (toInteger (maybe 0 Player.completedDungeons (Map.lookup pid (GameState.players gs))))
+    _ -> Nothing
   -- CR 400.7 / 608.2i read as a 0/1: did the object this evaluation is aimed at
   -- enter the battlefield this turn?
   --
@@ -626,6 +642,7 @@ substituteStar star quantity = case quantity of
   Quantity.CardsDiscardedThisTurn _ -> quantity
   Quantity.PlayersDealtDamageThisTurn _ -> quantity
   Quantity.SpellsCastLastTurn _ -> quantity
+  Quantity.DungeonsCompleted _ -> quantity
   Quantity.EnteredThisTurn -> quantity
   Quantity.BlockersBeyondFirst -> quantity
   -- No descent, for the Count arm's reason: CR 604.3 makes a CDA a static
@@ -725,6 +742,9 @@ slots quantity = case quantity of
   -- And another in that same position, CR 601.2i's cast tally having nothing
   -- beside its PlayerRef either.
   Quantity.SpellsCastLastTurn _ -> Set.empty
+  -- And another again, CR 309.7's completion tally having nothing beside its
+  -- PlayerRef either.
+  Quantity.DungeonsCompleted _ -> Set.empty
   -- And a nullary arm, which names nothing at all: CR 400.7's entry is read
   -- against the object the evaluation is aimed at, as ObjectCounters is.
   Quantity.EnteredThisTurn -> Set.empty
@@ -781,6 +801,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.CardsDiscardedThisTurn ref -> playerRefIsSlotless ref
   Quantity.PlayersDealtDamageThisTurn ref -> playerRefIsSlotless ref
   Quantity.SpellsCastLastTurn ref -> playerRefIsSlotless ref
+  Quantity.DungeonsCompleted ref -> playerRefIsSlotless ref
   Quantity.EnteredThisTurn -> True
   Quantity.BlockersBeyondFirst -> True
   -- True because `slots` above DOES report this arm's slot, unlike the nested
@@ -903,6 +924,7 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.CardsDiscardedThisTurn ref -> Quantity.CardsDiscardedThisTurn (f ref)
   Quantity.PlayersDealtDamageThisTurn ref -> Quantity.PlayersDealtDamageThisTurn (f ref)
   Quantity.SpellsCastLastTurn ref -> Quantity.SpellsCastLastTurn (f ref)
+  Quantity.DungeonsCompleted ref -> Quantity.DungeonsCompleted (f ref)
   Quantity.ManaCount c -> Quantity.ManaCount c {ManaCount.Type.player = f (ManaCount.Type.player c)}
   Quantity.Count c -> Quantity.Count (intoCount c)
   Quantity.Plus (Plus.MkPlus a b) -> Quantity.Plus (Plus.MkPlus (recur a) (recur b))
@@ -1050,6 +1072,7 @@ readsX quantity = case quantity of
   Quantity.CardsDiscardedThisTurn _ -> False
   Quantity.PlayersDealtDamageThisTurn _ -> False
   Quantity.SpellsCastLastTurn _ -> False
+  Quantity.DungeonsCompleted _ -> False
   Quantity.EnteredThisTurn -> False
   Quantity.BlockersBeyondFirst -> False
   -- Not a leaf: its payload is a whole Quantity and may read X, the same recursion

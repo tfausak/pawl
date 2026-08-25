@@ -95,7 +95,10 @@ emptyGame order =
               Player.commanderDamage = Map.empty,
               -- CR 309.2: dungeon cards begin outside the game, and which one a
               -- player brought is their deck's business -- createDeck below.
-              Player.dungeon = Nothing
+              Player.dungeon = Nothing,
+              -- CR 309.7: nobody has completed a dungeon in a game that has not
+              -- started, there having been no venture to remove one from it.
+              Player.completedDungeons = 0
             }
         )
    in GameState.MkGameState
@@ -402,7 +405,12 @@ resetPlayers players =
               -- CR 903.10a counts "over the course of the game", and CR 727.1
               -- makes the restarted one a new game, so the tally starts over
               -- with the tax.
-              Player.commanderDamage = Map.empty
+              Player.commanderDamage = Map.empty,
+              -- CR 727.1 / 729.2 again: a NEW game, so no dungeon has been
+              -- completed in it. Player.dungeon is deliberately NOT reset beside
+              -- it, for Player.commander's reason -- the supply outside the game
+              -- comes from the deck, and the restart reuses the same decks.
+              Player.completedDungeons = 0
             }
         Status.Departed _ -> player
    in fmap reset players
