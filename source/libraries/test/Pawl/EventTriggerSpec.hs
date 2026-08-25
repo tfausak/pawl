@@ -3402,12 +3402,13 @@ seiferSpec s registry =
               Spec.assertEqWith s "CR 508.3e and no trigger fired to be removed" (fired after) 0
               Spec.assertEqWith s "and the Elves really was declared at bob" (sentAt after) (Map.fromList [(elves, AttackTarget.OfPlayer S.bob)])
             _ -> Spec.assertFailure s "fixture should give alice an Elves, and bob two Giants and a Seifer"
-        -- Rule 508.3e's ARITY, which is CR 508.3b's and not rule 508.3d's: one
-        -- trigger per player attacked. alice sends one Elves at bob and one at
-        -- bob's Jace, which is ONE declaration, ONE attacked player and one
-        -- trigger -- a reading against GameEvent.AttackersDeclared would fire
-        -- once here too, so the number is not what parts them; the Jace board
-        -- above is.
+        -- Rule 508.3e's ARITY, which is CR 508.3b's per-TARGET one: TWO
+        -- attackers, ONE attacked player, one trigger. A reading against the
+        -- per-creature GameEvent.AttackerDeclared (CR 508.3a) fires twice, and
+        -- so does one that took every GameEvent.BecameAttacked without narrowing
+        -- to OfPlayer -- which is what the second attacker being aimed at bob's
+        -- Jace is for. One attacker, or both sent at bob, would let all three
+        -- readings agree.
         --
         -- Counted off the event log rather than at gameplay level because this
         -- card cannot show the difference: goading the same Giant twice is

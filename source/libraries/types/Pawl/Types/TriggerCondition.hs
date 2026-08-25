@@ -214,8 +214,9 @@ data TriggerCondition
     -- player").
     --
     -- CR 508.3e's "[a player] attacks [another player]" reads the same event,
-    -- and PlayerAttacksPlayer below is that arm: this one names its subject by
-    -- attachment where that one names both sides by relation.
+    -- and PlayerAttacksPlayer below is that arm: this one names the ATTACKED
+    -- player by attachment, that one names the ATTACKING player by relation and
+    -- leaves the attacked side unqualified.
     --
     -- Not implemented: rule 508.3b's planeswalker and battle subjects -- the
     -- sweep above turned up no card writing one, and GameEvent.BecameAttacked
@@ -276,8 +277,9 @@ data TriggerCondition
   | -- | CR 508.3e: "whenever [a player] attacks [another player]" -- Seifer,
     -- Balamb Rival's "whenever you attack a player". The payload is which player
     -- rule 508.3e names FIRST, the one who declared; the second subject is the
-    -- rule's bare "[another player]", which every printing of this shape leaves
-    -- bare too.
+    -- rule's bare "[another player]", left unqualified because every printing
+    -- this arm serves prints it bare -- Scryfall o:"attack a player",
+    -- 2026-08-24, twenty-four cards and not one of them narrows that side.
     --
     -- CR 508.3b's per-TARGET arity and not rule 508.3d's, so this reads
     -- GameEvent.BecameAttacked where PlayerAttacks above reads
