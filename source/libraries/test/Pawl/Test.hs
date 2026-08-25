@@ -43,6 +43,7 @@ import qualified Pawl.Codec.AttackerBlockedSpec
 import qualified Pawl.Codec.AttackerDeclaredSpec
 import qualified Pawl.Codec.AttackingPlayersSpec
 import qualified Pawl.Codec.BattlefieldCandidateSpec
+import qualified Pawl.Codec.BecameAttackedSpec
 import qualified Pawl.Codec.BecameBlockingSpec
 import qualified Pawl.Codec.BecameDesignatedSpec
 import qualified Pawl.Codec.BecomeCopySpec
@@ -551,6 +552,7 @@ spec s registry = do
   Pawl.Codec.AttackerDeclaredSpec.spec s
   Pawl.Codec.AttackingPlayersSpec.spec s
   Pawl.Codec.BattlefieldCandidateSpec.spec s
+  Pawl.Codec.BecameAttackedSpec.spec s
   Pawl.Codec.BecameDesignatedSpec.spec s
   Pawl.Codec.BecomeCopySpec.spec s
   Pawl.Codec.BeginningStepSpec.spec s

@@ -2214,6 +2214,9 @@ rewriteTriggerCondition pairs condition = case condition of
   -- creature type, which is exactly what CR 612.1's text-changing effect
   -- rewrites.
   TriggerCondition.PlayerAttacksWith payload -> TriggerCondition.PlayerAttacksWith payload {PlayerAttacksWith.filter = Filter.rewrite pairs (PlayerAttacksWith.filter payload)}
+  -- Two PlayerRelations and no Filter, so nothing here names a creature type
+  -- for CR 612.1 to rewrite -- the arm two above's answer.
+  TriggerCondition.PlayerAttacksPlayer {} -> condition
   TriggerCondition.SelfAttacksPlayerWithMostLife -> condition
   TriggerCondition.SelfBlocks -> condition
   TriggerCondition.SelfBlocksCreature f -> TriggerCondition.SelfBlocksCreature (Filter.rewrite pairs f)

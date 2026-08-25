@@ -146,6 +146,8 @@ library codec
     Pawl.Codec.BattlefieldCandidate
     Pawl.Codec.BattlefieldCandidateSpec
     Pawl.Codec.BecameAttached
+    Pawl.Codec.BecameAttacked
+    Pawl.Codec.BecameAttackedSpec
     Pawl.Codec.BecameBlocking
     Pawl.Codec.BecameBlockingSpec
     Pawl.Codec.BecameDesignated
@@ -1232,6 +1234,7 @@ library types
     Pawl.Types.AttackTarget
     Pawl.Types.BattlefieldCandidate
     Pawl.Types.BecameAttached
+    Pawl.Types.BecameAttacked
     Pawl.Types.BecameBlocking
     Pawl.Types.BecameDesignated
     Pawl.Types.BecameTarget

@@ -7,10 +7,10 @@
 module Pawl.Codec.GameEvent where
 
 import qualified Pawl.Codec.AbilityTriggered as AbilityTriggered
-import qualified Pawl.Codec.AttackTarget as AttackTarget
 import qualified Pawl.Codec.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Codec.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Codec.BecameAttached as BecameAttached
+import qualified Pawl.Codec.BecameAttacked as BecameAttacked
 import qualified Pawl.Codec.BecameBlocking as BecameBlocking
 import qualified Pawl.Codec.BecameDesignated as BecameDesignated
 import qualified Pawl.Codec.BecameTarget as BecameTarget
@@ -53,7 +53,7 @@ codec =
       Arm.payload "Milled" Milled.codec GameEvent.Milled (\x -> case x of GameEvent.Milled y -> Just y; _ -> Nothing),
       Arm.payload "Drew" Drew.codec GameEvent.Drew (\x -> case x of GameEvent.Drew y -> Just y; _ -> Nothing),
       Arm.payload "AttackerDeclared" AttackerDeclared.codec GameEvent.AttackerDeclared (\x -> case x of GameEvent.AttackerDeclared y -> Just y; _ -> Nothing),
-      Arm.payload "BecameAttacked" AttackTarget.codec GameEvent.BecameAttacked (\x -> case x of GameEvent.BecameAttacked y -> Just y; _ -> Nothing),
+      Arm.payload "BecameAttacked" BecameAttacked.codec GameEvent.BecameAttacked (\x -> case x of GameEvent.BecameAttacked y -> Just y; _ -> Nothing),
       Arm.payload "AttackersDeclared" PlayerId.codec GameEvent.AttackersDeclared (\x -> case x of GameEvent.AttackersDeclared y -> Just y; _ -> Nothing),
       Arm.payload "BecameBlocking" BecameBlocking.codec GameEvent.BecameBlocking (\x -> case x of GameEvent.BecameBlocking y -> Just y; _ -> Nothing),
       Arm.payload "AttackerBlocked" AttackerBlocked.codec GameEvent.AttackerBlocked (\x -> case x of GameEvent.AttackerBlocked y -> Just y; _ -> Nothing),
