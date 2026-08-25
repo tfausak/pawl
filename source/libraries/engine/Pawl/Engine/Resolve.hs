@@ -3697,13 +3697,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- out of it. EVERY flip is recorded, won or lost -- Pawl.Types.CoinFlipped
   -- says why the outcome is a field rather than the presence of an entry.
   --
-  -- One writer, one road: Prompt.FlipCoin is asked from this arm and from no
-  -- other place in the engine, so there is no second road to record on.
+  -- TWO WRITERS, two roads. Prompt.FlipCoin is also asked by
+  -- Pawl.Engine.Event's ChoiceByCoinFlip arm, CR 705.2's first-sentence flip
+  -- (Molten Sentry), which records its own winnerless CoinFlipped there. Every
+  -- road that flips records, which is what keeps this event the log of CR 705.1
+  -- flips rather than the log of one opcode.
   --
   -- Recorded AFTER the binding, the roll's order and for its reason.
   --
-  -- Not implemented: CR 705.2's face-only flips, which have no winner and ask no
-  -- call (#2251); CR 705.3's stated result (#2252); and CR 614's replacement
+  -- Not implemented: CR 705.3's stated result (#2252); and CR 614's replacement
   -- over the flip, which Krark's Thumb wants (#2253).
   Effect.FlipCoin flipCoin -> do
     gs <- State.get
@@ -3717,7 +3719,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           ( GameEvent.CoinFlipped
               CoinFlipped.MkCoinFlipped
                 { CoinFlipped.flipper = controller,
-                  CoinFlipped.won = matched
+                  -- CR 705.2's win or loss, which this kind of flip always has
+                  -- -- the caller made the call. Never Nothing here; that is the
+                  -- winnerless flip's, in Pawl.Engine.Event.
+                  CoinFlipped.won = Just matched
                 }
           )
       )

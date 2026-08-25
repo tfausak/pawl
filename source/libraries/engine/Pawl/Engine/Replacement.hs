@@ -521,6 +521,7 @@ admitsEntry :: GameState -> ObjectId -> EntryRewrite.EntryRewrite effect -> Bool
 admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.AsCopy _ -> True
   EntryRewrite.ChoiceOf _ -> True
+  EntryRewrite.ChoiceByCoinFlip _ -> True
   EntryRewrite.ChooseColor -> True
   EntryRewrite.ChooseBasicLandType -> True
   EntryRewrite.ChoosePlayer -> True
@@ -936,9 +937,10 @@ bucketOfEffect re = case re of
   -- object is entering as a copy, which an excepted copy still is.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.AsCopy _)) -> ReplacementBucket.CopyOnEntry
   -- CR 616.1a-d name self-replacement, entering under a control effect, entering
-  -- as a copy and entering with the back face up. None of the next four arms is
+  -- as a copy and entering with the back face up. None of the next five arms is
   -- any of those, so CR 616.1e is what applies to each.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ChoiceOf _)) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ChoiceByCoinFlip _)) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ChooseColor) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ChooseBasicLandType) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ChoosePlayer) -> ReplacementBucket.Other
@@ -1032,6 +1034,10 @@ readsApplier re = case re of
   -- Same chooser, and the options ride the effect: CR 614.1c's "enters as"
   -- (Primal Plasma).
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ChoiceOf _)) -> False
+  -- NO chooser at all, and the options ride the effect just the same: CR 705.2's
+  -- first sentence makes the face nobody's to pick, so two such rows are the same
+  -- offer whoever's is applying (Molten Sentry).
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ChoiceByCoinFlip _)) -> False
   -- Same chooser again, with no payload at all: CR 105.1's five colours are the
   -- whole offer whoever's row is applying (Painter's Servant).
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ChooseColor) -> False

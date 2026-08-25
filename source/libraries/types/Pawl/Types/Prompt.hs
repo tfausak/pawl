@@ -115,8 +115,9 @@ data Prompt r where
   -- wins or loses it, and no other player is involved -- so it is the flipper's
   -- seat and never an opponent's.
   --
-  -- Not implemented: CR 705.2's face-only effects, which have no winner and so
-  -- ask no call at all (#2251).
+  -- CR 705.2's face-only effects have no winner and so ask no call at all: the
+  -- entry rewrite that flips (Pawl.Types.EntryRewrite's ChoiceByCoinFlip) asks
+  -- FlipCoin above and never this.
   CallCoin :: Decider.Decider -> PlayerId.PlayerId -> Prompt CoinFace.CoinFace
   -- | CR 514.2. The [ObjectId] is the hand; the Natural is how many to discard.
   ChooseDiscard :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]

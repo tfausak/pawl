@@ -479,11 +479,11 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = PlayerId.MkPlayerId 5, CoinFlipped.won = True})
+      (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = PlayerId.MkPlayerId 5, CoinFlipped.won = Just True})
       " {\"type\":\"CoinFlipped\",\"value\":{\"flipper\":5,\"won\":true}} "
   Spec.it s "CoinFlipped, a lost flip" $
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = PlayerId.MkPlayerId 5, CoinFlipped.won = False})
+      (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = PlayerId.MkPlayerId 5, CoinFlipped.won = Just False})
       " {\"type\":\"CoinFlipped\",\"value\":{\"flipper\":5,\"won\":false}} "

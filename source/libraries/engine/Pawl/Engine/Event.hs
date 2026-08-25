@@ -73,6 +73,7 @@ import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
+import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
@@ -101,6 +102,7 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -1163,6 +1165,51 @@ apply batch candidate event =
             Replacement.consume (ReplacementCandidate.identity candidate)
             State.modify' (Replacement.applyEntryOption oid picked)
             pure (Just event)
+      -- CR 614.1c decided by CR 705.2's first sentence: Molten Sentry's "as this
+      -- creature enters, flip a coin", whose face picks between the same two
+      -- shapes ChoiceOf offers a player. Written into the COPIABLE snapshot
+      -- (applyEntryOption), ChoiceOf's road and for its reason.
+      --
+      -- Game.ask, never Game.choose, and NO Prompt.CallCoin: "no player wins or
+      -- loses a coin flip for this kind of effect", so there is no call to make
+      -- and nothing for a CR 723 controller to usurp. Proved by
+      -- Pawl.ReplacementSpec's "CR 705.2 nobody wins Molten Sentry's flip", on a
+      -- board holding a Tavern Scoundrel that would mint two Treasures off a won
+      -- one.
+      --
+      -- ALWAYS ASKED, where ChoiceOf elides a one-option prompt: a flip is not a
+      -- choice, so nothing about it is indistinguishable, and a card whose two
+      -- faces named the same shape would still have flipped a coin (which
+      -- Pawl.Types.EntryFlip's two required faces keep separate anyway).
+      --
+      -- The flip is recorded as a CR 705.1 event with NO outcome, which is what
+      -- keeps CR 705.2's first sentence honest against
+      -- TriggerCondition.PlayerWinsCoinFlip -- see Pawl.Types.CoinFlipped.
+      EntryRewrite.ChoiceByCoinFlip entryFlip -> do
+        face <- Game.ask Prompt.FlipCoin
+        let picked = case face of
+              CoinFace.Heads -> EntryFlip.heads entryFlip
+              CoinFace.Tails -> EntryFlip.tails entryFlip
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        State.modify' (Replacement.applyEntryOption oid picked)
+        -- CR 109.5's "you" on the entering permanent, ChoiceOf's chooser and CR
+        -- 705.2's only involved seat. The Nothing branch is unreachable and
+        -- defensive, ChoiceOf's position: the object is materialized on the
+        -- battlefield before this loop runs, so controllerOf falls back to its
+        -- owner. Nothing is recorded there rather than a seat being conjured --
+        -- the flip still happened and still applied.
+        applied <- State.get
+        Monad.forM_ (Projection.controllerOf oid applied) $ \flipper ->
+          State.modify'
+            ( recordEvent
+                ( GameEvent.CoinFlipped
+                    CoinFlipped.MkCoinFlipped
+                      { CoinFlipped.flipper = flipper,
+                        CoinFlipped.won = Nothing
+                      }
+                )
+            )
+        pure (Just event)
       -- CR 614.1c: Painter's Servant's as-enters colour choice. Unlike ChoiceOf
       -- above, this is asked every time the entering object has a controller to
       -- ask: CR 105.1's five colours are always all legal and always
@@ -8748,7 +8795,9 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
-    GameEvent.CoinFlipped flipped -> CoinFlipped.won flipped && PlayerRelation.holds relation you (CoinFlipped.flipper flipped)
+    -- A flip with NO outcome (CR 705.2's first sentence) is not a won one, so
+    -- Nothing answers False exactly as Just False does.
+    GameEvent.CoinFlipped flipped -> CoinFlipped.won flipped == Just True && PlayerRelation.holds relation you (CoinFlipped.flipper flipped)
   -- CR 702.170a / 702.170c: the bearer's own card became plotted. Self-scoped, so the
   -- match is the id and nothing else -- and the id the event carries is the
   -- CR 400.7 incarnation in exile, which is the bearer here because

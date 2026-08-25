@@ -3502,6 +3502,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- honest), and neither does the CR 614.1d `tapped` flag beside them (Vesuva).
   EntryRewrite.AsCopy (AsCopy.MkAsCopy f _ _) -> [f]
   EntryRewrite.ChoiceOf _ -> []
+  EntryRewrite.ChoiceByCoinFlip _ -> []
   EntryRewrite.ChooseColor -> []
   EntryRewrite.ChooseBasicLandType -> []
   EntryRewrite.ChoosePlayer -> []
