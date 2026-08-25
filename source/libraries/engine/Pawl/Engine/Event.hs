@@ -2685,9 +2685,10 @@ putPlayerCounters cause pid kind n = do
     Just (target, settledKind, settledCount)
       | settledCount == 0 -> pure 0
       | otherwise -> do
-          -- Zero is the guard putCounters puts on its own write, and Scaling.Halve
-          -- is what makes it reachable here: half of one counter, rounded down, is
-          -- a replacement that removes the event.
+          -- Zero is the guard putCounters puts on its own write, and the two
+          -- shrinking scalings are what make it reachable here: half of one
+          -- counter, rounded down, and one counter minus one, are replacements
+          -- that remove the event.
           State.modify' $ \gs ->
             let bump p = p {Player.counters = Map.insertWith (+) settledKind settledCount (Player.counters p)}
              in gs {GameState.players = Map.adjust bump target (GameState.players gs)}

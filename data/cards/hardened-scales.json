@@ -25,6 +25,9 @@
                     "type": "Creature"
                   }
                 },
+                "subject": {
+                  "type": "ByAnything"
+                },
                 "whichKind": {
                   "type": "PlusOnePlusOne"
                 },

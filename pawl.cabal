@@ -266,6 +266,8 @@ library codec
     Pawl.Codec.CounterR
     Pawl.Codec.CounterRSpec
     Pawl.Codec.CounterSpec
+    Pawl.Codec.CounterSubject
+    Pawl.Codec.CounterSubjectSpec
     Pawl.Codec.CountSpec
     Pawl.Codec.Create
     Pawl.Codec.CreateCopy
@@ -1310,6 +1312,7 @@ library types
     Pawl.Types.CounterName
     Pawl.Types.CounterPattern
     Pawl.Types.CounterR
+    Pawl.Types.CounterSubject
     Pawl.Types.Create
     Pawl.Types.CreateCopy
     Pawl.Types.CreatureBecomesBlockedByAtLeast
