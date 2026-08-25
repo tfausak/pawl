@@ -740,6 +740,21 @@ sourceIsToken source = case source of
   Source.OfSpellCopy _ -> False
   Source.OfInherentTrigger _ -> False
 
+-- CR 111.8: a token that has LEFT the battlefield -- one waiting for the state-
+-- based action CR 111.7 and CR 704.5d state. Two rules read it and must agree:
+-- Pawl.Engine.Sba removes such a token, and Pawl.Engine.Event's zone-change
+-- funnel refuses to move it, since "if such a token would change zones, it
+-- remains in its current zone instead". One predicate, because a token the
+-- funnel would still move is exactly one the sweep has not yet removed.
+--
+-- Object.zone and NOT GameState.battlefield, which is the one place in the
+-- engine where the two must disagree: CR 702.26d says "tokens continue to exist
+-- on the battlefield while phased out", and a phased-out permanent is absent
+-- from that set (CR 702.26b). Reading the set here would make a phasing token
+-- cease to exist the moment it phased out.
+tokenHasLeftTheBattlefield :: Object -> Bool
+tokenHasLeftTheBattlefield obj = sourceIsToken (Object.source obj) && Object.zone obj /= Zone.Battlefield
+
 -- CR 104.2a: who is still in the game. Here rather than in
 -- Pawl.Engine.Departure because Departure imports Pawl.Engine.Monarch, which
 -- imports Pawl.Engine.Event, so the event pipeline (Event.createTokens, for CR
