@@ -3165,8 +3165,87 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   conditionalAbilitySpec s registry
   hiddenZoneStaticSpec s registry
   keywordCounterSpec s registry
+  honeCounterSpec s registry
   levelerSpec s registry
   supertypeSpec s registry
+
+-- CR 122.1j: "A hone counter on an Equipment gives +1/+0 to any creature that
+-- Equipment is attached to." CR 613.1g's layer 7, and CR 613.4c's 7c within it,
+-- exactly where CR 122.1a's +1/+1 counters land -- but the counter is on the
+-- EQUIPMENT and the power belongs to something else, which is the whole of what
+-- these boards are about.
+--
+-- Bonesplitter ({1} Artifact -- Equipment, "Equipped creature gets +2/+0." /
+-- "Equip {1}", checked against Scryfall 2026-08-25) carries the counters. Its
+-- own +2/+0 is what makes the indirection observable twice over: a reading that
+-- put the counters' bonus on the Equipment itself would leave the equipped
+-- creature at the Bonesplitter's 4, a number this board also produces honestly,
+-- so every count below is TWO counters rather than one.
+honeCounterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
+  -- Two boards ONE attachment apart, so nothing but the Equipment's host moves.
+  Spec.it s "CR 122.1j two hone counters on an equipping Bonesplitter give the creature +2/+0" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let base = Setup.emptyGame S.bothPlayers
+        (pikerId, g1) = S.addCreature piker S.alice base
+        (equip, g2) = S.addCreature bonesplitter S.alice g1
+        loose = S.addCounter CounterKind.Hone 2 equip g2
+        equipped = S.addCounter CounterKind.Hone 2 equip (S.attach equip pikerId g2)
+    Spec.assertEqWith s "2 printed + 2 from the Bonesplitter + 2 from the counters" (Projection.powerOf pikerId equipped) (Just 6)
+    Spec.assertEqWith s "CR 122.1j gives +1/+0, so toughness is untouched" (Projection.toughnessOf pikerId equipped) (Just 1)
+    Spec.assertEqWith s "the same counters on an UNATTACHED Bonesplitter reach nothing" (Projection.powerOf pikerId loose) (Just 2)
+    Spec.assertEqWith s "and the Bonesplitter alone, with no counters, is the 4 this board would otherwise report" (Projection.powerOf pikerId (S.attach equip pikerId g2)) (Just 4)
+
+  -- The bonus is read through CR 301.5a's attachment live, so moving the
+  -- Equipment moves it. Two boards differing in exactly one thing again: which
+  -- creature the one honed Bonesplitter is on. A Hill Giant beside the Piker so
+  -- no two readings of the board share a number.
+  Spec.it s "CR 122.1j the bonus follows the Equipment, and is gone from the creature it left" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let base = Setup.emptyGame S.bothPlayers
+        (pikerId, g1) = S.addCreature piker S.alice base
+        (giantId, g2) = S.addCreature giant S.alice g1
+        (equip, g3) = S.addCreature bonesplitter S.alice g2
+        honed = S.addCounter CounterKind.Hone 2 equip g3
+        onPiker = S.attach equip pikerId honed
+        onGiant = S.attach equip giantId honed
+    Spec.assertEqWith s "on the Piker: 2 + 2 + 2" (Projection.powerOf pikerId onPiker) (Just 6)
+    Spec.assertEqWith s "and the Giant it is not on gets nothing" (Projection.powerOf giantId onPiker) (Just 3)
+    Spec.assertEqWith s "moved: the Giant is 3 + 2 + 2" (Projection.powerOf giantId onGiant) (Just 7)
+    Spec.assertEqWith s "and the Piker is back to its printed 2" (Projection.powerOf pikerId onGiant) (Just 2)
+
+  -- The whole card. Dwalin, Weaponmaster {1}{R/W} Legendary Creature -- Dwarf
+  -- Warrior 2/1, "First strike" / "Whenever Dwalin enters or attacks, put a hone
+  -- counter on each Equipment you control." (name, cost, type line and Oracle
+  -- text checked against api.scryfall.com 2026-08-25). Only the ENTERS half of
+  -- the card's two-event condition is driven here; the attacks half is the same
+  -- shape Blossoming Tortoise's condition already carries.
+  --
+  -- bob's equipped Bonesplitter is what "you control" is read against, and his
+  -- Piker keeps a different number from alice's Giant so neither board's power
+  -- can stand in for the other's.
+  Spec.it s "CR 122.1j whole card: Dwalin's enters trigger hones each Equipment its controller has" $ do
+    dwalin <- S.printingOf s registry "Dwalin, Weaponmaster"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let base = Setup.emptyGame S.bothPlayers
+        (giantId, g1) = S.addCreature giant S.alice base
+        (mine, g2) = S.addCreature bonesplitter S.alice g1
+        (pikerId, g3) = S.addCreature piker S.bob (S.attach mine giantId g2)
+        (theirs, g4) = S.addCreature bonesplitter S.bob g3
+        (dwalinId, arrived) = S.entersWithTrigger dwalin S.alice (S.attach theirs pikerId g4)
+        placed = S.runPure S.identityAnswer arrived Engine.placePendingTriggers
+        after = S.runPure S.identityAnswer placed Stack.resolveTop
+    Spec.assertEqWith s "setup: equipped and unhoned, the Giant is 3 + 2" (Projection.powerOf giantId arrived) (Just 5)
+    Spec.assertEqWith s "the honed Bonesplitter gives its Giant one more" (Projection.powerOf giantId after) (Just 6)
+    Spec.assertEqWith s "bob's Equipment is not one alice controls, so his Piker is still 2 + 2" (Projection.powerOf pikerId after) (Just 4)
+    Spec.assertEqWith s "one counter on alice's Equipment" (S.counterOf CounterKind.Hone mine after) 1
+    Spec.assertEqWith s "none on bob's" (S.counterOf CounterKind.Hone theirs after) 0
+    Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike dwalinId after) "and Dwalin's own printed first strike is there"
 
 -- CR 711 / CR 702.87 through a whole card: Student of Warfare ({W} Creature --
 -- Human Knight 1/1, "Level up {W}", "LEVEL 2-6 / 3/3 / First strike",

@@ -82,6 +82,14 @@ spec s = Spec.describe s "Pawl.Codec.CounterKind" $ do
       (CounterKind.codec Keyword.codec)
       CounterKind.Level
       " {\"type\":\"Level\"} "
+  -- CR 122.1j, the kind whose +1/+0 lands on the creature the bearer is
+  -- attached to rather than on the bearer.
+  Spec.it s "Hone" $
+    Common.assertCodec
+      s
+      (CounterKind.codec Keyword.codec)
+      CounterKind.Hone
+      " {\"type\":\"Hone\"} "
   -- CR 122.1's unlettered kinds, carrying the name the card prints rather than
   -- one constructor per printing.
   Spec.it s "Named carries the name the card prints" $
