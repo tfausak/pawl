@@ -2138,12 +2138,20 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
 -- admits "a number of +1/+1 counters equal to the number of creature cards in all
 -- graveyards" (Undergrowth Scavenger), and a Count inside it names a card type or
 -- a subtype CR 612.2 licenses swapping.
-rewriteWithCounters :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> WithCounters.WithCounters -> WithCounters.WithCounters
 --
 -- EVERY KIND on the row, since the row carries a map of them (#2314). Map.mapKeys
--- rather than a rebuild, so two kinds a rewrite collapses onto one -- which no
--- pair in CR 612.2's scope produces, since a counter kind holding a subtype holds
--- exactly one -- would leave one entry rather than two spellings of one key.
+-- rather than a rebuild: two keys colliding onto one loses a row silently
+-- (Map.mapKeys keeps an arbitrary survivor), the hazard Projection's
+-- Modification.ChangeSubtypeWord arm above guards against with
+-- 'Map.mapKeysWith (+)' for the same reason (islandwalk/swampwalk hacked
+-- Island -> Swamp). Left as 'Map.mapKeys' here rather than matching that guard:
+-- CR 122.1b's fifteen eligible keywords admit only one word a CR 612.2 swap can
+-- reach (Hexproof's quality, rewriteKeyword's Hexproof arm), so a collision would
+-- need two keyword counters both naming a quality the swap maps to the same word
+-- -- no printing this pool holds does. Quantity has no principled combiner to
+-- give 'mapKeysWith' if that ever changes (Pawl.Types.Quantity is deliberately
+-- Num-free), so a printing that does collide is unimplemented (#N).
+rewriteWithCounters :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> WithCounters.WithCounters -> WithCounters.WithCounters
 rewriteWithCounters pairs w =
   WithCounters.MkWithCounters
     . Map.mapKeys (Filter.rewriteCounterKind pairs)

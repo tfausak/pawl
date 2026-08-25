@@ -16,10 +16,4 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- a row that places nothing, which no card prints.
 codec :: Codec.Codec WithCounters.WithCounters
 codec =
-  Codec.MkCodec
-    { Codec.encode = Codec.encode inner . WithCounters.counters,
-      Codec.decode = fmap WithCounters.MkWithCounters . Codec.decode inner,
-      Codec.schema = Codec.schema inner
-    }
-  where
-    inner = Common.nonEmptyKeyedList EntryRiders.counter
+  Common.wrapper (Common.nonEmptyKeyedList EntryRiders.counter) WithCounters.MkWithCounters WithCounters.counters

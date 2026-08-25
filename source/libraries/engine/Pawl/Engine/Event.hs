@@ -1374,9 +1374,10 @@ apply batch candidate event =
       --
       -- CR 614.1c also admits "a number of ... counters ... equal to [something]"
       -- (Undergrowth Scavenger), so the amount is a Quantity and is evaluated ONCE
-      -- here (CR 608.2f), when this row applies, rather than per iteration of the
-      -- entry loop around it. CR 107.1b clamps a negative result to zero, which is
-      -- Integer.toNaturalSaturating.
+      -- here (CR 608.2h: information the effect requires is determined only once,
+      -- when the effect is applied), when this row applies, rather than per
+      -- iteration of the entry loop around it. CR 107.1b clamps a negative result
+      -- to zero, which is Integer.toNaturalSaturating.
       --
       -- The permanent is already materialized on the battlefield when this loop
       -- runs (see runEntry), so the CR 613 projection answers for it. The Context
