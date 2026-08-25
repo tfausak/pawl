@@ -215,7 +215,7 @@ theRingDrainsOnCombatDamage =
     { TriggeredAbility.condition = TriggerCondition.PermanentDealsCombatDamageToPlayer yourRingBearer,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       -- No intervening "if" (CR 603.4): rule 701.54c gives the emblem the ability
       -- or does not, and an ability that exists and declines to trigger is a

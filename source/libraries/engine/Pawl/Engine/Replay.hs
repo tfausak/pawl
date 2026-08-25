@@ -128,6 +128,7 @@ encode p answer = case p of
   Prompt.MulliganAction {} -> Response.TookMulliganAction answer
   Prompt.OpeningHandAction {} -> Response.TookOpeningHandAction answer
   Prompt.ChooseOptional {} -> Response.ChoseOptional answer
+  Prompt.ChooseClause {} -> Response.ChoseClause answer
   Prompt.OfferedCast {} -> Response.ChoseOfferedCast answer
   Prompt.ChooseOfferedCastFace {} -> Response.ChoseOfferedCastFace answer
   Prompt.OfferedMiracleReveal {} -> Response.ChoseMiracleReveal answer
@@ -381,6 +382,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseOptional {} -> case response of
     Response.ChoseOptional decision -> Just decision
+    _ -> Nothing
+  Prompt.ChooseClause {} -> case response of
+    Response.ChoseClause cIdx -> Just cIdx
     _ -> Nothing
   Prompt.OfferedCast {} -> case response of
     Response.ChoseOfferedCast decision -> Just decision
@@ -723,6 +727,12 @@ defaultAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a "may" is always legal and changes nothing.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2d: an either-or has no "decline" -- both branches are instructions --
+  -- so the default is the FIRST branch, which is the one CR 608.2c prints first.
+  -- Deliberate rather than arbitrary: Pawl.Engine.Script.declining routes every
+  -- unattended game and Pawl.Support.identityAnswer most of the suite through
+  -- this, so a Twiddle they never answer taps rather than untaps.
+  Prompt.ChooseClause _ _ _ _ branches -> NonEmpty.head branches
   -- CR 608.2g: declining an offered cast is always legal, and it leaves the card
   -- exactly where the resolving effect put it.
   Prompt.OfferedCast {} -> OptionalDecision.Declines

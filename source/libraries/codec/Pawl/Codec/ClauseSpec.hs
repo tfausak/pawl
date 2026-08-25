@@ -43,10 +43,10 @@ toJson = Codec.encode codec
 fromJson :: Value.Value -> Either Text.Text (Clause.Clause Text.Text)
 fromJson = Codec.decode codec
 
--- One constructor, so six cases: a populated clause, CR 603.5's `optionality`
+-- One constructor, so seven cases: a populated clause, CR 603.5's `optionality`
 -- flag when present, CR 118.12's `payGate` when present, CR 701.46a's
--- `condition` gate when present, CR 608.2c's `ifTaken` when present, and every
--- field defaulted at once.
+-- `condition` gate when present, CR 608.2c's `ifTaken` when present, CR 608.2d's
+-- `orElse` branch when present, and every field defaulted at once.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Clause" $ do
   Spec.it s "MkClause with one effect" $
@@ -54,7 +54,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       s
       toJson
       fromJson
-      (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target")))))
+      (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target")))))
       " {\"effects\":[{\"type\":\"Attach\",\"value\":\"target\"}]} "
   -- CR 603.5: an Optional clause is what a printed "may" encodes to, and the key
   -- is emitted only for that value.
@@ -63,7 +63,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       s
       toJson
       fromJson
-      (Clause.MkClause Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing Seq.empty)
+      (Clause.MkClause Nothing Nothing Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing Seq.empty)
       " {\"optionality\":{\"type\":\"Optional\"}} "
   -- CR 608.2c: Tweeze's "If you do" names the ordinal of the clause it hangs
   -- off, and the key is emitted only when there is one.
@@ -72,8 +72,19 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       s
       toJson
       fromJson
-      (Clause.MkClause (Just (ClauseIndex.MkClauseIndex 1)) Nothing Optionality.Mandatory Nothing Seq.empty)
+      (Clause.MkClause (Just (ClauseIndex.MkClauseIndex 1)) Nothing Nothing Optionality.Mandatory Nothing Seq.empty)
       " {\"ifTaken\":1} "
+  -- CR 608.2d: Twiddle's tap names the untap it is exclusive with, and the key is
+  -- emitted only when there is one. A DIFFERENT key from ifTaken, though both
+  -- hold a bare ordinal: one clause may hang off an earlier one and branch
+  -- against another, and a wire that fused them could not say which.
+  Spec.it s "a clause exclusive with a sibling writes the orElse key" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Clause.MkClause Nothing Nothing (Just (ClauseIndex.MkClauseIndex 1)) Optionality.Mandatory Nothing Seq.empty)
+      " {\"orElse\":1} "
   -- CR 118.12a: Mana Leak's "unless its controller pays {3}" is what the
   -- payGate key encodes, and it is emitted only when there is one.
   Spec.it s "a clause carrying a resolution cost writes the key" $
@@ -82,6 +93,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       toJson
       fromJson
       ( Clause.MkClause
+          Nothing
           Nothing
           Nothing
           Optionality.Mandatory
@@ -106,6 +118,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       ( Clause.MkClause
           Nothing
           (Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters CounterKind.PlusOnePlusOne) Comparison.Exactly (Quantity.Literal 0))))
+          Nothing
           Optionality.Mandatory
           Nothing
           Seq.empty
@@ -116,5 +129,5 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       s
       toJson
       fromJson
-      (Clause.MkClause Nothing Nothing Optionality.Mandatory Nothing Seq.empty)
+      (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)
       " {} "
