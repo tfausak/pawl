@@ -3,6 +3,7 @@ module Pawl.Types.EntryRewrite where
 import qualified Data.Sequence as Seq
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AsCopy as AsCopy
+import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -12,7 +13,8 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- | CR 614.1c-d: how an entry replacement modifies the entry. AsCopy is Clone
 -- (CR 707.5, and a real "may" -- declining is legal), with CR 707.9's
 -- exceptions attached Quicksilver Gargantuan, and with its `tapped` set Vesuva; ChoiceOf is Primal Plasma
--- (CR 208.2b); ChooseColor is Painter's Servant (CR 614.1c);
+-- (CR 208.2b); ChoiceByCoinFlip is Molten Sentry, the same options picked by CR
+-- 705.2's winnerless coin flip; ChooseColor is Painter's Servant (CR 614.1c);
 -- ChooseBasicLandType is Convincing Mirage (CR 614.1c); ChoosePlayer is Stuffy
 -- Doll (CR 614.1c); ChooseCardNames is Null
 -- Chamber (CR 614.1c with CR 201.4); WithCounters is CR 306.5b's intrinsic
@@ -22,8 +24,8 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- Monstrous War-Leech (CR 614.1c); ReadAhead is CR 702.155b's pair of
 -- intrinsic abilities on a Saga (CR 714.3b).
 --
--- AsCopy and ChoiceOf write into the object's COPIABLE snapshot, which is what
--- makes CR 707.2 fall out with no further machinery -- and CR 707.9b puts
+-- AsCopy, ChoiceOf and ChoiceByCoinFlip write into the object's COPIABLE
+-- snapshot, which is what makes CR 707.2 fall out with no further machinery -- and CR 707.9b puts
 -- AsCopy's exceptions in the same place, since the excepted value "becomes part
 -- of the copiable values of the copy". CR 707.5's second half is
 -- load-bearing here too: a copied "as [this] enters" ability takes effect, so a
@@ -44,6 +46,28 @@ data EntryRewrite effect
     -- 707.9's exceptions to the copying process; see Pawl.Types.AsCopy.
     AsCopy AsCopy.AsCopy
   | ChoiceOf [EntryOption.EntryOption]
+  | -- | CR 614.1c decided by CR 705.2's FIRST sentence: "as this creature
+    -- enters, flip a coin. If the coin comes up heads, this creature enters as a
+    -- 5/2 creature with haste. If it comes up tails, this creature enters as a
+    -- 2/5 creature with defender" (Molten Sentry).
+    --
+    -- ChoiceOf one seat over: the same EntryOption values written into the same
+    -- copiable snapshot, picked by the coin instead of by the controller. So a
+    -- Clone of a Molten Sentry copies the as-enters ability (CR 707.5) and flips
+    -- its own coin, exactly as it makes its own choice off a Primal Plasma.
+    --
+    -- NOT ChoiceOf with a flag, because the two differ in who decides: rule
+    -- 208.2b's choice is a player's and this one is nobody's, so the arms ask
+    -- different questions (Prompt.ChooseEntryOption against Prompt.FlipCoin) and
+    -- an elision legal for one is illegal for the other -- a one-option ChoiceOf
+    -- is not a choice and must not prompt, while a flip whose two faces name the
+    -- same option still happens.
+    --
+    -- NO WINNER, which is the whole of rule 705.2's first sentence: nothing here
+    -- asks Prompt.CallCoin, and the GameEvent.CoinFlipped Pawl.Engine.Event
+    -- records carries no outcome at all. A flip recorded as LOST would be the
+    -- same board today and the wrong claim -- see Pawl.Types.CoinFlipped.
+    ChoiceByCoinFlip EntryFlip.EntryFlip
   | -- | CR 614.1c's other choosing shape: choose a colour as this enters
     -- (Painter's Servant). Nullary -- CR 105.1's five colours are the offer, and
     -- no card narrows them.

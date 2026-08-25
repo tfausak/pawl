@@ -74,6 +74,7 @@ import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -2082,6 +2083,15 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   EntryRewrite.AsCopy c -> EntryRewrite.AsCopy c {AsCopy.eligible = Filter.rewrite pairs (AsCopy.eligible c)}
   -- CR 702.14a's word again, this time inside a keyword an option grants.
   EntryRewrite.ChoiceOf os -> EntryRewrite.ChoiceOf (fmap (\o -> o {EntryOption.keywords = Set.map (Filter.rewriteKeyword pairs) (EntryOption.keywords o)}) os)
+  -- The same word again, in an option a coin picks rather than a player. NO
+  -- BOARD OBSERVES IT, and cannot: rewriteKeyword only ever changes a keyword
+  -- that CARRIES a word (landwalk, typecycling, hexproof from, protection from),
+  -- and Molten Sentry's two options grant haste and defender, which carry none.
+  -- The arm is the rule (CR 612.1) rather than a proven behaviour -- an option
+  -- granting islandwalk would be what proves it.
+  EntryRewrite.ChoiceByCoinFlip f ->
+    let rewriteOption o = o {EntryOption.keywords = Set.map (Filter.rewriteKeyword pairs) (EntryOption.keywords o)}
+     in EntryRewrite.ChoiceByCoinFlip f {EntryFlip.heads = rewriteOption (EntryFlip.heads f), EntryFlip.tails = rewriteOption (EntryFlip.tails f)}
   -- CR 105.1's five colours, CR 305.6's five basic land types and CR 102.1's
   -- seats are the offers themselves, so none of the three prints a word the card
   -- chose.

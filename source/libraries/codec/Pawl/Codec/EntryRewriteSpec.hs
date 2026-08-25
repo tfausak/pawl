@@ -13,6 +13,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect.Type
+import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Filter as Filter
@@ -64,6 +65,19 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
           ]
       )
       " {\"type\":\"ChoiceOf\",\"value\":[{\"power\":3,\"toughness\":3},{\"power\":1,\"toughness\":6,\"keywords\":[{\"type\":\"Defender\"}]}]} "
+  -- CR 614.1c with CR 705.2: the same two shapes picked by a coin instead of by
+  -- a player, keyed by face rather than listed.
+  Spec.it s "ChoiceByCoinFlip (Molten Sentry)" $
+    Common.assertCodec
+      s
+      (EntryRewrite.codec (Effect.codec Card.codec))
+      ( EntryRewrite.ChoiceByCoinFlip
+          EntryFlip.MkEntryFlip
+            { EntryFlip.heads = EntryOption.MkEntryOption {EntryOption.power = 5, EntryOption.toughness = 2, EntryOption.keywords = Set.singleton Keyword.Haste},
+              EntryFlip.tails = EntryOption.MkEntryOption {EntryOption.power = 2, EntryOption.toughness = 5, EntryOption.keywords = Set.singleton Keyword.Defender}
+            }
+      )
+      " {\"type\":\"ChoiceByCoinFlip\",\"value\":{\"heads\":{\"power\":5,\"toughness\":2,\"keywords\":[{\"type\":\"Haste\"}]},\"tails\":{\"power\":2,\"toughness\":5,\"keywords\":[{\"type\":\"Defender\"}]}}} "
   -- CR 614.1c / 105.1: an as-enters colour choice, payload-free because the
   -- five colours are always the whole offer.
   Spec.it s "ChooseColor (Painter's Servant)" $

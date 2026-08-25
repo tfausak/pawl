@@ -2098,9 +2098,10 @@ representativeEvents cond =
         TriggerCondition.PlayerSurveils _ -> one (GameEvent.Surveiled S.bob)
         TriggerCondition.PlayerRollsDice _ -> one (GameEvent.DiceRolled S.bob)
         -- CR 705.2's own event, and the only one this condition admits. A WON
-        -- flip, since a lost one does not match at all -- and bob rather than the
-        -- perspective player, on the PlayerScries arm's reasoning.
-        TriggerCondition.PlayerWinsCoinFlip _ -> one (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.bob, CoinFlipped.won = True})
+        -- flip, since neither a lost one nor rule 705.2's winnerless one matches
+        -- at all -- and bob rather than the perspective player, on the
+        -- PlayerScries arm's reasoning.
+        TriggerCondition.PlayerWinsCoinFlip _ -> one (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.bob, CoinFlipped.won = Just True})
         -- CR 702.170a's own event, and the only one this condition admits. On
         -- `departed`, which is not the bearer on the board below -- so the pair
         -- does not match, which pins the floor for a matching pair too, this

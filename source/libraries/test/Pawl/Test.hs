@@ -140,6 +140,7 @@ import qualified Pawl.Codec.EachCardInHandSpec
 import qualified Pawl.Codec.EffectSpec
 import qualified Pawl.Codec.EndTurnSignalSpec
 import qualified Pawl.Codec.EndingStepSpec
+import qualified Pawl.Codec.EntryFlipSpec
 import qualified Pawl.Codec.EntryOptionSpec
 import qualified Pawl.Codec.EntryRSpec
 import qualified Pawl.Codec.EntryRestrictionSpec
@@ -650,6 +651,7 @@ spec s registry = do
   Pawl.Codec.EffectSpec.spec s
   Pawl.Codec.EndTurnSignalSpec.spec s
   Pawl.Codec.EndingStepSpec.spec s
+  Pawl.Codec.EntryFlipSpec.spec s
   Pawl.Codec.EntryOptionSpec.spec s
   Pawl.Codec.EntryRSpec.spec s
   Pawl.Codec.EntryRestrictionSpec.spec s

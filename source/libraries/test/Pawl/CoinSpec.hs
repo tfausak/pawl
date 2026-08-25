@@ -10,6 +10,10 @@
 -- group proves with Tavern Scoundrel: what a trigger sees is a rule 603 question
 -- rather than a rule 705 one, and Winter Sky watches nothing.
 --
+-- NOT rule 705.2's FIRST sentence either -- the flip nobody wins, which is an
+-- entry replacement rather than an effect (Molten Sentry), and is proved in
+-- Pawl.ReplacementSpec beside the rest of the CR 614.1c family.
+--
 -- Its own module rather than a group in Pawl.DiceSpec: CR 705 and CR 706 are
 -- different rules sharing no type, no prompt and no effect. A coin has no size,
 -- no results table and no modifier; a die has no call and no winner.

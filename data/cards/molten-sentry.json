@@ -1,0 +1,75 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Molten Sentry",
+      "power": {
+        "type": "Star"
+      },
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "ChoiceByCoinFlip",
+                "value": {
+                  "heads": {
+                    "keywords": [
+                      {
+                        "type": "Haste"
+                      }
+                    ],
+                    "power": 5,
+                    "toughness": 2
+                  },
+                  "tails": {
+                    "keywords": [
+                      {
+                        "type": "Defender"
+                      }
+                    ],
+                    "power": 2,
+                    "toughness": 5
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "toughness": {
+        "type": "Star"
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elemental"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -54,6 +54,8 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CoinFace as CoinFace
+import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -261,6 +263,53 @@ enteringAs which p = case p of
   Prompt.ChooseEntryOption {} -> which
   Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe (List.sortOn Ord.Down legal)
   _ -> S.identityAnswer p
+
+-- alice holds a Molten Sentry, with four untapped Mountains and one Tavern
+-- Scoundrel already on the battlefield, in her precombat main phase with
+-- priority. Four Mountains rather than the printed {3}{R}'s worth exactly --
+-- nothing here is testing whether the mana was enough.
+sentryBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+sentryBoard mountain scoundrel sentry =
+  let (_, withScoundrel) = S.addCreature scoundrel S.alice (S.landsInPlay mountain 4)
+      (spellId, withSentry) = S.addHandCard sentry S.alice withScoundrel
+   in ( withSentry
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        spellId
+      )
+
+-- Pins BOTH of CR 705.2's questions to the same face, never to anything derived
+-- from the prompt: a road that wrongly called the coin therefore MATCHES and
+-- wins, which is the reading the Treasure count rules out.
+sentryAnswer :: CoinFace.CoinFace -> Prompt.Prompt r -> r
+sentryAnswer face p = case p of
+  Prompt.FlipCoin -> face
+  Prompt.CallCoin {} -> face
+  _ -> S.identityAnswer p
+
+isFlip :: GameEvent.GameEvent -> Bool
+isFlip e = case e of
+  GameEvent.CoinFlipped _ -> True
+  _ -> False
+
+wasCall :: Response.Response -> Bool
+wasCall r = case r of
+  Response.CalledCoin _ -> True
+  _ -> False
+
+-- Cast the Sentry, resolve it, then run CR 603.3's place/resolve cycle twice, so
+-- a trigger that the entry's flip wrongly fired has room to resolve and be seen.
+runSentry :: CoinFace.CoinFace -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+runSentry face board spellId =
+  let drain n g =
+        if n <= (0 :: Int) || null (GameState.stack g)
+          then g
+          else drain (n - 1) (S.runPure (sentryAnswer face) g Stack.resolveTop)
+      cycleOnce g = drain 8 (S.runPure (sentryAnswer face) g Engine.placePendingTriggers)
+      resolved = S.runPure (sentryAnswer face) board (S.cast S.alice spellId >> Stack.resolveTop)
+   in cycleOnce (cycleOnce resolved)
 
 -- The newest battlefield object whose printed card has this name.
 newestNamed :: CardName.CardName -> GameState.GameState -> Maybe ObjectId.ObjectId
@@ -3838,6 +3887,79 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
                 Spec.assertEqWith s "its OWN choice wins on P/T" (Projection.toughnessOf clone s3) (Just 3)
                 Spec.assertBool s (Projection.hasKeyword Keyword.Flying clone s3 && Projection.hasKeyword Keyword.Defender clone s3) "flying and defender rode the copy chain"
       _ -> Spec.assertFailure s "fixture did not deal three cards"
+  -- CR 705.2's FIRST sentence, the flip nobody wins: Molten Sentry {3}{R}
+  -- Creature -- Elemental */*, "As this creature enters, flip a coin. If the
+  -- coin comes up heads, this creature enters as a 5/2 creature with haste. If
+  -- it comes up tails, this creature enters as a 2/5 creature with defender."
+  --
+  -- THE BOARD carries a Tavern Scoundrel ("Whenever you win a coin flip, create
+  -- two Treasure tokens") under the same seat, and it is the discrimination.
+  -- The shortest wrong implementation of this rewrite is the road already built
+  -- -- Pawl.Engine.Resolve's Effect.FlipCoin arm -- which calls the coin first
+  -- and records the flip as WON when the call matches. The answerer below pins
+  -- both questions to the same face, so that road wins its flip and the
+  -- Scoundrel mints two Treasures; the correct road asks no call, records no
+  -- outcome, and mints none. 0 against 2, asserted FIRST so no proxy absorbs
+  -- it.
+  --
+  -- CR 603.3 IS THE SEQUENCING, as in Pawl.EventTriggerSpec's Scoundrel case:
+  -- the flip happens inside the entry replacement, so a trigger off it would
+  -- reach the stack only at the next priority. `runSentry` runs the
+  -- place/resolve cycle twice, which is what gives a wrongly-won flip room to
+  -- pay out.
+  --
+  -- THE P/T assertions run on both faces, one board apiece, so the face-to-option
+  -- mapping is pinned in both directions: a swapped mapping cannot pass both.
+  Spec.it s "CR 705.2 nobody wins Molten Sentry's flip, so its heads face mints no Treasure" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    scoundrel <- S.printingOf s registry "Tavern Scoundrel"
+    sentry <- S.printingOf s registry "Molten Sentry"
+    let (board, spellId) = sentryBoard mountain scoundrel sentry
+        after = runSentry CoinFace.Heads board spellId
+    Spec.assertEqWith
+      s
+      "CR 705.2: no player won the flip, so the Scoundrel minted nothing"
+      (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Treasure Token") S.alice after)
+      0
+    -- The flip HAPPENED and was recorded with no outcome, which keeps the zero
+    -- above from passing for a Sentry that never flipped at all. Asserted as the
+    -- WHOLE list of flips rather than as membership: CR 705.1's sentence
+    -- instructs one flip, so a rewrite applied twice is as wrong as one applied
+    -- never.
+    Spec.assertEqWith
+      s
+      "CR 705.1: one flip, and CR 705.2 left it with no winner"
+      (filter isFlip (S.eventsOf after))
+      [GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.alice, CoinFlipped.won = Nothing}]
+    case newestNamed (CardName.MkCardName $ Text.pack "Molten Sentry") after of
+      Nothing -> Spec.assertFailure s "Molten Sentry did not reach the battlefield"
+      Just sentryId -> do
+        Spec.assertEqWith s "CR 208.2b: heads is the 5/2" (S.powerToughnessOf sentryId after) (Just (5, 2))
+        Spec.assertBool s (Projection.hasKeyword Keyword.Haste sentryId after) "with haste"
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Defender sentryId after)) "and not defender"
+    -- No call was ever made, which is the other half of rule 705.2's first
+    -- sentence: the flip was asked (Response.FlippedCoin) and nobody was asked
+    -- to call it.
+    let asked = answersFor (sentryAnswer CoinFace.Heads) board (S.cast S.alice spellId >> Stack.resolveTop)
+    Spec.assertBool s (elem (Response.FlippedCoin CoinFace.Heads) asked) "the coin was flipped"
+    Spec.assertBool s (not (any wasCall asked)) "and no CallCoin was raised"
+  Spec.it s "CR 705.2 the same flip coming up tails is the 2/5 with defender" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    scoundrel <- S.printingOf s registry "Tavern Scoundrel"
+    sentry <- S.printingOf s registry "Molten Sentry"
+    let (board, spellId) = sentryBoard mountain scoundrel sentry
+        after = runSentry CoinFace.Tails board spellId
+    Spec.assertEqWith
+      s
+      "CR 705.2: a tails flip has no winner either"
+      (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Treasure Token") S.alice after)
+      0
+    case newestNamed (CardName.MkCardName $ Text.pack "Molten Sentry") after of
+      Nothing -> Spec.assertFailure s "Molten Sentry did not reach the battlefield"
+      Just sentryId -> do
+        Spec.assertEqWith s "CR 208.2b: tails is the 2/5" (S.powerToughnessOf sentryId after) (Just (2, 5))
+        Spec.assertBool s (Projection.hasKeyword Keyword.Defender sentryId after) "with defender"
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste sentryId after)) "and not haste"
   -- CR 208.2b's own elision, at the ChoiceOf boundary: such an ability
   -- "lists two or more specific power and toughness values", so a
   -- single-option as-enters choice is not a 208.2b choice at all and

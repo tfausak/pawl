@@ -2,6 +2,7 @@ module Pawl.Codec.EntryRewrite where
 
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.AsCopy as AsCopy
+import qualified Pawl.Codec.EntryFlip as EntryFlip
 import qualified Pawl.Codec.EntryOption as EntryOption
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
@@ -27,6 +28,7 @@ codec effectCodec =
   Arm.tagged
     [ Arm.payload "AsCopy" AsCopy.codec EntryRewrite.AsCopy (\x -> case x of EntryRewrite.AsCopy y -> Just y; _ -> Nothing),
       Arm.payload "ChoiceOf" (Common.list EntryOption.codec) EntryRewrite.ChoiceOf (\x -> case x of EntryRewrite.ChoiceOf y -> Just y; _ -> Nothing),
+      Arm.payload "ChoiceByCoinFlip" EntryFlip.codec EntryRewrite.ChoiceByCoinFlip (\x -> case x of EntryRewrite.ChoiceByCoinFlip y -> Just y; _ -> Nothing),
       Arm.payload "WithCounters" WithCounters.codec EntryRewrite.WithCounters (\x -> case x of EntryRewrite.WithCounters y -> Just y; _ -> Nothing),
       Arm.nullary "ChooseColor" EntryRewrite.ChooseColor,
       Arm.nullary "ChooseBasicLandType" EntryRewrite.ChooseBasicLandType,

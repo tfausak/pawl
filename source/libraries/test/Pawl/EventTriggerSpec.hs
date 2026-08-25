@@ -4400,7 +4400,7 @@ tavernScoundrelSpec s registry =
                 -- an ability that never activated at all.
                 Spec.assertBool
                   s
-                  (elem (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.alice, CoinFlipped.won = False}) (S.eventsOf after))
+                  (elem (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.alice, CoinFlipped.won = Just False}) (S.eventsOf after))
                   "CR 705.1 the flip is recorded even though CR 705.2 lost it"
             _ -> Spec.assertFailure s "expected exactly one Scoundrel"
         -- CR 109.5 / 603.3a: the relation is read against the ABILITY'S
