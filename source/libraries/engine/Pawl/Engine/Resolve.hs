@@ -3266,8 +3266,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- whether the CANDIDATE could legally be attached to the object this
     -- instruction fixes (Auratouched Mage's "an Aura card that could enchant
     -- it"), which for a search is the searching ability's own SOURCE. Answered by
-    -- Attach.attachmentFor, the same function the move goes through, so the offer
-    -- and the move cannot disagree. Lazy, so a filter that never names
+    -- Attach.attachableWithLastKnown, whose live half is the same function the
+    -- move goes through, so the offer and the move cannot disagree -- and whose
+    -- other half is CR 608.2h: a source killed while its own trigger was on the
+    -- stack is read as it MOST RECENTLY existed, so the search still finds the
+    -- card that could have enchanted it, and putFound's own CR 608.2h branch is
+    -- where that card then goes. Lazy, so a filter that never names
     -- Filter.CanAttachToSubject pays nothing for it.
     --
     -- No recursion to bound: this is called from a resolution rather than from
@@ -3284,7 +3288,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let searchContext g = (Filter.contextFor Nothing Nothing) {Filter.sourceChosenNames = PlayerEffect.chosenNamesOf (Just source) g}
         viewOfCandidate g oid =
           (Projection.viewOfObject oid g)
-            { Filter.canAttachToSubject = Maybe.isJust (Attach.attachmentFor oid (Recipient.ToObject source) g)
+            { Filter.canAttachToSubject = Attach.attachableWithLastKnown oid source g
             }
         matches1 g oid = Filter.matches (searchContext g) (viewOfCandidate g oid) filter_
         -- CR 400.2: the library and the hand are the hidden zones. CR 701.23b,
@@ -6251,13 +6255,30 @@ putFound searcher source destination cardId = case destination of
   -- Nothing is CR 303.4i's "the Aura remains in its current zone" -- unreachable
   -- from a filter naming Filter.CanAttachToSubject, since that atom is this same
   -- function, and the honest answer for a card whose filter does not.
+  --
+  -- The OUTER branch is the card's own "If this creature is still on the
+  -- battlefield ... Otherwise", asked of the SOURCE's liveness rather than of
+  -- attachmentFor's Nothing. The two are different questions and the rules give
+  -- them opposite answers: an Aura a LIVE host cannot legally hold stays in the
+  -- library (CR 303.4i), while an Aura whose host has gone is revealed and put
+  -- into its owner's hand (CR 608.2h; CR 113.7a is what keeps the ability
+  -- resolving at all with its source gone). Branching on Nothing alone would
+  -- send the first of those to the hand.
   SearchDestination.BattlefieldAttachedToSource -> do
     gs <- State.get
-    case Attach.attachmentFor cardId (Recipient.ToObject source) gs of
-      Nothing -> pure ()
-      Just seed ->
-        Monad.void
-          (Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False)
+    if Set.member source (GameState.battlefield gs)
+      then case Attach.attachmentFor cardId (Recipient.ToObject source) gs of
+        Nothing -> pure ()
+        Just seed ->
+          Monad.void
+            (Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False)
+      else do
+        -- CR 701.20b makes the order matter, for RevealThenHand's reason above:
+        -- swapped, CR 400.7 has already ceased `cardId` and the reveal shows
+        -- nothing. The reveal is the CARD's own instruction (CR 701.23e), which
+        -- is why it is written here rather than in the searching rule.
+        Event.reveal RevealCause.Ordinary searcher cardId
+        Event.changeZone cardId Zone.Hand
 
 -- Put a found card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.
