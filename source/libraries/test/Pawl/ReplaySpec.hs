@@ -29,6 +29,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
@@ -1024,6 +1025,22 @@ combatReplaySpec s =
             "the head"
             (Replay.defaultAnswer (Prompt.ChooseDamageSource decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
             (ObjectId.MkObjectId 7)
+        -- CR 122.5: which KIND of counter a player moved is a decision like any
+        -- other, and the only one whose answer is not an object at all.
+        Spec.it s "ChooseMovedCounter round-trips through the transcript" $ do
+          let a = CounterKind.PlusOnePlusOne
+              b = CounterKind.Shield
+              p = Prompt.ChooseMovedCounter decider S.alice oid (ObjectId.MkObjectId 9) (a NonEmpty.:| [b])
+          Spec.assertEqWith s "choosing the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          Spec.assertEqWith s "choosing the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        Spec.it s "a short moved-counter transcript returns the first kind offered" $
+          -- CR 122.5: every offered kind is one the object actually has, so the
+          -- head can really be moved.
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.ChooseMovedCounter decider S.alice oid (ObjectId.MkObjectId 9) (CounterKind.PlusOnePlusOne NonEmpty.:| [CounterKind.Shield])))
+            CounterKind.PlusOnePlusOne
         -- CR 701.68a: which creature a blighting player put the counters on is a
         -- decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseBlight round-trips through the transcript" $ do

@@ -220,6 +220,7 @@ import qualified Pawl.Codec.MonarchTargetSpec
 import qualified Pawl.Codec.MonarchWatchSpec
 import qualified Pawl.Codec.MorphSpec
 import qualified Pawl.Codec.MorphVariantSpec
+import qualified Pawl.Codec.MoveCountersSpec
 import qualified Pawl.Codec.MoveToZoneSpec
 import qualified Pawl.Codec.MovedBetweenSpec
 import qualified Pawl.Codec.MovedSpec
@@ -419,6 +420,7 @@ import qualified Pawl.ManaSpec
 import qualified Pawl.MassEffectSpec
 import qualified Pawl.ModalDoubleFacedSpec
 import qualified Pawl.ModalSpec
+import qualified Pawl.MoveCounterSpec
 import qualified Pawl.MulliganSpec
 import qualified Pawl.PhasingSpec
 import qualified Pawl.PlaneswalkerSpec
@@ -779,6 +781,7 @@ spec s registry = do
   Pawl.Codec.PrintingSpec.spec s
   Pawl.Codec.ProductionTagSpec.spec s
   Pawl.Codec.ProjectedCharacteristicsSpec.spec s
+  Pawl.Codec.MoveCountersSpec.spec s
   Pawl.Codec.PutCountersSpec.spec s
   Pawl.Codec.QuantitySpec.spec s
   Pawl.Codec.RecipientSpec.spec s
@@ -941,6 +944,7 @@ spec s registry = do
   Pawl.RadSpec.spec s registry
   Pawl.RegistrySpec.spec s
   Pawl.ReplaySpec.spec s registry
+  Pawl.MoveCounterSpec.spec s registry
   Pawl.ResolveSpec.spec s registry
   Pawl.RingSpec.spec s registry
   Pawl.RoomSpec.spec s registry

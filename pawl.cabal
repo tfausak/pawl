@@ -503,6 +503,8 @@ library codec
     Pawl.Codec.MorphSpec
     Pawl.Codec.MorphVariant
     Pawl.Codec.MorphVariantSpec
+    Pawl.Codec.MoveCounters
+    Pawl.Codec.MoveCountersSpec
     Pawl.Codec.Moved
     Pawl.Codec.MovedBetween
     Pawl.Codec.MovedBetweenSpec
@@ -1159,6 +1161,7 @@ library test
     Pawl.MassEffectSpec
     Pawl.ModalDoubleFacedSpec
     Pawl.ModalSpec
+    Pawl.MoveCounterSpec
     Pawl.MulliganSpec
     Pawl.PhasingSpec
     Pawl.PlaneswalkerSpec
@@ -1440,6 +1443,7 @@ library types
     Pawl.Types.MonarchWatch
     Pawl.Types.Morph
     Pawl.Types.MorphVariant
+    Pawl.Types.MoveCounters
     Pawl.Types.Moved
     Pawl.Types.MovedBetween
     Pawl.Types.MoveToZone

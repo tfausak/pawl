@@ -894,6 +894,7 @@ effectCounts effect = case effect of
   Effect.BecomesBlocked _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
+  Effect.MoveCounters {} -> []
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> quantityCounts quantity
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
@@ -1159,6 +1160,7 @@ effectNestedEffects effect = case effect of
   Effect.BecomesBlocked {} -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
+  Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
@@ -1618,6 +1620,7 @@ effectReplacements effect = case effect of
   Effect.BecomesBlocked _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
+  Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
@@ -2316,6 +2319,7 @@ effectMintedFaces effect = case effect of
   Effect.BecomesBlocked _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
+  Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
@@ -3867,6 +3871,7 @@ effectFilters effect = case effect of
   -- you control with a +1/+1 counter on it", and a Filter there would otherwise
   -- escape the lint.
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity ref) -> unframed (quantityFilters quantity) <> sourceHosted (objectRefFilters ref)
+  Effect.MoveCounters {} -> []
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> unframed (quantityFilters quantity)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)

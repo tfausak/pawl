@@ -1793,6 +1793,8 @@ rewriteEffect pairs effect = case effect of
   Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) ->
     Effect.PutCounters (PutCounters.MkPutCounters kind (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
   Effect.RemoveCounters {} -> effect
+  -- Two bare slots, and Filter.rewrite renames no slot: nothing here to rewrite.
+  Effect.MoveCounters {} -> effect
   Effect.GainPlayerCounters {} -> effect
   Effect.RemovePlayerCounters {} -> effect
   Effect.PayAnyEnergy _ -> effect

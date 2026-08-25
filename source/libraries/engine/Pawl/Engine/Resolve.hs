@@ -164,6 +164,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
+import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -536,6 +537,9 @@ slotsOf effect = case effect of
   Effect.Counter (Counter.MkCounter ref _) -> objectRefSlots ref
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity ref) -> joinTwo (objectRefSlots ref) (quantitySlots quantity)
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity slot) -> insertOne slot (quantitySlots quantity)
+  -- CR 122.5's pair, both read singly: the object the counter leaves and the
+  -- object it lands on.
+  Effect.MoveCounters (MoveCounters.MkMoveCounters from to) -> insertOne from (oneSlot to)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- The SlotName is a DEFINITION, not a read; it belongs to boundSlots below.
@@ -788,6 +792,8 @@ slotsAreExhaustive effect = case effect of
   Effect.Counter {} -> True
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
+  -- No Quantity at all: rule 122.5 moves one counter.
+  Effect.MoveCounters {} -> True
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.PayAnyEnergy _ -> True
@@ -945,6 +951,7 @@ readsX = any effectReadsX
       Effect.Counter {} -> False
       Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
       Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.readsX quantity
+      Effect.MoveCounters {} -> False
       Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
       Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
       -- CR 107.14's amount is asked for as the spell resolves, never CR
@@ -1141,6 +1148,7 @@ boundSlots effect = case effect of
   Effect.Counter (Counter.MkCounter _ mSlot) -> foldMap Set.singleton mSlot
   Effect.PutCounters {} -> Set.empty
   Effect.RemoveCounters {} -> Set.empty
+  Effect.MoveCounters {} -> Set.empty
   Effect.GainPlayerCounters {} -> Set.empty
   Effect.RemovePlayerCounters {} -> Set.empty
   -- CR 107.14: how much {E} the payer paid, for a later effect of the same
@@ -5649,17 +5657,76 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
           Just n -> Monad.when (n > 0) (Event.removeCounters target kind (Integer.toNaturalSaturating n))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
-      -- CR 701.34a: choose any number of permanents and/or players that have a
-      -- counter, then give each one more of every kind it already has. "That have
-      -- a counter" is the candidate filter, and "any number" is why a lone
-      -- candidate is still asked about.
-      --
-      -- Candidates and kinds are read BEFORE the prompt and before any counter
-      -- lands (CR 608.2h), so a CR 614 replacement cannot widen the kinds.
-      -- Targetless: no CR 608.2b legality to re-check.
-      --
-      -- The roster is Game.stillPlaying, not the keys of GameState.players, whose
-      -- departed seats keep counters CR 800.4a does not remove.
+  Effect.MoveCounters (MoveCounters.MkMoveCounters fromSlot toSlot) -> do
+    -- CR 122.5: move ONE counter off one permanent and onto a second, the player
+    -- choosing which kind. ATOMIC -- "if either of these actions isn't possible,
+    -- it's not possible to move a counter, and no counter is removed from or put
+    -- onto anything" -- so every impossibility the rule names is checked BEFORE
+    -- either half runs, and this arm is not a RemoveCounters followed by a
+    -- PutCounters however much its tail looks like one.
+    --
+    -- Three of the rule's four impossibilities are checked here, in its own order.
+    -- Its third, "the second object can't have counters put onto it", is a
+    -- PROHIBITION (Solemnity, Melira) and not a replacement, and pawl models no
+    -- such prohibition at all, so there is nothing to consult (gap #2320). A CR
+    -- 614.16 row that scales the placement to nothing is NOT that case: the
+    -- placement was possible and was replaced, which rule 122.5 does not undo.
+    --
+    -- The two halves go through Event.removeCounters and Event.putCounters, so the
+    -- move records both crossings -- a CR 122.7 "when the Nth counter is put on"
+    -- trigger sees the arrival, and rule 122.5's own reading is that a move IS
+    -- those two actions.
+    gs <- State.get
+    let objectAt slot = legalOne slot legal >>= Recipient.objectOf
+    case (objectAt fromSlot, objectAt toSlot) of
+      (Just from, Just to)
+        -- "This may occur if the first and second objects are the same object".
+        | from /= to,
+          -- "... or if either object is no longer in the correct zone". A counter
+          -- is a marker on a permanent (CR 122.1), so for both sides of THIS
+          -- opcode's pair the correct zone is the battlefield: a slot bound as
+          -- the ability triggered may name an object CR 400.7 has since moved.
+          --
+          -- The `from` half is a REGRESSION FENCE rather than proven behaviour:
+          -- mutating it away leaves the suite green, because CR 122.2 makes a
+          -- permanent's counters cease to exist as it changes zones and CR 400.7
+          -- gives what arrives a new id, so the candidate sweep below already
+          -- finds nothing. Kept because rule 122.5 states it about both objects.
+          -- Pawl.MoveCounterSpec's sacrifice case is the board it fences.
+          Set.member from (GameState.battlefield gs),
+          Set.member to (GameState.battlefield gs) ->
+            -- "... if the first object doesn't have the appropriate kind of
+            -- counter on it". The kinds actually on it ARE the candidates, so an
+            -- object bearing none leaves nothing to move and nothing to ask.
+            -- Ascending (Map.keys), so a transcript is deterministic.
+            case Map.keys (Map.filter (> 0) (maybe Map.empty Object.counters (Game.lookupObject from gs))) of
+              [] -> pure ()
+              first : rest -> do
+                kind <- case rest of
+                  -- One kind on the object leaves nothing to decide.
+                  [] -> pure first
+                  second : more -> do
+                    let offered = first NonEmpty.:| (second : more)
+                    answer <- Game.choose (Prompt.ChooseMovedCounter (Decide.deciderFor controller gs) controller from to offered)
+                    -- FILTERED, NOT TRUSTED: an answer naming a kind that is not
+                    -- on the object is dropped for the first one offered.
+                    pure (if Foldable.elem answer offered then answer else first)
+                Event.removeCounters from kind 1
+                Monad.void (Event.putCounters (CounterCause.ByEffect controller) to kind 1)
+      -- Either side unresolvable: an illegal slot at resolution (CR 608.2b), a
+      -- player recipient, or rule 122.5's impossibilities above. Nothing moves.
+      _ -> pure ()
+  -- CR 701.34a: choose any number of permanents and/or players that have a
+  -- counter, then give each one more of every kind it already has. "That have
+  -- a counter" is the candidate filter, and "any number" is why a lone
+  -- candidate is still asked about.
+  --
+  -- Candidates and kinds are read BEFORE the prompt and before any counter
+  -- lands (CR 608.2h), so a CR 614 replacement cannot widen the kinds.
+  -- Targetless: no CR 608.2b legality to re-check.
+  --
+  -- The roster is Game.stillPlaying, not the keys of GameState.players, whose
+  -- departed seats keep counters CR 800.4a does not remove.
   Effect.Proliferate -> do
     gs <- State.get
     let everyone = Game.stillPlaying gs
