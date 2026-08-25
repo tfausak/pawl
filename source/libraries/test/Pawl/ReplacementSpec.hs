@@ -6527,10 +6527,11 @@ entryCountersSpec s registry = Spec.describe s "The counters a Create says its t
 -- X +1/+1 counters on it, where X is the number of other creatures you control",
 -- and is the printing that puts the count INSIDE the rider: Scryfall
 -- `o:/token enters with/ -is:digital`, 2026-08-22, answers this card and Ochre
--- Jelly, whose split token is an Effect.CreateCopy, which carries no riders at
--- all (gap #1255). The other "X +1/+1 counters on it, where X" printings say it
--- in a SECOND SENTENCE, which is an Effect.PutCounters after the Create and
--- needs no rider at all -- CR 704.3 is why the 0/0 survives in between.
+-- Jelly, whose split token is an Effect.CreateCopy -- the OTHER opcode that now
+-- carries the same rider (Pawl.CopySpec, Littjara Mirrorlake). The other
+-- "X +1/+1 counters on it, where X" printings say it in a SECOND SENTENCE, which
+-- is an Effect.PutCounters after the Create and needs no rider at all -- CR 704.3
+-- is why the 0/0 survives in between.
 --
 -- X is defined by the ability's own text (CR 107.3c) and answered once, when the
 -- effect is applied (CR 608.2h) -- Pawl.Engine.Resolve.freezeRiders, against the
