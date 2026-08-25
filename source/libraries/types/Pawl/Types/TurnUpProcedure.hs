@@ -12,8 +12,9 @@ module Pawl.Types.TurnUpProcedure where
 -- over -- CR 702.37e admits "a face-down permanent you control with a morph
 -- ability", so a permanent Backslide turned face down qualifies -- while
 -- manifest's asks about nothing else, since CR 701.40b's subject is "a
--- manifested permanent". And FaceDownReason.TurnedFaceDown names no procedure at
--- all, which a reused type would let a caller ask for.
+-- manifested permanent". And FaceDownReason.TurnedFaceDown and
+-- FaceDownReason.EnteredFaceDown name no procedure at all, which a reused type
+-- would let a caller ask for.
 data TurnUpProcedure
   = -- | CR 702.37e: pay what the permanent's morph cost would be if it were face
     -- up.

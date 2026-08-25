@@ -5897,17 +5897,18 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no effect enters face down anywhere but the battlefield" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _) -> EntryRiders.faceDown riders && zone /= Zone.Battlefield
-          Effect.Create (Create.MkCreate _ _ riders _ _) -> EntryRiders.faceDown riders
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _) -> Maybe.isJust (EntryRiders.faceDown riders) && zone /= Zone.Battlefield
+          Effect.Create (Create.MkCreate _ _ riders _ _) -> Maybe.isJust (EntryRiders.faceDown riders)
           _ -> False
-        manifests effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> EntryRiders.faceDown riders
+        entersFaceDown effect = case effect of
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> Maybe.isJust (EntryRiders.faceDown riders)
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: with no face-down entry in the pool at all
-    -- this would pass whatever a card said. Soul Summons and Cloudform are the
-    -- cards that print one.
-    Spec.assertBool s (any (anyFace (any manifests . cardResolutionEffects) . Printing.card) ps) "the pool has a card putting a permanent onto the battlefield face down"
+    -- this would pass whatever a card said. Soul Summons and Cloudform manifest
+    -- (CR 701.40a) and Yedora, Grave Gardener lists its own characteristics (CR
+    -- 708.2a), so the guard holds under either shape of the rider.
+    Spec.assertBool s (any (anyFace (any entersFaceDown . cardResolutionEffects) . Printing.card) ps) "the pool has a card putting a permanent onto the battlefield face down"
     Spec.assertEqWith s "only the battlefield takes a face-down entry (CR 708.3)" (fmap (S.nameOf . Printing.card) offenders) []
   -- What Pawl.Engine.Replacement.applies rests on when it gates a WithCounters
   -- turn-up rewrite on CR 702.37b's "if its megamorph cost was paid": the only

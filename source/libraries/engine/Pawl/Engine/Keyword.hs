@@ -1678,7 +1678,7 @@ ingest =
                 EntryRiders.counters = Map.empty,
                 EntryRiders.underOwner = False,
                 EntryRiders.exiledFaceDown = False,
-                EntryRiders.faceDown = False
+                EntryRiders.faceDown = Nothing
               }
             Nothing
             Nothing
@@ -2379,7 +2379,7 @@ returns kind =
                 EntryRiders.counters = Map.singleton kind (Quantity.Literal 1),
                 EntryRiders.underOwner = True,
                 EntryRiders.exiledFaceDown = False,
-                EntryRiders.faceDown = False
+                EntryRiders.faceDown = Nothing
               }
             Nothing
             Nothing
@@ -2427,7 +2427,7 @@ afterlife n =
                   EntryRiders.counters = Map.empty,
                   EntryRiders.underOwner = False,
                   EntryRiders.exiledFaceDown = False,
-                  EntryRiders.faceDown = False
+                  EntryRiders.faceDown = Nothing
                 },
             Create.slot = Nothing,
             -- CR 111.2 under CR 109.5: the keyword ability's own controller.
@@ -2547,7 +2547,7 @@ fabricate n =
                   EntryRiders.counters = Map.empty,
                   EntryRiders.underOwner = False,
                   EntryRiders.exiledFaceDown = False,
-                  EntryRiders.faceDown = False
+                  EntryRiders.faceDown = Nothing
                 },
             Create.slot = Nothing,
             -- CR 111.2 under CR 109.5: the keyword ability's own controller.
@@ -2653,7 +2653,7 @@ soulshift n =
                 EntryRiders.counters = Map.empty,
                 EntryRiders.underOwner = False,
                 EntryRiders.exiledFaceDown = False,
-                EntryRiders.faceDown = False
+                EntryRiders.faceDown = Nothing
               }
             Nothing
             Nothing
