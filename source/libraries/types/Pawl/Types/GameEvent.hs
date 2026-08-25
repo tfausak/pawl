@@ -302,11 +302,13 @@ data GameEvent
     -- onto the battlefield blocking (CR 509.4).
     --
     -- Which producer it was rides on the payload's putOntoBattlefield, because
-    -- CR 509.4 makes the two readers disagree: rule 509.3b's "blocks a creature"
-    -- won't trigger for a creature put onto the battlefield blocking, and rule
-    -- 509.3d's "becomes blocked by a creature" will. Combat.blockers cannot tell
-    -- them apart, which is why the flag is on the event rather than read off the
-    -- board.
+    -- CR 509.4 makes two of the readers disagree: rule 509.3b's "blocks a
+    -- creature" won't trigger for a creature put onto the battlefield blocking,
+    -- and rule 509.3d's "becomes blocked by a creature" will. Combat.blockers
+    -- cannot tell them apart, which is why the flag is on the event rather than
+    -- read off the board. The third reader, CR 509.3e's blocker COUNT, wants the
+    -- flag set: it is the declaration that reaches that condition through
+    -- AttackerBlocked below instead.
     --
     -- ONE event per PAIR, which is CR 509.3b's arity ("once for each attacking
     -- creature the creature blocks"). CR 509.3a's once-per-blocker arity is
@@ -333,11 +335,15 @@ data GameEvent
     --
     -- The BLOCKERS are not carried. CR 509.3d's "becomes blocked by a creature"
     -- is the condition that names one, and it reads BecameBlocking's pair
-    -- instead -- this event exists to be the once-per-combat one (#1146). The
+    -- instead -- this event exists to be the once-per-combat one. The
     -- conditions that ask about the blockers as a GROUP -- their quality, or how
     -- many there were -- read Combat.blockers off this event instead, which is
     -- exact because CR 509.2a puts these triggers on the stack before any player
-    -- gets priority.
+    -- gets priority. Rule 509.3e's "effects that add or remove blockers" is why
+    -- one of them, CreatureBecomesBlockedByAtLeast, reads the same record off
+    -- BecameBlocking as well: an arrival that joins an ALREADY blocked attacker
+    -- records no event of this kind at all, CR 509.3c's guard below withholding
+    -- it.
     --
     -- CR 509.3c's THIRD producer records it as well: an attacker whose only
     -- blocker is one put onto the battlefield blocking becomes blocked too -- CR
