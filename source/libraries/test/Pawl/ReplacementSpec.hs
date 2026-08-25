@@ -2334,8 +2334,8 @@ moonmistSpec s registry = Spec.describe s "Moonmist (CR 615.1, CR 609.7b)" $ do
       Spec.assertEqWith s "while a Goblin Warrior, the 2 is prevented whole" (S.lifeOf S.alice asPrinted) (Just 20)
       Spec.assertEqWith s "once a Wolf, the same 2 is dealt" (S.lifeOf S.alice after) (Just 18)
 
--- CR 615.13's trigger, whose one producer in the pool is Selfless Squire ({3}{W}
--- Creature -- Human Soldier 1/1, Flash, "When this creature enters, prevent all
+-- CR 615.13's trigger read BLIND to which prevention applied: Selfless Squire
+-- ({3}{W} Creature -- Human Soldier 1/1, Flash, "When this creature enters, prevent all
 -- damage that would be dealt to you this turn. Whenever damage that would be
 -- dealt to you is prevented, put that many +1/+1 counters on this creature").
 --
@@ -2513,12 +2513,13 @@ strikeAndSettleWith answer gs batch =
 -- fires for its OWN prevention effect where Selfless Squire above fires for
 -- anybody's.
 --
--- One prevention on the board cannot tell those two readings apart, so the
--- discriminating case puts TWO on one permanent -- the Vindicator's printed
--- ability and CR 122.1c's shield-counter pair. They stop the same event,
--- addressed to the same recipient, for the same amount; the CR 616.1 choice of
--- which applies is the only thing that differs, and an implementation firing on
--- any prevention at all passes the first case and fails that one.
+-- One prevention on the board cannot tell those two readings apart, so the two
+-- discriminating cases each put a SECOND one on the same creature -- CR 122.1c's
+-- shield-counter pair, and Mending Hands' floating shield. Either stops the same
+-- event, addressed to the same recipient, for the same amount, so the CR 616.1
+-- choice of which applies is the only thing that differs between the branches;
+-- an implementation firing on any prevention at all passes the whole-card case
+-- and fails both of those.
 phyrexianVindicatorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 phyrexianVindicatorSpec s registry = Spec.describe s "Phyrexian Vindicator (CR 615.13)" $ do
   let hit src recipient n =
@@ -2539,7 +2540,7 @@ phyrexianVindicatorSpec s registry = Spec.describe s "Phyrexian Vindicator (CR 6
     -- somebody else, and bob's life is the only place that shows.
     Spec.assertEqWith s "bob took the 4 the Vindicator's own prevention stopped" (S.lifeOf S.bob after) (Just 16)
     Spec.assertEqWith s "and the Vindicator itself took none of it (CR 615.6)" (S.damageOf vindicator after) (Just 0)
-    Spec.assertEqWith s "one trigger, not one per prevention effect on the board" (length (GameState.stack dealt)) 1
+    Spec.assertEqWith s "exactly one trigger was gathered" (length (GameState.stack dealt)) 1
   -- THE DISCRIMINATOR. One shielded Vindicator, one 4-damage event, and a CR
   -- 616.1 choice answered both ways. Rule 122.1c's pair is minted onto the
   -- permanent by the rules rather than printed on its card, so the damage it

@@ -9111,9 +9111,9 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- an AMOUNT rather than a reference, read back by Quantity.InSlot off the stack
   -- object these bindings are stamped on (see Binding.eventAmount).
   --
-  -- The recipient is NOT bound alongside it. Every payload in the pool acts on
-  -- the ability's own source (Selfless Squire counters itself), and the player
-  -- the recipient names under this condition is CR 109.5's "you", already bound.
+  -- The recipient is NOT bound alongside it. Every payload this CONDITION
+  -- carries acts on the ability's own source (Selfless Squire counters itself),
+  -- and the player the recipient names here is CR 109.5's "you", already bound.
   (TriggerCondition.DamageToPlayerPrevented _, GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented _ _ amount)) ->
     Binding.setEventAmount amount Map.empty
   -- CR 615.13's "that much" once more, off the same event and into the same
