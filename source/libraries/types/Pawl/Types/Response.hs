@@ -238,8 +238,8 @@ data Response
     -- which records what they then found: Delivery Moogle asks both, one after
     -- the other, so two answers in one replay are not a duplicate.
     ChoseSearchZones (Set.Set Zone.Zone)
-  | -- | CR 701.23: the cards a search found, in whichever of Search.zones
-    -- held them (empty = failed to find).
+  | -- | CR 701.23: the cards a search found, in whichever of the zones it looked
+    -- through held them (empty = failed to find).
     Searched [ObjectId.ObjectId]
   | -- | CR 601.3 (Panglacial): the library card cast while searching, paired with
     -- the CR 709.3 half being cast (Nothing = declined). The name is part of the

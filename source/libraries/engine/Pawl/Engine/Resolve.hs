@@ -3403,10 +3403,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- searcher's to give. Raised only where two or more zones make it a
             -- real choice.
             --
-            -- Offered over the card's own zones rather than over searchedZones,
-            -- and read LIVE rather than off gs0: CR 601.3's cast below is made
-            -- during an earlier searcher's pass, so a later pass reads a board
-            -- that resolution has already moved.
+            -- Offered over the card's own zones rather than over the
+            -- prohibition-filtered set just below, since CR 101.2 stops the
+            -- looking and not the card's other instructions -- the shuffle among
+            -- them. Read LIVE rather than off gs0: CR 601.3's cast and the finds
+            -- both happen during an earlier searcher's pass, so a later pass asks
+            -- over a board this resolution has already moved.
             chosenZones <-
               if Set.size zones < 2
                 then pure zones
@@ -3429,7 +3431,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- and abilities reach here. The Wurm's "while you're searching
                   -- your library" makes the offer the SEARCHER's, only where the
                   -- library being searched is their own, and only where a LIBRARY
-                  -- is among the zones at all.
+                  -- is among the zones being looked through.
                   --
                   -- That last conjunct is a REGRESSION FENCE rather than a
                   -- proven behaviour. It is now REACHABLE -- a searcher may take

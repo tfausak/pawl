@@ -409,9 +409,10 @@ data Prompt r where
   -- through is what the rest of the instruction is about.
   ChooseSearchZones :: Decider.Decider -> PlayerId.PlayerId -> Set.Set Zone.Zone -> Prompt (Set.Set Zone.Zone)
   -- | CR 701.23 / 701.23b. The [ObjectId] is the MATCHING cards
-  -- (engine-pre-filtered) across every zone Search.zones names, and the PlayerId
-  -- is the player SEARCHING, who need not own those zones. The Natural is how
-  -- many the search may find. A search that states no count at all (Mana
+  -- (engine-pre-filtered) across every zone this searcher is looking through --
+  -- the ones ChooseSearchZones settled, where the card printed "and/or" -- and
+  -- the PlayerId is the player SEARCHING, who need not own those zones. The
+  -- Natural is how many the search may find. A search that states no count at all (Mana
   -- Severance's "any number of land cards", a Nothing on Search.quantity)
   -- arrives here as the number of MATCHING cards, which is the bound CR 701.23a
   -- gives it -- the zones, not a number the card names.
@@ -419,7 +420,7 @@ data Prompt r where
   -- ONE prompt over the union rather than one per zone, and no zone in the
   -- payload: the card prints one instruction with one count over the zones it
   -- names, and where a short answer is completed from is Pawl.Engine.Resolve's
-  -- to settle from Search.zones.
+  -- to settle from the zones being looked through.
   --
   -- Answering with fewer is legal for a search of a HIDDEN zone (CR 400.2)
   -- stating a quality (CR 701.23b's "some or all"), for one printing "up to"

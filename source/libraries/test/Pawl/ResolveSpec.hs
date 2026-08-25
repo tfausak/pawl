@@ -1648,10 +1648,10 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "and her library is in its original order -- unsearched, so unshuffled"
       (Game.zoneMembers Zone.Library S.alice settled)
       (Game.zoneMembers Zone.Library S.alice (moogleState board))
-  -- The lying answerer, the shape #222 is about: a zone the card never named.
-  -- The answer is filtered back through the printed zones and what is left is
-  -- empty, so every named zone is searched -- the always-legal maximal reading,
-  -- and the one the searcher cannot decline out of in a public zone.
+  -- The lying answerer, in the ZONE dimension: an answer naming a zone the card
+  -- never printed. It is filtered back through the printed zones, what is left
+  -- is empty, and every named zone is searched -- the always-legal maximal
+  -- reading, and the one the searcher cannot decline out of in a public zone.
   Spec.it s "CR 701.23a whole card: a zone Delivery Moogle never named is not one alice can choose" $ do
     board <- moogleBoard s registry ["Bonesplitter"]
     let settled = resolveMoogle (searchingZones (Set.singleton Zone.Exile) []) board

@@ -131,10 +131,11 @@ data Effect card
     -- resolves through Resolve.applyEffect, which reads the whole record.
     AddMana ManaAddition.ManaAddition
   | -- | CR 701.23: the players Search.searcher names each search the Search.zones
-    -- of each player Search.owner names, for Search.quantity cards matching
-    -- Search.filter -- or for any number of them, where Search.quantity is
-    -- Nothing (Mana Severance) -- put them where Search.destination says, then
-    -- that library's owner shuffles, where a library was among the zones. The
+    -- of each player Search.owner names -- or whichever of them they choose,
+    -- where the card printed "and/or" -- for Search.quantity cards matching
+    -- Search.filter, or for any number of them where Search.quantity is Nothing
+    -- (Mana Severance); put them where Search.destination says, then that
+    -- library's owner shuffles, where a library was among the zones searched. The
     -- Filter is evaluated over each card's own CR 613 projection
     -- (Projection.viewOfObject).
     --
@@ -149,8 +150,9 @@ data Effect card
     -- CR 701.23d makes a bare quantity find that many. Filter.statesAQuality
     -- classifies; Search.upTo and an absent count are the two cases it cannot
     -- reach, both of which land in CR 701.23b's branch. CR 701.23b is scoped to a
-    -- HIDDEN zone (CR 400.2), so its classification is applied per zone in
-    -- Search.zones; the two the card prints itself hold in every zone it names.
+    -- HIDDEN zone (CR 400.2), so its classification is applied per zone LOOKED
+    -- THROUGH -- which is the searcher's own choice where the card prints
+    -- "and/or" -- while the two the card prints itself hold in every such zone.
     Search Search.Search
   | -- | CR 701.13 / Rest in Peace: exile every card in every graveyard.
     -- Targetless and bulk; a general exile-from-zone is future.
