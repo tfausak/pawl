@@ -4,6 +4,7 @@ import qualified Pawl.Codec.AddActivationCost as AddActivationCost
 import qualified Pawl.Codec.AddSpellCost as AddSpellCost
 import qualified Pawl.Codec.DamagePattern as DamagePattern
 import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Codec.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ManaFilter as ManaFilter
@@ -26,6 +27,7 @@ codec =
       Arm.nullary "CantCastChosenName" PlayerEffect.CantCastChosenName,
       Arm.nullary "CantPlayLandChosenName" PlayerEffect.CantPlayLandChosenName,
       Arm.payload "IncreaseSpellCost" IncreaseSpellCost.codec PlayerEffect.IncreaseSpellCost (\x -> case x of PlayerEffect.IncreaseSpellCost y -> Just y; _ -> Nothing),
+      Arm.payload "IncreaseActivationCost" IncreaseActivationCost.codec PlayerEffect.IncreaseActivationCost (\x -> case x of PlayerEffect.IncreaseActivationCost y -> Just y; _ -> Nothing),
       Arm.payload "ReduceSpellCost" ReduceSpellCost.codec PlayerEffect.ReduceSpellCost (\x -> case x of PlayerEffect.ReduceSpellCost y -> Just y; _ -> Nothing),
       Arm.payload "ReduceActivationCost" ReduceActivationCost.codec PlayerEffect.ReduceActivationCost (\x -> case x of PlayerEffect.ReduceActivationCost y -> Just y; _ -> Nothing),
       Arm.payload "AddActivationCost" AddActivationCost.codec PlayerEffect.AddActivationCost (\x -> case x of PlayerEffect.AddActivationCost y -> Just y; _ -> Nothing),

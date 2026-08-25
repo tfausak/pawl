@@ -13,6 +13,7 @@ import qualified Pawl.Types.CostScale as CostScale
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaFilter as ManaFilter
@@ -64,6 +65,14 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.Not (Filter.HasCardType CardType.Creature)) 1))
       " {\"type\":\"IncreaseSpellCost\",\"value\":{\"whichSpells\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"amount\":1}} "
+  -- CR 613.11 / 601.2f / 602.2b / Oppressive Rays, whose criterion is CR
+  -- 303.4b's "enchanted" and nothing else.
+  Spec.it s "IncreaseActivationCost" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost Filter.IsHostOfSource 3))
+      " {\"type\":\"IncreaseActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"IsHostOfSource\"},\"amount\":3}} "
   -- CR 613.11 / 601.2f / Sapphire Medallion.
   Spec.it s "ReduceSpellCost" $
     Common.assertCodec
