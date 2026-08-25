@@ -34,6 +34,7 @@ import qualified Data.Ord as Ord
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -253,6 +254,54 @@ activates srcId ability p = case p of
           h : _ -> h
           [] -> A.Pass
   _ -> S.identityAnswer p
+
+-- `activates` with a target slot to fill: the ability Littjara Mirrorlake
+-- activates says "target creature you control". FILTERED out of the offered
+-- candidates rather than built, so the recipient is the one the engine itself
+-- offered for that pool -- a hand-built Recipient of the same permanent is a
+-- different recipient, and CR 608.2b's re-read at resolution drops it silently.
+-- Pinned to one id for `activates`' reason: an answerer that took whatever was
+-- legal would find the other creature after a mutation.
+activatesTargeting :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> ObjectId -> Prompt.Prompt r -> r
+activatesTargeting srcId ability victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (\r -> Recipient.objectOf r == Just victim) candidates) sets
+  _ -> activates srcId ability p
+
+-- The +1/+1 counters on one object. Duplicated from Pawl.ReplacementSpec rather
+-- than hoisted into Pawl.Support, which rebuilds every spec in the tree.
+plusOnesOn :: ObjectId -> GameState.GameState -> Natural.Natural
+plusOnesOn oid gs = maybe 0 (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+
+-- Littjara Mirrorlake Land: "This land enters tapped. {T}: Add {U}.
+-- {2}{G}{G}{U}, {T}, Sacrifice this land: Create a token that's a copy of target
+-- creature you control, except it enters with an additional +1/+1 counter on it.
+-- Activate only as a sorcery." (data/cards/littjara-mirrorlake.json; Oracle text
+-- checked against api.scryfall.com, 2026-08-25.) Its SECOND printed ability is
+-- the copy one -- the first is the mana ability CR 605.3b keeps off the stack.
+sacrificeAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+sacrificeAbility = Maybe.listToMaybe . drop 1 . Face.activatedAbilities . S.combinedFace
+
+-- alice controls the Mirrorlake untapped, a Goblin Piker carrying TWO +1/+1
+-- counters, and five other lands -- two Forests and three Islands, which is
+-- exactly {2}{G}{G}{U} once the Mirrorlake itself is tapped for the cost and so
+-- cannot pay for anything. Returns the Mirrorlake and the Piker.
+--
+-- The Mirrorlake is placed already on the battlefield and UNTAPPED: its own entry
+-- rewrite would tap it, and a tapped land cannot pay the {T} in its cost.
+mirrorlakeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId, ObjectId, GameState.GameState)
+mirrorlakeBoard forest island piker mirrorlake =
+  let base = S.landsFor island S.alice 3 (S.landsInPlay forest 2)
+      (pikerId, g1) = S.addCreature piker S.alice base
+      g2 = S.addCounter CounterKind.PlusOnePlusOne 2 pikerId g1
+      (lakeId, g3) = S.addCreature mirrorlake S.alice g2
+   in ( lakeId,
+        pikerId,
+        g3
+          { GameState.priority = Just S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice
+          }
+      )
 
 -- Mutavault's SECOND printed ability -- "{1}: This land becomes a 2/2 creature
 -- with all creature types until end of turn. It's still a land". The first is the
@@ -583,6 +632,39 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "the token copies the base 2, not 3" (Projection.powerOf tokenId resolved) $ Just 2
         Spec.assertEqWith s "the token copies the base 1, not 2" (Projection.toughnessOf tokenId resolved) $ Just 1
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+
+  -- THE PROVING TEST for CR 122.6 on the COPY opcode: "except it enters with an
+  -- additional +1/+1 counter on it" is a rider the effect states, not something
+  -- copied off the original -- CR 707.2 excludes counters from the copiable
+  -- values either way.
+  --
+  -- The Piker carries TWO counters, which is what separates the three readings.
+  -- A rider that never reaches Event.createTokens leaves the token at ZERO. The
+  -- rule's answer is ONE. An implementation that copied the original's counters
+  -- and added the rider's would say THREE. With a bare Piker the second and third
+  -- readings both say one and the board proves nothing.
+  --
+  -- Driven through the priority loop rather than Activate.activateAbility, the
+  -- Vesuva case's reason: the ability reaches the stack because the engine offered
+  -- it under CR 602.5d's sorcery-speed restriction.
+  Spec.it s "Littjara Mirrorlake's copy token enters with the counter the effect states (CR 122.6, CR 707.2)" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mirrorlake <- S.printingOf s registry "Littjara Mirrorlake"
+    case sacrificeAbility mirrorlake of
+      Nothing -> Spec.assertFailure s "Littjara Mirrorlake prints no second activated ability"
+      Just ability -> do
+        let (lakeId, pikerId, board) = mirrorlakeBoard forest island piker mirrorlake
+            after = S.runPure (activatesTargeting lakeId ability pikerId) board Engine.priorityLoop
+        case tokensOnBattlefield after of
+          [tokenId] -> do
+            Spec.assertEqWith s "the token enters with the one counter the effect stated" (plusOnesOn tokenId after) 1
+            Spec.assertEqWith s "the original keeps its own two, which were never copied" (plusOnesOn pikerId after) 2
+            Spec.assertEqWith s "the token is a copy of the Piker" (Projection.namesOf tokenId after) . Set.singleton . CardName.MkCardName $ Text.pack "Goblin Piker"
+            Spec.assertEqWith s "so it is the printed 2/1 plus its one counter" (S.powerToughnessOf tokenId after) $ Just (3, 2)
+            Spec.assertEqWith s "against the original's 2/1 plus two" (S.powerToughnessOf pikerId after) $ Just (4, 3)
+          tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
 
   -- Watchful Radstag {2}{G} 2/2 Elk Mutant: evolve, plus "whenever this creature
   -- evolves, create a token that's a copy of it". The copied permanent is the

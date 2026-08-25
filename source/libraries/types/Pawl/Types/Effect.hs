@@ -454,9 +454,14 @@ data Effect card
     -- (Event.createTokens takes the count), which is what CR 614.12's entry loop
     -- and CR 616.1g's containment are asked about.
     --
-    -- Not implemented: EntryRiders and a bound slot, each with a real printing
-    -- behind it -- Kiki-Jiki's haste-and-sacrifice, Ochre Jelly's counters
-    -- (#1255).
+    -- The EntryRiders are Create's own record, and CR 122.6's counters is the
+    -- one field read -- Littjara Mirrorlake's "except it enters with an
+    -- additional +1/+1 counter on it", which is no more copied from the original
+    -- than any other counter is (CR 707.2).
+    --
+    -- Not implemented: the rest of that record, and a bound slot for CR 603.7c's
+    -- "it" -- Kiki-Jiki's hasty token and the delayed sacrifice that names it
+    -- (#2302).
     CreateCopy CreateCopy.CreateCopy
   | -- | CR 707.4 / 613.1a: make a permanent ALREADY ON THE BATTLEFIELD a copy of
     -- another object (Unstable Shapeshifter). CreateCopy mints a new object off

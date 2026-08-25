@@ -500,7 +500,7 @@ slotsOf effect = case effect of
   -- which names the attacker the token enters blocking (Flash Foliage's target).
   Effect.Create (Create.MkCreate quantity _ riders _ creator) -> joinSlots [quantitySlots quantity, playerRefSlots creator, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
   -- A READ, unlike Create's slot: the ref names the permanent being copied.
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> joinTwo (quantitySlots quantity) (objectRefSlots ref)
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> joinSlots [quantitySlots quantity, objectRefSlots ref, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
   -- Both refs: either may name a slot.
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> joinTwo (objectRefSlots original) (objectRefSlots subject)
   Effect.CopySpell (CopySpell.MkCopySpell ref _) -> objectRefSlots ref
@@ -767,7 +767,7 @@ slotsAreExhaustive effect = case effect of
   -- Its entry riders are not: CR 122.6's count per kind is the effect speaking,
   -- read in the resolution's own slots.
   Effect.Create (Create.MkCreate quantity _ riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.slotsAreExhaustive quantity
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
   Effect.BecomeCopy {} -> True
   Effect.CopySpell {} -> True
   -- The ReplacementEffect holds no Quantity, and the one reference it can hold --
@@ -932,7 +932,7 @@ readsX = any effectReadsX
       Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.DecreaseSpeed d -> Quantity.readsX (SpeedDecrease.quantity d)
       Effect.Create (Create.MkCreate quantity _ riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders)
-      Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.readsX quantity
+      Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> any Quantity.readsX (quantity : riderQuantities riders)
       Effect.BecomeCopy {} -> False
       Effect.CopySpell {} -> False
       Effect.Replace {} -> False
@@ -4818,7 +4818,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         answer <- Game.choose (Prompt.ChooseBoundToken decider controller source candidates)
         let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
         State.modify' (bindSlot resolving slot named)
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> do
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref entry) -> do
     gs <- State.get
     -- CR 707.2 / 111.3: this many tokens per named permanent, minted through the
     -- same CR 111.2 funnel, carrying the copied permanent's COPIABLE values
@@ -4832,22 +4832,30 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
         sources = objectRefObjects legal resolving controller source gs ref
+        -- CR 608.2h: the counters the copies enter with, settled ONCE off the
+        -- pre-effect board, outside the loop over named permanents below.
+        frozen = freezeRiders viewOf context gs resolving source entry
     -- The count is Create's, read the same way and off the same `gs` (CR 707.1).
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
             Monad.forM_ sources $ \src ->
               Monad.forM_ (Game.cardOfWithLastKnown src gs) $ \card ->
-                -- No riders: CR 707.2 copies no counters.
+                -- CR 707.2 copies no counters, so what the token arrives with
+                -- is what the EFFECT said and nothing the original carried --
+                -- Littjara Mirrorlake's "except it enters with an additional
+                -- +1/+1 counter on it". Through Event.createTokens' own counter
+                -- argument, CR 122.6's door, so CR 614.16's replacements see
+                -- them; Create's arm one case up hands over the same value.
                 --
-                -- Not implemented: a copy token an effect says enters with
-                -- counters on it (Ochre Jelly, Littjara Mirrorlake) arrives
-                -- bare (#1255).
+                -- Untapped rather than the rider's tap state: only `counters` is
+                -- read here, and Pawl.CardSpec lints that no CreateCopy in the
+                -- pool sets any other rider (gap #2302).
                 --
                 -- ONE call per named permanent, with the whole count: CR 614.12's
                 -- entry loop is handed the batch, so the copies enter
                 -- simultaneously and none may copy a sibling.
-                Monad.void (Event.createTokens controller card (Just (Event.copiedSnapshotWithLastKnown src gs)) (Integer.toNaturalSaturating n) TapState.Untapped Map.empty)
+                Monad.void (Event.createTokens controller card (Just (Event.copiedSnapshotWithLastKnown src gs)) (Integer.toNaturalSaturating n) TapState.Untapped (EntryRiders.counters frozen))
       _ -> pure ()
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef) ->
     State.modify' $ \gs ->

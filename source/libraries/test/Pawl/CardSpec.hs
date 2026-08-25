@@ -858,8 +858,10 @@ effectCounts effect = case effect of
   Effect.DecreaseSpeed d -> quantityCounts (SpeedDecrease.quantity d)
   Effect.Create (Create.MkCreate quantity card _ _ _) -> quantityCounts quantity <> overFaces cardCounts card
   -- No embedded card -- the copied permanent supplies the text -- but the count
-  -- is card data like Create's.
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> quantityCounts quantity
+  -- is card data like Create's. The riders are skipped for the reason Create's
+  -- arm above skips its own: a rider count is a Quantity, and effectFilters below
+  -- is where a Filter under one is swept.
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ _) -> quantityCounts quantity
   -- Neither a Quantity nor a Duration, so no Count can hide here; the refs'
   -- Filters are effectFilters' business below.
   Effect.BecomeCopy {} -> []
@@ -2622,8 +2624,8 @@ canHostSubjects predicate = case predicate of
 -- Both Filter positions an entry rider has: the counter KINDS it is keyed by (CR
 -- 122.1b's keyword counter carries a whole Keyword) and the COUNTS it holds (CR
 -- 122.6, each a Quantity, which may carry a Count whose Filter is card text).
--- One function so the two effect arms that read a rider cannot sweep different
--- halves of it.
+-- One function so the three effect arms that carry a rider cannot sweep
+-- different halves of it.
 riderFilters :: EntryRiders.EntryRiders Quantity.Type.Quantity -> [Filter.Type.Filter Keyword.Keyword]
 riderFilters riders =
   concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))
@@ -3814,8 +3816,8 @@ effectFilters effect = case effect of
   -- card author can write -- the same nesting Pawl.Codec's round trip walks.
   Effect.Create (Create.MkCreate quantity card riders _ _) -> unframed (quantityFilters quantity <> riderFilters riders) <> overFaces cardFilters card
   -- An EachMatching ref's Filter is card text like RequireBlock's below, and the
-  -- count's Filters are as much card text as Create's.
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> unframed (quantityFilters quantity) <> sourceHosted (objectRefFilters ref)
+  -- count's and the riders' Filters are as much card text as Create's.
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> unframed (quantityFilters quantity <> riderFilters riders) <> sourceHosted (objectRefFilters ref)
   -- BOTH refs, RequireBlock's arm below: each EachMatching Filter is card text.
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> sourceHosted (objectRefFilters original <> objectRefFilters subject)
   -- The one ref, CreateCopy's arm above: an EachMatching Filter is card text.
@@ -5901,6 +5903,37 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- cards that print one.
     Spec.assertBool s (any (anyFace (any manifests . cardResolutionEffects) . Printing.card) ps) "the pool has a card putting a permanent onto the battlefield face down"
     Spec.assertEqWith s "only the battlefield takes a face-down entry (CR 708.3)" (fmap (S.nameOf . Printing.card) offenders) []
+  -- Effect.CreateCopy carries the SAME EntryRiders record Create and MoveToZone
+  -- do, but Pawl.Engine.Resolve's arm reads only CR 122.6's `counters` -- what
+  -- Littjara Mirrorlake's "except it enters with an additional +1/+1 counter on
+  -- it" says. This is the fence for every other field, and one lint rather than an
+  -- arm added to each above: a CreateCopy is the only opcode where the whole rest
+  -- of the record is unread, so a card setting any of them would say something
+  -- nothing performs.
+  --
+  -- Why each is unread rather than merely unwired. `underOwner` is inert by CR
+  -- 111.2, which makes the creating player a token's owner anyway. `transformed`
+  -- and `faceDown` are inert for the reason the two lints above give: a token is
+  -- not a card (CR 111.1), and CR 707.8a decides a copy token's face by copy rules.
+  -- `exiledFaceDown` is inert because a token is created onto the battlefield and
+  -- CR 111.7 would end one anywhere else. `tapped`, `attacking` and `blocking`
+  -- are the three a printing could really write, and none is implemented (gap
+  -- #2302).
+  Spec.it s "no CreateCopy carries an entry rider but CR 122.6's counters" $ do
+    ps <- S.allPrintings s
+    let bare riders = riders == EntryRiders.defaultValue {EntryRiders.counters = EntryRiders.counters riders}
+        offends effect = case effect of
+          Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ riders) -> not (bare riders)
+          _ -> False
+        counters effect = case effect of
+          Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ riders) -> not (Map.null (EntryRiders.counters riders))
+          _ -> False
+        offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
+    -- Guards against a vacuous sweep: with no copy token carrying a rider at all
+    -- this would pass whatever the arm read. Littjara Mirrorlake is the card that
+    -- prints one.
+    Spec.assertBool s (any (anyFace (any counters . cardResolutionEffects) . Printing.card) ps) "the pool has a card creating a copy token with counters on it"
+    Spec.assertEqWith s "a copy token reads only CR 122.6's counters" (fmap (S.nameOf . Printing.card) offenders) []
   -- What Pawl.Engine.Replacement.applies rests on when it gates a WithCounters
   -- turn-up rewrite on CR 702.37b's "if its megamorph cost was paid": the only
   -- producer of that rewrite is the megamorph arm of
