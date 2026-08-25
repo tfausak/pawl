@@ -54,9 +54,10 @@ import qualified Pawl.Types.Recipient as Recipient
 -- otherwise have to mean "any object OR any player", which is not what any other
 -- Filter position means.
 --
--- `whichSource` is the ONE object a shield watches, baked as an id, and two
+-- `whichSource` is the ONE object a row watches -- a prevention shield's or CR
+-- 614.9's redirection (Oracle's Attendants) -- baked as an id, and two
 -- unlike questions land in it: CR 609.7a's player-CHOSEN source (Healing Grace's
--- "by a source of your choice", answered when the shield is created) and CR
+-- "by a source of your choice", answered when the effect is created) and CR
 -- 601.2c's TARGETED one (Dovin, Hand of Control's "prevent all damage ... dealt
 -- by target permanent", declared on the stack). Nothing means EVERY source, the
 -- way Nothing means every recipient above, rather than an unanswered choice.
