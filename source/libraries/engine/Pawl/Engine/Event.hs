@@ -1683,6 +1683,39 @@ apply batch candidate event =
         Replacement.consume (ReplacementCandidate.identity candidate)
         addEnteringCounters oid CounterKind.PlusOnePlusOne n
         pure (Just event)
+      -- CR 702.150a via CR 614.1c: compleated on Tamiyo, Compleated Sage. "It
+      -- instead enters the battlefield with that many loyalty counters MINUS TWO
+      -- FOR EACH OF THOSE MANA SYMBOLS" -- the payload is the symbol count, so the
+      -- two is rule 702.150a's and appears only here.
+      --
+      -- A SUBTRACTION FROM THE PENDING MAP, not a removal from Object.counters:
+      -- rule 702.150a removes nothing, it changes how many arrive, so nothing
+      -- keyed on counter removal may see this. Sitting in the pending map is also
+      -- what puts the row in the entry's own CR 616.1 pool beside CR 614.16's
+      -- multipliers, which is the whole of #1996 -- the orders reach 6 and 8 on
+      -- Tamiyo under a Doubling Season.
+      --
+      -- Map.adjust rather than insert, for the CounterR arm's reason: an absent
+      -- id means nothing is entering, which `admitsEntry` has already ruled out.
+      --
+      -- Saturating, because a counter count is a Natural and CR 122.1 knows no
+      -- negative number of them. Rule 702.150a's own "would enter with one or more
+      -- loyalty counters" -- asked in `admitsEntry` -- is what keeps the floor out
+      -- of reach on a printed card anyway.
+      --
+      -- NO CONDITION HERE. Rule 702.150a's two are asked before this point: "one
+      -- or more loyalty counters" in Pawl.Engine.Replacement.admitsEntry, and
+      -- "chose to pay life" where the row is minted.
+      --
+      -- No prompt, and none is owed: rule 702.150a states no choice.
+      EntryRewrite.Compleated symbols -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        State.modify' $ \gs ->
+          gs
+            { GameState.enteringCounters =
+                Map.adjust (Map.adjust (\n -> Natural.minusSaturating n (2 * symbols)) CounterKind.Loyalty) oid (GameState.enteringCounters gs)
+            }
+        pure (Just event)
       -- CR 614.1d / 110.5b: "This permanent enters tapped" (Zof Bloodbog's land,
       -- Headless Skaab's creature -- the arm gates on no card type). CR 110.5b
       -- has a permanent enter untapped "unless a spell or ability says otherwise",

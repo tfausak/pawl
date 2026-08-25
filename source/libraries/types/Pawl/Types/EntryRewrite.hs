@@ -274,6 +274,35 @@ data EntryRewrite effect
     -- The counters go through Pawl.Engine.Event.addEnteringCounters, as
     -- WithCounters' and riot's do, so CR 614.16 applies to them.
     Bloodthirst Natural.Natural
+  | -- | CR 702.150a via CR 614.1c: compleated. "If this permanent would enter
+    -- with one or more loyalty counters on it and the player who cast it chose to
+    -- pay life for any part of its cost represented by Phyrexian mana symbols, it
+    -- instead enters the battlefield with that many loyalty counters minus two
+    -- for each of those mana symbols."
+    --
+    -- THE PAYLOAD IS THE NUMBER OF PHYREXIAN MANA SYMBOLS life was paid for, not
+    -- the number of counters to subtract: rule 702.150a's "two" is the rule's, so
+    -- doubling it here would put a card's number where a rule's belongs. N rides
+    -- the constructor for Bloodthirst's reason above -- the count is settled when
+    -- the row is minted, off Object.phyrexianLifePaid (CR 601.2f).
+    --
+    -- A ROW rather than arithmetic folded into CR 306.5b's count, which is the
+    -- whole of #1996: only a row can be ORDERED against CR 614.16's counter
+    -- multipliers under CR 616.1e, and the two orders reach different loyalty.
+    -- Tamiyo, Compleated Sage's third Gatherer ruling is what makes them siblings
+    -- rather than CR 616.1g's nesting: "Any other replacement effect that would
+    -- apply to the number of loyalty counters it enters the battlefield with will
+    -- apply as normal."
+    --
+    -- NOT WRITTEN BY A CARD -- minted from the finished projection by
+    -- Pawl.Engine.Projection.intrinsicReplacementsOf, so a card says only
+    -- `Keyword.Compleated` and rule 702.150a says what it means. It still
+    -- round-trips through the codec, because every arm of this type does.
+    --
+    -- SUBTRACTS from the pending count (GameState.enteringCounters) and never
+    -- from Object.counters, so nothing keyed on counter REMOVAL sees it: rule
+    -- 702.150a removes nothing, it changes how many arrive.
+    Compleated Natural.Natural
   | -- | CR 614.1d: "This permanent enters tapped" (Zof Bloodbog's land half,
     -- Headless Skaab's creature). The one arm a permanent's OWN printed text
     -- writes about the STATUS it enters with, where every other writer of an

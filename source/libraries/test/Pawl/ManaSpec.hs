@@ -38,6 +38,7 @@ import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -102,6 +103,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
@@ -6011,6 +6013,60 @@ tamiyoSpec s registry = Spec.describe s "Tamiyo, Compleated Sage" $ do
     Spec.assertEqWith s "nor about a half" (halfAnnouncements asked) []
     Spec.assertEqWith s "all four lands paid {2}{G}{U}" (S.tappedCount S.alice resolved) 4
     Spec.assertEqWith s "and 2 life paid the symbol" (S.lifeOf S.alice resolved) (Just 18)
+
+  -- CR 616.1e: compleated and CR 614.16's multiplier are SIBLINGS on one event,
+  -- not CR 616.1g's nesting -- Tamiyo, Compleated Sage's third Gatherer ruling
+  -- says so outright: "Any other replacement effect that would apply to the
+  -- number of loyalty counters it enters the battlefield with will apply as
+  -- normal." So the controller picks, and the two orders are two boards.
+  --
+  -- ONE prompt, and CR 616.2 is why: on the loop's first pass nothing is pending,
+  -- so neither compleated nor Doubling Season's entry-level row is applicable and
+  -- CR 306.5b's is the lone candidate, applied unprompted. The other two become
+  -- applicable together only once it has placed something.
+  Spec.it s "CR 616.1e compleated and Doubling Season are ordered against each other" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    tamiyo <- S.printingOf s registry "Tamiyo, Compleated Sage"
+    doublingSeason <- S.printingOf s registry "Doubling Season"
+    let (seasonId, board) = S.addCreature doublingSeason S.alice (mixedLands forest island 3 2)
+        (gs, tamiyoId) = S.handOne tamiyo board
+        (askedFirst, compleatedFirst) = castAndResolveRecording (racesCompleated True seasonId) gs tamiyoId
+        (_, doubledFirst) = castAndResolveRecording (racesCompleated False seasonId) gs tamiyoId
+    Spec.assertEqWith s "CR 702.150a then CR 614.16: 5 less two is 3, doubled is 6" (S.counterOf CounterKind.Loyalty (tamiyoOn compleatedFirst) compleatedFirst) 6
+    Spec.assertEqWith s "CR 614.16 then CR 702.150a: 5 doubled is 10, less two is 8" (S.counterOf CounterKind.Loyalty (tamiyoOn doubledFirst) doubledFirst) 8
+    Spec.assertEqWith s "CR 306.5b's row had no rival on the first pass, so exactly one order was asked" (length (filter wasReplacementChoice askedFirst)) 1
+
+-- castAndResolve with the RESOLUTION recorded too. The entry loop runs while the
+-- permanent spell resolves (CR 608.3), which is after the transcript
+-- castAndResolve keeps has ended, so a CR 616.1 order asked there is invisible to
+-- it. AuraSpec records the pair the same way.
+castAndResolveRecording ::
+  (forall r. Prompt.Prompt r -> r) ->
+  GameState.GameState ->
+  ObjectId.ObjectId ->
+  ([Response.Response], GameState.GameState)
+castAndResolveRecording answer gs oid =
+  let ((_, resolved), asked) = Replay.record answer gs (S.cast S.alice oid >> Stack.resolveTop)
+   in (asked, resolved)
+
+-- Pay the {G/U/P} with life, and answer the CR 616.1e race by SOURCE -- Doubling
+-- Season's row names the enchantment, compleated's names Tamiyo -- so the
+-- assertion does not rest on the engine's canonical candidate order.
+-- Pawl.ReplacementSpec.raceIsSelf is the same idiom.
+racesCompleated :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+racesCompleated wantCompleated seasonId p = case p of
+  Prompt.ChooseReplacement _ _ entries ->
+    maybe 0 Int.toNaturalSaturating (List.findIndex ((== wantCompleated) . (/= seasonId) . ReplacementEntry.source) entries)
+  _ -> announcesBoth PhyrexianPayment.PaysLife greenMana p
+
+-- Was this recorded answer a CR 616.1 ordering choice?
+-- Pawl.ReplacementSpec.wasAskedToReplace as a per-response predicate, so the
+-- case above can COUNT the orders asked rather than only notice one.
+wasReplacementChoice :: Response.Response -> Bool
+wasReplacementChoice r = case r of
+  Response.ChoseReplacement _ -> True
+  _ -> False
 
 -- Answers BOTH of a hybrid Phyrexian symbol's announcements -- `way` for
 -- Prompt.AnnouncePhyrexianPayment and `half` for Prompt.AnnounceHybridHalf --

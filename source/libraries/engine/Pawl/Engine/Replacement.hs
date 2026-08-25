@@ -580,6 +580,18 @@ admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.Bloodthirst _ ->
     let context = Filter.contextFor (Projection.controllerOf oid gs) (Just oid)
      in maybe False (> 0) (Quantity.evaluate (Projection.fullView gs) context gs oid (Quantity.Type.PlayersDealtDamageThisTurn (PlayerRef.Relative PlayerRelation.Opponent)))
+  -- CR 702.150a's own first condition, the ability's rather than the pattern's:
+  -- "If this permanent WOULD ENTER WITH ONE OR MORE LOYALTY COUNTERS ON IT". The
+  -- pending count is what that asks about (GameState.enteringCounters), so the
+  -- row is inapplicable until CR 306.5b's has placed something -- which is also
+  -- what makes CR 616.2 sequence the two: this row and CR 614.16's multiplier
+  -- become applicable together on the pass after the loyalty row applied.
+  --
+  -- Rule 702.150a's SECOND condition -- "chose to pay life for any part of its
+  -- cost" -- is asked where the row is minted instead
+  -- (Pawl.Engine.Projection.intrinsicReplacementsOf), since CR 601.2f's record is
+  -- read off the SPELL and this function is handed the permanent.
+  EntryRewrite.Compleated _ -> Map.findWithDefault 0 CounterKind.Loyalty (enteringCountersOf gs oid) > 0
   EntryRewrite.Tapped -> True
   EntryRewrite.PayLifeOrTapped _ -> True
   EntryRewrite.RevealOrTapped _ -> True
@@ -993,6 +1005,11 @@ bucketOfEffect re = case re of
   -- what the permanent enters WITH. Its condition does not change the bucket --
   -- `admitsEntry` has already kept an unsatisfied row out of the collection.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Bloodthirst _)) -> ReplacementBucket.Other
+  -- CR 616.1a-d name self-replacement, control on entry, copy on entry and back
+  -- face up; CR 702.150a is none of them -- compleated rewrites HOW MANY loyalty
+  -- counters the permanent enters with. So CR 616.1e, the same bucket CR 614.16's
+  -- counter multipliers fall in, which is what puts the two rows in one race.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Compleated _)) -> ReplacementBucket.Other
   -- CR 614.1d is none of CR 616.1a-d either: a tap-state rewrite changes the
   -- STATUS the permanent enters with (CR 110.5b), never whose it is, what it
   -- copies or which face is up. So CR 616.1e.
@@ -1113,6 +1130,11 @@ readsApplier re = case re of
   -- applier, so two bloodthirst rows on one permanent are admitted together and
   -- place the same counters in either order.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Bloodthirst _)) -> False
+  -- CR 702.150a: no chooser at all, and the symbol count rides the effect.
+  -- Applying it reads the row's payload and the entering object's pending
+  -- counters, nothing off the candidate -- so two compleated rows of equal count
+  -- subtract the same amount in either order.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Compleated _)) -> False
   -- CR 614.1d: no chooser at all, and no payload -- the rewrite sets one status on
   -- the object the event already named (CR 110.5b), so it applies the same way
   -- whoever's row is applying it. Two such rows are the same write twice.
