@@ -913,6 +913,13 @@ loop asOf batch applied prevented exiledBy event = do
       -- a floating row's source is a spell or ability that has already changed
       -- zones and taken a new id, so no id in a batch of entering permanents can
       -- name one.
+      --
+      -- THE ONLY SEAM the exclusion is enforced at for a permanent's entering
+      -- counters, which used to reach it a second time through the counter funnel:
+      -- those counters are settled by rows offered against WouldEnter here (see
+      -- addEnteringCounters), so a sibling's Corpsejack Menace is filtered out
+      -- once, in this loop. Pawl.ReplacementSpec's "a Corpsejack Menace reanimated
+      -- beside a modular creature doubles nothing" is the proof.
       notSibling candidate = not (Set.member (ReplacementCandidate.source candidate) batch)
       fresh = filter (\candidate -> unused candidate && notSibling candidate) (Replacement.applicable asOf gs event)
   case Replacement.highestBucket fresh of
@@ -1367,9 +1374,9 @@ apply batch candidate event =
       --
       -- CR 614.1c also admits "a number of ... counters ... equal to [something]"
       -- (Undergrowth Scavenger), so the amount is a Quantity and is evaluated ONCE
-      -- here (CR 608.2f) rather than inside the CR 122.6 funnel, which would
-      -- re-read it per replacement iteration. CR 107.1b clamps a negative result
-      -- to zero, which is Integer.toNaturalSaturating.
+      -- here (CR 608.2f), when this row applies, rather than per iteration of the
+      -- entry loop around it. CR 107.1b clamps a negative result to zero, which is
+      -- Integer.toNaturalSaturating.
       --
       -- The permanent is already materialized on the battlefield when this loop
       -- runs (see runEntry), so the CR 613 projection answers for it. The Context
@@ -2444,23 +2451,18 @@ strengthen gs oid regenerability =
 -- it -- CR 702.100b and CR 702.149c, at Pawl.Engine.Resolve's Effect.Evolve and
 -- Effect.Train arms; every other caller places and moves on.
 putCounters :: CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
-putCounters = putCountersIn Set.empty
-
--- putCounters with CR 614.12's same-batch exclusion: `batch` is the permanents
--- entering beside `oid`, and only an entry path has one to pass.
-putCountersIn :: Set ObjectId -> CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
-putCountersIn batch cause oid kind n = do
-  resolved <- resolveCounters batch cause oid kind n
+putCounters cause oid kind n = do
+  resolved <- resolveCounters cause oid kind n
   case resolved of
     Nothing -> pure 0
     Just (target, settledKind, settledCount) -> settleCounters target settledKind settledCount
 
--- The WRITE-AND-EMIT half of putCountersIn, with no CR 616.1 loop in front of it:
+-- The WRITE-AND-EMIT half of putCounters, with no CR 616.1 loop in front of it:
 -- the counters have already been settled and this records them. Its second caller
 -- is flushEnteringCounters below, where CR 616.1 ran at the ENTRY level and running
 -- it again here would let one row apply twice.
 --
--- Not a second funnel. putCountersIn is still the only door that both settles and
+-- Not a second funnel. putCounters is still the only door that both settles and
 -- writes; this is that door's tail, shared rather than copied.
 settleCounters :: ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
 settleCounters target settledKind settledCount
@@ -2509,28 +2511,21 @@ settleCounters target settledKind settledCount
 -- putCounters places nothing on such an object anyway -- so answering 0 without
 -- raising the event is the same answer, reached one step earlier.
 putOwnCounters :: ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
-putOwnCounters = putOwnCountersIn Set.empty
-
--- putOwnCounters with CR 614.12's same-batch exclusion; `batch` is putCountersIn's
--- and is Set.empty at every caller today, the entry roads that used to pass one
--- having moved to addEnteringCounters below, where the entry loop's own sibling
--- filter answers rule 614.12 instead.
-putOwnCountersIn :: Set ObjectId -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
-putOwnCountersIn batch oid kind n = do
+putOwnCounters oid kind n = do
   gs <- State.get
   case Projection.controllerOf oid gs of
     Nothing -> pure 0
-    Just putter -> putCountersIn batch (CounterCause.ByEffect putter) oid kind n
+    Just putter -> putCounters (CounterCause.ByEffect putter) oid kind n
 
 -- CR 614.1c: this permanent is going to enter with n more counters of a kind than
 -- it was a moment ago. Written to the pending map rather than to the object; see
 -- GameState.enteringCounters and flushEnteringCounters, which places them once the
 -- entry's own CR 616.1 loop has finished saying how many that is.
 --
--- The replacement for putOwnCountersIn at every ENTRY door. No `batch` is passed
--- and none is owed: CR 614.12's same-batch exclusion is the entry loop's own, and
--- it now covers these counters too, since the row that would scale them is offered
--- inside that loop.
+-- The replacement for putOwnCounters at every ENTRY door. No batch of entering
+-- siblings is passed and none is owed: CR 614.12's same-batch exclusion is the
+-- entry loop's own `notSibling`, and it now covers these counters too, since the
+-- row that would scale them is offered inside that loop.
 addEnteringCounters :: ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game ()
 addEnteringCounters oid kind n =
   Monad.when (n > 0) . State.modify' $ \gs ->
@@ -2595,14 +2590,15 @@ removeCounters oid kind n =
 -- every representable counter replacement was one of rule 614.16's; Vorinclex is
 -- not one, so the gate moved into the row filter (#847).
 --
--- `batch` is applyReplacementsIn's: the permanents entering the battlefield
--- BESIDE the object being counted, empty for every placement that is not part of
--- an entry. A counter a permanent enters with is part of how it enters (CR
--- 614.1c), so CR 614.12 settles which effects may scale it, and a Corpsejack
--- Menace arriving in the same batch is not one of them.
-resolveCounters :: Set ObjectId -> CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game (Maybe (ObjectId, CounterKind.CounterKind Keyword.Type.Keyword, Natural))
-resolveCounters batch cause oid kind n = do
-  outcome <- applyReplacementsIn Nothing batch (ProposedEvent.WouldPutCounters cause oid kind n)
+-- NO ENTERING BATCH is passed, and CR 614.12's sibling exclusion is not asked
+-- here: a counter a permanent enters with is part of how it enters (CR 614.1c),
+-- so it is settled in the entry loop instead, where `notSibling` answers rule
+-- 614.12 for it. What reaches THIS door is a placement onto a permanent that has
+-- already entered, which rule 614.12 says nothing about, so the exclusion has no
+-- subject here.
+resolveCounters :: CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game (Maybe (ObjectId, CounterKind.CounterKind Keyword.Type.Keyword, Natural))
+resolveCounters cause oid kind n = do
+  outcome <- applyReplacements (ProposedEvent.WouldPutCounters cause oid kind n)
   pure (outcome >>= Replacement.asCounters)
 
 -- CR 122.1 / 122.6: putCounters' player half -- the ONE place a player's counters
@@ -3425,6 +3421,15 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                 -- Before the loop rather than during it, which no card observes: no
                 -- entry replacement in the pool reads a counter the entering object
                 -- already has, and the two are simultaneous in the rules anyway.
+                --
+                -- That claim is WIDER than it was. These counters used to be on the
+                -- object by the time the loop began; now they sit pending for the
+                -- loop's whole duration, so a row reading them would answer
+                -- differently at every iteration rather than only before the first.
+                -- Checked when the pending map landed: Filter.HasCounters and
+                -- Replacement.admitsEntry are the two readers a row could reach a
+                -- counter through, and neither is fed by an entering permanent's own
+                -- pending counters today.
                 Monad.mapM_ (uncurry (addEnteringCounters newId)) (Map.toAscList entering)
                 runEntry batch newId
               -- CR 709.5h: an ability that triggers on a door opening fires "regardless
@@ -4111,13 +4116,15 @@ createTokens controller card copy n tapped entering = do
           -- for the move that carries the same rider.
           --
           -- The WHOLE BATCH is dressed before any token runs its entry loop, rather
-          -- than each token being dressed and then entered: CR 614.12 checks "the
-          -- characteristics of the permanent as it would exist on the battlefield",
-          -- and every sibling of this batch is already there by then, so the counters
-          -- they are entering with belong to that reading too. No card observes the
-          -- difference -- no entry replacement in the pool reads a counter the
-          -- entering object already has -- so this buys the ordering rather than a
-          -- passing test.
+          -- than each token being dressed and then entered. That order buys CR 614.12
+          -- nothing any more and is kept only because it costs nothing: what the
+          -- rule's "characteristics of the permanent as it would exist on the
+          -- battlefield" reads is the OBJECTS, and these counters are no longer on
+          -- them -- Pawl.Engine.Projection cannot see GameState.enteringCounters, and
+          -- the map is per-object, so no sibling's loop reads another's pending
+          -- counters whenever they were written. What CR 614.12 does rest on is
+          -- `placeObject` above having materialized every token first, which is what
+          -- `siblingsOf` then hands each entry loop.
           let siblingsOf oid = Set.delete oid (Set.fromList ids)
           Monad.mapM_ (\oid -> Monad.mapM_ (uncurry (addEnteringCounters oid)) (Map.toAscList entering)) ids
           Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
