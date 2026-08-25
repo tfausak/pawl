@@ -2398,18 +2398,23 @@ alwaysFunctioning :: ObjectId -> Layer -> Condition.Type.Condition -> Bool
 alwaysFunctioning _ _ _ = True
 
 -- Does any static ability in play carry a CR 604.2 "as long as" clause at all?
--- gather's cheap structural precondition, a pure read of the printed faces with
--- no projection behind it. Emblems, the stack, graveyards, hands and libraries
--- are all walked, because gatherGiven gathers abilities from each (CR 114.4 /
--- 113.6 / 113.6b / 113.6f) and skipping one would leave its clause wired open by
--- alwaysFunctioning.
+-- gather's cheap structural precondition, with no projection behind it. Emblems,
+-- the stack, graveyards, hands and libraries are all walked, because gatherGiven
+-- gathers abilities from each (CR 114.4 / 113.6 / 113.6b / 113.6f) and skipping
+-- one would leave its clause wired open by alwaysFunctioning.
+--
+-- Each arm reads the SAME list its walk in gatherGiven does, which is the whole
+-- of what makes this precondition sound. On the battlefield that is the copiable
+-- list (CR 707.2a); everywhere else it is the face, and for the one copy that
+-- reaches another zone the two are already the same value -- a copy of a spell
+-- carries Source.OfSpellCopy, so Game.faceOfObject resolves to the copied
+-- printing's face.
 anyConditional :: GameState -> Bool
 anyConditional gs =
-  let -- CR 707.2a: the COPIABLE list on the battlefield, which is the list
-      -- permanentParts and setLandSubtypeEffectsGiven gather from. A printed
-      -- read here would leave a copy's "as long as" clause answered by
+  let -- A printed read here would leave a copy's "as long as" clause answered by
       -- alwaysFunctioning on a board whose only conditional static ability is
-      -- the copy's.
+      -- the copy's, which Pawl.ClassSpec's "CR 604.2 a copy's own as-long-as
+      -- clause is still gated once the original is exiled" proves.
       conditionalPermanent oid = any (Maybe.isJust . StaticAbility.condition) (staticAbilitiesOf oid gs)
       conditional oid = case Game.faceOf oid gs of
         Nothing -> False
@@ -2463,8 +2468,9 @@ conditionHolds cands gs src lowest =
 -- Empty of exclusions at every priority window, so outside an entry loop this is
 -- the battlefield. Three walks read it -- this module's static-ability gather,
 -- its CR 305.7 set-subtype scan and its layer-2 control grants -- which together
--- are every place a permanent's own printed static ability becomes a continuous
--- effect. Only the FIRST has an observer: Pawl.ReplacementSpec's "a Wood Elemental
+-- are every place a permanent's own static ability becomes a continuous effect.
+-- All three read that ability list through staticAbilitiesOf, so a copy's rules
+-- text reaches each of them (CR 707.2a). Only the FIRST has an observer: Pawl.ReplacementSpec's "a Wood Elemental
 -- reanimated beside Ashaya sacrifices nothing" goes red when it is widened back to
 -- the whole battlefield, and neither of the other two moves a case, because
 -- nothing in `data/cards/` puts a control-changer or a Blood Moon-shaped subtype
@@ -4036,10 +4042,14 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- The short-circuit reads BASE cards while the result reads the PROJECTION,
 -- sound only because every route to an unprinted replacement effect is covered:
 -- `EntryR AsCopy` on a card that is itself a base card with one, CR 122.1c's
--- shield counters, or a minting keyword printed on or granted by a face.
+-- shield counters, or a minting keyword printed on or granted by a face. The
+-- ability disjunct asks staticAbilitiesOf rather than the face, so a copy's
+-- granting text is seen (CR 707.2a).
 --
 -- Not implemented: a minting keyword reaching a permanent through a stored
--- continuous effect or a keyword counter is on no base face (#833).
+-- continuous effect or a keyword counter is on no base face (#833). Nor is a
+-- copy's own KEYWORD, which the disjunct above this one still reads off the
+-- copier's printed face (#2220).
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect (Effect.Effect Card.Type.Card))]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
@@ -4231,6 +4241,14 @@ data ControlGrant = MkControlGrant
 -- values rather than the projection, and why no CR 305.7 gate is applied here.
 -- Hoisted for the same reason setLandSubtypeEffects is: `controls` calls
 -- controllerOf once per battlefield object.
+--
+-- The ability list is staticAbilitiesOf, so a copy's control-granting text is
+-- read (CR 707.2a) -- which staticAbilitiesOf can supply without breaking the
+-- rule above, being projection-free itself. No case observes that: every pooled
+-- control grant is on an Aura (Confiscate, Control Magic), and a copy of an Aura
+-- would enter attached to nothing and be put into a graveyard by CR 704.5m, so
+-- the pool has no board where a copy holds one. A regression fence, kept because
+-- the three walks over abilitySources must agree on which list they read.
 --
 -- Not implemented: CR 604.2's "as long as" gate, which setLandSubtypeEffects
 -- does ask -- the same mutual recursion rules it out here (#1529).

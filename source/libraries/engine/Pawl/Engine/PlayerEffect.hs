@@ -396,7 +396,9 @@ applying pid gs =
 --
 -- HERE and not beside rewriteModification, which is where the printed-text
 -- rewrites for objects live: this module is the only one that may case on
--- PlayerEffect, and Pawl.Engine.Projection never sees the type at all. The
+-- PlayerEffect: Pawl.Engine.Projection carries the rows opaquely through
+-- ProjectedCharacteristics.playerAbilities so a copy acquires them (CR 707.2a),
+-- and never looks inside one. The
 -- shape Pawl.Engine.CombatRestriction takes for a restriction -- destructure the
 -- module's own type, hand each inner value to the module that owns it -- is the
 -- one taken here, with Pawl.Engine.Filter.rewrite doing the descent.

@@ -284,9 +284,12 @@ inForce gs =
       --
       -- Reading BASE faces is enough for the reason given there -- a keyword
       -- reaches a permanent either from its own base face or from a grant whose
-      -- granting permanent is on the battlefield -- and it inherits the same hole:
-      -- a minting keyword arriving through a stored continuous effect or a keyword
-      -- counter is on no base face (#833).
+      -- granting permanent is on the battlefield -- and the GRANT half asks
+      -- Projection.staticAbilitiesOf, so a copy's granting text is seen (CR
+      -- 707.2a). It inherits the same hole: a minting keyword arriving through a
+      -- stored continuous effect or a keyword counter is on no base face (#833),
+      -- and a copy's own KEYWORD is still read off the copier's printed face
+      -- (#2220).
       anyMinted = any baseCouldMint (Set.toList (GameState.battlefield gs))
       baseCouldMint oid =
         any (any (Projection.grantsKeywordWhere Keyword.mintsCombatRestriction) . StaticAbility.modifications) (Projection.staticAbilitiesOf oid gs)

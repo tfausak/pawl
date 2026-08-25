@@ -1306,9 +1306,10 @@ lingeringSpec s registry = Spec.describe s "TitaniasSong" $ do
   -- already frozen the original's effect to a set that cannot hold it (the case
   -- above proves that freeze). Only the copy's own handover reaches it.
   --
-  -- Both Songs have to go, and in that order: CR 707.5 needs the original on the
-  -- battlefield for the copy to be made at all, and a Song still in play would
-  -- animate the Statue live and prove nothing about the handover.
+  -- Both Songs have to go, and in that order: Copy Enchantment's own text names
+  -- an enchantment on the battlefield, so the original has to still be there when
+  -- the copy enters (CR 707.5), and a Song still in play would animate the Statue
+  -- live and prove nothing about the handover.
   Spec.it s "CR 707.2a a copy of Titania's Song hands over its own effect" $ do
     plains <- S.printingOf s registry "Plains"
     titaniasSong <- S.printingOf s registry "Titania's Song"
