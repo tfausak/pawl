@@ -2054,7 +2054,7 @@ apply batch candidate event =
     -- Not implemented: a row that matches two pending kinds at once scales both in
     -- this one application, where the nested-loop shape it replaced gave the row a
     -- fresh CR 614.5 opportunity per kind. No card in the pool enters with two
-    -- kinds one pattern matches (#N).
+    -- kinds one pattern matches (#2312).
     (ReplacementEffect.CounterR (CounterR.MkCounterR pat scaling), ProposedEvent.WouldEnter oid) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
       gs <- State.get

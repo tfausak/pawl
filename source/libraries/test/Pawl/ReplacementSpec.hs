@@ -6802,8 +6802,8 @@ printlifterSpec s registry = Spec.describe s "The counters a Create says its tok
 
 -- CR 122.1c: the replacement and the prevention effect one or more shield counters
 -- create. Gameplay-level throughout: Swooping Protector is cast and enters with its
--- counter through the CR 122.6 funnel, and every spell aimed at it afterwards is a
--- real card cast and resolved.
+-- counter accumulated into the entry's own CR 616.1 pool, and every spell aimed at
+-- it afterwards is a real card cast and resolved.
 --
 -- The two effects are proven SEPARATELY, and that separation is the point rather
 -- than tidiness: a board where a shielded creature merely survives cannot tell "the
@@ -6815,8 +6815,9 @@ shieldCounterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m 
 shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ do
   let protectorName = CardName.MkCardName (Text.pack "Swooping Protector")
       -- alice CASTS the bird rather than having it placed, so its counter arrives
-      -- through Event.putCounters (CR 122.6's as-it-enters clause) and a scaling
-      -- replacement can reach it. Four Plains pay the {3}{W}; `extra` seats the
+      -- through Event.addEnteringCounters (CR 306.5b's as-it-enters clause) into
+      -- the entry's own CR 616.1 pool, where a scaling replacement can reach it.
+      -- Four Plains pay the {3}{W}; `extra` seats the
       -- lands whatever spell the case aims at the bird needs, and `scaler` seats a
       -- counter-scaling permanent under a named player.
       board extra scaler = do
@@ -6861,11 +6862,12 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
           let key e = (DamageEvent.source e /= src, DamageEvent.source e)
            in fmap fst (List.sortOn (key . snd) (zip [0 ..] events))
         _ -> S.identityAnswer p
-  -- CR 122.6 / 614.16: the counter goes through the placement funnel, so the two
-  -- replacements that scale a placement reach it. Three DISTINCT counts off one
-  -- card -- doubled, unreplaced and halved -- which is what separates "the funnel
-  -- was used" from "the number was written onto the object".
-  Spec.it s "CR 122.6 the shield counter the bird enters with runs the placement funnel" $ do
+  -- CR 306.5b / 614.16: the counter accumulates into the entry's own CR 616.1
+  -- pool, so the two replacements that scale a placement reach it there. Three
+  -- DISTINCT counts off one card -- doubled, unreplaced and halved -- which is
+  -- what separates "the entry pool was used" from "the number was written onto
+  -- the object".
+  Spec.it s "CR 306.5b the shield counter the bird enters with reaches the entry's CR 616.1 pool" $ do
     (doubledBird, doubled) <- board [] (Just ("Doubling Season", S.alice))
     (plainBird, plain) <- board [] Nothing
     (halvedBird, halved) <- board [] (Just ("Vorinclex, Monstrous Raider", S.bob))

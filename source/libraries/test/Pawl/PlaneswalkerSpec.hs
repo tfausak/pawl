@@ -393,9 +393,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
       (all (`notElem` Action.legalActions S.alice theirTurn) (activation jaceId plusTwo jace))
       "the +2 is not offered"
 
-  -- The proof that CR 306.5b's counters go through the CR 122.6 funnel rather
-  -- than straight onto the object. CR 614.16's second sentence is the rule:
-  -- a counter-scaling replacement applies "even if the original event being
+  -- The proof that CR 306.5b's counters accumulate into GameState.enteringCounters
+  -- rather than landing straight onto the object, so CR 614.16 reaches them in the
+  -- entry's own CR 616.1 pool. CR 614.16's second sentence is the rule: a
+  -- counter-scaling replacement applies "even if the original event being
   -- modified wasn't itself an effect", and CR 306.5b's entry counters are
   -- placed by a replacement effect.
   Spec.it s "CR 614.16 Doubling Season doubles a planeswalker's starting loyalty" $ do

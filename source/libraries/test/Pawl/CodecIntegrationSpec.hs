@@ -340,8 +340,10 @@ gameStateRoundTripSpec s registry = do
     Spec.assertBool s (Map.size (GameState.printings gs) >= 2) "the fixture should hold two printings"
     roundTrips "two interned printings" gs
 
-  -- Task 1 of #1996: enteringCounters is written by nobody yet, so this case
-  -- forces the field non-empty by hand rather than through play.
+  -- Forces GameState.enteringCounters non-empty by hand rather than through
+  -- play, since the field is normally emptied by flushEnteringCounters before
+  -- an event finishes applying and a round trip in between is not observable
+  -- through play.
   Spec.it s "a pending entry counter round trips" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
