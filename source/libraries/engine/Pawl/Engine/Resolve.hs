@@ -4978,7 +4978,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Replace (Replace.MkReplace duration uses origin condition re) ->
     -- CR 614.3 / 615.3: install the floating replacement. Targetless and
     -- unprompted. CR 113.7: the SOURCE is this effect's source, which with the
-    -- timestamp is the row's CR 614.5 identity (#687). CR 614.15: the ORIGIN
+    -- timestamp is the row's CR 614.5 identity. CR 614.15: the ORIGIN
     -- travels with the row rather than being re-derived.
     State.modify' $ \gs ->
       let context = effectContext controller source legal (slotGroups resolving gs)

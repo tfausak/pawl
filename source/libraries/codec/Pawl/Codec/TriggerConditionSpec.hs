@@ -450,6 +450,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.DamageToPlayerPrevented PlayerRelation.Opponent)
       " {\"type\":\"DamageToPlayerPrevented\",\"value\":{\"type\":\"Opponent\"}} "
+  -- Rule 615.13's other reading, "prevented this way". Nullary: its subject is
+  -- the bearer's own prevention effect, so there is no relation to carry.
+  Spec.it s "SelfPreventsDamage" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfPreventsDamage
+      " {\"type\":\"SelfPreventsDamage\"} "
   -- CR 119.9's life-gain trigger. Both relations, for the same reason.
   Spec.it s "PlayerGainsLife round-trips both relations" $ do
     Common.assertCodec

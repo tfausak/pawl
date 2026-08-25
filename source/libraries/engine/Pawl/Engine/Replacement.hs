@@ -1615,6 +1615,38 @@ preventionBy candidate before after = case (ReplacementCandidate.effect candidat
               else Nothing
   _ -> Nothing
 
+-- CR 615.13's "prevented THIS WAY": which object's own PRINTED prevention effect
+-- an application was, or Nothing when no card printed it. What
+-- TriggerCondition.SelfPreventsDamage compares against its bearer.
+--
+-- A floating row is always a card's: CR 615.3's shields are installed by the
+-- resolution of a spell or ability, and `source` is the object whose text said
+-- so. A REGRESSION FENCE rather than a proved answer -- every producer of a
+-- floating prevention paired with a "this way" trigger needs a filter on the
+-- damage's source that pawl has not got, so nothing observes this arm answering
+-- Just, and mutating it to Nothing leaves the suite green (gap #2287).
+--
+-- A permanent's is too, with one exception -- CR 122.1c's shield-counter pair,
+-- which Pawl.Engine.Projection.shieldOf mints onto any permanent carrying a
+-- shield counter. It is a rule rather than an ability the card prints, so a
+-- "prevented this way" trigger on that same permanent is not about it: the
+-- counter prevented the damage and the printed effect never applied.
+--
+-- The wildcard is over the EFFECT of a permanent candidate, where it is the only
+-- way to say "not the minted pair" -- the classification is
+-- DamageRewrite.PreventRemovingShieldCounter's, which rule 122.1c makes part of
+-- the rulebook, and nothing here asks what a card's effect does.
+--
+-- Not implemented: the OTHER prevention the rules mint onto a permanent, CR
+-- 702.16e's protection, which is a plain PreventAll and so has nothing to be
+-- told apart by (#2288).
+printedBy :: CandidateId.CandidateId -> Maybe ObjectId
+printedBy candidate = case candidate of
+  CandidateId.OfFloating floating -> Just (FloatingCandidate.source floating)
+  CandidateId.OfPermanent permanent -> case PermanentCandidate.effect permanent of
+    ReplacementEffect.DamageR (DamageR.MkDamageR _ DamageRewrite.PreventRemovingShieldCounter _) -> Nothing
+    _ -> Just (PermanentCandidate.source permanent)
+
 -- CR 615.13: collapse a batch's per-event preventions to one entry per applying
 -- instance per recipient, carrying the total that instance prevented.
 --

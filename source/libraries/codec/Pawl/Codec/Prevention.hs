@@ -10,9 +10,10 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.Prevention as Prevention
 
--- | `by` is written even though nothing downstream reads it: it is CR 615.13's
--- GROUPING key, so an encoder dropping it would let two instances' preventions
--- decode as one.
+-- | `by` is CR 615.13's GROUPING key, so an encoder dropping it would let two
+-- instances' preventions decode as one -- and it is the same identity the
+-- GameEvent this becomes carries, which is what "prevented this way" compares
+-- against (Pawl.Types.DamagePrevented).
 --
 -- `rider` is 'Fields.required' over 'Common.maybe' rather than defaulted, the
 -- posture Pawl.Codec.Combat takes: the absent case is an explicit null.

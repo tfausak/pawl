@@ -18,6 +18,7 @@ import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
+import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
@@ -33,6 +34,7 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.FloatingCandidate as FloatingCandidate
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.LifeChange as LifeChange
@@ -51,6 +53,7 @@ import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
@@ -85,14 +88,16 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       ( "{\"type\":\"DamageDealt\",\"value\":{\"source\":1,\"target\":{\"type\":\"ToPlayer\",\"value\":1},\"amount\":2,"
           <> "\"dealtByDeathtouch\":true,\"dealtByToxic\":3,\"dealtByLifelink\":2,\"kind\":{\"type\":\"Combat\"}}}"
       )
-  -- CR 615.13's record. The recipient is a PLAYER, which is the only shape the
-  -- pool's one reader matches.
+  -- CR 615.13's record, carrying the applying instance's CR 614.5 identity
+  -- alongside the recipient and the amount.
   Spec.it s "DamagePrevented" $
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (Recipient.ToPlayer (PlayerId.MkPlayerId 1)) 3))
-      " {\"type\":\"DamagePrevented\",\"value\":{\"recipient\":{\"type\":\"ToPlayer\",\"value\":1},\"amount\":3}} "
+      (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (CandidateId.OfFloating (FloatingCandidate.MkFloatingCandidate (ObjectId.MkObjectId 4) (Timestamp.MkTimestamp 6))) (Recipient.ToPlayer (PlayerId.MkPlayerId 1)) 3))
+      ( "{\"type\":\"DamagePrevented\",\"value\":{\"by\":{\"type\":\"OfFloating\",\"value\":{\"source\":4,\"timestamp\":6}},"
+          <> "\"recipient\":{\"type\":\"ToPlayer\",\"value\":1},\"amount\":3}}"
+      )
   Spec.it s "StepBegan" $
     Common.assertCodec
       s

@@ -44,6 +44,7 @@ import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
+import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClassLevel as ClassLevel
@@ -76,6 +77,7 @@ import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.FloatingCandidate as FloatingCandidate
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
@@ -123,6 +125,7 @@ import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -1769,6 +1772,9 @@ representativeEvents cond =
         GameEvent.DamageDealt
           (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat)
       one e = e NonEmpty.:| []
+      -- CR 614.5's identity for a shield the BEARER's own resolution installed,
+      -- which is what "prevented this way" compares against.
+      preventedByBearer = CandidateId.OfFloating (FloatingCandidate.MkFloatingCandidate departed (Timestamp.MkTimestamp 1))
    in case cond of
         TriggerCondition.SelfEnters -> one (moved Zone.Stack Zone.Battlefield)
         TriggerCondition.PermanentEnters _ -> one (moved Zone.Stack Zone.Battlefield)
@@ -1925,7 +1931,11 @@ representativeEvents cond =
         -- CR 615.13: the recipient has to be a PLAYER, this condition being
         -- scoped to damage that would be dealt to one -- an event naming a
         -- creature matches nothing and would pin the floor at empty.
-        TriggerCondition.DamageToPlayerPrevented _ -> one (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (Recipient.ToPlayer S.bob) 2))
+        TriggerCondition.DamageToPlayerPrevented _ -> one (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented preventedByBearer (Recipient.ToPlayer S.bob) 2))
+        -- The same event read for its IDENTITY instead: rule 615.13's "this way"
+        -- needs the prevention to be the BEARER's own, and an event naming
+        -- another object matches nothing and would pin the floor at empty.
+        TriggerCondition.SelfPreventsDamage -> one (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented preventedByBearer (Recipient.ToCreature departed) 2))
         -- CR 119.9's own event, and the only one this condition admits: the
         -- payload is a player and an amount, and the amount is the floor.
         TriggerCondition.PlayerGainsLife _ -> one (GameEvent.LifeGained (LifeChange.MkLifeChange S.bob 2))
@@ -2139,6 +2149,7 @@ everyTriggerCondition =
     TriggerCondition.HauntedCreatureDies,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
     TriggerCondition.DamageToPlayerPrevented PlayerRelation.You,
+    TriggerCondition.SelfPreventsDamage,
     TriggerCondition.PlayerGainsLife PlayerRelation.You,
     TriggerCondition.PlayerLosesLife PlayerRelation.Opponent,
     TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached CounterKind.Lore 1),
