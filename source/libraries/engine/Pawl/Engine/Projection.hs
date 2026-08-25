@@ -3945,6 +3945,12 @@ abilitiesFromCharacteristics peers pc oid gs =
 replacementsOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
 replacementsOf oid gs =
   let pc = project oid gs
+      -- CR 614.12: a card-authored condition must read the board as though only
+      -- this permanent were entering. `fullView gs` reads the batch's OTHER
+      -- members too when a Quantity.Count condition counts over a battlefield
+      -- Filter -- GameState.enteringBeside only suppresses static-ability
+      -- SOURCES (abilitySources), not a Count's own Filter over the battlefield
+      -- (#2324).
       lives pr = case PrintedReplacement.condition pr of
         Nothing -> True
         Just cond -> Condition.holds (fullView gs) (Filter.contextFor (controllerOf oid gs) (Just oid)) gs oid cond

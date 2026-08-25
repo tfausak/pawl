@@ -533,8 +533,8 @@ applies gs event candidate =
 -- card-authored gate on a replacement ability goes, CR 604.2's clause on
 -- Pawl.Types.PrintedReplacement, which Pawl.Engine.Projection.replacementsOf has
 -- already asked against the entering permanent (CR 614.12) before a row reaches
--- here. One condition mechanism, not two: nothing on Pawl.Types.EntryRewrite says
--- when a row applies, and no arm below reads a card-authored condition.
+-- here. One condition mechanism, not two: no arm below reads a card-authored
+-- condition, only a rule's.
 --
 -- One arm per constructor, no wildcard, so a new rewrite with a condition breaks
 -- the build here as well as in bucketOfEffect, readsApplier and Event.apply. A
