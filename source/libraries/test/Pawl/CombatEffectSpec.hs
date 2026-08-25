@@ -3701,14 +3701,15 @@ landSubtypeStripSpec s registry = Spec.describe s "LandSubtypeStrip" $ do
     Spec.assertEqWith s "the Piker attacked anyway" (S.attackerDeclarationsOf (declared stripped)) mine
     Spec.assertBool s (allUntapped forests (declared stripped)) "and not one Forest went"
   Spec.it s "CR 305.7 an animated Hollow Warrior set to Mountain costs nothing to block" $ do
-    -- Pawl.Engine.BlockCost.costsOn, the sixth reader of the shared gate and the
-    -- last to get a case. Discriminating it wants a cost to BLOCK printed on a
-    -- nontoken creature, since Ashaya animates nontoken creatures. Hollow
-    -- Warrior {4} 4/4 ("This creature can't attack or block unless you tap an
-    -- untapped creature you control not declared as an attacking or blocking
-    -- creature this combat") is the pool's only such printing: the two other
-    -- Face.blockCosts printings, Oppressive Rays and Synthetic Blocking Tithe,
-    -- are Auras and Ashaya can never reach either.
+    -- Pawl.Engine.BlockCost.costsOn, this module's sixth reader of the shared
+    -- gate and the last to get a case. Discriminating it wants a cost to BLOCK
+    -- printed on a nontoken creature, since Ashaya animates nontoken creatures.
+    -- Hollow Warrior {4} 4/4 ("This creature can't attack or block unless you
+    -- tap an untapped creature you control not declared as an attacking or
+    -- blocking creature this combat") is the only such printing in
+    -- data/cards/: the other two files carrying a Face.blockCosts entry,
+    -- oppressive-rays.json and synthetic-blocking-tithe.json, are Auras
+    -- (Affected.Attached), which Ashaya can never reach.
     --
     -- Both extras go under BOB, since CR 509.1a chooses blockers from the
     -- DEFENDING player's creatures and Ashaya animates its own controller's.
