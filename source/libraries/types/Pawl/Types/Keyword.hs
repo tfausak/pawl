@@ -41,6 +41,21 @@ data Keyword
   = Deathtouch -- 702.2
   | Defender -- 702.3
   | DoubleStrike -- 702.4
+  | -- | 702.6a: "Equip [cost]" means "[Cost]: Attach this permanent to target
+    -- creature you control. Activate only as a sorcery." An ACTIVATED ability of
+    -- Equipment cards, minted on the battlefield by
+    -- Pawl.Engine.Keyword.battlefieldAbilitiesFor -- level up's and outlast's
+    -- neighbour there (702.87a, 702.107a), and the only one of the three whose
+    -- ability TARGETS, which is reinforce's (702.77a) shape one zone over.
+    --
+    -- ONE ability PER INSTANCE, which is what CR 702.6d settles: "if a permanent
+    -- has multiple equip abilities, any of its equip abilities may be activated."
+    -- Crew's reading (702.122a), not toxic's (702.164b).
+    --
+    -- A BARE Cost, so neither variant rule 702.6 states is expressible. Not
+    -- implemented: CR 702.6c's "equip [quality] creature", which narrows the
+    -- TARGET only, and CR 702.6e's "equip planeswalker" (#2291).
+    Equip (Cost.Cost Keyword)
   | FirstStrike -- 702.7
   | -- | 702.8a: this card may be played any time you could cast an instant. The
     -- only keyword here about WHEN a card may be cast -- rule 702's other casting

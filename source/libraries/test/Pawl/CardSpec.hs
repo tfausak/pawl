@@ -2697,6 +2697,10 @@ keywordFilters keyword = case keyword of
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
+  -- CR 702.6a's payload is a COST, level up's and outlast's shape below, so its
+  -- Filters are its components'. The "target creature you control" filter its
+  -- minted ability carries is the ENGINE's, never a card's.
+  Keyword.Equip cost -> costFilters cost
   Keyword.FirstStrike -> []
   -- CR 702.8a: flash is a static ability with no payload -- it changes WHEN the
   -- card may be cast, and names nothing to filter.

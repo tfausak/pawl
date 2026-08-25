@@ -1,50 +1,17 @@
 {
   "faces": [
     {
-      "activatedAbilities": [
+      "keywords": [
         {
-          "cost": {
+          "type": "Equip",
+          "value": {
             "mana": [
               {
                 "type": "Generic",
                 "value": 3
               }
             ]
-          },
-          "modal": {
-            "modes": [
-              {
-                "clauses": [
-                  {
-                    "effects": [
-                      {
-                        "type": "Attach",
-                        "value": "target"
-                      }
-                    ]
-                  }
-                ],
-                "targetSlots": {
-                  "target": {
-                    "filter": {
-                      "type": "ControlledBy",
-                      "value": {
-                        "type": "You"
-                      }
-                    },
-                    "pool": {
-                      "type": "Creatures"
-                    }
-                  }
-                }
-              }
-            ]
-          },
-          "restrictions": [
-            {
-              "type": "SorcerySpeed"
-            }
-          ]
+          }
         }
       ],
       "manaCost": [

@@ -4576,9 +4576,12 @@ brambleElementalSpec s registry =
       let (brambleId, base1) = S.addCreature bramble S.alice (S.landsInPlay plains 3)
           (bladeId, base2) = S.addCreature bonesplitter S.alice base1
           ready = base2 {GameState.priority = Just S.alice}
-      case firstActivatedOf bonesplitter of
-        Nothing -> Spec.assertFailure s "Bonesplitter should print one activated ability"
-        Just equip -> do
+      -- From the PROJECTION, not the face: Bonesplitter declares CR 702.6a's
+      -- keyword and prints no activated ability, so the equip is minted by
+      -- Pawl.Engine.Keyword and appended by Pawl.Engine.Projection.
+      case Projection.abilitiesOf bladeId ready of
+        [] -> Spec.assertFailure s "Bonesplitter should offer rule 702.6a's minted equip ability"
+        equip : _ -> do
           let activated = S.runPure (aimAtOffered brambleId) ready (Activate.activateAbility S.alice bladeId equip)
               equipped = S.runPure (aimAtOffered brambleId) activated Stack.resolveTop
               after = fireTriggers (aimAtOffered brambleId) equipped

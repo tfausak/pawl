@@ -215,6 +215,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
+  Keyword.Equip _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -300,6 +301,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
+  Keyword.Equip _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -495,6 +497,10 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
+  -- CR 702.6d: "if a permanent has multiple equip abilities, any of its equip
+  -- abilities may be activated" -- so one ability per instance, crew's reading
+  -- above.
+  Keyword.Equip cost -> List.genericReplicate count (equip cost)
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -695,6 +701,46 @@ outlast cost =
   where
     grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
 
+-- CR 702.6a's whole ability: "[Cost]: Attach this permanent to target creature
+-- you control. Activate only as a sorcery." levelUp's and outlast's neighbour on
+-- the battlefield, and the only one of the three that TARGETS -- so the slot map
+-- is reinforce's above rather than their empty one.
+--
+-- THE COST is the printed one UNCHANGED: rule 702.6a appends neither a tap symbol
+-- nor anything else, so CR 302.6 never reaches this ability and an Equipment that
+-- arrived this turn can equip.
+--
+-- "TARGET CREATURE YOU CONTROL" is the pool plus a Filter and not the pool alone:
+-- CR 115.4 makes the control question part of target legality, so it is re-asked
+-- at resolution (CR 608.2b) and an Equipment whose host changed hands fizzles.
+-- CR 301.5b's separate restriction -- that an Equipment may only be attached to a
+-- creature at all -- is Pawl.Engine.Attach's and is not restated here.
+--
+-- Not implemented: CR 702.6c's "equip [quality] creature" and CR 702.6e's "equip
+-- planeswalker", neither of which Pawl.Types.Keyword's bare Cost can say (#2291).
+equip :: Cost Keyword -> ActivatedAbility Card
+equip cost =
+  ActivatedAbility.MkActivatedAbility
+    { ActivatedAbility.cost = cost,
+      ActivatedAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton equipTarget slot)))
+          (ModeSelection.ChooseExactly 1),
+      -- CR 702.6a's "Activate only as a sorcery", which CR 307.5 spells out.
+      ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+      ActivatedAbility.condition = Nothing,
+      -- Nothing on every keyword-minted ability: no clause of a card refers to
+      -- one, CR 702's own text being what mints it.
+      ActivatedAbility.name = Nothing
+    }
+  where
+    slot = TargetSlot.required Pool.Creatures (Just (Filter.ControlledBy PlayerRelation.You))
+    effect = Effect.Attach equipTarget
+
+-- The slot rule 702.6a's one target is chosen into, reinforceTarget's position.
+equipTarget :: SlotName.SlotName
+equipTarget = SlotName.MkSlotName (Text.pack "equipped")
+
 -- CR 601.3: the casting permissions rule 702 gives a card for holding a keyword.
 -- A card's own printed permissions are a separate, additive list.
 --
@@ -733,6 +779,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
+  Keyword.Equip _ -> []
   Keyword.FirstStrike -> []
   -- CR 702.8a grants no permission, and it is the near miss worth stating: its
   -- SECOND sentence widens the TIME a cast may be proposed at (Cast.instantSpeed)
@@ -1109,6 +1156,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
+  Keyword.Equip _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -1310,6 +1358,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
+  Keyword.Equip _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -1432,8 +1481,8 @@ mintsCombatRestriction = not . null . mintedCombatRestrictionsFor
 -- handAbilitiesFor and battlefieldAbilitiesFor -- so asking both cannot answer
 -- twice for one keyword.
 --
--- The five minting keywords -- cycling, reinforce, crew, level up, outlast -- all
--- carry a payload, so familyOf answers Just for every one of them and its Nothing
+-- Every minting keyword -- cycling, reinforce, crew, level up, outlast, equip --
+-- carries a payload, so familyOf answers Just for every one of them and its Nothing
 -- is unreachable from here. Its Nothing is still let through rather than made an
 -- error: a nullary keyword that minted an activated ability would have no family
 -- to name, and CR 702 would have to grow one first.
@@ -1468,6 +1517,9 @@ familyGranting counts ability =
 -- the next parameterized keyword.
 familyOf :: Keyword -> Maybe KeywordFamily.KeywordFamily
 familyOf keyword = case keyword of
+  -- CR 702.6a's parameterized keyword: "equip abilities" drops the cost, which
+  -- is what Bureau Headmaster's reduction names (#1431).
+  Keyword.Equip _ -> Just KeywordFamily.Equip
   Keyword.Hexproof _ -> Just KeywordFamily.Hexproof
   Keyword.Landwalk _ -> Just KeywordFamily.Landwalk
   Keyword.Cycling {} -> Just KeywordFamily.Cycling
