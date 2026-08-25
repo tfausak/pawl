@@ -10,7 +10,6 @@ import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBl
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
-import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -275,11 +274,10 @@ data TriggerCondition
     -- three or more creatures" needs (#2226).
     PlayerAttacksWith PlayerAttacksWith.PlayerAttacksWith
   | -- | CR 508.3e: "whenever [a player] attacks [another player]" -- Seifer,
-    -- Balamb Rival's "whenever you attack a player" and Mirkwood Trapper's
-    -- "whenever a player attacks you". BOTH of rule 508.3e's subjects are in the
-    -- payload, and neither can stand in for the other: the two cards name the
-    -- opposite sides, and a board where a third player is attacked tells them
-    -- apart.
+    -- Balamb Rival's "whenever you attack a player". The payload is which player
+    -- rule 508.3e names FIRST, the one who declared; the second subject is the
+    -- rule's bare "[another player]", which every printing of this shape leaves
+    -- bare too.
     --
     -- CR 508.3b's per-TARGET arity and not rule 508.3d's, so this reads
     -- GameEvent.BecameAttacked where PlayerAttacks above reads
@@ -305,12 +303,10 @@ data TriggerCondition
     -- creature was never declared, and Pawl.Engine.Combat.putOntoBattlefieldAttacking
     -- records no event.
     --
-    -- Opponent and AnyPlayer are indistinguishable on the ATTACKED side, CR
-    -- 506.2/508.1 making every attackable player an opponent of the attacker, so
-    -- a card printing the bare "a player" there takes AnyPlayer -- what it
-    -- prints -- and no board can tell the two apart. You is the reading that
-    -- pays, and Mirkwood Trapper is what proves the field is read at all.
-    PlayerAttacksPlayer PlayerAttacksPlayer.PlayerAttacksPlayer
+    -- Not implemented: a NAMED attacked side, which "whenever a player attacks
+    -- you" needs -- Mirkwood Trapper and Lulu, Stern Guardian print it, and each
+    -- wants a second capability besides (#2281).
+    PlayerAttacksPlayer PlayerRelation.PlayerRelation
   | -- | CR 702.105a: dethrone -- SelfAttacks narrowed by whom the bearer
     -- attacked. The attacked player comes from Combat.attackers rather than the
     -- event, and that is the whole narrowing: the event carries CR 508.5's

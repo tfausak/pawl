@@ -136,7 +136,6 @@ import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesign
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.Player as Player
-import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -5529,18 +5528,24 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Exerted _ -> False
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
-  -- CR 508.3e: the player the payload's `attacker` names declared attackers, and
-  -- at least one of them was sent at a player its `attacked` names.
-  -- AttachedPlayerIsAttacked's event and its per-TARGET arity, with both
-  -- subjects read off relations instead of off the bearer's attachment -- so one
-  -- declaration split across two opponents fires this TWICE where PlayerAttacks
-  -- above fires once, which is what parts rule 508.3e from rule 508.3d.
+  -- CR 508.3e: the player the payload names declared attackers, and at least one
+  -- of them was sent at a PLAYER. AttachedPlayerIsAttacked's event and its
+  -- per-TARGET arity, with the subject read off a relation instead of off the
+  -- bearer's attachment -- so one declaration split across two opponents fires
+  -- this TWICE where PlayerAttacks above fires once, which is what parts rule
+  -- 508.3e from rule 508.3d.
   --
   -- Both sides come off the EVENT. Combat.declareAttackers stamps CR 508.1's
   -- declaring player onto it beside the target, which is what lets this arm ask
   -- rule 508.3e's question at all; reading GameState.activePlayer for the
   -- attacker would agree today, rule 508.1 letting only the active player
   -- declare, but the rule asks who declared.
+  --
+  -- The attacked side is UNQUALIFIED, rule 508.3e's "[another player]" as every
+  -- printing of this shape leaves it -- Pawl.Types.TriggerCondition's arm says
+  -- which cards would narrow it (#2281). CR 506.2 makes it an opponent of the
+  -- attacker whatever this arm did, so there is nothing here to compare against
+  -- `you`.
   --
   -- ONLY AttackTarget.OfPlayer, which is rule 508.3e's last sentence in as many
   -- words: "it won't trigger if a creature attacks a planeswalker or a battle".
@@ -5552,11 +5557,9 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- No bearer test, PlayerAttacks' bystanding posture above: rule 508.3e's two
   -- subjects are both players, so a Seifer held out of combat still triggers on
   -- its controller's attack.
-  TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer attacking attacked) -> case event of
+  TriggerCondition.PlayerAttacksPlayer relation -> case event of
     GameEvent.BecameAttacked payload -> case BecameAttacked.target payload of
-      AttackTarget.OfPlayer victim ->
-        PlayerRelation.holds attacking you (BecameAttacked.attacker payload)
-          && PlayerRelation.holds attacked you victim
+      AttackTarget.OfPlayer _ -> PlayerRelation.holds relation you (BecameAttacked.attacker payload)
       AttackTarget.OfPlaneswalker _ -> False
       AttackTarget.OfBattle _ -> False
     GameEvent.AttackerDeclared {} -> False
@@ -11536,7 +11539,7 @@ controllerTurnScoped cond = case cond of
   -- The same comparison over the ATTACKING side, which is the field rule
   -- 508.3e's event pins to the active player; the attacked side says nothing
   -- about whose turn it is.
-  TriggerCondition.PlayerAttacksPlayer payload -> PlayerAttacksPlayer.attacker payload == PlayerRelation.You
+  TriggerCondition.PlayerAttacksPlayer relation -> relation == PlayerRelation.You
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
