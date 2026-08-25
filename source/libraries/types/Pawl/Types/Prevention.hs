@@ -11,13 +11,13 @@ import qualified Pawl.Types.Recipient as Recipient
 -- Pawl.Engine.Damage needs to record a CR 615.13 trigger event.
 --
 -- `by` is the applying instance's CR 614.5 identity, the same key the CR 616.1
--- loop's applied-set is drawn from. It is a GROUPING key rather than a payload:
--- CR 615.13 fires an ability "each time a prevention effect is applied to one or
+-- loop's applied-set is drawn from. It is both a GROUPING key and a payload: CR
+-- 615.13 fires an ability "each time a prevention effect is applied to one or
 -- more simultaneous damage events", so several events of one batch prevented by
--- ONE instance are one prevention with the total, and two instances are two.
--- Nothing downstream reads it -- the GameEvent it becomes carries only the
--- recipient and the amount, because no card in the pool asks WHICH prevention
--- prevented the damage ("prevented this way", #687).
+-- ONE instance are one prevention with the total, and two instances are two --
+-- and the same identity rides the GameEvent it becomes, which is what a card
+-- printing "prevented this way" compares against (Phyrexian Vindicator; see
+-- Pawl.Types.DamagePrevented).
 --
 -- `amount` is the damage this instance stopped, which is the whole point of the
 -- type: the CR 616.1 loop's own answer is the SURVIVING event, and a caller
