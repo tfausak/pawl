@@ -109,7 +109,6 @@ import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
-import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Uses as Uses
@@ -485,26 +484,25 @@ applies gs event candidate =
         -- have ... after it's turned face up" is answered by asking about the
         -- board rather than by a counterfactual.
         --
-        -- CR 702.37b is the second conjunct, and only for the counter rewrite:
-        -- "put a +1/+1 counter on it IF ITS MEGAMORPH COST WAS PAID to turn it
-        -- face up". CR 701.40c gives a manifested megamorph card a second road up
-        -- at its MANA cost, and down that road the ability does not apply at all
-        -- -- so the row is refused here rather than consumed and skipped, which
-        -- is CR 614.1's own shape for an ability whose condition is not met.
-        -- An Effect.TurnFaceUp carries no procedure at all and is refused for the
-        -- same sentence: it paid no cost, megamorph or otherwise.
+        -- TurnUpR.requiring is the second conjunct, and it is the ROW's own
+        -- condition rather than the rewrite class's. CR 702.37b's megamorph
+        -- counter is the one row that carries it -- "put a +1/+1 counter on it IF
+        -- ITS MEGAMORPH COST WAS PAID to turn it face up" -- so the row is
+        -- refused down CR 701.40c's manifest road and off an Effect.TurnFaceUp
+        -- that names no procedure at all, neither having paid that cost. Refused
+        -- rather than consumed and skipped, which is CR 614.1's own shape for an
+        -- ability whose condition is not met.
         --
-        -- Scoped to WithCounters because that rewrite has exactly one producer:
-        -- Pawl.Engine.Keyword.mintedReplacementsFor's megamorph arm, whose rule
-        -- carries the condition. CR 303.4k's MayAttachTo has no such clause and
-        -- applies down either road. Pawl.CardSpec holds that no printing writes a
-        -- WithCounters turn-up rewrite of its own, which is what keeps this from
-        -- over-gating a card.
-        (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat rewrite), ProposedEvent.WouldTurnFaceUp oid procedure) ->
-          matchesFiltered gs candidate pat oid
-            && case rewrite of
-              TurnUpRewrite.WithCounters {} -> procedure == Just TurnUpProcedure.Morph
-              TurnUpRewrite.MayAttachTo {} -> True
+        -- NOT scoped by rewrite class: CR 614.1e applies down every road, and a
+        -- card writing an "as this creature is turned face up, put N counters on
+        -- it" clause of its own -- Bubble Smuggler, whose road up is CR 702.168d's
+        -- disguise procedure -- states no such condition; see #987. CR 303.4k's
+        -- MayAttachTo has none either. Pawl.CardSpec holds that no printing
+        -- authors a `requiring` at all, which is what keeps a card's row
+        -- unconditional here.
+        (ReplacementEffect.TurnUpR turnUpR, ProposedEvent.WouldTurnFaceUp oid procedure) ->
+          matchesFiltered gs candidate (TurnUpR.matching turnUpR) oid
+            && maybe True (\required -> procedure == Just required) (TurnUpR.requiring turnUpR)
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
         -- MISMATCHED class, where False is the correct answer rather than a
@@ -1198,13 +1196,13 @@ readsApplier re = case re of
   -- WithCounters' answer one event class over. The inner sum is cased so a
   -- second TurnUpRewrite -- CR 208.2b's power-and-toughness setter -- has to be
   -- decided here rather than inheriting this answer.
-  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ (TurnUpRewrite.WithCounters {})) -> False
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ _ (TurnUpRewrite.WithCounters {})) -> False
   -- CR 303.4k: "the AURA's controller" makes the choice, and the Aura is the
   -- object the event already named -- so the player asked is read off the event
   -- rather than off whose row is applying, and two identical rows would put the
   -- same question to the same player. The destination Filter is the effect's own
   -- field, inside `choose`'s comparison already.
-  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ (TurnUpRewrite.MayAttachTo _)) -> False
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ _ (TurnUpRewrite.MayAttachTo _)) -> False
   -- CR 614.10: a skip replaces the step or phase with nothing. The player it is
   -- ABOUT is baked into PhasePattern.whosePhase, on the EFFECT, where this
   -- comparison already sees it.

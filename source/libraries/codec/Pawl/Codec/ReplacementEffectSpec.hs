@@ -34,6 +34,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.WithCounters as WithCounters
@@ -213,8 +214,8 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
     Common.assertCodec
       s
       codec
-      (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (TurnUpRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 1)))))
-      " {\"type\":\"TurnUpR\",\"value\":{\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"WithCounters\",\"value\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":{\"type\":\"Literal\",\"value\":1}}]}}} "
+      (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (Just TurnUpProcedure.Morph) (TurnUpRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 1)))))
+      " {\"type\":\"TurnUpR\",\"value\":{\"matching\":{\"type\":\"IsSource\"},\"requiring\":{\"type\":\"Morph\"},\"rewrite\":{\"type\":\"WithCounters\",\"value\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":{\"type\":\"Literal\",\"value\":1}}]}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
   where
     -- CR 615.5: the DamageR arm carries riders, so the codec takes the effect

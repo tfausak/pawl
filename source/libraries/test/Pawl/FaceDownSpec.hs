@@ -1288,7 +1288,7 @@ declining fodder p = case p of
 giftDestinationFilter :: Printing.Printing -> Maybe (Filter.Type.Filter Keyword.Keyword)
 giftDestinationFilter printing =
   case Face.replacementEffects (S.combinedFace printing) of
-    [PrintedReplacement.MkPrintedReplacement _ (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ (TurnUpRewrite.MayAttachTo f))) _] -> Just f
+    [PrintedReplacement.MkPrintedReplacement _ (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ _ (TurnUpRewrite.MayAttachTo f))) _] -> Just f
     _ -> Nothing
 
 -- CR 701.40a / 708.3: a permanent PUT onto the battlefield face down, which is
@@ -1898,6 +1898,11 @@ disguiseSpec s registry =
               Spec.assertEqWith s "CR 702.168d only the disguise procedure is open" (FaceDown.turnableFaceUp S.alice down) [(permanent, TurnUpProcedure.Disguise)]
               let up = S.runPure S.identityAnswer down (FaceDown.turnFaceUp S.alice TurnUpProcedure.Disguise permanent)
               Spec.assertEqWith s "CR 702.168d it regains its normal characteristics: the printed 4/3" (S.powerToughnessOf permanent up) (Just (4, 3))
+              -- THE PAIR for Bubble Smuggler's case at the end of this group: the
+              -- same procedure on a disguise card whose text has no CR 614.1e
+              -- clause puts nothing on it, so the four counters there are the
+              -- card's own text rather than something the road up does.
+              Spec.assertEqWith s "CR 614.1e nothing to replace the turning-over, so no counter" (S.counterOf CounterKind.PlusOnePlusOne permanent up) 0
               Spec.assertBool s (Projection.hasKeyword Keyword.Flying permanent up) "CR 702.168d and its flying"
               Spec.assertBool s (not (Projection.hasKeyword ward2 permanent up)) "CR 702.168d the disguise effect ended, so the listed ward is gone"
               Spec.assertEqWith s "CR 110.5 it is face up" (fmap Object.facing (Game.lookupObject permanent up)) (Just Facing.FaceUp)
@@ -2033,9 +2038,50 @@ disguiseSpec s registry =
               Spec.assertEqWith s "CR 702.37c the Growth resolved with nothing to counter it" (S.powerToughnessOf permanent after) (Just (5, 5))
               Spec.assertEqWith s "and bob spent only the Growth's Forest" (S.tappedCount S.bob after) 1
 
+        -- THE PROVING TEST for a CARD-AUTHORED CR 614.1e counter clause; see #987.
+        -- Bubble Smuggler is the card: {1}{U} Creature -- Octopus Fish 2/1,
+        -- "Disguise {5}{U}" and "As this creature is turned face up, put four
+        -- +1/+1 counters on it", transcribed whole.
+        --
+        -- Its road up is CR 702.168d's DISGUISE procedure, which is the point.
+        -- Until #987 the engine gated every WithCounters turn-up rewrite on CR
+        -- 702.37b's "if its megamorph cost was paid" -- a condition this card does
+        -- not have -- so these four counters would have been refused. The
+        -- condition now rides megamorph's own row (TurnUpR.requiring).
+        --
+        -- FOUR AND NOT ONE is what says the count is card data rather than
+        -- megamorph's hard-coded 1, and the P/T separates three readings: the
+        -- face-down 2/2, the printed 2/1, and the 6/5 the four counters make.
+        --
+        -- Nine Islands: {3} for the face-down cast (CR 702.168a) and {5}{U} for
+        -- the disguise cost (CR 702.168d).
+        Spec.it s "CR 614.1e Bubble Smuggler's own clause puts four +1/+1 counters on it as the disguise procedure turns it face up" $ do
+          island <- S.printingOf s registry "Island"
+          smuggler <- S.printingOf s registry smugglerName
+          let (gs, oid) = morphBoard island smuggler 9
+              (down, entered) = castAndResolve smuggler disguised gs oid
+          case entered of
+            Nothing -> Spec.assertFailure s "the disguise cast did not reach the battlefield"
+            Just permanent -> do
+              let up = S.runPure S.identityAnswer down (FaceDown.turnFaceUp S.alice TurnUpProcedure.Disguise permanent)
+              -- THE BEHAVIOUR, ahead of every control below.
+              Spec.assertEqWith s "CR 614.1e four +1/+1 counters, the card's own count and not megamorph's one" (S.counterOf CounterKind.PlusOnePlusOne permanent up) 4
+              Spec.assertEqWith s "CR 614.1e a 6/5: the printed 2/1 under four counters, neither the 2/2 nor the 2/1" (S.powerToughnessOf permanent up) (Just (6, 5))
+              -- The controls: it really was face down with no counters on it, and
+              -- the road up really was the disguise one at its own price.
+              Spec.assertEqWith s "no counter before it turned over" (S.counterOf CounterKind.PlusOnePlusOne permanent down) 0
+              Spec.assertEqWith s "CR 702.168b it was the face-down 2/2" (S.powerToughnessOf permanent down) (Just (2, 2))
+              Spec.assertEqWith s "CR 702.168d only the disguise procedure was open" (FaceDown.turnableFaceUp S.alice down) [(permanent, TurnUpProcedure.Disguise)]
+              Spec.assertEqWith s "CR 110.5 and it is face up" (fmap Object.facing (Game.lookupObject permanent up)) (Just Facing.FaceUp)
+              Spec.assertEqWith s "CR 702.168a/702.168d three for the cast and six for {5}{U}, nine in all" (S.tappedCount S.alice up) 9
+
 -- The card whose face-down listing carries CR 702.168b's ward {2}.
 phantomName :: String
 phantomName = "Defenestrated Phantom"
+
+-- The pool's one card writing CR 614.1e's counter clause in its own text; see #987.
+smugglerName :: String
+smugglerName = "Bubble Smuggler"
 
 -- Its pair: the morph card whose rule lists nothing (CR 702.37c).
 ainokName :: String

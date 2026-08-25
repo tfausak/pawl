@@ -695,7 +695,7 @@ replacementPatternSlots re = case re of
   ReplacementEffect.DestructionR _ -> Map.empty
   ReplacementEffect.CounterR (CounterR.MkCounterR pat _) -> filterSlotsOf (CounterPattern.onWhat pat)
   ReplacementEffect.TokenR _ -> Map.empty
-  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat _) -> filterSlotsOf pat
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat _ _) -> filterSlotsOf pat
   ReplacementEffect.PhaseR _ -> Map.empty
 
 -- One Filter's slot reads, at arity One -- the same shape modeSlots folds over a

@@ -744,6 +744,8 @@ library codec
     Pawl.Codec.TurnFaceDownSpec
     Pawl.Codec.TurnScope
     Pawl.Codec.TurnScopeSpec
+    Pawl.Codec.TurnUpProcedure
+    Pawl.Codec.TurnUpProcedureSpec
     Pawl.Codec.TurnUpR
     Pawl.Codec.TurnUpRewrite
     Pawl.Codec.TurnUpRewriteSpec
