@@ -72,13 +72,10 @@ costsOn blocker gs =
             -- 305.7's basic-land subtype set, and CR 604.2 against a CR 613.1f
             -- layer-6 removal.
             --
-            -- Unproven, where the five readers pinned in
-            -- Pawl.CombatEffectSpec's LandSubtypeStrip group each have a case:
-            -- discriminating it wants a cost to block printed on a nontoken
-            -- creature, since Ashaya, Soul of the Wild animates creatures.
-            -- Hollow Warrior is now such a printing, so the board is buildable
-            -- and simply unbuilt. A regression fence rather than a proof
-            -- (#1999).
+            -- Proved by Pawl.CombatEffectSpec's LandSubtypeStrip case "an
+            -- animated Hollow Warrior set to Mountain costs nothing to block",
+            -- which is where the group's per-reader case for this copy of the
+            -- guard lives.
             if (null setEffs || Projection.liveAfterLayers setEffs source gs)
               && not (removed source)
               then concatMap (fromCost source) costs
