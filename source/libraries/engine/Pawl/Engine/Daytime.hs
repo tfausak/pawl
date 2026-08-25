@@ -155,10 +155,13 @@ dueToTurn gs = case GameState.daytime gs of
 -- Every road this module has to a turn takes it, so the CR 702.145c/f sweep is
 -- not a second, silent way to turn a permanent over.
 --
--- A REGRESSION FENCE rather than a proved behaviour: no daybound or nightbound
--- card in data/cards prints a "transforms into" trigger, so removing the record
--- from this road leaves the suite green. Wildsong Howler would observe it
--- (#2051).
+-- Proved at gameplay level by Pawl.TransformSpec's nightfall case, whose fixture
+-- is Howlpack Piper // Wildsong Howler: its back face prints "whenever this
+-- creature enters or transforms into Wildsong Howler", and the permanent is
+-- placed rather than cast so only the transform limb can fire. Removing the
+-- record here reddens that case's hand assertion and leaves every case in
+-- Pawl.DaytimeSpec green, the one asserting the permanent turned over included:
+-- the record is what is lost, not the turn.
 turnDue :: ([ObjectId] -> GameState -> GameState) -> Game Bool
 turnDue record = do
   gs <- State.get
