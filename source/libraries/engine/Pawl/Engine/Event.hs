@@ -2196,8 +2196,29 @@ runEntry batch oid = do
   before <- State.gets GameState.enteringBeside
   State.modify' (\gs -> gs {GameState.enteringBeside = batch})
   Monad.void (applyReplacementsIn Nothing batch (ProposedEvent.WouldEnter oid))
+  flushEnteringCounters oid
   designateProtector oid
   State.modify' (\gs -> gs {GameState.enteringBeside = before})
+
+-- CR 614.1c: the counters the entering permanent turned out to be entering WITH,
+-- placed once, after CR 616.1's loop has finished deciding how many that is.
+--
+-- Through settleCounters and NOT putCounters, because the CR 616.1 loop the
+-- funnel's door opens has already run at the entry level -- see the CounterR arm
+-- of `apply`. Going back through the door would offer every counter-scaling row a
+-- second opportunity CR 614.5 has already spent.
+--
+-- Ascending by kind so the CountersPut events are ordered deterministically; no
+-- rule fixes the order, and nothing between them can observe it, since a trigger
+-- scan runs only once this whole entry finishes.
+--
+-- The id is deleted whether or not anything was pending, so a nested entry cannot
+-- inherit an outer subject's leftovers.
+flushEnteringCounters :: ObjectId -> Game ()
+flushEnteringCounters oid = do
+  pending <- State.gets (Map.findWithDefault Map.empty oid . GameState.enteringCounters)
+  State.modify' (\gs -> gs {GameState.enteringCounters = Map.delete oid (GameState.enteringCounters gs)})
+  Monad.mapM_ (\(kind, n) -> Monad.void (settleCounters oid kind n)) (Map.toAscList pending)
 
 -- CR 310.9a: "as a battle enters the battlefield, its controller chooses a player
 -- to be its protector." Run for every entering object, and a no-op for all but a
@@ -2409,37 +2430,47 @@ putCountersIn batch cause oid kind n = do
   resolved <- resolveCounters batch cause oid kind n
   case resolved of
     Nothing -> pure 0
-    Just (target, settledKind, settledCount)
-      | settledCount == 0 -> pure 0
-      | otherwise -> do
-          gs <- State.get
-          -- No write and no event for an object that is not there. Map.adjust on a
-          -- missing id is a silent no-op, so proceeding would record a placement
-          -- the state does not show. ONE lookup answers both questions -- whether
-          -- the object exists, and how many counters of the kind it already had.
-          case Game.lookupObject target gs of
-            Nothing -> pure 0
-            Just obj -> do
-              -- CR 613.7c: the counters arriving get a timestamp, and the ones of
-              -- that kind already there get the same one.
-              ts <- State.state Game.freshTimestamp
-              let before = Map.findWithDefault 0 settledKind (Object.counters obj)
-                  bump o =
-                    o
-                      { Object.counters = Map.insertWith (+) settledKind settledCount (Object.counters o),
-                        Object.counterTimestamps = Map.insert settledKind ts (Object.counterTimestamps o)
-                      }
-                  bumped g = g {GameState.objects = Map.adjust bump target (GameState.objects g)}
-              -- CR 122.6's placement, recorded AFTER the write and from the SETTLED
-              -- count, so a Doubling Season that turned one counter into two records
-              -- the crossing the board actually saw. The before/after pair is what
-              -- CR 714.2b's chapter ability reads.
-              --
-              -- Guarded by the same `settledCount > 0` the write is: an event
-              -- recorded for a placement that did not happen would fire a chapter
-              -- ability off nothing.
-              State.modify' (recordEvent (GameEvent.CountersPut (CounterChange.MkCounterChange target settledKind before (before + settledCount))) . bumped)
-              pure settledCount
+    Just (target, settledKind, settledCount) -> settleCounters target settledKind settledCount
+
+-- The WRITE-AND-EMIT half of putCountersIn, with no CR 616.1 loop in front of it:
+-- the counters have already been settled and this records them. Its second caller
+-- is flushEnteringCounters below, where CR 616.1 ran at the ENTRY level and running
+-- it again here would let one row apply twice.
+--
+-- Not a second funnel. putCountersIn is still the only door that both settles and
+-- writes; this is that door's tail, shared rather than copied.
+settleCounters :: ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
+settleCounters target settledKind settledCount
+  | settledCount == 0 = pure 0
+  | otherwise = do
+      gs <- State.get
+      -- No write and no event for an object that is not there. Map.adjust on a
+      -- missing id is a silent no-op, so proceeding would record a placement
+      -- the state does not show. ONE lookup answers both questions -- whether
+      -- the object exists, and how many counters of the kind it already had.
+      case Game.lookupObject target gs of
+        Nothing -> pure 0
+        Just obj -> do
+          -- CR 613.7c: the counters arriving get a timestamp, and the ones of
+          -- that kind already there get the same one.
+          ts <- State.state Game.freshTimestamp
+          let before = Map.findWithDefault 0 settledKind (Object.counters obj)
+              bump o =
+                o
+                  { Object.counters = Map.insertWith (+) settledKind settledCount (Object.counters o),
+                    Object.counterTimestamps = Map.insert settledKind ts (Object.counterTimestamps o)
+                  }
+              bumped g = g {GameState.objects = Map.adjust bump target (GameState.objects g)}
+          -- CR 122.6's placement, recorded AFTER the write and from the SETTLED
+          -- count, so a Doubling Season that turned one counter into two records
+          -- the crossing the board actually saw. The before/after pair is what
+          -- CR 714.2b's chapter ability reads.
+          --
+          -- Guarded by the same `settledCount > 0` the write is: an event
+          -- recorded for a placement that did not happen would fire a chapter
+          -- ability off nothing.
+          State.modify' (recordEvent (GameEvent.CountersPut (CounterChange.MkCounterChange target settledKind before (before + settledCount))) . bumped)
+          pure settledCount
 
 -- CR 122.6a: putCounters with the rule's DEFAULT putter -- "if the effect doesn't
 -- specify a player, the object's controller puts those counters on it". Every
