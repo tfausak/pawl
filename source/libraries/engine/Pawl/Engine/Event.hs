@@ -6183,9 +6183,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           -- `n >= 2` is "GameEvent.AttackerBlocked was not recorded for this
           -- same arrival", stated in terms of the floor: that event rides an
           -- arrival only when the attacker had no blocker before it, which
-          -- together with `== n` means n == 1. Seifer, Balamb Rival is the only
-          -- printing and reads two, but the codec admits one, and both events
-          -- would otherwise answer the one arrival.
+          -- together with `== n` means n == 1. That conjunct is a REGRESSION
+          -- FENCE rather than proved behaviour: Seifer, Balamb Rival is the only
+          -- printing and reads two, so relaxing it to `n >= 0` leaves the whole
+          -- trigger subtree green. The codec admits one, and both events would
+          -- then answer the one arrival.
           --
           -- Not implemented: several creatures put onto the battlefield
           -- blocking one attacker at once, where the count jumps past the floor

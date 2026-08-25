@@ -453,7 +453,7 @@ data TriggerCondition
     -- Pawl.ZoneTriggerSpec's representativeEvents pins by listing both.
     --
     -- Rule 509.3e's "effects that add or remove blockers" reaches it too, and
-    -- this is the one form of rule 509.3e they can reach: a creature put onto
+    -- this is the only form of rule 509.3e they reach today: a creature put onto
     -- the battlefield blocking an attacker that was ALREADY blocked pushes the
     -- count over the floor, against GameEvent.BecameBlocking rather than the
     -- grouped event -- CR 509.3c's "was an unblocked creature at that time"
