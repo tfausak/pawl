@@ -2135,8 +2135,9 @@ apply batch candidate event =
     --
     -- The counters go through putCounters, the CR 122.6 funnel -- so a CR 614.1
     -- counter replacement applies and Hardened Scales sees a megamorph counter
-    -- the way it sees a riot one. NOT the pending map the EntryR arms write: CR 614.1e's turning face up
-    -- is not an entry, so there is no entry loop for a row to be ordered in.
+    -- the way it sees a riot one. NOT the pending map the EntryR arms write:
+    -- CR 614.1e's turning face up is not an entry, so there is no entry loop
+    -- for a row to be ordered in.
     --
     -- The amount is evaluated the same way too, though rule 702.37b states its own number and
     -- Pawl.CardSpec holds that no printing authors a turn-up counter rewrite, so

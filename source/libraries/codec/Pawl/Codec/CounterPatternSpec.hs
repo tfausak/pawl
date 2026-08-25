@@ -1,6 +1,9 @@
 module Pawl.Codec.CounterPatternSpec where
 
+import qualified Data.Either as Either
+import qualified Data.Text as Text
 import qualified Pawl.Codec.CounterPattern as CounterPattern
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
@@ -68,4 +71,12 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
           CounterPattern.onWho = Just ControllerRelation.Anyones
         }
       " {\"subject\":{\"type\":\"ByPlayer\",\"value\":{\"type\":\"Opponents\"}},\"onWhat\":{\"type\":\"And\",\"value\":[]},\"onWho\":{\"type\":\"Anyones\"}} "
+  -- The breaking format change, made to prove itself: `subject` is required, so
+  -- the pre-#1232 wire shape -- the same object with the key absent -- does not
+  -- decode to a defaulted subject, it does not decode at all.
+  Spec.it s "rejects a CounterPattern with no subject key" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Codec.decode CounterPattern.codec =<< Common.parse (Text.pack " {\"onWhat\":{\"type\":\"And\",\"value\":[]}} ")))
+      "expected a decode failure"
   Spec.it s "has a schema" $ Common.assertHasSchema s CounterPattern.codec

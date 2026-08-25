@@ -1153,11 +1153,15 @@ fortressKinGuardSpec s registry = Spec.describe s "FortressKinGuard" $ do
             Spec.assertEqWith s "CR 111.2: alice created it, so alice controls it" (Projection.controllerOf spiritId after) (Just S.alice)
           other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
       other -> Spec.assertFailure s ("expected one Fortress Kin-Guard, got " <> show (length other))
-  -- CR 614.16 over a cost paid DURING a resolution. The board differs from the
-  -- first case in NOTHING but the Hardened Scales, and Hardened Scales does apply,
-  -- because CR 118.12 pays this cost as the ability resolves and CR 609.1 makes
-  -- what happens then an effect of that ability. A payment routed around the
-  -- counter funnel reads 2/3 here.
+  -- CR 614.1 over a cost paid DURING a resolution. The board differs from the
+  -- first case in NOTHING but the Hardened Scales, and what it proves is that the
+  -- payment places its counter through CR 122.6's funnel rather than writing it
+  -- onto the object directly: a direct write reads 2/3 here.
+  --
+  -- NOT the payment moment. Hardened Scales is CR 614.1's passive subject, which
+  -- reaches a placement at either moment; the moment's own split is pinned by
+  -- Pawl.ReplacementSpec's blight pair and by Pawl.PlaneswalkerSpec's loyalty
+  -- case, all three of them CR 614.16 subjects (Doubling Season).
   Spec.it s "CR 614.1 Hardened Scales sees endure's counter, so the Kin-Guard reads 3/4" $ do
     plains <- S.printingOf s registry "Plains"
     kinGuard <- S.printingOf s registry "Fortress Kin-Guard"

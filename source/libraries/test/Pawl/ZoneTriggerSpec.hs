@@ -3012,6 +3012,52 @@ undyingSpec s registry =
    in Spec.describe s "CR 702.93 undying and CR 702.79 persist" $ do
         twiceKilled "Young Wolf" CounterKind.PlusOnePlusOne 2 2
         twiceKilled "Putrid Goblin" CounterKind.MinusOneMinusOne 1 1
+        -- CR 122.1 and CR 614.1's passive subject in one board. Vizier of
+        -- Remedies is "if one or more -1\/-1 counters would be put on a creature
+        -- you control, that many minus one" -- Pawl.Types.Scaling.Subtract 1 --
+        -- so persist's ONE counter scales to ZERO, and a zero-count placement is
+        -- REMOVED rather than resized (Pawl.Engine.Event.settleCounters' guard).
+        -- The Goblin comes back bare, so CR 603.4's intervening "if" is true
+        -- again and rule 702.79a returns it a second time.
+        --
+        -- The ENTRY path, not a battlefield placement: CR 122.6 gives these
+        -- counters as the permanent enters, so the scaling has to reach the entry
+        -- row that Pawl.Engine.Event.flushEnteringCounters settles.
+        Spec.it s "CR 614.1 Vizier of Remedies takes persist's counter to zero, so the Goblin returns bare and persists again" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          murder <- S.printingOf s registry "Murder"
+          goblin <- S.printingOf s registry "Putrid Goblin"
+          vizier <- S.printingOf s registry "Vizier of Remedies"
+          let (_, withVizier) = S.addCreature vizier S.alice (S.landsInPlay swamp 6)
+              (goblinId, withGoblin) = S.addCreature goblin S.alice withVizier
+              (gs1, firstMurder) = S.handOne murder withGoblin
+              (secondMurder, gs2) = S.addHandCard murder S.alice gs1
+              -- Aimed by id and FILTERED, castAt's posture above and for its
+              -- reason: alice controls two creatures here, so an unaimed Murder
+              -- would kill whichever id sorts first.
+              killing :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+              killing oid spellId gs =
+                let answer :: Prompt.Prompt r -> r
+                    answer p = case p of
+                      Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just oid) . Recipient.objectOf) . snd) sets
+                      _ -> S.identityAnswer p
+                    cast = S.runPure answer gs (S.cast S.alice spellId)
+                    destroyed = S.runPure answer cast Stack.resolveTop
+                    settled = S.runPure answer destroyed Engine.settleForPriority
+                 in S.runPure answer settled Stack.resolveTop
+              first = killing goblinId firstMurder gs2
+          Spec.assertEqWith s "the Vizier is still there, so the Murder went where it was aimed" (length (named "Vizier of Remedies" first)) 1
+          case named "Putrid Goblin" first of
+            [backId] -> do
+              Spec.assertEqWith s "CR 122.1: one counter minus one is none, so it returns with no counter at all" (countersOn backId first) Map.empty
+              Spec.assertEqWith s "and at its printed size" (Projection.powerOf backId first, Projection.toughnessOf backId first) (Just 2, Just 2)
+              let second = killing backId secondMurder first
+              case named "Putrid Goblin" second of
+                [againId] -> do
+                  Spec.assertEqWith s "CR 603.4: it had no counter, so persist returns it a second time" (countersOn againId second) Map.empty
+                  Spec.assertBool s (not (inGraveyard "Putrid Goblin" S.alice second)) "and it is not in the graveyard"
+                other -> Spec.assertFailure s ("expected the Goblin back a second time, got " <> show other)
+            other -> Spec.assertFailure s ("expected exactly one Putrid Goblin back, got " <> show other)
         -- CR 110.2a's "unless the effect states otherwise". Alice steals bob's
         -- Wolf and kills it, so CR 603.3a hands ALICE the dies trigger -- which
         -- is what makes this discriminating, since a return under the ability's
@@ -3242,10 +3288,16 @@ fabricateSpec s registry =
                     )
                 other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
             other -> Spec.assertFailure s ("expected one Glint-Sleeve Artisan, got " <> show (length other))
-        -- CR 614.16 over a cost paid DURING a resolution: the board differs from
-        -- the first case in nothing but the Hardened Scales, and it applies,
-        -- because CR 118.12 pays this cost as the ability resolves and CR 609.1
-        -- makes what happens then an effect of that ability.
+        -- CR 614.1 over a cost paid DURING a resolution: the board differs from
+        -- the first case in nothing but the Hardened Scales, and what it proves
+        -- is that fabricate's payment places its counter through CR 122.6's
+        -- funnel rather than writing it onto the object directly.
+        --
+        -- NOT the payment moment. Hardened Scales is CR 614.1's passive subject,
+        -- which reaches a placement at either moment; the moment's own split is
+        -- pinned by Pawl.ReplacementSpec's blight pair and by
+        -- Pawl.PlaneswalkerSpec's loyalty case, all three of them CR 614.16
+        -- subjects (Doubling Season).
         Spec.it s "CR 614.1 Hardened Scales sees fabricate's counter, so the Artisan reads 4/4" $ do
           onStack <- board ["Hardened Scales"]
           let after = S.runPure (paysFor S.alice) onStack Stack.resolveTop
