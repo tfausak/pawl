@@ -112,6 +112,31 @@ data Player = MkPlayer
     -- the game: CR 309.5b has the player put a dungeon they own back into the
     -- command zone after finishing one, so the card outside the game is a supply
     -- rather than a stock of one.
-    dungeon :: Maybe PrintingId.PrintingId
+    dungeon :: Maybe PrintingId.PrintingId,
+    -- | CR 309.7: how many dungeons this player has completed. "A player
+    -- completes a dungeon as that dungeon card is removed from the game", so
+    -- Pawl.Engine.Dungeon.remove is the sole writer -- the one function both CR
+    -- 701.49c's venture out of the bottommost room and CR 704.5t's state-based
+    -- action go through. Zero until one is, and only ever climbs: nothing in the
+    -- rules uncompletes a dungeon.
+    --
+    -- Keyed on the dungeon card's OWNER, which is CR 309.6's own word ("the
+    -- dungeon card's owner removes it from the game"). In the venture case the
+    -- owner and the resolving controller coincide; in the state-based action the
+    -- owner is the only player available.
+    --
+    -- A COUNT and not the set of dungeons completed, though the printing is in
+    -- hand at the removal site. CR 309.7 states no more than the fact of
+    -- completion, and no card in data/cards/ asks which dungeon: Gloom Stalker's
+    -- "as long as you've completed a dungeon" is this compared to 1. Acererak the
+    -- Archlich's "if you haven't completed Tomb of Annihilation" is the card that
+    -- would need the names. Not implemented: the named read (#2259).
+    --
+    -- NOT a PlayerCounterKind, for Player.ringTemptations' reason: CR 122.1 makes
+    -- a counter a MARKER an effect can add or remove, and rule 309 never calls
+    -- this one -- proliferate (CR 701.34a) would find it if it were.
+    --
+    -- Read by Pawl.Engine.Quantity's Quantity.DungeonsCompleted arm.
+    completedDungeons :: Natural.Natural
   }
   deriving (Eq, Ord, Show)

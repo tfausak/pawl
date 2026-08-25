@@ -246,12 +246,32 @@ enter pid = do
 -- leave the command zone except as it leaves the game, and outside the game is not
 -- a zone (CR 400.11) -- so the object ceases to be, the shape CR 704.5d's
 -- vanishing token takes in Pawl.Engine.Sba.
+--
+-- CR 309.7: "a player completes a dungeon AS that dungeon card is removed from
+-- the game", so the tally on Player.completedDungeons is written here and not at
+-- either caller -- this is the one function both roads to the removal go through
+-- (CR 701.49c's venture out of the bottommost room, and CR 704.5t's state-based
+-- action in Pawl.Engine.Sba). The OWNER completes it, which is CR 309.6's own
+-- word; the two coincide on the venture road, and on the SBA road the owner is
+-- the only player there is.
+--
+-- Nothing is recorded on the Nothing branch, which is right: a lookup miss
+-- removed no dungeon and so completed none.
+--
+-- The tally and not a GameEvent, so no ability can trigger on completing a
+-- dungeon. Not implemented: the event form, Dungeon Crawler's "whenever you
+-- complete a dungeon" (#2260).
 remove :: ObjectId -> GameState.GameState -> GameState.GameState
 remove oid gs = case Game.lookupObject oid gs of
   Nothing -> gs
   Just obj ->
-    let stripped = Game.removeFromZones (Object.owner obj) oid gs
-     in stripped {GameState.objects = Map.delete oid (GameState.objects stripped)}
+    let owner = Object.owner obj
+        completed p = p {Player.completedDungeons = Player.completedDungeons p + 1}
+        stripped = Game.removeFromZones owner oid gs
+     in stripped
+          { GameState.objects = Map.delete oid (GameState.objects stripped),
+            GameState.players = Map.adjust completed owner (GameState.players stripped)
+          }
 
 -- CR 701.49b: move the marker along one arrow out of the room it is on.
 --
@@ -292,9 +312,9 @@ advance pid oid room = do
 -- is normally out of the dungeon before they next have priority. It is reached
 -- when two ventures happen inside one resolution.
 --
--- CR 309.7's "a player completes a dungeon as that dungeon card is removed from
--- the game" is not recorded anywhere, so no card can ask whether a dungeon has
--- been completed (#1336).
+-- CR 701.49c's "doing so causes the player to complete that dungeon" is `remove`
+-- above's business, not this case's -- which is why the tally lives there and CR
+-- 704.5t's road records it too.
 venture :: PlayerId -> Game ()
 venture pid = do
   gs <- State.get
