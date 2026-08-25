@@ -1768,8 +1768,10 @@ rewriteEffect pairs effect = case effect of
   -- printed keyword (#1190).
   Effect.Create (Create.MkCreate quantity card riders slot creator) -> Effect.Create (Create.MkCreate quantity (rewriteCard pairs card) riders slot creator)
   -- CR 707.2 excludes text-changing effects from copiable values, so what the
-  -- token becomes is not rewritten -- only the ref is.
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> Effect.CreateCopy (CreateCopy.MkCreateCopy quantity (rewriteObjectRef pairs ref))
+  -- token becomes is not rewritten -- only the ref is. The riders are left alone
+  -- for the reason Create's arm above leaves its own: a CR 122.1b keyword counter
+  -- named in them keeps its printed keyword (#1190).
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> Effect.CreateCopy (CreateCopy.MkCreateCopy quantity (rewriteObjectRef pairs ref) riders)
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) ->
     Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (rewriteObjectRef pairs original) (rewriteObjectRef pairs subject))
   -- The ref alone, CreateCopy's reason: CR 707.2 keeps a text change out of the
