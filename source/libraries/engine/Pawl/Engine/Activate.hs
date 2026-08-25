@@ -132,8 +132,8 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
 
 -- CR 702 / CR 601.2f: WHICH RULE minted this ability of `oid`, as the family
 -- designator Pawl.Types.ReduceActivationCost.grantedBy compares -- Fluctuator's
--- "cycling abilities you activate" against the ability actually being activated
--- (#1431). Nothing for an ability the card itself prints.
+-- "cycling abilities you activate" against the ability actually being activated.
+-- Nothing for an ability the card itself prints.
 --
 -- The zone split is abilitiesForGiven's above, and for its reason: the hand arm
 -- reads PRINTED keywords because rules 702.29a and 702.77a state the hand, and

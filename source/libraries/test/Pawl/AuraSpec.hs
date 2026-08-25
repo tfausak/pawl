@@ -153,7 +153,8 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     Spec.assertEqWith s "the first creature is back to 2 power" (Projection.powerOf first after) (Just 2)
     Spec.assertEqWith s "the second is 3+2" (Projection.powerOf second after) (Just 5)
   -- The gameplay-level proof design.md section 4 asks for: cast Bonesplitter,
-  -- activate its printed equip ability through the real activation path, let
+  -- activate the equip ability rule 702.6a mints from its keyword through the
+  -- real activation path, let
   -- it resolve, and see the creature actually hit harder. Everything above
   -- drives Effect.Attach directly; this drives the CARD.
   Spec.it s "CR 702.6 whole card: cast Bonesplitter, equip a Piker, and it swings for 4" $ do
@@ -171,11 +172,14 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     case equipId of
       Nothing -> Spec.assertFailure s "Bonesplitter should have resolved onto the battlefield"
       Just equip -> do
-        let ability = case Face.activatedAbilities (S.combinedFace bonesplitter) of
+        -- From the PROJECTION, not the face: rule 702.6a's ability is minted
+        -- from the keyword Bonesplitter declares, so its card file lists no
+        -- activated ability at all.
+        let ability = case Projection.abilitiesOf equip resolved of
               ab : _ -> Just ab
               [] -> Nothing
         case ability of
-          Nothing -> Spec.assertFailure s "Bonesplitter should print an equip ability"
+          Nothing -> Spec.assertFailure s "Bonesplitter should offer rule 702.6a's minted equip ability"
           Just equipAbility -> do
             let ready = resolved {GameState.priority = Just S.alice}
                 activated = snd (Engine.runGamePure S.identityAnswer ready (Activate.activateAbility S.alice equip equipAbility))
@@ -1910,11 +1914,13 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
         (brawlerId, base2) = S.addCreature brawler S.alice base1
         (splitterId, base3) = S.addCreature bonesplitter S.alice base2
         ready = base3 {GameState.priority = Just S.alice}
-        equip = case Face.activatedAbilities (S.combinedFace bonesplitter) of
+        -- From the PROJECTION, not the face: Bonesplitter declares CR 702.6a's
+        -- keyword and prints no activated ability of its own.
+        equip = case Projection.abilitiesOf splitterId ready of
           ability : _ -> Just ability
           [] -> Nothing
     case equip of
-      Nothing -> Spec.assertFailure s "Bonesplitter should print one activated ability"
+      Nothing -> Spec.assertFailure s "Bonesplitter should offer rule 702.6a's minted equip ability"
       Just ability -> do
         let run victim =
               snd

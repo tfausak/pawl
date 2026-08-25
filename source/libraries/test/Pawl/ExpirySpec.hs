@@ -1222,8 +1222,9 @@ lingeringSpec s registry = Spec.describe s "TitaniasSong" $ do
   -- it makes all three of the Song's parts observable at once: it is a
   -- noncreature artifact (so the layer-4 animation reaches it), its mana value
   -- is 1 (so CR 613.4b's base P/T is a 1/1 rather than a 0/0 CR 704.5f would
-  -- bury), and it prints a real Equip ability (so the layer-6 strip is
-  -- observable at all -- without one, steps 1 and 4 would pass vacuously).
+  -- bury), and it declares CR 702.6a's equip keyword, whose minted ability is
+  -- read off the POST-LAYER keyword map (so the layer-6 strip is observable at
+  -- all -- without one, steps 1 and 4 would pass vacuously).
   --
   -- Angelic Edict ({4}{W} Sorcery, "Exile target creature or enchantment") is
   -- how the Song leaves: exiling is leaving the battlefield, and no card in the
