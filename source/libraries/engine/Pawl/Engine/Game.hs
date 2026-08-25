@@ -752,8 +752,8 @@ sourceIsToken source = case source of
 -- on the battlefield while phased out", and a phased-out permanent is absent
 -- from that set (CR 702.26b). Reading the set here would make a phasing token
 -- cease to exist the moment it phased out.
-leftTheBattlefield :: Object -> Bool
-leftTheBattlefield obj = sourceIsToken (Object.source obj) && Object.zone obj /= Zone.Battlefield
+tokenHasLeftTheBattlefield :: Object -> Bool
+tokenHasLeftTheBattlefield obj = sourceIsToken (Object.source obj) && Object.zone obj /= Zone.Battlefield
 
 -- CR 104.2a: who is still in the game. Here rather than in
 -- Pawl.Engine.Departure because Departure imports Pawl.Engine.Monarch, which

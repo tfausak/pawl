@@ -2821,7 +2821,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
     -- -- they rewrite the destination -- and that loop leaves the board alone on
     -- this path (see resolveZoneChange, which restricts it to ZoneChangeR
     -- candidates, so the one state-writing arm is out of reach).
-    Just obj | Game.leftTheBattlefield obj -> pure Nothing
+    Just obj | Game.tokenHasLeftTheBattlefield obj -> pure Nothing
     Just obj -> do
       let pid = Object.owner obj
           fromZone = Object.zone obj

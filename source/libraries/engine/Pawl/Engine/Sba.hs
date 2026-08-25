@@ -796,12 +796,12 @@ performStateBasedActions = Event.simultaneously $ do
       -- never to a specific zone, so exile is caught too.
       isVanishing oid = case Game.lookupObject oid departed of
         Nothing -> False
-        -- CR 704.5d's own arm, asked through Game.leftTheBattlefield -- the
+        -- CR 704.5d's own arm, asked through Game.tokenHasLeftTheBattlefield -- the
         -- predicate Pawl.Engine.Event's zone-change funnel refuses a move on (CR
         -- 111.8), so the token this pass removes and the token that can no longer
         -- move are the same token by construction. That function's comment says
         -- why it reads the object's own zone rather than the battlefield set.
-        Just obj | Game.leftTheBattlefield obj -> True
+        Just obj | Game.tokenHasLeftTheBattlefield obj -> True
         Just obj -> case Object.source obj of
           -- CR 704.5e / 707.10a: a copy of a spell in a zone other than the
           -- stack ceases to exist. The SAME pass and the same shape as the
