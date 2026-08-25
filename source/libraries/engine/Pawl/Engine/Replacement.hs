@@ -527,6 +527,15 @@ applies gs event candidate =
 -- arm here: rule 702.145b's night-and-double-faced pair, and rule 702.54a's "if
 -- an opponent was dealt damage this turn".
 --
+-- ONLY A RULE'S CONDITION, and every arm below is one. A CARD's condition on its
+-- own entry clause -- Dust Animus's "if you control five or more untapped lands",
+-- Monstrous War-Leech's "if it was kicked" -- is written where every other
+-- card-authored gate on a replacement ability goes, CR 604.2's clause on
+-- Pawl.Types.PrintedReplacement, which Pawl.Engine.Projection.replacementsOf has
+-- already asked against the entering permanent (CR 614.12) before a row reaches
+-- here. One condition mechanism, not two: no arm below reads a card-authored
+-- condition, only a rule's.
+--
 -- One arm per constructor, no wildcard, so a new rewrite with a condition breaks
 -- the build here as well as in bucketOfEffect, readsApplier and Event.apply. A
 -- wildcard defaulting to True would silently apply such a rewrite always.

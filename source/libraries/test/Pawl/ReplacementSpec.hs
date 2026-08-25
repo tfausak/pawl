@@ -4191,6 +4191,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   perennationSpec s registry
   toolkitSpec s registry
   unevenToolkitSpec s registry
+  dustAnimusSpec s registry
   printlifterSpec s registry
   shieldCounterSpec s registry
   warLeechSpec s registry
@@ -6823,8 +6824,10 @@ perennationSpec s registry = Spec.describe s "Perennation (CR 614.5)" $ do
 --
 -- Scryfall `o:/enters with .*counter.? and a .*counter/ -is:digital`,
 -- 2026-08-25, answers three printings and no more: this one, Voidpouncer and
--- Dust Animus, and the other two condition the clause on something no
--- EntryRewrite carries (gap #2317).
+-- Dust Animus. The other two condition the clause, which is CR 604.2's clause on
+-- Pawl.Types.PrintedReplacement rather than anything an EntryRewrite carries --
+-- so Dust Animus is in the pool (dustAnimusSpec), and Voidpouncer is not, for
+-- the reason unevenToolkitSpec gives.
 --
 -- THE BOARD IS PERENNATION'S, and for its reasons: alice's Doubling Season and
 -- bob's Vorinclex are order-sensitive against each other (CR 616.1e), the counts
@@ -6908,9 +6911,12 @@ toolkitOrders seasonFirst seasonId p = case p of
 -- Synthetic Uneven Toolkit -- {1}{G}{U} Artifact, whole text: "this artifact
 -- enters with two +1/+1 counters and a trample counter on it" -- STANDS IN FOR
 -- Voidpouncer ({1}{R} Creature - Eldrazi, oracle checked on Scryfall
--- 2026-08-25), whose kicked clause reads exactly that but conditions it on the
--- kicker being paid, which no EntryRewrite carries (gap #2317) and this test
--- does not exercise -- the counter placement is unconditional here.
+-- 2026-08-25), whose kicked clause reads exactly that. The kicked condition
+-- itself is writable -- CR 604.2's clause on Pawl.Types.PrintedReplacement, the
+-- way Monstrous War-Leech writes it -- and this test does not exercise it: the
+-- counter placement is unconditional here. What keeps the real card out of the
+-- pool is the REST of that sentence, "and with haste", which no EntryRewrite
+-- grants (gap #2323).
 unevenToolkitSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 unevenToolkitSpec s registry = Spec.describe s "Synthetic Uneven Toolkit (CR 614.5)" $ do
   let toolkitName = CardName.MkCardName (Text.pack "Synthetic Uneven Toolkit")
@@ -6981,6 +6987,71 @@ ordersEntry seasonFirst seasonId p = case p of
           (List.findIndex ((== wantSeason) . (== seasonId) . ReplacementEntry.source) entries)
       )
   _ -> pure (S.identityAnswer p)
+
+-- CR 614.1c's counter row with a CARD-AUTHORED condition on it, which is CR
+-- 604.2's clause on Pawl.Types.PrintedReplacement -- the same clause Monstrous
+-- War-Leech's "if it was kicked" rides above, over a WithCounters rewrite
+-- instead of a RunEffects one (see #2317). Nothing on Pawl.Types.EntryRewrite says
+-- when the row applies: rule 702.54a's bloodthirst and rule 702.150a's
+-- compleated ask their conditions in Pawl.Engine.Replacement.admitsEntry
+-- because those conditions are RULES', with nowhere on a card to live, and this
+-- one is the card's.
+--
+-- Dust Animus {1}{W} Creature -- Spirit 2/3, whole text: "Flying. If you control
+-- five or more untapped lands, this creature enters with two +1/+1 counters and
+-- a lifelink counter on it. Plot {1}{W}." (oracle checked on Scryfall
+-- 2026-08-25)
+--
+-- THE TWO BOARDS DIFFER IN ONE TAP. Both give alice seven Plains and the Animus
+-- in hand; the negative board taps one Plains first. Casting spends {1}{W}, so
+-- five lands are untapped as the Animus enters on the first board and four on
+-- the second -- CR 614.12 checks the condition against the board the permanent
+-- would enter on, which is the board AFTER the cast's own lands were tapped.
+-- Same land count, same mana available, same spell: only the tap differs, so a
+-- negative that passed because the spell was uncastable is ruled out.
+--
+-- Seven and five and two and one are distinct, and the readout is doubled: the
+-- counters themselves, and the CR 613.4c power and toughness they move in
+-- layer 613.1g (4/5 against the printed 2/3).
+dustAnimusSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+dustAnimusSpec s registry = Spec.describe s "Dust Animus (CR 614.1c)" $ do
+  let animusName = CardName.MkCardName (Text.pack "Dust Animus")
+      countsOn oid gs =
+        ( countersOn CounterKind.PlusOnePlusOne oid gs,
+          countersOn (CounterKind.Keyword Keyword.Lifelink) oid gs
+        )
+      board tapOne = do
+        plains <- S.printingOf s registry "Plains"
+        animus <- S.printingOf s registry "Dust Animus"
+        let lands = S.landsInPlay plains 7
+            oneLand = List.sort (Set.toList (GameState.battlefield lands))
+            tapped = case oneLand of
+              landId : _ | tapOne -> S.tapObject landId lands
+              _ -> lands
+            (held, ready) = S.addHandCard animus S.alice tapped
+        pure (held, ready)
+      castIt (held, ready) =
+        let after = S.runPure S.identityAnswer ready (S.cast S.alice held >> Stack.resolveTop)
+         in (newestNamed animusName after, after)
+  Spec.it s "CR 614.1c five untapped lands as it enters, so the row applies: two +1/+1 counters and a lifelink counter" $ do
+    built <- board False
+    case castIt built of
+      (Just oid, after) -> do
+        Spec.assertEqWith s "two +1/+1 counters and one lifelink counter" (countsOn oid after) (2, 1)
+        Spec.assertEqWith s "so the printed 2/3 is a 4/5" (S.powerToughnessOf oid after) (Just (4, 5))
+        Spec.assertEqWith s "and the cast tapped two of the seven Plains, leaving five untapped" (S.tappedCount S.alice after) 2
+      _ -> Spec.assertFailure s "the Spirit did not reach the battlefield"
+  -- The same board and the same seven lands, one of them already tapped. The
+  -- Animus ENTERS HERE TOO, so what the pair tells apart is whether the row
+  -- applied and not whether the permanent arrived.
+  Spec.it s "CR 614.1c only four untapped lands as it enters, so the row does not apply: no counters at all" $ do
+    built <- board True
+    case castIt built of
+      (Just oid, after) -> do
+        Spec.assertEqWith s "neither kind of counter arrives" (countsOn oid after) (0, 0)
+        Spec.assertEqWith s "so it is the printed 2/3" (S.powerToughnessOf oid after) (Just (2, 3))
+        Spec.assertEqWith s "and three of the seven Plains are tapped, leaving four untapped" (S.tappedCount S.alice after) 3
+      _ -> Spec.assertFailure s "the Spirit did not reach the battlefield"
 
 -- CR 122.6 with CR 107.3c: an entry rider whose COUNT is not a number. Printlifter
 -- Ooze -- {1}{G} 2/2 Creature -- Ooze with deathtouch and disguise {3}{G} --
