@@ -41,6 +41,8 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CoinFace as CoinFace
+import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ControlChanged as ControlChanged
@@ -4291,6 +4293,136 @@ feywildTricksterSpec s registry =
             (S.countOnBattlefieldByName faerieDragon S.alice after)
             0
 
+-- Tavern Scoundrel {1}{R} Creature -- Human Rogue 1/3, "Whenever you win a coin
+-- flip, create two Treasure tokens. / {1}, {T}, Sacrifice another permanent:
+-- Flip a coin." -- the pool's producer for TriggerCondition.PlayerWinsCoinFlip
+-- (CR 705.2).
+--
+-- ONE CARD carries both halves, which is why no second producer is on the board:
+-- the activated ability is the only flipper and the triggered ability is the
+-- only watcher.
+--
+-- THE BOARD is deliberately TWO permanents a seat -- the Scoundrel and one
+-- untapped Mountain -- and that count is load-bearing twice over. The Mountain
+-- pays the {1}, CR 601.2g's mana window running before the components, and it is
+-- then the ONLY candidate CR 701.21a's cost has, so Prompt.ChooseSacrifices is
+-- elided and no answerer stands between the card's Filter and what dies. The
+-- printed word "another" is Not IsSource: under a bare IsSource the Scoundrel
+-- itself would be the only candidate, so WHICH permanent left the battlefield
+-- reads that Filter directly.
+--
+-- THE ASSERTED QUANTITY is how many permanents NAMED "Treasure Token" a seat
+-- has. By name rather than by token total for feywildTricksterSpec's reason: it
+-- says WHICH ability resolved rather than that something did.
+--
+-- THREE LEGS, with randomness pinned by CONSTANT in both directions --
+-- Replay.defaultAnswer would supply Heads to both prompts unasked, and so a win,
+-- which is exactly the leg a run that asked nothing could fake.
+--
+--   * WON (call Heads, face Heads): two Treasures.
+--   * LOST (call Heads, face Tails): none. Not decoration -- it is the only leg
+--     separating "triggers on a WIN" from "triggers on any flip at all", and the
+--     flip really happened, which the log assertion beside it pins.
+--   * BOB'S WIN with a Scoundrel on BOTH seats: one event, two watchers, and
+--     only the flipper's fires. AnyPlayer, Opponent and a condition ignoring its
+--     relation each differ from You here.
+--
+-- CR 603.3 IS THE SEQUENCING. The flip happens during the resolution of the
+-- activated ability, so the trigger reaches the stack only the next time a player
+-- would receive priority -- one place/resolve cycle short of the tokens.
+-- `runFlip` runs the cycle twice.
+tavernScoundrelSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tavernScoundrelSpec s registry =
+  let treasure = CardName.MkCardName (Text.pack "Treasure Token")
+      mountainName = CardName.MkCardName (Text.pack "Mountain")
+      -- A Scoundrel and one Mountain for each named seat, and nothing else.
+      flipBoard seats = do
+        scoundrel <- S.printingOf s registry "Tavern Scoundrel"
+        mountain <- S.printingOf s registry "Mountain"
+        let step (ids, gs) who =
+              let (oid, withCreature) = S.addCreature scoundrel who gs
+               in (ids <> [oid], S.landsFor mountain who 1 withCreature)
+        pure (List.foldl' step ([], Setup.emptyGame S.bothPlayers) seats)
+      -- Pins CR 705.2's two questions by constant, never by anything derived from
+      -- the prompt, so the engine cannot repair either answer after a mutation.
+      flipAnswer :: CoinFace.CoinFace -> CoinFace.CoinFace -> Prompt.Prompt r -> r
+      flipAnswer face called p = case p of
+        Prompt.FlipCoin -> face
+        Prompt.CallCoin {} -> called
+        _ -> S.identityAnswer p
+      runFlip face called who scoundrelId gs =
+        let drain n g =
+              if n <= (0 :: Int) || null (GameState.stack g)
+                then g
+                else drain (n - 1) (S.runPure (flipAnswer face called) g Stack.resolveTop)
+            cycleOnce g = drain 8 (S.runPure (flipAnswer face called) g Engine.placePendingTriggers)
+         in case Activate.abilitiesFor scoundrelId gs of
+              [ability] -> Right (cycleOnce (cycleOnce (S.runPure (flipAnswer face called) gs (Activate.activateAbility who scoundrelId ability))))
+              other -> Left (length other)
+      oneAbility n = "expected exactly one activated ability, got " <> show n
+   in Spec.describe s "PlayerWinsCoinFlip" $ do
+        -- CR 705.2: the call matched the face, so alice won her own flip and her
+        -- own Scoundrel fires.
+        Spec.it s "CR 705.2 a won flip creates two Treasures" $ do
+          (ids, board) <- flipBoard [S.alice]
+          case ids of
+            [scoundrelId] -> case runFlip CoinFace.Heads CoinFace.Heads S.alice scoundrelId board of
+              Left n -> Spec.assertFailure s (oneAbility n)
+              Right after -> do
+                Spec.assertEqWith
+                  s
+                  "CR 705.2: two Treasure tokens for the won flip"
+                  (S.countOnBattlefieldByName treasure S.alice after)
+                  2
+                -- The printed "another", read off the board rather than off the
+                -- Filter: the land paid CR 701.21a's cost and the Scoundrel did
+                -- not.
+                Spec.assertBool s (S.onBattlefield scoundrelId after) "CR 701.21a the Scoundrel did not sacrifice itself (another)"
+                Spec.assertEqWith s "and the Mountain it sacrificed instead is gone" (S.countOnBattlefieldByName mountainName S.alice after) 0
+                Spec.assertEqWith s "the stack is empty, so the trigger really resolved" (GameState.stack after) []
+            _ -> Spec.assertFailure s "expected exactly one Scoundrel"
+        -- CR 705.2's other half, on the SAME board: the call did not match, so the
+        -- flip was lost and nothing fires. A condition matching the flip rather
+        -- than the win mints two Treasures here.
+        Spec.it s "CR 705.2 a lost flip creates none" $ do
+          (ids, board) <- flipBoard [S.alice]
+          case ids of
+            [scoundrelId] -> case runFlip CoinFace.Tails CoinFace.Heads S.alice scoundrelId board of
+              Left n -> Spec.assertFailure s (oneAbility n)
+              Right after -> do
+                Spec.assertEqWith
+                  s
+                  "CR 705.2: a lost flip mints no Treasure"
+                  (S.countOnBattlefieldByName treasure S.alice after)
+                  0
+                -- The flip HAPPENED, which keeps the zero above from passing for
+                -- an ability that never activated at all.
+                Spec.assertBool
+                  s
+                  (elem (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = S.alice, CoinFlipped.won = False}) (S.eventsOf after))
+                  "CR 705.1 the flip is recorded even though CR 705.2 lost it"
+            _ -> Spec.assertFailure s "expected exactly one Scoundrel"
+        -- CR 109.5 / 603.3a: the relation is read against the ABILITY'S
+        -- CONTROLLER. Both seats hold a Scoundrel and bob flips, so the two
+        -- readings of "you" fall on different seats over one event.
+        Spec.it s "CR 109.5 with a Scoundrel on each side only the flipper's fires" $ do
+          (ids, board) <- flipBoard [S.alice, S.bob]
+          case ids of
+            [_, bobsScoundrelId] -> case runFlip CoinFace.Heads CoinFace.Heads S.bob bobsScoundrelId board of
+              Left n -> Spec.assertFailure s (oneAbility n)
+              Right after -> do
+                Spec.assertEqWith
+                  s
+                  "CR 705.2: bob won the flip, so bob's Scoundrel made the Treasures"
+                  (S.countOnBattlefieldByName treasure S.bob after)
+                  2
+                Spec.assertEqWith
+                  s
+                  "and alice's Scoundrel, watching the same event, made none"
+                  (S.countOnBattlefieldByName treasure S.alice after)
+                  0
+            _ -> Spec.assertFailure s "expected a Scoundrel on each side"
+
 -- Aloe Alchemist {1}{G} Creature -- Plant Warlock 3/2, "Trample; When this card
 -- becomes plotted, target creature gets +3/+2 and gains trample until end of
 -- turn; Plot {1}{G}" -- the pool's producer for TriggerCondition
@@ -4899,6 +5031,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   monarchTriggerSpec s registry
   matoyaTriggerSpec s registry
   feywildTricksterSpec s registry
+  tavernScoundrelSpec s registry
   aloeAlchemistSpec s registry
   wildgrowthWalkerSpec s registry
   rayOfCommandSpec s registry

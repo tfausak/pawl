@@ -16,6 +16,7 @@ import qualified Pawl.Codec.BecameDesignated as BecameDesignated
 import qualified Pawl.Codec.BecameTarget as BecameTarget
 import qualified Pawl.Codec.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Codec.ClassLevelChange as ClassLevelChange
+import qualified Pawl.Codec.CoinFlipped as CoinFlipped
 import qualified Pawl.Codec.ControlChanged as ControlChanged
 import qualified Pawl.Codec.CounterChange as CounterChange
 import qualified Pawl.Codec.Countering as Countering
@@ -87,5 +88,6 @@ codec =
       Arm.payload "Plotted" ObjectId.codec GameEvent.Plotted (\x -> case x of GameEvent.Plotted y -> Just y; _ -> Nothing),
       Arm.payload "Explored" ObjectId.codec GameEvent.Explored (\x -> case x of GameEvent.Explored y -> Just y; _ -> Nothing),
       Arm.payload "Exerted" ObjectId.codec GameEvent.Exerted (\x -> case x of GameEvent.Exerted y -> Just y; _ -> Nothing),
-      Arm.payload "BecameTapped" ObjectId.codec GameEvent.BecameTapped (\x -> case x of GameEvent.BecameTapped y -> Just y; _ -> Nothing)
+      Arm.payload "BecameTapped" ObjectId.codec GameEvent.BecameTapped (\x -> case x of GameEvent.BecameTapped y -> Just y; _ -> Nothing),
+      Arm.payload "CoinFlipped" CoinFlipped.codec GameEvent.CoinFlipped (\x -> case x of GameEvent.CoinFlipped y -> Just y; _ -> Nothing)
     ]

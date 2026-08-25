@@ -753,6 +753,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
+  TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
   TriggerCondition.PermanentExplores _ -> []
   -- CR 701.43d carries nothing at all, so no Count either.
@@ -3196,6 +3197,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
+  TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
   -- CR 701.44b DOES carry one, a predicate over the explorer -- Wildgrowth
   -- Walker's "a creature you control" -- which the card lint must sweep.
