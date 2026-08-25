@@ -2628,6 +2628,93 @@ turnTheTablesSpec s registry = Spec.describe s "Turn the Tables (CR 614.9)" $ do
         Spec.assertEqWith s "at its full size" (amounts after) [5]
       _ -> Spec.assertFailure s "fixture should have one attacker"
 
+-- The SOURCE each floating redirection row watches (DamagePattern.whichSource),
+-- read off the store. redirectRows above reads the other three baked fields; a
+-- fourth element there would have moved every Turn the Tables tuple, and this is
+-- a proxy for one group rather than a field those cases assert on.
+redirectSources :: GameState.GameState -> [Maybe ObjectId.ObjectId]
+redirectSources gs =
+  [ DamagePattern.whichSource pat
+  | active <- GameState.replacements gs,
+    ReplacementEffect.DamageR (DamageR.MkDamageR pat (DamageRewrite.Redirect _) _) <- [ActiveReplacement.effect active]
+  ]
+
+-- CR 609.7a's chosen source on CR 614.9's REDIRECTION, whose producer is
+-- Oracle's Attendants ({3}{W} Creature -- Human Soldier, 1/5: "{T}: All damage
+-- that would be dealt to target creature this turn by a source of your choice is
+-- dealt to this creature instead").
+--
+-- Turn the Tables above with CR 609.7a's clause added, which is exactly the
+-- difference the rule makes: that redirection moves damage from EVERY source,
+-- this one only from the ONE object its controller chose when the effect was
+-- created. Auriok Replica's chosenSource on the other side of CR 614.1 -- a
+-- replacement rather than a prevention -- and the field this unit added.
+--
+-- The chosen source is deliberately NOT the first candidate the prompt offers:
+-- CR 609.7a's pool here is alice's Plains, the Attendants, the victim, the two
+-- Pikers and the ability itself on the stack, sorted ascending, so an engine
+-- that ignored the answer and took the head would watch the Plains and both
+-- damage assertions would read the other way round.
+--
+-- "This creature" is the destination, so the Attendants is BOTH the ability's
+-- source and where the damage lands: `to` is EachMatching Filter.IsSource, and
+-- the case asserts that sweep resolved to the Attendants alone by reading the
+-- damage off it.
+oraclesAttendantsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+oraclesAttendantsSpec s registry = Spec.describe s "Oracle's Attendants (CR 614.9, CR 609.7a)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+  Spec.it s "CR 609.7a the redirection moves the chosen source's damage and no other source's" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    attendants <- S.printingOf s registry "Oracle's Attendants"
+    let base = S.landsInPlay plains 1
+        (attendantsId, g1) = S.addCreature attendants S.alice base
+        (victim, g2) = S.addCreature pikerPrinting S.alice g1
+        (alpha, g3) = S.addCreature pikerPrinting S.bob g2
+        (omega, g4) = S.addCreature pikerPrinting S.bob g3
+        activate = Activate.activateAbility S.alice attendantsId (theAbility attendants) Monad.>> Stack.resolveTop
+        aimed = S.runPure (aimAndChoose victim omega) g4 activate
+        strike src n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src (Recipient.ToCreature victim) n])
+    -- THE gameplay assertion, and the one this unit exists for: the source alice
+    -- did NOT choose is not redirected, so its damage stays on the creature it
+    -- was aimed at. Before the chosenSource field this 2 moved to the
+    -- Attendants, the row naming no source at all.
+    Spec.assertEqWith s "the unchosen source's 2 stays on the victim" (S.damageOf victim (strike alpha 2 aimed)) (Just 2)
+    Spec.assertEqWith s "and nothing landed on the Attendants" (S.damageOf attendantsId (strike alpha 2 aimed)) (Just 0)
+    -- Its twin, on the same board and differing in one thing: the chosen
+    -- source's damage IS moved, so the case cannot pass by installing no row.
+    Spec.assertEqWith s "the chosen source's 3 leaves the victim" (S.damageOf victim (strike omega 3 aimed)) (Just 0)
+    -- CR 614.9 replaces the RECIPIENT and nothing else, so the whole 3 arrives:
+    -- "does nothing" and "prevents" are what this separates the redirect from.
+    Spec.assertEqWith s "and lands whole on the Attendants, the ability's own source" (S.damageOf attendantsId (strike omega 3 aimed)) (Just 3)
+    -- The proxies, after the behaviour: a row exists, it watches the object
+    -- alice named, and she was asked at all.
+    Spec.assertEqWith s "setup: one redirection row, from the targeted victim to the Attendants" (redirectRows aimed) [(Nothing, Just (Recipient.ToCreature victim), Recipient.ToCreature attendantsId)]
+    Spec.assertEqWith s "and it watches the source alice chose" (redirectSources aimed) [Just omega]
+    Spec.assertEqWith s "alice was asked which source, and answered omega" (chosenSourcesIn (answersFor (aimAndChoose victim omega) g4 activate)) [omega]
+  -- The discriminating twin, differing from the case above in the ANSWER alone:
+  -- CR 609.7a's source is the player's choice, so the same board answering alpha
+  -- moves alpha's damage and leaves omega's where it was. Without it the case
+  -- above could pass on an engine that baked a fixed candidate -- the last one,
+  -- say -- rather than the one alice named.
+  Spec.it s "CR 609.7a the same board answering the OTHER source moves that one's damage instead" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    attendants <- S.printingOf s registry "Oracle's Attendants"
+    let base = S.landsInPlay plains 1
+        (attendantsId, g1) = S.addCreature attendants S.alice base
+        (victim, g2) = S.addCreature pikerPrinting S.alice g1
+        (alpha, g3) = S.addCreature pikerPrinting S.bob g2
+        (omega, g4) = S.addCreature pikerPrinting S.bob g3
+        activate = Activate.activateAbility S.alice attendantsId (theAbility attendants) Monad.>> Stack.resolveTop
+        aimed = S.runPure (aimAndChoose victim alpha) g4 activate
+        strike src n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src (Recipient.ToCreature victim) n])
+    Spec.assertEqWith s "alpha's 2 moves now that alpha is the chosen source" (S.damageOf attendantsId (strike alpha 2 aimed)) (Just 2)
+    Spec.assertEqWith s "and the victim took none of it" (S.damageOf victim (strike alpha 2 aimed)) (Just 0)
+    Spec.assertEqWith s "omega's 3 stays on the victim" (S.damageOf victim (strike omega 3 aimed)) (Just 3)
+    Spec.assertEqWith s "alice was asked which source, and answered alpha" (chosenSourcesIn (answersFor (aimAndChoose victim alpha) g4 activate)) [alpha]
+
 -- Apply one damage batch under a given interpreter. Top-level rather than a
 -- `where` binding for castEach's reason: the answer is rank-2 and GHC will not
 -- infer it.
@@ -3734,6 +3821,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   moonmistSpec s registry
   selflessSquireSpec s registry
   turnTheTablesSpec s registry
+  oraclesAttendantsSpec s registry
   gatherSpecimensSpec s registry
   kismetSpec s registry
   shimatsuSpec s registry

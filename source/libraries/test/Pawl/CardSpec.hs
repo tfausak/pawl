@@ -869,7 +869,7 @@ effectCounts effect = case effect of
   -- card's Counts -- the same recursion Create takes into a minted token.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ quantity rider) -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ rider) -> durationCounts duration <> concatMap effectCounts rider
-  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _) -> durationCounts duration
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _ _) -> durationCounts duration
   -- CR 708.2's listed characteristics are card data, so the listed power and
   -- toughness are walked for the reason Create's minted face is. The listed type
   -- line holds no Quantity.
@@ -1702,7 +1702,8 @@ phasePatternOffends replacement = case replacement of
 -- unbounded one -- is for Resolve's prevention arms to write, CR 609.7a's chosen
 -- SOURCE beside it likewise, and CR 615.7's remaining amount rides the same
 -- carrier. A card says "a source of your choice" through the chosenSource of
--- Effect.PreventNextDamage or Effect.PreventAllDamage, which is a Filter and names nothing. CR 122.1c's pair is engine-only for a
+-- Effect.PreventNextDamage, Effect.PreventAllDamage or Effect.RedirectDamage,
+-- which is a Filter and names nothing. CR 122.1c's pair is engine-only for a
 -- different reason: a RULE creates it off a permanent's counters, so a card
 -- printing either half would be claiming an ability no rule gives it.
 --
@@ -3769,8 +3770,10 @@ effectFilters effect = case effect of
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ ref _ chosenSource rider) ->
     unframed (durationFilters duration <> Maybe.maybeToList chosenSource) <> sourceHosted (objectRefFilters ref) <> concatMap effectFilters rider
   -- BOTH refs, or a Filter inside a redirect's destination escapes this lint.
-  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ srcRef destRef) ->
-    unframed (durationFilters duration) <> sourceHosted (objectRefFilters srcRef <> objectRefFilters destRef)
+  -- CR 609.7a's chosen source is UNFRAMED, for the reason the two prevention
+  -- arms above give.
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ srcRef destRef chosenSource) ->
+    unframed (durationFilters duration <> Maybe.maybeToList chosenSource) <> sourceHosted (objectRefFilters srcRef <> objectRefFilters destRef)
   -- CR 708.2's listed characteristics hold no Filter.
   Effect.TurnFaceDown _ -> []
   Effect.TurnFaceUp _ -> []
