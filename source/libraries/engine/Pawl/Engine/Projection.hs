@@ -2115,8 +2115,9 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   EntryRewrite.Riot -> rewrite
   EntryRewrite.Unleash -> rewrite
   EntryRewrite.Bloodthirst _ -> rewrite
-  -- CR 702.150a states compleated whole, the symbol count being CR 601.2f's
-  -- record rather than card text, so there is no word here for CR 612.1 either.
+  -- CR 702.150a states compleated whole, the symbol count being CR 118.13a's
+  -- announced payment rather than card text, so there is no word here for CR
+  -- 612.1 either.
   EntryRewrite.Compleated _ -> rewrite
   -- CR 614.1d's bare "enters tapped", and the life total CR 614.1c's alternative
   -- to it asks for: a tap status and a number.

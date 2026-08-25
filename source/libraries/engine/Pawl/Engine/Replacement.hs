@@ -589,8 +589,9 @@ admitsEntry gs oid rewrite = case rewrite of
   --
   -- Rule 702.150a's SECOND condition -- "chose to pay life for any part of its
   -- cost" -- is asked where the row is minted instead
-  -- (Pawl.Engine.Projection.intrinsicReplacementsOf), since CR 601.2f's record is
-  -- read off the SPELL and this function is handed the permanent.
+  -- (Pawl.Engine.Projection.intrinsicReplacementsOf), since CR 118.13a's
+  -- announcement is recorded on the SPELL and this function is handed the
+  -- permanent.
   EntryRewrite.Compleated _ -> Map.findWithDefault 0 CounterKind.Loyalty (enteringCountersOf gs oid) > 0
   EntryRewrite.Tapped -> True
   EntryRewrite.PayLifeOrTapped _ -> True

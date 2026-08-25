@@ -22,7 +22,8 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- Bloodbog and Headless Skaab (CR 614.1d); PayLifeOrTapped is Razorgrass Field
 -- (CR 614.1c); RevealOrTapped is Rustic Clachan (CR 614.1c); RunEffects is
 -- Monstrous War-Leech (CR 614.1c); ReadAhead is CR 702.155b's pair of
--- intrinsic abilities on a Saga (CR 714.3b).
+-- intrinsic abilities on a Saga (CR 714.3b); Compleated is CR 702.150a's
+-- reduction of the loyalty a planeswalker enters with (Tamiyo, Compleated Sage).
 --
 -- AsCopy, ChoiceOf and ChoiceByCoinFlip write into the object's COPIABLE
 -- snapshot, which is what makes CR 707.2 fall out with no further machinery -- and CR 707.9b puts
@@ -284,7 +285,7 @@ data EntryRewrite effect
     -- the number of counters to subtract: rule 702.150a's "two" is the rule's, so
     -- doubling it here would put a card's number where a rule's belongs. N rides
     -- the constructor for Bloodthirst's reason above -- the count is settled when
-    -- the row is minted, off Object.phyrexianLifePaid (CR 601.2f).
+    -- the row is minted, off Object.phyrexianLifePaid (CR 118.13a).
     --
     -- A ROW rather than arithmetic folded into CR 306.5b's count, which is the
     -- whole of #1996: only a row can be ORDERED against CR 614.16's counter
