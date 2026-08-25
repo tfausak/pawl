@@ -1150,9 +1150,9 @@ selfBlocksOneOrMoreSpec s registry =
         -- every reading agrees until the arrival, and the arrival is the whole
         -- difference.
         --
-        -- Two legs off one board and one answerer, differing in the CARD bob
-        -- takes out of hand: Disowned Ancestor {B} 0/4, and Secret Door {U} 0/4
-        -- as the control. Both are 0/4, so the two legs agree on what the
+        -- Two boards and one answerer, differing in the one CARD bob holds:
+        -- Disowned Ancestor {B} 0/4, and Secret Door {U} 0/4 as the control.
+        -- Both are 0/4, so the two legs agree on what the
         -- arrival can do and on what survives its own return damage, and differ
         -- only in colour -- and 4 is the one toughness that separates 3 from 5.
         -- Power 0 is why nothing else on the board moves either way. Secret
@@ -1168,9 +1168,10 @@ selfBlocksOneOrMoreSpec s registry =
         --   * declining Aetherplasm's first "may". Clause 1 hangs on it (CR
         --     608.2c), so that leg differs in two things -- the blocker that
         --     stays and the arrival that never comes.
-        --   * reading the Inquisitors' power alone. A partial fix could reach
-        --     5/3 without the pump landing on anything; the Ancestor's death is
-        --     the quantity and the power comes after it.
+        --   * reading the Inquisitors' power alone, which is what the cases
+        --     above this one do. It says the trigger fired but nothing about
+        --     what the grant reached, so the Ancestor's death is asserted first
+        --     and the power after it.
         Spec.it s "CR 509.3e whole card: a black creature put onto the battlefield blocking is +2/+0, a blue one is nothing" $ do
           (blackGs, blackMine, blackTheirs, ancestor) <- plasmBoard ["Serra Inquisitors"] ["Aetherplasm"] "Disowned Ancestor"
           (blueGs, blueMine, blueTheirs, door) <- plasmBoard ["Serra Inquisitors"] ["Aetherplasm"] "Secret Door"
