@@ -970,6 +970,10 @@ loop asOf batch applied prevented exiledBy event = do
 -- Wheel of Sun and Moon's "into its owner's library instead" is the shape --
 -- would refute that and reach both arms. Only the first has a producer.
 --
+-- `offerCommandZone` is not a second way to reach them either: it runs after this
+-- loop has finished, so no candidate is read off its answer, and rule 903.9b only
+-- fires on a destination of hand or library.
+--
 -- No case on effect identity: the question is a proposed event's destination
 -- ZONE, and the answer is the row's source object.
 exiledByAfter :: ReplacementCandidate -> ProposedEvent -> ProposedEvent -> Maybe ObjectId -> Maybe ObjectId
@@ -2914,7 +2918,9 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- from gating on the request today, and not because of a claim
               -- about Magic: no ReplacementEffect.ZoneChangeR in data/cards/
               -- names the battlefield as its destination -- every one of them
-              -- names exile (see exiledByAfter, which rests on the same fact).
+              -- names exile (see exiledByAfter, which rests on the same fact) --
+              -- and the one RULES-based redirect in this funnel, rule 903.9b's
+              -- offerCommandZone above, answers Zone.Command.
               --
               -- CR 400.7: Object.newIncarnation is the whole forgetting -- the
               -- entry controller (CR 110.2), the as-enters choices (CR 614.1c),
