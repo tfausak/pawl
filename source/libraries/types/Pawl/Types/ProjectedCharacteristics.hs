@@ -14,7 +14,9 @@ import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
+import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
+import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -120,6 +122,29 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     characteristicPT :: Maybe CharacteristicPT.CharacteristicPT,
     cardTypes :: Set.Set CardType.CardType,
     subtypes :: Set.Set Subtype.Subtype,
+    -- | CR 604.1 / 613 layer 6: the object's static abilities. Seeded from the
+    -- card and touched by NO layer, unlike the three ability lists below: a
+    -- static ability's continuous effect is what the layers apply, so the fold
+    -- reads this field rather than writing it, and CR 613.1f's removal and CR
+    -- 305.7's strip are asked of the GATHER (Pawl.Engine.Projection.gather) at
+    -- CR 613.6's per-ability decision point instead of by emptying a list here.
+    --
+    -- Here at all because CR 707.2 names rules text among the copiable values:
+    -- without it Pawl.Engine.Projection.copiableCharacteristics has nowhere to
+    -- put the copied object's static abilities, and a copy reads the COPIER's
+    -- printed face (CR 707.2a). A GRANTED instance is not copiable, which falls
+    -- out of where each is written -- the seed here, the grant in the gathered
+    -- list -- exactly as `enchant` below argues.
+    --
+    -- Pawl.Engine.Projection.staticAbilitiesOf is the reader, and it answers
+    -- this field without building the rest of the record.
+    staticAbilities :: [StaticAbility.StaticAbility Card.Card],
+    -- | CR 613.10 / 613.11: the object's player-affecting static abilities --
+    -- the axis Pawl.Types.Face.playerAbilities carries, applied AFTER the seven
+    -- layers by Pawl.Engine.PlayerEffect. Seeded and untouched by any layer for
+    -- staticAbilities' reason above, copiable for the same one, and read by
+    -- Pawl.Engine.Projection.playerAbilitiesOf.
+    playerAbilities :: [PlayerStaticAbility.PlayerStaticAbility],
     -- | CR 602 / 613 layer 6: the object's activated abilities after the layer
     -- system. Seeded from the card and added to by CR 613.1f's grant (Presence of
     -- Gond); emptied by LoseAllAbilities (Humility) and by CR 305.7's strip at
