@@ -424,6 +424,12 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f n) -> PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.rewrite pairs f) n)
   PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f n) -> PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost (Filter.rewrite pairs f) n)
   PlayerEffect.ReduceSpellCost x -> PlayerEffect.ReduceSpellCost x {ReduceSpellCost.whichSpells = Filter.rewrite pairs (ReduceSpellCost.whichSpells x)}
+  -- TWO Filters of its own, and both descend. The second names
+  -- what the ability targets (Dwarven Mauler's "that target this creature",
+  -- spelled Filter.IsSource), so no card in `data/cards/` puts a subtype word
+  -- there today and neutralising that descent leaves the suite green -- it is
+  -- here so that the card which does write one cannot silently keep the printed
+  -- word.
   PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f family targets cost floor_) -> PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.rewrite pairs f) family (fmap (Filter.rewrite pairs) targets) cost floor_)
   -- The two arms with a word in TWO places: their own criterion ("nontoken
   -- Rebels"), and the criterion inside each component they add ("sacrifice a
