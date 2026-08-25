@@ -5543,9 +5543,10 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   --
   -- The attacked side is UNQUALIFIED, rule 508.3e's "[another player]" as every
   -- printing of this shape leaves it -- Pawl.Types.TriggerCondition's arm says
-  -- which cards would narrow it (#2281). CR 506.2 makes it an opponent of the
-  -- attacker whatever this arm did, so there is nothing here to compare against
-  -- `you`.
+  -- which cards would narrow it (#2281). A relation there would be nearly
+  -- unobservable besides: CR 506.2 and CR 802.2 make every defending player an
+  -- opponent of the attacker, so Opponent and AnyPlayer would pick the same
+  -- seats on every legal declaration.
   --
   -- ONLY AttackTarget.OfPlayer, which is rule 508.3e's last sentence in as many
   -- words: "it won't trigger if a creature attacks a planeswalker or a battle".

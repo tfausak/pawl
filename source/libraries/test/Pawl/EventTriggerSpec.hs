@@ -3045,8 +3045,8 @@ boggartPranksterSpec s registry =
 --
 -- The Opponent arm is exercised by no card. Its producer, Ever-Watching
 -- Threshold, carries a CR 603.4 intervening "if" reading what was attacked
--- (#538); the boards below prove only that the implementation does not BEHAVE as
--- Opponent.
+-- (#2280); the boards below prove only that the implementation does not BEHAVE
+-- as Opponent.
 avatarRokuSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 avatarRokuSpec s registry =
   let isActivate a = case a of
