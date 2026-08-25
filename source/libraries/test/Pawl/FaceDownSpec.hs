@@ -1800,8 +1800,10 @@ faceUpEffectSpec s registry = Spec.describe s "TurnFaceUp (CR 701.40g)" $ do
 --
 -- Defenestrated Phantom is the card, {4}{W}{W} Creature -- Spirit 4/3, "Flying /
 -- Disguise {4}{W}", transcribed whole. Chosen as the pool's plainest disguise
--- creature: MKM's others carry investigate or a turned-face-up trigger, either of
--- which would put a second observable event beside the one these cases read. Its
+-- creature: MKM's others carry investigate or something that happens as they are
+-- turned face up -- Bubble Smuggler's CR 614.1e counter clause, at the end of this
+-- group, is one -- either of which would put a second observable event beside the
+-- one these cases read. Its
 -- printed values differ from CR 702.168b's listing on every axis the rule names
 -- -- 4/3 against the 2/2, a Spirit against no subtypes, flying against ward {2},
 -- a name against none, and a mana value of 6 against CR 202.3a's 0.
