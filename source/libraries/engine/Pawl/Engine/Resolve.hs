@@ -529,7 +529,7 @@ slotsOf effect = case effect of
         Map.delete Binding.eventAmount (joinSlots (fmap slotsOf (Foldable.toList rider)))
       ]
   -- BOTH ObjectRefs: a target slot may be read through the destination ref.
-  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ srcRef destRef) ->
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ srcRef destRef _) ->
     joinSlots [durationSlots duration, objectRefSlots srcRef, objectRefSlots destRef]
   -- The bound slot is a DEFINITION, not a read: see boundSlots below.
   Effect.Counter (Counter.MkCounter ref _) -> objectRefSlots ref
@@ -783,7 +783,7 @@ slotsAreExhaustive effect = case effect of
     durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity && all slotsAreExhaustive rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ rider) ->
     durationSlotsAreExhaustive duration && all slotsAreExhaustive rider
-  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _) -> durationSlotsAreExhaustive duration
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _ _) -> durationSlotsAreExhaustive duration
   Effect.Counter {} -> True
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
@@ -2607,9 +2607,9 @@ installDamageRow players controller source duration kind rewrite rider g (recipi
             }
      in g1 {GameState.replacements = active : GameState.replacements g1}
 
--- CR 609.7a: choose the SOURCE a prevention effect names, and answer the pair
--- installDamageRow bakes -- the printed properties beside the id the choice
--- landed on. Nothing for a shield naming no source, and Nothing again where the
+-- CR 609.7a: choose the SOURCE a prevention or redirection effect names, and
+-- answer the pair installDamageRow bakes -- the printed properties beside the id
+-- the choice landed on. Nothing for a row naming no source, and Nothing again where the
 -- rule's pool held nothing the card's properties admit, which the caller tells
 -- apart by whether it passed a Filter at all.
 --
@@ -5056,7 +5056,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- every source would be.
             (Just _, Nothing) -> pure ()
             _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind DamageRewrite.PreventAll rider) g0 (fmap (\recipient -> (Just recipient, sourceChoice)) recipients)
-  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind srcRef destRef) -> do
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind srcRef destRef sourceFilter) -> do
     -- CR 614.9: install a floating redirection effect. BOTH sides are baked here,
     -- both being known only at resolution: the source side into
     -- DamagePattern.whichRecipient, the destination into the rewrite. Both
@@ -5064,14 +5064,31 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- at redirect time, in Event.apply, the destination being able to leave.
     gs <- State.get
     let recipientsOf ref = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs ref)
+        -- Through effectContext rather than Filter.contextFor, for
+        -- PreventAllDamage's reason: CR 609.7a's candidates are narrowed against
+        -- this resolution's own slot bindings and CR 109.5's "you".
+        context = effectContext controller source legal (slotGroups resolving gs)
+        redirected = recipientsOf srcRef
     -- EXACTLY ONE destination (CR 614.9). None means CR 608.2b's target is
     -- already gone, so no row is installed.
     case recipientsOf destRef of
       [dest] ->
-        -- Nothing for CR 609.7a's choice: the two prevention opcodes carry a
-        -- chosenSource field and this one does not, so Oracle's Attendants'
-        -- redirection "by a source of your choice" is unsayable (gap #1902).
-        State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind (DamageRewrite.Redirect dest) Nothing) g0 (fmap (\recipient -> (Just recipient, Nothing)) (recipientsOf srcRef))
+        -- No recipient to redirect FROM is CR 608.2b's gone target, so there is
+        -- nothing to install and CR 609.7a's choice -- a choice existing only to
+        -- be baked into a row -- is not raised either. The prevention opcodes'
+        -- posture.
+        Monad.unless (null redirected) $ do
+          -- CR 609.7a: "the source is chosen when the effect is created", so the
+          -- choice is made ONCE here and every row this resolution installs
+          -- watches the object it landed on.
+          sourceChoice <- chooseDamageSource controller resolving context gs sourceFilter
+          case (sourceFilter, sourceChoice) of
+            -- The card asked for a source and CR 609.7a's pool was empty, so
+            -- there is nothing to redirect and no row is installed -- stricter
+            -- than printed rather than weaker, which a row watching every source
+            -- would be.
+            (Just _, Nothing) -> pure ()
+            _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind (DamageRewrite.Redirect dest) Nothing) g0 (fmap (\recipient -> (Just recipient, sourceChoice)) redirected)
       _ -> pure ()
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase ref selector) -> do
     -- CR 614.1b: "skip" is a replacement effect, installed floating because a
