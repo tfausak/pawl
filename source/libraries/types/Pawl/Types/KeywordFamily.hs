@@ -37,7 +37,12 @@ module Pawl.Types.KeywordFamily where
 -- not whenever a card first asks for one. Pawl.Engine.Keyword.familyOf is
 -- exhaustive and takes no wildcard, so the compiler asks for the decision.
 data KeywordFamily
-  = -- | CR 702.11d: hexproof from [quality].
+  = -- | CR 702.6a: equip [cost]. Bureau Headmaster's "equip abilities you
+    -- activate cost {1} less to activate" is the card asking, through
+    -- Pawl.Types.ReduceActivationCost's @grantedBy@ rather than through a
+    -- Filter.
+    Equip
+  | -- | CR 702.11d: hexproof from [quality].
     Hexproof
   | -- | CR 702.14a: "[type]walk".
     Landwalk

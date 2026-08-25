@@ -3738,12 +3738,14 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     recall <- S.printingOf s registry "Ancestral Recall"
     solRing <- S.printingOf s registry "Sol Ring"
-    case Face.activatedAbilities (S.combinedFace bonesplitter) of
-      [] -> Spec.assertFailure s "Bonesplitter should print an equip ability"
+    let (hawkerId, g1) = S.addCreature hawker S.alice (Setup.emptyGame S.bothPlayers)
+        (equipId, g2) = S.addCreature bonesplitter S.alice g1
+    -- From the PROJECTION: Bonesplitter declares CR 702.6a's keyword and prints
+    -- no activated ability of its own.
+    case Projection.abilitiesOf equipId g2 of
+      [] -> Spec.assertFailure s "Bonesplitter should offer rule 702.6a's minted equip ability"
       equipAbility : _ -> do
-        let (hawkerId, g1) = S.addCreature hawker S.alice (Setup.emptyGame S.bothPlayers)
-            (equipId, g2) = S.addCreature bonesplitter S.alice g1
-            -- S.handOne rather than a second S.addHandCard: it is what puts the
+        let -- S.handOne rather than a second S.addHandCard: it is what puts the
             -- board in a MAIN PHASE with priority, which both the equip's
             -- "activate only as a sorcery" (CR 702.6a) and Sol Ring's sorcery
             -- timing need.
@@ -3785,12 +3787,12 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
     recall <- S.printingOf s registry "Ancestral Recall"
     solRing <- S.printingOf s registry "Sol Ring"
     island <- S.printingOf s registry "Island"
-    case Face.activatedAbilities (S.combinedFace bonesplitter) of
-      [] -> Spec.assertFailure s "Bonesplitter should print an equip ability"
+    let (hawkerId, g1) = S.addCreature hawker S.alice (S.landsInPlay island 1)
+        (equipId, g2) = S.addCreature bonesplitter S.alice g1
+    case Projection.abilitiesOf equipId g2 of
+      [] -> Spec.assertFailure s "Bonesplitter should offer rule 702.6a's minted equip ability"
       equipAbility : _ -> do
-        let (hawkerId, g1) = S.addCreature hawker S.alice (S.landsInPlay island 1)
-            (equipId, g2) = S.addCreature bonesplitter S.alice g1
-            (g3, recallId) = S.handOne recall g2
+        let (g3, recallId) = S.handOne recall g2
             (ringId, board) = S.addHandCard solRing S.alice g3
             equipped =
               let activated = S.runPure S.identityAnswer board (Activate.activateAbility S.alice equipId equipAbility)

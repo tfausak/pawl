@@ -46,13 +46,14 @@ toJson = Codec.encode codec
 fromJson :: Value.Value -> Either Text.Text (ActivatedAbility.ActivatedAbility Text.Text)
 fromJson = Codec.decode codec
 
--- One constructor, so three cases: an equip ability (CR 702.6a) carrying CR
--- 602.5d's printed SorcerySpeed clause, CR 602.2's default of no clause at all,
+-- One constructor, so three cases: rule 702.6a's equip ability as
+-- Pawl.Engine.Keyword mints it, carrying CR 602.5d's SorcerySpeed clause, CR
+-- 602.2's default of no clause at all,
 -- whose key is elided, and Kongming's Contraptions' TWO clauses, which is what
 -- the key being an array is for.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
-  Spec.it s "MkActivatedAbility, Bonesplitter's Equip ability" $
+  Spec.it s "MkActivatedAbility, rule 702.6a's equip ability" $
     Common.assertJsonCodec
       s
       toJson

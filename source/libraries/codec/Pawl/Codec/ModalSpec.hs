@@ -41,7 +41,7 @@ fromJson = Codec.decode codec
 -- required and non-empty by invariant), and the empty-modes decode failure.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Modal" $ do
-  Spec.it s "MkModal, Bonesplitter's Equip payload" $
+  Spec.it s "MkModal, rule 702.6a's equip payload" $
     Common.assertJsonCodec
       s
       toJson

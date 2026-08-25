@@ -350,6 +350,19 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (miracle 2)
       " {\"type\":\"Miracle\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (miracle 2) /= Codec.encode Keyword.codec (plotOf 2)) "the same cost under two keywords encodes differently"
+  -- CR 702.6a's payload is a Cost, LevelUp's and Outlast's shape. The corpus
+  -- load guards the DECODE direction for free -- the six Equipment in
+  -- data/cards/ fail to parse without the arm -- and nothing but this case
+  -- guards the encode, since Pawl.Codec.Keyword is an Arm.tagged list whose own
+  -- `_ -> Nothing` fallthroughs let a missing arm compile (#2262).
+  Spec.it s "Equip carries its cost" $ do
+    let equip n = Keyword.Equip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (equip 1)
+      " {\"type\":\"Equip\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (equip 1) /= Codec.encode Keyword.codec (equip 3)) "the cost is part of the encoding"
   -- CR 702.87a's payload is a Cost, and the tag must not collide with the level
   -- COUNTER's -- CounterKind's "Level" and this keyword's "LevelUp" are two
   -- different wire tags for the two halves of rule 711.
