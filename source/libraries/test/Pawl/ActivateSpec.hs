@@ -519,6 +519,7 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
       (Projection.fullView pumped S.noSource >>= Filter.power)
 
   cyclingSpec s registry
+  equipSpec s registry
   reinforceSpec s registry
   authoredHandAbilitySpec s registry
 
@@ -922,6 +923,160 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
         gs = g0 {GameState.priority = Just S.alice}
     Spec.assertEqWith s "no abilities minted" (Activate.abilitiesFor oid gs) []
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "and no Activate offered"
+
+-- Answers a target slot with exactly the offered recipient for `oid`, rather
+-- than building one: a Pool.Creatures slot tags its candidates ToCreature, and a
+-- hand-built recipient of another tag is dropped by CR 608.2b's re-read at
+-- resolution with no error. These boards offer several creatures, so
+-- S.identityAnswer's head-of-candidates would not discriminate.
+aimAtOffered :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtOffered oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
+
+-- CR 702.6 equip, and the cost reducer that is the only thing in the pool able
+-- to tell it from an ordinary printed ability.
+--
+-- Bureau Headmaster ({R}{W} Creature -- Human Assassin 2/2, "Equipment spells
+-- you cast cost {1} less to cast." / "Equip abilities you activate cost {1} less
+-- to activate", checked against Scryfall on 2026-08-25) is the producer.
+-- Fluctuator above is the same shape one keyword over; what this group adds is
+-- the keyword itself, since the six Equipment in data/cards/ produce a
+-- byte-identical ActivatedAbility whether the equip is printed or minted, and
+-- nothing else in the pool asks which.
+--
+-- alice's board: a Bonesplitter (equip {1}), a Goblin Piker to equip, a Withered
+-- Wretch ("{1}: Exile target card from a graveyard"), a Goblin Piker in bob's
+-- graveyard so the Wretch's slot is fillable, and NO MANA SOURCE OF ANY KIND.
+-- Bureau Headmaster rides the Bool; the two boards differ in it and in nothing
+-- else.
+--
+-- WHY THE WRETCH. Its printed {1} is the equip's printed cost exactly, so a
+-- reduction that ignored `grantedBy` and reduced every activated ability offers
+-- both permanents and one that honours it offers only the Equipment. With the
+-- Bonesplitter alone the two readings produce the same board.
+--
+-- WHY NO MANA. With even one land in play both readings can equip, and what is
+-- offered stops discriminating; on nothing at all the difference is offered
+-- against not offered rather than two arithmetic answers that agree.
+equipBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+equipBoard s registry withHeadmaster = do
+  bonesplitter <- S.printingOf s registry "Bonesplitter"
+  piker <- S.printingOf s registry "Goblin Piker"
+  wretch <- S.printingOf s registry "Withered Wretch"
+  headmaster <- S.printingOf s registry "Bureau Headmaster"
+  let (pikerId, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+      (splitterId, g1) = S.addCreature bonesplitter S.alice g0
+      (wretchId, g2) = S.addCreature wretch S.alice g1
+      g3 = if withHeadmaster then snd (S.addCreature headmaster S.alice g2) else g2
+      (_, g4) = S.addGraveyardCard piker S.bob g3
+  -- The phase is set here rather than left to Setup.emptyGame's untap step,
+  -- because CR 702.6a's "activate only as a sorcery" is a real gate (CR 307.5)
+  -- and every case below reads what Action.legalActions offers.
+  pure (splitterId, wretchId, pikerId, g4 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
+
+equipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+equipSpec s registry = Spec.describe s "Equip" $ do
+  -- CR 702.6a: "Equip is an activated ability of Equipment cards. 'Equip [cost]'
+  -- means '[Cost]: Attach this permanent to target creature you control.
+  -- Activate only as a sorcery.'" The ability is MINTED from the keyword, so
+  -- Bonesplitter's card file declares Keyword.Equip and prints no activated
+  -- ability at all.
+  --
+  -- The single-ability match is the trap assertion: a conversion that added the
+  -- keyword and left the printed ability behind gives the permanent two equips,
+  -- and every gameplay case below passes anyway.
+  Spec.it s "CR 702.6a the equip ability is minted from the keyword, not printed" $ do
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    (splitterId, _, _, gs) <- equipBoard s registry False
+    Spec.assertEqWith s "the card itself prints no activated ability" (Face.activatedAbilities (S.combinedFace bonesplitter)) []
+    case Projection.abilitiesOf splitterId gs of
+      [ability] -> do
+        Spec.assertEqWith
+          s
+          "the printed {1}, with nothing appended -- rule 702.6a states no tap symbol"
+          (ActivatedAbility.cost ability)
+          (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [])
+        Spec.assertEqWith s "and CR 702.6a's 'activate only as a sorcery'" (ActivatedAbility.restrictions ability) [ActivationRestriction.SorcerySpeed]
+      abilities -> Spec.assertFailure s ("expected exactly one equip ability, got " <> show (length abilities))
+
+  -- CR 118.7 narrowed to one rule-702 family, which is what
+  -- Pawl.Types.ReduceActivationCost's `grantedBy` names and what
+  -- Pawl.Engine.Keyword.familyGranting answers by re-minting. The whole card:
+  -- with no mana source in the game, {1} minus {1} is {0} and the Equipment
+  -- moves.
+  Spec.it s "CR 118.7 whole card: Bureau Headmaster equips a Bonesplitter off no mana at all" $ do
+    (splitterId, _, pikerId, gs) <- equipBoard s registry True
+    (withoutId, _, _, without) <- equipBoard s registry False
+    case Projection.abilitiesOf splitterId gs of
+      [ability] -> do
+        let activated = S.runPure (aimAtOffered pikerId) gs (Activate.activateAbility S.alice splitterId ability)
+            after = S.runPure (aimAtOffered pikerId) activated Stack.resolveTop
+        Spec.assertEqWith s "CR 301.5f the equip resolved and the Piker is a 4/1" (S.powerToughnessOf pikerId after) (Just (4, 1))
+        Spec.assertEqWith s "with the Bonesplitter on it (CR 701.3a)" (fmap Object.attachedTo (Game.lookupObject splitterId after)) (Just (Just (Recipient.ToCreature pikerId)))
+        Spec.assertEqWith s "unequipped it was a plain 2/1" (S.powerToughnessOf pikerId gs) (Just (2, 1))
+        Spec.assertEqWith s "and the equip is offered with no mana source in the game" (length (activationsOf splitterId (Action.legalActions S.alice gs))) 1
+        Spec.assertEqWith s "where the same board one Headmaster short cannot pay the printed {1}" (length (activationsOf withoutId (Action.legalActions S.alice without))) 0
+      abilities -> Spec.assertFailure s ("expected exactly one equip ability, got " <> show (length abilities))
+
+  -- The criterion, from the other side, and the case that fails if `grantedBy`
+  -- is ignored: Withered Wretch's "{1}: Exile target card from a graveyard" is a
+  -- PRINTED activated ability, so rule 702.6a minted nothing and Bureau
+  -- Headmaster's sentence does not name it. Same board, same printed cost, same
+  -- empty mana -- a reducer that reduced every activated ability offers both.
+  Spec.it s "CR 118.7 the reduction does not reach an ability rule 702.6a did not mint" $ do
+    (splitterId, wretchId, _, gs) <- equipBoard s registry True
+    Spec.assertEqWith s "the Wretch's printed {1} is not reduced away" (length (activationsOf wretchId (Action.legalActions S.alice gs))) 0
+    Spec.assertEqWith s "while the equip on the same board is offered" (length (activationsOf splitterId (Action.legalActions S.alice gs))) 1
+    Spec.assertBool s (not (null (Projection.abilitiesOf wretchId gs))) "and the Wretch has an ability to withhold"
+
+  -- The control for the case above, one Swamp apart: everything the Wretch's
+  -- refusal could otherwise be about -- its target slot, its timing, its being
+  -- summoning sick -- is unchanged, and the ability is offered. So what withheld
+  -- it there was the cost.
+  Spec.it s "CR 118.3 one land pays the Wretch's printed {1}" $ do
+    (_, wretchId, _, gs) <- equipBoard s registry True
+    swamp <- S.printingOf s registry "Swamp"
+    Spec.assertEqWith s "the Wretch is offered once the mana exists" (length (activationsOf wretchId (Action.legalActions S.alice (S.landsFor swamp S.alice 1 gs)))) 1
+
+  -- "Equip abilities YOU activate", which is the player ability's scope (CR
+  -- 109.5) and not a clause of its filter: bob's own Bonesplitter, at the same
+  -- printed {1} and with the same empty mana, is not reduced by alice's
+  -- Headmaster. The third assertion is the pair's control -- one Swamp of bob's
+  -- own does offer it, so what refused was the cost and not his turn.
+  Spec.it s "CR 118.7 'equip abilities you activate' does not reach an opponent's" $ do
+    (aliceSplitter, _, _, gs) <- equipBoard s registry True
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
+    let (_, g1) = S.addCreature piker S.bob gs
+        (bobSplitter, g2) = S.addCreature bonesplitter S.bob g1
+        bobsTurn = g2 {GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
+    Spec.assertEqWith s "bob's equip is not offered, though alice's Headmaster is on the battlefield" (length (activationsOf bobSplitter (Action.legalActions S.bob bobsTurn))) 0
+    Spec.assertEqWith s "while alice's is offered on her own turn" (length (activationsOf aliceSplitter (Action.legalActions S.alice gs))) 1
+    Spec.assertEqWith s "and one Swamp of his own does offer it" (length (activationsOf bobSplitter (Action.legalActions S.bob (S.landsFor swamp S.bob 1 bobsTurn)))) 1
+
+  -- The card's OTHER sentence, on CR 118.7's spell side. Bonesplitter is {1}, so
+  -- with no land in the game an Equipment spell is castable only if the
+  -- reduction ran. Braidwood Sextant is the discriminating control: a {1}
+  -- artifact that is not an Equipment, in the same hand on the same board, so a
+  -- reducer that named every spell would cast it too.
+  Spec.it s "CR 118.7 whole card: an Equipment spell you cast costs {1} less" $ do
+    headmaster <- S.printingOf s registry "Bureau Headmaster"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    sextant <- S.printingOf s registry "Braidwood Sextant"
+    let (handOnly, splitterId) = S.handOne bonesplitter (Setup.emptyGame S.bothPlayers)
+        (sextantId, withBoth) = S.addHandCard sextant S.alice handOnly
+        (headmasterId, gs) = S.addCreature headmaster S.alice withBoth
+        cast = S.runPure S.identityAnswer gs (S.cast S.alice splitterId)
+        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+    Spec.assertBool s (S.castable S.alice splitterId gs) "the Equipment spell is castable with no land in the game"
+    -- BY NAME, since a resolving spell becomes a new object (CR 608.3) and the
+    -- hand's id does not follow it onto the battlefield.
+    Spec.assertEqWith s "and it resolves onto the battlefield" (S.countOnBattlefieldByName (S.printingName bonesplitter) S.alice resolved) 1
+    Spec.assertBool s (not (S.castable S.alice sextantId gs)) "where a {1} artifact that is not an Equipment is not reduced"
+    Spec.assertBool s (not (S.castable S.alice splitterId withBoth)) "and without the Headmaster the Equipment's own {1} is unpayable"
+    Spec.assertBool s (elem headmasterId (GameState.battlefield gs)) "setup: the Headmaster really is on the battlefield"
 
 -- CR 702.77: reinforce, cycling's zone with a TARGET. Mosquito Guard is a {W}
 -- 1/1 whose only other text is first strike, so nothing but rule 702.77a
