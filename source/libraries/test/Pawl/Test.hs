@@ -43,6 +43,7 @@ import qualified Pawl.Codec.AttackerBlockedSpec
 import qualified Pawl.Codec.AttackerDeclaredSpec
 import qualified Pawl.Codec.AttackingPlayersSpec
 import qualified Pawl.Codec.BattlefieldCandidateSpec
+import qualified Pawl.Codec.BecameAttackedSpec
 import qualified Pawl.Codec.BecameBlockingSpec
 import qualified Pawl.Codec.BecameDesignatedSpec
 import qualified Pawl.Codec.BecomeCopySpec
@@ -238,6 +239,7 @@ import qualified Pawl.Codec.PhaseSelectorSpec
 import qualified Pawl.Codec.PhaseSpec
 import qualified Pawl.Codec.PhasedOutSpec
 import qualified Pawl.Codec.PlayPermissionOriginSpec
+import qualified Pawl.Codec.PlayerAttacksPlayerSpec
 import qualified Pawl.Codec.PlayerAttacksWithSpec
 import qualified Pawl.Codec.PlayerCounterKindSpec
 import qualified Pawl.Codec.PlayerCounterTallySpec
@@ -550,6 +552,7 @@ spec s registry = do
   Pawl.Codec.AttackerDeclaredSpec.spec s
   Pawl.Codec.AttackingPlayersSpec.spec s
   Pawl.Codec.BattlefieldCandidateSpec.spec s
+  Pawl.Codec.BecameAttackedSpec.spec s
   Pawl.Codec.BecameDesignatedSpec.spec s
   Pawl.Codec.BecomeCopySpec.spec s
   Pawl.Codec.BeginningStepSpec.spec s
@@ -746,6 +749,7 @@ spec s registry = do
   Pawl.Codec.PhasedOutSpec.spec s
   Pawl.Codec.PlayPermissionOriginSpec.spec s
   Pawl.Codec.PlayerCounterKindSpec.spec s
+  Pawl.Codec.PlayerAttacksPlayerSpec.spec s
   Pawl.Codec.PlayerAttacksWithSpec.spec s
   Pawl.Codec.PlayerCounterTallySpec.spec s
   Pawl.Codec.PlayerCountersSpec.spec s

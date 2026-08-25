@@ -20,6 +20,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -233,6 +234,20 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.You (Filter.HasSubtype Subtype.Bird)))
       " {\"type\":\"PlayerAttacksWith\",\"value\":{\"player\":{\"type\":\"You\"},\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Bird\"}}}} "
+  -- CR 508.3e, whose payload names BOTH of the rule's subjects -- so the two
+  -- cards spell the same two relations the opposite ways round, and a codec
+  -- reading one key for both would round-trip the first and fail the second.
+  Spec.it s "PlayerAttacksPlayer round-trips both sides" $ do
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.You PlayerRelation.AnyPlayer))
+      " {\"type\":\"PlayerAttacksPlayer\",\"value\":{\"attacker\":{\"type\":\"You\"},\"attacked\":{\"type\":\"AnyPlayer\"}}} "
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.AnyPlayer PlayerRelation.You))
+      " {\"type\":\"PlayerAttacksPlayer\",\"value\":{\"attacker\":{\"type\":\"AnyPlayer\"},\"attacked\":{\"type\":\"You\"}}} "
   -- CR 508.3b, nullary for the sibling above's reason and one of its own: the
   -- subject is whom the ability's own source is attached to.
   Spec.it s "AttachedPlayerIsAttacked" $

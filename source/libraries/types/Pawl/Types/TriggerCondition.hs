@@ -10,6 +10,7 @@ import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBl
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -213,10 +214,13 @@ data TriggerCondition
     -- of every one of those five Curses needs ("each opponent attacking that
     -- player").
     --
+    -- CR 508.3e's "[a player] attacks [another player]" reads the same event,
+    -- and PlayerAttacksPlayer below is that arm: this one names its subject by
+    -- attachment where that one names both sides by relation.
+    --
     -- Not implemented: rule 508.3b's planeswalker and battle subjects -- the
     -- sweep above turned up no card writing one, and GameEvent.BecameAttacked
-    -- already carries the permanent an arm for them would read -- and CR 508.3e's
-    -- "[a player] attacks [another player]" (#538).
+    -- already carries the permanent an arm for them would read (#2279).
     AttachedPlayerIsAttacked
   | -- | CR 508.3d: "whenever [a player] attacks" -- once per DECLARATION,
     -- against GameEvent.AttackersDeclared, which
@@ -240,10 +244,13 @@ data TriggerCondition
     -- Nothing is bound. Rule 508.3d names a SET of creatures rather than one, so
     -- there is no attacker to point at.
     --
+    -- CR 508.3e's "attacks [another player]" is PlayerAttacksPlayer below, and
+    -- the ARITY is the whole difference: this one fires once for the
+    -- declaration, that one once per player attacked.
+    --
     -- Not implemented: rule 508.3d's BOUND attacking player -- "that player" and
     -- "the attacking player", which Norn's Decree and Mirkwood Trapper print
-    -- (#2154). Nor CR 508.3e's "attacks [another player]" (#538). CR 508.3c's
-    -- "attacks with [a creature]" is the arm below.
+    -- (#2154). CR 508.3c's "attacks with [a creature]" is the arm below.
     PlayerAttacks PlayerRelation.PlayerRelation
   | -- | CR 508.3c: "whenever [a player] attacks with [a creature]" -- Hermes,
     -- Overseer of Elpis' "whenever you attack with one or more Birds". The arm
@@ -267,6 +274,43 @@ data TriggerCondition
     -- Not implemented: a FLOOR above one, which Aurelia, the Law Above's "with
     -- three or more creatures" needs (#2226).
     PlayerAttacksWith PlayerAttacksWith.PlayerAttacksWith
+  | -- | CR 508.3e: "whenever [a player] attacks [another player]" -- Seifer,
+    -- Balamb Rival's "whenever you attack a player" and Mirkwood Trapper's
+    -- "whenever a player attacks you". BOTH of rule 508.3e's subjects are in the
+    -- payload, and neither can stand in for the other: the two cards name the
+    -- opposite sides, and a board where a third player is attacked tells them
+    -- apart.
+    --
+    -- CR 508.3b's per-TARGET arity and not rule 508.3d's, so this reads
+    -- GameEvent.BecameAttacked where PlayerAttacks above reads
+    -- GameEvent.AttackersDeclared: rule 508.3e triggers "if one or more
+    -- creatures the first player controls are declared as attackers attacking
+    -- the second player", once per pair. One declaration split across two
+    -- opponents fires this twice and PlayerAttacks once, which is what parts
+    -- them.
+    --
+    -- The attacked player is BOUND under the reserved
+    -- Pawl.Engine.Binding.triggerPlayer slot, AttachedPlayerIsAttacked's slot
+    -- off the same event, because that is what the printed payloads read --
+    -- Seifer's "goad target creature that player controls", Karazikar, the Eye
+    -- Tyrant's and Gornog, the Red Reaper's the same. The ATTACKING player is
+    -- not bound: no printing points back at it that the payload's own "you"
+    -- cannot say.
+    --
+    -- ONLY AttackTarget.OfPlayer matches, which is rule 508.3e's last sentence
+    -- in as many words -- "it won't trigger if a creature attacks a planeswalker
+    -- or a battle" -- and AttachedPlayerIsAttacked's narrowing for rule 508.3b's
+    -- version of it. That sentence's other exclusion, a creature put onto the
+    -- battlefield attacking, holds by construction: CR 508.4 says such a
+    -- creature was never declared, and Pawl.Engine.Combat.putOntoBattlefieldAttacking
+    -- records no event.
+    --
+    -- Opponent and AnyPlayer are indistinguishable on the ATTACKED side, CR
+    -- 506.2/508.1 making every attackable player an opponent of the attacker, so
+    -- a card printing the bare "a player" there takes AnyPlayer -- what it
+    -- prints -- and no board can tell the two apart. You is the reading that
+    -- pays, and Mirkwood Trapper is what proves the field is read at all.
+    PlayerAttacksPlayer PlayerAttacksPlayer.PlayerAttacksPlayer
   | -- | CR 702.105a: dethrone -- SelfAttacks narrowed by whom the bearer
     -- attacked. The attacked player comes from Combat.attackers rather than the
     -- event, and that is the whole narrowing: the event carries CR 508.5's

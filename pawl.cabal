@@ -146,6 +146,8 @@ library codec
     Pawl.Codec.BattlefieldCandidate
     Pawl.Codec.BattlefieldCandidateSpec
     Pawl.Codec.BecameAttached
+    Pawl.Codec.BecameAttacked
+    Pawl.Codec.BecameAttackedSpec
     Pawl.Codec.BecameBlocking
     Pawl.Codec.BecameBlockingSpec
     Pawl.Codec.BecameDesignated
@@ -539,6 +541,8 @@ library codec
     Pawl.Codec.PhaseSelectorSpec
     Pawl.Codec.PhaseSpec
     Pawl.Codec.Player
+    Pawl.Codec.PlayerAttacksPlayer
+    Pawl.Codec.PlayerAttacksPlayerSpec
     Pawl.Codec.PlayerAttacksWith
     Pawl.Codec.PlayerAttacksWithSpec
     Pawl.Codec.PlayerCounterKind
@@ -1230,6 +1234,7 @@ library types
     Pawl.Types.AttackTarget
     Pawl.Types.BattlefieldCandidate
     Pawl.Types.BecameAttached
+    Pawl.Types.BecameAttacked
     Pawl.Types.BecameBlocking
     Pawl.Types.BecameDesignated
     Pawl.Types.BecameTarget
@@ -1460,6 +1465,7 @@ library types
     Pawl.Types.PhaseSelector
     Pawl.Types.PhyrexianPayment
     Pawl.Types.Player
+    Pawl.Types.PlayerAttacksPlayer
     Pawl.Types.PlayerAttacksWith
     Pawl.Types.PlayerCounterKind
     Pawl.Types.PlayerCounters

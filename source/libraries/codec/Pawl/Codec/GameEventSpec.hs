@@ -13,6 +13,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
+import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
@@ -143,14 +144,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 3) (PlayerId.MkPlayerId 1) 4))
       " {\"type\":\"AttackerDeclared\",\"value\":{\"attacker\":3,\"defender\":1,\"count\":4}} "
-  -- AttackerDeclared's grouping sibling: one target, no attacker and no count,
-  -- which is the whole of what CR 508.3b's subject is.
+  -- AttackerDeclared's grouping sibling: the target and the player who declared,
+  -- with no creature and no count -- CR 508.3b's subject beside CR 508.3e's.
   Spec.it s "BecameAttacked" $
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.BecameAttacked (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 6)))
-      " {\"type\":\"BecameAttacked\",\"value\":{\"type\":\"OfPlaneswalker\",\"value\":6}} "
+      (GameEvent.BecameAttacked (BecameAttacked.MkBecameAttacked (PlayerId.MkPlayerId 2) (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 6))))
+      " {\"type\":\"BecameAttacked\",\"value\":{\"attacker\":2,\"target\":{\"type\":\"OfPlaneswalker\",\"value\":6}}} "
   -- CR 508.3d's once-per-declaration sibling: one PLAYER, the one who declared,
   -- where the arm above carries what was attacked and AttackerDeclared carries
   -- CR 508.5's defending player.
