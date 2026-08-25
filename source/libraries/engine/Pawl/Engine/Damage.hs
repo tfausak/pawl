@@ -1184,7 +1184,7 @@ applyDamage events = do
         let marked = List.foldl' markOne gs survivors
             gained = List.foldl' gainOne marked survivors
             tallied = List.foldl' tallyOne gained survivors
-            noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (Prevention.by p) (Prevention.recipient p) (Prevention.amount p))) g) tallied prevented
+            noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (Prevention.by p) (Prevention.source p) (Prevention.recipient p) (Prevention.amount p))) g) tallied prevented
             dealt = List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) noted survivors
          in -- CR 119.2's life loss and CR 120.3f's life gain are recorded AFTER
             -- the damage that caused them, which is the same reasoning the

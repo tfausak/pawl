@@ -73,7 +73,11 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "SelfPreventsDamage"
+            "type": "SelfPreventsDamage",
+            "value": {
+              "type": "And",
+              "value": []
+            }
           },
           "modal": {
             "modes": [

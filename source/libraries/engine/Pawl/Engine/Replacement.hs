@@ -1604,6 +1604,10 @@ preventionBy candidate before after = case (ReplacementCandidate.effect candidat
                 Just
                   Prevention.MkPrevention
                     { Prevention.by = ReplacementCandidate.identity candidate,
+                      -- CR 120.1's source of the damage that did not happen,
+                      -- read off the event as PROPOSED for the recipient's
+                      -- reason below.
+                      Prevention.source = DamageEvent.source de,
                       -- The recipient of the event as PROPOSED, which is the
                       -- reading CR 615.13 asks for: its ability watches "damage
                       -- that WOULD be dealt [and] is prevented". Damage CAN now
@@ -1627,10 +1631,9 @@ preventionBy candidate before after = case (ReplacementCandidate.effect candidat
 --
 -- A floating row is always a card's: CR 615.3's shields are installed by the
 -- resolution of a spell or ability, and `source` is the object whose text said
--- so. A REGRESSION FENCE rather than a proved answer -- every producer of a
--- floating prevention paired with a "this way" trigger needs a filter on the
--- damage's source that pawl has not got, so nothing observes this arm answering
--- Just, and mutating it to Nothing leaves the suite green (gap #2287).
+-- so. Proved by Pawl.ReplacementSpec's "CR 615.9 / 615.13 samite ministration
+-- gains life from a black source it named", where the shield and the delayed
+-- trigger are both the instant's, so answering Nothing here withholds the life.
 --
 -- A permanent's is too, with one exception -- CR 122.1c's shield-counter pair,
 -- which Pawl.Engine.Projection.shieldOf mints onto any permanent carrying a
@@ -1673,12 +1676,22 @@ printedBy candidate = case candidate of
 -- same rider and taking either side is taking the same value -- which is also
 -- the rule: one application of one prevention effect runs its additional effect
 -- once, with the total it prevented.
+--
+-- The SOURCE is neither summed nor keyed on, and a merged entry keeps one of the
+-- sources merged into it. Samite Ministration -- the one card in data/cards/
+-- whose CR 615.13 trigger reads the source -- cannot tell that apart from the
+-- rule, its shield naming ONE source under CR 609.7a, so a key already fixed to
+-- one instance is fixed to one source too. Not implemented: a shield covering two
+-- DIFFERENT sources in one batch, where rule 615.13's one prevention has two
+-- sources and this reports one (#2287). Keying on the source instead would report
+-- two preventions where that rule counts one, which is the wrong trade and the
+-- design call the issue is left open for.
 groupPreventions :: [Prevention] -> [Prevention]
 groupPreventions ps =
-  let merge (a1, r) (a2, _) = (a1 + a2, r)
-      keyed = Map.fromListWith merge [((Prevention.by p, Prevention.recipient p), (Prevention.amount p, Prevention.rider p)) | p <- ps]
-      rebuild ((by, recipient), (amount, rider)) =
-        Prevention.MkPrevention {Prevention.by = by, Prevention.recipient = recipient, Prevention.amount = amount, Prevention.rider = rider}
+  let merge (a1, s1, r1) (a2, _, _) = (a1 + a2, s1, r1)
+      keyed = Map.fromListWith merge [((Prevention.by p, Prevention.recipient p), (Prevention.amount p, Prevention.source p, Prevention.rider p)) | p <- ps]
+      rebuild ((by, recipient), (amount, source, rider)) =
+        Prevention.MkPrevention {Prevention.by = by, Prevention.source = source, Prevention.recipient = recipient, Prevention.amount = amount, Prevention.rider = rider}
    in fmap rebuild (Map.toAscList keyed)
 
 -- CR 615.7: when two or more applicable sources would deal damage to a shielded

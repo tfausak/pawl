@@ -2657,6 +2657,89 @@ phyrexianVindicatorSpec s registry = Spec.describe s "Phyrexian Vindicator (CR 6
         (_, after) = strikeAndSettleWith (preferTarget (Recipient.ToCreature vindicator : onlyBob)) g2 [hit attacker (Recipient.ToCreature vindicator) 4]
     Spec.assertEqWith s "the Vindicator was not offered, so the fallback took the 4" (S.lifeOf S.bob after) (Just 16)
 
+-- CR 609.7a's "a source of your choice", answered by id so neither branch below
+-- depends on the engine's canonical candidate order.
+nameDamageSource :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+nameDamageSource wanted p = case p of
+  Prompt.ChooseDamageSource _ _ _ offered ->
+    if List.elem wanted (NonEmpty.toList offered) then wanted else NonEmpty.head offered
+  _ -> S.identityAnswer p
+
+-- Which object a floating prevention row was baked to watch (CR 609.7a), off the
+-- one row the boards below install. Nothing where the board has no row at all,
+-- which is what makes the setup assertion able to fail.
+shieldedSource :: GameState.GameState -> Maybe ObjectId.ObjectId
+shieldedSource gs = case GameState.replacements gs of
+  [active] -> case ActiveReplacement.effect active of
+    ReplacementEffect.DamageR (DamageR.MkDamageR matching _ _) -> DamagePattern.whichSource matching
+    _ -> Nothing
+  _ -> Nothing
+
+-- CR 615.13's "this way" asked about the DAMAGE'S SOURCE -- Samite Ministration
+-- ({1}{W} Instant, "Prevent all damage that would be dealt to you this turn by a
+-- source of your choice. Whenever damage from a black or red source is prevented
+-- this way this turn, you gain that much life"). Phyrexian Vindicator above
+-- pairs the same trigger with no filter at all; this is the reading that looks at
+-- what would have dealt the damage, and the shield is a FLOATING row where the
+-- Vindicator's is a permanent's -- so this is also what observes
+-- Replacement.printedBy's floating arm.
+--
+-- ONE board and ONE damage batch, run twice, differing only in the answer to CR
+-- 609.7a's source choice. bob's black Cabal Evangel and his green Giant Spider
+-- strike alice simultaneously; the shield names one of them, so exactly one
+-- event is prevented and the other lands whichever way the choice went. Naming
+-- the black source gains the life; naming the green one must not, and that is
+-- the case an implementation with no filter fails -- it fires on its own
+-- prevention whatever dealt the damage, and hands alice the 5 as life.
+--
+-- Distinct amounts on the two events, so no life total below can be reached two
+-- ways: 20 - 5 + 2 is 17, 20 - 2 is 18, and the unfiltered reading's 20 - 2 + 5
+-- is 23.
+samiteMinistrationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+samiteMinistrationSpec s registry = Spec.describe s "Samite Ministration (CR 615.9 / 615.13)" $ do
+  Spec.it s "CR 615.9 / 615.13 samite ministration gains life from a black source it named, and none from a green one" $ do
+    plains <- S.printingOf s registry "Plains"
+    evangelPrinting <- S.printingOf s registry "Cabal Evangel"
+    spiderPrinting <- S.printingOf s registry "Giant Spider"
+    ministration <- S.printingOf s registry "Samite Ministration"
+    let base = S.landsInPlay plains 2
+        (evangel, g1) = S.addCreature evangelPrinting S.bob base
+        (spider, g2) = S.addCreature spiderPrinting S.bob g1
+        (g3, spellId) = S.handOne ministration g2
+        batch =
+          [ DamageEvent.MkDamageEvent evangel (Recipient.ToPlayer S.alice) 2 False False False 0 Nothing DamageKind.Noncombat,
+            DamageEvent.MkDamageEvent spider (Recipient.ToPlayer S.alice) 5 False False False 0 Nothing DamageKind.Noncombat
+          ]
+        run named =
+          let shielded = castAndResolve (nameDamageSource named) g3 spellId
+              (dealt, after) = strikeAndSettleWith (nameDamageSource named) shielded batch
+           in (shielded, dealt, after)
+        (blackShield, blackDealt, blackAfter) = run evangel
+        (greenShield, greenDealt, greenAfter) = run spider
+    Spec.assertEqWith s "setup: alice is at 20 before either branch" (S.lifeOf S.alice g3) (Just 20)
+    Spec.assertEqWith s "setup: each branch installed one shield, naming the source it chose" (fmap shieldedSource [blackShield, greenShield]) [Just evangel, Just spider]
+    -- The gameplay assertions, ahead of every proxy: alice's life is the only
+    -- place the trigger shows, and the two branches disagree about it.
+    Spec.assertEqWith s "naming the black source: the green 5 got through, and the prevented 2 came back as life" (S.lifeOf S.alice blackAfter) (Just 17)
+    Spec.assertEqWith s "naming the green source: only the black 2 got through, and no life came back" (S.lifeOf S.alice greenAfter) (Just 18)
+    Spec.assertEqWith s "the black branch gathered its trigger" (length (GameState.stack blackDealt)) 1
+    Spec.assertEqWith s "and the green branch gathered nothing" (length (GameState.stack greenDealt)) 0
+  -- The printed sentence names TWO colours, and a Filter that had dropped either
+  -- disjunct would still pass the pair above. bob's red Goblin Piker on a board
+  -- of its own, for a third amount again.
+  Spec.it s "CR 615.13 the other disjunct: a red source gains the life too" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    ministration <- S.printingOf s registry "Samite Ministration"
+    let base = S.landsInPlay plains 2
+        (piker, g1) = S.addCreature pikerPrinting S.bob base
+        (g2, spellId) = S.handOne ministration g1
+        shielded = castAndResolve (nameDamageSource piker) g2 spellId
+        (dealt, after) = strikeAndSettleWith (nameDamageSource piker) shielded [DamageEvent.MkDamageEvent piker (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing DamageKind.Noncombat]
+    Spec.assertEqWith s "setup: the shield names the Piker" (shieldedSource shielded) (Just piker)
+    Spec.assertEqWith s "the 3 was prevented and came back as life" (S.lifeOf S.alice after) (Just 23)
+    Spec.assertEqWith s "one trigger was gathered" (length (GameState.stack dealt)) 1
+
 -- alice is mid-combat attacking with `mine`; bob defends holding `spells` and
 -- `lands` untapped Plains that pay for them. Sits at the declare attackers step
 -- like every combatBoardOf board, so the ENGINE declares the attack and the
@@ -4088,6 +4171,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   moonmistSpec s registry
   selflessSquireSpec s registry
   phyrexianVindicatorSpec s registry
+  samiteMinistrationSpec s registry
   turnTheTablesSpec s registry
   oraclesAttendantsSpec s registry
   gatherSpecimensSpec s registry

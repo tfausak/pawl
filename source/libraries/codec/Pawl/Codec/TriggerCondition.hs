@@ -79,7 +79,7 @@ codec =
       Arm.nullary "HauntedCreatureDies" TriggerCondition.HauntedCreatureDies,
       Arm.payload "SpellOrAbilityCounters" PlayerRelation.codec TriggerCondition.SpellOrAbilityCounters (\x -> case x of TriggerCondition.SpellOrAbilityCounters y -> Just y; _ -> Nothing),
       Arm.payload "DamageToPlayerPrevented" PlayerRelation.codec TriggerCondition.DamageToPlayerPrevented (\x -> case x of TriggerCondition.DamageToPlayerPrevented y -> Just y; _ -> Nothing),
-      Arm.nullary "SelfPreventsDamage" TriggerCondition.SelfPreventsDamage,
+      Arm.payload "SelfPreventsDamage" filterCodec TriggerCondition.SelfPreventsDamage (\x -> case x of TriggerCondition.SelfPreventsDamage y -> Just y; _ -> Nothing),
       Arm.payload "PlayerGainsLife" PlayerRelation.codec TriggerCondition.PlayerGainsLife (\x -> case x of TriggerCondition.PlayerGainsLife y -> Just y; _ -> Nothing),
       Arm.payload "PlayerLosesLife" PlayerRelation.codec TriggerCondition.PlayerLosesLife (\x -> case x of TriggerCondition.PlayerLosesLife y -> Just y; _ -> Nothing),
       Arm.payload "SelfCountersReached" SelfCountersReached.codec TriggerCondition.SelfCountersReached (\x -> case x of TriggerCondition.SelfCountersReached y -> Just y; _ -> Nothing),
