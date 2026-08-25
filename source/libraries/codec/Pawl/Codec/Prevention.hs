@@ -3,6 +3,7 @@
 module Pawl.Codec.Prevention where
 
 import qualified Pawl.Codec.CandidateId as CandidateId
+import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PreventionRider as PreventionRider
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -20,12 +21,14 @@ import qualified Pawl.Types.Prevention as Prevention
 codec :: Codec.Codec Prevention.Prevention
 codec = Fields.object $ do
   by <- Fields.required "by" CandidateId.codec Prevention.by
+  source <- Fields.required "source" ObjectId.codec Prevention.source
   recipient <- Fields.required "recipient" Recipient.codec Prevention.recipient
   amount <- Fields.required "amount" Common.natural Prevention.amount
   rider <- Fields.required "rider" (Common.maybe PreventionRider.codec) Prevention.rider
   pure
     Prevention.MkPrevention
       { Prevention.by = by,
+        Prevention.source = source,
         Prevention.recipient = recipient,
         Prevention.amount = amount,
         Prevention.rider = rider

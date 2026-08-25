@@ -14,7 +14,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DamagePrevented" $ do
   -- CR 615.1 / 615.13: which prevention effect stopped it, how much it stopped,
-  -- and who the damage was headed for.
+  -- who the damage was headed for, and what would have dealt it.
   Spec.it s "MkDamagePrevented, every key" $
     Common.assertCodec
       s
@@ -26,9 +26,10 @@ spec s = Spec.describe s "Pawl.Codec.DamagePrevented" $ do
                   { FloatingCandidate.source = ObjectId.MkObjectId 7,
                     FloatingCandidate.timestamp = Timestamp.MkTimestamp 2
                   },
+            DamagePrevented.source = ObjectId.MkObjectId 13,
             DamagePrevented.recipient = Recipient.ToPlayer (PlayerId.MkPlayerId 0),
             DamagePrevented.amount = 3
           }
       )
-      " {\"by\":{\"type\":\"OfFloating\",\"value\":{\"source\":7,\"timestamp\":2}},\"recipient\":{\"type\":\"ToPlayer\",\"value\":0},\"amount\":3} "
+      " {\"by\":{\"type\":\"OfFloating\",\"value\":{\"source\":7,\"timestamp\":2}},\"source\":13,\"recipient\":{\"type\":\"ToPlayer\",\"value\":0},\"amount\":3} "
   Spec.it s "has a schema" $ Common.assertHasSchema s DamagePrevented.codec

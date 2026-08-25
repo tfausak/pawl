@@ -3,6 +3,7 @@
 module Pawl.Codec.DamagePrevented where
 
 import qualified Pawl.Codec.CandidateId as CandidateId
+import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -15,11 +16,13 @@ import qualified Pawl.Types.DamagePrevented as DamagePrevented
 codec :: Codec.Codec DamagePrevented.DamagePrevented
 codec = Fields.object $ do
   by <- Fields.required "by" CandidateId.codec DamagePrevented.by
+  source <- Fields.required "source" ObjectId.codec DamagePrevented.source
   recipient <- Fields.required "recipient" Recipient.codec DamagePrevented.recipient
   amount <- Fields.required "amount" Common.natural DamagePrevented.amount
   pure
     DamagePrevented.MkDamagePrevented
       { DamagePrevented.by = by,
+        DamagePrevented.source = source,
         DamagePrevented.recipient = recipient,
         DamagePrevented.amount = amount
       }
