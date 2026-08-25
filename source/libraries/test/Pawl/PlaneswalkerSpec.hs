@@ -18,12 +18,16 @@
 -- of combat damage one counter-removal record, and combat is the only producer of
 -- a batch with two damage events in it.
 --
--- Three cards carry it. Nissa, Steward of Elements -- {X}{G}{U} Legendary
+-- A group per planeswalker, each group's card named in its own comment. Nissa,
+-- Steward of Elements -- {X}{G}{U} Legendary
 -- Planeswalker -- Nissa, whose lower right corner prints CR 107.3's X -- is the
 -- VariableLoyalty group's alone, where CR 107.3m decides what that X is worth.
 -- Chandra, Fire Artisan -- {2}{R}{R} Legendary Planeswalker -- Chandra, printed
 -- loyalty 4 -- is the CountersRemoved group's alone, where CR 606.4's cost and CR
 -- 306.8's damage are read as EVENTS rather than as writes.
+-- Grist, the Hunger Tide -- {1}{B}{G} Legendary Planeswalker -- Grist, printed
+-- loyalty 3 -- is the GristLoyalty group's, where a loyalty ability's EFFECT is
+-- what is read rather than its cost or the permanent's counters.
 -- Jace Beleren is the rest: {1}{U}{U} Legendary Planeswalker -- Jace, with
 -- printed loyalty 3 and three loyalty abilities (+2, -1, -10). Its -10 is what
 -- makes CR 606.6 observable at 3 loyalty, and three -1s across three of alice's
@@ -56,6 +60,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
@@ -75,6 +80,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
@@ -816,3 +822,173 @@ variableLoyaltySpec s registry = Spec.describe s "VariableLoyalty" $ do
     Spec.assertBool s (all (Set.member CardType.Land . PC.cardTypes) animated) "they're still lands"
     Spec.assertBool s (all (Set.member Subtype.Elemental . PC.subtypes) animated) "each is an Elemental"
     Spec.assertBool s (all (\pc -> Map.member Keyword.Flying (PC.keywords pc) && Map.member Keyword.Haste (PC.keywords pc)) animated) "with flying and haste"
+
+-- Grist, the Hunger Tide's abilities in the order the card file carries them: the
+-- -2 then the -5. Indexed for the reason Jace's are. The printed +1 has no index
+-- because pawl's Grist does not carry it (#1932).
+minusTwo, minusFive :: Int
+minusTwo = 0
+minusFive = 1
+
+-- Grist on the battlefield under alice's control with this many loyalty counters.
+-- PLACED and not cast, unlike jaceOnBattlefield: no case below is about CR 306.5b,
+-- and the -5 needs more loyalty than the printed 3 -- the +1 that would climb
+-- there is the half of the card pawl cannot write (#1932). The -5 case is the one
+-- whose loyalty is not the printed 3, so it asserts the six the fixture put on
+-- before reading what the cost took off; the -2 boards keep the printed number.
+gristWith :: Natural -> Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+gristWith loyalty grist gs =
+  let (oid, placed) = S.addCreature grist S.alice gs
+   in (oid, S.addCounter CounterKind.Loyalty loyalty oid placed)
+
+-- useAbility with an answerer of the caller's choosing, which the -2 needs: its CR
+-- 118.12 gate and the reflexive ability's target are both real choices here.
+useGristAbility ::
+  (forall r. Prompt.Prompt r -> r) ->
+  Int ->
+  Printing.Printing ->
+  ObjectId.ObjectId ->
+  GameState.GameState ->
+  GameState.GameState
+useGristAbility answer i p oid gs = case abilityAt i p of
+  ability : _ -> S.runPure answer gs (do Activate.activateAbility S.alice oid ability; Stack.resolveTop)
+  [] -> gs
+
+-- `decision` for the -2's CR 118.12 gate, and a target chosen by PREFERENCE over
+-- the set the engine offered -- aimedAt's posture with a ranking instead of one
+-- id, so a case can ask for a permanent it expects the pool to withhold and find
+-- out. Filtering the offered set rather than building a Recipient is what keeps
+-- CR 608.2b's re-read from dropping the choice.
+--
+-- The whole offered set follows as a fallback, which keeps the answerer total; a
+-- board offering none of `prefer` then targets whatever the pool's Ord puts first,
+-- and the case's own assertions are what catch it.
+gristAnswer :: PaymentDecision.PaymentDecision -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+gristAnswer decision prefer p = case p of
+  Prompt.ChooseToPay {} -> decision
+  Prompt.ChooseTargets _ _ _ sets ->
+    let ranked candidates = concatMap (\oid -> filter (\r -> Recipient.objectOf r == Just oid) (Set.toList candidates)) prefer
+        naming (n, candidates) =
+          Set.fromList
+            . take (Natural.toIntSaturating n)
+            $ ranked candidates <> Set.toList candidates
+     in fmap naming sets
+  _ -> S.identityAnswer p
+
+-- alice holds Grist at 3 loyalty and ONE Goblin Piker; bob holds Jace Beleren at 3
+-- loyalty, a Villainous Ogre and a Mountain. Returned as
+-- (Grist, alice's Piker, bob's Jace, bob's Mountain).
+--
+-- One creature for alice because CR 118.12's cost then has exactly its count of
+-- candidates and Pawl.Types.Prompt.ChooseSacrifices is elided -- there is nothing
+-- to choose. Grist is not among them: its "as long as Grist isn't on the
+-- battlefield" ability (CR 113.6c) is switched off exactly here.
+--
+-- The reflexive ability's slot then has more candidates than its count of one --
+-- bob's Ogre and his Jace, and Grist itself, which is a planeswalker on the
+-- battlefield and so a legal choice for its own ability -- so a prompt offered
+-- exactly its count cannot short-circuit. The Mountain is the permanent the slot
+-- must NOT offer, which is how "creature or planeswalker" is read as a
+-- restriction rather than assumed.
+gristMinusTwoBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+gristMinusTwoBoard grist piker jace ogre mountain =
+  let (pikerId, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+      (jaceId, withJace) = S.addCreature jace S.bob withPiker
+      loyal = S.addCounter CounterKind.Loyalty 3 jaceId withJace
+      (_, withOgre) = S.addCreature ogre S.bob loyal
+      (mountainId, withMountain) = S.addCreature mountain S.bob withOgre
+      (gristId, board) = gristWith 3 grist withMountain
+   in (gristId, pikerId, jaceId, mountainId, board)
+
+-- Grist, the Hunger Tide -- {1}{B}{G} Legendary Planeswalker -- Grist, printed
+-- loyalty 3 (Oracle text fetched from Scryfall 2026-08-25) -- carries two of its
+-- three loyalty abilities here:
+--
+--   -2: "You may sacrifice a creature. When you do, destroy target creature or
+--       planeswalker."
+--   -5: "Each opponent loses life equal to the number of creature cards in your
+--       graveyard."
+--
+-- Not implemented: the +1, "create a 1/1 black and green Insect creature token,
+-- then mill a card. If an Insect card was milled this way, put a loyalty counter
+-- on Grist and repeat this process" -- the repeat is a loop the effect DSL has no
+-- shape for (#1932). That leaves pawl's Grist STRICTER than printed.
+--
+-- The -2 is a CR 603.12 reflexive trigger whose armed ability targets a
+-- PERMANENT; Pawl.CastSpec's FugitiveDoctor group reads the shape against a card
+-- in a graveyard. The -5 is read at three seats, which is what separates
+-- "each opponent" from "each player" and from "target opponent" at once.
+gristLoyaltySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
+  -- Three graveyards, no two of which agree. alice's holds three creature cards
+  -- and two Lightning Bolts, bob's four creature cards and carol's one -- so
+  -- "creature cards in your graveyard" is 3, "cards in your graveyard" is 5, and
+  -- "creature cards in every graveyard" is 8. Only the first lands on 17.
+  Spec.it s "CR 606.4 the -5 takes each opponent for the creature cards in alice's graveyard alone" $ do
+    grist <- S.printingOf s registry "Grist, the Hunger Tide"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let bury n printing pid gs = List.foldl' (\g _ -> snd (S.addGraveyardCard printing pid g)) gs [1 :: Int .. n]
+        stocked =
+          bury 1 piker S.carol
+            . bury 4 piker S.bob
+            . bury 2 bolt S.alice
+            $ bury 3 piker S.alice S.threePlayerGame
+        (gristId, board) = gristWith 6 grist stocked
+        after = useGristAbility S.identityAnswer minusFive grist gristId board
+    Spec.assertEqWith
+      s
+      "both opponents lost three and alice lost nothing"
+      (S.lifeOf S.alice after, S.lifeOf S.bob after, S.lifeOf S.carol after)
+      (Just 20, Just 17, Just 17)
+    Spec.assertEqWith s "the fixture's six loyalty" (S.counterOf CounterKind.Loyalty gristId board) 6
+    Spec.assertEqWith s "CR 606.4: five of them came off" (S.counterOf CounterKind.Loyalty gristId after) 1
+
+  -- The answerer PREFERS the Mountain and settles for the Jace. So a slot that
+  -- offered every permanent would destroy the land and leave the planeswalker
+  -- standing, which is the reading this case rules out; and one that offered only
+  -- creatures would leave the Jace standing too.
+  Spec.it s "CR 603.12 / 701.8a the -2's reflexive trigger destroys the planeswalker it targets, and no land is offered" $ do
+    grist <- S.printingOf s registry "Grist, the Hunger Tide"
+    piker <- S.printingOf s registry "Goblin Piker"
+    jace <- S.printingOf s registry "Jace Beleren"
+    ogre <- S.printingOf s registry "Villainous Ogre"
+    mountain <- S.printingOf s registry "Mountain"
+    let (gristId, pikerId, jaceId, mountainId, board) = gristMinusTwoBoard grist piker jace ogre mountain
+        answer :: Prompt.Prompt r -> r
+        answer = gristAnswer PaymentDecision.Pays [mountainId, jaceId]
+        after = firedTrigger answer (useGristAbility answer minusTwo grist gristId board)
+    Spec.assertEqWith
+      s
+      "the Jace died and the Mountain the answerer asked for first did not"
+      (S.onBattlefield jaceId after, S.onBattlefield mountainId after)
+      (False, True)
+    Spec.assertEqWith s "CR 701.8a: into its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertBool s (not (S.onBattlefield pikerId after)) "CR 701.21a: alice's own creature paid for it"
+    Spec.assertEqWith s "CR 606.4: two of the three loyalty came off" (S.counterOf CounterKind.Loyalty gristId after) 1
+
+  -- The pair. One thing differs -- alice declines CR 118.12's optional cost -- so
+  -- the same board, the same seats and the same answerer for every other prompt.
+  Spec.it s "CR 118.12 declining the -2's sacrifice arms nothing and destroys nothing" $ do
+    grist <- S.printingOf s registry "Grist, the Hunger Tide"
+    piker <- S.printingOf s registry "Goblin Piker"
+    jace <- S.printingOf s registry "Jace Beleren"
+    ogre <- S.printingOf s registry "Villainous Ogre"
+    mountain <- S.printingOf s registry "Mountain"
+    let (gristId, pikerId, jaceId, mountainId, board) = gristMinusTwoBoard grist piker jace ogre mountain
+        answer :: Prompt.Prompt r -> r
+        answer = gristAnswer PaymentDecision.Declines [mountainId, jaceId]
+        after = firedTrigger answer (useGristAbility answer minusTwo grist gristId board)
+    Spec.assertEqWith
+      s
+      "the Jace the paying board destroyed is untouched, and so is alice's creature"
+      (S.onBattlefield jaceId after, S.onBattlefield pikerId after)
+      (True, True)
+    Spec.assertEqWith s "bob's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
+    Spec.assertEqWith s "CR 606.4: the loyalty cost was paid either way" (S.counterOf CounterKind.Loyalty gristId after) 1
