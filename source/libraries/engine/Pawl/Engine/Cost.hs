@@ -677,7 +677,7 @@ announce subject spending pid oid total_ cost = case Cost.mana cost of
     -- The claims are read here rather than inside Mana.announce, which cannot
     -- reach claimOf -- this module imports that one, not the other way about.
     gs <- State.get
-    (announced, life, paidWithLife) <- Mana.announce subject (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) spending pid oid total_ (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost
+    (announced, life, paidWithLife) <- Mana.announce subject (manaActivationsGiven (PlayerEffect.applying pid gs)) spending pid oid total_ (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost
     pure
       ( cost
           { Cost.mana = Just announced,
@@ -1243,7 +1243,7 @@ canPay pid oid cost gs = case Cost.mana cost of
     -- resolution-time payment -- so the mana is spent as it is, and CR
     -- 106.6-restricted mana is no supply for any of them: neither of CR 106.6's
     -- two subjects is one of these payments (ForNeither).
-    Mana.canPayCommitting PaymentSubject.ForNeither (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) ManaSpending.AsProduced pid (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost gs
+    Mana.canPayCommitting PaymentSubject.ForNeither (manaActivationsGiven (PlayerEffect.applying pid gs)) ManaSpending.AsProduced pid (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost gs
       && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
       && jointlyPayable pid oid (Cost.components cost) gs
 
@@ -1283,7 +1283,7 @@ canPay pid oid cost gs = case Cost.mana cost of
 -- rules charge {2} for. `manaActivationAdjustments` is the gather, and
 -- Cost.tapForManaWith charges the same total off the same one.
 manaActivations :: Mana.Capacity
-manaActivations measure pcs pid oid cost restrictions gs = manaActivationsGiven (PlayerEffect.applyingTo pid gs) measure pcs pid oid cost restrictions gs
+manaActivations measure pcs pid oid cost restrictions gs = manaActivationsGiven (PlayerEffect.applying pid gs) measure pcs pid oid cost restrictions gs
 
 -- The same capacity given the player effects the CALLER has already gathered.
 -- `manaActivationAdjustments` is a walk of everything in play asking each what
@@ -1296,10 +1296,13 @@ manaActivations measure pcs pid oid cost restrictions gs = manaActivationsGiven 
 -- PARTIALLY APPLIED, which is the whole of the hoist: one closure carrying one
 -- thunk, so every route the sweep under it measures shares the one walk.
 --
--- IT MUST BE `PlayerEffect.applyingTo pid gs`'s OWN ANSWER for the pid and the
+-- IT MUST BE `PlayerEffect.applying pid gs`'s OWN ANSWER for the pid and the
 -- board this is then called with, exactly as `pcs` must be that board's
 -- projection; the wrapper above is what a caller with no list of its own uses.
-manaActivationsGiven :: [PlayerEffect.Type.PlayerEffect] -> Mana.Capacity
+--
+-- Each row carries the SOURCE that printed it, which the gather under this needs
+-- and no reader here reads: see Pawl.Engine.PlayerEffect.matchesObjectFrom.
+manaActivationsGiven :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> Mana.Capacity
 manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
   let adjustments = manaActivationAdjustmentsGiven effects oid gs
       -- The COMPONENT half of CR 601.2f, applied here so every conjunct below
@@ -1358,10 +1361,10 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
 -- elided, and CR 605.1a is the argument: a keyword-granted ability that adds
 -- mana would have to move no card to or from a library, which cycling does.
 manaActivationAdjustments :: PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
-manaActivationAdjustments pid oid gs = manaActivationAdjustmentsGiven (PlayerEffect.applyingTo pid gs) oid gs
+manaActivationAdjustments pid oid gs = manaActivationAdjustmentsGiven (PlayerEffect.applying pid gs) oid gs
 
 -- The same gather off a hoisted effect list; see manaActivationsGiven.
-manaActivationAdjustmentsGiven :: [PlayerEffect.Type.PlayerEffect] -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
+manaActivationAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
 manaActivationAdjustmentsGiven effects = PlayerEffect.activationCostAdjustmentsGiven effects Nothing
 
 -- CR 118.3 asked of a mana ability's own MANA part, and the one read
@@ -1378,7 +1381,7 @@ manaActivationAdjustmentsGiven effects = PlayerEffect.activationCostAdjustmentsG
 -- reduction's hybrid halves (CR 118.7e) and the order of several reductions are
 -- the payer's, unmade at this moment, so a cost this refuses has to be one NO
 -- resolution could have paid.
-manaPartPayable :: [PlayerEffect.Type.PlayerEffect] -> CostAdjustments.CostAdjustments -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
+manaPartPayable :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> CostAdjustments.CostAdjustments -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
 manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost []) -> True
@@ -1529,7 +1532,7 @@ canPaySomeCompletion subject spending pid oid total_ cost gs =
 -- else. It is NOT the list a payability GATE is judged against; that one is
 -- supplyManaSourcesGiven below, and NEITHER contains the other -- see there.
 activationManaSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
-activationManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) grants pcs pid gs
+activationManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (manaActivationsGiven (PlayerEffect.applying pid gs)) grants pcs pid gs
 
 -- The mana sources a payability GATE is judged against -- the same sweep under
 -- Mana.supplyCapacity, which is the invariant Mana.payableResolutionsGiven
@@ -1548,7 +1551,7 @@ activationManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (manaActiva
 --     602.2a puts on the stack BEFORE its cost is paid, which closes CR 307.5's
 --     window. Grinning Ignus in that window is an offer that is no supply.
 supplyManaSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
-supplyManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (Mana.supplyCapacity (stackedManaActivations (PlayerEffect.applyingTo pid gs))) grants pcs pid gs
+supplyManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (Mana.supplyCapacity (stackedManaActivations (PlayerEffect.applying pid gs))) grants pcs pid gs
 
 -- `manaActivationsGiven` narrowed to the routes a payment made AFTER its object
 -- reached the stack may take -- which is every cast (CR 601.2a) and every
@@ -1573,7 +1576,7 @@ supplyManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (Mana.supplyCap
 -- run with the object already on the stack, so ActivationRestriction.restrictionsOk
 -- reads the real stack there and refuses the same routes. The gate and the
 -- payment agree because this function states exactly the move between them.
-stackedManaActivations :: [PlayerEffect.Type.PlayerEffect] -> Mana.Capacity
+stackedManaActivations :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> Mana.Capacity
 stackedManaActivations effects measure pcs pid oid cost restrictions gs =
   if any ActivationRestriction.needsEmptyStack restrictions
     then Mana.noActivations
@@ -1609,7 +1612,7 @@ canPaySomeCompletionGiven subject spending sources pcs pid oid total_ cost gs = 
         -- Ignus, Lavinia and Synthetic Ember Spring carry the pool's three riders
         -- on a mana ability and each has one route, while Gemstone Caverns,
         -- Muraganda Raceway and Phyrexian Tower have two routes and no rider.
-        hoisted = stackedManaActivations (PlayerEffect.applyingTo pid gs)
+        hoisted = stackedManaActivations (PlayerEffect.applying pid gs)
         payable (completed, life) =
           any
             (\totalled -> Mana.canPayCommittingGiven subject hoisted spending sources pcs pid (outside + life) claimed totalled gs)
@@ -2115,7 +2118,7 @@ payManaExcept inFlight subject spending pid cost = do
     -- permission the cast carried in, so a Celestial Dawn that leaves
     -- mid-payment stops applying (CR 604.2) -- the opposite of `spending`, which
     -- rule 118.14 fixes when the cast was permitted.
-    settlement gs = Mana.spend (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) spending pid cost gs)) cost (Mana.Type.MkMana (fst (Mana.spendableFor subject pid gs)))
+    settlement gs = Mana.spend (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (manaActivationsGiven (PlayerEffect.applying pid gs)) spending pid cost gs)) cost (Mana.Type.MkMana (fst (Mana.spendableFor subject pid gs)))
     window refused = do
       gs <- State.get
       let covered = Maybe.isJust (settlement gs)
@@ -2129,10 +2132,10 @@ payManaExcept inFlight subject spending pid cost = do
           --
           -- The capacity is taken on the board of the PASS rather than once for
           -- the payment: a tap changes the board, and
-          -- Pawl.Engine.PlayerEffect.applyingTo is a function of it. `pid` is the
+          -- Pawl.Engine.PlayerEffect.applying is a function of it. `pid` is the
           -- payer, and manaSourcesGiven offers only what that player controls, so
           -- the capacity's own `pid` is this one.
-          windowCapacity = manaActivationsGiven (PlayerEffect.applyingTo pid gs)
+          windowCapacity = manaActivationsGiven (PlayerEffect.applying pid gs)
           offered = filter (`Set.notMember` inFlight) (Mana.manaSourcesGiven windowCapacity (Projection.controlGrants gs) pcs pid gs)
       case filter (`Set.notMember` refused) offered of
         [] -> settle
@@ -2156,7 +2159,7 @@ payManaExcept inFlight subject spending pid cost = do
       -- the pool goes back beside what it leaves (CR 106.4 -- unspent mana stays
       -- unspent, it does not vanish because one cost could not use it).
       let (available, withheld) = Mana.spendableFor subject pid gs
-      case Mana.plan (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (manaActivationsGiven (PlayerEffect.applyingTo pid gs)) spending pid cost gs)) cost (Mana.Type.MkMana available) of
+      case Mana.plan (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (manaActivationsGiven (PlayerEffect.applying pid gs)) spending pid cost gs)) cost (Mana.Type.MkMana available) of
         Nothing -> pure False
         Just (steps, life) -> do
           (Mana.Type.MkMana left, spent) <- Mana.spendChosen pid (PlayerEffect.spendManaAsThough pid gs) steps (Mana.Type.MkMana available)
@@ -2255,7 +2258,7 @@ tapForManaWith inFlight oid = do
           -- ONE gather of the player's effects for every option this permanent
           -- offers, rather than one per option: `manaActivations` would take its
           -- own, and that walk is the shape #1073 was about.
-          capacity = manaActivationsGiven (PlayerEffect.applyingTo controller gs)
+          capacity = manaActivationsGiven (PlayerEffect.applying controller gs)
       case filter (\option -> Activations.times (capacity Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) gs) > 0) (Mana.manaOptionsOf oid gs) of
         [] -> pure False
         first : rest -> do

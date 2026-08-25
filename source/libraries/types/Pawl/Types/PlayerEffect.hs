@@ -5,6 +5,7 @@ import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaFilter as ManaFilter
@@ -62,6 +63,17 @@ data PlayerEffect
   | -- | CR 613.11 / 601.2f / Thalia: matching spells cost this much more generic
     -- mana to cast.
     IncreaseSpellCost IncreaseSpellCost.IncreaseSpellCost
+  | -- | CR 613.11 / 601.2f / Oppressive Rays: the activated abilities of matching
+    -- permanents cost this much more generic mana to activate, which CR 602.2b
+    -- makes an activation cost's rule as much as a spell's.
+    --
+    -- A SEPARATE constructor from IncreaseSpellCost for the reason
+    -- ReduceActivationCost is separate from ReduceSpellCost, stated in full
+    -- below: the Filter classifies an OBJECT, so nothing in it can say "and it
+    -- is a spell", which leaves the MOMENT an arm is asked at the constructor's
+    -- to say. Thalia does not tax an activation, and Oppressive Rays does not
+    -- tax a spell.
+    IncreaseActivationCost IncreaseActivationCost.IncreaseActivationCost
   | -- | CR 613.11 / 601.2f / Sapphire Medallion, Edgewalker: matching spells cost
     -- this much less to cast.
     --
@@ -122,9 +134,9 @@ data PlayerEffect
     -- why a floor never raises a cost, and why the two kinds cannot share one
     -- floor over the pool.
     --
-    -- Not implemented: nothing INCREASES an activation cost (Suppression Field),
-    -- which would be this arm's sibling and needs the "unless they're mana
-    -- abilities" rider besides (#1242).
+    -- IncreaseActivationCost above is this arm's sibling. Not implemented:
+    -- narrowing either of them by the KIND of ability, which Suppression Field's
+    -- "unless they're mana abilities" needs (#1431).
     ReduceActivationCost ReduceActivationCost.ReduceActivationCost
   | -- | CR 613.11 / 601.2f / Brutal Suppression: the activated abilities of
     -- matching permanents cost these additional NON-MANA components to activate

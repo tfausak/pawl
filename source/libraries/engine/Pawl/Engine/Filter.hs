@@ -652,11 +652,14 @@ data Context = MkContext
     -- is the same read in the other direction, per candidate.
     --
     -- Supplied by the caller for sourcePower's reason -- this module holds no game
-    -- state and cannot read an object's attachment -- and by four:
+    -- state and cannot read an object's attachment -- and by five:
     -- Pawl.Engine.Projection.conditionHolds for CR 604.2's "as long as" clause,
     -- Pawl.Engine.Event.interveningHolds for CR 603.4's "if" clause,
-    -- Pawl.Engine.Stack for CR 608.2a's re-check of that same clause, and
-    -- Pawl.Engine.Resolve.objectRefObjects for an effect naming the host.
+    -- Pawl.Engine.Stack for CR 608.2a's re-check of that same clause,
+    -- Pawl.Engine.Resolve.objectRefObjects for an effect naming the host, and
+    -- Pawl.Engine.PlayerEffect.matchesObjectFrom for a printed player ability's
+    -- own criterion (Oppressive Rays), which takes it off the row
+    -- Pawl.Engine.PlayerEffect.applying returns.
     --
     -- No laziness ARGUMENT, unlike sourcePower and defendingPlayer: filling it is a
     -- map lookup and a Recipient read (Pawl.Engine.Projection.hostOf), with no
@@ -705,9 +708,10 @@ data Context = MkContext
 -- provoke; Pawl.CardSpec's lints keep all three out of card data, so no other
 -- position can read the Nothings this leaves.
 --
--- CR 303.4b's host atom is the second one a CARD may write (Ray of Frost), and it
--- reads a Nothing here in every position but the four that supply it -- see
--- sourceAttachedTo above for the list and for the lint that keeps a card to it.
+-- CR 303.4b's host atom is the second one a CARD may write (Ray of Frost,
+-- Oppressive Rays), and it reads a Nothing here in every position but the ones
+-- that supply it -- see sourceAttachedTo above for the list and for the lint that
+-- keeps a card to it.
 --
 -- CR 119.5's recipient atom is the one a CARD may write (Biorhythm), so the
 -- Nothing it leaves here is reachable: a card naming "they control" outside a
