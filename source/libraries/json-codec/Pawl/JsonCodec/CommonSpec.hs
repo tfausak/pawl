@@ -201,6 +201,15 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
         (Either.isLeft (Codec.decode (Common.nonEmpty Common.integer) =<< Common.parse (Text.pack "[]")))
         "expected a decode failure"
 
+  Spec.describe s "nonEmptyKeyedList" $ do
+    Spec.it s "round trips" $
+      Common.assertCodec s (Common.nonEmptyKeyedList (Common.keyValue Common.integer Common.integer)) (Map.fromList [(1, 2)]) "[{\"key\":1,\"value\":2}]"
+    Spec.it s "rejects an empty array" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Codec.decode (Common.nonEmptyKeyedList (Common.keyValue Common.integer Common.integer)) =<< Common.parse (Text.pack "[]")))
+        "expected a decode failure"
+
   Spec.describe s "multiset" $ do
     -- ONE entry per key, ascending, and the counts are given DESCENDING here so
     -- an encoder that emitted the map in traversal order would fail.

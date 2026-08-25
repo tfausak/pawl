@@ -433,6 +433,22 @@ keyedList c =
       Codec.schema = Schema.array <$> Codec.schema c
     }
 
+-- | 'keyedList', but the empty map is a decode failure rather than a value that
+-- does nothing -- 'nonEmpty''s posture, and 'Schema.nonEmptyArray' says the same
+-- thing. Pawl.Codec.WithCounters is the caller: a row placing no counters at all
+-- is not a sentence any card prints.
+nonEmptyKeyedList :: (Ord k) => Codec.Codec (k, v) -> Codec.Codec (Map.Map k v)
+nonEmptyKeyedList c =
+  Codec.MkCodec
+    { Codec.encode = Codec.encode (keyedList c),
+      Codec.decode = \value -> do
+        m <- Codec.decode (keyedList c) value
+        if Map.null m
+          then Left $ Text.pack "expected a non-empty array"
+          else pure m,
+      Codec.schema = Schema.nonEmptyArray <$> Codec.schema c
+    }
+
 -- | A name-keyed map, on the wire as a JSON OBJECT keyed by the name, ascending
 -- by key -- which is canonical and byte-stable because 'Object.Object' is a LIST
 -- OF PAIRS rather than a map, so the order written is the order rendered

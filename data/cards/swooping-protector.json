@@ -39,15 +39,17 @@
               },
               "rewrite": {
                 "type": "WithCounters",
-                "value": {
-                  "amount": {
-                    "type": "Literal",
-                    "value": 1
-                  },
-                  "kind": {
-                    "type": "Shield"
+                "value": [
+                  {
+                    "count": {
+                      "type": "Literal",
+                      "value": 1
+                    },
+                    "kind": {
+                      "type": "Shield"
+                    }
                   }
-                }
+                ]
               }
             }
           }

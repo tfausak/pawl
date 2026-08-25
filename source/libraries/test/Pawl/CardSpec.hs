@@ -3514,7 +3514,8 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- of creature cards in all graveyards"), so a Count inside it holds card text on
   -- the same axis EntryRiders' counts do -- riderFilters walks those, and this
   -- walks this.
-  EntryRewrite.WithCounters w -> quantityFilters (WithCounters.amount w)
+  -- EVERY kind's amount, since the row carries a map of them (#2314).
+  EntryRewrite.WithCounters w -> foldMap quantityFilters (Map.elems (WithCounters.counters w))
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.Riot -> []
   EntryRewrite.Unleash -> []
@@ -3539,7 +3540,7 @@ turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
   -- entryRewriteFilters' WithCounters arm, on the rewrite that shares the payload.
   -- Vacuous over `data/cards/` while the CR 702.37b lint below holds, and walked
   -- anyway so the two halves of one payload cannot be swept differently.
-  TurnUpRewrite.WithCounters w -> quantityFilters (WithCounters.amount w)
+  TurnUpRewrite.WithCounters w -> foldMap quantityFilters (Map.elems (WithCounters.counters w))
   TurnUpRewrite.MayAttachTo f -> [f]
 
 -- CR 614.1c-e: four replacement patterns narrow by a Filter. CounterPattern.onWhat

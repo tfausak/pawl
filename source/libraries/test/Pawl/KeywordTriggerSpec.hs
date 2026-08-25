@@ -3638,7 +3638,7 @@ vanishingSpec s registry =
             s
             "and two entry rewrites of two time counters each, which is what makes them add up"
             (Keyword.mintedReplacementsFor (Keyword.Type.Vanishing (Just 2)) 2)
-            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time (Quantity.Type.Literal 2))))))
+            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.Time (Quantity.Type.Literal 2))))))
 
 -- CR 702.63b, vanishing printed with NO number: the two triggers and no entry
 -- replacement at all. Tidewalker {2}{U} Creature -- Elemental */* is the card --
@@ -3846,7 +3846,7 @@ fadingSpec s registry =
             s
             "and two entry rewrites of two FADE counters each, never rule 702.63a's time counters"
             (Keyword.mintedReplacementsFor (Keyword.Type.Fading 2) 2)
-            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Fade (Quantity.Type.Literal 2))))))
+            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.Fade (Quantity.Type.Literal 2))))))
 
 -- CR 702.43 modular, whose rule text also spans BOTH of
 -- Pawl.Engine.Keyword's mints -- one CR 614.1c entry replacement and one death
@@ -4002,7 +4002,7 @@ modularSpec s registry =
             s
             "and two entry rewrites of two counters each, which is what makes them add up"
             (Keyword.mintedReplacementsFor (Keyword.Type.Modular 2) 2)
-            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 2))))))
+            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Type.Literal 2))))))
 
 -- CR 510.1b / 510.2's combat damage watched by a BYSTANDER rather than by the
 -- creature that dealt it -- TriggerCondition.PermanentDealsCombatDamageToPlayer,
