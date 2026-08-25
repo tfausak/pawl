@@ -2647,12 +2647,12 @@ redirectSources gs =
 -- Turn the Tables above with CR 609.7a's clause added, which is exactly the
 -- difference the rule makes: that redirection moves damage from EVERY source,
 -- this one only from the ONE object its controller chose when the effect was
--- created. Auriok Replica's chosenSource on the other side of CR 614.1 -- a
--- replacement rather than a prevention -- and the field this unit added.
+-- created. Auriok Replica carries the same field on CR 615.1's PREVENTION side;
+-- this is the same choice on CR 614.1's replacement side.
 --
 -- The chosen source is deliberately NOT the first candidate the prompt offers:
--- CR 609.7a's pool here is alice's Plains, the Attendants, the victim, the two
--- Pikers and the ability itself on the stack, sorted ascending, so an engine
+-- CR 609.7a's pool here holds alice's Plains, the Attendants, the victim and the
+-- two Pikers, sorted ascending, and the Plains was placed first -- so an engine
 -- that ignored the answer and took the head would watch the Plains and both
 -- damage assertions would read the other way round.
 --
