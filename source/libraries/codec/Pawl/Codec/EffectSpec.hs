@@ -79,6 +79,7 @@ import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
+import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
@@ -931,6 +932,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.EachMatching (Filter.HasDesignation Designation.Renowned))))
       " {\"type\":\"PutCounters\",\"value\":{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasDesignation\",\"value\":{\"type\":\"Renowned\"}}}}} "
+  -- CR 122.5: a third tag, not the other two in sequence -- the move is atomic
+  -- where the pair is not, so a card file must be able to say which it printed.
+  Spec.it s "MoveCounters" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.MoveCounters (MoveCounters.MkMoveCounters (SlotName.MkSlotName (Text.pack "self")) (SlotName.MkSlotName (Text.pack "became"))))
+      " {\"type\":\"MoveCounters\",\"value\":{\"from\":\"self\",\"to\":\"became\"}} "
   -- CR 122: PutCounters' mirror, and a distinct tag -- a signed amount under one
   -- tag would make the two indistinguishable in a card file.
   Spec.it s "RemoveCounters" $

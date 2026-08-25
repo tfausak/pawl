@@ -17,6 +17,7 @@ import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EntryOption as EntryOption
@@ -221,6 +222,22 @@ data Prompt r where
   -- ChooseBolster. ChooseBolster's posture, constructor argument and elision;
   -- not raised for zero, by CR 101.3 or CR 701.68b depending on the caller.
   ChooseBlight :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 122.5: which KIND of counter a move takes off the first object
+  -- (Agent's Toolkit's "move a counter from this artifact onto that creature").
+  -- The first ObjectId is the object the counter leaves, the second the object
+  -- it lands on; the NonEmpty is the kinds the first object actually HAS,
+  -- engine-pre-filtered, so every candidate offered can really be moved.
+  -- ChooseBolster's posture -- choose, not target; filtered rather than trusted;
+  -- raised only for two or more candidates. Not raised for zero, which is rule
+  -- 122.5's "the first object doesn't have the appropriate kind of counter on
+  -- it" and moves nothing at all.
+  --
+  -- Its own constructor rather than a reused one, for ChooseDamageSource's
+  -- reason: the candidate set is a different question, and Pawl.Engine.Replay's
+  -- transcript must not let one prompt's answer satisfy another. A +1\/+1
+  -- counter and a deathtouch counter are plainly distinguishable, so no elision
+  -- is available above one candidate.
+  ChooseMovedCounter :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> NonEmpty.NonEmpty (CounterKind.CounterKind Keyword.Keyword) -> Prompt (CounterKind.CounterKind Keyword.Keyword)
   -- | CR 107.14: how much {E} this player pays to an Effect.PayAnyEnergy, asked
   -- as the spell or ability RESOLVES (Harnessed Lightning). The ObjectId is the
   -- resolving object.

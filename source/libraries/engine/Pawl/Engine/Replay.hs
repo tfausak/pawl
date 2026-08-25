@@ -73,6 +73,7 @@ encode p answer = case p of
   Prompt.ChoosePaidEnergy {} -> Response.ChosePaidEnergy answer
   Prompt.ChooseReadAheadChapter {} -> Response.ChoseReadAheadChapter answer
   Prompt.ChooseDamageSource {} -> Response.ChoseDamageSource answer
+  Prompt.ChooseMovedCounter {} -> Response.ChoseMovedCounter answer
   Prompt.ChooseCardInGraveyard {} -> Response.ChoseCardInGraveyard answer
   Prompt.ChooseCardInHand {} -> Response.ChoseCardInHand answer
   Prompt.ChooseCardFromAmong {} -> Response.ChoseCardFromAmong answer
@@ -233,6 +234,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseDamageSource {} -> case response of
     Response.ChoseDamageSource oid -> Just oid
+    _ -> Nothing
+  Prompt.ChooseMovedCounter {} -> case response of
+    Response.ChoseMovedCounter kind -> Just kind
     _ -> Nothing
   Prompt.ChooseCardInGraveyard {} -> case response of
     Response.ChoseCardInGraveyard oid -> Just oid
@@ -537,6 +541,9 @@ defaultAnswer p = case p of
   -- CR 609.7a: the prompt is only raised with two or more sources matching the
   -- shield's printed properties, and every one of them is a legal choice.
   Prompt.ChooseDamageSource _ _ _ candidates -> NonEmpty.head candidates
+  -- CR 122.5: the prompt is only raised with two or more kinds actually on the
+  -- object the counter leaves, and every one of them is a legal choice.
+  Prompt.ChooseMovedCounter _ _ _ _ candidates -> NonEmpty.head candidates
   -- CR 608.2d: the prompt is only raised with two or more matching cards in the
   -- named graveyards, and every one of them is a legal choice.
   Prompt.ChooseCardInGraveyard _ _ _ candidates -> NonEmpty.head candidates

@@ -1395,7 +1395,7 @@ apply batch candidate event =
       -- counter, a deathtouch counter, and a shield counter" (#2314). CR 614.5
       -- gives a scaling replacement one opportunity over the whole entry, so a
       -- kind per row would put an ordering in CR 616.1's pool that the card's own
-      -- sentence does not have; Pawl.ReplacementSpec's Agent's Toolkit stand-in
+      -- sentence does not have; Pawl.ReplacementSpec's Agent's Toolkit case
       -- reads that off a board where the two orders disagree. The amounts are
       -- evaluated against the SAME board for the same reason: the row applies
       -- once, so its amounts are read once.

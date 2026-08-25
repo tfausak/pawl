@@ -6814,16 +6814,17 @@ perennationSpec s registry = Spec.describe s "Perennation (CR 614.5)" $ do
 -- pool, and one opportunity for a scaling replacement across every kind (#2314).
 -- A kind per row would put an ordering in that pool the sentence does not have.
 --
--- Synthetic Toolkit -- {1}{G}{U} Artifact, whole text: "this artifact enters with
--- a +1/+1 counter, a deathtouch counter, a flying counter, and a shield counter
--- on it" -- STANDS IN FOR Agent's Toolkit ({1}{G}{U} Artifact - Clue, NCC;
--- oracle checked on Scryfall 2026-08-25), whose entry line is exactly that and
--- whose second line, "whenever a creature you control enters, you may move a
--- counter from this artifact onto that creature", has no effect to write it with
--- (CR 122.5, gap #2316). Scryfall `o:/enters with .*counter.? and a .*counter/
--- -is:digital`, 2026-08-25, answers three printings and no more: that one,
--- Voidpouncer and Dust Animus, and the other two condition the clause on
--- something no EntryRewrite carries (gap #2317).
+-- Agent's Toolkit {1}{G}{U} Artifact - Clue (New Capenna Commander; name, cost,
+-- type line and oracle text checked against Scryfall 2026-08-25), whose entry
+-- line is "this artifact enters with a +1/+1 counter, a flying counter, a
+-- deathtouch counter, and a shield counter on it". Its other two lines are
+-- Pawl.MoveCounterSpec's -- CR 122.5's move, and the Clue line its sacrifice
+-- case spends.
+--
+-- Scryfall `o:/enters with .*counter.? and a .*counter/ -is:digital`,
+-- 2026-08-25, answers three printings and no more: this one, Voidpouncer and
+-- Dust Animus, and the other two condition the clause on something no
+-- EntryRewrite carries (gap #2317).
 --
 -- THE BOARD IS PERENNATION'S, and for its reasons: alice's Doubling Season and
 -- bob's Vorinclex are order-sensitive against each other (CR 616.1e), the counts
@@ -6833,8 +6834,8 @@ perennationSpec s registry = Spec.describe s "Perennation (CR 614.5)" $ do
 -- counters come from: here the entering permanent's own text (CR 614.1c), which
 -- is the half the multi-kind row is for.
 toolkitSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-toolkitSpec s registry = Spec.describe s "Synthetic Toolkit (CR 614.1c)" $ do
-  let toolkitName = CardName.MkCardName (Text.pack "Synthetic Toolkit")
+toolkitSpec s registry = Spec.describe s "Agent's Toolkit (CR 614.1c)" $ do
+  let toolkitName = CardName.MkCardName (Text.pack "Agent's Toolkit")
       -- All four kinds the row names, read off the permanent that entered.
       kindsOn oid gs =
         ( countersOn CounterKind.PlusOnePlusOne oid gs,
@@ -6848,7 +6849,7 @@ toolkitSpec s registry = Spec.describe s "Synthetic Toolkit (CR 614.1c)" $ do
         plains <- S.printingOf s registry "Plains"
         forest <- S.printingOf s registry "Forest"
         island <- S.printingOf s registry "Island"
-        toolkit <- S.printingOf s registry "Synthetic Toolkit"
+        toolkit <- S.printingOf s registry "Agent's Toolkit"
         doublingSeason <- S.printingOf s registry "Doubling Season"
         vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
         let bare = S.landsFor forest S.alice 1 (S.landsFor island S.alice 1 (S.landsInPlay plains 1))

@@ -159,6 +159,7 @@ manaProduced effect = case effect of
   Effect.Counter {} -> Nothing
   Effect.PutCounters {} -> Nothing
   Effect.RemoveCounters {} -> Nothing
+  Effect.MoveCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
   Effect.RemovePlayerCounters {} -> Nothing
   Effect.PayAnyEnergy _ -> Nothing
@@ -341,6 +342,7 @@ movesLibraryCard effect = case effect of
   Effect.Counter {} -> False
   Effect.PutCounters {} -> False
   Effect.RemoveCounters {} -> False
+  Effect.MoveCounters {} -> False
   Effect.GainPlayerCounters {} -> False
   Effect.RemovePlayerCounters {} -> False
   Effect.PayAnyEnergy _ -> False

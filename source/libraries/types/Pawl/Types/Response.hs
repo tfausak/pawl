@@ -13,6 +13,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
@@ -175,6 +176,11 @@ data Response
     -- of the counter-placing pools -- CR 609.7a's set spans the battlefield, the
     -- stack and the command zone, and is not scoped to the chooser at all.
     ChoseDamageSource ObjectId.ObjectId
+  | -- | CR 122.5: the KIND of counter a player chose to move off the first
+    -- object. Its own constructor for ChoseDamageSource's reason -- the answer
+    -- is not even an object, so no counter-placing response could stand in for
+    -- it.
+    ChoseMovedCounter (CounterKind.CounterKind Keyword.Keyword)
   | -- | CR 608.2d: the graveyard card a player chose for an
     -- Pawl.Types.ObjectRef.ChosenCardInGraveyard. One of these per chooser, so a
     -- transcript of Exhume resolving holds one for each stocked graveyard.

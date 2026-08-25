@@ -32,6 +32,7 @@ import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
+import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
@@ -593,6 +594,18 @@ data Effect card
     -- more; CR 122 states no rule making the instruction fail. Passes through no
     -- CR 614.16 gate -- that rule replaces a PLACEMENT.
     RemoveCounters RemoveCounters.RemoveCounters
+  | -- | CR 122.5: move ONE counter from the first slot's permanent onto the
+    -- second slot's, the player choosing which kind.
+    --
+    -- NOT a RemoveCounters beside a PutCounters, which is the whole reason this
+    -- arm exists: rule 122.5 makes the pair ATOMIC -- "if either of these actions
+    -- isn't possible, it's not possible to move a counter, and no counter is
+    -- removed from or put onto anything" -- so the two-step spelling would take a
+    -- counter off in a case the printed card leaves the board untouched.
+    --
+    -- The rule's four impossibilities are checked BEFORE either half runs; see
+    -- Pawl.Engine.Resolve's arm for which of them pawl can reach.
+    MoveCounters MoveCounters.MoveCounters
   | -- | CR 122 / 107.14: the players the PlayerRef names each get N counters of a
     -- player-counter kind. Subsumes any self-scoped player counter (energy,
     -- experience, rad) as `Relative You`.
