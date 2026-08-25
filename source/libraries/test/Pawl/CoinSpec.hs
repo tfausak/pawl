@@ -6,6 +6,10 @@
 -- the call and the flip are externalised through. The transcript legs live in
 -- Pawl.ReplaySpec with the other randomness prompts.
 --
+-- NOT the flip's GameEvent, which Pawl.EventTriggerSpec's PlayerWinsCoinFlip
+-- group proves with Tavern Scoundrel: what a trigger sees is a rule 603 question
+-- rather than a rule 705 one, and Winter Sky watches nothing.
+--
 -- Its own module rather than a group in Pawl.DiceSpec: CR 705 and CR 706 are
 -- different rules sharing no type, no prompt and no effect. A coin has no size,
 -- no results table and no modifier; a die has no call and no winner.

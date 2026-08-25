@@ -1075,6 +1075,19 @@ data TriggerCondition
     -- count (#2085); one roll is one event, so the batch and per-occurrence
     -- readings coincide today.
     PlayerRollsDice PlayerRelation.PlayerRelation
+  | -- | CR 705.2: "whenever you win a coin flip" (Tavern Scoundrel), against
+    -- GameEvent.CoinFlipped, with the relation read against CR 109.5's "you" --
+    -- the ability's controller at the moment it triggered (CR 603.3a),
+    -- PlayerRollsDice's shape.
+    --
+    -- Reads the event's WIN, unlike PlayerRollsDice beside it, which deliberately
+    -- ignores what the die showed. The printed template says so: CR 705.2's
+    -- "wins the flip" is a named outcome of the flip rather than a number the
+    -- flip produced, and the losing flip is recorded too -- so this condition is
+    -- a filter on the log rather than the presence of an entry. An outcome-blind
+    -- "whenever you flip a coin" would be a SIBLING arm over that same event
+    -- rather than a widening of this one.
+    PlayerWinsCoinFlip PlayerRelation.PlayerRelation
   | -- | CR 702.170a / 702.170c: "when this card becomes plotted" (Aloe
     -- Alchemist), against GameEvent.Plotted naming the bearer. Self-scoped and
     -- nullary. Watched for from EXILE, which is where both routes leave the
