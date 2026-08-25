@@ -7084,9 +7084,9 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.CoinFlipped {} -> False
   -- CR 615.13's other reading: the damage was prevented THIS WAY -- by a
   -- prevention effect the BEARER's own card prints (Phyrexian Vindicator).
-  -- Replacement.printedBy is that question, and it is the whole of the match:
-  -- rule 615.13 says nothing about whom the damage was addressed to, and neither
-  -- does the printed sentence.
+  -- Replacement.printedBy is that question, and it plus the Filter below is the
+  -- whole of the match: rule 615.13 says nothing about whom the damage was
+  -- addressed to, and neither does either printed sentence.
   --
   -- The identity, never the recipient: the Vindicator's shield covers only
   -- itself, so a recipient test would be a second name for a fact the identity
@@ -7098,7 +7098,9 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- contributes only CR 109.5's "you" and the Filter.Context's source, exactly as
   -- in the PermanentDealsCombatDamageToPlayer arm above. viewWithLastKnown for
   -- that arm's reason: CR 608.2h's record is what still answers "was it black"
-  -- for a source that died to the very batch this prevented.
+  -- for a source that died to the very batch this prevented. A fence rather than
+  -- a tested branch, as it is there -- Samite Ministration's shield covers a
+  -- PLAYER, so nothing that reaches this arm kills the damage's source.
   --
   -- Filter.IsSource is meaningless in THIS position where it is meaningful
   -- there: the context's source is the bearer, and the bearer is the object whose

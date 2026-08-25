@@ -1671,15 +1671,15 @@ printedBy candidate = case candidate of
 -- the rule: one application of one prevention effect runs its additional effect
 -- once, with the total it prevented.
 --
--- The SOURCE is neither summed nor keyed on, and one merged entry keeps one of
--- them. Not a live divergence: every prevention a card in this pool pairs with a
--- CR 615.13 trigger that reads the source names ONE source (CR 609.7a's chosen
--- source -- Samite Ministration), so a key already fixed to one instance is
--- fixed to one source too. Not implemented: a shield covering two DIFFERENT
--- sources in one batch, where the rule's one prevention has two sources and this
--- reports one (#2287). Keying on the source instead would report two preventions
--- where rule 615.13 counts one, which is the wrong trade and the design call
--- that issue is left open for.
+-- The SOURCE is neither summed nor keyed on, and a merged entry keeps one of the
+-- sources merged into it. Samite Ministration -- the one card in data/cards/
+-- whose CR 615.13 trigger reads the source -- cannot tell that apart from the
+-- rule, its shield naming ONE source under CR 609.7a, so a key already fixed to
+-- one instance is fixed to one source too. Not implemented: a shield covering two
+-- DIFFERENT sources in one batch, where rule 615.13's one prevention has two
+-- sources and this reports one (#2287). Keying on the source instead would report
+-- two preventions where that rule counts one, which is the wrong trade and the
+-- design call the issue is left open for.
 groupPreventions :: [Prevention] -> [Prevention]
 groupPreventions ps =
   let merge (a1, s1, r1) (a2, _, _) = (a1 + a2, s1, r1)

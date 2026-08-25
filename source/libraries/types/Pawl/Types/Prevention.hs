@@ -21,10 +21,10 @@ import qualified Pawl.Types.Recipient as Recipient
 -- Pawl.Types.DamagePrevented).
 --
 -- `source` is CR 120.1's source of the damage that did not happen, read off the
--- PROPOSED event for `recipient`'s reason below: the shield watches "damage that
--- WOULD be dealt", so the event as offered is the one the rule describes. It is
--- carried so Pawl.Types.DamagePrevented can carry it, a source filter being the
--- one question CR 615.13's trigger can ask that `by` does not already settle.
+-- event as PROPOSED, exactly as `recipient` is: rule 615.13 watches "damage that
+-- WOULD be dealt [and] is prevented", so the event as offered is the one it
+-- describes. Carried so Pawl.Types.DamagePrevented can carry it, a source filter
+-- being the one question that rule's trigger can ask that `by` does not settle.
 --
 -- Not a grouping key, unlike `by`: see Pawl.Engine.Replacement.groupPreventions.
 --

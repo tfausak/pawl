@@ -522,7 +522,7 @@ snapshotView gs shape event = case event of
         else Nothing
     EventShape.SpellCast -> Nothing
   GameEvent.DamageDealt _ -> Nothing
-  -- CR 615.13's record names a recipient and an amount and snapshots no
+  -- CR 615.13's record names two ids, a recipient and an amount, and snapshots no
   -- characteristics, so there is nothing for a Filter to look at.
   GameEvent.DamagePrevented {} -> Nothing
   GameEvent.StepBegan {} -> Nothing
