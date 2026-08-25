@@ -6117,28 +6117,42 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           -- `== n`. Removing blockers cannot reach this form either -- a
           -- departure only shrinks the admitted set.
           --
-          -- `prior` is the bearer's entry with this arrival taken back out. It
-          -- cannot be read off Combat.blockers directly: CR 509.2a puts these
-          -- triggers on the stack before any player gets priority, so the record
-          -- already holds the arrival that made the event.
+          -- `prior` is the bearer's entry with this arrival taken back out, and
+          -- the deletion is what makes it prior: CR 509.2a puts these triggers
+          -- on the stack before any player gets priority, so the entry already
+          -- holds the arrival that made the event.
+          --
+          -- A blocker that has since left keeps its id in that entry, and
+          -- `admits` reads it through CR 608.2h last known information -- which
+          -- is the right answer rather than a leak. An attacker declared blocked
+          -- by an admitted creature became blocked by one THEN, so a later
+          -- arrival is no new becoming however the first one ended.
           --
           -- BecameBlocking.attackerWasBlocked is "GameEvent.AttackerBlocked was
           -- not also recorded for this same arrival": CR 509.3c withholds that
           -- event exactly when the attacker was already blocked, and without
           -- this conjunct an arrival that is the attacker's FIRST blocker would
           -- be answered by the arm above and by this one both. A REGRESSION
-          -- FENCE rather than proved behaviour -- both pooled producers leave it
-          -- True (Aetherplasm's arrival replaces a blocker it declared, and
-          -- Flash Foliage's Saproling is green where the only filtered printing
-          -- asks for black), so dropping the conjunct leaves the suite green.
+          -- FENCE rather than proved behaviour: no pooled board can reach an
+          -- arrival that is admitted AND lands on an unblocked attacker.
+          -- Aetherplasm has to be blocking to put anything out, so the attacker
+          -- is blocked by then whatever became of the declared blocker; and
+          -- Flash Foliage, which can name an unblocked attacker, makes a GREEN
+          -- Saproling where the only filtered printing on this side asks for
+          -- black. Relaxing the conjunct to a wildcard leaves the whole suite
+          -- green.
           --
-          -- The flag is load-bearing for a second reason: Combat.declareBlockers
-          -- records this same constructor once per declared PAIR with it clear,
-          -- so an unguarded arm would answer an ordinary declaration the arm
-          -- above has already answered.
+          -- BecameBlocking.putOntoBattlefield is load-bearing beside it:
+          -- Combat.declareBlockers records this same constructor once per
+          -- declared PAIR with that flag clear, so an arm without it would
+          -- answer an ordinary declaration the arm above has already answered,
+          -- once more per blocker.
           --
-          -- Not implemented: an effect that causes a creature already on the
-          -- battlefield to block, which records no event at all (#1146).
+          -- Not implemented: several creatures put onto the battlefield blocking
+          -- one attacker at once, where each arrival reads the others as prior
+          -- blockers and every one of them declines (#2298); and an effect that
+          -- causes a creature already on the battlefield to block, which records
+          -- no event at all (#1146).
           GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = True})
             | attacker == bearer ->
                 let prior = Set.delete blocker (Map.findWithDefault Set.empty bearer (Combat.blockers (GameState.combat gs)))

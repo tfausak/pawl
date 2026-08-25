@@ -1648,6 +1648,12 @@ attemptBlockDeclaration pid attacking rejected = do
               -- write above, and so says of each attacker whether it was already
               -- blocked when this declaration was made. The same set answers CR
               -- 509.3c below.
+              --
+              -- Not constant here: becomeBlocked writes the key with an EMPTY set
+              -- for Effect.BecomesBlocked, which can resolve ahead of this
+              -- declaration. No condition reads the flag off a declared pair
+              -- today, so no board observes what it holds -- it is recorded
+              -- faithfully rather than clamped, since the event is the record.
               let wasBlocked = Map.keysSet (Combat.blockers (GameState.combat gs2))
               State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = Set.member attacker wasBlocked})) h) g pairs
               State.modify' $ \g -> List.foldl' (\h (blocker, attackers) -> Event.recordEvent (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker (Natural.length attackers))) h) g (filter (not . Set.null . snd) (Map.toList declaration))
