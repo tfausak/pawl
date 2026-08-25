@@ -261,8 +261,9 @@ activates srcId ability p = case p of
 -- candidates rather than built, so the recipient is the one the engine itself
 -- offered for that pool -- a hand-built Recipient of the same permanent is a
 -- different recipient, and CR 608.2b's re-read at resolution drops it silently.
--- Pinned to one id for `activates`' reason: an answerer that took whatever was
--- legal would find the other creature after a mutation.
+-- Named rather than "whatever is legal" for `activates`' reason, even where one
+-- board offers a single candidate: an answerer that searched would quietly repair
+-- a mutation on a board that later grows a second creature.
 activatesTargeting :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> ObjectId -> Prompt.Prompt r -> r
 activatesTargeting srcId ability victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (\r -> Recipient.objectOf r == Just victim) candidates) sets

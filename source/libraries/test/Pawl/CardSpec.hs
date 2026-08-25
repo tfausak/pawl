@@ -5912,10 +5912,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Effect.CreateCopy carries the SAME EntryRiders record Create and MoveToZone
   -- do, but Pawl.Engine.Resolve's arm reads only CR 122.6's `counters` -- what
   -- Littjara Mirrorlake's "except it enters with an additional +1/+1 counter on
-  -- it" says. This is the fence for every other field, and one lint rather than an
-  -- arm added to each above: a CreateCopy is the only opcode where the whole rest
-  -- of the record is unread, so a card setting any of them would say something
-  -- nothing performs.
+  -- it" says. This is the fence for every other field, and ONE lint rather than a
+  -- CreateCopy arm added to each above: the lints above each fence one field
+  -- across the opcodes that carry it, where here every field but one is unread,
+  -- so a card setting any of them would say something nothing performs.
   --
   -- Why each is unread rather than merely unwired. `underOwner` is inert by CR
   -- 111.2, which makes the creating player a token's owner anyway. `transformed`
