@@ -6478,7 +6478,7 @@ vorinclexSpec s registry = Spec.describe s "Vorinclex, Monstrous Raider (CR 122.
         Spec.assertEqWith s "1 * 2" (countersOn CounterKind.PlusOnePlusOne piker (castAndResolve (raceAnswer praetor piker) gs spellId)) 2
         Spec.assertEqWith s "and one without the praetor" (countersOn CounterKind.PlusOnePlusOne barePiker (castAndResolve (raceAnswer barePiker barePiker) bare bareSpell)) 1
       _ -> Spec.assertFailure s "fixture did not build both boards"
-  -- The object half's other direction, and the pair the byWhom check on that arm
+  -- The object half's other direction, and the pair the subject check on that arm
   -- turns on: BOB casts the Battlegrowth, at his own creature, with alice's
   -- praetor watching. Half of one counter is none. The two boards differ in the
   -- praetor alone.
@@ -6640,6 +6640,28 @@ damageCountersSpec s registry = Spec.describe s "Counters damage causes (CR 120.
       (Just ([wall], watched), Just ([bare], once)) -> do
         Spec.assertEqWith s "two, not four" (shrunk wall watched) 2
         Spec.assertEqWith s "the same two the bare board shows" (shrunk bare once) 2
+      _ -> Spec.assertFailure s "fixture did not build both boards"
+  -- CR 614.1's third subject, and the case that needs it: Vizier of Remedies
+  -- ({1}{W} Creature -- Human Cleric 2/1, "If one or more -1/-1 counters would be
+  -- put on a creature you control, that many -1/-1 counters minus one are put on
+  -- it instead.") names neither an effect nor a player, so it reaches a placement
+  -- rule 120.3d dictates -- which the case above shows CR 614.16's subject does
+  -- not.
+  --
+  -- Both other subjects would leave these alone, so the board separates all three:
+  -- the cause is CounterCause.ByRule, which rule 614.16's subject refuses, and the
+  -- putter is ALICE (the damage source's controller), where bob controls the
+  -- vizier -- so a "if you would put" clause in bob's seat would miss them too.
+  --
+  -- The vizier neither attacks nor blocks, for the reason `fights` gives, so the
+  -- pair of boards differs in the replacement alone.
+  Spec.it s "CR 614.1 bob's Vizier of Remedies shrinks the counters damage causes" $ do
+    shrinking <- board (Just ("Vizier of Remedies", S.bob)) ["Wall of Stone"]
+    plain <- board Nothing ["Wall of Stone"]
+    case (shrinking, plain) of
+      (Just ([wall], fewer), Just ([bare], once)) -> do
+        Spec.assertEqWith s "that many minus one" (shrunk wall fewer) 1
+        Spec.assertEqWith s "and two without the vizier" (shrunk bare once) 2
       _ -> Spec.assertFailure s "fixture did not build both boards"
 
 -- CR 122.6 with CR 701.53a: the counters an EFFECT says a token enters the

@@ -44,15 +44,18 @@
             "type": "CounterR",
             "value": {
               "matching": {
-                "byWhom": {
-                  "type": "Yours"
-                },
                 "onWhat": {
                   "type": "And",
                   "value": []
                 },
                 "onWho": {
                   "type": "Anyones"
+                },
+                "subject": {
+                  "type": "ByPlayer",
+                  "value": {
+                    "type": "Yours"
+                  }
                 }
               },
               "scaling": {
@@ -67,15 +70,18 @@
             "type": "CounterR",
             "value": {
               "matching": {
-                "byWhom": {
-                  "type": "Opponents"
-                },
                 "onWhat": {
                   "type": "And",
                   "value": []
                 },
                 "onWho": {
                   "type": "Anyones"
+                },
+                "subject": {
+                  "type": "ByPlayer",
+                  "value": {
+                    "type": "Opponents"
+                  }
                 }
               },
               "scaling": {

@@ -849,7 +849,7 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --      in this pool are CR 614.1c's self-only `IsSource` (Clone, Primal Plasma,
 --      CR 306.5b's loyalty), which no sibling can satisfy, so the exclusion bites
 --      on the other-objects forms: Kismet's CR 614.1d "enter tapped" and
---      Corpsejack Menace's CR 614.16 counter doubling. Pawl.ReplacementSpec's
+--      Corpsejack Menace's CR 614.1 counter doubling. Pawl.ReplacementSpec's
 --      "a Corpsejack Menace reanimated beside a modular creature doubles nothing"
 --      is the proof, over a Rise of the Dark Realms batch; without it an Arcbound
 --      Worker returned beside the Menace enters 2/2 instead of 1/1, and which
@@ -2041,7 +2041,7 @@ apply batch candidate event =
         pure Nothing
     -- Unreachable: `applies` admits DestructionR only against WouldBeDestroyed.
     (ReplacementEffect.DestructionR _, _) -> pure (Just event)
-    -- CR 122.6/614.16: Hardened Scales/Doubling Season scale a counter placement.
+    -- CR 122.6/614.1: Hardened Scales/Doubling Season scale a counter placement.
     (ReplacementEffect.CounterR (CounterR.MkCounterR _ scaling), ProposedEvent.WouldPutCounters cause oid kind n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
       pure (Just (ProposedEvent.WouldPutCounters cause oid kind (Replacement.scale scaling n)))
@@ -2134,10 +2134,11 @@ apply batch candidate event =
     -- alike -- applied WHILE the permanent turns over (CR 708.11) because
     -- FaceDown.performTurnFaceUp raises this event there and nowhere else.
     --
-    -- The counters go through putCounters, the CR 122.6 funnel -- so CR 614.16
-    -- applies and Hardened Scales sees a megamorph counter the way it sees a riot
-    -- one. NOT the pending map the EntryR arms write: CR 614.1e's turning face up
-    -- is not an entry, so there is no entry loop for a row to be ordered in.
+    -- The counters go through putCounters, the CR 122.6 funnel -- so a CR 614.1
+    -- counter replacement applies and Hardened Scales sees a megamorph counter
+    -- the way it sees a riot one. NOT the pending map the EntryR arms write:
+    -- CR 614.1e's turning face up is not an entry, so there is no entry loop
+    -- for a row to be ordered in.
     --
     -- The amount is evaluated the same way too, though every row that reaches here
     -- today states its own number: megamorph's Literal 1 and the Smuggler's
@@ -2685,9 +2686,10 @@ putPlayerCounters cause pid kind n = do
     Just (target, settledKind, settledCount)
       | settledCount == 0 -> pure 0
       | otherwise -> do
-          -- Zero is the guard putCounters puts on its own write, and Scaling.Halve
-          -- is what makes it reachable here: half of one counter, rounded down, is
-          -- a replacement that removes the event.
+          -- Zero is the guard putCounters puts on its own write, and the two
+          -- shrinking scalings are what make it reachable here: half of one
+          -- counter, rounded down, and one counter minus one, are replacements
+          -- that remove the event.
           State.modify' $ \gs ->
             let bump p = p {Player.counters = Map.insertWith (+) settledKind settledCount (Player.counters p)}
              in gs {GameState.players = Map.adjust bump target (GameState.players gs)}

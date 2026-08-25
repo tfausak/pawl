@@ -2592,9 +2592,13 @@ payComponent moment pid oid component = case component of
   -- AddLoyaltyToThis above makes, and the difference is WHEN the cost is paid,
   -- which `counterCause` below reads off the moment rather than assuming.
   -- Every printing of this component is CR 118.12's endure, paid as the spell or
-  -- ability RESOLVES, which is what CR 609.1 calls an effect and so what CR
-  -- 614.16 reaches: Hardened Scales sees endure's counter, and still not a
-  -- planeswalker's +1. Paid whatever the funnel then places.
+  -- ability RESOLVES, which is what CR 609.1 calls an effect, so even CR 614.16's
+  -- narrower subject reaches it: Doubling Season doubles endure's counter, and
+  -- still not a planeswalker's +1, which is the split Pawl.PlaneswalkerSpec and
+  -- Pawl.ReplacementSpec's blight pair pin. CR 614.1's passive subject --
+  -- Hardened Scales -- reaches the placement at EITHER moment, so it says nothing
+  -- about which cause this arm hands the funnel. Paid whatever the funnel then
+  -- places.
   CostComponent.PutPlusOneCountersOnThis n -> do
     Monad.void (Event.putCounters (counterCause moment pid) oid CounterKind.PlusOnePlusOne n)
     pure bindsNothing

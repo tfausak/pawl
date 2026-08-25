@@ -2,6 +2,7 @@ module Pawl.Types.CounterPattern where
 
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterSubject as CounterSubject
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 
@@ -13,27 +14,24 @@ import qualified Pawl.Types.Keyword as Keyword
 --
 -- Two axes, not one, and Vorinclex, Monstrous Raider is why: "if YOU would put
 -- one or more counters on a permanent or player" narrows by who is PUTTING them
--- (`byWhom`), where Doubling Season's "on a permanent you control" narrows by
+-- (`subject`), where Doubling Season's "on a permanent you control" narrows by
 -- whose permanent RECEIVES them (`whose`). Its own ruling says the card "cares
 -- deeply about who is putting the counters", and the two players differ whenever
 -- one player's effect puts counters on another's permanent.
 data CounterPattern = MkCounterPattern
   { whichKind :: Maybe (CounterKind.CounterKind Keyword.Keyword),
-    -- | CR 109.5: who is PUTTING the counters, read against the controller of the
-    -- effect's source -- or Nothing for CR 614.16's own subject, "if an EFFECT
-    -- would put", which names no player. Doubling Season, Hardened Scales and
-    -- Corpsejack Menace all take Nothing; Vorinclex is Just Yours and Just
-    -- Opponents.
+    -- | CR 614.1: what the clause says its "would put" OF -- an effect, a player,
+    -- or nothing at all. See Pawl.Types.CounterSubject, which carries the three
+    -- printed shapes and what each reaches, and
+    -- Pawl.Engine.Replacement.matchesPutter, which answers it against the cause
+    -- riding the event.
     --
-    -- The distinction is not decoration: rule 614.16's effects reach only what a
-    -- resolving spell, ability, replacement or prevention effect puts on, where a
-    -- clause naming a player also reaches CR 714.3c's turn-based lore counter --
-    -- which a player puts. See Pawl.Engine.Replacement.matchesPutter.
-    --
-    -- Not implemented: a PASSIVE wording, which names neither an effect nor a
-    -- player (Hardened Scales, Corpsejack Menace), has no encoding of its own and
-    -- takes Nothing -- narrower than printed (#1232).
-    byWhom :: Maybe ControllerRelation.ControllerRelation,
+    -- Not a Maybe and not defaulted in the codec: which subject a card names is
+    -- the difference between Doubling Season leaving CR 714.3c's lore counter
+    -- alone and Vizier of Remedies shrinking what CR 120.3d's wither damage
+    -- leaves, and a silently narrow default is what made two cards narrower than
+    -- printed; see #1232.
+    subject :: CounterSubject.CounterSubject,
     -- | CR 109.5: whose PERMANENT receives them.
     whose :: ControllerRelation.ControllerRelation,
     -- | Which permanents receive them.

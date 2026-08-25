@@ -6657,6 +6657,6 @@ exploreOne oid = do
       -- case, that rule firing even when the actions were impossible.
       State.modify' (Event.recordEvent (GameEvent.Explored oid))
   where
-    -- CR 122.6 through the one counter funnel, so a CR 614.16 replacement
+    -- CR 122.6 through the one counter funnel, so a CR 614.1 counter replacement
     -- (Hardened Scales) gets its opportunity against this placement too.
     grow pid = Monad.void (Event.putCounters (CounterCause.ByEffect pid) oid CounterKind.PlusOnePlusOne 1)

@@ -14,6 +14,7 @@ import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterR as CounterR
+import qualified Pawl.Types.CounterSubject as CounterSubject
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
@@ -145,7 +146,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
           ( CounterR.MkCounterR
               CounterPattern.MkCounterPattern
                 { CounterPattern.whichKind = Just CounterKind.PlusOnePlusOne,
-                  CounterPattern.byWhom = Nothing,
+                  CounterPattern.subject = CounterSubject.ByAnything,
                   CounterPattern.whose = ControllerRelation.Yours,
                   CounterPattern.onWhat = Filter.HasCardType CardType.Creature,
                   CounterPattern.onWho = Nothing
@@ -153,7 +154,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
               (Scaling.AddMore 1)
           )
       )
-      " {\"type\":\"CounterR\",\"value\":{\"matching\":{\"whichKind\":{\"type\":\"PlusOnePlusOne\"},\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"scaling\":{\"type\":\"AddMore\",\"value\":1}}} "
+      " {\"type\":\"CounterR\",\"value\":{\"matching\":{\"whichKind\":{\"type\":\"PlusOnePlusOne\"},\"subject\":{\"type\":\"ByAnything\"},\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"scaling\":{\"type\":\"AddMore\",\"value\":1}}} "
   -- whichKind = Nothing means any kind, never "no kind", and the trivial filter
   -- matches every permanent. An absent whichKind key is what that Nothing
   -- means.
@@ -165,7 +166,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
           ( CounterR.MkCounterR
               CounterPattern.MkCounterPattern
                 { CounterPattern.whichKind = Nothing,
-                  CounterPattern.byWhom = Nothing,
+                  CounterPattern.subject = CounterSubject.ByEffect,
                   CounterPattern.whose = ControllerRelation.Yours,
                   CounterPattern.onWhat = Filter.And [],
                   CounterPattern.onWho = Nothing
@@ -173,7 +174,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
               (Scaling.Multiply 2)
           )
       )
-      " {\"type\":\"CounterR\",\"value\":{\"matching\":{\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"And\",\"value\":[]}},\"scaling\":{\"type\":\"Multiply\",\"value\":2}}} "
+      " {\"type\":\"CounterR\",\"value\":{\"matching\":{\"subject\":{\"type\":\"ByEffect\"},\"whose\":{\"type\":\"Yours\"},\"onWhat\":{\"type\":\"And\",\"value\":[]}},\"scaling\":{\"type\":\"Multiply\",\"value\":2}}} "
   -- Pattern and scaling are both DATA, so both have to survive the trip.
   Spec.it s "TokenR (Doubling Season, tokens)" $
     Common.assertCodec

@@ -45,6 +45,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Extra.Int as Int
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import Pawl.Types.CandidateId (CandidateId)
 import qualified Pawl.Types.CandidateId as CandidateId
@@ -56,6 +57,7 @@ import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterR as CounterR
+import qualified Pawl.Types.CounterSubject as CounterSubject
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
@@ -416,7 +418,7 @@ applies gs event candidate =
           -- Our own encoding convention, not a rule: `whichKind = Nothing` means
           -- any kind, never no kind.
           maybe True (== kind) (CounterPattern.whichKind pat)
-            && matchesPutter gs src (CounterPattern.byWhom pat) cause
+            && matchesPutter gs src (CounterPattern.subject pat) cause
             && matchesController gs src (CounterPattern.whose pat) oid
             && matchesPermanent gs Nothing (CounterPattern.onWhat pat) oid
         -- CR 122.1 / 614.1: the same pattern against a PLAYER recipient. A
@@ -426,7 +428,7 @@ applies gs event candidate =
         -- counter without saying so.
         (ReplacementEffect.CounterR (CounterR.MkCounterR pat _), ProposedEvent.WouldPutPlayerCounters cause pid _ _) ->
           Maybe.isNothing (CounterPattern.whichKind pat)
-            && matchesPutter gs src (CounterPattern.byWhom pat) cause
+            && matchesPutter gs src (CounterPattern.subject pat) cause
             && maybe False (\rel -> matchesPlayer gs src rel pid) (CounterPattern.onWho pat)
         -- CR 614.16 at the ENTRY level: the counters this permanent is entering
         -- with are a placement this row may scale, and CR 616.1 orders it against
@@ -443,7 +445,7 @@ applies gs event candidate =
             Nothing -> False
             Just putter ->
               not (Map.null (matchingEnteringCounters gs pat oid))
-                && matchesPutter gs src (CounterPattern.byWhom pat) (CounterCause.ByEffect putter)
+                && matchesPutter gs src (CounterPattern.subject pat) (CounterCause.ByEffect putter)
                 && matchesController gs src (CounterPattern.whose pat) oid
                 && matchesPermanent gs Nothing (CounterPattern.onWhat pat) oid
         -- CR 109.5: "under YOUR control" -- the tokens' controller against the
@@ -632,30 +634,40 @@ admitsEntry gs oid rewrite = case rewrite of
 -- CR 614.16 versus CR 614.1: does this placement's PROVENANCE satisfy the
 -- pattern's subject?
 --
--- Nothing is rule 614.16's own subject, "if an EFFECT would put one or more
+-- ByEffect is rule 614.16's own subject, "if an EFFECT would put one or more
 -- counters" -- so it admits exactly that rule's two causes and no others. CR 609.1
 -- makes CR 714.3c's turn-based action neither, which is what keeps Doubling Season
 -- off a Saga's advancing lore counter, and it makes a cost paid under CR 601.2h
 -- neither for the same reason, which keeps Doubling Season off Soul Immolation's
 -- "blight X".
 --
--- Just a relation is a clause naming a PLAYER instead (Vorinclex, Monstrous
--- Raider's "if you would put", "if an opponent would put"). Rule 714.3c has "that
--- player" put the lore counter, so such a clause reaches it: the two subjects
--- disagree about exactly this case, which is why the cause rides the event to here
--- rather than being spent at the funnel's door (#847).
-matchesPutter :: GameState -> ObjectId -> Maybe ControllerRelation -> CounterCause.CounterCause -> Bool
+-- ByPlayer is a clause naming a PLAYER instead (Vorinclex, Monstrous Raider's "if
+-- you would put", "if an opponent would put"). Rule 714.3c has "that player" put
+-- the lore counter, so such a clause reaches it: the two subjects disagree about
+-- exactly this case, which is why the cause rides the event to here rather than
+-- being spent at the funnel's door (#847).
+--
+-- ByAnything is a clause naming neither (Hardened Scales, Vizier of Remedies).
+-- Rule 614.1 gives it nothing to narrow by, so every cause satisfies it -- CR
+-- 120.3d's wither and infect counters included, which is the placement no other
+-- subject and no other axis of the pattern can reach.
+matchesPutter :: GameState -> ObjectId -> CounterSubject.CounterSubject -> CounterCause.CounterCause -> Bool
 matchesPutter gs src subject cause = case (subject, cause) of
-  (Nothing, CounterCause.ByEffect _) -> True
-  (Nothing, CounterCause.ByPayment _) -> False
-  (Nothing, CounterCause.ByRule _) -> False
+  (CounterSubject.ByEffect, CounterCause.ByEffect _) -> True
+  (CounterSubject.ByEffect, CounterCause.ByPayment _) -> False
+  (CounterSubject.ByEffect, CounterCause.ByRule _) -> False
   -- The three causes coincide here on purpose, and the rows are written out
   -- rather than collapsed through CounterCause.putter: a player clause asks WHO,
   -- and every cause names a player, but a fourth cause must be read against rule
   -- 614.16 above before it is answered here.
-  (Just rel, CounterCause.ByEffect pid) -> matchesPlayer gs src rel pid
-  (Just rel, CounterCause.ByPayment pid) -> matchesPlayer gs src rel pid
-  (Just rel, CounterCause.ByRule pid) -> matchesPlayer gs src rel pid
+  (CounterSubject.ByPlayer rel, CounterCause.ByEffect pid) -> matchesPlayer gs src rel pid
+  (CounterSubject.ByPlayer rel, CounterCause.ByPayment pid) -> matchesPlayer gs src rel pid
+  (CounterSubject.ByPlayer rel, CounterCause.ByRule pid) -> matchesPlayer gs src rel pid
+  -- Written out for the same reason, and answering True for a reason of its own:
+  -- the clause narrows by nothing, not by "any player".
+  (CounterSubject.ByAnything, CounterCause.ByEffect _) -> True
+  (CounterSubject.ByAnything, CounterCause.ByPayment _) -> True
+  (CounterSubject.ByAnything, CounterCause.ByRule _) -> True
 
 -- CR 109.5 / 614.1: does this PLAYER satisfy a pattern's relation, read against
 -- the controller of the effect's SOURCE? Anyones always does; a source with no
@@ -944,8 +956,11 @@ scale :: Scaling.Scaling -> Natural -> Natural
 scale s n = case s of
   Scaling.Multiply m -> n * m
   Scaling.AddMore m -> n + m
+  -- CR 122.1: saturating, for the reason Pawl.Types.Scaling gives -- and one of
+  -- the two scalings that can answer zero.
+  Scaling.Subtract m -> Natural.minusSaturating n m
   -- CR 107.1a: "half that many . . . rounded down", which `div` on Natural
-  -- already is. One is what makes this the only scaling that can answer zero.
+  -- already is. One is what makes this answer zero, as Subtract above does.
   Scaling.Halve -> n `div` 2
 
 -- CR 616.1a-e: take the HIGHEST non-empty bucket. Ord on ReplacementBucket is

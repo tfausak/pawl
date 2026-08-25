@@ -101,6 +101,7 @@ import qualified Pawl.Codec.CounterNameSpec
 import qualified Pawl.Codec.CounterPatternSpec
 import qualified Pawl.Codec.CounterRSpec
 import qualified Pawl.Codec.CounterSpec
+import qualified Pawl.Codec.CounterSubjectSpec
 import qualified Pawl.Codec.CounterabilitySpec
 import qualified Pawl.Codec.CounteringSpec
 import qualified Pawl.Codec.CreateCopySpec
@@ -614,6 +615,7 @@ spec s registry = do
   Pawl.Codec.CounterPatternSpec.spec s
   Pawl.Codec.CounterRSpec.spec s
   Pawl.Codec.CounterSpec.spec s
+  Pawl.Codec.CounterSubjectSpec.spec s
   Pawl.Codec.CounterabilitySpec.spec s
   Pawl.Codec.CounteringSpec.spec s
   Pawl.Codec.CopySpellSpec.spec s

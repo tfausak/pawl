@@ -19,6 +19,12 @@ spec s = Spec.describe s "Pawl.Codec.Scaling" $ do
       Scaling.codec
       (Scaling.AddMore 1)
       " {\"type\":\"AddMore\",\"value\":1} "
+  Spec.it s "Subtract" $
+    Common.assertCodec
+      s
+      Scaling.codec
+      (Scaling.Subtract 1)
+      " {\"type\":\"Subtract\",\"value\":1} "
   Spec.it s "Halve" $
     Common.assertCodec
       s
