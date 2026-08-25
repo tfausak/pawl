@@ -35,6 +35,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Zone as Zone
 
 -- | One answer to a prompt, serialized so a DecisionLog replays the game
 -- deterministically.
@@ -232,8 +233,13 @@ data Response
     -- Singular, and distinct from ChoseLandTypeSwap above for
     -- Prompt.ChooseBasicLandType's reason.
     ChoseBasicLandType Subtype.Subtype
-  | -- | CR 701.23: the cards a search found, in whichever of Search.zones
-    -- held them (empty = failed to find).
+  | -- | CR 701.23: which of the zones a multi-zone search named the searcher
+    -- chose to look through (Prompt.ChooseSearchZones). Distinct from Searched,
+    -- which records what they then found: Delivery Moogle asks both, one after
+    -- the other, so two answers in one replay are not a duplicate.
+    ChoseSearchZones (Set.Set Zone.Zone)
+  | -- | CR 701.23: the cards a search found, in whichever of the zones it looked
+    -- through held them (empty = failed to find).
     Searched [ObjectId.ObjectId]
   | -- | CR 601.3 (Panglacial): the library card cast while searching, paired with
     -- the CR 709.3 half being cast (Nothing = declined). The name is part of the

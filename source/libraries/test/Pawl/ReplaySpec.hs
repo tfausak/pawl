@@ -70,6 +70,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.Zone as Zone
 
 -- One way of tapping a single-colour source: CR 305.6's intrinsic "{T}" cost and
 -- a one-unit yield, which is what a ChooseManaYield candidate looks like for
@@ -1049,6 +1050,30 @@ combatReplaySpec s =
             "the head"
             (Replay.defaultAnswer (Prompt.ChooseBlight decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
             (ObjectId.MkObjectId 7)
+        -- CR 701.23: which zones a multi-zone search's searcher took is a
+        -- decision, so it has to survive a transcript like any other.
+        Spec.it s "ChooseSearchZones round-trips through the transcript" $ do
+          let offered = Set.fromList [Zone.Library, Zone.Graveyard]
+              p = Prompt.ChooseSearchZones decider S.alice offered
+          Spec.assertEqWith s "taking the graveyard half alone round trips" (Replay.decode p (Replay.encode p (Set.singleton Zone.Graveyard))) (Just (Set.singleton Zone.Graveyard))
+          -- Discriminating: a decode that ignored the response and answered the
+          -- whole offer would pass a leg naming both zones by accident.
+          Spec.assertEqWith s "taking the library half alone round trips" (Replay.decode p (Replay.encode p (Set.singleton Zone.Library))) (Just (Set.singleton Zone.Library))
+        Spec.it s "a search's zones do not decode as the cards it found" $ do
+          -- Discriminating: fails if ChooseSearchZones shares Searched's
+          -- constructor. The two are answers to the SAME search, one after the
+          -- other, which is exactly the pair a transcript could replay crossed.
+          let p = Prompt.ChooseSearchZones decider S.alice (Set.fromList [Zone.Library, Zone.Graveyard])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.Searched [ObjectId.MkObjectId 7])) Nothing
+        Spec.it s "a short search-zone transcript takes every zone the card named" $
+          -- Every named zone at once is always legal -- the printed "and/or"
+          -- permits all of them -- and it is what pawl did before the searcher
+          -- was asked at all.
+          Spec.assertEqWith
+            s
+            "the whole offer"
+            (Replay.defaultAnswer (Prompt.ChooseSearchZones decider S.alice (Set.fromList [Zone.Library, Zone.Graveyard])))
+            (Set.fromList [Zone.Library, Zone.Graveyard])
         -- CR 107.14: how much {E} a player paid mid-resolution is a decision, so
         -- it has to survive a transcript like any other.
         Spec.it s "ChoosePaidEnergy round-trips through the transcript" $ do

@@ -47,8 +47,9 @@ data Search = MkSearch
     -- where the same search of a library need not (CR 701.23b's Splinter
     -- example).
     --
-    -- Not implemented: the zones being the searcher's CHOICE, printed "and/or"
-    -- (#2148).
+    -- The zones the card NAMES, not the ones looked through: the printed
+    -- "and/or" makes that a choice the searcher is asked on resolution, and this
+    -- set is what Pawl.Types.Prompt.ChooseSearchZones offers them.
     zones :: Set.Set Zone.Zone,
     -- | How many cards the search may find, or 'Nothing' where the printed
     -- instruction states no count at all -- Mana Severance's "any number of land
