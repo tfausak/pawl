@@ -219,10 +219,10 @@ returnable events gs =
 -- object headed for any hand or library goes to its OWNER's, so every move this
 -- admits is already the rule's.
 --
--- Not implemented: rule 903.9b's "may apply more than once to the same event", the
--- exception to CR 614.5 (#2264), nor CR 903.9c's melded or merged commander
--- (#2265). Nor does the offer take a position in CR 616.1e's ordering among other
--- applicable replacements (#2266).
+-- Not implemented: rule 903.9b's "may apply more than once to the same event",
+-- which is its named exception to CR 614.5 (#2264); CR 903.9c's melded or merged
+-- commander (#2265); and a place for the offer in the CR 616.1 ordering, where CR
+-- 616.1e leaves the affected player free to pick among applicable effects (#2266).
 commandZoneOffer :: ZoneChange.ZoneChange -> GameState -> Maybe PlayerId
 commandZoneOffer zc gs
   | notElem (ZoneChange.to zc) [Zone.Hand, Zone.Library] = Nothing

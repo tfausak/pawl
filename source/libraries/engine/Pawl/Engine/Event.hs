@@ -698,6 +698,9 @@ createEmblem pid card = do
 -- `asOf` is applyReplacementsIn's: Nothing for a lone move, Just the pre-batch
 -- board when this move is one member of a CR 608.2f / 704.3 batch.
 --
+-- CR 903.9b's rules-based offer is asked here too, once the loop has settled a
+-- destination -- see `offerCommandZone`.
+--
 -- Also reports CR 607.2b's link: the object whose replacement effect is what made
 -- the destination exile, or Nothing when the move was headed there on its own
 -- instruction. The caller files it once the arriving incarnation has an id.
@@ -722,16 +725,18 @@ resolveZoneChange asOf zc = do
 -- would put a rules-invented value into the structure whose whole point is that it
 -- came from data, and rule 903.9b's "may" has no home on that type in any case:
 -- every ZoneChangeR is unconditional, so the prompt would have to be asked from
--- `apply`'s generic arm under a guard on WHICH candidate this is. Pawl.Engine.Cast's
--- CR 205.4e legend restriction and EntryRestriction.prohibited below take the same
--- posture -- a rule the rulebook states is asked here, not modelled as a card.
+-- `apply`'s generic arm under a guard on WHICH candidate this is.
+-- Pawl.Engine.Cast.legendaryRestrictionOk takes the same posture toward CR 205.4e:
+-- a restriction the rulebook states is asked by the engine, not modelled as
+-- something a card carries.
 --
 -- AFTER the CR 616.1 loop and asked of the SETTLED destination, CR 614.6's
 -- reading: a printed redirect that already moved this move off a hand or a library
 -- is the event that happens, and rule 903.9b has nothing to say about it.
 --
--- Not implemented: a position in CR 616.1e's ordering among the other applicable
--- replacements (#2266). Unobservable while no ZoneChangeR in data/cards/ matches a
+-- Not implemented: a place in CR 616.1's ordering, where CR 616.1e leaves the
+-- affected player free to pick among the applicable effects and this offer instead
+-- always goes last (#2266). Unobservable while no ZoneChangeR in data/cards/ matches a
 -- hand or a library -- all six match a graveyard or the stack and redirect to exile
 -- -- so no second candidate can be applicable to the same event; a printed redirect
 -- naming a hand or a library as the destination it watches (Wheel of Sun and Moon

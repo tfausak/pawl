@@ -2,8 +2,9 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Engine.Commander (CR 903.3's designation, CR 903.6's starting zone,
--- CR 903.8's permission and tax, CR 903.9a's state-based action), the
--- Player.commander and Player.commanderCasts fields, Deck's commander, the
+-- CR 903.8's permission and tax, CR 903.9a's state-based action, CR 903.9b's
+-- command-zone replacement), the Player.commander and Player.commanderCasts
+-- fields, Deck's commander, the
 -- Zone.Command arm of Pawl.Engine.Cast.castableZones, and the CR 903.8 increase
 -- Pawl.Engine.Cost.spellAdjustments folds into CR 601.2f. Also the commander half
 -- of Pawl.Engine.Setup's subgame pair -- CR 729.2c in and CR 729.5c out -- and
@@ -28,6 +29,11 @@
 --
 -- Its printed cost is {3}{R}, so the tax is directly readable in the mana spent:
 -- four the first time, six the second (CR 903.8's {2}), eight the third.
+--
+-- The Bounce group adds two of bob's spells and the Islands to cast them with:
+-- Unsummon ({U} Instant, "return target creature to its owner's hand") for rule
+-- 903.9b's hand half and Griptide ({3}{U} Instant, "put target creature on top of
+-- its owner's library") for its library half.
 module Pawl.CommanderSpec where
 
 import qualified Data.List as List
