@@ -1335,8 +1335,8 @@ manifestSpec s registry = Spec.describe s "Manifest" $ do
   Spec.it s "CR 110.5b the same card entering FACE UP is a 5/3 Beast whose trigger does fire" $ do
     (before, _, topId) <- summonsBoard s registry
     thragtusk <- S.printingOf s registry "Thragtusk"
-    let (up, upId) = putOntoBattlefield False topId before
-        (down, downId) = putOntoBattlefield True topId before
+    let (up, upId) = putOntoBattlefield Nothing topId before
+        (down, downId) = putOntoBattlefield (Just (FaceDownState.defaultFor FaceDownReason.Manifested)) topId before
     case (upId, downId) of
       (Just faceUp, Just faceDown) -> do
         Spec.assertEqWith s "the printed 5/3" (S.powerToughnessOf faceUp up) (Just (5, 3))
@@ -1534,7 +1534,7 @@ manifestedWith s registry land top extra = do
 -- Effect.MoveToZone takes, with CR 708.3's rider set or not and nothing else
 -- differing -- then settled and run to a stable board so any enters trigger has
 -- resolved. Nothing if the move did not land.
-putOntoBattlefield :: Bool -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Maybe ObjectId.ObjectId)
+putOntoBattlefield :: Maybe FaceDownState.FaceDownState -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Maybe ObjectId.ObjectId)
 putOntoBattlefield faceDown oid gs =
   let riders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = faceDown}
       (entered, moved) = Engine.runGamePure S.identityAnswer gs (Event.changeZoneEntering oid Zone.Battlefield LibraryPosition.defaultValue riders (Just S.alice))

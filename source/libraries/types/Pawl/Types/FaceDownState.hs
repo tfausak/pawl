@@ -17,3 +17,11 @@ data FaceDownState = MkFaceDownState
     listed :: FaceDownCharacteristics.FaceDownCharacteristics
   }
   deriving (Eq, Ord, Show)
+
+-- | CR 708.2a's list, named by the rule that allowed it: what a producer that
+-- specifies no characteristics of its own carries. Morph, manifest and
+-- Effect.TurnFaceDown's Backslide all take this; the two that do not are
+-- disguise ('FaceDownCharacteristics.disguisedValue') and an entry that lists
+-- its own (Pawl.Types.EntryRiders' faceDown).
+defaultFor :: FaceDownReason.FaceDownReason -> FaceDownState
+defaultFor r = MkFaceDownState {reason = r, listed = FaceDownCharacteristics.defaultValue}
