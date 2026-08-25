@@ -114,6 +114,7 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -2106,9 +2107,7 @@ rewriteModal pairs modal =
   let rewriteClause c =
         c
           { Clause.effects = fmap (rewriteEffect pairs) (Clause.effects c),
-            -- Not implemented: the clause's CR 118.12 pay gate keeps its printed
-            -- word, so the resolution-time offer asks the pre-hack question
-            -- (#635).
+            Clause.payGate = fmap (rewritePayGate pairs) (Clause.payGate c),
             Clause.condition = fmap (rewriteCondition pairs) (Clause.condition c)
           }
       rewriteMode m =
@@ -2117,6 +2116,26 @@ rewriteModal pairs modal =
             Mode.targetSlots = fmap (rewriteTargetSlot pairs) (Mode.targetSlots m)
           }
    in modal {Modal.modes = fmap rewriteMode (Modal.modes modal)}
+
+-- CR 612.1 through the cost a clause offers as it resolves (CR 118.12).
+-- Lithophage's "sacrifice this creature unless you sacrifice a Mountain" is the
+-- producer: Magical Hack swaps the land type word, and CR 612.2 licenses it
+-- because the word is used as a land type.
+--
+-- Written out field by field rather than as a record update, rewriteComponent's
+-- posture one level up: `cost` is the only field a printed word can reach --
+-- `payer` names a player, `branch` and `obligation` name rules categories, and
+-- `offeredAt` is CR 608.2e's ordinal -- so a later field carrying one must fail
+-- to compile here instead of silently keeping the printed word.
+rewritePayGate :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> PayGate.PayGate -> PayGate.PayGate
+rewritePayGate pairs gate =
+  PayGate.MkPayGate
+    { PayGate.payer = PayGate.payer gate,
+      PayGate.cost = Filter.rewriteCost pairs (PayGate.cost gate),
+      PayGate.branch = PayGate.branch gate,
+      PayGate.obligation = PayGate.obligation gate,
+      PayGate.offeredAt = PayGate.offeredAt gate
+    }
 
 -- A single target slot under CR 612.1. Top-level because Pawl.Engine.Resolve
 -- needs the same rewrite over a resolving spell's slots (CR 608.2b).
