@@ -1519,12 +1519,13 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- find the Howling Mine in the graveyard, but may choose to find zero, one, or
   -- two of the Howling Mines in the library".
   --
-  -- Not implemented: the printed "and/or", which lets the searcher pick which of
-  -- the two zones to look through (#2148). Pawl searches both, which is the
-  -- STRICTER reading -- a graveyard find it cannot decline.
+  -- It is also the whole-card proof of the printed "and/or"
+  -- (Prompt.ChooseSearchZones): which of the two zones alice looks through is
+  -- hers to choose, and the card's own shuffle follows that choice.
   --
-  -- The three cases share one board and differ in the ANSWER alone, except that
-  -- the second empties the graveyard, which is the one thing the rule turns on.
+  -- The cases share one board and differ in the ANSWER alone, except that one
+  -- empties the graveyard -- which is the one thing CR 400.2 turns on -- and one
+  -- adds Leonin Arbiter.
   -- Bonesplitter sits in the GRAVEYARD and Chromatic Star in the LIBRARY, both
   -- matching and both mana value 1, so the cap of one cannot separate them and
   -- the assertion has to name the card. Crucible of Worlds is a mana value 3
@@ -1604,6 +1605,62 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "and the library she could not search is untouched"
       (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
       (Set.fromList [moogleStar board, moogleCrucible board])
+  -- The printed "and/or" itself: alice takes the LIBRARY half alone and declines
+  -- the find there. The graveyard is the zone CR 400.2 makes public and CR
+  -- 701.23b therefore cannot decline in -- which is exactly why the choice
+  -- matters, and why the two zones each hold a match. An engine that searches
+  -- every zone the card names completes her declined answer from the graveyard
+  -- and hands her the Bonesplitter.
+  Spec.it s "CR 701.23a whole card: Delivery Moogle's and/or lets alice take the library half alone" $ do
+    board <- moogleBoard s registry ["Bonesplitter"]
+    let settled = resolveMoogle (searchingZones (Set.singleton Zone.Library) []) board
+    Spec.assertEqWith
+      s
+      "the graveyard she never looked through still holds the Bonesplitter"
+      (namesIn Zone.Graveyard S.alice settled)
+      [Just (CardName.MkCardName (Text.pack "Bonesplitter"))]
+    Spec.assertEqWith s "and her hand is empty -- CR 701.23b's fail-to-find, over the hidden zone she DID take" (namesIn Zone.Hand S.alice settled) []
+    Spec.assertEqWith
+      s
+      "she took the library, so the card's own shuffle fired -- the reversing answerer left it reversed"
+      (Game.zoneMembers Zone.Library S.alice settled)
+      (reverse (Game.zoneMembers Zone.Library S.alice (moogleState board)))
+  -- The other half of the same choice, on a board differing in exactly the
+  -- answer: alice takes the GRAVEYARD half alone and names the library's
+  -- Chromatic Star anyway. That card is not among the offered matches, so it is
+  -- filtered out and CR 400.2's forced find in the public zone completes the
+  -- answer instead. An engine searching both zones hands her the Star.
+  --
+  -- The library assertion is the second half of the rule and not a proxy: the
+  -- shuffle answerer REVERSES whatever it is given, so a library still in its
+  -- original order is one nothing shuffled, which is Delivery Moogle's printed
+  -- "if you search your library this way, shuffle" with its condition unmet.
+  Spec.it s "CR 701.23a whole card: Delivery Moogle's and/or lets alice take the graveyard half alone, and then she does not shuffle" $ do
+    board <- moogleBoard s registry ["Bonesplitter"]
+    let settled = resolveMoogle (searchingZones (Set.singleton Zone.Graveyard) [moogleStar board]) board
+    Spec.assertEqWith
+      s
+      "she named the library card, but only the graveyard was searched, so the Bonesplitter is what reached her hand"
+      (namesIn Zone.Hand S.alice settled)
+      [Just (CardName.MkCardName (Text.pack "Bonesplitter"))]
+    Spec.assertEqWith
+      s
+      "and her library is in its original order -- unsearched, so unshuffled"
+      (Game.zoneMembers Zone.Library S.alice settled)
+      (Game.zoneMembers Zone.Library S.alice (moogleState board))
+  -- The lying answerer, the shape #222 is about: a zone the card never named.
+  -- The answer is filtered back through the printed zones and what is left is
+  -- empty, so every named zone is searched -- the always-legal maximal reading,
+  -- and the one the searcher cannot decline out of in a public zone.
+  Spec.it s "CR 701.23a whole card: a zone Delivery Moogle never named is not one alice can choose" $ do
+    board <- moogleBoard s registry ["Bonesplitter"]
+    let settled = resolveMoogle (searchingZones (Set.singleton Zone.Exile) []) board
+    Spec.assertEqWith
+      s
+      "both printed zones were searched, so CR 400.2 still forced the graveyard find"
+      (namesIn Zone.Hand S.alice settled)
+      [Just (CardName.MkCardName (Text.pack "Bonesplitter"))]
+    Spec.assertEqWith s "and the graveyard is empty" (namesIn Zone.Graveyard S.alice settled) []
   -- Ancient Vendetta -- "{3}{B} Sorcery: Choose a card name. Search target
   -- opponent's graveyard, hand, and library for up to four cards with that name
   -- and exile them. Then that player shuffles." The whole-card proof of CR 201.4
@@ -2512,6 +2569,17 @@ withArbiter :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> MoogleBoard 
 withArbiter s registry board = do
   arbiter <- S.printingOf s registry "Leonin Arbiter"
   pure board {moogleState = snd (S.addCreature arbiter S.bob (moogleState board))}
+
+-- findPinned, plus the printed "and/or" answered with a fixed set of zones and a
+-- REVERSING shuffle. Alice's library holds two cards, so an order that came back
+-- reversed is one that was shuffled and the original order is one that was not
+-- -- the only quantity that tells "she took the library and found nothing" apart
+-- from "she never took the library at all".
+searchingZones :: Set.Set Zone.Zone -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+searchingZones zones wanted p = case p of
+  Prompt.ChooseSearchZones {} -> zones
+  Prompt.Shuffle offered -> reverse offered
+  _ -> findPinned wanted p
 
 resolveMoogle :: (forall r. Prompt.Prompt r -> r) -> MoogleBoard -> GameState.GameState
 resolveMoogle answer board =

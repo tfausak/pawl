@@ -3392,7 +3392,30 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- Pawl.Engine.PlayerEffect.prohibitsSearching, which takes no library
             -- (#1269).
             prohibited <- State.gets (PlayerEffect.prohibitsSearching searcher)
-            let searchedZones = if prohibited then Set.delete Zone.Library zones else zones
+            -- The printed "and/or": the searcher picks which of the zones the
+            -- card names to look through -- Delivery Moogle's "your library
+            -- and/or graveyard" -- and the rest of the instruction, the shuffle
+            -- included, follows the CHOICE rather than the printing.
+            --
+            -- Filtered, not trusted, and never empty: an answer naming a zone
+            -- the card did not, or naming none at all, takes every named zone.
+            -- Prompt.ChooseSearchZones says why the empty answer is not the
+            -- searcher's to give. Raised only where two or more zones make it a
+            -- real choice.
+            --
+            -- Offered over the card's own zones rather than over searchedZones,
+            -- and read LIVE rather than off gs0: CR 601.3's cast below is made
+            -- during an earlier searcher's pass, so a later pass reads a board
+            -- that resolution has already moved.
+            chosenZones <-
+              if Set.size zones < 2
+                then pure zones
+                else do
+                  gsZones <- State.get
+                  answer <- Game.choose (Prompt.ChooseSearchZones (Decide.deciderFor searcher gsZones) searcher zones)
+                  let kept = Set.intersection answer zones
+                  pure (if Set.null kept then zones else kept)
+            let searchedZones = if prohibited then Set.delete Zone.Library chosenZones else chosenZones
             -- A cap of zero asks nothing and finds nothing: one legal answer is
             -- no choice to put to a player. An unbounded search has no such
             -- shortcut -- its cap is not known until the zones are read.
@@ -3408,10 +3431,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- library being searched is their own, and only where a LIBRARY
                   -- is among the zones at all.
                   --
-                  -- That last conjunct is a REGRESSION FENCE rather than a proven
-                  -- behaviour: every card in the pool naming a zone also names a
-                  -- library, so removing it reddens nothing. A graveyard-only
-                  -- search would be its observer.
+                  -- That last conjunct is a REGRESSION FENCE rather than a
+                  -- proven behaviour. It is now REACHABLE -- a searcher may take
+                  -- the graveyard half of an "and/or" alone -- but observing it
+                  -- needs a castable library card on the board at the same time,
+                  -- which no case builds; removing it reddens nothing.
                   Monad.when (searcher == owner && Set.member Zone.Library searchedZones) (Cast.castWhileSearching searcher)
                   gs <- State.get
                   -- ONE prompt over the union, not one per zone: the card prints
@@ -3470,17 +3494,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             Monad.mapM_ (putFound searcher source destination) found
             -- The shuffle is the CARD's instruction too (CR 701.23h, CR 701.24b).
             -- The library shuffled is the one that was READ, so this seat is the
-            -- owner -- and only where a LIBRARY is among the zones the card named.
-            -- Delivery Moogle's "if you search your library this way, shuffle" is
-            -- that condition printed; a graveyard-only search shuffles nothing.
-            -- Read off the card's own zones rather than searchedZones, since CR
-            -- 101.2's prohibition stops the looking and not the card's other
-            -- instructions.
+            -- owner -- and only where a LIBRARY is among the zones the searcher
+            -- CHOSE. Delivery Moogle's "if you search your library this way,
+            -- shuffle" is that condition printed: a searcher who took the
+            -- graveyard half alone shuffles nothing.
             --
-            -- A REGRESSION FENCE for castWhileSearching's reason above: no card
-            -- in the pool searches without naming a library, so removing this
-            -- guard reddens nothing.
-            Monad.when (Set.member Zone.Library zones) $ do
+            -- Read off chosenZones rather than searchedZones, since CR 101.2's
+            -- prohibition stops the looking and not the card's other
+            -- instructions.
+            Monad.when (Set.member Zone.Library chosenZones) $ do
               lib <- State.gets (Game.zoneMembers Zone.Library owner)
               shuffleAnswer <- Game.ask (Prompt.Shuffle lib)
               State.modify' (reorderLibrary owner (Game.honourShuffle lib shuffleAnswer))

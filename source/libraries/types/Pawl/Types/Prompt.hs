@@ -48,6 +48,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
+import qualified Pawl.Types.Zone as Zone
 
 data Prompt r where
   ChooseAction :: Decider.Decider -> PlayerId.PlayerId -> [Action.Action] -> Prompt Action.Action
@@ -387,6 +388,26 @@ data Prompt r where
   -- fixing the five types. No SlotName -- the answer is written to
   -- Object.chosenSubtype rather than bound into a slot.
   ChooseBasicLandType :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Subtype.Subtype
+  -- | The printed "and/or" of a multi-zone search: which of the zones the card
+  -- names this searcher actually looks through -- Delivery Moogle's "search your
+  -- library and/or graveyard", Dark Supplicant's "graveyard, hand, and/or
+  -- library". The Set is the zones OFFERED, all owned by one player, and the
+  -- answer is intersected back with it.
+  --
+  -- No rule of the CR spells "and/or"; it is the card's own English for "one,
+  -- the other, or both", and the answer is a NONEMPTY subset. Boonweaver Giant
+  -- is why nonempty: it prints "you MAY search your graveyard, hand, and/or
+  -- library", and that "may" would be redundant if the and/or already permitted
+  -- searching nothing. An engine allowing the empty answer would be weaker than
+  -- printed in the searcher's favour twice over -- it would dodge the forced
+  -- find of a public zone (CR 400.2, CR 701.23b) and the card's own "if you
+  -- search your library this way, shuffle".
+  --
+  -- Raised only where two or more zones make it a real choice, a one-zone search
+  -- having exactly one nonempty subset. Asked once per searcher, ahead of CR
+  -- 601.3's offer and of the search itself, because which zones are looked
+  -- through is what the rest of the instruction is about.
+  ChooseSearchZones :: Decider.Decider -> PlayerId.PlayerId -> Set.Set Zone.Zone -> Prompt (Set.Set Zone.Zone)
   -- | CR 701.23 / 701.23b. The [ObjectId] is the MATCHING cards
   -- (engine-pre-filtered) across every zone Search.zones names, and the PlayerId
   -- is the player SEARCHING, who need not own those zones. The Natural is how
