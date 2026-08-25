@@ -809,6 +809,95 @@ whipstitchedZombieSpec s registry = Spec.describe s "WhipstitchedZombie" $ do
     Spec.assertEqWith s "nothing was sacrificed" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
     Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
 
+-- alice's Lithophage, one Mountain, one Island and a Seat of the Synod, with a
+-- Magical Hack in hand; when `hacked`, she casts it at the Lithophage and lets it
+-- resolve first, swapping Mountain for Island. Her upkeep is then begun and the
+-- trigger settled onto the stack -- zombieUpkeep's shape with a text change in
+-- front of it. Returns the Lithophage and that state.
+--
+-- TWO land types is what makes either case discriminating: with only a Mountain
+-- out, "the gate asks for an Island" and "the gate kept the printed word" pick
+-- the same permanent to sacrifice.
+--
+-- Seat of the Synod ({T}: Add {U}, an Artifact Land with no land subtype at all,
+-- checked against Scryfall) pays for the Hack, and both lands start TAPPED, so it
+-- is the only untapped blue source and the hacked and unhacked boards differ in
+-- nothing but whether the Hack was cast. Being neither a Mountain nor an Island
+-- it can never join the sacrifice candidates either. Tap state gates nothing
+-- about a sacrifice (CR 701.21a), so both lands stay eligible.
+lithophageUpkeep :: Bool -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+lithophageUpkeep hacked lithophage mountain island seat magicalHack =
+  let (lithoId, g1) = S.addCreature lithophage S.alice (Setup.emptyGame S.bothPlayers)
+      (mountainId, g2) = S.addCreature mountain S.alice g1
+      (islandId, g3) = S.addCreature island S.alice g2
+      (_seatId, g4) = S.addCreature seat S.alice g3
+      (hackId, g5) = S.addHandCard magicalHack S.alice g4
+      tapped = S.tapObject islandId (S.tapObject mountainId g5)
+      ready = tapped {GameState.priority = Just S.alice}
+      hackIt g = S.runPure (hackAt lithoId Subtype.Mountain Subtype.Island) g (do S.cast S.alice hackId; Stack.resolveTop)
+      board = if hacked then hackIt ready else ready
+      upkeep = Phase.Beginning BeginningStep.Upkeep
+      begun =
+        Event.recordEvent
+          (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice))
+          (board {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+   in (lithoId, snd (Engine.runGamePure S.identityAnswer begun Engine.settleForPriority))
+
+-- CR 612.1 reaching the cost a triggered ability OFFERS as it resolves (CR
+-- 118.12) -- the half neither Pawl.ActivateSpec's Dark Heart of the Wood (an
+-- ACTIVATION cost) nor Pawl.TriggerSpec's Barbarian Outcast (a trigger's own
+-- CONDITION) covers.
+--
+-- Lithophage {3}{R}{R} Creature -- Insect 7/7, "At the beginning of your upkeep,
+-- sacrifice this creature unless you sacrifice a Mountain." (checked against
+-- Scryfall). CR 118.12a's rewriting makes that an IfNotPaid gate whose clause
+-- sacrifices the Lithophage, and CR 612.2 licenses the swap because the gate's
+-- criterion reads a land type word used as a land type.
+--
+-- alice PAYS in both cases, so the Lithophage lives in both and the whole
+-- difference is which land died. The graveyard COUNT cannot tell the two
+-- readings apart -- one land either way -- so the load-bearing assertions are
+-- the two land NAMES, and they come first.
+lithophageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lithophageSpec s registry =
+  let mountainName = CardName.MkCardName (Text.pack "Mountain")
+      islandName = CardName.MkCardName (Text.pack "Island")
+      run hacked = do
+        lithophage <- S.printingOf s registry "Lithophage"
+        mountain <- S.printingOf s registry "Mountain"
+        island <- S.printingOf s registry "Island"
+        seat <- S.printingOf s registry "Seat of the Synod"
+        magicalHack <- S.printingOf s registry "Magical Hack"
+        let (lithoId, onStack) = lithophageUpkeep hacked lithophage mountain island seat magicalHack
+            ((_, after), transcript) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
+        pure (lithoId, onStack, after, transcript)
+   in Spec.describe s "Lithophage" $ do
+        -- The control, and what keeps the case below from passing vacuously:
+        -- unhacked, the printed word stands and the MOUNTAIN is the only thing
+        -- that can pay.
+        Spec.it s "CR 118.12 whole card: an unhacked Lithophage's gate demands the Mountain" $ do
+          (lithoId, onStack, after, transcript) <- run False
+          Spec.assertEqWith s "the Mountain is gone" (S.countOnBattlefieldByName mountainName S.alice after) 0
+          Spec.assertEqWith s "the Island survives" (S.countOnBattlefieldByName islandName S.alice after) 1
+          Spec.assertBool s (elem (Just mountainName) (namesIn Zone.Graveyard S.alice after)) "the Mountain was sacrificed, so it is IN alice's graveyard"
+          Spec.assertBool s (S.onBattlefield lithoId onStack) "the Lithophage is on the battlefield before its upkeep trigger resolves"
+          Spec.assertBool s (not (null (GameState.stack onStack))) "and the upkeep trigger really reached the stack"
+          Spec.assertBool s (S.onBattlefield lithoId after) "paying kept the Lithophage on the battlefield"
+          Spec.assertEqWith s "alice was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+        -- The swap. alice's board did not move -- the same Mountain and the same
+        -- Island -- but the gate printed on the Lithophage now offers "sacrifice
+        -- an Island", so the Island is what dies and the Mountain is not even
+        -- eligible.
+        Spec.it s "CR 612.1 whole card: hacking Lithophage moves which land its CR 118.12 gate demands" $ do
+          (lithoId, onStack, after, transcript) <- run True
+          Spec.assertEqWith s "the Island is gone" (S.countOnBattlefieldByName islandName S.alice after) 0
+          Spec.assertEqWith s "the Mountain survives" (S.countOnBattlefieldByName mountainName S.alice after) 1
+          Spec.assertBool s (elem (Just islandName) (namesIn Zone.Graveyard S.alice after)) "the Island was sacrificed, so it is IN alice's graveyard"
+          Spec.assertBool s (S.onBattlefield lithoId onStack) "the Lithophage is on the battlefield before its upkeep trigger resolves"
+          Spec.assertBool s (not (null (GameState.stack onStack))) "and the upkeep trigger really reached the stack"
+          Spec.assertBool s (S.onBattlefield lithoId after) "paying kept the Lithophage on the battlefield"
+          Spec.assertEqWith s "alice was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+
 -- The names of the cards in one player's copy of a zone, in that zone's order.
 -- Named rather than compared by id because CR 400.7 mints a new object on every
 -- move, so an id taken before a zone change never matches the one after it.
@@ -2099,6 +2188,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   standstillSpec s registry
   dontMakeASoundSpec s registry
   whipstitchedZombieSpec s registry
+  lithophageSpec s registry
   circlingVulturesSpec s registry
   merfolkSeerSpec s registry
   fortressKinGuardSpec s registry
