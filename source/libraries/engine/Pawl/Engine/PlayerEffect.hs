@@ -844,10 +844,10 @@ chosenNamesOf source gs = maybe Set.empty Object.chosenNames (source >>= \oid ->
 -- never Nothing by default -- which is what makes CR 303.4b's IsHostOfSource
 -- answerable here at all. It was a literal Nothing until this function grew the
 -- argument, so Oppressive Rays' "activated abilities of ENCHANTED CREATURE"
--- matched nothing whatever the board held (#1242), the vacuous-atom shape #2141
--- names. A stored CR 611.2c effect legitimately has none: it came from a
--- resolved spell and there is no permanent behind it, so the atom is False for
--- it and CR 303.4b agrees -- a stored effect enchants nothing.
+-- matched nothing whatever the board held; see #1242. A stored CR 611.2c effect
+-- legitimately has none: it came from a resolved spell and there is no permanent
+-- behind it -- `applying` hands Nothing for every stored row, for the reason its
+-- own haddock gives -- so CR 303.4b's atom is simply False there.
 --
 -- The source's HOST comes off the board here rather than riding in the row,
 -- because it is a map lookup with no projection behind it
@@ -1115,8 +1115,8 @@ activationCostAdjustments family pid srcId gs = activationCostAdjustmentsGiven (
 activationCostAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect)] -> Maybe KeywordFamily.KeywordFamily -> ObjectId -> GameState -> CostAdjustments
 activationCostAdjustmentsGiven effects family srcId gs =
   let -- CR 601.2f's MANA increase, the half CostAdjustments.increases was an
-      -- empty literal for until Oppressive Rays gave it a producer (#1242). No
-      -- family beside the criterion, IncreaseActivationCost's own reason.
+      -- empty literal for until Oppressive Rays gave it a producer; see #1242.
+      -- No family beside the criterion, IncreaseActivationCost's own reason.
       increaseOf (source, effect) = case effect of
         PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost criterion amount) ->
           if matchesObjectFrom source criterion srcId gs then Just amount else Nothing

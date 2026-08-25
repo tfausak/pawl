@@ -3996,7 +3996,7 @@ cardFilters card =
     -- ability is framed against the permanent that has it, so an IsSource inside
     -- it names that permanent rather than being unframed.
     <> concatMap (sourceHosted . concatMap conditionFilters . Maybe.maybeToList . PlayerStaticAbility.condition) (Face.playerAbilities card)
-    -- And the EFFECT beside that clause, for the same reason and since #1242:
+    -- And the EFFECT beside that clause, for the same reason and see #1242:
     -- Pawl.Engine.PlayerEffect.matchesObjectFrom is handed the row's own source,
     -- so CR 303.4b's atom is answerable in every arm of a printed player ability
     -- (Oppressive Rays' "enchanted creature"). The STORED CR 611.2c carrier is

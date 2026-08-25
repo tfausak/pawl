@@ -56,6 +56,11 @@
 -- Pawl.Engine.Event's countering funnel. Prowling Serpopard is its NARROWED
 -- counterpart, and the pair is the point: one board, one Cancel, and the filter
 -- alone deciding whether the victim spell survives.
+--
+-- Oppressive Rays is CR 601.2f's ACTIVATION side, on a criterion no other group
+-- here has: CR 303.4b's "enchanted", answered off the source the row carries.
+-- Brothers of Fire is the taxed ability, and the group runs two of them so that
+-- "the tax reached this object" is told apart from "the tax reached everything".
 module Pawl.PlayerEffectSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -4731,9 +4736,9 @@ voidWinnowerSpec s registry =
 -- Filter.IsHostOfSource and nothing else, so the tax reaches exactly the object
 -- the Aura is attached to -- which the engine can only answer because
 -- Pawl.Engine.PlayerEffect.matchesObjectFrom is handed the row's own source. It
--- was handed Nothing until #1242, and every case below would have passed the
--- WRONG WAY: the atom would have been vacuously False and the taxed Brothers
--- would have activated for its printed cost.
+-- was handed Nothing until then (see #1242), and every case below would have
+-- passed the WRONG WAY: the atom would have been vacuously False and the taxed
+-- Brothers would have activated for its printed cost.
 --
 -- TWO Brothers of Fire and not one, which is what separates the three readings a
 -- single-creature board cannot tell apart -- the tax reached this object, the tax
@@ -4754,9 +4759,10 @@ oppressiveRaysBoard rays brothers mountain n =
 oppressiveRaysSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 oppressiveRaysSpec s registry =
   Spec.describe s "OppressiveRays" $ do
-    -- CR 605.3a's offer, asked of both creatures on ONE board: three Mountains
-    -- pay the printed {1}{R}{R} and cannot pay the taxed {4}{R}{R}, so the two
-    -- answers are the whole of the criterion.
+    -- CR 118.3's offer gate, reached at an activation by CR 602.2b, asked of both
+    -- creatures on ONE board: three Mountains pay the printed {1}{R}{R} and
+    -- cannot pay the taxed {4}{R}{R}, so the two answers are the whole of the
+    -- criterion.
     Spec.it s "CR 601.2f the enchanted creature's activation is off the menu at its printed cost" $ do
       rays <- S.printingOf s registry "Oppressive Rays"
       brothers <- S.printingOf s registry "Brothers of Fire"
