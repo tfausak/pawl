@@ -1212,7 +1212,7 @@ permanentDiesSpec s registry =
               TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) TurnScope.ControllersTurn)
             ]
 
--- CR 603.2c's second sentence, and the fork it forces on the written form
+-- CR 603.2c's two sentences, and the fork they force on the written form
 -- permanentDiesSpec above proves the other side of. Vengeful Townsfolk's
 -- "whenever ONE OR MORE other creatures you control die" names the whole CR 704.3
 -- batch as its trigger event, so a state-based-action pass that buries three

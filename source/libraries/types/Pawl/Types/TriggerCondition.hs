@@ -826,8 +826,8 @@ data TriggerCondition
     -- "whenever one or more -1/-1 counters are put on A CREATURE" (Wickersmith's
     -- Tools, Auntie Ool, Cursewretch). Those name one creature and so fire once
     -- per creature however the placements are grouped; this names a set and fires
-    -- once for the set. A card printing the narrower form would want a sibling
-    -- constructor rather than this one.
+    -- once for the set. Not implemented: the narrower form, which wants a sibling
+    -- constructor rather than this one (gap #2332).
     --
     -- Binds nothing, for PermanentsDie's reason: a batch may cover several
     -- permanents, so one slot could not name them all.

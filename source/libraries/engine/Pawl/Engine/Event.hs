@@ -10711,8 +10711,8 @@ looksBack condition = case condition of
   -- a reflexive is fired by none. Its bearer is a CR 603.7 delayed entry too.
   TriggerCondition.Reflexive -> False
 
--- CR 603.2c, the second sentence: does this condition's trigger event CONTAIN the
--- occurrences, or IS each occurrence its trigger event? "Whenever one or more
+-- CR 603.2c: does this condition's trigger event CONTAIN the occurrences, or IS
+-- each occurrence its trigger event? "Whenever one or more
 -- other creatures you control die" names the whole CR 704.3 / CR 608.2f batch, so
 -- a sweep that buries three contains one occurrence of it; "whenever another
 -- creature you control dies" names each death, so the same sweep contains three,
@@ -10726,8 +10726,9 @@ looksBack condition = case condition of
 -- A total case over TriggerCondition and never a wildcard, for looksBack's reason:
 -- the fork is one CR 603.2c forces on every zone-change and event-watching
 -- condition, so a new one must be classified rather than defaulted. Everything but
--- the batch reading is per-occurrence, which is what the rule's first sentence
--- makes the default -- but a future "whenever one or more" printing on any other
+-- the batch reading is per-occurrence, which is the rule's SECOND sentence -- one
+-- event containing several occurrences triggers repeatedly -- where the batch
+-- reading is its FIRST, one trigger event and so one trigger. But a future "whenever one or more" printing on any other
 -- event would answer True here, so the arms are written out rather than folded.
 --
 -- CR 603.1b lets one ability carry several conditions, and `any` makes such an
@@ -10827,9 +10828,9 @@ batchScoped condition = case condition of
   TriggerCondition.SelfBecomesClassLevel _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
   TriggerCondition.SelfCountersRemoved _ -> False
-  -- The one True beside PermanentsDie: CR 603.2c's second sentence is what this
+  -- The one True beside PermanentsDie: CR 603.2c's FIRST sentence is what this
   -- constructor exists for -- "one or more counters ... on one or more
-  -- permanents" names the whole group as the trigger event.
+  -- permanents" names the whole group as the trigger event, which occurs once.
   TriggerCondition.PermanentsGetCounters {} -> True
   TriggerCondition.SpellCast {} -> False
   TriggerCondition.SelfCast -> False
@@ -11665,11 +11666,12 @@ eventTriggers events gs =
       -- in the hand, which no other source reads.
       candidates onBattlefield event later same arrivedAfter = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, revealedInHand event, Map.withoutKeys inGraveyards arrivedAfter, arrivedInGraveyard event, inCommand, inExile])
       scanOne onBattlefield later same arrivedAfter event = concatMap (forOne event) (candidates onBattlefield event later same arrivedAfter)
-      -- CR 603.2c's second sentence, applied to ONE event group: a batch-scoped
-      -- condition's trigger event is the whole group, so it triggers once however
+      -- CR 603.2c's FIRST sentence, applied to ONE event group: a batch-scoped
+      -- condition's trigger event is the whole group, which occurs once however
       -- many of the group's members matched, where a per-occurrence condition
-      -- triggers once per member (CR 603.2c's own Example, the sweeper that fires a
-      -- "whenever A land is put into a graveyard" ability once per land).
+      -- triggers once per member (the rule's second sentence and its own Example,
+      -- the sweeper that fires a "whenever A land is put into a graveyard" ability
+      -- once per land).
       --
       -- The FIRST match wins rather than the last, which keeps the canonical order
       -- below intact: this drops later duplicates and reorders nothing, so a batch

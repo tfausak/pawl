@@ -758,6 +758,31 @@ blightSimultaneitySpec s registry =
           Spec.assertEqWith s "alice drew her card" (S.handSize S.alice after) 1
           Spec.assertEqWith s "bob's Wall took the counter" (fmap (\oid -> minusCountersOn oid after) walls) [Just 1]
           Spec.assertEqWith s "one placement, one group" (length (placementGroups after)) 1
+        -- The control that separates "once per event GROUP" from a dedup coarser
+        -- than the group -- once ever, or once per turn -- which the boards above
+        -- cannot tell apart, each holding one batch. alice's Dawnhand Dissident is
+        -- another Elf entering, so the Morcant already standing triggers a second
+        -- time (CR 603.6a), both opponents blight again, and that second batch is
+        -- an event group of its own: TWO cards, where a coarser dedup leaves the
+        -- one card the first batch drew and a per-seat reading gives four.
+        --
+        -- What this cannot separate is per-group from per-SCAN: the two batches are
+        -- two resolutions and so two CR 117.5 scans. Nothing in data/cards puts
+        -- -1/-1 counters in two groups inside ONE scan; Pawl.ZoneTriggerSpec's "CR
+        -- 704.3 two death groups in one trigger scan are two trigger events" is
+        -- what tells those two readings apart, on the death side.
+        --
+        -- S.entersWithTrigger REWRITES the log, so the group count below reads the
+        -- second batch alone rather than both.
+        Spec.it s "CR 603.2c a second blight is a second trigger event" $ do
+          dissident <- S.printingOf s registry "Dawnhand Dissident"
+          (walls, board) <- censusBoard [S.bob, S.carol] S.threePlayerGame
+          let after = resolveEverything board
+              again = resolveEverything (snd (S.entersWithTrigger dissident S.alice after))
+          Spec.assertEqWith s "alice drew a second card for the second batch" (S.handSize S.alice again) 2
+          Spec.assertEqWith s "she held one after the first" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "both Walls took a second counter" (fmap (\oid -> minusCountersOn oid again) walls) [Just 2, Just 2]
+          Spec.assertEqWith s "and the second batch was one event group" (length (placementGroups again)) 1
 
 -- CR 701.68 blight as a COST (CostComponent.Blight), which is the position most of
 -- the pool prints it in and the one CR 701.68b's "they can't choose to blight"
