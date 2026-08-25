@@ -23,6 +23,8 @@
 --     (#940) -- both are deck-legality rules, and pawl validates no deck.
 --   * Two commanders via partner or a background (#939).
 --   * The Brawl and Oathbreaker variants (CR 903.12 and beyond).
+--   * CR 903.9b's "may apply more than once to the same event" (#2264) and CR
+--     903.9c's melded or merged commander (#2265).
 module Pawl.Engine.Commander where
 
 import qualified Data.List as List
@@ -30,9 +32,9 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.Cost as Cost
+import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -178,11 +180,16 @@ taxCandidates pid oid gs cost =
 -- NOT a replacement effect. Rule 903.9a says "this is a state-based action" in so
 -- many words, which is why it is classified in Pawl.Engine.Sba beside CR 704.5's
 -- own list rather than installed as a Pawl.Types.ReplacementEffect. Its sibling CR
--- 903.9b -- hand and library, which IS a replacement, and an explicit exception to
--- CR 614.5 at that -- is not implemented (#942).
-returnable :: GameState -> [(PlayerId, ObjectId)]
-returnable gs =
-  let arrivals = Maybe.mapMaybe arrivalOf (Event.unscannedSbaEvents gs)
+-- 903.9b -- hand and library, which IS a replacement -- is `commandZoneOffer`
+-- below, asked from the zone-change funnel instead.
+--
+-- Takes the unscanned events rather than reading them off the state, which is
+-- what keeps this module free of Pawl.Engine.Event: rule 903.9b's half is called
+-- FROM that module, so the dependency runs the other way now. Pawl.Engine.Sba
+-- passes Event.unscannedSbaEvents, the watermark it owns anyway.
+returnable :: [GameEvent] -> GameState -> [(PlayerId, ObjectId)]
+returnable events gs =
+  let arrivals = Maybe.mapMaybe arrivalOf events
       arrivalOf event = case event of
         GameEvent.Moved (Moved.MkMoved zc _)
           | elem (ZoneChange.to zc) [Zone.Graveyard, Zone.Exile] -> Just (ZoneChange.object zc)
@@ -194,6 +201,33 @@ returnable gs =
         Just obj | isCommander oid gs && stillThere oid -> Just (Object.owner obj, oid)
         _ -> Nothing
    in Maybe.mapMaybe offer (List.nub arrivals)
+
+-- | CR 903.9b: "if a commander would be put into its owner's hand or library from
+-- anywhere, its owner may put it into the command zone instead". This is the
+-- CONDITION half -- the owner to ask, or Nothing when the rule has nothing to say
+-- about this move -- and Pawl.Engine.Event.offerCommandZone is the question.
+--
+-- Asked of ZoneChange.departed, the id that still exists: the proposed event has
+-- not moved anything yet, so `departed` and `object` are the same value there (see
+-- Pawl.Types.ZoneChange), and naming the departing one is what keeps this correct
+-- if that ever stops being true. `returnable` above takes the opposite id for the
+-- opposite reason -- rule 903.9a asks about an object that has ALREADY arrived.
+--
+-- Both destinations, because rule 903.9b names both and a fix handling only the
+-- hand would leave "put target creature on top of its owner's library" (Griptide)
+-- unoffered. CR 400.3 is why no owner check on the destination is needed: an
+-- object headed for any hand or library goes to its OWNER's, so every move this
+-- admits is already the rule's.
+--
+-- Not implemented: rule 903.9b's "may apply more than once to the same event",
+-- which is its named exception to CR 614.5 (#2264); CR 903.9c's melded or merged
+-- commander (#2265); and a place for the offer in the CR 616.1 ordering, where CR
+-- 616.1e leaves the affected player free to pick among applicable effects (#2266).
+commandZoneOffer :: ZoneChange.ZoneChange -> GameState -> Maybe PlayerId
+commandZoneOffer zc gs
+  | notElem (ZoneChange.to zc) [Zone.Hand, Zone.Library] = Nothing
+  | not (isCommander (ZoneChange.departed zc) gs) = Nothing
+  | otherwise = fmap Object.owner (Game.lookupObject (ZoneChange.departed zc) gs)
 
 -- | CR 903.8's counter, bumped as the cast is announced. Called by
 -- Pawl.Engine.Cast only when the spell left the COMMAND ZONE -- a commander cast
