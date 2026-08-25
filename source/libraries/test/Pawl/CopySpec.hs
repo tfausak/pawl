@@ -8,7 +8,8 @@
 -- "any creature"), the P2 copy gate (Clone), and
 -- Pawl.Engine.Resolve's CreateCopy arm (CR 707.2's token copy, Cackling
 -- Counterpart and Watchful Radstag; its count, and the simultaneous entry that
--- count buys, kicked Rite of Replication) and its BecomeCopy arm (CR 707.4's
+-- count buys, kicked Rite of Replication; and CR 122.6's entry rider on it,
+-- Littjara Mirrorlake) and its BecomeCopy arm (CR 707.4's
 -- change of a permanent already on the battlefield, Unstable Shapeshifter).
 -- Gameplay-level: Clone enters via the zone-change funnel, the Counterpart is
 -- cast and resolved, the Radstag evolves and the Shapeshifter's trigger resolves,
