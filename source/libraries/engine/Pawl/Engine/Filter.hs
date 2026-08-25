@@ -1379,6 +1379,10 @@ rewriteKeyword pairs keyword = case keyword of
 -- payment: the ability on the stack "has the text of the ability that created
 -- it", so it pays the cost this rewrite produced.
 --
+-- A CR 118.12 cost offered as a clause resolves is printed in that same text box
+-- and takes the same descent -- Lithophage's "unless you sacrifice a Mountain",
+-- through Pawl.Engine.Projection.rewritePayGate.
+--
 -- Here rather than in Pawl.Engine.Projection beside the ability rewriters, because
 -- rewriteKeyword above needs it too and Pawl.Engine.Filter cannot import
 -- Pawl.Engine.Projection. One descent, so the keyword carrier and the ability
@@ -1398,12 +1402,13 @@ rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (
 -- six that descend; the rest name a number, or the object the cost is on, and
 -- CR 612.2 finds no word in them to swap.
 --
--- Of the six, only Sacrifice has a producer -- Dark Heart of the Wood. The
--- TapForTotalPower, TapPermanents, DiscardCards, ExileCardsFromGraveyard and
--- ExileTopFromGraveyard arms are a regression fence: no printing pairs any of
--- them with a basic land type, so no test can falsify them. Magmatic Insight's
--- "a land card" comes closest and is still not one -- CR 612.2 swaps a SUBTYPE
--- word, and the land CARD TYPE is not one.
+-- Of the six, only Sacrifice has a producer: Dark Heart of the Wood on an
+-- activation cost, and Lithophage on the cost a trigger offers as it resolves
+-- (CR 118.12). The TapForTotalPower, TapPermanents, DiscardCards,
+-- ExileCardsFromGraveyard and ExileTopFromGraveyard arms are a regression fence:
+-- no printing pairs any of them with a basic land type, so no test can falsify
+-- them. Magmatic Insight's "a land card" comes closest and is still not one --
+-- CR 612.2 swaps a SUBTYPE word, and the land CARD TYPE is not one.
 rewriteComponent :: [(Subtype.Subtype, Subtype.Subtype)] -> CostComponent.CostComponent Keyword.Type.Keyword -> CostComponent.CostComponent Keyword.Type.Keyword
 rewriteComponent pairs component = case component of
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) -> CostComponent.Sacrifice (Sacrifice.MkSacrifice n (rewrite pairs criterion))
