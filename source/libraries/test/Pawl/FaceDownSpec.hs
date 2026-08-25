@@ -1625,8 +1625,12 @@ enteringFaceDownSpec s registry = Spec.describe s "Entering face down" $ do
         -- make names the subtype. A listing of a bare Land would pass the
         -- assertion above and fail this one.
         Spec.assertEqWith s "CR 305.6 the Forest taps for {G}" (Mana.manaTypesOf returned after) [ManaType.Colored Color.Green]
-        -- CR 208.3: a noncreature permanent has no power or toughness, which is
-        -- why the listing's are Maybe and why they are Nothing here.
+        -- CR 208.3: a noncreature permanent has no power or toughness. A FENCE
+        -- rather than a proof of the listing, and measured so: putting a power
+        -- into Yedora's listing leaves this green, because the projection
+        -- answers CR 208.3 off the card types and never reaches the listed
+        -- value. What pins the listing's own Nothing is the structural
+        -- assertion two lines down.
         Spec.assertEqWith s "CR 208.3 and has no power or toughness" (S.powerToughnessOf returned after) Nothing
         -- CR 708.6/708.7, the half a listing alone would not fix: the allower is
         -- Yedora's own effect and not manifest, so CR 701.40b's special action

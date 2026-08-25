@@ -49,8 +49,10 @@ data FaceDownCharacteristics = MkFaceDownCharacteristics
 
 -- | CR 708.2a, which is the list for an ability or effect that names none: "it
 -- becomes a 2\/2 face-down creature with no text, no name, no subtypes, and no
--- mana cost". Morph (CR 702.37c), the EntryRiders.faceDown rider and
--- Effect.TurnFaceDown's Backslide all list nothing and get this.
+-- mana cost". Morph (CR 702.37c), manifest (CR 701.40a) and
+-- Effect.TurnFaceDown's Backslide all list nothing and get this. An entry rider
+-- that lists its own -- Yedora, Grave Gardener's "It's a Forest land" -- carries
+-- a value of its own instead.
 defaultValue :: FaceDownCharacteristics
 defaultValue =
   MkFaceDownCharacteristics

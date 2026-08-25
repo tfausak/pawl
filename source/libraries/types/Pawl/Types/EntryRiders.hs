@@ -142,8 +142,9 @@ import qualified Pawl.Types.TapState as TapState
 --
 -- `faceDown` is CR 708.3's "objects that are put onto the battlefield face
 -- down", said by the EFFECT that does the putting -- the "manifest the top card of
--- your library" Soul Summons and Cloudform share (CR 701.40a) -- against CR
--- 110.5b's face-up default.
+-- your library" Soul Summons and Cloudform share (CR 701.40a), and Yedora, Grave
+-- Gardener's "return it to the battlefield face down" -- against CR 110.5b's
+-- face-up default.
 -- A rider and not a write after the move for `exiledFaceDown`'s reason and one
 -- of its own: CR 708.3 says the object is turned face down BEFORE it enters, so
 -- the CR 614.1c entry loop, the CR 603.2g Moved event and every trigger scanning

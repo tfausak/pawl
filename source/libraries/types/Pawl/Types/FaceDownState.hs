@@ -5,8 +5,9 @@ import qualified Pawl.Types.FaceDownReason as FaceDownReason
 
 -- | CR 708.2: the whole of what the game knows about a face-down object -- the
 -- ability or rules that ALLOWED it to be face down (CR 708.6), and the
--- characteristics that allower LISTED for it. Morph and the rest list nothing
--- and carry 'FaceDownCharacteristics.defaultValue'.
+-- characteristics that allower LISTED for it. Morph, manifest and Backslide
+-- list nothing and carry 'FaceDownCharacteristics.defaultValue'; disguise and an
+-- entry rider that lists its own carry something else.
 --
 -- The reason is first because CR 708.2's own sentence puts it first: the listed
 -- characteristics are "those listed by the ability or rules that allowed the
