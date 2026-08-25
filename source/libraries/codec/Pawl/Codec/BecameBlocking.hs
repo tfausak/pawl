@@ -19,9 +19,14 @@ codec = Fields.object $ do
   -- declaration is the producer of all but a handful of these events, so the key
   -- rides only on CR 509.4's entry.
   putOntoBattlefield <- Fields.defaulted "putOntoBattlefield" False Common.boolean BecameBlocking.putOntoBattlefield
+  -- Defaulted for the same reason, and to the same value: CR 509.1's declaration
+  -- is the first thing that blocks any attacker, so every event it records
+  -- carries this clear too.
+  attackerWasBlocked <- Fields.defaulted "attackerWasBlocked" False Common.boolean BecameBlocking.attackerWasBlocked
   pure
     BecameBlocking.MkBecameBlocking
       { BecameBlocking.blocker = blocker,
         BecameBlocking.attacker = attacker,
-        BecameBlocking.putOntoBattlefield = putOntoBattlefield
+        BecameBlocking.putOntoBattlefield = putOntoBattlefield,
+        BecameBlocking.attackerWasBlocked = attackerWasBlocked
       }

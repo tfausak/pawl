@@ -1443,7 +1443,13 @@ putOntoBattlefieldBlocking oid attacker = do
           --
           -- The flag is CR 509.4's exclusion: rule 509.3b reads the same event
           -- and must NOT fire off this one.
-          State.modify' (Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = oid, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = True})))
+          --
+          -- `wasBlocked` rides the event because no reader can re-derive it
+          -- afterwards: the write above has already put this creature into the
+          -- attacker's entry, and CR 509.1h lets that entry be an EMPTY set for
+          -- an attacker that is blocked all the same. CR 509.3e's filtered form
+          -- is the reader.
+          State.modify' (Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = oid, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = wasBlocked})))
           -- CR 509.3c: the attacker became a blocked creature. The defending
           -- player rides the event as it does off the declaration; the guard
           -- above has already settled that it is this creature's controller.
@@ -1637,7 +1643,19 @@ attemptBlockDeclaration pid attacking rejected = do
               -- TWO events per declaration, split by CR 509.3a against CR 509.3b: one
               -- BecameBlocking per PAIR, and one BlocksDeclared per BLOCKING CREATURE.
               -- The count it carries is CR 509.3e's.
-              State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = False})) h) g pairs
+              --
+              -- CR 509.1h's flag is read off `gs2`, which is the state BEFORE the
+              -- write above, and so says of each attacker whether it was already
+              -- blocked when this declaration was made. The same set answers CR
+              -- 509.3c below.
+              --
+              -- Not constant here: becomeBlocked writes the key with an EMPTY set
+              -- for Effect.BecomesBlocked, which can resolve ahead of this
+              -- declaration. No condition reads the flag off a declared pair
+              -- today, so no board observes what it holds -- it is recorded
+              -- faithfully rather than clamped, since the event is the record.
+              let wasBlocked = Map.keysSet (Combat.blockers (GameState.combat gs2))
+              State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = Set.member attacker wasBlocked})) h) g pairs
               State.modify' $ \g -> List.foldl' (\h (blocker, attackers) -> Event.recordEvent (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker (Natural.length attackers))) h) g (filter (not . Set.null . snd) (Map.toList declaration))
               -- CR 509.1h: the same declaration makes each attacker it named a BLOCKED
               -- creature. One event per attacker rather than per pair, which is CR
@@ -1657,8 +1675,7 @@ attemptBlockDeclaration pid attacking rejected = do
               --
               -- The defending player rides the event as it rides AttackerDeclared (CR
               -- 702.130a's afflict is the reader), with `pid` as the fallback.
-              let wasBlocked = Map.keysSet (Combat.blockers (GameState.combat gs2))
-                  becameBlocked = Set.difference (Set.fromList (fmap snd pairs)) wasBlocked
+              let becameBlocked = Set.difference (Set.fromList (fmap snd pairs)) wasBlocked
               State.modify'
                 ( \g ->
                     let defendingFor oid = Maybe.fromMaybe pid (Defender.playerOfAttacker oid g)

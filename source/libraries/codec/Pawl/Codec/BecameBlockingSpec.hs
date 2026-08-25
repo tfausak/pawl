@@ -18,7 +18,8 @@ spec s = Spec.describe s "Pawl.Codec.BecameBlocking" $ do
       ( BecameBlocking.MkBecameBlocking
           { BecameBlocking.blocker = ObjectId.MkObjectId 1,
             BecameBlocking.attacker = ObjectId.MkObjectId 2,
-            BecameBlocking.putOntoBattlefield = False
+            BecameBlocking.putOntoBattlefield = False,
+            BecameBlocking.attackerWasBlocked = False
           }
       )
       " {\"blocker\":1,\"attacker\":2} "
@@ -30,8 +31,25 @@ spec s = Spec.describe s "Pawl.Codec.BecameBlocking" $ do
       ( BecameBlocking.MkBecameBlocking
           { BecameBlocking.blocker = ObjectId.MkObjectId 1,
             BecameBlocking.attacker = ObjectId.MkObjectId 2,
-            BecameBlocking.putOntoBattlefield = True
+            BecameBlocking.putOntoBattlefield = True,
+            BecameBlocking.attackerWasBlocked = False
           }
       )
       " {\"blocker\":1,\"attacker\":2,\"putOntoBattlefield\":true} "
+  -- CR 509.1h's flag, and the one producer that can set it: an arrival at an
+  -- attacker that was ALREADY blocked. The case above holds it clear while the
+  -- other flag is set, which is what tells the two apart -- a codec that read
+  -- either key into the other field disagrees there.
+  Spec.it s "MkBecameBlocking, put onto the battlefield blocking an already-blocked attacker" $
+    Common.assertCodec
+      s
+      BecameBlocking.codec
+      ( BecameBlocking.MkBecameBlocking
+          { BecameBlocking.blocker = ObjectId.MkObjectId 1,
+            BecameBlocking.attacker = ObjectId.MkObjectId 2,
+            BecameBlocking.putOntoBattlefield = True,
+            BecameBlocking.attackerWasBlocked = True
+          }
+      )
+      " {\"blocker\":1,\"attacker\":2,\"putOntoBattlefield\":true,\"attackerWasBlocked\":true} "
   Spec.it s "has a schema" $ Common.assertHasSchema s BecameBlocking.codec
