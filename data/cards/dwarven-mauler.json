@@ -1,0 +1,70 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Dwarven Mauler",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "ReduceActivationCost",
+            "value": {
+              "floor": 0,
+              "grantedBy": {
+                "type": "Equip"
+              },
+              "reduction": [
+                {
+                  "type": "Generic",
+                  "value": 2
+                }
+              ],
+              "whichAbilities": {
+                "type": "And",
+                "value": []
+              },
+              "whichTargets": {
+                "type": "IsSource"
+              }
+            }
+          },
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Dwarf"
+          },
+          {
+            "type": "Warrior"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

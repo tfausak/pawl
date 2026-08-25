@@ -424,7 +424,13 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f n) -> PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.rewrite pairs f) n)
   PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f n) -> PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost (Filter.rewrite pairs f) n)
   PlayerEffect.ReduceSpellCost x -> PlayerEffect.ReduceSpellCost x {ReduceSpellCost.whichSpells = Filter.rewrite pairs (ReduceSpellCost.whichSpells x)}
-  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f family cost floor_) -> PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.rewrite pairs f) family cost floor_)
+  -- TWO Filters of its own, and both descend. The second names
+  -- what the ability targets (Dwarven Mauler's "that target this creature",
+  -- spelled Filter.IsSource), so no card in `data/cards/` puts a subtype word
+  -- there today and neutralising that descent leaves the suite green -- it is
+  -- here so that the card which does write one cannot silently keep the printed
+  -- word.
+  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f family targets cost floor_) -> PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.rewrite pairs f) family (fmap (Filter.rewrite pairs) targets) cost floor_)
   -- The two arms with a word in TWO places: their own criterion ("nontoken
   -- Rebels"), and the criterion inside each component they add ("sacrifice a
   -- LAND", "sacrifice a SWAMP"). Both descend, which is Filter.rewriteCost's
@@ -1098,6 +1104,14 @@ spellCostAdjustments pid oid gs =
 -- family. Compared and never inspected further: a KeywordFamily is a rulebook
 -- designator, so nothing here learns what the reduced ability DOES.
 --
+-- `targets` is the THIRD criterion and the one that arrives from a different
+-- MOMENT: CR 601.2c's announced targets, which CR 601.2f's reductions may name
+-- (Dwarven Mauler's "equip abilities you activate that target this creature").
+-- A caller that has not reached CR 601.2c hands the empty set, and every reducer
+-- whose sentence names a target is then simply inapplicable -- see
+-- Pawl.Engine.Activate.activateAbility, which gathers once before the targets
+-- exist and again after.
+--
 -- The MANA increases are gathered too (Oppressive Rays), and CR 601.2f orders
 -- every one of them before any reduction -- which is Cost.applyAdjustments'
 -- doing rather than this gather's, since the record has no order in it. The
@@ -1108,8 +1122,8 @@ spellCostAdjustments pid oid gs =
 -- sentence says "this effect", so an effect that states no floor is not bound by
 -- another's, and Pawl.Engine.Cost.applyAdjustments applies each floor as its own
 -- reduction lands.
-activationCostAdjustments :: Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> CostAdjustments
-activationCostAdjustments family pid srcId gs = activationCostAdjustmentsGiven (applying pid gs) family srcId gs
+activationCostAdjustments :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> CostAdjustments
+activationCostAdjustments targets family pid srcId gs = activationCostAdjustmentsGiven (applying pid gs) targets family srcId gs
 
 -- The same gather given the effect list the CALLER has already taken, which is
 -- the half a per-permanent loop wants: `applying` is a walk of everything in
@@ -1125,9 +1139,21 @@ activationCostAdjustments family pid srcId gs = activationCostAdjustmentsGiven (
 -- The rows arrive PAIRED WITH THEIR SOURCE and not stripped to bare effects,
 -- because CR 303.4b's "enchanted" is a fact about the row's own permanent: the
 -- criterion is matched through matchesObjectFrom, which needs it.
-activationCostAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect)] -> Maybe KeywordFamily.KeywordFamily -> ObjectId -> GameState -> CostAdjustments
-activationCostAdjustmentsGiven effects family srcId gs =
-  let -- CR 601.2f's MANA increase, the half CostAdjustments.increases was an
+activationCostAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect)] -> Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> ObjectId -> GameState -> CostAdjustments
+activationCostAdjustmentsGiven effects targets family srcId gs =
+  let -- CR 601.2c's chosen targets, asked of ReduceActivationCost's third
+      -- criterion: Dwarven Mauler's "equip abilities you activate THAT TARGET
+      -- THIS CREATURE". ANY rather than all, which is what the sentence says of
+      -- an ability announcing more than one target, and False on an empty set --
+      -- an ability that targets nothing is not an ability that targets this
+      -- creature.
+      --
+      -- Matched through the same matchesObjectFrom the other two criteria use, so
+      -- the filter is asked against the TARGET's projection with the reducer's own
+      -- permanent as Pawl.Engine.Filter's source -- which is what makes
+      -- Filter.IsSource read "this creature" here.
+      aims source criterion = any (\oid -> matchesObjectFrom source criterion oid gs) (Set.toList targets)
+      -- CR 601.2f's MANA increase, the half CostAdjustments.increases was an
       -- empty literal for until Oppressive Rays gave it a producer; see #1242.
       -- No family beside the criterion, IncreaseActivationCost's own reason.
       increaseOf (source, effect) = case effect of
@@ -1163,10 +1189,10 @@ activationCostAdjustmentsGiven effects family srcId gs =
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
       reductionOf (source, effect) = case effect of
-        PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost criterion granted amount floor_) ->
+        PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost criterion granted aimedAt amount floor_) ->
           -- Never confined to coloured mana: no printed activation-cost reducer
           -- states Edgewalker's sentence, so CR 118.7b-d's spill stands.
-          if matchesObjectFrom source criterion srcId gs && maybe True (\g -> Just g == family) granted
+          if matchesObjectFrom source criterion srcId gs && maybe True (\g -> Just g == family) granted && maybe True (aims source) aimedAt
             then Just (AppliedReduction.MkAppliedReduction amount floor_ False)
             else Nothing
         -- The non-mana addition, gathered by `additionOf` below: CR 601.2f's
