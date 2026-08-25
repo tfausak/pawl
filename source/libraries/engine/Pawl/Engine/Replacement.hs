@@ -1615,26 +1615,6 @@ preventionBy candidate before after = case (ReplacementCandidate.effect candidat
               else Nothing
   _ -> Nothing
 
--- CR 615.13: collapse a batch's per-event preventions to one entry per applying
--- instance per recipient, carrying the total that instance prevented.
---
--- Keyed on the RECIPIENT as well as the instance, which is narrower than the
--- rule's own unit -- 615.13 counts one application of one prevention effect,
--- whoever the simultaneous events were addressed to. Every prevention the ENGINE
--- bakes names exactly one recipient (Resolve's two prevention arms), and the one
--- card-authored prevention that names none -- Fog's -- has no CR 615.13 trigger
--- paired with it, so the two readings coincide today. Not implemented: a
--- prevention effect naming NO recipient that reaches two recipients in one batch
--- reports two preventions where the rule describes one (#688).
---
--- Ascending by key, so the CR 608.2i record -- and therefore the CR 603.3b order
--- these triggers are offered in -- is canonical rather than gather-dependent.
---
--- Only the AMOUNTS are summed. CR 615.5's rider is a property of the INSTANCE,
--- and the key already fixes the instance, so every entry merged here carries the
--- same rider and taking either side is taking the same value -- which is also
--- the rule: one application of one prevention effect runs its additional effect
--- once, with the total it prevented.
 -- CR 615.13's "prevented THIS WAY": which object's own PRINTED prevention effect
 -- an application was, or Nothing when no card printed it. What
 -- TriggerCondition.SelfPreventsDamage compares against its bearer.
@@ -1667,6 +1647,26 @@ printedBy candidate = case candidate of
     ReplacementEffect.DamageR (DamageR.MkDamageR _ DamageRewrite.PreventRemovingShieldCounter _) -> Nothing
     _ -> Just (PermanentCandidate.source permanent)
 
+-- CR 615.13: collapse a batch's per-event preventions to one entry per applying
+-- instance per recipient, carrying the total that instance prevented.
+--
+-- Keyed on the RECIPIENT as well as the instance, which is narrower than the
+-- rule's own unit -- 615.13 counts one application of one prevention effect,
+-- whoever the simultaneous events were addressed to. Every prevention the ENGINE
+-- bakes names exactly one recipient (Resolve's two prevention arms), and the one
+-- card-authored prevention that names none -- Fog's -- has no CR 615.13 trigger
+-- paired with it, so the two readings coincide today. Not implemented: a
+-- prevention effect naming NO recipient that reaches two recipients in one batch
+-- reports two preventions where the rule describes one (#688).
+--
+-- Ascending by key, so the CR 608.2i record -- and therefore the CR 603.3b order
+-- these triggers are offered in -- is canonical rather than gather-dependent.
+--
+-- Only the AMOUNTS are summed. CR 615.5's rider is a property of the INSTANCE,
+-- and the key already fixes the instance, so every entry merged here carries the
+-- same rider and taking either side is taking the same value -- which is also
+-- the rule: one application of one prevention effect runs its additional effect
+-- once, with the total it prevented.
 groupPreventions :: [Prevention] -> [Prevention]
 groupPreventions ps =
   let merge (a1, r) (a2, _) = (a1 + a2, r)

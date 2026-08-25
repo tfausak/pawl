@@ -2597,7 +2597,7 @@ phyrexianVindicatorSpec s registry = Spec.describe s "Phyrexian Vindicator (CR 6
   -- bob only because the pool never offers it. Damage the Vindicator dealt
   -- ITSELF would be prevented by its own shield (CR 615.6) and so leave no mark,
   -- which is why bob's life is what this reads.
-  Spec.it s "CR 601.2c the trigger's pool excludes its own source: 'any OTHER target'" $ do
+  Spec.it s "CR 115.4 the trigger's pool excludes its own source: 'any OTHER target'" $ do
     plains <- S.printingOf s registry "Plains"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     vindicatorPrinting <- S.printingOf s registry "Phyrexian Vindicator"
