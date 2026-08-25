@@ -6730,8 +6730,8 @@ entryCountersSpec s registry = Spec.describe s "The counters a Create says its t
 -- CR 614.5's "only one opportunity", at the entry level. Perennation
 -- ({3}{W}{B}{G} Sorcery, whole text: "Return target permanent card from your
 -- graveyard to the battlefield with a hexproof counter and an indestructible
--- counter on it." -- oracle checked on Scryfall) is the pool's producer of TWO
--- KINDS of entry counters from ONE effect, which is the board the rule needs:
+-- counter on it." -- oracle checked on Scryfall) gives one permanent TWO KINDS
+-- of entry counter from ONE effect, which is the board the rule needs:
 -- CR 614.1c makes both counters part of the permanent's single entry event, so a
 -- scaling row whose pattern matches every kind gets ONE opportunity covering
 -- both, not one per kind.
