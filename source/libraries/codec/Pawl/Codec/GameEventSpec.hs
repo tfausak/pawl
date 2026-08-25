@@ -173,7 +173,7 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 6, BecameBlocking.attacker = ObjectId.MkObjectId 7, BecameBlocking.putOntoBattlefield = False}))
+      (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 6, BecameBlocking.attacker = ObjectId.MkObjectId 7, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = False}))
       " {\"type\":\"BecameBlocking\",\"value\":{\"blocker\":6,\"attacker\":7}} "
   -- An object and a COUNT: CR 509.3a's event is per blocking creature, and the
   -- number beside it is how many attackers it took (CR 509.3e). Distinct

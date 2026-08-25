@@ -306,9 +306,9 @@ data GameEvent
     -- creature" won't trigger for a creature put onto the battlefield blocking,
     -- and rule 509.3d's "becomes blocked by a creature" will. Combat.blockers
     -- cannot tell them apart, which is why the flag is on the event rather than
-    -- read off the board. The third reader, CR 509.3e's blocker COUNT, wants the
-    -- flag set: it is the declaration that reaches that condition through
-    -- AttackerBlocked below instead.
+    -- read off the board. Rule 509.3e's two readers -- the blocker COUNT and the
+    -- filtered "one or more" -- want the flag set instead: it is the declaration
+    -- that reaches those conditions through AttackerBlocked below.
     --
     -- ONE event per PAIR, which is CR 509.3b's arity ("once for each attacking
     -- creature the creature blocks"). CR 509.3a's once-per-blocker arity is
@@ -340,10 +340,11 @@ data GameEvent
     -- many there were -- read Combat.blockers off this event instead, which is
     -- exact because CR 509.2a puts these triggers on the stack before any player
     -- gets priority. Rule 509.3e's "effects that add or remove blockers" is why
-    -- one of them, CreatureBecomesBlockedByAtLeast, reads the same record off
-    -- BecameBlocking as well: an arrival that joins an ALREADY blocked attacker
-    -- records no event of this kind at all, CR 509.3c's guard below withholding
-    -- it.
+    -- both of them, SelfBecomesBlockedByOneOrMore and
+    -- CreatureBecomesBlockedByAtLeast, read the same record off BecameBlocking
+    -- as well: an arrival that joins an ALREADY blocked attacker records no
+    -- event of this kind at all, CR 509.3c's guard below withholding it -- which
+    -- is what BecameBlocking.attackerWasBlocked says on the other side.
     --
     -- CR 509.3c's THIRD producer records it as well: an attacker whose only
     -- blocker is one put onto the battlefield blocking becomes blocked too -- CR

@@ -1024,6 +1024,44 @@ selfBlocksOneOrMoreSpec s registry =
         _ -> S.aggressiveAnswer p
       atDamage :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
       atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage)
+      afterCombat :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      afterCombat = S.runToStep (Phase.Combat CombatStep.EndOfCombat)
+      -- `board` with one creature card added to bob's HAND, which is what
+      -- Aetherplasm's second clause puts onto the battlefield blocking. The hand
+      -- holds that card alone, so the two arrival legs below differ in the CARD
+      -- and in nothing else.
+      plasmBoard mine theirs card = do
+        (gs0, ours, yours) <- board mine theirs
+        printing <- S.printingOf s registry card
+        let (handId, withCard) = S.addHandCard printing S.bob gs0
+        pure (withCard, ours, yours, handId)
+      -- Declares `blockers` against the lone attacker, takes both of
+      -- Aetherplasm's printed "may"s, and takes `card` out of hand.
+      --
+      -- The offer is FILTERED rather than replaced: clause 0 has already put
+      -- Aetherplasm back in hand beside it and both are creature cards, so the
+      -- choice is a real one, and a leg where `card` is not offered takes the
+      -- fallback instead of succeeding on a hand-built id.
+      --
+      -- The declaration is spelled out here rather than left to the answerer
+      -- S.runToStep was handed: that function stops when the phase first
+      -- matches, which is BEFORE CR 509.1's turn-based action, so an answer of
+      -- Map.empty would silently leave the attacker unblocked.
+      swapping :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      swapping attacker blockers card p = case p of
+        Prompt.DeclareBlockers {} -> Map.fromList (fmap (\b -> (b, Set.singleton attacker)) blockers)
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        Prompt.ChooseCardInHand _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== card) (NonEmpty.toList offered))
+        _ -> S.aggressiveAnswer p
+      survivors :: String -> GameState.GameState -> Int
+      survivors name = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack name)) S.bob
+      -- The ids Combat.blockers holds for an attacker, narrowed to the ones
+      -- still on the battlefield. Nothing prunes a blocker's id as it leaves
+      -- (Pawl.Engine.Damage's liveness filter is what makes the assignment
+      -- right), and Aetherplasm leaves ALIVE, so its stale id is still in the
+      -- set below.
+      liveBlockers :: ObjectId.ObjectId -> GameState.GameState -> [ObjectId.ObjectId]
+      liveBlockers attacker gs = filter (`S.onBattlefield` gs) (Set.toList (Combat.blockersOf attacker gs))
    in Spec.describe s "SelfBlocksOneOrMore" $ do
         -- The proving test for the BLOCKING half, and its control: two boards
         -- differing only in the attacker's colour.
@@ -1103,6 +1141,85 @@ selfBlocksOneOrMoreSpec s registry =
                 (S.powerToughnessOf inquisitors (atDamage (blockEverything piker) gs))
                 (Just (3, 3))
             _ -> Spec.assertFailure s "fixture should give bob an Inquisitors and a Piker"
+        -- Rule 509.3e's SECOND sentence, "effects that add or remove blockers
+        -- can also cause such abilities to trigger", for the ATTACKING half.
+        -- Aetherplasm {2}{U}{U} 1/1 declares the block, its own trigger returns
+        -- it to hand and puts a creature card onto the battlefield blocking the
+        -- same attacker (CR 509.4), and the Inquisitors becomes blocked by that
+        -- arrival. The declaration admits nobody -- Aetherplasm is blue -- so
+        -- every reading agrees until the arrival, and the arrival is the whole
+        -- difference.
+        --
+        -- Two legs off one board and one answerer, differing in the CARD bob
+        -- takes out of hand: Disowned Ancestor {B} 0/4, and Secret Door {U} 0/4
+        -- as the control. Both are 0/4, so the two legs agree on what the
+        -- arrival can do and on what survives its own return damage, and differ
+        -- only in colour -- and 4 is the one toughness that separates 3 from 5.
+        -- Power 0 is why nothing else on the board moves either way. Secret
+        -- Door's activated ability is sorcery-speed and bob has no mana; the
+        -- Ancestor's outlast is sorcery-speed too.
+        --
+        -- WHAT DOES NOT DISCRIMINATE, and each is a board a reader reaches for
+        -- first:
+        --
+        --   * Cabal Evangel 2/2 as the arrival, which the issue drafted. The
+        --     grant is +2/+0, so the 3/3 kills a 2/2 under both readings and
+        --     takes 2 and lives under both.
+        --   * declining Aetherplasm's first "may". Clause 1 hangs on it (CR
+        --     608.2c), so that leg differs in two things -- the blocker that
+        --     stays and the arrival that never comes.
+        --   * reading the Inquisitors' power alone. A partial fix could reach
+        --     5/3 without the pump landing on anything; the Ancestor's death is
+        --     the quantity and the power comes after it.
+        Spec.it s "CR 509.3e whole card: a black creature put onto the battlefield blocking is +2/+0, a blue one is nothing" $ do
+          (blackGs, blackMine, blackTheirs, ancestor) <- plasmBoard ["Serra Inquisitors"] ["Aetherplasm"] "Disowned Ancestor"
+          (blueGs, blueMine, blueTheirs, door) <- plasmBoard ["Serra Inquisitors"] ["Aetherplasm"] "Secret Door"
+          case (blackMine, blackTheirs, blueMine, blueTheirs) of
+            ([inquisitors], [plasm], [control], [otherPlasm]) -> do
+              Spec.assertEqWith
+                s
+                "the Ancestor takes 5 and dies, and the same board with a blue arrival leaves it standing"
+                (survivors "Disowned Ancestor" (afterCombat (swapping inquisitors [plasm] ancestor) blackGs), survivors "Secret Door" (afterCombat (swapping control [otherPlasm] door) blueGs))
+                (0, 1)
+              -- The control leg is not vacuous: its arrival really did come and
+              -- really is blocking, so the survival above is the Filter and not
+              -- a clause that never ran.
+              Spec.assertEqWith
+                s
+                "control: the blue arrival is blocking the Inquisitors all the same"
+                (length (liveBlockers control (atDamage (swapping control [otherPlasm] door) blueGs)))
+                1
+              -- The pump itself, after the gameplay quantity.
+              Spec.assertEqWith
+                s
+                "5/3 against the Ancestor, 3/3 against the Door"
+                (S.powerToughnessOf inquisitors (atDamage (swapping inquisitors [plasm] ancestor) blackGs), S.powerToughnessOf control (atDamage (swapping control [otherPlasm] door) blueGs))
+                (Just (5, 3), Just (3, 3))
+            _ -> Spec.assertFailure s "fixture should give alice one Serra Inquisitors and bob one Aetherplasm on each board"
+        -- The CROSSING and not the arrival: an admitted creature that joins an
+        -- attacker ALREADY blocked by an admitted one is no second becoming, so
+        -- the ability fires once for the whole combat. The case above's board
+        -- with a Bog Wraith 3/3 declared alongside Aetherplasm, and nothing else
+        -- changed -- the declaration fires the trigger there, and the Ancestor
+        -- arrives into a block a black creature is already part of.
+        --
+        -- Read at the combat damage step, before damage: the Wraith's 3 kills a
+        -- 5/3 and a 7/3 alike, so the survivors cannot tell the two apart.
+        Spec.it s "CR 509.3e a black creature joining a block a black creature is already in is +2/+0 once" $ do
+          (gs, mine, theirs, ancestor) <- plasmBoard ["Serra Inquisitors"] ["Aetherplasm", "Bog Wraith"] "Disowned Ancestor"
+          case (mine, theirs) of
+            ([inquisitors], [plasm, wraith]) -> do
+              let joined = atDamage (swapping inquisitors [plasm, wraith] ancestor) gs
+              Spec.assertEqWith s "one pump, not two" (S.powerToughnessOf inquisitors joined) (Just (5, 3))
+              -- Anti-vacuity: the arrival did come and did join THIS attacker's
+              -- block, so the single pump is the crossing and not a clause that
+              -- never ran.
+              Spec.assertEqWith
+                s
+                "CR 509.4: the Wraith and the Ancestor are both blocking the Inquisitors"
+                (length (liveBlockers inquisitors joined), survivors "Disowned Ancestor" joined)
+                (2, 1)
+            _ -> Spec.assertFailure s "fixture should give alice one Serra Inquisitors, and bob an Aetherplasm and a Wraith"
 
 -- CR 509.3e read by a BYSTANDER on the ATTACKING side: "whenever a creature
 -- attacking one of your opponents becomes blocked by two or more creatures".

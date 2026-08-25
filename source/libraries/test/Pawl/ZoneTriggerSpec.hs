@@ -1758,8 +1758,9 @@ leavesBattlefieldSpec s registry =
 -- keyset. The exceptions are SelfLeavesTheBattlefield, whose two destinations
 -- differ because CR 400.7e binds `became` for the public one and withholds it
 -- for the hidden one (CR 400.2); SelfIsDealtDamage, which admits both of CR
--- 120.3's damage kinds; and CreatureBecomesBlockedByAtLeast, which admits rule
--- 509.3e's two producers under two different event constructors.
+-- 120.3's damage kinds; and SelfBecomesBlockedByOneOrMore and
+-- CreatureBecomesBlockedByAtLeast, which each admit rule 509.3e's two producers
+-- under two different event constructors.
 --
 -- Exhaustive with no wildcard, which is half of what keeps the pin honest -- a
 -- new TriggerCondition fails to compile here. The other half, the list below, is
@@ -1875,25 +1876,36 @@ representativeEvents cond =
         TriggerCondition.SelfBlocksOneOrMore _ -> one (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared departed 1))
         -- The PAIRWISE event instead: CR 509.3b's bearer is the BLOCKER too, and
         -- the attacker beside it is what this one binds.
-        TriggerCondition.SelfBlocksCreature _ -> one (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = departed, BecameBlocking.attacker = ObjectId.MkObjectId 41, BecameBlocking.putOntoBattlefield = False}))
+        TriggerCondition.SelfBlocksCreature _ -> one (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = departed, BecameBlocking.attacker = ObjectId.MkObjectId 41, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = False}))
         -- CR 508.5's defending player again, and carol for SelfAttacks' reason
         -- above: eventBindings binds this field under `thatPlayer`.
         TriggerCondition.SelfBecomesBlocked -> one (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol))
         -- The same declaration event SelfBlocks names, with the ids the other way
         -- round: this condition's bearer is the ATTACKER, and the blocker is what
         -- it binds.
-        TriggerCondition.SelfBecomesBlockedBy _ -> one (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 41, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = False}))
+        TriggerCondition.SelfBecomesBlockedBy _ -> one (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 41, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = False}))
         -- The GROUPED attacking-side event, which is what makes this one fire
         -- once where the arm above fires per blocker. carol on SelfBecomesBlocked's
         -- reasoning -- and this one binds that player nothing, which is the
         -- difference the pin catches.
-        TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> one (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol))
+        --
+        -- The SECOND list longer than one, and for the same reason as
+        -- CreatureBecomesBlockedByAtLeast below: rule 509.3e's second producer,
+        -- the arrival of a creature put onto the battlefield blocking an
+        -- attacker that was already blocked, is admitted under a different event
+        -- constructor. This condition names a SET rather than an object, so both
+        -- events bind nothing and the intersection is empty -- which is what an
+        -- eventBindings arm added here without eventBindingSlots being told
+        -- would break.
+        TriggerCondition.SelfBecomesBlockedByOneOrMore _ ->
+          GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol)
+            NonEmpty.:| [GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 42, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = True})]
         -- The same grouped event once more, with the ids read the other way from
         -- every arm above it: the bearer is a BYSTANDER, so `departed` sits in
         -- the attacker position and is what this one binds -- an arm that bound
         -- the bearer instead would pin the empty set here.
         --
-        -- The THIRD list longer than one, and rule 509.3e's second producer is
+        -- The LAST list longer than one, and rule 509.3e's second producer is
         -- why: this condition also admits the arrival of a creature put onto the
         -- battlefield blocking, which names the attacker in a different payload
         -- and so needs its own eventBindings arm. An arm added to matchesTrigger
@@ -1903,7 +1915,7 @@ representativeEvents cond =
         -- intersection is the fence for exactly that.
         TriggerCondition.CreatureBecomesBlockedByAtLeast {} ->
           GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol)
-            NonEmpty.:| [GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 42, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = True})]
+            NonEmpty.:| [GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 42, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = True})]
         -- The same declaration's unblocked branch, which carries the attacker
         -- and nothing else -- so the floor it pins is the empty set.
         TriggerCondition.SelfAttacksUnblocked -> one (GameEvent.AttackerUnblocked departed)
@@ -2488,10 +2500,12 @@ becameSlotSpec s registry =
         -- could have placed the trigger. A few conditions have a list longer
         -- than one -- SelfLeavesTheBattlefield, where the two destinations
         -- disagree about `became`; SelfIsDealtDamage, where CR 120.3's two
-        -- damage kinds agree on `thatMuch` and so make the floor a real one; and
+        -- damage kinds agree on `thatMuch` and so make the floor a real one;
         -- CreatureBecomesBlockedByAtLeast, where rule 509.3e's two producers
-        -- agree on `attackingCreature` off two different event constructors. For
-        -- every other the intersection is exactly that single event's keyset.
+        -- agree on `attackingCreature` off two different event constructors; and
+        -- SelfBecomesBlockedByOneOrMore, whose two producers agree on binding
+        -- nothing at all. For every other the intersection is exactly that
+        -- single event's keyset.
         --
         -- The BEARER ARRIVAL argument is held constant at a present one, and is
         -- not a second dimension of the intersection: it is CR 400.7f's datum

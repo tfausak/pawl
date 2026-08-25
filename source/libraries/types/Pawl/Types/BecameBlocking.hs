@@ -30,6 +30,24 @@ data BecameBlocking = MkBecameBlocking
     -- neither a declaration nor an entry, and CR 509.3b does trigger for it. No
     -- such effect is in the pool (#1146); it would record this event with the
     -- flag clear.
-    putOntoBattlefield :: Bool
+    putOntoBattlefield :: Bool,
+    -- | CR 509.1h: whether the ATTACKER was already a blocked creature
+    -- immediately before this event, read before the write that made it.
+    --
+    -- Not derivable from Combat.blockers by the time a trigger condition is
+    -- scanned. The write has already put this blocker into the attacker's entry,
+    -- so Map.member answers True for every arrival; and rule 509.1h's last
+    -- sentence ("a creature remains blocked even if all the creatures blocking
+    -- it are removed from combat") means the surviving key can hold an EMPTY
+    -- set, so no count over that entry can tell "was blocked, nothing blocking
+    -- it now" from "was unblocked" either. Pawl.Engine.Game.removeFromCombat is
+    -- what spells that emptied key.
+    --
+    -- The one reader is rule 509.3e's filtered form
+    -- (TriggerCondition.SelfBecomesBlockedByOneOrMore), which fires off an
+    -- arrival only when no GameEvent.AttackerBlocked rode the same arrival --
+    -- CR 509.3c withholds that event exactly when this field is True, so the
+    -- field is how the two arms avoid answering one becoming-blocked twice.
+    attackerWasBlocked :: Bool
   }
   deriving (Eq, Ord, Show)
