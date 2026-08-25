@@ -2579,6 +2579,7 @@ canHostSubjects predicate = case predicate of
     CounterKind.Fade -> 0
     CounterKind.Shield -> 0
     CounterKind.Level -> 0
+    CounterKind.Hone -> 0
     CounterKind.Named _ -> 0
   -- Zero and not a descent, unlike the atom above: a family is payload-free, so
   -- there is no Filter position inside it for a card author to reach.
@@ -2678,6 +2679,7 @@ counterKindFilters kind = case kind of
   CounterKind.Fade -> []
   CounterKind.Shield -> []
   CounterKind.Level -> []
+  CounterKind.Hone -> []
   CounterKind.Named _ -> []
 
 keywordFilters :: Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]

@@ -47,6 +47,7 @@ reserved =
         "-1/-1",
         "defense",
         "fade",
+        "hone",
         "level",
         "lore",
         "loyalty",

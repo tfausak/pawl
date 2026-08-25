@@ -8,9 +8,9 @@ import qualified Pawl.Types.CounterName as CounterName
 -- on a card. CR 122.1a for the P/T kinds, CR 122.1b for keyword, CR 122.1e for
 -- loyalty, rule 714 for lore, CR 702.63 for time and CR 702.32 for fade -- none
 -- of which rule 122.1 lists at all, and CR 122.1c for shield. What rule 122.1
--- names and this type does not are CR 122.1d's stun counter, CR 122.1h's
--- finality counter and CR 122.1j's hone counter (#1519); 122.1f's poison and
--- 122.1i's rad are a PLAYER's and live in Pawl.Types.PlayerCounterKind.
+-- names and this type does not are CR 122.1d's stun counter and CR 122.1h's
+-- finality counter (#1519); 122.1f's poison and 122.1i's rad are a PLAYER's and
+-- live in Pawl.Types.PlayerCounterKind.
 -- Ord is load-bearing: CounterKind is a Map key on Object.counters.
 --
 -- PARAMETRIC in the keyword, for the reason Pawl.Types.Filter is and only that
@@ -122,6 +122,19 @@ data CounterKind keyword
     -- cards." A class level is not a counter at all, so it is not a kind here --
     -- it is Object.classLevel, and the two must not share a field.
     Level
+  | -- | CR 122.1j: "A hone counter on an Equipment gives +1/+0 to any creature
+    -- that Equipment is attached to." The one kind in rule 122.1 whose count is
+    -- read off one object and applied to ANOTHER: every kind above either
+    -- modifies its own bearer (CR 122.1a, CR 122.1b) or is a tally some rule
+    -- counts in place.
+    --
+    -- CR 613.4c is the layer, as it is for CR 122.1a's P/T counters, so
+    -- Pawl.Engine.Projection.counterGathered emits it at Layer.ModifyPT --
+    -- but with Affected.Attached rather than the bearer, which is the same
+    -- affected set an Equipment's own "equipped creature gets +N/+0" ability
+    -- names. CR 303.4b's host is read live there, so the bonus follows the
+    -- Equipment as it moves and goes with it when it comes off.
+    Hone
   | -- | CR 122.1: a kind no rule in the CR reads, identified by the NAME the
     -- card prints -- Zhao, the Moon Slayer's conqueror counter, Gemstone
     -- Caverns' luck counter. Rule 122.1 letters none of them, so its own first

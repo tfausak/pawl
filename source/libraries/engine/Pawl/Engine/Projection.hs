@@ -3062,7 +3062,8 @@ staticLives functioning changes lowest sa =
 -- CR 122.1a / 613.4c: +1/+1 and -1/-1 counters modify P/T in layer 7c, as one
 -- synthetic ModifyPowerToughness per KIND. CR 122.1b / 613.1f: a keyword counter
 -- grants its keyword in layer 6, one grant per counter, since that layer counts
--- instances.
+-- instances. CR 122.1j: a hone counter is layer 7c too (CR 613.1g's header), and
+-- is the one kind whose part names an object other than the one carrying it.
 --
 -- CR 613.7c: each is stamped from Object.counterTimestamps, the moment its kind
 -- was put on, which is also why the two P\/T kinds emit separately rather than
@@ -3090,6 +3091,23 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
                 d /= 0
               ]
             pt = deltaOf CounterKind.PlusOnePlusOne 1 <> deltaOf CounterKind.MinusOneMinusOne (-1)
+            -- CR 122.1j / 613.4c: a hone counter sits on the EQUIPMENT and gives
+            -- +1/+0 to the creature that Equipment is attached to, so this is
+            -- the one kind whose recipient is not its bearer. Affected.Attached
+            -- rather than the bearer's own id: it is the same affected set an
+            -- Equipment's printed "equipped creature gets +N/+0" names, and it
+            -- reads CR 303.4b's host live, so the bonus follows the Equipment
+            -- when it moves and is gone the moment it comes off. Unattached, the
+            -- set is empty and the part reaches nothing.
+            --
+            -- Not implemented: rule 122.1j says an Equipment and this asks only
+            -- that the bearer is attached to something, so a hone counter on an
+            -- Aura would pump its host (#2328).
+            honed =
+              [ (at CounterKind.Hone Layer.ModifyPT (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal n) (Quantity.Type.Literal 0)))) {gAffected = Affected.Attached}
+              | let n = toInteger (Map.findWithDefault 0 CounterKind.Hone cs),
+                n /= 0
+              ]
             grantOf (kind, n) = case kind of
               CounterKind.Keyword kw -> List.genericReplicate n (at kind Layer.Ability (Modification.GainKeyword kw))
               CounterKind.PlusOnePlusOne -> []
@@ -3105,6 +3123,9 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               CounterKind.Time -> []
               -- Nor a fade counter (CR 702.32a).
               CounterKind.Fade -> []
+              -- CR 122.1j: emitted by `honed` above rather than here, because
+              -- what it modifies is another object's power.
+              CounterKind.Hone -> []
               -- CR 122.1c: a shield counter is not a keyword counter, so it must
               -- make no grant here. shieldOf mints its effects instead.
               CounterKind.Shield -> []
@@ -3118,7 +3139,7 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- grant at all are indistinguishable, so there is no assertion to
               -- write here rather than one nobody wrote.
               CounterKind.Named _ -> []
-         in pt <> concatMap grantOf (Map.toList cs)
+         in pt <> honed <> concatMap grantOf (Map.toList cs)
 
 -- CR 701.60c / 613.1f: a SUSPECTED permanent has menace, emitted as a layer-6
 -- grant on the permanent itself. Read off Object.designations on every
