@@ -99,6 +99,7 @@ import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
+import qualified Pawl.Types.PermanentsGetCounters as PermanentsGetCounters
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -1211,7 +1212,7 @@ permanentDiesSpec s registry =
               TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) TurnScope.ControllersTurn)
             ]
 
--- CR 603.2c's second sentence, and the fork it forces on the written form
+-- CR 603.2c's two sentences, and the fork they force on the written form
 -- permanentDiesSpec above proves the other side of. Vengeful Townsfolk's
 -- "whenever ONE OR MORE other creatures you control die" names the whole CR 704.3
 -- batch as its trigger event, so a state-based-action pass that buries three
@@ -1983,6 +1984,12 @@ representativeEvents cond =
         -- implementation that had cased on `after` would find no match here and the
         -- eventBindingSlots pin below would see nothing stamped.
         TriggerCondition.SelfCountersRemoved kind -> one (GameEvent.CountersRemoved (CounterChange.MkCounterChange departed kind 3 1))
+        -- CR 603.2c's batch placement, on the same event the chapter arm above
+        -- names and read the other way round: the id is the SUBJECT the Filter is
+        -- applied to rather than the bearer. The Filter below is the trivial one,
+        -- so what decides the match is whether the subject can be viewed at all --
+        -- and the floor is empty either way, a batch condition binding nothing.
+        TriggerCondition.PermanentsGetCounters (PermanentsGetCounters.MkPermanentsGetCounters kind _) -> one (GameEvent.CountersPut (CounterChange.MkCounterChange departed kind 0 1))
         -- CR 601.2i's own event, and the only one this condition admits. Both
         -- halves are bound whichever ids the event names -- the spell under
         -- `thatSpell`, the caster under `thatPlayer` -- so the two sides agree
@@ -2188,6 +2195,7 @@ everyTriggerCondition =
     TriggerCondition.SelfBecomesClassLevel (ClassLevel.MkClassLevel 2),
     TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
     TriggerCondition.SelfCountersRemoved CounterKind.Loyalty,
+    TriggerCondition.PermanentsGetCounters (PermanentsGetCounters.MkPermanentsGetCounters CounterKind.MinusOneMinusOne (Filter.Type.And [])),
     -- BOTH scopes, unlike StepBegins' one above: the TurnScope is new on this
     -- condition, and the pin below asserts eventBindingSlots against what
     -- eventBindings stamps for every event -- so an arm that had cased on the
