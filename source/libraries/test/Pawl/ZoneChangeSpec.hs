@@ -163,6 +163,16 @@ activateSole oid gs = case Activate.abilitiesFor oid gs of
      in S.runPure S.identityAnswer activated Stack.resolveTop
   other -> error ("Pawl.ZoneChangeSpec: expected exactly one activated ability, got " <> show (length other))
 
+-- alice casts the spell from her hand at the only legal target the board offers
+-- and it resolves, then state-based actions run. The shared half of the two
+-- Flicker of Fate cases below, so the token board and the card board differ in
+-- the victim and in nothing else.
+castAndSettle :: Printing.Printing -> GameState.GameState -> GameState.GameState
+castAndSettle spell board =
+  let (gs, spellId) = S.handOne spell board
+      cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
+   in S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
+
 zoneChangeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
   Spec.it s "CR 701.8 Murder destroys a normal creature into its owner's graveyard" $ do
@@ -241,6 +251,46 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "the enchantment left the battlefield" (Game.lookupObject ripId after) Nothing
     Spec.assertEqWith s "one card in exile" (length (Game.zoneMembers Zone.Exile S.bob after)) 1
+  -- Flicker of Fate's two clauses in one resolution: the exile binds its arrival
+  -- into a slot (CR 400.7j) and the return names that slot, which is what "then
+  -- return IT" means. The card twin of the CR 111.8 case below, and it is what
+  -- makes that case discriminating: a board where nothing comes back proves
+  -- nothing on its own, since a return clause that found no object to move reads
+  -- exactly the same. Here the same wire path returns the creature, so the slot
+  -- binding and the second move are both known to work.
+  Spec.it s "CR 400.7 Flicker of Fate returns the creature card it exiled, as a new object" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    flickerOfFate <- S.printingOf s registry "Flicker of Fate"
+    let (victim, board) = S.addCreature piker S.bob (S.landsInPlay plains 2)
+        after = castAndSettle flickerOfFate board
+    Spec.assertEqWith s "the creature came back onto the battlefield" (S.creaturesInPlay S.bob after) 1
+    -- alice cast the spell, so a return that ignored the card's "under its
+    -- owner's control" would hand bob's creature to her (CR 110.2a).
+    Spec.assertEqWith s "CR 110.2a it came back under its owner's control, not the caster's" (Maybe.mapMaybe (`Projection.controllerOf` after) (Game.zoneMembers Zone.Battlefield S.bob after)) [S.bob]
+    Spec.assertEqWith s "CR 400.7 and as a new object: neither the permanent that left nor the exiled incarnation is there" (Game.lookupObject victim after) Nothing
+    Spec.assertEqWith s "nothing stayed in exile" (Game.zoneMembers Zone.Exile S.bob after) []
+  -- CR 111.8: "A token that has left the battlefield can't move to another zone
+  -- or come back onto the battlefield." Only a within-one-resolution window
+  -- reaches the rule -- CR 704.5d removes such a token at the next state-based
+  -- check -- and Flicker of Fate is the pool's one shape that opens it, since
+  -- its second clause names the object its first clause exiled rather than "that
+  -- card" (CR 111.6 would keep a token out of the latter on the card's own
+  -- wording).
+  --
+  -- This board differs from the card twin above in exactly one thing: the victim
+  -- is a token of the same printing. So "no creature came back" here cannot be
+  -- the return clause missing its reference, which is what that twin rules out;
+  -- it is the rule refusing the move.
+  Spec.it s "CR 111.8 Flicker of Fate cannot bring back a token it exiled" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    flickerOfFate <- S.printingOf s registry "Flicker of Fate"
+    let (victim, board) = S.addToken (Printing.card piker) S.bob (S.landsInPlay plains 2)
+        after = castAndSettle flickerOfFate board
+    Spec.assertEqWith s "no token came back onto the battlefield" (S.creaturesInPlay S.bob after) 0
+    Spec.assertEqWith s "CR 111.7 it ceased to exist rather than waiting in exile" (Game.zoneMembers Zone.Exile S.bob after) []
+    Spec.assertEqWith s "the token that was exiled is gone" (Game.lookupObject victim after) Nothing
   Spec.it s "CR 121.1 Divination draws its controller two cards" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"

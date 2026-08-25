@@ -2800,6 +2800,28 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Nothing
+    -- CR 111.8: "A token that has left the battlefield can't move to another
+    -- zone or come back onto the battlefield. If such a token would change
+    -- zones, it remains in its current zone instead." Nothing is this funnel's
+    -- word for a move that did not happen -- the object is never touched, so it
+    -- is still in the zone it was in, which is what the rule asks for.
+    --
+    -- Only a WITHIN-ONE-RESOLUTION window reaches this: CR 704.5d removes such a
+    -- token the next time state-based actions are checked, and until then a slot
+    -- an earlier clause bound to the token's exile or graveyard incarnation
+    -- still names it. Flicker of Fate is the pool's producer -- "exile target
+    -- creature or enchantment, THEN RETURN IT to the battlefield" -- and
+    -- Pawl.ZoneChangeSpec is where the token and the card twin are separated.
+    --
+    -- Asked BEFORE the CR 616.1 replacement loop rather than after it, which is
+    -- CR 101.2: a "can't" beats whatever would allow the move, so there is no
+    -- event left for a replacement to choose among. Ordering it after the loop
+    -- would answer the same, and not on a claim about Magic: the predicate reads
+    -- the object and its CURRENT zone, neither of which any ZoneChangeR rewrites
+    -- -- they rewrite the destination -- and that loop leaves the board alone on
+    -- this path (see resolveZoneChange, which restricts it to ZoneChangeR
+    -- candidates, so the one state-writing arm is out of reach).
+    Just obj | Game.tokenHasLeftTheBattlefield obj -> pure Nothing
     Just obj -> do
       let pid = Object.owner obj
           fromZone = Object.zone obj
