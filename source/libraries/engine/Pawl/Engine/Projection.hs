@@ -2183,6 +2183,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerGainsLife _ -> condition
   TriggerCondition.PlayerLosesLife _ -> condition
   TriggerCondition.SelfCountersReached {} -> condition
+  TriggerCondition.SelfBecomesClassLevel _ -> condition
   TriggerCondition.SelfLastCounterRemoved _ -> condition
   TriggerCondition.SelfCountersRemoved _ -> condition
   TriggerCondition.SelfHalfUnlocked _ -> condition

@@ -70,6 +70,7 @@ import qualified Pawl.Codec.ChooserSpec
 import qualified Pawl.Codec.ChosenCardFromAmongSpec
 import qualified Pawl.Codec.ChosenCardInGraveyardSpec
 import qualified Pawl.Codec.ChosenCardInHandSpec
+import qualified Pawl.Codec.ClassLevelChangeSpec
 import qualified Pawl.Codec.ClassLevelSpec
 import qualified Pawl.Codec.ClauseIndexSpec
 import qualified Pawl.Codec.ClauseSpec
@@ -576,6 +577,7 @@ spec s registry = do
   Pawl.Codec.ChosenCardFromAmongSpec.spec s
   Pawl.Codec.ChosenCardInGraveyardSpec.spec s
   Pawl.Codec.ChosenCardInHandSpec.spec s
+  Pawl.Codec.ClassLevelChangeSpec.spec s
   Pawl.Codec.ClassLevelSpec.spec s
   Pawl.Codec.ClauseIndexSpec.spec s
   Pawl.Codec.ClauseSpec.spec s

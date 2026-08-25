@@ -6,6 +6,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
@@ -463,6 +464,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached CounterKind.Lore 3))
       " {\"type\":\"SelfCountersReached\",\"value\":{\"kind\":{\"type\":\"Lore\"},\"amount\":3}} "
+  -- CR 716.2a. The payload is the bar's printed level number and nothing else:
+  -- the ability is printed on the Class whose level changes, so there is nothing
+  -- to select among.
+  Spec.it s "SelfBecomesClassLevel round-trips its level" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfBecomesClassLevel (ClassLevel.MkClassLevel 2))
+      " {\"type\":\"SelfBecomesClassLevel\",\"value\":2} "
   -- CR 310.12b. The payload is the counter kind alone: "the last" needs no number.
   Spec.it s "SelfLastCounterRemoved round-trips its kind" $
     Common.assertCodec
