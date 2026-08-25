@@ -1755,10 +1755,11 @@ leavesBattlefieldSpec s registry =
 -- admits -- and a condition that binds a slot for some of its events and not
 -- others cannot be pinned by any single one of them. Most conditions are
 -- represented by a one-element list, for which the floor is that event's exact
--- keyset. Two are not: SelfLeavesTheBattlefield, whose two destinations differ
--- because CR 400.7e binds `became` for the public one and withholds it for the
--- hidden one (CR 400.2), and SelfIsDealtDamage, which admits both of CR 120.3's
--- damage kinds.
+-- keyset. The exceptions are SelfLeavesTheBattlefield, whose two destinations
+-- differ because CR 400.7e binds `became` for the public one and withholds it
+-- for the hidden one (CR 400.2); SelfIsDealtDamage, which admits both of CR
+-- 120.3's damage kinds; and CreatureBecomesBlockedByAtLeast, which admits rule
+-- 509.3e's two producers under two different event constructors.
 --
 -- Exhaustive with no wildcard, which is half of what keeps the pin honest -- a
 -- new TriggerCondition fails to compile here. The other half, the list below, is
@@ -1891,7 +1892,18 @@ representativeEvents cond =
         -- every arm above it: the bearer is a BYSTANDER, so `departed` sits in
         -- the attacker position and is what this one binds -- an arm that bound
         -- the bearer instead would pin the empty set here.
-        TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> one (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol))
+        --
+        -- The THIRD list longer than one, and rule 509.3e's second producer is
+        -- why: this condition also admits the arrival of a creature put onto the
+        -- battlefield blocking, which names the attacker in a different payload
+        -- and so needs its own eventBindings arm. An arm added to matchesTrigger
+        -- and forgotten there would bind nothing for this event, Seifer's "that
+        -- attacking creature" would resolve to nothing, and the board would be
+        -- indistinguishable from one where the trigger never fired -- so the
+        -- intersection is the fence for exactly that.
+        TriggerCondition.CreatureBecomesBlockedByAtLeast {} ->
+          GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol)
+            NonEmpty.:| [GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 42, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = True})]
         -- The same declaration's unblocked branch, which carries the attacker
         -- and nothing else -- so the floor it pins is the empty set.
         TriggerCondition.SelfAttacksUnblocked -> one (GameEvent.AttackerUnblocked departed)
@@ -2473,11 +2485,13 @@ becameSlotSpec s registry =
         -- The INTERSECTION over the events a condition admits, because the
         -- classification answers the guaranteed floor rather than the union: a
         -- slot the lint says is available must be bound for every event that
-        -- could have placed the trigger. Two conditions have a list longer than
-        -- one -- SelfLeavesTheBattlefield, where the two destinations disagree
-        -- about `became`, and SelfIsDealtDamage, where CR 120.3's two damage
-        -- kinds agree on `thatMuch` and so make the floor a real one; for every
-        -- other the intersection is exactly that single event's keyset.
+        -- could have placed the trigger. A few conditions have a list longer
+        -- than one -- SelfLeavesTheBattlefield, where the two destinations
+        -- disagree about `became`; SelfIsDealtDamage, where CR 120.3's two
+        -- damage kinds agree on `thatMuch` and so make the floor a real one; and
+        -- CreatureBecomesBlockedByAtLeast, where rule 509.3e's two producers
+        -- agree on `attackingCreature` off two different event constructors. For
+        -- every other the intersection is exactly that single event's keyset.
         --
         -- The BEARER ARRIVAL argument is held constant at a present one, and is
         -- not a second dimension of the intersection: it is CR 400.7f's datum
