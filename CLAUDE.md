@@ -211,7 +211,9 @@ to agents as written. What it doesn't say:
     *fails*, put it back. Read WHICH assertion failed: if it is not the
     gameplay-level one, an assertion ahead of it absorbed the mutation and the
     behaviour is unproven. If nothing fails, say so in the PR rather than
-    implying coverage. `docs/agents/implementing.md` lists the traps.
+    implying coverage. `script/mutate.sh` runs one mutation and prints the
+    assertion, without judging whether it is the gameplay-level one;
+    `docs/agents/implementing.md` lists the traps.
 
 4.  Find the sites `-Werror` won't. A `{}` or `_` pattern absorbs a new
     constructor or field silently; the recurring ones are

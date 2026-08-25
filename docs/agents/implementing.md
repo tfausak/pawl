@@ -124,6 +124,18 @@ opcode's arm alone would have missed the day/night road entirely.
 
 `CLAUDE.md` requires mutating the change away and re-running. How:
 
+`script/mutate.sh FILE SED_EXPR PATTERN` runs one, and is the shape the rest of
+this section describes: it backs the file up outside the tree, applies the
+mutation, runs the tasty subtree `PATTERN` selects, prints the first failing
+assertion with its group path, and restores the file from a `trap`. Its exit
+status is the outcome --- red, nothing red, did not compile, or pattern matched
+nothing, which tasty otherwise reports as a pass. `--help` has the codes.
+
+What it does **not** do is the judgement the next two bullets ask for: it names
+the assertion that went red, and says nothing about whether that assertion is
+the gameplay-level one. A proxy ahead of the behavioural assertion produces a
+perfectly good-looking line of output. Read the label, then decide.
+
 - **One mutation at a time, and read the failure.** Red is not the bar: it must
   go red for the *intended* reason, in the intended place. A mutation that
   fails a dozen unrelated cases, or the target case with a different message
@@ -147,7 +159,10 @@ opcode's arm alone would have missed the day/night road entirely.
   Ask what a wrong implementation would have produced at the moment you read
   the value; for a counter that means resolving the stack down.
 - **Never `git checkout <file>` to revert a mutation** --- real edits have been
-  lost that way. Copy the file to a backup and move it back.
+  lost that way. Copy the file to a backup and move it back, or let
+  `script/mutate.sh` do it; its backup lives under `mktemp -d` rather than
+  beside the file, because a stray `Foo.hs.bak` turns up in a concurrent
+  session's `git status`.
 - **Build a negative as a pair of boards differing in exactly one thing.** A
   negative assembled on its own board passes for reasons you did not choose.
 - **Keep the mutated binding referenced.** Deleting a use trips

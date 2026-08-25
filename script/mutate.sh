@@ -18,8 +18,11 @@
 # - PATTERN is required rather than defaulting to the whole suite, so that a
 #   mutation run stays a minute instead of twenty.
 # - A corrupt shared GHC job semaphore (`semWait: invalid argument`) is retried
-#   once with `--no-semaphore -j4`. Those flags are not passed unconditionally:
-#   the semaphore is what keeps concurrent worktrees off each other's cores.
+#   once with `--no-semaphore -j4`, and can also be worked around by passing
+#   those flags in, because cabal has been seen to HANG on the corrupt semaphore
+#   rather than exit, which no retry can reach. They are not passed
+#   unconditionally: the semaphore is what keeps concurrent worktrees off each
+#   other's cores.
 # - Nothing is killed and nothing runs in the background. `pkill` reaches other
 #   agents' worktrees.
 # - `sed -i` is spelled differently by GNU and BSD sed, and both are reachable
@@ -33,14 +36,17 @@ self=$0
 
 usage() {
   cat <<'EOF'
-mutate.sh FILE SED_EXPR PATTERN
+mutate.sh FILE SED_EXPR PATTERN [CABAL_ARG...]
 
 Applies SED_EXPR to FILE, runs the tasty subtree PATTERN selects, prints the
 first failing assertion, and restores FILE.
 
-  FILE      the file to mutate
-  SED_EXPR  a sed script; it must actually change FILE
-  PATTERN   a tasty pattern, passed as -p; required, and keep it narrow
+  FILE       the file to mutate
+  SED_EXPR   a sed script; it must actually change FILE
+  PATTERN    a tasty pattern, passed as -p; required, and keep it narrow
+  CABAL_ARG  extra arguments for `cabal test`; `--no-semaphore -j4` when the
+             shared GHC semaphore is corrupt and cabal hangs on it instead of
+             failing, which the built-in retry cannot reach
 
 This reports WHICH assertion went red. It does NOT judge whether that assertion
 is the gameplay-level one. A cheap proxy ordered ahead of the behavioural
@@ -51,11 +57,14 @@ see docs/agents/implementing.md, "Mutation testing".
 
 Exit status is the outcome, not the test run's:
 
-  0  RED           at least one case failed; the first assertion is printed
-  1  NOTHING RED   the subtree passed, so the mutated line has no observer
+  0  RED           a case failed; its first assertion is printed
+  1  NOTHING RED   the subtree passed, so nothing in it observes the mutation
   2  usage error, or a mutation that changed nothing
   3  the mutated source did not build, or the run produced no tasty summary
   4  PATTERN matched no tests at all
+
+Run it from the repository root; it builds the `pawl-test-suite` target, so it
+needs cabal.project.local in place for +pedantic like any other build.
 EOF
 }
 
@@ -66,8 +75,8 @@ case ${1:-} in
     ;;
 esac
 
-if [ $# -ne 3 ]; then
-  echo "$self: expected FILE SED_EXPR PATTERN" >&2
+if [ $# -lt 3 ]; then
+  echo "$self: expected FILE SED_EXPR PATTERN [CABAL_ARG...]" >&2
   usage >&2
   exit 2
 fi
@@ -75,6 +84,7 @@ fi
 file=$1
 sed_expr=$2
 pattern=$3
+shift 3
 
 if [ ! -f "$file" ]; then
   echo "$self: no such file: $file" >&2
@@ -103,14 +113,20 @@ fi
 
 log=$work/output
 
+# --test-option, singular, passes one argument verbatim; the plural
+# --test-options takes a string that cabal splits on whitespace, so a pattern
+# naming a test case by its own words arrives as several arguments and tasty
+# rejects the second one.
 run() {
   cabal test pawl-test-suite \
     --test-show-details=direct \
-    --test-options="-p $pattern --hide-successes" \
+    --test-option=-p \
+    --test-option="$pattern" \
+    --test-option=--hide-successes \
     ${1:+"$@"} >"$log" 2>&1 || true
 }
 
-run
+run "$@"
 if grep -q 'semWait: invalid argument' "$log"; then
   echo 'shared GHC semaphore is corrupt; retrying with --no-semaphore -j4'
   run --no-semaphore -j4
@@ -141,8 +157,10 @@ case $summary in
     ;;
   'All '*)
     echo "NOTHING WENT RED ($summary)"
-    echo 'The mutated line has no observer. Per docs/agents/implementing.md that'
-    echo 'is a finding, not a formality: do not close the issue on it.'
+    echo 'The mutated line has no observer IN THIS SUBTREE -- which is a finding'
+    echo 'either way: either the case proves nothing, or the pattern is pointed'
+    echo 'at the wrong one. Per docs/agents/implementing.md, do not read it as'
+    echo 'coverage and do not close the issue on it.'
     exit 1
     ;;
 esac
@@ -150,7 +168,7 @@ esac
 echo "RESULT: $summary"
 echo
 echo 'FIRST FAILING ASSERTION (the gameplay-level one, or a proxy ahead of it?):'
-awk '
+first=$(awk '
   state == 2 { next }
   /^[[:space:]]*$/ { if (state == 1) state = 2; next }
   {
@@ -171,6 +189,16 @@ awk '
     for (i = indent + 1; i <= depth; i++) delete header[i]
     depth = indent
   }
-' "$log"
+' "$log")
+
+# Falling back to the whole log rather than printing nothing: the summary says a
+# case failed, so silence here would mean the block layout changed under this
+# parser, and silence reads far too much like "no failure".
+if [ -n "$first" ]; then
+  printf '%s\n' "$first"
+else
+  echo '(no FAIL block recognized; the whole run follows)'
+  cat "$log"
+fi
 
 exit 0
