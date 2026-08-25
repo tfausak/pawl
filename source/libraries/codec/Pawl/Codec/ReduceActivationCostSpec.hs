@@ -22,6 +22,7 @@ spec s = Spec.describe s "Pawl.Codec.ReduceActivationCost" $ do
       ( ReduceActivationCost.MkReduceActivationCost
           { ReduceActivationCost.whichAbilities = Filter.HasCardType CardType.Creature,
             ReduceActivationCost.grantedBy = Nothing,
+            ReduceActivationCost.whichTargets = Nothing,
             ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 1],
             ReduceActivationCost.floor = 1
           }
@@ -39,9 +40,28 @@ spec s = Spec.describe s "Pawl.Codec.ReduceActivationCost" $ do
       ( ReduceActivationCost.MkReduceActivationCost
           { ReduceActivationCost.whichAbilities = Filter.And [],
             ReduceActivationCost.grantedBy = Just KeywordFamily.Cycling,
+            ReduceActivationCost.whichTargets = Nothing,
             ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 2],
             ReduceActivationCost.floor = 0
           }
       )
       " {\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"grantedBy\":{\"type\":\"Cycling\"},\"reduction\":[{\"type\":\"Generic\",\"value\":2}],\"floor\":0} "
+  -- CR 601.2c from the reducer's side: Dwarven Mauler's "equip abilities you
+  -- activate THAT TARGET THIS CREATURE", the one shape in the pool that writes
+  -- whichTargets. Its own case for the reason the grantedBy case above has one --
+  -- the field is DEFAULTED, so a round trip whose value is Nothing would stay
+  -- green with it dropped from the codec.
+  Spec.it s "MkReduceActivationCost, narrowed to what the ability targets" $
+    Common.assertCodec
+      s
+      ReduceActivationCost.codec
+      ( ReduceActivationCost.MkReduceActivationCost
+          { ReduceActivationCost.whichAbilities = Filter.And [],
+            ReduceActivationCost.grantedBy = Just KeywordFamily.Equip,
+            ReduceActivationCost.whichTargets = Just Filter.IsSource,
+            ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 2],
+            ReduceActivationCost.floor = 0
+          }
+      )
+      " {\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"grantedBy\":{\"type\":\"Equip\"},\"whichTargets\":{\"type\":\"IsSource\"},\"reduction\":[{\"type\":\"Generic\",\"value\":2}],\"floor\":0} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ReduceActivationCost.codec

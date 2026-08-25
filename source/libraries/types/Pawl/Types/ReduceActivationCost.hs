@@ -16,7 +16,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- means, why a floor never raises a cost, and why the two kinds cannot share one
 -- floor over the pool.
 --
--- TWO criteria, and they ask about different things. `whichAbilities` names the
+-- THREE criteria, and they ask about different things. `whichAbilities` names the
 -- ability's SOURCE OBJECT -- Heartstone's "activated abilities of creatures",
 -- Blossoming Tortoise's "of lands you control" -- and is matched by
 -- Pawl.Engine.PlayerEffect.matchesObject against that object's projection.
@@ -32,9 +32,25 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- A rule-702 FAMILY designator and not an effect: what the closed half compares
 -- here is which rule minted the ability (Pawl.Engine.Keyword.familyGranting),
 -- never what the ability does.
+--
+-- `whichTargets` is the THIRD question, and it is neither of the other two: an
+-- object again, but the ability's CHOSEN TARGET rather than its source -- Dwarven
+-- Mauler's "equip abilities you activate THAT TARGET THIS CREATURE". Nothing is
+-- the sentence that names no target, which is every other reducer in the pool;
+-- Just a filter holds when SOME target the activation announced matches it, which
+-- is what "that target this creature" says of an ability with more than one
+-- target slot. A filter here can never be spelled as a conjunct of
+-- `whichAbilities`: that field is asked of the Equipment, and the creature the
+-- equip aims at is a different object entirely.
+--
+-- Asked LATER than the other two, and that is the field's whole difficulty: CR
+-- 601.2c announces targets and CR 601.2f applies reductions, so a target-aware
+-- reduction cannot be gathered at CR 601.2b's position.
+-- Pawl.Engine.Activate.activateAbility gathers twice for exactly that reason.
 data ReduceActivationCost = MkReduceActivationCost
   { whichAbilities :: Filter.Filter Keyword.Keyword,
     grantedBy :: Maybe KeywordFamily.KeywordFamily,
+    whichTargets :: Maybe (Filter.Filter Keyword.Keyword),
     reduction :: ManaCost.ManaCost,
     floor :: Natural.Natural
   }
