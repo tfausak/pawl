@@ -351,7 +351,7 @@ objectsLeaveWith pid gs =
 -- Effect.ModifyTarget, and this function does not end one -- but such an effect
 -- is inert: Projection.controllerOfGiven's storedSetter matches only
 -- Modification.SetController, Projection.controlGrants reads control-granting
--- static abilities off Face.staticAbilities and never off stored effects, and
+-- static abilities off Projection.staticAbilitiesOf and never off stored effects, and
 -- Projection.applyModification's SetControllerToSource arm is the identity. A
 -- card authoring one would grant control to no one, so there is nothing here for
 -- CR 800.4a to end (#199).

@@ -61,6 +61,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.PlayerScope (PlayerScope)
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
@@ -163,8 +164,20 @@ playersInScope perspective gs scope =
         PlayerScope.EachPlayer -> Just everyone
         PlayerScope.ControllingMostPermanents -> Just (Maybe.maybeToList (permanentLeader gs))
 
--- CR 613.7a: the PRINTED carrier's rows, one per player ability on one
--- battlefield permanent that still has it, as
+-- CR 707.2a: the player abilities this permanent's copiable rules text gives it
+-- -- its copy snapshot's when it has one, its printed face's otherwise. The
+-- Pawl.Engine.Projection.staticAbilitiesOf of this axis, and written here rather
+-- than beside it so that Pawl.Engine.Projection goes on never seeing
+-- Pawl.Types.PlayerEffect; the one read of Binding.copyOf both share is
+-- Projection.copiableSnapshotOf.
+playerAbilitiesOf :: ObjectId -> GameState -> [PlayerStaticAbility.PlayerStaticAbility]
+playerAbilitiesOf oid gs = case Projection.copiableSnapshotOf oid gs of
+  Just snapshot -> PC.playerAbilities snapshot
+  Nothing -> foldMap Face.playerAbilities (Game.faceOf oid gs)
+
+-- CR 613.7a: the PRINTED carrier's rows -- printed as opposed to CR 611.2c's
+-- stored one, the list itself being the COPIABLE one above -- one per player
+-- ability on one battlefield permanent that still has it, as
 -- (timestamp, source, controller, scope, effect) -- the shape `applying` below
 -- sorts, filters and strips.
 --
@@ -186,88 +199,86 @@ printedRows gs =
       -- has a player ability forces it -- so the ordinary board pays nothing for
       -- the CR 604.2 question below.
       removed = Projection.abilityRemoval gs
-      fromPermanent oid = case Game.faceOf oid gs of
-        Nothing -> []
-        Just face -> case Face.playerAbilities face of
-          -- The overwhelming majority of permanents: no ability, so no
-          -- controller projection and no CR 305.7 check is paid for.
-          [] -> []
-          -- CR 613.7a: a permanent's static ability produces its continuous effect
-          -- with the PERMANENT's timestamp, so the row's order comes off the object
-          -- rather than being minted here. Looked up INSIDE this branch and not
-          -- beside the walk: the `[]` case above has already turned away every
-          -- permanent that prints no player ability, so the ordinary board pays for
-          -- no lookup at all. Nothing is unreachable rather than a guess -- faceOf
-          -- above resolved this id -- and is written only because lookupObject's
-          -- type is honest about ids that do not.
-          abilities -> case (Game.lookupObject oid gs, Projection.controllerOf oid gs) of
-            (Nothing, _) -> []
-            (_, Nothing) -> []
-            (Just object, Just controller) ->
-              -- TWO ability losses, exactly the pair Projection.gather asks about
-              -- for a permanent's static abilities.
-              --
-              -- CR 305.7: a land whose subtype has been SET to a basic type
-              -- loses its rules-text abilities, this one included (Blood Moon on
-              -- Reliquary Tower).
-              --
-              -- CR 604.2: a static ability's continuous effect is active only
-              -- while the permanent remains on the battlefield and has the
-              -- ability, so a CR 613.1f layer-6 removal takes this one with it
-              -- (Humility on Thalia). CR 613.6's rescue for an effect that has
-              -- already STARTED to apply cannot reach it: CR 613.10/613.11 apply
-              -- a player effect AFTER the seven layers have run, so it never
-              -- started to apply before layer 6 and the cut is unconditional.
-              --
-              -- That same "after the layers" placement is why the CR 305.7 gate
-              -- is liveAfterLayers: the projection is finished here, so the
-              -- setter's affected set is read against it rather than against base
-              -- characteristics, and a permanent animated into a land at layer 4
-              -- is reached (Ashaya on Thalia, under Blood Moon).
-              if (null setEffs || Projection.liveAfterLayers setEffs oid gs)
-                && not (removed oid)
-                then
-                  -- CR 612.1's word swap over the permanent's own text, computed
-                  -- HERE rather than hoisted beside setEffs above, exactly as
-                  -- Pawl.Engine.CombatRestriction.restricted computes it:
-                  -- textChangesAffecting folds the whole continuous-effect list,
-                  -- and the empty case above has already turned away every
-                  -- permanent that prints no player ability, so the fold runs
-                  -- once per ability-bearing permanent instead of once per
-                  -- permanent on the battlefield.
-                  let changes = Projection.textChangesAffecting oid gs
-                      readAs = if null changes then id else rewritePlayerEffect changes
-                      -- CR 604.2's "as long as" clause, the same gate
-                      -- Projection.gatherStatic applies to the object-facing
-                      -- carrier, and asked here for the player-facing one.
-                      --
-                      -- The VIEW is the FINISHED projection, not a bounded one:
-                      -- CR 613.10 and CR 613.11 apply a player effect after the
-                      -- seven layers have run, so there is no layer to bound
-                      -- against -- the answer Projection.abilitiesGiven takes for
-                      -- CR 702.178a's max speed gate, and for that same reason.
-                      --
-                      -- The PERSPECTIVE is the permanent's controller and the
-                      -- source is the permanent, so CR 109.5's "you" inside the
-                      -- clause is the Class controller rather than the taxed
-                      -- player -- which is the whole content of "during YOUR
-                      -- turn". The taxed player rides
-                      -- PlayerStaticAbility.scope instead and never reaches here.
-                      --
-                      -- The clause takes the same CR 612.1 word swap the effect
-                      -- beside it does, since one ability's two halves cannot
-                      -- disagree about what a word means.
-                      lives ability = case PlayerStaticAbility.condition ability of
-                        Nothing -> True
-                        Just c ->
-                          Condition.holds
-                            (Projection.fullView gs)
-                            (Filter.contextFor (Just controller) (Just oid))
-                            gs
-                            oid
-                            (if null changes then c else Projection.rewriteCondition changes c)
-                   in fmap (\ability -> (Object.timestamp object, Just oid, controller, AffectedPlayers.Scoped (PlayerStaticAbility.scope ability), readAs (PlayerStaticAbility.effect ability))) (filter lives abilities)
-                else []
+      fromPermanent oid = case playerAbilitiesOf oid gs of
+        -- The overwhelming majority of permanents: no ability, so no
+        -- controller projection and no CR 305.7 check is paid for.
+        [] -> []
+        -- CR 613.7a: a permanent's static ability produces its continuous effect
+        -- with the PERMANENT's timestamp, so the row's order comes off the object
+        -- rather than being minted here. Looked up INSIDE this branch and not
+        -- beside the walk: the `[]` case above has already turned away every
+        -- permanent that prints no player ability, so the ordinary board pays for
+        -- no lookup at all. Nothing is unreachable rather than a guess -- the
+        -- id came off the battlefield -- and is written only because
+        -- lookupObject's type is honest about ids that do not.
+        abilities -> case (Game.lookupObject oid gs, Projection.controllerOf oid gs) of
+          (Nothing, _) -> []
+          (_, Nothing) -> []
+          (Just object, Just controller) ->
+            -- TWO ability losses, exactly the pair Projection.gather asks about
+            -- for a permanent's static abilities.
+            --
+            -- CR 305.7: a land whose subtype has been SET to a basic type
+            -- loses its rules-text abilities, this one included (Blood Moon on
+            -- Reliquary Tower).
+            --
+            -- CR 604.2: a static ability's continuous effect is active only
+            -- while the permanent remains on the battlefield and has the
+            -- ability, so a CR 613.1f layer-6 removal takes this one with it
+            -- (Humility on Thalia). CR 613.6's rescue for an effect that has
+            -- already STARTED to apply cannot reach it: CR 613.10/613.11 apply
+            -- a player effect AFTER the seven layers have run, so it never
+            -- started to apply before layer 6 and the cut is unconditional.
+            --
+            -- That same "after the layers" placement is why the CR 305.7 gate
+            -- is liveAfterLayers: the projection is finished here, so the
+            -- setter's affected set is read against it rather than against base
+            -- characteristics, and a permanent animated into a land at layer 4
+            -- is reached (Ashaya on Thalia, under Blood Moon).
+            if (null setEffs || Projection.liveAfterLayers setEffs oid gs)
+              && not (removed oid)
+              then
+                -- CR 612.1's word swap over the permanent's own text, computed
+                -- HERE rather than hoisted beside setEffs above, exactly as
+                -- Pawl.Engine.CombatRestriction.restricted computes it:
+                -- textChangesAffecting folds the whole continuous-effect list,
+                -- and the empty case above has already turned away every
+                -- permanent that prints no player ability, so the fold runs
+                -- once per ability-bearing permanent instead of once per
+                -- permanent on the battlefield.
+                let changes = Projection.textChangesAffecting oid gs
+                    readAs = if null changes then id else rewritePlayerEffect changes
+                    -- CR 604.2's "as long as" clause, the same gate
+                    -- Projection.gatherStatic applies to the object-facing
+                    -- carrier, and asked here for the player-facing one.
+                    --
+                    -- The VIEW is the FINISHED projection, not a bounded one:
+                    -- CR 613.10 and CR 613.11 apply a player effect after the
+                    -- seven layers have run, so there is no layer to bound
+                    -- against -- the answer Projection.abilitiesGiven takes for
+                    -- CR 702.178a's max speed gate, and for that same reason.
+                    --
+                    -- The PERSPECTIVE is the permanent's controller and the
+                    -- source is the permanent, so CR 109.5's "you" inside the
+                    -- clause is the Class controller rather than the taxed
+                    -- player -- which is the whole content of "during YOUR
+                    -- turn". The taxed player rides
+                    -- PlayerStaticAbility.scope instead and never reaches here.
+                    --
+                    -- The clause takes the same CR 612.1 word swap the effect
+                    -- beside it does, since one ability's two halves cannot
+                    -- disagree about what a word means.
+                    lives ability = case PlayerStaticAbility.condition ability of
+                      Nothing -> True
+                      Just c ->
+                        Condition.holds
+                          (Projection.fullView gs)
+                          (Filter.contextFor (Just controller) (Just oid))
+                          gs
+                          oid
+                          (if null changes then c else Projection.rewriteCondition changes c)
+                 in fmap (\ability -> (Object.timestamp object, Just oid, controller, AffectedPlayers.Scoped (PlayerStaticAbility.scope ability), readAs (PlayerStaticAbility.effect ability))) (filter lives abilities)
+              else []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
 
 -- CR 116.2d's WHO: is `pid` a player whose game the permanent `oid` is changing
@@ -385,7 +396,9 @@ applying pid gs =
 --
 -- HERE and not beside rewriteModification, which is where the printed-text
 -- rewrites for objects live: this module is the only one that may case on
--- PlayerEffect, and Pawl.Engine.Projection never sees the type at all. The
+-- PlayerEffect: Pawl.Engine.Projection carries the rows opaquely through
+-- ProjectedCharacteristics.playerAbilities so a copy acquires them (CR 707.2a),
+-- and never looks inside one. The
 -- shape Pawl.Engine.CombatRestriction takes for a restriction -- destructure the
 -- module's own type, hand each inner value to the module that owns it -- is the
 -- one taken here, with Pawl.Engine.Filter.rewrite doing the descent.

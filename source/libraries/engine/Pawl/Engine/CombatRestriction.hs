@@ -284,15 +284,18 @@ inForce gs =
       --
       -- Reading BASE faces is enough for the reason given there -- a keyword
       -- reaches a permanent either from its own base face or from a grant whose
-      -- granting permanent is on the battlefield -- and it inherits the same hole:
-      -- a minting keyword arriving through a stored continuous effect or a keyword
-      -- counter is on no base face (#833).
+      -- granting permanent is on the battlefield -- and the GRANT half asks
+      -- Projection.staticAbilitiesOf, so a copy's granting text is seen (CR
+      -- 707.2a). It inherits the same hole: a minting keyword arriving through a
+      -- stored continuous effect or a keyword counter is on no base face (#833),
+      -- and a copy's own KEYWORD is still read off the copier's printed face
+      -- (#2220).
       anyMinted = any baseCouldMint (Set.toList (GameState.battlefield gs))
-      baseCouldMint oid = case Game.faceOf oid gs of
-        Nothing -> False
-        Just face ->
-          any Keyword.mintsCombatRestriction (Face.keywords face)
-            || any (any (Projection.grantsKeywordWhere Keyword.mintsCombatRestriction) . StaticAbility.modifications) (Face.staticAbilities face)
+      baseCouldMint oid =
+        any (any (Projection.grantsKeywordWhere Keyword.mintsCombatRestriction) . StaticAbility.modifications) (Projection.staticAbilitiesOf oid gs)
+          || case Game.faceOf oid gs of
+            Nothing -> False
+            Just face -> any Keyword.mintsCombatRestriction (Face.keywords face)
       -- CR 701.60c: "a suspected permanent has menace and 'This creature can't
       -- block' for as long as it's suspected". Decayed's row (CR 702.147a) with
       -- the keyword swapped for the designation -- aimed at the source alone,

@@ -1,5 +1,6 @@
 module Pawl.Codec.ProjectedCharacteristicsSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -7,13 +8,19 @@ import qualified Pawl.Codec.FaceSpec as FaceSpec
 import qualified Pawl.Codec.ProjectedCharacteristics as PC
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.PlayerEffect as PlayerEffect
+import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -46,6 +53,8 @@ testCharacteristics =
       PC.characteristicPT = Nothing,
       PC.cardTypes = Set.singleton CardType.Creature,
       PC.subtypes = Set.singleton Subtype.Human,
+      PC.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing Set.empty Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))],
+      PC.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer Nothing (PlayerEffect.CantCastMoreThan 1)],
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
       PC.triggeredAbilities = [FaceSpec.minimalTriggeredAbility],
@@ -58,6 +67,8 @@ testCharacteristicsJson =
   "{\"names\":[\"Test Creature\"],\"supertypes\":[{\"type\":\"Legendary\"}],\"keywords\":[{\"key\":{\"type\":\"Flying\"},\"value\":1}],"
     <> "\"colors\":[{\"type\":\"Blue\"}],\"manaValue\":3,\"power\":1,\"toughness\":2,"
     <> "\"cardTypes\":[{\"type\":\"Creature\"}],\"subtypes\":[{\"type\":\"Human\"}],"
+    <> "\"staticAbilities\":[{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]}],"
+    <> "\"playerAbilities\":[{\"scope\":{\"type\":\"EachPlayer\"},\"effect\":{\"type\":\"CantCastMoreThan\",\"value\":1}}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"enchant\":[{\"pool\":{\"type\":\"Creatures\"}}],"
@@ -79,6 +90,8 @@ minimalCharacteristics =
       PC.characteristicPT = Nothing,
       PC.cardTypes = Set.singleton CardType.Land,
       PC.subtypes = Set.empty,
+      PC.staticAbilities = [],
+      PC.playerAbilities = [],
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
       PC.triggeredAbilities = [],

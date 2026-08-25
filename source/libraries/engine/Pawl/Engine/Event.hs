@@ -3382,16 +3382,20 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
 -- it does not exist, so it was generating no effect to continue -- CR 702.26k
 -- still takes it out of the game with its owner.
 --
--- Short-circuited on the cheap PRINTED read, so an ordinary zone change -- every
--- one in the pool but this card's -- never pays for the projection
--- frozenStaticParts spends.
+-- Short-circuited on the cheap COPIABLE read (Projection.staticAbilitiesOf,
+-- which is projection-free), so an ordinary zone change -- every one in the pool
+-- but this card's -- never pays for the projection frozenStaticParts spends.
+--
+-- That read and not the printed face, because `n` is CR 613.6's index into the
+-- list Projection.permanentParts tagged, and that walk reads the copiable list
+-- (CR 707.2a). Indexing a different list here would join the wrong ability's
+-- duration onto the frozen part, with no type error to say so.
 lingeringHandover :: ObjectId -> PlayerId -> GameState -> [ContinuousEffect.ContinuousEffect Card]
 lingeringHandover oid lastController gs =
   let lingering :: [(Natural, Duration.Duration)]
       lingering =
         [ (n, duration)
-        | face <- Maybe.maybeToList (Game.faceOf oid gs),
-          (n, sa) <- zip [0 ..] (Face.staticAbilities face),
+        | (n, sa) <- zip [0 ..] (Projection.staticAbilitiesOf oid gs),
           duration <- Maybe.maybeToList (StaticAbility.lingers sa)
         ]
    in if null lingering

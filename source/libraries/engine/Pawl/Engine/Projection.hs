@@ -1053,10 +1053,34 @@ countersOf oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
 -- counters, pumps, control and ability grants are never part of a copiable value.
 -- Not a recursion: a copy of a copy stored resolved values when it was stamped.
 copiableCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
-copiableCharacteristics oid gs =
-  case Game.lookupObject oid gs >>= (Binding.copyOf . Object.bindings) of
-    Just snapshot -> snapshot
-    Nothing -> baseCharacteristics oid gs
+copiableCharacteristics oid gs = case copiableSnapshotOf oid gs of
+  Just snapshot -> snapshot
+  Nothing -> baseCharacteristics oid gs
+
+-- CR 707.3: the copy snapshot stamped onto this object, and Nothing for the
+-- object that is copying nothing. The ONE read of Binding.copyOf, so the three
+-- questions asked of a copiable value -- the whole record above, its static
+-- abilities below, and its player abilities in Pawl.Engine.PlayerEffect --
+-- cannot disagree about which objects have one.
+copiableSnapshotOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
+copiableSnapshotOf oid gs = Game.lookupObject oid gs >>= (Binding.copyOf . Object.bindings)
+
+-- CR 707.2a: the static abilities this object's copiable rules text gives it --
+-- its copy snapshot's when it has one, its printed face's otherwise. Equal to
+-- PC.staticAbilities (copiableCharacteristics oid gs) by construction, since
+-- that is what both arms of baseCharacteristics seed the field from.
+--
+-- Written as its own read rather than through copiableCharacteristics for two
+-- reasons, both structural. It stays PROJECTION-FREE, which controlGrants below
+-- requires of everything it touches -- baseCharacteristics asks controllerOf,
+-- and controllerOf is built on controlGrants. And it costs one map lookup on
+-- the ordinary permanent, where the seed spends Game.namesOf and two
+-- Quantity.evaluates, so the readers below stay as cheap as the printed read
+-- they replace.
+staticAbilitiesOf :: ObjectId -> GameState -> [StaticAbility.StaticAbility Card.Type.Card]
+staticAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
+  Just snapshot -> PC.staticAbilities snapshot
+  Nothing -> foldMap Face.staticAbilities (Game.faceOf oid gs)
 
 -- CR 208.2 / 604.3: the card's characteristic-defining P/T, with the printed star
 -- resolved to what the CDA counts. Nothing unless the card declares a CDA *and*
@@ -1091,6 +1115,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.characteristicPT = Nothing,
         PC.cardTypes = Set.empty,
         PC.subtypes = Set.empty,
+        PC.staticAbilities = [],
+        PC.playerAbilities = [],
         PC.activatedAbilities = [],
         PC.replacementEffects = [],
         PC.triggeredAbilities = [],
@@ -1142,6 +1168,14 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             PC.characteristicPT = seedCharacteristicPT face,
             PC.cardTypes = TypeLine.types (Face.typeLine face),
             PC.subtypes = TypeLine.subtypes (Face.typeLine face),
+            -- CR 604.1 / 613.10: the two ability lists the layer fold never
+            -- rewrites. In the SEED for enchant's reason below -- CR 707.2
+            -- names rules text among the copiable values -- which is what puts
+            -- a copied permanent's static and player abilities where
+            -- staticAbilitiesOf and Pawl.Engine.PlayerEffect can find them
+            -- instead of on the copier's printed face (CR 707.2a).
+            PC.staticAbilities = Face.staticAbilities face,
+            PC.playerAbilities = Face.playerAbilities face,
             PC.activatedAbilities = Face.activatedAbilities face,
             PC.replacementEffects = Face.replacementEffects face,
             PC.triggeredAbilities = Face.triggeredAbilities face,
@@ -1419,15 +1453,13 @@ setLandSubtypeEffectsGiven functioning gs =
       -- than once per permanent per projection. The MODIFICATIONS stay unrewritten,
       -- which is sound because a word swap cannot change whether an arm is a set
       -- arm.
-      fromPerm permId = case Game.faceOf permId gs of
-        Nothing -> []
-        Just face ->
-          let changes = textChangesAffecting permId gs
-              -- CR 604.2's clause, asked exactly as gatherStatic asks it. Free for
-              -- an unconditional ability, since staticLives answers first.
-              lives sa = staticLives (functioning permId) changes (minimum (fmap layer (staticParts changes sa))) sa
-           in fmap (\sa -> (permId, rewriteAffected changes (StaticAbility.affected sa))) $
-                filter (\sa -> any isSet (StaticAbility.modifications sa) && functionsFromZone Zone.Battlefield sa && lives sa) (Face.staticAbilities face)
+      fromPerm permId =
+        let changes = textChangesAffecting permId gs
+            -- CR 604.2's clause, asked exactly as gatherStatic asks it. Free for
+            -- an unconditional ability, since staticLives answers first.
+            lives sa = staticLives (functioning permId) changes (minimum (fmap layer (staticParts changes sa))) sa
+         in fmap (\sa -> (permId, rewriteAffected changes (StaticAbility.affected sa))) $
+              filter (\sa -> any isSet (StaticAbility.modifications sa) && functionsFromZone Zone.Battlefield sa && lives sa) (staticAbilitiesOf permId gs)
    in concatMap fromStored (GameState.continuousEffects gs)
         <> concatMap fromPerm (abilitySources gs)
 
@@ -2366,14 +2398,25 @@ alwaysFunctioning :: ObjectId -> Layer -> Condition.Type.Condition -> Bool
 alwaysFunctioning _ _ _ = True
 
 -- Does any static ability in play carry a CR 604.2 "as long as" clause at all?
--- gather's cheap structural precondition, a pure read of the printed faces with
--- no projection behind it. Emblems, the stack, graveyards, hands and libraries
--- are all walked, because gatherGiven gathers abilities from each (CR 114.4 /
--- 113.6 / 113.6b / 113.6f) and skipping one would leave its clause wired open by
--- alwaysFunctioning.
+-- gather's cheap structural precondition, with no projection behind it. Emblems,
+-- the stack, graveyards, hands and libraries are all walked, because gatherGiven
+-- gathers abilities from each (CR 114.4 / 113.6 / 113.6b / 113.6f) and skipping
+-- one would leave its clause wired open by alwaysFunctioning.
+--
+-- Each arm reads the SAME list its walk in gatherGiven does, which is the whole
+-- of what makes this precondition sound. On the battlefield that is the copiable
+-- list (CR 707.2a); everywhere else it is the face, and for the one copy that
+-- reaches another zone the two are already the same value -- a copy of a spell
+-- carries Source.OfSpellCopy, so Game.faceOfObject resolves to the copied
+-- printing's face.
 anyConditional :: GameState -> Bool
 anyConditional gs =
-  let conditional oid = case Game.faceOf oid gs of
+  let -- A printed read here would leave a copy's "as long as" clause answered by
+      -- alwaysFunctioning on a board whose only conditional static ability is
+      -- the copy's, which Pawl.ClassSpec's "CR 604.2 a copy's own as-long-as
+      -- clause is still gated once the original is exiled" proves.
+      conditionalPermanent oid = any (Maybe.isJust . StaticAbility.condition) (staticAbilitiesOf oid gs)
+      conditional oid = case Game.faceOf oid gs of
         Nothing -> False
         Just face -> any (Maybe.isJust . StaticAbility.condition) (Face.staticAbilities face)
       conditionalStating zone oid = case Game.lookupObject oid gs of
@@ -2382,7 +2425,7 @@ anyConditional gs =
         Just obj -> case Game.faceOfObject gs obj of
           Nothing -> False
           Just face -> any (\sa -> Maybe.isJust (StaticAbility.condition sa) && statesZone zone sa) (Face.staticAbilities face)
-   in any conditional (Set.toList (GameState.battlefield gs))
+   in any conditionalPermanent (Set.toList (GameState.battlefield gs))
         || any conditional (Set.toList (GameState.command gs))
         || any conditional (GameState.stack gs)
         -- Every card in the graveyard rather than only the ones whose ability
@@ -2425,8 +2468,9 @@ conditionHolds cands gs src lowest =
 -- Empty of exclusions at every priority window, so outside an entry loop this is
 -- the battlefield. Three walks read it -- this module's static-ability gather,
 -- its CR 305.7 set-subtype scan and its layer-2 control grants -- which together
--- are every place a permanent's own printed static ability becomes a continuous
--- effect. Only the FIRST has an observer: Pawl.ReplacementSpec's "a Wood Elemental
+-- are every place a permanent's own static ability becomes a continuous effect.
+-- All three read that ability list through staticAbilitiesOf, so a copy's rules
+-- text reaches each of them (CR 707.2a). Only the FIRST has an observer: Pawl.ReplacementSpec's "a Wood Elemental
 -- reanimated beside Ashaya sacrifices nothing" goes red when it is widened back to
 -- the whole battlefield, and neither of the other two moves a case, because
 -- nothing in `data/cards/` puts a control-changer or a Blood Moon-shaped subtype
@@ -2662,34 +2706,34 @@ spellStaticTypes = Set.fromList [CardType.Instant, CardType.Sorcery]
 permanentParts :: (ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> [(ObjectId, Affected.Affected)] -> (ObjectId -> Bool) -> GameState -> ObjectId -> [(Natural, Gathered)]
 permanentParts stripped functioning setEffs setStripped gs permId = case Game.lookupObject permId gs of
   Nothing -> []
-  Just permObj -> case Game.faceOf permId gs of
-    Nothing -> []
-    Just face ->
-      if null setEffs || liveGiven setEffs permId gs
-        then
-          -- CR 612: rewrite each static ability's subtype words by the text
-          -- changes affecting THIS source, before its effect is folded on.
-          let changes = textChangesAffecting permId gs
-              -- CR 613.1f's layer-6 removal and CR 305.7's layer-4 strip, asked
-              -- of ONE ability at CR 613.6's decision point rather than of the
-              -- permanent as a whole. Each spares an ability whose effect had
-              -- ALREADY started applying when the stripper did: rule 613.6 keeps
-              -- such an effect applying even though the ability generating it is
-              -- gone. An ability deciding AT layer 4 is spared here and left to
-              -- the base-characteristics gate above, which is CR 613.8's order
-              -- for it -- see liveGiven.
-              removed lowest = (lowest > Layer.Ability && stripped permId) || (lowest > Layer.Type && setStripped permId)
-              -- One thunk per permanent, shared by all its abilities. Bound
-              -- here, OUTSIDE the zipWith, which is what shares it.
-              partsOf = gatherStatic (functioning permId) permId (Object.timestamp permObj) changes removed
-              -- CR 113.6b, applied WITHOUT disturbing the index: `n` is the key
-              -- half of CR 613.6's decision memo and Pawl.Engine.Event's
-              -- departure handover indexes Face.staticAbilities by it, so an
-              -- ability this rule drops must leave a hole rather than shift its
-              -- neighbours up.
-              tagged n sa = if functionsFromZone Zone.Battlefield sa then fmap ((,) n) (partsOf n sa) else []
-           in concat (zipWith tagged [0 ..] (Face.staticAbilities face))
-        else []
+  Just permObj ->
+    if null setEffs || liveGiven setEffs permId gs
+      then
+        -- CR 612: rewrite each static ability's subtype words by the text
+        -- changes affecting THIS source, before its effect is folded on.
+        let changes = textChangesAffecting permId gs
+            -- CR 613.1f's layer-6 removal and CR 305.7's layer-4 strip, asked
+            -- of ONE ability at CR 613.6's decision point rather than of the
+            -- permanent as a whole. Each spares an ability whose effect had
+            -- ALREADY started applying when the stripper did: rule 613.6 keeps
+            -- such an effect applying even though the ability generating it is
+            -- gone. An ability deciding AT layer 4 is spared here and left to
+            -- the base-characteristics gate above, which is CR 613.8's order
+            -- for it -- see liveGiven.
+            removed lowest = (lowest > Layer.Ability && stripped permId) || (lowest > Layer.Type && setStripped permId)
+            -- One thunk per permanent, shared by all its abilities. Bound
+            -- here, OUTSIDE the zipWith, which is what shares it.
+            partsOf = gatherStatic (functioning permId) permId (Object.timestamp permObj) changes removed
+            -- CR 113.6b, applied WITHOUT disturbing the index: `n` is the key
+            -- half of CR 613.6's decision memo and Pawl.Engine.Event's
+            -- departure handover indexes the SAME list by it, so an ability
+            -- this rule drops must leave a hole rather than shift its
+            -- neighbours up. That handover reads staticAbilitiesOf too, and
+            -- it must: the moment the two walks index different lists, `n`
+            -- means two different things and the join is silently wrong.
+            tagged n sa = if functionsFromZone Zone.Battlefield sa then fmap ((,) n) (partsOf n sa) else []
+         in concat (zipWith tagged [0 ..] (staticAbilitiesOf permId gs))
+      else []
 
 -- CR 611.2c, applied to a static ability's effect: the parts `src`'s own static
 -- abilities are generating RIGHT NOW, each with the index of the ability it
@@ -3998,10 +4042,14 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- The short-circuit reads BASE cards while the result reads the PROJECTION,
 -- sound only because every route to an unprinted replacement effect is covered:
 -- `EntryR AsCopy` on a card that is itself a base card with one, CR 122.1c's
--- shield counters, or a minting keyword printed on or granted by a face.
+-- shield counters, or a minting keyword printed on or granted by a face. The
+-- ability disjunct asks staticAbilitiesOf rather than the face, so a copy's
+-- granting text is seen (CR 707.2a).
 --
 -- Not implemented: a minting keyword reaching a permanent through a stored
--- continuous effect or a keyword counter is on no base face (#833).
+-- continuous effect or a keyword counter is on no base face (#833). Nor is a
+-- copy's own KEYWORD, which the disjunct above this one still reads off the
+-- copier's printed face (#2220).
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect (Effect.Effect Card.Type.Card))]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
@@ -4020,7 +4068,7 @@ replacementsAffecting gs =
             -- And the battle disjunct is the third, for CR 310.4b.
             || Set.member CardType.Battle (TypeLine.types (Face.typeLine face))
             || any Keyword.mintsReplacement (Face.keywords face)
-            || any (any (grantsKeywordWhere Keyword.mintsReplacement) . StaticAbility.modifications) (Face.staticAbilities face)
+            || any (any (grantsKeywordWhere Keyword.mintsReplacement) . StaticAbility.modifications) (staticAbilitiesOf oid gs)
       forOne oid = fmap (\re -> (oid, re)) (replacementsOf oid gs)
    in if not (any baseHas onBattlefield)
         then []
@@ -4194,26 +4242,32 @@ data ControlGrant = MkControlGrant
 -- Hoisted for the same reason setLandSubtypeEffects is: `controls` calls
 -- controllerOf once per battlefield object.
 --
+-- The ability list is staticAbilitiesOf, so a copy's control-granting text is
+-- read (CR 707.2a) -- which staticAbilitiesOf can supply without breaking the
+-- rule above, being projection-free itself. No case observes that: every pooled
+-- control grant is on an Aura (Confiscate, Control Magic), and a copy of an Aura
+-- would enter attached to nothing and be put into a graveyard by CR 704.5m, so
+-- the pool has no board where a copy holds one. A regression fence, kept because
+-- the three walks over abilitySources must agree on which list they read.
+--
 -- Not implemented: CR 604.2's "as long as" gate, which setLandSubtypeEffects
 -- does ask -- the same mutual recursion rules it out here (#1529).
 controlGrants :: GameState -> [ControlGrant]
 controlGrants gs =
   let grantsOf permId = case Game.lookupObject permId gs of
         Nothing -> []
-        Just permObj -> case Game.faceOf permId gs of
-          Nothing -> []
-          Just face ->
-            let isControl sa = any isControlOp (StaticAbility.modifications sa)
-                isControlOp m = case m of
-                  Modification.SetControllerToSource -> True
-                  _ -> False
-                toGrant sa =
-                  MkControlGrant
-                    { cgSource = permId,
-                      cgAffected = StaticAbility.affected sa,
-                      cgTimestamp = Object.timestamp permObj
-                    }
-             in fmap toGrant (filter (\sa -> isControl sa && functionsFromZone Zone.Battlefield sa) (Face.staticAbilities face))
+        Just permObj ->
+          let isControl sa = any isControlOp (StaticAbility.modifications sa)
+              isControlOp m = case m of
+                Modification.SetControllerToSource -> True
+                _ -> False
+              toGrant sa =
+                MkControlGrant
+                  { cgSource = permId,
+                    cgAffected = StaticAbility.affected sa,
+                    cgTimestamp = Object.timestamp permObj
+                  }
+           in fmap toGrant (filter (\sa -> isControl sa && functionsFromZone Zone.Battlefield sa) (staticAbilitiesOf permId gs))
    in concatMap grantsOf (abilitySources gs)
 
 -- CR 303.4b: WHICH object this one is attached to -- what an Aura "enchants".
