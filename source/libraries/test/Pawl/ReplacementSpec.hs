@@ -2490,6 +2490,14 @@ raceShield wantMinted wanted p = case p of
      in maybe 0 Int.toNaturalSaturating (List.findIndex ((== wantMinted) . minted) entries)
   _ -> preferTarget wanted p
 
+-- CR 616.1's choice between a permanent's own prevention effect and a FLOATING
+-- one somebody else installed, told apart by whose object the entry names.
+raceIsSelf :: Bool -> ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt.Prompt r -> r
+raceIsSelf wantSelf oid wanted p = case p of
+  Prompt.ChooseReplacement _ _ entries ->
+    maybe 0 Int.toNaturalSaturating (List.findIndex ((== wantSelf) . (== oid) . ReplacementEntry.source) entries)
+  _ -> preferTarget wanted p
+
 -- Settle one damage batch, then let whatever it triggered go on the stack and
 -- resolve. selflessSquireSpec's local twin, top-level because the answer is
 -- rank-2 and these cases hand it a different one per case.
@@ -2560,6 +2568,31 @@ phyrexianVindicatorSpec s registry = Spec.describe s "Phyrexian Vindicator (CR 6
     -- prevention each branch actually applied.
     Spec.assertEqWith s "the counter was spent on the minted branch" (countersOn CounterKind.Shield vindicator mintedAfter) 0
     Spec.assertEqWith s "and left alone on the printed one" (countersOn CounterKind.Shield vindicator printedAfter) 1
+  -- The FLOATING rival, and the Squire's ruling read from the other end. Mending
+  -- Hands ({W} Instant, "Prevent the next 4 damage that would be dealt to any
+  -- target this turn") shields the Vindicator for exactly the amount its own
+  -- ability would have stopped, so the two candidates race for one event and
+  -- neither the recipient nor the amount can tell them apart -- only whose effect
+  -- it was. A prevention of somebody else's is not "this way".
+  Spec.it s "CR 615.13 another card's prevention of the same 4, on the same creature, is not 'this way'" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    vindicatorPrinting <- S.printingOf s registry "Phyrexian Vindicator"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let base = S.landsInPlay plains 1
+        (attacker, g1) = S.addCreature pikerPrinting S.bob base
+        (vindicator, g2) = S.addCreature vindicatorPrinting S.alice g1
+        (g3, spellId) = S.handOne mendingHands g2
+        shielded = castAndResolve (preferTarget [Recipient.ToCreature vindicator]) g3 spellId
+        batch = [hit attacker (Recipient.ToCreature vindicator) 4]
+        (theirsDealt, theirsAfter) = strikeAndSettleWith (raceIsSelf False vindicator onlyBob) shielded batch
+        (oursDealt, oursAfter) = strikeAndSettleWith (raceIsSelf True vindicator onlyBob) shielded batch
+    Spec.assertEqWith s "setup: Mending Hands left a floating shield behind" (length (GameState.replacements shielded)) 1
+    Spec.assertEqWith s "Mending Hands' prevention leaves bob untouched" (S.lifeOf S.bob theirsAfter) (Just 20)
+    Spec.assertEqWith s "the Vindicator's own deals him the same 4" (S.lifeOf S.bob oursAfter) (Just 16)
+    Spec.assertEqWith s "both prevented the whole 4 off the Vindicator" (fmap (S.damageOf vindicator) [theirsAfter, oursAfter]) [Just 0, Just 0]
+    Spec.assertEqWith s "nothing triggered off Mending Hands' prevention" (length (GameState.stack theirsDealt)) 0
+    Spec.assertEqWith s "and the Vindicator's own triggered once" (length (GameState.stack oursDealt)) 1
   -- "Any OTHER target": the answerer reaches for the Vindicator first and takes
   -- bob only because the pool never offers it. Damage the Vindicator dealt
   -- ITSELF would be prevented by its own shield (CR 615.6) and so leave no mark,

@@ -1641,7 +1641,10 @@ preventionBy candidate before after = case (ReplacementCandidate.effect candidat
 --
 -- A floating row is always a card's: CR 615.3's shields are installed by the
 -- resolution of a spell or ability, and `source` is the object whose text said
--- so.
+-- so. A REGRESSION FENCE rather than a proved answer -- every producer of a
+-- floating prevention paired with a "this way" trigger needs a filter on the
+-- damage's source that pawl has not got, so nothing observes this arm answering
+-- Just, and mutating it to Nothing leaves the suite green (gap #2287).
 --
 -- A permanent's is too, with one exception -- CR 122.1c's shield-counter pair,
 -- which Pawl.Engine.Projection.shieldOf mints onto any permanent carrying a
@@ -1653,6 +1656,10 @@ preventionBy candidate before after = case (ReplacementCandidate.effect candidat
 -- way to say "not the minted pair" -- the classification is
 -- DamageRewrite.PreventRemovingShieldCounter's, which rule 122.1c makes part of
 -- the rulebook, and nothing here asks what a card's effect does.
+--
+-- Not implemented: the OTHER prevention the rules mint onto a permanent, CR
+-- 702.16e's protection, which is a plain PreventAll and so has nothing to be
+-- told apart by (#2288).
 printedBy :: CandidateId.CandidateId -> Maybe ObjectId
 printedBy candidate = case candidate of
   CandidateId.OfFloating floating -> Just (FloatingCandidate.source floating)

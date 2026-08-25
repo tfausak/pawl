@@ -624,6 +624,10 @@ data TriggerCondition
     -- o:"prevented this way", 2026-08-25). CR 122.1c's shield-counter pair is a
     -- prevention the RULES mint onto a permanent rather than one its card prints,
     -- and Pawl.Engine.Replacement.printedBy is what tells the two apart.
+    --
+    -- Not implemented: any question about the SOURCE of the damage that was
+    -- prevented, which Samite Ministration's "damage from a black or red source"
+    -- needs (#2287).
     SelfPreventsDamage
   | -- | CR 119.9: "whenever [a player] gains life" (Ajani's Pridemate). That
     -- rule rewrites the sentence as "whenever a SOURCE causes [a player] to gain
