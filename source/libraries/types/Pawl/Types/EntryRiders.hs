@@ -2,6 +2,7 @@ module Pawl.Types.EntryRiders where
 
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TapState as TapState
@@ -141,8 +142,9 @@ import qualified Pawl.Types.TapState as TapState
 --
 -- `faceDown` is CR 708.3's "objects that are put onto the battlefield face
 -- down", said by the EFFECT that does the putting -- the "manifest the top card of
--- your library" Soul Summons and Cloudform share (CR 701.40a) -- against CR
--- 110.5b's face-up default.
+-- your library" Soul Summons and Cloudform share (CR 701.40a), and Yedora, Grave
+-- Gardener's "return it to the battlefield face down" -- against CR 110.5b's
+-- face-up default.
 -- A rider and not a write after the move for `exiledFaceDown`'s reason and one
 -- of its own: CR 708.3 says the object is turned face down BEFORE it enters, so
 -- the CR 614.1c entry loop, the CR 603.2g Moved event and every trigger scanning
@@ -151,10 +153,20 @@ import qualified Pawl.Types.TapState as TapState
 -- enters-the-battlefield trigger on the way in, which is the one thing the rule
 -- exists to forbid.
 --
--- A Bool, so it always writes CR 708.2a's characteristics. CR 708.2a's "unless
--- otherwise specified by the effect that put it onto the battlefield face down"
--- -- an entry that LISTS its own, as Yedora, Grave Gardener and Missy do -- is
--- not implemented (#1668).
+-- A Maybe FaceDownState and not a Bool, which is CR 708.2a's "unless otherwise
+-- specified by the effect that put it onto the battlefield face down" plus CR
+-- 708.6's "what ability or rules caused the permanents to be face down". Yedora,
+-- Grave Gardener's "It's a Forest land" is the listing and its reason is CR
+-- 708.3's own rather than manifest's, which matters because manifest's reason is
+-- the one CR 701.40b's special action reads
+-- (Pawl.Engine.FaceDown.canTurnFaceUp): a rider that could only say "face down"
+-- handed Yedora's permanent a turn-face-up its printing never grants.
+--
+-- The SAME type Facing.FaceDown carries, because the two say the same thing: CR
+-- 708.3 turns the object face down before it enters, so what the effect states
+-- and what the arriving permanent's status holds are one value, and
+-- Event.changeZoneEntering hands it straight to Facing.FaceDown without
+-- rebuilding it.
 --
 -- A SECOND rider beside `exiledFaceDown` and not the same one widened, which is
 -- CR 110.5d in as many words: an exiled card's face-downness "has no correlation
@@ -172,13 +184,10 @@ import qualified Pawl.Types.TapState as TapState
 -- Create arm does not read it and the same CardSpec lint holds that no Create in
 -- the pool sets it.
 --
--- A Bool and not a choice of listed characteristics, which is what CR 701.58a's
--- cloak would need -- a 2/2 with ward {2}, which
--- FaceDownCharacteristics.disguisedValue now is. The same Bool is why
--- Event.changeZoneEntering writes FaceDownReason.Manifested unconditionally: CR
--- 701.40a is the only rule in the pool that puts a card onto the battlefield face
--- down, and cloak, the one other rule that would, would need both halves of this
--- rider (gap #1668).
+-- CR 701.58a's cloak is one value of this rider: the 2/2 with ward {2} that
+-- FaceDownCharacteristics.disguisedValue is, listed under
+-- FaceDownReason.Disguised, which is the reason CR 701.58d makes a cloaked
+-- permanent turnable by. That pairing is the one a Bool could not say at all.
 data EntryRiders count = MkEntryRiders
   { tapped :: TapState.TapState,
     attacking :: Bool,
@@ -187,6 +196,6 @@ data EntryRiders count = MkEntryRiders
     counters :: Map.Map (CounterKind.CounterKind Keyword.Keyword) count,
     underOwner :: Bool,
     exiledFaceDown :: Bool,
-    faceDown :: Bool
+    faceDown :: Maybe FaceDownState.FaceDownState
   }
   deriving (Eq, Ord, Show)

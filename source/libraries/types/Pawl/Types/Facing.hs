@@ -1,6 +1,5 @@
 module Pawl.Types.Facing where
 
-import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.FaceDownState as FaceDownState
 
@@ -31,7 +30,7 @@ data Facing
 -- | CR 708.2a's face-down status -- what every producer that lists no
 -- characteristics writes, named by the rule that allowed it.
 faceDown :: FaceDownReason.FaceDownReason -> Facing
-faceDown r = FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = r, FaceDownState.listed = FaceDownCharacteristics.defaultValue}
+faceDown r = FaceDown (FaceDownState.defaultFor r)
 
 -- | Whether an object is face down at all, for a reader that wants the CR 110.5
 -- STATUS rather than the list on it.

@@ -2633,13 +2633,15 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
       -- (CR 708.4, changeZoneCasting), so the gate cannot live there. A card
       -- stating the rider on a move anywhere else says something no rule reads,
       -- which Pawl.CardSpec lints.
-      -- CR 701.40a names the allower: manifest is the only rule in the pool that
-      -- puts a card onto the battlefield face down, and "that permanent is a
-      -- manifested permanent for as long as it remains face down" is what the
-      -- reason records -- which is what opens CR 701.40b's turn-face-up procedure
-      -- to it (Pawl.Engine.FaceDown.canTurnFaceUp). The rider is a Bool, so it
-      -- names no other (gap #1668); see Pawl.Types.EntryRiders.
-      facing = if onto && EntryRiders.faceDown riders then Facing.faceDown FaceDownReason.Manifested else Facing.FaceUp
+      -- CR 708.2 and CR 708.6 both come off the rider rather than being minted
+      -- here: the effect that put the permanent onto the battlefield face down
+      -- is what LISTS its characteristics (CR 708.2a's "unless otherwise
+      -- specified") and what CR 708.6 names as the allower, so this door only
+      -- says WHERE the value applies. Soul Summons and Cloudform write CR
+      -- 701.40a's manifest -- the reason that opens CR 701.40b's turn-face-up
+      -- procedure (Pawl.Engine.FaceDown.canTurnFaceUp) -- and Yedora, Grave
+      -- Gardener writes CR 708.3's plain putting, which opens nothing.
+      facing = if onto then maybe Facing.FaceUp Facing.FaceDown (EntryRiders.faceDown riders) else Facing.FaceUp
   if refused
     then pure Nothing
     else changeZoneAttaching asOf batch oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under' shown facing (EntryRiders.exiledFaceDown riders)

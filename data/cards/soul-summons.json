@@ -42,7 +42,12 @@
                         }
                       },
                       "riders": {
-                        "faceDown": true
+                        "faceDown": {
+                          "listed": {},
+                          "reason": {
+                            "type": "Manifested"
+                          }
+                        }
                       },
                       "zone": {
                         "type": "Battlefield"
