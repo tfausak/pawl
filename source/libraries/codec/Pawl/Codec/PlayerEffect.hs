@@ -8,6 +8,7 @@ import qualified Pawl.Codec.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Codec.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ManaFilter as ManaFilter
+import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Codec.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Codec.ReduceSpellCost as ReduceSpellCost
@@ -48,7 +49,8 @@ codec =
       Arm.nullary "CantPlayLands" PlayerEffect.CantPlayLands,
       Arm.payload "CastFromGraveyard" filterCodec PlayerEffect.CastFromGraveyard (\x -> case x of PlayerEffect.CastFromGraveyard y -> Just y; _ -> Nothing),
       Arm.nullary "PlayLandsFromGraveyard" PlayerEffect.PlayLandsFromGraveyard,
-      Arm.payload "CastFromHandWithoutPayingManaCost" filterCodec PlayerEffect.CastFromHandWithoutPayingManaCost (\x -> case x of PlayerEffect.CastFromHandWithoutPayingManaCost y -> Just y; _ -> Nothing)
+      Arm.payload "CastFromHandWithoutPayingManaCost" filterCodec PlayerEffect.CastFromHandWithoutPayingManaCost (\x -> case x of PlayerEffect.CastFromHandWithoutPayingManaCost y -> Just y; _ -> Nothing),
+      Arm.payload "CantGetCounters" (Common.maybe PlayerCounterKind.codec) PlayerEffect.CantGetCounters (\x -> case x of PlayerEffect.CantGetCounters y -> Just y; _ -> Nothing)
     ]
   where
     filterCodec = Filter.codec Keyword.codec

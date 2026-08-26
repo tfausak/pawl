@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.CounterRestriction as CounterRestriction
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Daytime as Daytime
 import qualified Pawl.Engine.Decide as Decide
@@ -5666,12 +5667,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- either half runs, and this arm is not a RemoveCounters followed by a
     -- PutCounters however much its tail looks like one.
     --
-    -- Three of the rule's four impossibilities are checked here, in its own order.
+    -- All four of the rule's impossibilities are checked here, in its own order.
     -- Its third, "the second object can't have counters put onto it", is a
-    -- PROHIBITION (Solemnity, Melira) and not a replacement, and pawl models no
-    -- such prohibition at all, so there is nothing to consult (gap #2320). A CR
-    -- 614.16 row that scales the placement to nothing is NOT that case: the
-    -- placement was possible and was replaced, which rule 122.5 does not undo.
+    -- PROHIBITION (Solemnity, Melira Sylvok Outcast) and not a replacement, so it
+    -- is Pawl.Engine.CounterRestriction rather than a CR 614.16 row -- a row that
+    -- scales the placement to nothing is NOT that case: the placement was
+    -- possible and was replaced, which rule 122.5 does not undo.
+    --
+    -- That third impossibility is asked PER KIND, which is what makes it part of
+    -- the candidate sweep below rather than a gate beside the two zone reads:
+    -- Melira names one kind, so a destination that can't take a -1/-1 counter may
+    -- still take a +1/+1 one. A kind the destination refuses is not a kind this
+    -- move could choose, and rule 122.5's atomicity is why it is dropped from the
+    -- candidates rather than chosen and then half-performed -- "no counter is
+    -- removed from or put onto anything".
     --
     -- The two halves go through Event.removeCounters and Event.putCounters, so the
     -- move records both crossings -- a CR 122.7 "when the Nth counter is put on"
@@ -5703,10 +5712,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Set.member from (GameState.battlefield gs),
           Set.member to (GameState.battlefield gs) ->
             -- "... if the first object doesn't have the appropriate kind of
-            -- counter on it". The kinds actually on it ARE the candidates, so an
-            -- object bearing none leaves nothing to move and nothing to ask.
+            -- counter on it". The kinds actually on it ARE the candidates, less
+            -- the ones rule 122.5's third impossibility rules out, so an object
+            -- bearing none -- or bearing only kinds the destination refuses --
+            -- leaves nothing to move and nothing to ask.
             -- Ascending (Map.keys), so a transcript is deterministic.
-            case Map.keys (Map.filter (> 0) (maybe Map.empty Object.counters (Game.lookupObject from gs))) of
+            case filter (\kind -> not (CounterRestriction.prohibited to kind gs)) (Map.keys (Map.filter (> 0) (maybe Map.empty Object.counters (Game.lookupObject from gs)))) of
               [] -> pure ()
               first : rest -> do
                 kind <- case rest of

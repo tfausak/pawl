@@ -154,6 +154,7 @@ theRingEmblem temptations =
               Face.sacrificeRestrictions = [],
               Face.untapRestrictions = [],
               Face.attachRestrictions = [],
+              Face.counterRestrictions = [],
               Face.entryRestrictions = [],
               Face.attackCosts = [],
               Face.blockCosts = [],

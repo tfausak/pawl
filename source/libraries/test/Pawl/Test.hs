@@ -101,6 +101,7 @@ import qualified Pawl.Codec.CounterNameSpec
 import qualified Pawl.Codec.CounterPatternSpec
 import qualified Pawl.Codec.CounterPlacementSpec
 import qualified Pawl.Codec.CounterRSpec
+import qualified Pawl.Codec.CounterRestrictionSpec
 import qualified Pawl.Codec.CounterSpec
 import qualified Pawl.Codec.CounterSubjectSpec
 import qualified Pawl.Codec.CounterabilitySpec
@@ -368,6 +369,7 @@ import qualified Pawl.CopySpec
 import qualified Pawl.CoreSpec
 import qualified Pawl.CostSpec
 import qualified Pawl.CountSpec
+import qualified Pawl.CounterRestrictionSpec
 import qualified Pawl.CounterspellSpec
 import qualified Pawl.CrewSpec
 import qualified Pawl.DamageSpec
@@ -661,6 +663,7 @@ spec s registry = do
   Pawl.Codec.EntryFlipSpec.spec s
   Pawl.Codec.EntryOptionSpec.spec s
   Pawl.Codec.EntryRSpec.spec s
+  Pawl.Codec.CounterRestrictionSpec.spec s
   Pawl.Codec.EntryRestrictionSpec.spec s
   Pawl.Codec.EntryRewriteSpec.spec s
   Pawl.Codec.EntryRidersSpec.spec s
@@ -958,6 +961,7 @@ spec s registry = do
   Pawl.RoomSpec.spec s registry
   Pawl.SetupSpec.spec s registry
   Pawl.SlugSpec.spec s
+  Pawl.CounterRestrictionSpec.spec s registry
   Pawl.EntryRestrictionSpec.spec s registry
   Pawl.SacrificeRestrictionSpec.spec s registry
   Pawl.SagaSpec.spec s registry

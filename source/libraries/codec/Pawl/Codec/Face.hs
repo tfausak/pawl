@@ -30,6 +30,7 @@ import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.CombatRestriction as CombatRestriction
 import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.CostReduction as CostReduction
+import qualified Pawl.Codec.CounterRestriction as CounterRestriction
 import qualified Pawl.Codec.Counterability as Counterability
 import qualified Pawl.Codec.Defense as Defense
 import qualified Pawl.Codec.DungeonRoom as DungeonRoom
@@ -102,6 +103,7 @@ codec cardCodec = Fields.object $ do
   sacrificeRestrictions <- Fields.defaulted "sacrificeRestrictions" [] (Common.list SacrificeRestriction.codec) Face.sacrificeRestrictions
   untapRestrictions <- Fields.defaulted "untapRestrictions" [] (Common.list UntapRestriction.codec) Face.untapRestrictions
   attachRestrictions <- Fields.defaulted "attachRestrictions" [] (Common.list AttachRestriction.codec) Face.attachRestrictions
+  counterRestrictions <- Fields.defaulted "counterRestrictions" [] (Common.list CounterRestriction.codec) Face.counterRestrictions
   entryRestrictions <- Fields.defaulted "entryRestrictions" [] (Common.list EntryRestriction.codec) Face.entryRestrictions
   attackCosts <- Fields.defaulted "attackCosts" [] (Common.list AttackCost.codec) Face.attackCosts
   blockCosts <- Fields.defaulted "blockCosts" [] (Common.list BlockCost.codec) Face.blockCosts
@@ -152,6 +154,7 @@ codec cardCodec = Fields.object $ do
         Face.sacrificeRestrictions = sacrificeRestrictions,
         Face.untapRestrictions = untapRestrictions,
         Face.attachRestrictions = attachRestrictions,
+        Face.counterRestrictions = counterRestrictions,
         Face.entryRestrictions = entryRestrictions,
         Face.attackCosts = attackCosts,
         Face.blockCosts = blockCosts,
