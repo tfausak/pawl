@@ -148,7 +148,7 @@ ventureTimes n answer ability doorId gs = List.foldl' (\acc _ -> ventureOnce ans
 --
 -- The dungeons are interned in the order given, and Player.dungeons is ordered by
 -- interned id, so the FIRST argument is the head of what Prompt.ChooseDungeon
--- offers -- which is what `payingLastDungeon` below is the discriminator against.
+-- offers -- which is what `payingLastDungeon` above is the discriminator against.
 dungeonBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> Int -> (ObjectId, GameState.GameState)
 dungeonBoard island door dungeons lands =
   let stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) (S.landsInPlay island lands) [1 .. (4 :: Int)]

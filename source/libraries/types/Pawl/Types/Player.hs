@@ -74,7 +74,7 @@ data Player = MkPlayer
     -- to it.
     --
     -- The printing is named by its id (#1592), which is stable for the whole
-    -- game: Pawl.Engine.Setup.internDeck interns each of a deck's distinct
+    -- game: Pawl.Engine.Setup.createDeck interns each of a deck's distinct
     -- printings exactly once, so this id is the same one the commander's own
     -- objects carry and Pawl.Engine.Commander.isCommander can compare the two.
     commander :: Maybe PrintingId.PrintingId,
@@ -106,7 +106,7 @@ data Player = MkPlayer
     -- there is no object at all until CR 701.49a brings a card into the command
     -- zone, and CR 309.5b removes it from the game and lets the SAME card be
     -- brought back in as a new object. What persists across both is the printing,
-    -- named by its id (#1592) -- interned by Pawl.Engine.Setup.internDeck along
+    -- named by its id (#1592) -- interned by Pawl.Engine.Setup.createDeck along
     -- with the rest of the deck, so it is minted before any of this is read.
     --
     -- SEVERAL, which is what makes CR 309.2a's "a dungeon card they own" a choice:

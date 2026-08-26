@@ -65,7 +65,7 @@ designate pid printingId gs =
 -- zone rather than the thief's.
 --
 -- Matches on the PRINTING ID, which is exact under CR 903.5's singleton rule and
--- is the only thing that survives CR 400.7's fresh id. Setup.internDeck is what
+-- is the only thing that survives CR 400.7's fresh id. Setup.createDeck is what
 -- makes the comparison sound: it interns a deck's distinct printings once, so
 -- the designation and the object name the same entry. Pawl does not enforce rule
 -- 903.5 (#940), so a deck holding two copies of its commander would have both
