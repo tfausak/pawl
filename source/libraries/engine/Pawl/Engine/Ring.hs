@@ -184,10 +184,10 @@ theRingEmblem temptations =
 -- perspective. The control conjunct is the RULE and not belt-and-braces: CR
 -- 701.54e states it in as many words.
 --
--- ONE binding for all three of the emblem's abilities, because every one of them
+-- ONE binding for every one of the emblem's abilities, because every one of them
 -- says "your Ring-bearer" and they must not drift apart: a clause reaching a
 -- creature another does not would be a Ring-bearer that is legendary but
--- blockable, or that connects but drains nobody.
+-- blockable, or that attacks without looting.
 --
 -- No creature-ness conjunct, for the reason isRingBearerOf below gives at length:
 -- CR 701.54e's "a creature" is the antecedent of the phrase, not a fourth
