@@ -33,7 +33,9 @@ import qualified Pawl.Types.Keyword as Keyword
 -- CR 101.2 is what gives it force over CR 701.3a's permission, and CR 702.16c and
 -- CR 702.16d are the rulebook's own instances of the same shape -- protection
 -- states the Aura half and the Equipment half separately, in these two fields'
--- words.
+-- words. Those two are MINTED rather than printed
+-- (Pawl.Engine.Keyword.mintedAttachRestrictionsFor) and never serialised, so
+-- Pawl.Codec.AttachRestriction stays the shape a face writes.
 --
 -- NOT a targeting restriction. CR 702.5a gives the ENCHANT ability both jobs, and
 -- this is neither of them: an Aura spell may still target a permanent that
@@ -62,7 +64,9 @@ import qualified Pawl.Types.Keyword as Keyword
 --
 -- Open-half card data, classified rather than identified:
 -- Pawl.Engine.AttachRestriction is the only module that may read it, and it
--- answers a Bool about a pair.
+-- answers a Bool about a pair. Pawl.Engine.Keyword CONSTRUCTS one -- rule
+-- 702.16c/702.16d's protection -- and reads none, which is
+-- Pawl.Types.CombatRestriction's standing toward that module too.
 data AttachRestriction = MkAttachRestriction
   { -- | Which permanents may not be attached to. An Affected, not a bare
     -- ObjectId, so the set is re-derived on every read -- Consecrate Land's

@@ -178,6 +178,18 @@ destroyedBySba gs pc oid =
 -- Guarded on the PROJECTED subtype, so a permanent that stops being an Equipment
 -- while attached stops matching here; cannotBeAttached below is the CR 704.5p
 -- branch that detaches it instead.
+--
+-- CR 702.16d's second sentence is the other disjunct -- "such Equipment or
+-- Fortifications become unattached from that permanent as a state-based action,
+-- but remain on the battlefield" -- and it is the SAME action, so it is a clause
+-- here rather than a classification of its own. It asks
+-- Pawl.Engine.AttachRestriction, the answer Attach.attachmentFor would have
+-- refused the equip by, which is what makes this the Equipment mirror of CR
+-- 704.5m's clause in fallsOff below: an Equipment that was attached legally and
+-- whose host LATER gained protection from its quality detaches on this pass.
+-- Rule 704.5n's own "illegal permanent" is the conjunct above it, and the two
+-- are kept apart because they read different things -- CR 301.5's card type,
+-- and CR 613.11's continuous effect.
 becomesUnattached :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
   Nothing -> False
@@ -190,7 +202,8 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
           hostIsCreature = case Recipient.objectOf host >>= (\h -> Map.lookup h pcs) of
             Nothing -> False
             Just pc -> Set.member CardType.Creature (PC.cardTypes pc)
-       in isEquipment && not hostIsCreature
+          hostRefuses = Maybe.maybe False (\h -> AttachRestriction.refusesGiven pcs oid h gs) (Recipient.objectOf host)
+       in isEquipment && (not hostIsCreature || hostRefuses)
 
 -- CR 704.5p: a battle or creature attached to an object or player becomes
 -- unattached and remains on the battlefield, and so does any nonbattle,
@@ -324,7 +337,16 @@ fallsOff pcs gs oid = case Map.lookup oid pcs of
             -- put here anyway is buried on this pass. Consecrate Land's Gatherer
             -- ruling is this clause: an Aura already on the land goes to its
             -- owner's graveyard when Consecrate Land arrives.
-            || Maybe.maybe False (\host -> AttachRestriction.refuses oid host gs) (Recipient.objectOf recipient)
+            --
+            -- CR 702.16c's SECOND sentence rides the same clause and needs no
+            -- branch of its own -- "such Auras attached to the permanent or
+            -- player with protection will be put into their owners' graveyards
+            -- as a state-based action" -- because the prohibition it states is
+            -- minted into that same AttachRestriction
+            -- (Pawl.Engine.Keyword.mintedAttachRestrictionsFor). CR 704.5n's
+            -- becomesUnattached carries rule 702.16d's sentence for the same
+            -- reason, off the same answer.
+            || Maybe.maybe False (\host -> AttachRestriction.refusesGiven pcs oid host gs) (Recipient.objectOf recipient)
 
 -- CR 303.4c: is `recipient` still one the enchanting Aura `source`'s enchant
 -- slot ADMITS?
@@ -336,10 +358,10 @@ fallsOff pcs gs oid = case Map.lookup oid pcs of
 -- Admission, NOT target legality: CR 303.4c asks about an illegal object or
 -- player as defined by the enchant ability, which rule 702's TARGETING
 -- restrictions do not speak to. Protection would bury this Aura, but by its own
--- separate clause (CR 702.16c), which is not implemented (#2228), while shroud
--- (CR 702.18) and hexproof (CR 702.11) restrict targeting and nothing else -- so
--- an Aura stays attached to a host that gains either. See
--- Target.admittedRecipients.
+-- separate clause (CR 702.16c), which fallsOff above answers through
+-- Pawl.Engine.AttachRestriction rather than here, while shroud (CR 702.18) and
+-- hexproof (CR 702.11) restrict targeting and nothing else -- so an Aura stays
+-- attached to a host that gains either. See Target.admittedRecipients.
 --
 -- Pool.Creatures with no Filter is the shape MOST folded enchant slots in this
 -- pool carry (Unholy Strength), and the shape a granted "enchant creature" takes

@@ -1899,9 +1899,25 @@ auraSpec s registry = Spec.describe s "Aura" $ do
 -- Goblin Brawler, but the Equipment will fail to move onto it"). CR 702.5a gives
 -- the enchant ability the targeting job and this restriction is not it; only
 -- protection also forbids the targeting, in a clause of its own (CR 702.16b),
--- which Pawl.Engine.Target.targetable answers. Not implemented: CR 702.16c's and
--- CR 702.16d's attachment prohibitions, so nothing here yet comes from a keyword
--- (#2228).
+-- which Pawl.Engine.Target.targetable answers.
+--
+-- Protection is also the pool's one MINTED producer of this restriction (CR
+-- 702.16c, CR 702.16d), so the last two cases below come from a keyword rather
+-- than from a face, and they are where Pawl.Engine.Sba.becomesUnattached's
+-- clause is proved as well as fallsOff's.
+--
+-- Rule 702.16d's ATTACH GATE has no case of its own, and could not have one on
+-- this pool: the only road that puts an Equipment onto a creature is an equip
+-- ability, whose source is the Equipment itself, so a black Equipment aimed at a
+-- creature with protection from black is refused by CR 702.16b before rule
+-- 702.16d is reached and the two readings agree. Separating them needs an effect
+-- that attaches an Equipment WITHOUT targeting, which the pool has none of --
+-- every Effect.Attach, Effect.AttachTarget and Effect.AttachTargetToEach in
+-- data/cards/ moves an Aura (Aura Graft, Crown of the Ages, Cloudform, Gliding
+-- Licid, Aura Diffusion), and the printed shape that would do it, "For
+-- Mirrodin!" (CR 702.163a attaches with no target), has no Keyword constructor.
+-- Reconfigure (CR 702.151a) would NOT do it: that ability targets too. The
+-- state-based half below is what covers rule 702.16d instead.
 attachRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
   -- CR 301.5b's last sentence, at the MOVE: "if an effect attempts to attach an
@@ -2005,6 +2021,83 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
     -- and did not get it, because CR 303.4's limit kept it out of the offer.
     Spec.assertBool s (notElem songId (attachedTo protectedLand after)) "CR 303.4: the protected land is not a destination"
     Spec.assertBool s (Maybe.isJust (Game.lookupObject songId after >>= Object.attachedTo)) "and the Aura did move, onto a permanent that will have it"
+  -- CR 702.16c's FIRST sentence at the destination offer, which is the half of
+  -- rule 702.16 that CR 702.16b does not already cover: Aura Graft picks its
+  -- destination through Filter.CanHostSubject rather than by targeting it, so
+  -- nothing asks Pawl.Engine.Target.targetable about the protected creature and
+  -- the attach gate is reached on its own.
+  --
+  -- TWO other creatures, so both readings MOVE the Aura and differ only in
+  -- where it lands: the answerer demands the Apostle every time, and under the
+  -- reading this case exists to refuse it never gets it, so the single remaining
+  -- candidate is elided onto the Mammoth. A board with the Apostle as the only
+  -- candidate would leave the Aura where it started, which is also what a broken
+  -- Aura Graft looks like.
+  Spec.it s "CR 702.16c whole cards: Aura Graft will not move a black Aura onto a creature with protection from black" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    apostle <- S.printingOf s registry "Apostle of Purifying Light"
+    strength <- S.printingOf s registry "Unholy Strength"
+    graft <- S.printingOf s registry "Aura Graft"
+    let base0 = S.landsInPlay island 2
+        (host, base1) = S.addCreature piker S.alice base0
+        (protected, base2) = S.addCreature apostle S.alice base1
+        (willing, base3) = S.addCreature mammoth S.alice base2
+        (auraId, base4) = S.addCreature strength S.alice base3
+        board = S.attach auraId host base4
+        (gs, spell) = S.handOne graft board
+        cast = snd (Engine.runGamePure (moveAura auraId protected) gs (S.cast S.alice spell))
+        after = snd (Engine.runGamePure (moveAura auraId protected) cast Stack.resolveTop)
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Protection (Filter.Type.HasColor Color.Black)) protected board) "before: the Apostle has protection from black"
+    Spec.assertBool s (Set.member Color.Black (Projection.colorsOf auraId board)) "and Unholy Strength is a black Aura"
+    Spec.assertEqWith s "before: it sits on the Piker" (fmap Object.attachedTo (Game.lookupObject auraId board)) (Just (Just (Recipient.ToCreature host)))
+    -- The gameplay-level assertion: the answerer asked for the protected
+    -- creature on both legs and got the Mammoth, because rule 702.16c kept the
+    -- Apostle out of the offer.
+    Spec.assertEqWith s "CR 702.16c: the Aura lands on the Mammoth, not the protected creature" (fmap Object.attachedTo (Game.lookupObject auraId after)) (Just (Just (Recipient.ToCreature willing)))
+    Spec.assertEqWith s "so the Mammoth carries the +2/+1" (S.powerToughnessOf willing after) (Just (5, 4))
+    Spec.assertEqWith s "and the Apostle is untouched" (S.powerToughnessOf protected after) (Just (2, 1))
+  -- CR 702.16c's and CR 702.16d's SECOND sentences, on one board and in one
+  -- state-based pass, because they differ in exactly the way the two rules say:
+  -- the Aura is put into its owner's graveyard and the Equipment stays on the
+  -- battlefield, unattached.
+  --
+  -- The protection ARRIVES AFTER the attachment, which is the only board that
+  -- reaches these sentences at all -- the attach gate proved above refuses every
+  -- other road. Unstable Shapeshifter is how: both permanents attach to a plain
+  -- 0/1 Shapeshifter, and its CR 603.6a trigger then makes it a copy of the
+  -- Apostle (CR 707.2a copies the keyword, protection being derived from rules
+  -- text), so protection from black turns up on a permanent that is already
+  -- carrying two black attachments.
+  Spec.it s "CR 702.16c/702.16d whole cards: a creature that becomes protected from black buries the black Aura on it and sheds the black Equipment" $ do
+    island <- S.printingOf s registry "Island"
+    shapeshifter <- S.printingOf s registry "Unstable Shapeshifter"
+    apostle <- S.printingOf s registry "Apostle of Purifying Light"
+    strength <- S.printingOf s registry "Unholy Strength"
+    finery <- S.printingOf s registry "Groom's Finery"
+    let base0 = S.landsInPlay island 1
+        (shifter, base1) = S.addCreature shapeshifter S.alice base0
+        (auraId, base2) = S.addCreature strength S.alice base1
+        wearing0 = S.attach auraId shifter base2
+        (equipId, base3) = S.addCreature finery S.alice wearing0
+        wearing = S.attach equipId shifter base3
+        (_, entered) = S.entersWithTrigger apostle S.alice wearing
+        onStack = snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority)
+        after = snd (Engine.runGamePure S.identityAnswer onStack (Stack.resolveTop >> Engine.settleForPriority))
+    Spec.assertBool s (Set.member Color.Black (Projection.colorsOf auraId wearing)) "before: Unholy Strength is a black Aura"
+    Spec.assertBool s (Set.member Color.Black (Projection.colorsOf equipId wearing)) "and Groom's Finery is a black Equipment"
+    Spec.assertEqWith s "before: the Shapeshifter wears both, so a 0/1 is a 4/2" (S.powerToughnessOf shifter wearing) (Just (4, 2))
+    Spec.assertBool s (not (null (GameState.stack onStack))) "the Shapeshifter's copy trigger really was on the stack"
+    -- The two gameplay-level assertions, ahead of every proxy: rule 702.16c's
+    -- outcome and rule 702.16d's, which is the whole reason the two rules are
+    -- separate sentences.
+    Spec.assertEqWith s "CR 702.16c / 704.5m: the black Aura is in its owner's graveyard" (length (filter (\oid -> Game.cardOf oid after == Just (Printing.card strength)) (Foldable.toList (Map.findWithDefault Seq.empty S.alice (GameState.graveyard after))))) 1
+    Spec.assertBool s (Set.member equipId (GameState.battlefield after)) "CR 702.16d / 704.5n: the black Equipment stays on the battlefield"
+    Spec.assertEqWith s "and it is unattached" (fmap Object.attachedTo (Game.lookupObject equipId after)) (Just Nothing)
+    Spec.assertBool s (not (Set.member auraId (GameState.battlefield after))) "the Aura left the battlefield, where the Equipment did not"
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Protection (Filter.Type.HasColor Color.Black)) shifter after) "the copy is what gave the Shapeshifter protection from black"
+    Spec.assertEqWith s "so it is the Apostle's printed 2/1, with neither bonus left" (S.powerToughnessOf shifter after) (Just (2, 1))
 
 -- The one battlefield object of alice's whose card carries this name. Every
 -- object here reaches the battlefield through CR 400.7, which mints a fresh id,
