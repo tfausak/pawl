@@ -3866,7 +3866,10 @@ effectFilters effect = case effect of
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ f quantity) -> unframed (f : quantityFilters quantity)
-  Effect.RestartGame _ -> []
+  -- CR 727.5's exemption is an ObjectRef like every other, and Karn Liberated's
+  -- "all non-Aura permanent cards exiled with Karn" states characteristics in it
+  -- -- so an empty list here took a Filter a card author writes out of the lint.
+  Effect.RestartGame mRef -> sourceHosted (concatMap objectRefFilters (Maybe.maybeToList mRef))
   Effect.ControlPlayerNextTurn _ -> []
   Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> sourceHosted (objectRefFilters ref)
   Effect.Sacrifice _ -> []
@@ -4000,6 +4003,210 @@ effectFilters effect = case effect of
   -- The swept ref's Filters AND the body's, the rider's shape: a nested effect
   -- list is exactly what this traversal must not stop at.
   Effect.ForEach (ForEach.MkForEach ref _ body) -> sourceHosted (objectRefFilters ref) <> concatMap effectFilters body
+
+-- Which chooser-shaped ObjectRef arms Pawl.Engine.Resolve can ASK for at the
+-- position this tags. A CR 608.2d choice is announced while the effect is
+-- applied, so an opcode that never reaches the Game monad for its objects cannot
+-- make one -- and today exactly two arms of Resolve do, over different subsets.
+-- Named for those two ARMS rather than for the opcodes: this is a property of
+-- what Pawl.Engine.Resolve implements, not of the card's alphabet.
+data Asks
+  = -- | Read through Pawl.Engine.Resolve.objectRefObjects, which is pure and so
+    -- raises no prompt: every ObjectRef position but the two below.
+    AsksNothing
+  | -- | Pawl.Engine.Resolve's Effect.MoveToZone gather, which runs in the Game
+    -- monad. It asks the graveyard, hand and from-among arms; the random arm
+    -- answers @pure []@ there (#1733).
+    AsksMoveGather
+  | -- | Pawl.Engine.Resolve's Effect.Reveal arm. It asks the from-among arm
+    -- through chooseCardFromAmong and the random arm through
+    -- Prompt.RandomObject, and falls through to the pure sweep for the two
+    -- zone-keyed chosen arms.
+    AsksRevealArm
+  deriving (Eq, Show)
+
+-- Whether an ObjectRef arm is a resolution-time QUESTION rather than a read --
+-- the four arms Pawl.Types.ObjectRef documents as such, and exactly the four
+-- Pawl.Engine.Resolve.objectRefObjects answers [] for.
+--
+-- ObjectRef.ChosenPlayer is NOT one, despite the name: the seat was chosen on
+-- entry and is read out of stored state here. ObjectRef.EachCardFromAmong is not
+-- one either -- "all" states no count and hands out no choice, so CR 608.2d has
+-- nobody to ask.
+--
+-- Exhaustive with no `_`, so a new arm has to be classified rather than
+-- defaulting to "a read".
+chooserRef :: ObjectRef.ObjectRef -> Bool
+chooserRef ref = case ref of
+  ObjectRef.InSlot {} -> False
+  ObjectRef.EachMatching {} -> False
+  ObjectRef.EachCardInGraveyard {} -> False
+  ObjectRef.EachCardInYourHand -> False
+  ObjectRef.EachCardInHand {} -> False
+  ObjectRef.EachCardExiledWithSource {} -> False
+  ObjectRef.EachSpell {} -> False
+  ObjectRef.EachOnStack {} -> False
+  ObjectRef.EachPlayer -> False
+  ObjectRef.EachOpponent -> False
+  ObjectRef.ChosenPlayer -> False
+  ObjectRef.TopOfLibrary {} -> False
+  ObjectRef.TopOfLibraryUntil {} -> False
+  ObjectRef.EachCardFromAmong {} -> False
+  ObjectRef.ChosenCardInGraveyard {} -> True
+  ObjectRef.ChosenCardInHand {} -> True
+  ObjectRef.ChosenCardFromAmong {} -> True
+  ObjectRef.RandomCardInHand {} -> True
+
+-- The asking matrix itself: whether the site an Asks names asks THIS arm. A
+-- per-(site, arm) pair and not a per-site or per-arm predicate, because both
+-- coarser readings admit a ref that names nothing -- MoveToZone's gather does not
+-- ask the random arm (#1733), and Reveal's arm does not ask either zone-keyed
+-- chosen one.
+asksFor :: Asks -> ObjectRef.ObjectRef -> Bool
+asksFor asks ref = case asks of
+  AsksNothing -> False
+  AsksMoveGather -> case ref of
+    ObjectRef.ChosenCardInGraveyard {} -> True
+    ObjectRef.ChosenCardInHand {} -> True
+    ObjectRef.ChosenCardFromAmong {} -> True
+    _ -> False
+  AsksRevealArm -> case ref of
+    ObjectRef.ChosenCardFromAmong {} -> True
+    ObjectRef.RandomCardInHand {} -> True
+    _ -> False
+
+-- Every ObjectRef position one effect holds, each tagged with the asking site
+-- that reads it. effectFilters' sibling one field shallower: that traversal takes
+-- each ref's Filters, this one takes the ref.
+--
+-- NOT recursive into a nested effect list, unlike effectFilters: every caller
+-- comes through cardAuthoredEffects, which has already closed over the four
+-- nesting arms with effectWithNested, and recursing here would double-count.
+--
+-- Exhaustive and hand-maintained with effectFilters' caveat, and the missing `_`
+-- is the whole point: a NEW opcode taking an ObjectRef is AsksNothing only by
+-- being written so here, and the build breaks until somebody decides. The two
+-- traversals are twins, which the cross-check below is what keeps from drifting.
+effectObjectRefs :: Effect.Effect Card.Type.Card -> [(Asks, ObjectRef.ObjectRef)]
+effectObjectRefs effect = case effect of
+  Effect.AttachTarget {} -> []
+  Effect.AttachTargetToEach {} -> []
+  Effect.DealDamage (DealDamage.MkDealDamage ref _ _ _) -> read_ [ref]
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> read_ [ref]
+  Effect.ChangeText {} -> []
+  Effect.AddMana {} -> []
+  Effect.Search {} -> []
+  Effect.ExileAllGraveyards -> []
+  Effect.Proliferate -> []
+  Effect.ChooseCardName {} -> []
+  Effect.Bolster {} -> []
+  Effect.Amass {} -> []
+  Effect.Blight {} -> []
+  Effect.TemptWithTheRing -> []
+  Effect.Venture -> []
+  Effect.ExileHandThenDraw -> []
+  Effect.PlayerSacrifices {} -> []
+  -- CR 727.5's exemption, optional: a card saying nothing about it exempts
+  -- nothing.
+  Effect.RestartGame mRef -> read_ (Maybe.maybeToList mRef)
+  Effect.ControlPlayerNextTurn {} -> []
+  Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> read_ [ref]
+  Effect.Sacrifice {} -> []
+  -- THE gather that asks, and the one that elides the random arm (#1733).
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> [(AsksMoveGather, ref)]
+  Effect.Draw {} -> []
+  Effect.Mill {} -> []
+  -- CR 701.20a's reveal, the other asking arm.
+  Effect.Reveal (Reveal.MkReveal ref _) -> [(AsksRevealArm, ref)]
+  Effect.LookAt (LookAt.MkLookAt ref _) -> read_ [ref]
+  Effect.Scry {} -> []
+  Effect.Surveil {} -> []
+  Effect.Fateseal {} -> []
+  Effect.Explore ref -> read_ [ref]
+  Effect.Discard subject -> case subject of
+    Discard.Counted {} -> []
+    Discard.These ref -> read_ [ref]
+  Effect.LoseLife {} -> []
+  Effect.GainLife {} -> []
+  Effect.ExchangeLifeTotals {} -> []
+  Effect.SetLifeTotal {} -> []
+  Effect.RedistributeLifeTotals -> []
+  Effect.IncreaseSpeed {} -> []
+  Effect.DecreaseSpeed {} -> []
+  -- CR 111.1's token holds a whole card, but the refs printed ON it are another
+  -- object's; mintedFaces is that axis, and every caller here sweeps one face at
+  -- a time. CreateEmblem answers the same way for CR 114.2's emblem.
+  Effect.Create {} -> []
+  Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _) -> read_ [ref]
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> read_ [original, subject]
+  Effect.CopySpell (CopySpell.MkCopySpell ref _) -> read_ [ref]
+  Effect.Replace {} -> []
+  Effect.SkipNextPhase {} -> []
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _) -> read_ [ref]
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _) -> read_ [ref]
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ srcRef destRef _) -> read_ [srcRef, destRef]
+  Effect.TurnFaceDown {} -> []
+  Effect.TurnFaceUp {} -> []
+  Effect.Fight {} -> []
+  Effect.RemoveFromCombat ref -> read_ [ref]
+  Effect.BecomesBlocked {} -> []
+  Effect.Counter (Counter.MkCounter ref _) -> read_ [ref]
+  Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> read_ [ref]
+  Effect.MoveCounters {} -> []
+  Effect.RemoveCounters {} -> []
+  Effect.GainPlayerCounters {} -> []
+  Effect.RemovePlayerCounters {} -> []
+  Effect.PayAnyEnergy {} -> []
+  Effect.Tap ref -> read_ [ref]
+  Effect.Untap ref -> read_ [ref]
+  Effect.Detain ref -> read_ [ref]
+  Effect.Goad ref -> read_ [ref]
+  Effect.MakePlotted ref -> read_ [ref]
+  Effect.DoesNotUntapNext ref -> read_ [ref]
+  Effect.Transform ref -> read_ [ref]
+  Effect.PhaseOut ref -> read_ [ref]
+  Effect.AddPhases {} -> []
+  Effect.EndTurn -> []
+  Effect.EndCombatPhase -> []
+  Effect.GainControl (DurationRef.MkDurationRef _ ref) -> read_ [ref]
+  Effect.ArmDelayedTrigger {} -> []
+  Effect.AffectPlayers {} -> []
+  Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> read_ [blocker, attacker]
+  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated _ ref) -> read_ [ref]
+  Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> read_ [attacker]
+  Effect.CreateEmblem {} -> []
+  Effect.BecomeMonarch {} -> []
+  Effect.Designate {} -> []
+  Effect.SetClassLevel {} -> []
+  Effect.Unsuspect ref -> read_ [ref]
+  Effect.Evolve {} -> []
+  Effect.Mentor {} -> []
+  Effect.Train {} -> []
+  Effect.ItBecomes {} -> []
+  Effect.ExileUntilMonarch {} -> []
+  Effect.ExileHaunting {} -> []
+  Effect.Attach {} -> []
+  Effect.PlaySubgame {} -> []
+  Effect.ChooseOpponent {} -> []
+  Effect.ChooseOpponentAtRandom {} -> []
+  Effect.RollDie {} -> []
+  Effect.FlipCoin {} -> []
+  Effect.TakeExtraTurn {} -> []
+  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> read_ [ref]
+  Effect.OfferCast {} -> []
+  Effect.GrantPlayFromExile grant -> read_ [GrantPlayFromExile.ref grant]
+  Effect.ForEach (ForEach.MkForEach ref _ _) -> read_ [ref]
+  where
+    read_ :: [ObjectRef.ObjectRef] -> [(Asks, ObjectRef.ObjectRef)]
+    read_ = fmap ((,) AsksNothing)
+
+-- The chooser-shaped refs one effect writes where nothing can ask for them: the
+-- lint's offenders. Each is a CR 608.2d choice nobody makes, so the ref names no
+-- object, that share of the instruction is silently skipped, and the card is
+-- weaker than printed with nothing on the wire to show it.
+inertChoosers :: Effect.Effect Card.Type.Card -> [ObjectRef.ObjectRef]
+inertChoosers effect =
+  [ref | (asks, ref) <- effectObjectRefs effect, chooserRef ref, not (asksFor asks ref)]
 
 -- Per MODE rather than through Modal.allTargetSlots, which is a Map.unions and so
 -- collapses two modes declaring the same slot name (#475) -- the cross-check
@@ -5937,6 +6144,90 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- would pass whatever a card said. Aetherspouts is the card that prints one.
     Spec.assertBool s (any (anyFace (any asks . cardResolutionEffects) . Printing.card) ps) "the pool has a card leaving the end to each owner"
     Spec.assertEqWith s "only a library has ends" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 608.2d: a choice an effect offers is announced while the effect is
+  -- applied, so an opcode that gathers its objects through the pure
+  -- Pawl.Engine.Resolve.objectRefObjects cannot make one. Two arms of Resolve
+  -- reach the Game monad and ask instead, over DIFFERENT subsets -- see Asks --
+  -- and a chooser-shaped ref written anywhere else names no object, so that share
+  -- of the instruction is skipped (CR 101.3, CR 609.3) with nothing on the wire
+  -- to show it. This is that lint (#1689).
+  Spec.it s "no effect asks for a chosen card where nothing can ask" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace (not . all (null . inertChoosers) . cardAuthoredEffects) . Printing.card) ps
+        asks = any (anyFace (any (any (chooserRef . snd) . effectObjectRefs) . cardAuthoredEffects) . Printing.card) ps
+    -- Guards against a vacuous sweep in the ONE direction it can guard: with no
+    -- chooser-shaped ref in the pool at all this would pass whatever a card said.
+    -- Exhume, Elvish Piper, Commune with the Gods and Merfolk Spy print them.
+    Spec.assertBool s asks "the pool has a card asking a player to pick a card"
+    Spec.assertEqWith s "a chosen card under an opcode that cannot ask (CR 608.2d)" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The sweep above still passes VACUOUSLY on the half that matters: every
+  -- committed card writes its chooser under one of the five asking pairs, so the
+  -- sweep proves nothing about the lint. Both directions are proven here instead,
+  -- against hand-built effects (never a card file -- a misauthored card must not
+  -- be loadable).
+  --
+  -- Both asking arms get an accept case AND a reject case, and the three
+  -- degenerate classifications this rules out are why. "Every pair asks" is ruled
+  -- out by Transform and by MoveToZone's random arm; "MoveToZone asks everything"
+  -- by that same random arm (#1733); "the three chosen arms always ask, the
+  -- random one never does" by Reveal accepting the random arm and rejecting both
+  -- zone-keyed chosen ones.
+  Spec.it s "the lint itself catches a chosen card under an opcode that cannot ask" $ do
+    exhume <- S.printingOf s registry "Exhume"
+    let anyCard = Filter.Type.HasCardType CardType.Creature
+        group = SlotName.MkSlotName (Text.pack "revealed")
+        inGraveyard = ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.You anyCard)
+        inHand = ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard)
+        fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard)
+        atRandom = ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.You)
+        moves ref = Effect.MoveToZone (MoveToZone.MkMoveToZone ref Zone.Battlefield EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
+        reveals ref = Effect.Reveal (Reveal.MkReveal ref Nothing)
+        inert :: [Effect.Effect Card.Type.Card] -> [Bool]
+        inert = fmap (not . null . inertChoosers)
+    Spec.assertEqWith
+      s
+      "MoveToZone's gather asks the three chosen arms and not the random one (#1733)"
+      (inert (fmap moves [inGraveyard, inHand, fromAmong, atRandom]))
+      [False, False, False, True]
+    Spec.assertEqWith
+      s
+      "CR 701.20a's reveal asks from-among and at-random, and neither zone-keyed chosen arm"
+      (inert (fmap reveals [inGraveyard, inHand, fromAmong, atRandom]))
+      [True, True, False, False]
+    -- #774's counterexample opcode: Tovolar, Dire Overlord transforms rather than
+    -- moving or revealing, so a chosen set written there would be inert.
+    Spec.assertEqWith
+      s
+      "no other opcode asks any of the four"
+      (inert (fmap Effect.Transform [inGraveyard, inHand, fromAmong, atRandom]))
+      [True, True, True, True]
+    -- The other direction on the same opcode: a ref that is a READ rather than a
+    -- CR 608.2d question is fine anywhere, so the lint is about the arm and not
+    -- about Transform.
+    Spec.assertBool
+      s
+      (null (inertChoosers (Effect.Transform (ObjectRef.InSlot group))))
+      "a ref that reads rather than asks is accepted under the same opcode"
+    Spec.assertBool
+      s
+      (all (null . inertChoosers) (cardAuthoredEffects (S.combinedFace exhume)))
+      "the real card's chosen graveyard card is accepted"
+  -- effectObjectRefs and effectFilters are twins -- one takes each ObjectRef
+  -- position, the other takes that ref's Filters -- and nothing but this compares
+  -- them, so an opcode added to effectFilters and forgotten here would leave the
+  -- lint above silently blind to it.
+  --
+  -- SETS, not lists: effectFilters recurses into a nested effect list of its own
+  -- while effectObjectRefs leaves that to cardResolutionEffects' closure, so the
+  -- two differ in how often they reach a nested ref and never in WHICH. Sound
+  -- because effectNestedEffects reaches a superset of effectFilters' own
+  -- recursion (replacementPrintedEffects contains replacementEffectRiders).
+  Spec.it s "every ObjectRef position the Filter traversal reaches is one the asking traversal reaches" $ do
+    ps <- S.allPrintings s
+    let viaFilters card = Set.fromList [f | effect <- cardResolutionEffects card, (SourceHostFramed, f) <- effectFilters effect]
+        viaRefs card = Set.fromList (concatMap (objectRefFilters . snd) (concatMap effectObjectRefs (cardResolutionEffects card)))
+        offenders = filter (anyFace (\card -> viaFilters card /= viaRefs card) . Printing.card) ps
+    Spec.assertEqWith s "the two ObjectRef traversals agree" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 406.3's rider is a rule about the EXILE ZONE, so on any other destination
   -- it is inert card data, and on a Create it is inert outright -- a token is
   -- created onto the battlefield, and CR 111.7 makes one anywhere else cease to

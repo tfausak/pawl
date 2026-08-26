@@ -398,14 +398,13 @@ data ObjectRef
     -- graveyard by the time the second is offered (#1437).
     --
     -- Read when the effect executes (CR 608.2c), the property every arm above
-    -- but InSlot has. Unlike them the read is a QUESTION, so only
-    -- Pawl.Engine.Resolve's MoveToZone arm -- which already gathers its objects
-    -- in the Game monad -- can carry it out; Resolve's pure sweep answers
-    -- nothing for it. A card that writes this arm under any other opcode
-    -- therefore names no object and does nothing, which is an INERT card-data
-    -- error of the same kind as a stated origin zone on somebody else's
-    -- permanent (Pawl.Engine.EffectZone's note), and gets no lint for the same
-    -- reason: nothing reaches the wire and no rule is misread.
+    -- but InSlot has. Unlike them the read is a QUESTION (CR 608.2d), so it can
+    -- be carried out only where Pawl.Engine.Resolve reaches the Game monad for
+    -- its objects -- today the Effect.MoveToZone gather alone; Resolve's pure
+    -- sweep answers nothing for it. A card that writes this arm under any other
+    -- opcode therefore names no object and does nothing, so Pawl.CardSpec's
+    -- inertChoosers rejects the pairing: which (opcode, arm) pairs ask is a
+    -- ragged matrix, and the lint is the only thing that states it.
     ChosenCardInGraveyard ChosenCardInGraveyard.ChosenCardInGraveyard
   | -- | A card in a HAND, chosen as the effect runs -- Karn Liberated's "+4:
     -- target player exiles a card from their hand". ChosenCardInGraveyard's
@@ -441,9 +440,9 @@ data ObjectRef
     -- the instruction is ignored (CR 101.3).
     --
     -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
-    -- read, so only Pawl.Engine.Resolve's MoveToZone arm can carry it out --
+    -- read, so only Pawl.Engine.Resolve's MoveToZone gather carries it out --
     -- ChosenCardInGraveyard's note above describes what a card writing it under
-    -- any other opcode gets, and why that inert answer earns no lint.
+    -- any other opcode gets, and which lint rejects that pairing.
     ChosenCardInHand ChosenCardInHand.ChosenCardInHand
   | -- | A card chosen out of the GROUP a slot holds -- the printed "from among
     -- them", as in Commune with the Gods' "reveal the top five cards of your
@@ -485,7 +484,7 @@ data ObjectRef
     -- among them and put it into your hand" being one choice its reveal makes and
     -- its move reads back out of a slot. Under any OTHER opcode the ref names no
     -- object; ChosenCardInGraveyard's note above describes that inert answer and
-    -- why it earns no lint.
+    -- which lint rejects it.
     ChosenCardFromAmong ChosenCardFromAmong.ChosenCardFromAmong
   | -- | EVERY card in the GROUP a slot holds that the Filter matches -- the
     -- printed "all land cards revealed this way", as in Mulch's "reveal the top
@@ -543,9 +542,10 @@ data ObjectRef
     --
     -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
     -- read -- so objectRefObjects answers nothing for it and only
-    -- Pawl.Engine.Resolve's Reveal arm carries it out. A card writing it under
-    -- any other opcode names no object and does nothing, the inert card-data
-    -- error ChosenCardInGraveyard's note above describes, which earns no lint for
-    -- that note's reason.
+    -- Pawl.Engine.Resolve's Reveal arm carries it out -- not even MoveToZone's
+    -- gather, which elides it (#1733). A card writing it under any other opcode
+    -- names no object and does nothing, the inert card-data error
+    -- ChosenCardInGraveyard's note above describes, and the lint that note names
+    -- rejects it.
     RandomCardInHand PlayerRef.PlayerRef
   deriving (Eq, Ord, Show)
