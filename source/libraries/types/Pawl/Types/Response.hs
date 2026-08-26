@@ -177,6 +177,15 @@ data Response
     -- of the counter-placing pools -- CR 609.7a's set spans the battlefield, the
     -- stack and the command zone, and is not scoped to the chooser at all.
     ChoseDamageSource ObjectId.ObjectId
+  | -- | CR 603.7b: which simultaneous occurrence of its trigger event the
+    -- controller of a duration-less delayed triggered ability chose, as a
+    -- position in the candidates the prompt offered.
+    --
+    -- Its own constructor and not ChoseReadAheadChapter or ChosePaidEnergy,
+    -- though all three carry one Natural, for ChoseReadAheadChapter's reason: a
+    -- transcript of one replaying as another would be a silently wrong answer
+    -- rather than a desync.
+    ChoseDelayedTriggerEvent Natural.Natural
   | -- | CR 122.5: the KIND of counter a player chose to move off the first
     -- object. Its own constructor for ChoseDamageSource's reason -- the answer
     -- is not even an object, so no counter-placing response could stand in for

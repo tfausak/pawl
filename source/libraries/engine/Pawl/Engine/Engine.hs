@@ -499,9 +499,6 @@ placePendingTriggers :: Game Bool
 placePendingTriggers = do
   gs <- State.get
   let evs = Event.unscannedEvents gs
-      -- The GROUPED view of the same snapshot, which the CR 603.10a look-back in
-      -- Event.eventTriggers needs and the three inherent gatherers below do not.
-      (pending, surviving) = Event.gatherTriggers (Event.unscannedGrouped gs) gs
       -- CR 725.2: the monarch's inherent triggers hang on no object, so
       -- Event.gatherTriggers -- which asks each battlefield permanent what it
       -- triggers -- has nowhere to find them. Gathered separately, from the SAME
@@ -520,6 +517,13 @@ placePendingTriggers = do
       -- and a dungeon card is not one. Unlike the four above these DO have a
       -- source, so they carry TriggerSource.OfObject and go through placeBorne.
       entered = Dungeon.roomPending evs gs
+  -- The GROUPED view of the same snapshot, which the CR 603.10a look-back in
+  -- Event.eventTriggers needs and the three inherent gatherers above do not.
+  -- Not in the `let` because it can ASK -- CR 603.7b's second sentence is a
+  -- question for the controller of a delayed entry that matched two simultaneous
+  -- occurrences -- and it is asked BEFORE the watermark below moves, so the game
+  -- the question carries is the one the batch occurred in.
+  (pending, surviving) <- Event.gatherTriggers (Event.unscannedGrouped gs) gs
   State.put
     gs
       { GameState.scannedThrough = Natural.length (GameState.events gs),

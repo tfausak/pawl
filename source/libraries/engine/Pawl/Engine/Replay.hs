@@ -73,6 +73,7 @@ encode p answer = case p of
   Prompt.ChoosePaidEnergy {} -> Response.ChosePaidEnergy answer
   Prompt.ChooseReadAheadChapter {} -> Response.ChoseReadAheadChapter answer
   Prompt.ChooseDamageSource {} -> Response.ChoseDamageSource answer
+  Prompt.ChooseDelayedTriggerEvent {} -> Response.ChoseDelayedTriggerEvent answer
   Prompt.ChooseMovedCounter {} -> Response.ChoseMovedCounter answer
   Prompt.ChooseCardInGraveyard {} -> Response.ChoseCardInGraveyard answer
   Prompt.ChooseCardInHand {} -> Response.ChoseCardInHand answer
@@ -236,6 +237,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseDamageSource {} -> case response of
     Response.ChoseDamageSource oid -> Just oid
+    _ -> Nothing
+  Prompt.ChooseDelayedTriggerEvent {} -> case response of
+    Response.ChoseDelayedTriggerEvent n -> Just n
     _ -> Nothing
   Prompt.ChooseMovedCounter {} -> case response of
     Response.ChoseMovedCounter kind -> Just kind
@@ -549,6 +553,12 @@ defaultAnswer p = case p of
   -- CR 609.7a: the prompt is only raised with two or more sources matching the
   -- shield's printed properties, and every one of them is a legal choice.
   Prompt.ChooseDamageSource _ _ _ candidates -> NonEmpty.head candidates
+  -- CR 603.7b: the prompt is only raised where one event group holds two or more
+  -- occurrences the entry's condition matched, and every one of them is a legal
+  -- choice. Answering 0 takes the earliest, which is what the engine did before
+  -- the rule's second sentence was implemented -- so an answerer that falls
+  -- through to this cannot tell the two readings apart.
+  Prompt.ChooseDelayedTriggerEvent {} -> 0
   -- CR 122.5: the prompt is only raised with two or more kinds actually on the
   -- object the counter leaves, and every one of them is a legal choice.
   Prompt.ChooseMovedCounter _ _ _ _ candidates -> NonEmpty.head candidates

@@ -113,6 +113,26 @@ castWave tidalWave island =
    in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice oid)))
 
 -- CR 608.2i: the log records; it is never emptied by a reader.
+-- Pawl.Engine.Event.gatherTriggers runs in Game since CR 603.7b's second
+-- sentence became a question for the controller of a delayed entry that matched
+-- two SIMULTANEOUS occurrences. No board in this module puts two matches into
+-- one event group, so nothing here is ever asked and the answerer is never
+-- reached; Pawl.EventTriggerSpec's Synthetic Singular Cure is where the
+-- question is.
+gatheredIn :: [LoggedEvent.LoggedEvent] -> GameState.GameState -> [PendingTrigger.PendingTrigger]
+gatheredIn grouped gs = fst (fst (S.runPureWith S.identityAnswer gs (Event.gatherTriggers grouped gs)))
+
+gathered :: GameState.GameState -> [PendingTrigger.PendingTrigger]
+gathered gs = gatheredIn (Event.unscannedGrouped gs) gs
+
+-- A hand-built batch for Event.delayedPending, EACH EVENT ITS OWN GROUP, which
+-- is what a sequence of occurrences is: these boards state the events directly
+-- rather than letting the recorder group them.
+delayedFrom :: [GameEvent.GameEvent] -> GameState.GameState -> ([PendingTrigger.PendingTrigger], Seq.Seq DelayedTrigger.DelayedTrigger)
+delayedFrom events gs =
+  let grouped = zipWith (\group event -> LoggedEvent.MkLoggedEvent {LoggedEvent.group = group, LoggedEvent.event = event}) (iterate EventGroup.next EventGroup.first) events
+   in fst (S.runPureWith S.identityAnswer gs (Event.delayedPending grouped gs))
+
 logSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 logSpec s registry =
   Spec.describe s "EventLog" $ do
@@ -232,13 +252,13 @@ scanSpec s registry =
           (pikerId, gs1) = S.addCreature piker S.bob gs0
           entered = ZoneChange.MkZoneChange pikerId pikerId Zone.Stack Zone.Battlefield
           gs2 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project pikerId gs1))] gs1
-      Spec.assertEqWith s "no trigger" (length (fst (Event.gatherTriggers (Event.unscannedGrouped gs2) gs2))) 0
+      Spec.assertEqWith s "no trigger" (length (gathered gs2)) 0
     Spec.it s "CR 603.6a a SelfEnters trigger still fires on its own entry" $ do
       restInPeace <- S.printingOf s registry "Rest in Peace"
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
           gs1 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project ripId gs0))] gs0
-      case fst (Event.gatherTriggers (Event.unscannedGrouped gs1) gs1) of
+      case gathered gs1 of
         [pt] -> do
           Spec.assertEqWith s "source is RiP" (PendingTrigger.source pt) (TriggerSource.OfObject ripId)
           Spec.assertEqWith s "controller is alice" (PendingTrigger.controller pt) S.alice
@@ -248,7 +268,7 @@ scanSpec s registry =
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           toGrave = ZoneChange.MkZoneChange ripId ripId Zone.Battlefield Zone.Graveyard
           gs1 = S.withEvents [GameEvent.Moved (Moved.MkMoved toGrave (Projection.project ripId gs0))] gs0
-      Spec.assertEqWith s "no triggers" (length (fst (Event.gatherTriggers (Event.unscannedGrouped gs1) gs1))) 0
+      Spec.assertEqWith s "no triggers" (length (gathered gs1)) 0
     Spec.it s "SelfEnters matches only a battlefield destination" $ do
       let bearer = ObjectId.MkObjectId 1
           movedTo zone = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange bearer bearer Zone.Stack zone) S.emptyCharacteristics)
@@ -292,7 +312,7 @@ scanSpec s registry =
                 GameEvent.Moved (Moved.MkMoved entered2 (Projection.project rip2 gs1))
               ]
               gs1
-          triggers = fst (Event.gatherTriggers (Event.unscannedGrouped gs2) gs2)
+          triggers = gathered gs2
       Spec.assertBool s (rip1 < rip2) "rip1 has the lower id"
       Spec.assertEqWith s "both triggers fired" (length triggers) 2
       Spec.assertEqWith s "sources in ascending ObjectId order" (fmap PendingTrigger.source triggers) (fmap TriggerSource.OfObject [rip1, rip2])
@@ -309,7 +329,7 @@ scanSpec s registry =
       let (ghoul1, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
           (ghoul2, gs1) = S.addCreature khabalGhoul S.alice gs0
           event = GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)
-          triggers = fst (Event.gatherTriggers [LoggedEvent.MkLoggedEvent {LoggedEvent.group = EventGroup.first, LoggedEvent.event = event}] gs1)
+          triggers = gatheredIn [LoggedEvent.MkLoggedEvent {LoggedEvent.group = EventGroup.first, LoggedEvent.event = event}] gs1
       Spec.assertBool s (ghoul1 < ghoul2) "ghoul1 has the lower id"
       Spec.assertEqWith s "both triggers fired" (length triggers) 2
       Spec.assertEqWith s "sources in ascending ObjectId order" (fmap PendingTrigger.source triggers) (fmap TriggerSource.OfObject [ghoul1, ghoul2])
@@ -1018,8 +1038,8 @@ delayedSpec s registry =
           let armed = castWave tidalWave island
               stated = withExpiry (Just Expiry.Type.AtCleanup) armed
               began = [GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)]
-              (firedOnce, survivors) = Event.delayedPending began stated
-              (firedAgain, _) = Event.delayedPending began stated {GameState.delayedTriggers = survivors}
+              (firedOnce, survivors) = delayedFrom began stated
+              (firedAgain, _) = delayedFrom began stated {GameState.delayedTriggers = survivors}
           Spec.assertEqWith s "it fired" (length firedOnce) 1
           Spec.assertEqWith s "and stayed armed" (Seq.length survivors) 1
           Spec.assertEqWith s "so the next end step fires it again" (length firedAgain) 1
@@ -1027,7 +1047,7 @@ delayedSpec s registry =
           tidalWave <- S.printingOf s registry "Tidal Wave"
           island <- S.printingOf s registry "Island"
           let armed = castWave tidalWave island
-              (fired, survivors) = Event.delayedPending [GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)] armed
+              (fired, survivors) = delayedFrom [GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)] armed
           Spec.assertEqWith s "it fired" (length fired) 1
           Spec.assertEqWith s "and was evicted" (Seq.length survivors) 0
         -- Synthetic Deferred Rally {W} Instant: "At the beginning of the next
@@ -1651,7 +1671,7 @@ orderingSpec s registry =
       -- The source of the OTHER pending trigger: Tidal Wave's delayed ability,
       -- whose source is the resolved spell's id rather than any permanent.
       otherThan ghoul gs =
-        let sources = fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped gs) gs))
+        let sources = fmap PendingTrigger.source (gathered gs)
          in case filter (/= TriggerSource.OfObject ghoul) sources of
               src : _ -> src
               [] -> TriggerSource.OfObject ghoul
@@ -2155,7 +2175,7 @@ permanentEntersSpec s registry =
   let anyCreature = Filter.Type.HasCardType CardType.Creature
       anotherCreature = Filter.Type.And [anyCreature, Filter.Type.Not Filter.Type.IsSource]
       enters oid = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield) S.emptyCharacteristics)
-      sourcesOf gs = fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped gs) gs))
+      sourcesOf gs = fmap PendingTrigger.source (gathered gs)
    in Spec.describe s "PermanentEnters" $ do
         -- The gameplay-level proof, cast to resolution: alice's second Soul
         -- Warden enters and the FIRST one's trigger resolves for exactly 1
