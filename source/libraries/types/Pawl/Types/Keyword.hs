@@ -1283,6 +1283,26 @@ data Keyword
     -- attack, whose cost is tapping a filtered creature rather than a yes-or-no
     -- (#877).
     Exert
+  | -- | 702.103a: bestow [cost]. A STATIC ability functioning in any zone the
+    -- card could be played from: "as you cast this spell, you may choose to cast
+    -- it bestowed. If you do, you pay [cost] rather than its mana cost".
+    --
+    -- The cost rides the constructor, as Flashback's and Foretell's do, because
+    -- rule 702.103a states it as part of the keyword; and like flashback's it is
+    -- the cost of the CAST rather than of a special action, so
+    -- Pawl.Engine.Cost.candidateCostsFor offers it as CR 118.9's alternative cost
+    -- and Pawl.Engine.Cast recovers which candidate was paid.
+    --
+    -- CR 702.103b's rewrite -- the spell becomes an Aura enchantment and gains
+    -- enchant creature -- is minted from this constructor rather than printed,
+    -- exactly as CR 702.29a's cycling ability is: the granted ability is always
+    -- the same "enchant creature", so the card has nothing to say about it. The
+    -- printed route is closed anyway, Pawl.CardSpec holding a card that declares
+    -- `enchant` to be an Aura.
+    --
+    -- No KeywordFamily sibling reader in the pool asks for one, but the family is
+    -- owed at the keyword: see Pawl.Types.KeywordFamily's Bestow.
+    Bestow (Cost.Cost Keyword)
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one

@@ -209,9 +209,8 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 --
 -- Read off the PROJECTED characteristics, which is the whole point: the card
 -- types this cases on are exactly what CR 613's layer 4 changes. "Aura" and
--- "Equipment" are subtypes (CR 205.3h, CR 301.5), so they come from PC.subtypes
--- -- unlike CR 704.5m's fallsOff, which asks the printed card for an enchant
--- ability because it needs that ability's target slot.
+-- "Equipment" are subtypes (CR 205.3h, CR 301.5), so they come from PC.subtypes,
+-- as CR 704.5m's fallsOff below reads PC.enchant for the same reason.
 --
 -- Subtype.Fortification is the one clause of the rule with no constructor to case
 -- on, and is therefore unreachable rather than elided. The BATTLE clause is
@@ -248,6 +247,13 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
             -- what makes the two sentences differ at all, since a battle that is
             -- also an Aura detaches by the first and not by the second.
             isBattle || isCreature || (not isBattle && not isCreature && not isAura && not isEquipment)
+
+-- CR 702.103b: is this object bestowed? The designation Pawl.Engine.Cast stamps
+-- and Pawl.Engine.Projection.bestowGathered mints from, read off the object
+-- rather than off `pcs`, because it is a record of a choice made while casting
+-- and no CR 613 layer computes it.
+isBestowed :: GameState -> ObjectId -> Bool
+isBestowed gs oid = maybe False Object.bestowed (Game.lookupObject oid gs)
 
 -- CR 704.5m: an Aura attached to an illegal object or player, or attached to
 -- nothing, is put into its owner's graveyard. Four clauses: unattached, attached
@@ -293,6 +299,11 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- A put-into-graveyard, NOT a destruction, so this goes through Event.changeZone
 -- and consults neither indestructible (CR 702.12b) nor a regeneration shield (CR
 -- 701.19a).
+--
+-- CR 702.103f is the one EXCEPTION the rule itself names, and
+-- performStateBasedActions subtracts it rather than this predicate: a bestowed
+-- Aura matching here becomes unattached and ceases to be bestowed instead of
+-- being buried.
 fallsOff :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 fallsOff pcs gs oid = case Map.lookup oid pcs of
   Nothing -> False
@@ -575,7 +586,19 @@ performStateBasedActions = Event.simultaneously $ do
       -- ability no longer admits. Judged against the SAME pre-pass pcs/gs as
       -- every other classification above -- see fallsOff's Haddock for why an
       -- Aura whose creature dies THIS pass survives it and falls off the next.
-      unattachedAuras = filter (fallsOff pcs gs) onBattlefield
+      unattachedAuras = filter (\oid -> fallsOff pcs gs oid && not (isBestowed gs oid)) onBattlefield
+      -- CR 702.103f: a bestowed Aura that becomes unattached, or is attached to
+      -- an illegal object or player, "ceases to be bestowed" instead -- "an
+      -- exception to rule 704.5m", which is why this is subtracted from
+      -- unattachedAuras above rather than added beside it. The CONDITION is the
+      -- same one, so the rule and its exception cannot come apart: whatever would
+      -- have buried the Aura unbestows it.
+      --
+      -- Judged against the same pre-pass pcs/gs as everything else (CR 704.3), so
+      -- a bestowed permanent whose host dies THIS pass unbestows on the next --
+      -- fallsOff's own timing, and the rule's, since the Aura is still legally
+      -- attached until the pass that sees the host gone.
+      unbestowing = filter (\oid -> fallsOff pcs gs oid && isBestowed gs oid) onBattlefield
       -- CR 704.5n and CR 704.5p: computed from the same pre-pass state, for the
       -- same reason. One list because they share an action -- detach, stay on
       -- the battlefield -- and differ only in why the attachment is illegal.
@@ -734,6 +757,16 @@ performStateBasedActions = Event.simultaneously $ do
   -- producer of. The attaching half is GameEvent.BecameAttached; there is no
   -- event and no trigger condition for the other direction (#1838).
   State.modify' (\g -> g {GameState.objects = List.foldl' (flip (Map.adjust (\o -> o {Object.attachedTo = Nothing}))) (GameState.objects g) detaching})
+  -- CR 702.103f: the two halves of "it becomes unattached and ceases to be
+  -- bestowed", in one write for the reason the detach above is one -- neither is
+  -- a zone change, so neither funnels through Pawl.Engine.Event. Clearing the
+  -- designation is what ends CR 702.103b's three modifications: the projection
+  -- mints them from this field (Projection.bestowGathered), so the permanent is a
+  -- creature again on the very next projection, with no effect to expire.
+  --
+  -- ONE WAY: no rule makes an object bestowed again, and CR 702.103a's choice is
+  -- available only while casting.
+  State.modify' (\g -> g {GameState.objects = List.foldl' (flip (Map.adjust (\o -> o {Object.attachedTo = Nothing, Object.bestowed = False}))) (GameState.objects g) unbestowing})
   -- CR 704.5g/h: destruction through the funnel, Regenerable -- the point rather
   -- than a default, since CR 701.19a's shield exists to replace exactly this
   -- destruction. ByRule for the mirror-image reason: no effect is destroying
@@ -881,7 +914,7 @@ performStateBasedActions = Event.simultaneously $ do
       -- named something. A regenerated creature still counts as destroyed, which
       -- the CR 704.3 settle loop re-checks and -- because the regen healed the
       -- damage -- terminates.
-      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching) || not (null revving) || not (null told) || not (null undefended) || not (null returningCommanders) || not (null finishedDungeons) || not (null routed)
+      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null unbestowing) || not (null detaching) || not (null revving) || not (null told) || not (null undefended) || not (null returningCommanders) || not (null finishedDungeons) || not (null routed)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles
   -- an outcome when the game did not already have one. Same ordering as

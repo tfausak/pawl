@@ -247,6 +247,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
   Keyword.Flashback _ -> []
+  Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
@@ -332,6 +333,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Renown _ -> []
   Keyword.Kicker _ -> []
   Keyword.Flashback _ -> []
+  Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
@@ -535,6 +537,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Renown _ -> []
   Keyword.Kicker _ -> []
   Keyword.Flashback _ -> []
+  Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
@@ -776,6 +779,12 @@ permissionsFor cardTypes keyword = case keyword of
     | Set.member CardType.Instant cardTypes || Set.member CardType.Sorcery cardTypes ->
         [CastingPermission.CastFromGraveyard]
     | otherwise -> []
+  -- CR 702.103a grants no permission either, and it is flashback's near miss:
+  -- both offer an alternative cost through CR 601.2b and 601.2f-h, but rule
+  -- 702.103a's ability "functions in any zone from which you could play the card
+  -- it's on" -- it widens no zone, it prices a cast the rules already allowed.
+  -- Pawl.Engine.Cost.candidateCostsFor is where that offer lives.
+  Keyword.Bestow _ -> []
   -- CR 702.29a is an ACTIVATED ability, not a casting permission: cycling discards
   -- the card, it never casts it. Rule 702.122a is one too, one zone over.
   Keyword.Cycling {} -> []
@@ -951,6 +960,50 @@ flashbackCosts keywords =
         Keyword.Flashback cost -> Just cost
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.103a: the BESTOW costs -- "you pay [cost] rather than its mana cost" --
+-- offered by Pawl.Engine.Cost.candidateCostsFor beside the printed cost. A LIST
+-- for flashbackCosts' reason: rule 702.103a states no limit on how many bestow
+-- abilities an object has, and CR 601.2b makes two of them a choice rather than a
+-- sum. Unlike flashback's, this one is offered from EVERY zone the card can be
+-- cast from, which is the whole of rule 702.103a's first sentence.
+--
+-- A wildcard rather than an exhaustive case, flashbackCosts' reason.
+bestowCosts :: Set Keyword -> [Cost Keyword]
+bestowCosts keywords =
+  let costOf keyword = case keyword of
+        Keyword.Bestow cost -> Just cost
+        _ -> Nothing
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.103b: the enchant ability a spell cast bestowed gains -- always exactly
+-- "enchant creature", so the RULE states it and no card has to. Minted here for
+-- the reason CR 702.29a's cycling ability is minted rather than printed.
+--
+-- Pool.Creatures with NO Filter, which is what rule 702.103b's bare "enchant
+-- creature" says and also the shape Pawl.Engine.Sba.stillLegalEnchant's fast arm
+-- matches: Pawl.Engine.Card.foldEnchant leaves a lone unfiltered instance exactly
+-- as it found it, so a bestowed permanent takes that arm rather than the slow one.
+--
+-- CR 702.5a prints no "up to", so the slot is required (TargetSlot.required).
+bestowEnchant :: TargetSlot.TargetSlot
+bestowEnchant = TargetSlot.required Pool.Creatures Nothing
+
+-- CR 702.103b's three modifications, in the order the rule states them: the spell
+-- "becomes an Aura enchantment and gains enchant creature". A card-type SET (CR
+-- 205.1a drops the correlated creature subtypes with the Creature card type),
+-- a subtype ADD, and the enchant grant -- one layer-4 pair and one layer-6 grant,
+-- which Pawl.Engine.Projection.bestowGathered hands the fold at one timestamp.
+--
+-- Here rather than in the projection so that the vocabulary rule 702.103b needs
+-- is stated beside the keyword it comes from; the projection cases on the
+-- Modification values, which is the one module licensed to.
+bestowModifications :: [Modification.Modification ability]
+bestowModifications =
+  [ Modification.SetCardType CardType.Enchantment,
+    Modification.AddSubtype Subtype.Aura,
+    Modification.GainEnchant bestowEnchant
+  ]
 
 -- CR 702.37a / 702.37e: the MORPH cost -- what a face-down permanent's controller
 -- pays to turn it face up as CR 116.2b's special action -- or Nothing when the
@@ -1238,6 +1291,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
   Keyword.Flashback _ -> []
+  Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
@@ -1416,6 +1470,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
   Keyword.Flashback _ -> []
+  Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
@@ -1534,6 +1589,7 @@ familyOf keyword = case keyword of
   Keyword.Cycling {} -> Just KeywordFamily.Cycling
   Keyword.Kicker _ -> Just KeywordFamily.Kicker
   Keyword.Flashback _ -> Just KeywordFamily.Flashback
+  Keyword.Bestow _ -> Just KeywordFamily.Bestow
   Keyword.Morph {} -> Just KeywordFamily.Morph
   Keyword.Entwine _ -> Just KeywordFamily.Entwine
   Keyword.Bushido _ -> Just KeywordFamily.Bushido

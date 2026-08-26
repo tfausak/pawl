@@ -979,7 +979,19 @@ chosenModes chosen face = Modal.chosenModes chosen (Face.spell face)
 -- the card's enchant slot (CR 303.4a) if it has one. Only these slots are
 -- prompted at cast and re-validated at CR 608.2b.
 modesTargetSlots :: Seq.Seq ModeIndex.ModeIndex -> Face.Face Card.Card -> Map SlotName TargetSlot
-modesTargetSlots chosen face = Map.union (enchantSlotMap face) (Modal.modesTargetSlots chosen (Face.spell face))
+modesTargetSlots chosen face = modesTargetSlotsGiven (Face.enchant face) chosen face
+
+-- modesTargetSlots with the enchant INSTANCES handed in rather than read off the
+-- printed face -- what an object's projection holds (CR 613.1f), which is where a
+-- granted instance lives (Modification.GainEnchant, CR 702.103b's bestow). The
+-- two callers that HAVE an object are Pawl.Engine.Cast's CR 601.2c prompt and
+-- Pawl.Engine.Resolve's CR 608.2b re-check, and both take this one, so a spell
+-- whose enchant ability it was granted is offered and re-judged on that ability
+-- rather than on the empty printed list. modesTargetSlots above is the same
+-- function fed the printed instances, which is what a caller holding only a face
+-- can supply.
+modesTargetSlotsGiven :: [TargetSlot] -> Seq.Seq ModeIndex.ModeIndex -> Face.Face Card.Card -> Map SlotName TargetSlot
+modesTargetSlotsGiven enchants chosen face = Map.union (enchantSlotMapGiven enchants) (Modal.modesTargetSlots chosen (Face.spell face))
 
 isLand :: Face.Face Card.Card -> Bool
 isLand f = Set.member CardType.Land (TypeLine.types (Face.typeLine f))
@@ -1067,7 +1079,12 @@ enchantSlot = SlotName.MkSlotName (Text.pack "enchant")
 -- the two functions above, and passed to Target.fillableModes by Pawl.Engine.Cast
 -- so castability accounts for it.
 enchantSlotMap :: Face.Face Card.Card -> Map SlotName TargetSlot
-enchantSlotMap face = case enchantTargetSlot face of
+enchantSlotMap = enchantSlotMapGiven . Face.enchant
+
+-- enchantSlotMap over the instances themselves, so a PROJECTED list reaches the
+-- same fold a printed one does; see modesTargetSlotsGiven above.
+enchantSlotMapGiven :: [TargetSlot] -> Map SlotName TargetSlot
+enchantSlotMapGiven enchants = case foldEnchant enchants of
   Nothing -> Map.empty
   Just slot -> Map.singleton enchantSlot slot
 
@@ -1106,9 +1123,11 @@ enchantTargetSlot = foldEnchant . Face.enchant
 -- GRANTED (Modification.GainEnchant), and this is the one place either
 -- reaches. Pawl.Engine.Projection seeds ProjectedCharacteristics.enchant from
 -- Face.enchant and appends grants to it, so a projected object's list is what
--- Pawl.Engine.Attach and Pawl.Engine.Sba fold; the cast path (enchantSlotMap
--- above, Pawl.Engine.Cast) still reads the printed face, since CR 601.2c judges
--- a spell on the stack, which no layer-6 grant in this pool reaches.
+-- Pawl.Engine.Attach and Pawl.Engine.Sba fold. The cast and resolve paths take
+-- the projected list too, through modesTargetSlotsGiven above: CR 702.103b's
+-- bestow grants "enchant creature" to a spell ON THE STACK, which is exactly what
+-- CR 601.2c and CR 608.2b then judge. enchantSlotMap's printed reading is what is
+-- left for a caller holding a face and no object.
 foldEnchant :: [TargetSlot] -> Maybe TargetSlot
 foldEnchant slots = case slots of
   [] -> Nothing

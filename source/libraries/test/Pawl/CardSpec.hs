@@ -2716,6 +2716,9 @@ keywordFilters :: Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 keywordFilters keyword = case keyword of
   Keyword.Cycling (Cycling.MkCycling cost mFilter) -> costFilters cost <> Maybe.maybeToList mFilter
   Keyword.Flashback cost -> costFilters cost
+  -- CR 702.103a: the bestow cost, whose components may hold a Filter exactly as
+  -- flashback's may.
+  Keyword.Bestow cost -> costFilters cost
   Keyword.Kicker cost -> costFilters cost
   Keyword.Entwine cost -> costFilters cost
   -- CR 702.170a: the plot cost, whose components may hold a Filter exactly as

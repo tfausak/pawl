@@ -206,9 +206,10 @@ data Face card = MkFace
     -- PRINTED, and no longer the whole story on the battlefield: an effect can
     -- GRANT an enchant ability (Modification.GainEnchant), which
     -- Pawl.Engine.Projection seeds this field into and appends to, so
-    -- Pawl.Engine.Attach and Pawl.Engine.Sba fold the PROJECTED list. What still
-    -- reads this field alone is the cast path (Pawl.Engine.Card.enchantSlotMap),
-    -- since CR 601.2c judges a spell on the stack.
+    -- Pawl.Engine.Attach and Pawl.Engine.Sba fold the PROJECTED list -- and so do
+    -- the cast and resolve paths, since CR 702.103b's bestow grants a SPELL an
+    -- enchant ability. Pawl.Engine.Card.enchantSlotMap is what still reads this
+    -- field alone, for a caller holding a face and no object.
     enchant :: [TargetSlot.TargetSlot],
     -- | CR 113.6g: a can't-be-countered ability functions on the stack (Rending
     -- Volley). Read straight off the card by Event.counter rather than through the
