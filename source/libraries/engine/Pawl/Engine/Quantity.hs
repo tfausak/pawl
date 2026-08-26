@@ -663,7 +663,7 @@ substituteStar star quantity = case quantity of
 -- evaluateAgainst's InSlot arm, because rule 107.3m states the exception and its
 -- limit in one sentence: "although the value of X for that permanent is 0". A
 -- fallback would answer the announcement everywhere the permanent is asked --
--- for an activated ability of its own, where rule 107.3i's 0 is the answer.
+-- for an activated ability of its own, where that same clause says 0.
 --
 -- Cost.substituteX's twin, one type over. The descent is substituteStar's, for
 -- the same reason: a composed quantity (1 + X) is still a reader of X. No

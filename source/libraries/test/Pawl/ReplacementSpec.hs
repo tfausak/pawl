@@ -1569,8 +1569,9 @@ stormwildCapridorSpec s registry = Spec.describe s "Stormwild Capridor (CR 615.5
 -- damage and remove that many +1/+1 counters from it."
 --
 -- Two rules this group is the pool's only producer of. CR 107.3m puts the SPELL's
--- announced X inside the permanent's own CR 614.1c entry replacement, where rule
--- 107.3i would otherwise answer 0; and CR 615.5's additional effect on a printed
+-- announced X inside the permanent's own CR 614.1c entry replacement, an
+-- exception the rule states against rule 107.3i and bounds in the same sentence
+-- ("the value of X for that permanent is 0"); and CR 615.5's additional effect on a printed
 -- ability names its own permanent by CR 113.7's reserved self slot, which is what
 -- Pawl.Types.RemoveCounters needs and Stormwild Capridor's PutCounters (an
 -- ObjectRef) does not.
@@ -1588,9 +1589,10 @@ proteanHydraSpec s registry = Spec.describe s "Protean Hydra (CR 107.3m, CR 615.
         -- CR 400.7 mints a new object, but under the same id: the permanent the
         -- spell became is `spellId` on the battlefield.
         after = castAndResolve (answerXOf 4) g1 spellId
-        -- CR 601.2a mints a new object as the card moves to the stack, so the
-        -- permanent is neither `spellId` nor any of the five lands: it is what
-        -- the battlefield gained.
+        -- CR 400.7 with CR 601.2a: casting moved the card to the stack, where it
+        -- became a new object, and resolving moved it again -- so the permanent
+        -- is neither `spellId` nor any of the five lands. It is what the
+        -- battlefield gained.
         hydra = case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield g1)) of
           oid : _ -> oid
           [] -> S.noSource
