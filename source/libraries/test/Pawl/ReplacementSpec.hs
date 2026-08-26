@@ -3096,8 +3096,11 @@ queensBayPaladinSpec s registry = Spec.describe s "Queen's Bay Paladin (CR 122.1
 --
 -- A REAL untap step throughout (Engine.runTurnBasedActions at CR 502.3), not a
 -- direct call to the funnel.
-cryogenicStasisSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+cryogenicStasisSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cryogenicStasisSpec s registry = Spec.describe s "Cryogenic Stasis (CR 122.1d)" $ do
+  -- alice is the active player, so CR 502.3's turn-based action is asked about
+  -- the permanents she controls.
+  let untapStep gs = S.runPure S.identityAnswer (gs {GameState.activePlayer = S.alice}) (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
   Spec.it s "CR 122.1d a stun counter replaces the untap step's untap and is spent doing it" $ do
     island <- S.printingOf s registry "Island"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
@@ -3108,9 +3111,6 @@ cryogenicStasisSpec s registry = Spec.describe s "Cryogenic Stasis (CR 122.1d)" 
         (g3, stasisId) = S.handOne stasis g2
         cast = S.runPure S.identityAnswer g3 (S.cast S.alice stasisId)
         resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-        -- alice is the active player, so CR 502.3's turn-based action is asked
-        -- about the permanent she controls.
-        untapStep gs = S.runPure S.identityAnswer (gs {GameState.activePlayer = S.alice}) (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
         first = untapStep resolved
         second = untapStep first
     -- The behaviour, ahead of every proxy: the untap step ran and left the Piker
@@ -3122,6 +3122,23 @@ cryogenicStasisSpec s registry = Spec.describe s "Cryogenic Stasis (CR 122.1d)" 
     Spec.assertEqWith s "CR 122.1d with the counter gone the next untap step untaps it" (tapStateOf piker second) (Just TapState.Untapped)
     Spec.assertEqWith s "setup: the spell tapped the Piker and left one stun counter on it" (tapStateOf piker resolved, countersOn CounterKind.Stun piker resolved) (Just TapState.Tapped, 1)
     Spec.assertEqWith s "setup: and drew alice her card, so the whole spell resolved" (S.handSize S.alice resolved) 1
+  -- Rule 701.26b's second sentence, which is `proposeUntap`'s guard: an UNTAPPED
+  -- permanent does not become untapped, so CR 122.1d's event is never proposed
+  -- for it and no counter is spent. The board differs from the case above in
+  -- exactly one thing -- the permanent's tap state -- so the pair is what tells
+  -- "the counter is spent by an untap step" from "the counter is spent by an
+  -- untap".
+  --
+  -- The counter is placed by the fixture rather than by Cryogenic Stasis: the
+  -- card TAPS what it stuns, so no board it can build reaches this arm.
+  Spec.it s "CR 701.26b an untapped permanent never becomes untapped, so its stun counter is not spent" $ do
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    let (piker, placed) = S.addCreature pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)
+        stunned = S.addCounter CounterKind.Stun 1 piker placed
+        after = untapStep stunned
+    Spec.assertEqWith s "CR 701.26b the untap step spent no stun counter on a permanent that was already upright" (countersOn CounterKind.Stun piker after) 1
+    Spec.assertEqWith s "setup: it went into the step untapped" (tapStateOf piker stunned) (Just TapState.Untapped)
+    Spec.assertEqWith s "and came out of it untapped" (tapStateOf piker after) (Just TapState.Untapped)
 
 -- CR 614.5's applied set is what makes the CR 616.1 loop TERMINATE, not merely
 -- correct: a regression there (an effect invoking itself repeatedly, e.g. two
