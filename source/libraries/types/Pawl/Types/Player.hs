@@ -32,9 +32,10 @@ data Player = MkPlayer
     --
     -- Read by Pawl.Engine.Ring, which is where CR 701.54c's "as long as the Ring
     -- has tempted that player N or more times" turns this number into the
-    -- emblem's ability set: the base tier and the four-temptation one are built.
+    -- emblem's ability set: the base tier and the two- and four-temptation ones
+    -- are built.
     --
-    -- Not implemented: the two- and three-temptation tiers (#706).
+    -- Not implemented: the three-temptation tier (#706).
     ringTemptations :: Natural.Natural,
     -- | CR 702.179b: this player's speed, or Nothing for a player who has none.
     -- "Players do not have speed until a rule or effect sets their speed to a
