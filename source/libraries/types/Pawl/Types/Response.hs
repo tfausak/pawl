@@ -32,6 +32,7 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SlotName as SlotName
@@ -208,6 +209,13 @@ data Response
     -- rather than from either zone, and a transcript of one must not satisfy
     -- another.
     ChoseCardFromAmong ObjectId.ObjectId
+  | -- | CR 309.2a \/ 701.49a: the dungeon card a venturing player chose to bring
+    -- in from outside the game.
+    --
+    -- Its own constructor rather than ChoseRoom reused: that one names a room of a
+    -- dungeon already in the command zone, this one names the CARD, and a
+    -- transcript of one must not satisfy the other.
+    ChoseDungeon PrintingId.PrintingId
   | -- | CR 309.5a: the room a venturing player chose to move their marker into.
     ChoseRoom RoomIndex.RoomIndex
   | -- | CR 709.5f \/ 709.5g: the half of a permanent a player chose to unlock or

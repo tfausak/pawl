@@ -1,6 +1,7 @@
 module Pawl.Types.Player where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -74,7 +75,7 @@ data Player = MkPlayer
     -- to it.
     --
     -- The printing is named by its id (#1592), which is stable for the whole
-    -- game: Pawl.Engine.Setup.internDeck interns each of a deck's distinct
+    -- game: Pawl.Engine.Setup.createDeck interns each of a deck's distinct
     -- printings exactly once, so this id is the same one the commander's own
     -- objects carry and Pawl.Engine.Commander.isCommander can compare the two.
     commander :: Maybe PrintingId.PrintingId,
@@ -98,22 +99,27 @@ data Player = MkPlayer
     -- exactly one commander today. Partner and background decks, which give a
     -- player two, would need a finer key (#939).
     commanderDamage :: Map.Map PlayerId.PlayerId Natural.Natural,
-    -- | CR 309.2 \/ 309.2a: the dungeon card this player owns from outside the
-    -- game, or Nothing for a player who brought none. Deck.dungeon is where it
-    -- comes from and Pawl.Engine.Setup.createDeck copies it here.
+    -- | CR 309.2 \/ 309.2a: the dungeon cards this player owns from outside the
+    -- game, empty for a player who brought none. Deck.dungeons is where they come
+    -- from and Pawl.Engine.Setup.createDeck copies them here.
     --
-    -- A PRINTING and not an ObjectId, for `commander`'s reason turned inside out:
-    -- there is no object at all until CR 701.49a brings the card into the command
+    -- PRINTINGS and not ObjectIds, for `commander`'s reason turned inside out:
+    -- there is no object at all until CR 701.49a brings a card into the command
     -- zone, and CR 309.5b removes it from the game and lets the SAME card be
     -- brought back in as a new object. What persists across both is the printing,
-    -- named by its id (#1592) -- interned by Pawl.Engine.Setup.internDeck along
+    -- named by its id (#1592) -- interned by Pawl.Engine.Setup.createDeck along
     -- with the rest of the deck, so it is minted before any of this is read.
     --
-    -- Read only by Pawl.Engine.Dungeon. It is not emptied when the dungeon enters
-    -- the game: CR 309.5b has the player put a dungeon they own back into the
-    -- command zone after finishing one, so the card outside the game is a supply
-    -- rather than a stock of one.
-    dungeon :: Maybe PrintingId.PrintingId,
+    -- SEVERAL, which is what makes CR 309.2a's "a dungeon card they own" a choice:
+    -- Pawl.Engine.Dungeon.enter raises Prompt.ChooseDungeon over this set. CR
+    -- 309.3's one-at-a-time limit is about the COMMAND ZONE, which
+    -- Pawl.Engine.Dungeon.inDungeon holds, and says nothing about how many a player
+    -- may own outside the game.
+    --
+    -- Read only by Pawl.Engine.Dungeon. Nothing is taken out of it when a dungeon
+    -- enters the game: CR 309.5b has the player put a dungeon they own back into the
+    -- command zone after finishing one, so this is a supply rather than a stock.
+    dungeons :: Set.Set PrintingId.PrintingId,
     -- | CR 309.7: how many dungeons this player has completed. "A player
     -- completes a dungeon as that dungeon card is removed from the game", so
     -- Pawl.Engine.Dungeon.remove is the sole writer -- the one function both CR

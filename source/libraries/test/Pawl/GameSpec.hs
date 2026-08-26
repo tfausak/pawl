@@ -1925,7 +1925,7 @@ printingSpec s registry = Spec.describe s "PrintingTable" $ do
           (Just (S.printingName mountain))
 
   -- The copies of a 4-of share one entry because the DECK groups them, not
-  -- because intern deduplicates -- Setup.internDeck is what makes that true, and
+  -- because intern deduplicates -- Setup.createDeck is what makes that true, and
   -- Pawl.Engine.Commander's designation check depends on it.
   Spec.it s "two objects from one deck entry name one printing" $ do
     mountain <- S.printingOf s registry "Mountain"

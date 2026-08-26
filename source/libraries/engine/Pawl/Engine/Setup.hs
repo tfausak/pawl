@@ -93,9 +93,9 @@ emptyGame order =
               -- commander has dealt anybody anything in one that has not
               -- started.
               Player.commanderDamage = Map.empty,
-              -- CR 309.2: dungeon cards begin outside the game, and which one a
+              -- CR 309.2: dungeon cards begin outside the game, and which ones a
               -- player brought is their deck's business -- createDeck below.
-              Player.dungeon = Nothing,
+              Player.dungeons = Set.empty,
               -- CR 309.7: nobody has completed a dungeon in a game that has not
               -- started, there having been no venture to remove one from it.
               Player.completedDungeons = 0
@@ -238,7 +238,7 @@ createCard pid printingId = do
 -- zones constantly; an id or an object field could not survive that.
 createDeck :: PlayerId -> Deck.Deck -> Game ()
 createDeck pid deck = do
-  dungeonId <- Monad.mapM (State.state . Game.intern) (Deck.dungeon deck)
+  dungeonIds <- Monad.mapM (State.state . Game.intern) (Set.toAscList (Deck.dungeons deck))
   -- CR 903.7 / CR 103.4: the starting life total, which is the deck's business
   -- and so cannot be settled by emptyGame above.
   State.modify' $ \gs ->
@@ -248,7 +248,7 @@ createDeck pid deck = do
           -- minted for it, because dungeon cards begin OUTSIDE the game and
           -- outside the game is not a zone (CR 400.11). CR 701.49a is what brings
           -- it in; Pawl.Engine.Dungeon.enter is that rule.
-          Map.adjust (\p -> p {Player.life = startingLife (Deck.commander deck), Player.dungeon = dungeonId}) pid (GameState.players gs)
+          Map.adjust (\p -> p {Player.life = startingLife (Deck.commander deck), Player.dungeons = Set.fromList dungeonIds}) pid (GameState.players gs)
       }
   Monad.forM_ (Map.toList (Deck.cards deck)) $ \(printing, n) -> do
     printingId <- State.state (Game.intern printing)
@@ -409,7 +409,7 @@ resetPlayers players =
               -- with the tax.
               Player.commanderDamage = Map.empty,
               -- CR 727.1 / 729.2 again: a NEW game, so no dungeon has been
-              -- completed in it. Player.dungeon is deliberately NOT reset beside
+              -- completed in it. Player.dungeons is deliberately NOT reset beside
               -- it, for Player.commander's reason -- the supply outside the game
               -- comes from the deck, and the restart reuses the same decks.
               Player.completedDungeons = 0
