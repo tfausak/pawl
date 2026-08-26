@@ -3669,7 +3669,7 @@ savantiRomeroSpec s registry =
         -- The same board with the stun counters taken away and nothing else
         -- changed: one counter, one card, one life. It is what stops a payload
         -- that hardcodes three from passing the case above, and -- since the only
-        -- counter here is the one the trigger put -- what shows CR 608.2's "then"
+        -- counter here is the one the trigger put -- what shows CR 608.2c's order
         -- reads the tally AFTER the placement rather than before it.
         Spec.it s "CR 122.1 with no stun counters the same trigger draws one, counting the counter it just put" $ do
           (savantiId, board) <- savantiBoard 0

@@ -316,8 +316,10 @@ data Quantity
     ObjectCounters (CounterKind.CounterKind Keyword.Keyword)
   | -- | CR 122.1: how many counters of EVERY kind are on the OBJECT this quantity
     -- is evaluated against, summed -- Savanti Romero, Time's Exile's "where X is
-    -- the number of counters on Savanti Romero", and the Boolean reading of the
-    -- same sum in Angelic Sleuth's "if it had counters on it".
+    -- the number of counters on Savanti Romero". Angelic Sleuth's "if it had
+    -- counters on it" is the same sum read as a Boolean, and is a different
+    -- card's whole question; what keeps that one out of the pool is not this arm
+    -- but the missing binding for the permanent that left (#2347).
     --
     -- ObjectCounters above in every respect but the kind: the same object (the one
     -- the evaluation is aimed at), the same injected ViewOf, and so the same CR
@@ -326,12 +328,12 @@ data Quantity
     -- A SEPARATE ARM rather than a Maybe inside ObjectCounters' payload. Two
     -- reasons. The narrower question is not this one with a filter applied -- CR
     -- 122.1a-j give each kind its own rule, and a card asking after +1/+1 counters
-    -- is asking about power and toughness where a card asking after counters is
-    -- asking about CR 122.2's marker -- so an absent payload standing for "every
-    -- kind" would make the field's absence the way a reader tells the two
-    -- questions apart, which is the untagged union Pawl.Types.PlayerQuantity's
-    -- haddock forbids. And every existing card's wire form stays exactly as
-    -- printed, ObjectCounters' payload remaining required.
+    -- is asking about power and toughness (CR 122.1a) where a card asking after
+    -- counters is asking about CR 122.1's bare marker -- so an absent payload
+    -- standing for "every kind" would make the field's absence the way a reader
+    -- tells the two questions apart, which is the untagged union
+    -- Pawl.Types.PlayerQuantity's haddock forbids. And every existing card's wire
+    -- form stays exactly as printed, ObjectCounters' payload remaining required.
     --
     -- An object with NO counters reads as 0 rather than as unanswered, ObjectCounters'
     -- convention: an empty sum is a number. Nothing survives only for an object the
