@@ -934,6 +934,7 @@ effectCounts effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> []
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect _ -> []
+  Effect.SetHalfLocked {} -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
   Effect.Train _ -> []
@@ -1191,6 +1192,7 @@ effectNestedEffects effect = case effect of
   Effect.EndCombatPhase -> []
   Effect.GainControl {} -> []
   Effect.Unsuspect {} -> []
+  Effect.SetHalfLocked {} -> []
   Effect.Evolve {} -> []
   Effect.Mentor {} -> []
   Effect.Train {} -> []
@@ -1662,6 +1664,7 @@ effectReplacements effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> []
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect _ -> []
+  Effect.SetHalfLocked {} -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
   Effect.Train _ -> []
@@ -2395,6 +2398,7 @@ effectMintedFaces effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> []
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect _ -> []
+  Effect.SetHalfLocked {} -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
   Effect.Train _ -> []
@@ -3978,6 +3982,7 @@ effectFilters effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> []
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect ref -> sourceHosted (objectRefFilters ref)
+  Effect.SetHalfLocked {} -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
   Effect.Train _ -> []
@@ -4180,6 +4185,7 @@ effectObjectRefs effect = case effect of
   Effect.Designate {} -> []
   Effect.SetClassLevel {} -> []
   Effect.Unsuspect ref -> read_ [ref]
+  Effect.SetHalfLocked {} -> []
   Effect.Evolve {} -> []
   Effect.Mentor {} -> []
   Effect.Train {} -> []
@@ -4804,8 +4810,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let branching = any (any (Maybe.isJust . Clause.orElse) . Mode.clauses) . Modal.modes
         offenders = filter (anyFace cardBranchesAreAsymmetric . Printing.card) ps
     -- Guards against passing vacuously: a pool where no clause branches at all
-    -- could not offend whatever the lint said. Twiddle and Teardrop Kami are the
-    -- two that make it real, one on a spell and one on an activated ability.
+    -- could not offend whatever the lint said. Twiddle, Teardrop Kami and Keys to
+    -- the House make it real -- a spell and two activated abilities, and Keys is
+    -- the one whose pair carries no "may".
     Spec.assertBool s (any (anyFace (any branching . faceModals) . Printing.card) ps) "the pool has a clause carrying an either-or"
     Spec.assertEqWith s "no half-named branch" (fmap (S.nameOf . Printing.card) offenders) []
   -- And the rejecting direction, against Twiddle misauthored on purpose -- never
