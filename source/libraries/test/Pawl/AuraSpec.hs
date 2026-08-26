@@ -1903,10 +1903,20 @@ auraSpec s registry = Spec.describe s "Aura" $ do
 -- Protection is also the pool's one MINTED producer of this restriction (CR
 -- 702.16c, CR 702.16d), so the last two cases below come from a keyword rather
 -- than from a face, and they are where Pawl.Engine.Sba.becomesUnattached's
--- clause is proved as well as fallsOff's. Rule 702.16d's own attach GATE has no
--- case: an equip ability is an ability from a black source, so CR 702.16b
--- refuses the target before rule 702.16d is reached, and the two readings agree
--- on every board.
+-- clause is proved as well as fallsOff's.
+--
+-- Rule 702.16d's ATTACH GATE has no case of its own, and could not have one on
+-- this pool: the only road that puts an Equipment onto a creature is an equip
+-- ability, whose source is the Equipment itself, so a black Equipment aimed at a
+-- creature with protection from black is refused by CR 702.16b before rule
+-- 702.16d is reached and the two readings agree. Separating them needs an effect
+-- that attaches an Equipment WITHOUT targeting, which the pool has none of --
+-- every Effect.Attach, Effect.AttachTarget and Effect.AttachTargetToEach in
+-- data/cards/ moves an Aura (Aura Graft, Crown of the Ages, Cloudform, Gliding
+-- Licid, Aura Diffusion), and the printed shape that would do it, "For
+-- Mirrodin!" (CR 702.163a attaches with no target), has no Keyword constructor.
+-- Reconfigure (CR 702.151a) would NOT do it: that ability targets too. The
+-- state-based half below is what covers rule 702.16d instead.
 attachRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
   -- CR 301.5b's last sentence, at the MOVE: "if an effect attempts to attach an
@@ -2055,9 +2065,10 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
   -- The protection ARRIVES AFTER the attachment, which is the only board that
   -- reaches these sentences at all -- the attach gate proved above refuses every
   -- other road. Unstable Shapeshifter is how: both permanents attach to a plain
-  -- 0/1 Shapeshifter, and its CR 603.2 trigger then makes it a copy of the
-  -- Apostle (CR 706.2 copies the keyword), so protection from black turns up on
-  -- a permanent that is already carrying two black attachments.
+  -- 0/1 Shapeshifter, and its CR 603.6a trigger then makes it a copy of the
+  -- Apostle (CR 707.2a copies the keyword, protection being derived from rules
+  -- text), so protection from black turns up on a permanent that is already
+  -- carrying two black attachments.
   Spec.it s "CR 702.16c/702.16d whole cards: a creature that becomes protected from black buries the black Aura on it and sheds the black Equipment" $ do
     island <- S.printingOf s registry "Island"
     shapeshifter <- S.printingOf s registry "Unstable Shapeshifter"

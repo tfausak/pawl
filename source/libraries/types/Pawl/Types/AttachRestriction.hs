@@ -64,7 +64,9 @@ import qualified Pawl.Types.Keyword as Keyword
 --
 -- Open-half card data, classified rather than identified:
 -- Pawl.Engine.AttachRestriction is the only module that may read it, and it
--- answers a Bool about a pair.
+-- answers a Bool about a pair. Pawl.Engine.Keyword CONSTRUCTS one -- rule
+-- 702.16c/702.16d's protection -- and reads none, which is
+-- Pawl.Types.CombatRestriction's standing toward that module too.
 data AttachRestriction = MkAttachRestriction
   { -- | Which permanents may not be attached to. An Affected, not a bare
     -- ObjectId, so the set is re-derived on every read -- Consecrate Land's

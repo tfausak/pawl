@@ -25,7 +25,7 @@
 -- CR 301.5c and CR 702.16d). Nothing here knows which is which: this answers one
 -- Bool about a pair, and Sba's own classification picks the outcome.
 --
--- TARGETING is not one of those places, and that is the rule rather than an
+-- TARGETING is not one of the three, and that is the rule rather than an
 -- omission: CR 702.5a gives the enchant ability both jobs and this restriction is
 -- neither, so an Aura spell may still target a permanent that refuses it (CR
 -- 608.2b keeps it legal, CR 608.3c attaches it, CR 704.5m buries it on the next
@@ -85,9 +85,9 @@ refuses = refusesGiven Map.empty
 -- hasKeywordGiven/hasKeyword pairing: Pawl.Engine.Sba asks this once per attached
 -- permanent on every state-based pass and already holds the CR 704.3 pre-pass map,
 -- so the host's keywords come out of that map rather than out of a fresh gather
--- per Aura -- the O(permanents^3) shape Pawl.Engine.Projection's `liveGiven`
--- comment warns about. Pawl.Engine.Attach.attachmentFor holds no such map and
--- passes Map.empty, exactly as every other *Of/*Given pair in the tree does.
+-- per attached permanent per pass -- fallsOff's haddock names that cost for its
+-- own enchant read. Pawl.Engine.Attach.attachmentFor holds no such map and passes
+-- Map.empty, exactly as every other *Of/*Given pair in the tree does.
 refusesGiven :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> ObjectId -> GameState -> Bool
 refusesGiven pcs subject host gs =
   let setEffs = Projection.setLandSubtypeEffects gs
