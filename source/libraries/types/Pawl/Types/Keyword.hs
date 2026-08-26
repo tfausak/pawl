@@ -159,11 +159,10 @@ data Keyword
     -- minted by Pawl.Engine.Keyword.mintedReplacementsFor), CR 702.16f's blocking
     -- (a CR 509.1b pairwise restriction minted by
     -- Pawl.Engine.Keyword.mintedCombatRestrictionsFor), and the attachment of CR
-    -- 702.16c's Auras and CR 702.16d's Equipment and Fortifications.
-    --
-    -- Not implemented: CR 702.16c's Auras and CR 702.16d's Equipment and
-    -- Fortifications, so an Aura or Equipment with the stated quality may still
-    -- become attached and is not removed as a state-based action (#2228).
+    -- 702.16c's Auras and CR 702.16d's Equipment and Fortifications (a
+    -- destination-side prohibition minted by
+    -- Pawl.Engine.Keyword.mintedAttachRestrictionsFor, whose two state-based
+    -- outcomes are Pawl.Engine.Sba's fallsOff and becomesUnattached).
     --
     -- HEXPROOF'S SHAPE (702.11d), minus the controller axis and plus three more
     -- clauses. The quality rides the constructor for rule 702.11d's reason,

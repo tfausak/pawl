@@ -20,6 +20,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
+import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import Pawl.Types.Card (Card)
@@ -1523,6 +1524,144 @@ mintedCombatRestrictionsFor keyword = case keyword of
 -- face on the battlefield could put a restriction-minting keyword on one.
 mintsCombatRestriction :: Keyword -> Bool
 mintsCombatRestriction = not . null . mintedCombatRestrictionsFor
+
+-- CR 701.3a with CR 101.2: every prohibition on what may become attached to a
+-- permanent that rule 702 gives it for HOLDING A KEYWORD.
+-- Pawl.Engine.AttachRestriction.refuses adds these to the ones a face PRINTS.
+--
+-- Its own mint point rather than an arm of the three ability folds, for
+-- mintedCombatRestrictionsOf's reason: a prohibition is not an ability object and
+-- rewrites no event. It is a fact CR 613.11 has a reader ask about.
+--
+-- MEMBERSHIP and not a per-keyword count, again for that function's reason: a
+-- pairing is refused or it is not, so a second copy of the keyword refuses
+-- nothing further. CR 702.16m says as much for protection in particular.
+mintedAttachRestrictionsOf :: Map Keyword Natural -> [AttachRestriction.AttachRestriction]
+mintedAttachRestrictionsOf = concatMap mintedAttachRestrictionsFor . Map.keys
+
+-- Exhaustive for `abilitiesFor`'s reason: the next keyword that forbids an
+-- attachment must break this build rather than silently forbid nothing.
+mintedAttachRestrictionsFor :: Keyword -> [AttachRestriction.AttachRestriction]
+mintedAttachRestrictionsFor keyword = case keyword of
+  Keyword.Unleash -> []
+  Keyword.Riot -> []
+  Keyword.Vanishing _ -> []
+  Keyword.Fading _ -> []
+  Keyword.Frenzy _ -> []
+  Keyword.Modular _ -> []
+  Keyword.Crew _ -> []
+  Keyword.Fabricate _ -> []
+  Keyword.Deathtouch -> []
+  Keyword.Defender -> []
+  Keyword.DoubleStrike -> []
+  Keyword.Equip _ -> []
+  Keyword.FirstStrike -> []
+  Keyword.Flash -> []
+  Keyword.Flying -> []
+  Keyword.Haste -> []
+  Keyword.Hexproof _ -> []
+  Keyword.Indestructible -> []
+  Keyword.Landwalk _ -> []
+  Keyword.Lifelink -> []
+  -- CR 702.16c and CR 702.16d, as ONE row: "a permanent or player with
+  -- protection can't be enchanted by Auras that have the stated quality", and
+  -- "a permanent with protection can't be equipped by Equipment that have the
+  -- stated quality or fortified by Fortifications that have the stated
+  -- quality". The two rules bar the same move (CR 701.3a's attach) and differ
+  -- only in which state-based action clears up an attachment that happened
+  -- anyway -- CR 704.5m's bury for an Aura, CR 704.5n's detach for an Equipment
+  -- -- so the split rides Pawl.Engine.Sba's existing classification rather than
+  -- a second restriction here.
+  --
+  -- No Aura-or-Equipment conjunct in the attachers filter, and none is owed: CR
+  -- 701.3b makes a permanent that is none of the three unattachable to anything
+  -- at all, so the quality alone bars exactly what the two rules name.
+  --
+  -- Filter.IsSource in the affected position, mintedCombatRestrictionsFor's
+  -- spelling above: the restricting permanent IS the protected one, where every
+  -- printed row (Consecrate Land) names a third permanent through
+  -- Affected.Attached.
+  --
+  -- Not implemented: rule 702.16c's PLAYER half. That rule reaches "a permanent
+  -- or player with protection", and a player has no keywords for this mint to
+  -- read, so CR 702.5d's enchant-player Aura is barred by nothing (#2387).
+  -- Rule 702.16d has no player half to miss.
+  --
+  -- Not implemented: rule 702.16n's and rule 702.16p's exceptions, where an Aura
+  -- grants protection from a quality and says the effect does not remove Auras,
+  -- or does not remove what is already attached. No card in the pool grants
+  -- protection at all, so nothing here can carry either rider (#2388).
+  Keyword.Protection quality ->
+    [ AttachRestriction.MkAttachRestriction
+        { AttachRestriction.affected = Affected.Matching Filter.IsSource,
+          AttachRestriction.attachers = quality
+        }
+    ]
+  Keyword.Reach -> []
+  Keyword.Shroud -> []
+  Keyword.Trample -> []
+  Keyword.TrampleOverPlaneswalkers -> []
+  Keyword.Vigilance -> []
+  Keyword.Ward _ -> []
+  Keyword.Banding -> []
+  Keyword.Flanking -> []
+  Keyword.Phasing -> []
+  Keyword.Shadow -> []
+  Keyword.Horsemanship -> []
+  Keyword.Aftermath -> []
+  Keyword.JumpStart -> []
+  Keyword.Afflict _ -> []
+  Keyword.Fear -> []
+  Keyword.Intimidate -> []
+  Keyword.Morph {} -> []
+  Keyword.Menace -> []
+  Keyword.Renown _ -> []
+  Keyword.Cycling {} -> []
+  Keyword.Kicker _ -> []
+  Keyword.Flashback _ -> []
+  Keyword.Bestow _ -> []
+  Keyword.Entwine _ -> []
+  Keyword.Bushido _ -> []
+  Keyword.Soulshift _ -> []
+  Keyword.Bloodthirst _ -> []
+  Keyword.Haunt -> []
+  Keyword.SplitSecond -> []
+  Keyword.Poisonous _ -> []
+  Keyword.Annihilator _ -> []
+  Keyword.BattleCry -> []
+  Keyword.Evolve -> []
+  Keyword.Dethrone -> []
+  Keyword.LevelUp _ -> []
+  Keyword.Outlast _ -> []
+  Keyword.Prowess -> []
+  Keyword.Infect -> []
+  Keyword.Wither -> []
+  Keyword.Exalted -> []
+  Keyword.Mentor -> []
+  Keyword.Afterlife _ -> []
+  Keyword.Provoke -> []
+  Keyword.Devoid -> []
+  Keyword.Ingest -> []
+  Keyword.Skulk -> []
+  Keyword.Melee -> []
+  Keyword.Rampage _ -> []
+  Keyword.Daybound -> []
+  Keyword.Nightbound -> []
+  Keyword.Decayed -> []
+  Keyword.Compleated -> []
+  Keyword.ReadAhead -> []
+  Keyword.Training -> []
+  Keyword.Toxic _ -> []
+  Keyword.Disguise _ -> []
+  Keyword.Plot _ -> []
+  Keyword.Foretell _ -> []
+  Keyword.Miracle _ -> []
+  Keyword.StartYourEngines -> []
+  Keyword.Exert -> []
+  Keyword.Persist -> []
+  Keyword.Undying -> []
+  Keyword.Changeling -> []
+  Keyword.Reinforce {} -> []
 
 -- CR 702: WHICH RULE MINTED this activated ability of an object whose keywords
 -- are `counts`, as a family designator -- the classification

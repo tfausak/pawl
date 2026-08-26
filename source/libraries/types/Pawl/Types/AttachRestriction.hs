@@ -33,7 +33,9 @@ import qualified Pawl.Types.Keyword as Keyword
 -- CR 101.2 is what gives it force over CR 701.3a's permission, and CR 702.16c and
 -- CR 702.16d are the rulebook's own instances of the same shape -- protection
 -- states the Aura half and the Equipment half separately, in these two fields'
--- words.
+-- words. Those two are MINTED rather than printed
+-- (Pawl.Engine.Keyword.mintedAttachRestrictionsFor) and never serialised, so
+-- Pawl.Codec.AttachRestriction stays the shape a face writes.
 --
 -- NOT a targeting restriction. CR 702.5a gives the ENCHANT ability both jobs, and
 -- this is neither of them: an Aura spell may still target a permanent that
