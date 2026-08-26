@@ -302,8 +302,10 @@ withinLimit limit size = case limit of
 -- ONE SEARCH, and it is GREEDY. Every declaration CR 508.1a and CR 508.1b let the
 -- active player write down used to be enumerated here -- O((1 + targets) ^
 -- candidates), which no board past a couple of dozen creatures finished; see #714.
--- It is a prefix of a sort instead, and it answers exactly the same question,
--- because THREE properties hold of pawl's attacking rules together:
+-- It is a sort and a prefix scan instead -- O(candidates ^ 2 * log candidates)
+-- all told, since the witness walk re-runs the scan once per candidate -- and it
+-- answers exactly the same question, because THREE properties hold of pawl's
+-- attacking rules together:
 --
 --   1. attackDeclarationAllowed reads only the declaration's KEY SET, and reads
 --      it as a cardinality cap (withinLimit) plus one exception at size one
@@ -356,6 +358,10 @@ attackCeilingGiven limit alone candidates gs =
       -- the defending player (Combat.attackTargets puts them first). Nothing when
       -- the creature has no free announcement at all, which is a creature the cost
       -- clause keeps out of every declaration.
+      --
+      -- Untested, not unimplemented: every board in the suite has one declarable
+      -- target, so both reversing this fold and replacing it with "the first
+      -- announceable target" leave the whole suite green (#2369).
       bestFor oid = case fmap (\target -> (target, Map.findWithDefault 0 (oid, target) required)) (announceable oid) of
         [] -> Nothing
         first : rest -> Just (List.foldl' (\best pair -> if snd pair > snd best then pair else best) first rest)
@@ -416,7 +422,16 @@ attackCeilingGiven limit alone candidates gs =
           if ceilingOver taken more == Just maximumMet
             then settle taken more
             else settle (taken <> [entry]) more
-   in (required, Map.fromList (fmap (\(oid, (target, _)) -> (oid, target)) (settle [] eligible)))
+   in ( required,
+        -- The board almost every game is played on, short-circuited: with no
+        -- requirement in force every weight is zero, so the walk below leaves
+        -- every candidate out and the answer is the empty declaration. Taken
+        -- before `eligible` is forced, which is what keeps AttackCost.costsOn off
+        -- the ordinary declare attackers step entirely.
+        if Map.null required
+          then Map.empty
+          else Map.fromList (fmap (\(oid, (target, _)) -> (oid, target)) (settle [] eligible))
+      )
 
 -- CR 508.1b's announcement list for the combat in progress, empty when no
 -- defending player has been chosen -- which is a combat no creature may attack
@@ -487,10 +502,9 @@ legalAttackDeclarationGiven candidates chosen gs =
 -- with no requirement in force is the empty one (declining to attack). CR 508.1's
 -- preamble asks for a fresh declaration instead, so this is reached only when an
 -- interpreter REPEATS a declaration that was already rewound. It obeys CR
--- 508.1c as well as CR 508.1d, attackCeiling's search having ranged over the
--- legal declarations only. Ordered by
--- `candidates` rather than by Map.toList, so it comes back in the order the player
--- was offered its creatures.
+-- 508.1c as well as CR 508.1d, attackCeiling's search having ranged over the legal
+-- declarations only. Ordered by `candidates` rather than by Map.toList, so it
+-- comes back in the order the player was offered its creatures.
 forcedAttackDeclaration :: (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget) -> [ObjectId] -> [(ObjectId, AttackTarget.AttackTarget)]
 forcedAttackDeclaration (_, best) =
   Maybe.mapMaybe (\oid -> fmap ((,) oid) (Map.lookup oid best))
@@ -835,9 +849,8 @@ choicesUpTo n attackers =
 -- 509.1c's cost clause: a player is never required to pay to block, so `best` is
 -- drawn from the untaxed creatures while `requirements` stays every instance in
 -- force. attackCeilingGiven applies the same clause in the same place, and the
--- placement is the whole of the rule --
--- a taxed creature is still a CANDIDATE and still a legal blocker, it is only
--- never one the defending player must reach for.
+-- placement is the whole of the rule -- a taxed creature is still a CANDIDATE and
+-- still a legal blocker, it is only never one the defending player must reach for.
 blockCeiling :: PlayerId -> GameState -> (Map (ObjectId, ObjectId) Natural, Map ObjectId (Set ObjectId))
 blockCeiling pid gs = blockCeilingGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
 
