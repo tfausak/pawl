@@ -124,4 +124,7 @@ data KeywordFamily
     Plot
   | -- | CR 702.143a: foretell [cost].
     Foretell
+  | -- | CR 702.103a: bestow [cost]. No card in the pool asks yet, and it is owed
+    -- at the keyword rather than at the first asker.
+    Bestow
   deriving (Bounded, Enum, Eq, Ord, Show)

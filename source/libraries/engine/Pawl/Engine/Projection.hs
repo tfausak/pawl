@@ -2669,7 +2669,8 @@ gatherGiven stripped functioning seed gs =
       libraries = foldZoneCards GameState.library (fromHiddenCard Zone.Library) gs
       counters = counterGathered gs
       designations = designationGathered gs
-   in stored <> static <> emblems <> spells <> graveyards <> hands <> libraries <> counters <> designations
+      bestows = bestowGathered gs
+   in stored <> static <> emblems <> spells <> graveyards <> hands <> libraries <> counters <> designations <> bestows
 
 -- CR 113.6b: does this static ability function from `zone`? THE zone
 -- classification -- one question, asked by each of gatherGiven's static-ability
@@ -3174,6 +3175,49 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- write here rather than one nobody wrote.
               CounterKind.Named _ -> []
          in pt <> honed <> concatMap grantOf (Map.toList cs)
+
+-- CR 702.103b: a BESTOWED object -- a spell cast bestowed, or the permanent it
+-- became -- "becomes an Aura enchantment and gains enchant creature". The three
+-- modifications are Pawl.Engine.Keyword.bestowModifications, stated beside the
+-- keyword they come from; this walk only decides WHICH objects carry them, at
+-- what timestamp, and in which layers.
+--
+-- Read off Object.bestowed on every projection rather than stored as a
+-- ContinuousEffect when the cast completes, and that is what makes the rule's
+-- own duration fall out: the effects last "until the spell or the permanent it
+-- becomes ceases to be bestowed", CR 400.7 would have left a stored effect
+-- naming the SPELL's id behind at CR 608.3c's move, and Pawl.Types.Expiry can
+-- say no such thing. designationGathered below is the same posture toward CR
+-- 701.60a's "for as long as it's suspected".
+--
+-- The STACK as well as the battlefield, unlike the two walks below it: rule
+-- 702.103b starts the effect "as a spell cast bestowed is put onto the stack",
+-- and a spell whose type line the effect has not reached is one CR 601.2c would
+-- have judged as a creature spell.
+--
+-- CR 613.7a: rule 702.103a makes bestow a STATIC ability, so the effect it
+-- generates takes the timestamp of the object that ability is on -- and takes a
+-- new one when that object does, which is what CR 608.3c's move gives the
+-- permanent. So Object.timestamp is the reading the rule asks for rather than a
+-- convenience, and designationGathered below reads it for the same reason.
+bestowGathered :: GameState -> [Gathered]
+bestowGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs) <> GameState.stack gs)
+  where
+    fromObject oid = case Game.lookupObject oid gs of
+      Just obj
+        | Object.bestowed obj ->
+            [ MkGathered
+                { gEffect = Nothing,
+                  gSource = oid,
+                  gAffected = Affected.TheseObjects (Set.singleton oid),
+                  gLayer = layer m,
+                  gLowest = layer m,
+                  gTimestamp = Object.timestamp obj,
+                  gModification = m
+                }
+            | m <- Keyword.bestowModifications
+            ]
+      _ -> []
 
 -- CR 701.60c / 613.1f: a SUSPECTED permanent has menace, emitted as a layer-6
 -- grant on the permanent itself. Read off Object.designations on every

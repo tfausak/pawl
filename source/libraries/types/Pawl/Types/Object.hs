@@ -623,6 +623,41 @@ data Object = MkObject
     -- A Bool and not a count: CR 702.33c's multikicker is payable "any number of
     -- times", and no card in the pool has two kicker costs either (#1234, #1235).
     kicked :: Bool,
+    -- | CR 702.103b: is this object BESTOWED, and since when? "As a spell cast
+    -- bestowed is put onto the stack, it becomes an Aura enchantment and gains
+    -- enchant creature... These effects last until the spell or the permanent it
+    -- becomes ceases to be bestowed." Stamped by Pawl.Engine.Cast at CR 601.2b
+    -- onto the stack incarnation CR 601.2a made, and read by
+    -- Pawl.Engine.Projection.bestowGathered, which mints the three modifications
+    -- rule 702.103b names on every projection.
+    --
+    -- Stored for `kicked` above's reason: nothing a CR 613 layer computes may
+    -- move it, since it records a choice made while casting.
+    --
+    -- A Bool and not the effect's timestamp, and CR 613.7a is why: rule 702.103a
+    -- makes bestow a STATIC ability, so the effect it generates "has the same
+    -- timestamp as the object the static ability is on" -- and when that object
+    -- receives a new one, so does the effect. bestowGathered reads
+    -- Object.timestamp for exactly that reason, which leaves nothing for this
+    -- field to carry but the designation itself.
+    --
+    -- Carried across the ONE move that matters -- stack to battlefield -- by
+    -- Pawl.Engine.Event.changeZoneAttaching, `kicked`'s route, and for a
+    -- STRONGER reason than rule 400.7d's: rule 702.103b says the effects last
+    -- until the permanent the spell becomes ceases to be bestowed, so the
+    -- permanent is the object the rule is still about. Every other destination
+    -- ends the effect, since a card in a graveyard is not a bestowed Aura.
+    --
+    -- Cleared by Pawl.Engine.Sba when CR 702.103f's "becomes unattached" fires;
+    -- that is what "ceases to be bestowed" IS, and it is one-way.
+    --
+    -- Not implemented: CR 702.103c's copy of a bestowed Aura spell, which CR
+    -- 707.10 never sends through the casting path that writes this (#2355), and
+    -- CR 702.103e's illegal target on resolution (#2357) -- two more ways to
+    -- become, or stop being, bestowed. CR 702.103g's phasing in unattached
+    -- reaches Pawl.Engine.Sba's CR 702.103f pass one pass later, since
+    -- Pawl.Engine.Phasing.phaseIn detaches first; see #2358.
+    bestowed :: Bool,
     -- | CR 601.2b with CR 107.4f: how many of the Phyrexian mana symbols in the
     -- cost of the SPELL that became this permanent its controller announced they
     -- would pay 2 life for. Rule 702.150a's compleated is the one reader, through
@@ -875,6 +910,10 @@ newIncarnation object =
       unlockedHalves = Set.empty,
       designations = Set.empty,
       kicked = False,
+      -- CR 400.7 forgets the designation, `kicked` above's route; rule 702.103b's
+      -- record is written back by Pawl.Engine.Event.changeZoneAttaching's mkObj
+      -- for the one move that keeps it.
+      bestowed = False,
       -- CR 400.7 forgets the announcement, `kicked` above's route; CR 601.2b's
       -- record is written back by Pawl.Engine.Event.changeZoneAttaching's mkObj.
       phyrexianLifePaid = 0,
