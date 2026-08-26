@@ -2357,8 +2357,8 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
     mammoth <- S.printingOf s registry "War Mammoth"
     rollicker <- S.printingOf s registry "Nyxborn Rollicker"
     let base = S.landsInPlay mountain 4
-        (host, gs1) = S.addCreature piker S.alice base
-        (bystander, gs2) = S.addCreature mammoth S.alice gs1
+        (bystander, gs1) = S.addCreature piker S.alice base
+        (host, gs2) = S.addCreature mammoth S.alice gs1
         (board, spellId) = S.handOne rollicker gs2
         bestowed = S.runPure (bestowing host) board (S.cast S.alice spellId)
         printed = S.runPure (payingPrinted host) board (S.cast S.alice spellId)
@@ -2414,17 +2414,20 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
     mammoth <- S.printingOf s registry "War Mammoth"
     rollicker <- S.printingOf s registry "Nyxborn Rollicker"
     let base = S.landsInPlay mountain 4
-        (host, gs1) = S.addCreature piker S.alice base
-        (bystander, gs2) = S.addCreature mammoth S.alice gs1
+        (bystander, gs1) = S.addCreature piker S.alice base
+        (host, gs2) = S.addCreature mammoth S.alice gs1
         (board, spellId) = S.handOne rollicker gs2
         resolveWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
         resolveWith answer = S.settleSba (S.runPure answer (S.runPure answer board (S.cast S.alice spellId)) Stack.resolveTop)
         bestowed = resolveWith (bestowing host)
         printed = resolveWith (payingPrinted host)
-    -- Goblin Piker is a 2/1 and War Mammoth a 3/3, so the pumped host cannot be
-    -- confused with the bystander at any reading.
-    Spec.assertEqWith s "CR 702.103b: the enchanted Goblin Piker is a 3/2" (S.powerToughnessOf host bestowed) (Just (3, 2))
-    Spec.assertEqWith s "and the creature the player did NOT choose is untouched" (S.powerToughnessOf bystander bestowed) (Just (3, 3))
+    -- War Mammoth is a 3/3 and Goblin Piker a 2/1, so the pumped host, the
+    -- bystander and the unbestowed Rollicker are three distinct readings. The
+    -- host is the creature added SECOND, deliberately: an implementation that
+    -- never asked CR 601.2c and let CR 303.4f pick a host instead would take the
+    -- first, and this assertion is what tells the two apart.
+    Spec.assertEqWith s "CR 702.103b: the enchanted War Mammoth is a 4/4" (S.powerToughnessOf host bestowed) (Just (4, 4))
+    Spec.assertEqWith s "and the creature the player did NOT choose is untouched" (S.powerToughnessOf bystander bestowed) (Just (2, 1))
     Spec.assertEqWith
       s
       "CR 303.4: the Rollicker entered attached to the host it targeted"
@@ -2435,7 +2438,7 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
       "and is not itself a creature while bestowed"
       (fmap (\oid -> Projection.cardTypesOf oid bestowed) (rollickerOn rollicker bestowed))
       (Just (Set.singleton CardType.Enchantment))
-    Spec.assertEqWith s "cast for its printed cost it pumps nobody" (S.powerToughnessOf host printed) (Just (2, 1))
+    Spec.assertEqWith s "cast for its printed cost it pumps nobody" (S.powerToughnessOf host printed) (Just (3, 3))
     Spec.assertEqWith
       s
       "and enters attached to nothing"
@@ -2456,12 +2459,12 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
     mammoth <- S.printingOf s registry "War Mammoth"
     rollicker <- S.printingOf s registry "Nyxborn Rollicker"
     let base = S.landsInPlay mountain 4
-        (host, gs1) = S.addCreature piker S.alice base
-        (_, gs2) = S.addCreature mammoth S.alice gs1
+        (_, gs1) = S.addCreature piker S.alice base
+        (host, gs2) = S.addCreature mammoth S.alice gs1
         (board, spellId) = S.handOne rollicker gs2
         attached = S.settleSba (S.runPure (bestowing host) (S.runPure (bestowing host) board (S.cast S.alice spellId)) Stack.resolveTop)
-        -- The enchanted Piker is a 3/2, so three damage is lethal (CR 704.5g).
-        pass1 = S.settleSba (S.markDamage host 3 attached)
+        -- The enchanted War Mammoth is a 4/4, so four damage is lethal (CR 704.5g).
+        pass1 = S.settleSba (S.markDamage host 4 attached)
         pass2 = S.settleSba pass1
         pass3 = S.settleSba pass2
     -- The control first, so nothing below passes because the Rollicker was never
