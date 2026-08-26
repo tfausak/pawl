@@ -74,6 +74,7 @@ import Pawl.Types.CandidateId (CandidateId)
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CarryOver as CarryOver
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
@@ -2960,7 +2961,7 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
       facing = if onto then maybe Facing.FaceUp Facing.FaceDown (EntryRiders.faceDown riders) else Facing.FaceUp
   if refused
     then pure Nothing
-    else changeZoneAttaching asOf batch oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under' shown facing (EntryRiders.exiledFaceDown riders)
+    else changeZoneAttaching asOf batch oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under' shown facing (EntryRiders.exiledFaceDown riders) CarryOver.NotCarried
 
 -- changeZoneReturning for a move that carries ONE NAMED HALF of the card into
 -- its destination: CR 709.3's choice of which half of a split card is being
@@ -2993,7 +2994,7 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
 -- See the `face` note in changeZoneAttaching's mkObj, and Pawl.CastSpec's "a cast
 -- redirected off the stack keeps both halves" for the case that proves it.
 changeZoneShowing :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
-changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.FaceUp False
+changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.FaceUp False CarryOver.NotCarried
 
 -- changeZoneShowing for a move that puts the object into its destination FACE
 -- DOWN -- the CR 110.5b "unless a spell or ability says otherwise" that morph is.
@@ -3019,7 +3020,7 @@ changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing Set.empt
 -- than being stored. Turning the permanent face up is what makes it observable
 -- again (CR 708.8).
 changeZoneFaceDown :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
-changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown (Facing.faceDown FaceDownReason.Morphed) False
+changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown (Facing.faceDown FaceDownReason.Morphed) False CarryOver.NotCarried
 
 -- CR 601.2a's move: the card goes onto the stack and "that player becomes its
 -- controller". The caster is carried BY THE MOVE, for the reason CR 709.3a
@@ -3038,7 +3039,7 @@ changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing Set.emp
 -- battlefield drops the stamp, exactly as it drops the face, because CR 109.4
 -- gives an object there no controller to record.
 changeZoneCasting :: PlayerId -> ObjectId -> Zone -> Maybe CardName.CardName -> Facing.Facing -> Game (Maybe ObjectId)
-changeZoneCasting caster oid requestedDest shown facing = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just caster) shown facing False
+changeZoneCasting caster oid requestedDest shown facing = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just caster) shown facing False CarryOver.NotCarried
 
 -- changeZone for one member of a batch of moves CR 608.2f or CR 704.3 processes
 -- SIMULTANEOUSLY. `asOf` is the board the batch began in -- or, for a batch inside
@@ -3063,14 +3064,14 @@ changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneInBatchReturnin
 -- id, Nothing when the move was cancelled or the id named no object. The destroy
 -- funnel is the one caller, for CR 701.8b's "put into a graveyard this way".
 changeZoneInBatchReturning :: GameState -> ObjectId -> Zone -> Game (Maybe ObjectId)
-changeZoneInBatchReturning asOf oid requestedDest = changeZoneAttaching (Just asOf) Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False
+changeZoneInBatchReturning asOf oid requestedDest = changeZoneAttaching (Just asOf) Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried
 
 -- changeZoneReturning's body, returning the destination incarnation's id: Just
 -- newId on a completed move (CR 400.7 minted a fresh id), Nothing when the id is
 -- unknown or the CR 616.1 replacement loop cancelled the move (`resolved ==
 -- Nothing`). changeZoneReturning itself is the `seed = Nothing` case below.
 changeZoneReturning :: ObjectId -> Zone -> Game (Maybe ObjectId)
-changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False
+changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried
 
 -- changeZoneReturning with an attachment seed. Per CR 303.4 attachment is a
 -- property of entering, not a step after it: the CR 614.1c entry replacement loop
@@ -3107,14 +3108,17 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oi
 -- a library, the default for every door but changeZoneEntering. `concealed` is
 -- CR 406.3's "exiled face down", False for every door but changeZoneEntering and
 -- inert for every destination but exile.
+-- `carrying` is CR 400.7a's exception, Carried for Pawl.Engine.Stack's two
+-- permanent-spell branches and NotCarried for every other door -- see carryOver
+-- below, which the body calls before the entry loop.
 --
 -- `position` needs no `dest == requestedDest` gate, unlike `face` and `facing`
 -- below: it is inert everywhere but a library, so a CR 616.1 redirect AWAY from
 -- one drops it for free, and a redirect INTO one from a move that named no
 -- position carries the default -- which is the right answer, since nothing said
 -- top.
-changeZoneAttaching :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> Game (Maybe ObjectId)
-changeZoneAttaching asOf batch oid requestedDest position seed tapped entering under shown facing concealed = do
+changeZoneAttaching :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> CarryOver.CarryOver -> Game (Maybe ObjectId)
+changeZoneAttaching asOf batch oid requestedDest position seed tapped entering under shown facing concealed carrying = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Nothing
@@ -3601,6 +3605,15 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                         GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj)) (GameState.lastKnown g1)
                       }
               newId <- placeObject pid (mkObj entrySeed) dest position
+              -- CR 400.7a, and BEFORE the entry loop below rather than after this
+              -- funnel returns: CR 614.12 decides an entry row against "continuous
+              -- effects that already exist and would apply to the permanent", so a
+              -- text change made to the permanent SPELL has to name the new
+              -- incarnation before its own row is read. Pawl.ReplacementSpec's
+              -- Tidewalker case is the proof: hacked Island -> Swamp on the
+              -- stack, its own "enters with a time counter for each Island"
+              -- counts Swamps.
+              carryOver carrying oid newId
               -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
               -- nowhere else. CR 616.1g's nesting of one event inside another is
               -- expressed as call nesting rather than a field. `batch` is the
@@ -3704,6 +3717,43 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                 State.modify' (\g -> g {GameState.exiledWith = Map.insert newId linked (GameState.exiledWith g)})
               State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange oid newId fromZone dest) snapshot)))
               pure (Just newId)
+
+-- CR 400.7a: effects that change a permanent spell's characteristics or
+-- controller keep applying to the permanent it becomes. CR 400.7 mints a fresh
+-- id for that permanent, so an effect stored against the SPELL's id would stop
+-- naming it; this re-keys the ones that do.
+--
+-- THE INVARIANT: no case on any effect's identity. Every stored
+-- ContinuousEffect qualifies by CLASSIFICATION -- Projection.layer puts each
+-- modification in one of CR 613.1's layers, and every layer either changes a
+-- characteristic (CR 109.3) or the controller (CR 613.1b), which are exactly
+-- what this rule carries over.
+--
+-- Only Affected.TheseObjects is re-keyed, because that is the only arm a
+-- resolution effect ever stores (CR 611.2c locks the set); the dynamic arms
+-- belong to static abilities and are re-derived each projection.
+--
+-- Called INSIDE changeZoneAttaching, before the CR 614.1c entry loop, and
+-- Pawl.Types.CarryOver is how the move says whether CR 400.7a's exception is
+-- the one it is making. Scoped to Pawl.Engine.Stack's two permanent-spell
+-- branches: CR 400.7b (static-ability ability grants) and CR 400.7c (prevention
+-- effects) are separate exceptions with separate carriers and are not claimed
+-- here (#634).
+carryOver :: CarryOver.CarryOver -> ObjectId -> ObjectId -> Game ()
+carryOver carrying oldId newId = case carrying of
+  CarryOver.NotCarried -> pure ()
+  CarryOver.Carried ->
+    State.modify' $ \gs ->
+      gs {GameState.continuousEffects = fmap (reanchor oldId newId) (GameState.continuousEffects gs)}
+
+-- carryOver's per-effect half: swap oldId for newId in a locked affected set
+-- that names it, and leave every other effect alone.
+reanchor :: ObjectId -> ObjectId -> ContinuousEffect.ContinuousEffect Card -> ContinuousEffect.ContinuousEffect Card
+reanchor oldId newId eff = case ContinuousEffect.affected eff of
+  Affected.TheseObjects oids
+    | Set.member oldId oids ->
+        eff {ContinuousEffect.affected = Affected.TheseObjects (Set.insert newId (Set.delete oldId oids))}
+  _ -> eff
 
 -- CR 604.2 ends a static ability's continuous effect the moment its permanent
 -- leaves the battlefield. A card whose own text overrides that -- Titania's
