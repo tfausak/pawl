@@ -248,6 +248,13 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
             -- also an Aura detaches by the first and not by the second.
             isBattle || isCreature || (not isBattle && not isCreature && not isAura && not isEquipment)
 
+-- CR 702.103b: is this object bestowed? The designation Pawl.Engine.Cast stamps
+-- and Pawl.Engine.Projection.bestowGathered mints from, read off the object
+-- rather than off `pcs`, because it is a record of a choice made while casting
+-- and no CR 613 layer computes it.
+isBestowed :: GameState -> ObjectId -> Bool
+isBestowed gs oid = maybe False Object.bestowed (Game.lookupObject oid gs)
+
 -- CR 704.5m: an Aura attached to an illegal object or player, or attached to
 -- nothing, is put into its owner's graveyard. Four clauses: unattached, attached
 -- to an id that is no longer a permanent, attached to one its own enchant
@@ -293,16 +300,10 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- and consults neither indestructible (CR 702.12b) nor a regeneration shield (CR
 -- 701.19a).
 --
--- CR 702.103f is the one EXCEPTION the rule itself names, and performStateBasedActions
--- subtracts it rather than this predicate: a bestowed Aura matching here becomes
--- unattached and ceases to be bestowed instead of being buried.
--- CR 702.103b: is this object bestowed? The designation Pawl.Engine.Cast stamps
--- and Pawl.Engine.Projection.bestowGathered mints from, read off the object
--- rather than off `pcs`, because it is a record of a choice made while casting
--- and no CR 613 layer computes it.
-isBestowed :: GameState -> ObjectId -> Bool
-isBestowed gs oid = maybe False Object.bestowed (Game.lookupObject oid gs)
-
+-- CR 702.103f is the one EXCEPTION the rule itself names, and
+-- performStateBasedActions subtracts it rather than this predicate: a bestowed
+-- Aura matching here becomes unattached and ceases to be bestowed instead of
+-- being buried.
 fallsOff :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 fallsOff pcs gs oid = case Map.lookup oid pcs of
   Nothing -> False
