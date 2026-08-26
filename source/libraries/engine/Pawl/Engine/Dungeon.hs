@@ -171,19 +171,37 @@ finished gs = filter isFinished (Set.toList (GameState.command gs))
 --
 -- The card is minted here rather than at setup, because CR 309.2 keeps dungeon
 -- cards outside the game until a venture brings one in -- and outside the game is
--- not a zone (CR 400.11), so there was nowhere to mint it into. Player.dungeon is
--- the supply, and it is NOT consumed: CR 309.5b lets the same card be brought back
--- in after it is finished.
+-- not a zone (CR 400.11), so there was nowhere to mint it into. Player.dungeons is
+-- the supply, and nothing is taken out of it: CR 309.5b lets the same card be
+-- brought back in after it is finished.
+--
+-- CR 309.2a's "they choose a dungeon card they own from outside the game" is the
+-- prompt. FILTERED, NOT TRUSTED, `advance`'s and Ring.tempt's posture: an answer
+-- naming a printing this player does not own falls back to the first offered,
+-- since entering is mandatory. Raised only for two or more, one owned dungeon
+-- leaving nothing to ask.
+--
+-- Ascending by interned id, so both the single-dungeon shortcut and a transcript
+-- are deterministic -- `advance`'s ordering for its arrows.
 --
 -- A player who owns no dungeon card enters none. CR 309.2a assumes they own one
 -- and says nothing about a player who does not; a card that says to venture is
 -- still resolved, and this is the "even if impossible" reading Ring.tempt takes.
 enter :: PlayerId -> Game ()
 enter pid = do
-  gs <- State.get
-  case Map.lookup pid (GameState.players gs) >>= Player.dungeon of
+  gs0 <- State.get
+  let owned = maybe Set.empty Player.dungeons (Map.lookup pid (GameState.players gs0))
+  case NonEmpty.nonEmpty (Set.toAscList owned) of
     Nothing -> pure ()
-    Just printingId -> do
+    Just offered -> do
+      printingId <- case offered of
+        only NonEmpty.:| [] -> pure only
+        first NonEmpty.:| _ -> do
+          answer <- Game.choose (Prompt.ChooseDungeon (Decide.deciderFor pid gs0) pid offered)
+          pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
+      -- Re-read, because Game.choose above wrote the answer into the transcript:
+      -- gs0 is the state before the prompt and minting off it would drop that.
+      gs <- State.get
       let (oid, gs1) = Game.freshObjectId gs
           (ts, gs2) = Game.freshTimestamp gs1
           obj =

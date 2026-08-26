@@ -60,6 +60,7 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
@@ -889,6 +890,20 @@ combatReplaySpec s =
           -- replaying as the other.
           let p = Prompt.ChooseRingBearer decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseLegend (ObjectId.MkObjectId 7))) Nothing
+        -- CR 309.2a: which dungeon card a venturing player brought in from outside
+        -- the game is a decision, so it has to survive a transcript like any
+        -- other.
+        Spec.it s "ChooseDungeon round-trips through the transcript" $ do
+          let a = PrintingId.MkPrintingId 7
+              b = PrintingId.MkPrintingId 9
+              p = Prompt.ChooseDungeon decider S.alice (a NonEmpty.:| [b])
+          Spec.assertEqWith s "choosing the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          -- Discriminating: a decode that ignored the response and returned the
+          -- head would pass one leg by accident.
+          Spec.assertEqWith s "choosing the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+          -- CR 309.2a again: with nothing recorded, the head is what the engine
+          -- would have entered.
+          Spec.assertEqWith s "a short transcript enters the first offered" (Replay.defaultAnswer p) a
         -- CR 709.3 / 712.11b / 715.3: which half of a multi-faced object a player
         -- chose to cast off an offer is a decision, so it has to survive a
         -- transcript like any other.
