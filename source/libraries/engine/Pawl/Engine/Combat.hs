@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
@@ -263,6 +264,14 @@ aloneAllows alone declaration = case Set.toList declaration of
 -- Only the SET-SHAPED restrictions are asked here; the per-creature ones keep a
 -- creature off `candidates` entirely. Both conjuncts are gathered by the caller so
 -- the declaration check and the ceiling cannot judge different boards.
+--
+-- A FENCE, because nothing else is one: attackCeilingGiven's greedy search is
+-- exact only while this answer is a cardinality cap plus the size-one exception,
+-- reading the declaration's KEY SET and never its announcements. A third conjunct
+-- naming WHICH creatures may attack together (#1686) -- or widening the third
+-- argument from Set ObjectId to the declaration -- would make that search answer
+-- CR 508.1d with a number no player can attain, and -Werror would say nothing.
+-- Re-derive the argument there before adding one.
 attackDeclarationAllowed :: Maybe Natural -> Set ObjectId -> Set ObjectId -> Bool
 attackDeclarationAllowed limit alone declaration =
   aloneAllows alone declaration
@@ -276,27 +285,12 @@ withinLimit limit size = case limit of
   Nothing -> True
   Just n -> toInteger size <= toInteger n
 
--- Every declaration CR 508.1a and CR 508.1b let the active player write down:
--- each candidate either does not attack, or attacks one of the targets
--- `announceable` admits for it. candidateBlockDeclarations' attacking twin, and
--- EXPONENTIAL for its reason -- O((1 + targets) ^ candidates), where the blocking
--- twin's base is the attackers a blocker may be assigned to.
---
--- Map.empty comes FIRST and every declaration precedes both its own supersets and
--- the same declaration with a LATER target for the creature just added, which
--- attackCeiling's tie-breaking fold relies on: the winner is one no proper
--- sub-declaration of which obeys as many requirements, and its targets are the
--- earliest that attain the maximum. Combat.attackTargets puts the defending
--- player first, so a tie is broken towards attacking the player.
-candidateAttackDeclarations :: (ObjectId -> [AttackTarget.AttackTarget]) -> [ObjectId] -> [Map ObjectId AttackTarget.AttackTarget]
-candidateAttackDeclarations announceable candidates =
-  let extend acc oid = concatMap (\declaration -> declaration : fmap (\target -> Map.insert oid target declaration) (announceable oid)) acc
-   in List.foldl' extend [Map.empty] candidates
-
 -- CR 508.1d's two halves, computed together because neither is usable alone: the
 -- requirement instances in force, and a declaration obeying the maximum number of
--- them that could be obeyed without disobeying any restriction. blockCeiling's
--- twin, deliberately the same shape.
+-- them that could be obeyed without disobeying any restriction. blockCeiling
+-- answers CR 509.1c's twin question, but NOT the same way any more: the argument
+-- below turns on the attacking restrictions all being set-shaped, and CR 509.1b's
+-- are not (#342).
 --
 -- A DECLARATION here is CR 508.1a's set and CR 508.1b's announcement together --
 -- Map ObjectId AttackTarget, the shape Combat.attackers itself takes -- because
@@ -305,22 +299,43 @@ candidateAttackDeclarations announceable candidates =
 -- Nothing else in the maximization changed with that widening; a requirement that
 -- names no object mints a pair per target and is obeyed by any announcement.
 --
--- TWO SEARCHES answering the same question. The CLOSED FORM gives each required
--- creature the target that obeys the most of its instances, taken independently
--- per creature; it is exact only when no set-shaped restriction (CR 508.1c)
--- reaches a candidate, since canAttack has already applied every per-creature one
--- to `candidates` and nothing in pawl restricts WHICH target a creature may be
--- announced against -- so with the per-creature choices independent, the
--- per-creature maximum sums to the maximum. Multiplicity leaves it alone.
--- Otherwise the ENUMERATION runs, at blockCeiling's exponential cost, uncapped
--- and unsampled (#714).
+-- ONE SEARCH, and it is GREEDY. Every declaration CR 508.1a and CR 508.1b let the
+-- active player write down used to be enumerated here -- O((1 + targets) ^
+-- candidates), which no board past a couple of dozen creatures finished; see #714.
+-- It is a prefix of a sort instead, and it answers exactly the same question,
+-- because THREE properties hold of pawl's attacking rules together:
 --
--- Both range over the announcements that can be made FREELY, which is CR 508.1d's
--- cost clause: a player is never required to pay to attack. The clause is applied
--- per (creature, target) PAIR rather than per creature, which is what CR 508.1b's
--- announcement makes of it -- a Ghostly Prison taxes attacking its controller and
--- not attacking a planeswalker they control, so a requirement to attack the
--- PLAYER is excused while a requirement to attack the planeswalker stands.
+--   1. attackDeclarationAllowed reads only the declaration's KEY SET, and reads
+--      it as a cardinality cap (withinLimit) plus one exception at size one
+--      (aloneAllows). It never asks WHICH creatures beyond that exception, and
+--      never asks what they were announced against.
+--   2. attackRequirementsMet is a sum of non-negative weights over independent
+--      (creature, target) PAIRS: AttackRequirement.instances is keyed by the
+--      pair, so no requirement spans two creatures.
+--   3. Nothing restricts which target a creature may be announced against, so
+--      each creature's best announcement is chosen alone (bestFor).
+--
+-- Given those, a declaration's score is at most the sum over its creatures of
+-- their per-creature best, and any set of creatures attains that sum -- so CR
+-- 508.1d's maximum is the largest such sum over the sets the cap admits, and
+-- with every weight non-negative the largest is the heaviest prefix of the sorted
+-- weights. What used to be the CLOSED FORM is the same computation where the cap
+-- binds on nothing.
+--
+-- Any of the three failing silently invalidates this: a restriction naming what
+-- the attack is aimed at (#1686), one reading the announcements rather than the
+-- key set, a requirement keyed by something other than a pair, or an attack cost
+-- read off the whole declaration. attackDeclarationAllowed and
+-- AttackRequirement.instances both carry a comment saying so, because -Werror
+-- cannot.
+--
+-- The search ranges over the announcements that can be made FREELY, which is CR
+-- 508.1d's cost clause: a player is never required to pay to attack. The clause is
+-- applied per (creature, target) PAIR rather than per creature, which is what CR
+-- 508.1b's announcement makes of it -- a Ghostly Prison taxes attacking its
+-- controller and not attacking a planeswalker they control, so a requirement to
+-- attack the PLAYER is excused while a requirement to attack the planeswalker
+-- stands.
 attackCeiling :: [ObjectId] -> GameState -> (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget)
 attackCeiling candidates gs =
   attackCeilingGiven (CombatRestriction.attackLimit gs) (CombatRestriction.cantAttackAlone candidates gs) candidates gs
@@ -336,34 +351,69 @@ attackCeilingGiven limit alone candidates gs =
       -- which is the question that rule's cards ask.
       freely oid target = null (AttackCost.costsOn oid target gs)
       announceable oid = filter (freely oid) targets
-      better best declaration =
-        if attackRequirementsMet required declaration > attackRequirementsMet required best
-          then declaration
-          else best
-      -- The fold's seed is the EMPTY declaration, always legal under restrictions
-      -- alone (CR 508.1c only ever forbids attacking), which is what makes the
-      -- answer total without a partial function.
-      enumerated =
-        List.foldl'
-          better
-          Map.empty
-          (filter (attackDeclarationAllowed limit alone . Map.keysSet) (candidateAttackDeclarations announceable candidates))
-      -- The best announcement for ONE creature, in `targets` order so a tie goes
-      -- to the defending player, and Nothing when no free announcement obeys
-      -- anything -- which is a creature the cost clause excuses entirely.
-      bestFor oid =
-        let scored = fmap (\target -> (target, Map.findWithDefault 0 (oid, target) required)) (announceable oid)
-            top = maximum (0 : fmap snd scored)
-         in if top == 0 then Nothing else fmap fst (List.find (\pair -> snd pair == top) scored)
-      closed = Map.fromList (Maybe.mapMaybe (\oid -> fmap ((,) oid) (bestFor oid)) (List.nub (fmap fst (Map.keys required))))
-   in ( required,
-        -- Map.size and not the multiplicity total, because what `limit` bounds is
-        -- a declaration's SIZE (CR 508.1c counts creatures). No board tells the
-        -- two apart, so this is argued from the rule rather than fenced by a test.
-        if (Set.null alone && withinLimit limit (Map.size closed)) || Map.null required
-          then closed
-          else enumerated
-      )
+      -- The best announcement for ONE creature and how many instances it obeys:
+      -- the EARLIEST freely announceable target obeying the most, so a tie goes to
+      -- the defending player (Combat.attackTargets puts them first). Nothing when
+      -- the creature has no free announcement at all, which is a creature the cost
+      -- clause keeps out of every declaration.
+      bestFor oid = case fmap (\target -> (target, Map.findWithDefault 0 (oid, target) required)) (announceable oid) of
+        [] -> Nothing
+        first : rest -> Just (List.foldl' (\best pair -> if snd pair > snd best then pair else best) first rest)
+      -- CR 508.1a's candidates that a declaration may actually contain, in that
+      -- rule's order, each carrying its announcement and its weight.
+      eligible = Maybe.mapMaybe (\oid -> fmap ((,) oid) (bestFor oid)) candidates
+      weightOf entry = snd (snd entry)
+      -- CR 508.1d's maximum over every legal declaration that contains all of
+      -- `taken` and any subset of `rest`, or Nothing when the restrictions admit
+      -- none at all.
+      --
+      -- Sizes rather than subsets: by property 1 above the only thing legality
+      -- asks of the creatures added is how MANY, and by properties 2 and 3 the
+      -- most `more` of them can add is the sum of the `more` largest weights. So
+      -- one sort and a running total answers every size at once.
+      ceilingOver taken rest =
+        let held = length taken
+            got = sum (fmap weightOf taken)
+            room = case limit of
+              Nothing -> length rest
+              -- Clamped through Integer rather than subtracted in Natural: the
+              -- prefix may already be longer than the bound allows, which is a
+              -- negative difference and no room at all.
+              Just n -> Integer.toIntSaturating (min (toInteger (length rest)) (max 0 (toInteger n - toInteger held)))
+            gains = take (room + 1) (List.scanl' (+) 0 (List.sortBy (flip compare) (fmap weightOf rest)))
+            sized = [got + gain | (more, gain) <- zip [0 :: Int ..] gains, held + more /= 1]
+            -- CR 506.5's exception, the one size the prefix above may not take on
+            -- trust: a declaration of exactly one creature is illegal when that
+            -- creature can't attack alone, so size one is answered over the
+            -- creatures the restriction leaves rather than over the heaviest.
+            singled = case taken of
+              [only] -> [weightOf only | not (Set.member (fst only) alone)]
+              []
+                | room >= 1 -> case fmap weightOf (filter (\entry -> not (Set.member (fst entry) alone)) rest) of
+                    [] -> []
+                    ws -> [maximum ws]
+              _ -> []
+         in case sized <> singled of
+              [] -> Nothing
+              scores -> Just (maximum scores)
+      -- Always Just: `sized` admits the empty declaration, which disobeys no
+      -- restriction (CR 508.1c only ever forbids attacking), so the maximum is at
+      -- worst zero and the answer is total without a partial function.
+      maximumMet = Maybe.fromMaybe 0 (ceilingOver [] eligible)
+      -- CR 508.1d fixes the NUMBER and not the declaration, so the witness is
+      -- pawl's own choice, and the choice is the least one in CR 508.1a's
+      -- candidate order counting "does not attack" as least: walk the candidates
+      -- once, leaving each one out whenever the rest can still reach the maximum.
+      -- That is the declaration the enumeration this replaced returned, since its
+      -- fold kept the first entry attaining the maximum and it emitted
+      -- declarations in exactly that order.
+      settle taken rest = case rest of
+        [] -> taken
+        entry : more ->
+          if ceilingOver taken more == Just maximumMet
+            then settle taken more
+            else settle (taken <> [entry]) more
+   in (required, Map.fromList (fmap (\(oid, (target, _)) -> (oid, target)) (settle [] eligible)))
 
 -- CR 508.1b's announcement list for the combat in progress, empty when no
 -- defending player has been chosen -- which is a combat no creature may attack
@@ -434,7 +484,8 @@ legalAttackDeclarationGiven candidates chosen gs =
 -- with no requirement in force is the empty one (declining to attack). CR 508.1's
 -- preamble asks for a fresh declaration instead, so this is reached only when an
 -- interpreter REPEATS a declaration that was already rewound. It obeys CR
--- 508.1c as well as CR 508.1d, on both of attackCeiling's paths. Ordered by
+-- 508.1c as well as CR 508.1d, attackCeiling's search having ranged over the
+-- legal declarations only. Ordered by
 -- `candidates` rather than by Map.toList, so it comes back in the order the player
 -- was offered its creatures.
 forcedAttackDeclaration :: (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget) -> [ObjectId] -> [(ObjectId, AttackTarget.AttackTarget)]
@@ -768,9 +819,10 @@ choicesUpTo n attackers =
 -- them that could be obeyed without disobeying any restriction.
 --
 -- Map.empty when no requirement is in force, WITHOUT enumerating anything: the
--- maximum is zero and every declaration obeys zero. That guard needs nothing added
--- for a SIZE BOUND, where attackCeilingGiven's twin does -- this shortcut's answer
--- is the empty declaration, which is within every bound.
+-- maximum is zero and every declaration obeys zero, and the empty declaration is
+-- within every bound. The attacking side needs no such guard any more, its search
+-- having stopped being an enumeration; CR 509.1b's pairwise restrictions are why
+-- that argument does not carry over here (#342).
 --
 -- The fold's Map.empty seed is always legal under restrictions alone, which is
 -- what makes the answer total. blockCeilingGiven is the half legalBlockDeclaration
@@ -779,7 +831,8 @@ choicesUpTo n attackers =
 -- The enumeration ranges over the creatures that block FREELY, which is CR
 -- 509.1c's cost clause: a player is never required to pay to block, so `best` is
 -- drawn from the untaxed creatures while `requirements` stays every instance in
--- force. attackCeilingGiven's twin, and the placement is the whole of the rule --
+-- force. attackCeilingGiven applies the same clause in the same place, and the
+-- placement is the whole of the rule --
 -- a taxed creature is still a CANDIDATE and still a legal blocker, it is only
 -- never one the defending player must reach for.
 blockCeiling :: PlayerId -> GameState -> (Map (ObjectId, ObjectId) Natural, Map ObjectId (Set ObjectId))
