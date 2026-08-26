@@ -4676,9 +4676,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- (`payGateCostsOf`, substituted in by Pawl.Engine.Resolve.announcedXOn).
   Spec.it s "every printing that reads X declares X, and vice versa" $ do
     ps <- S.allPrintings s
-    let readsX c =
+    let -- CR 107.3m's other reader, one CR 614.1c row over from the printed
+        -- loyalty above: "this creature enters with X +1/+1 counters on it"
+        -- (Protean Hydra). The amount is a Quantity on an
+        -- EntryRewrite.WithCounters row rather than an effect, so Card.allEffects
+        -- cannot see this one either.
+        entryCountersReadX c =
+          or
+            [ Set.member Binding.variableX (Quantity.slots q)
+            | ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithCounters wc)) <- fmap PrintedReplacement.effect (Face.replacementEffects c),
+              q <- Map.elems (WithCounters.counters wc)
+            ]
+        readsX c =
           Resolve.readsX (Card.allEffects c)
             || Face.loyalty c == Just Loyalty.Variable
+            || entryCountersReadX c
             || any declaresVariable (payGateCostsOf (Face.spell c))
         offenders =
           filter

@@ -1564,6 +1564,64 @@ stormwildCapridorSpec s registry = Spec.describe s "Stormwild Capridor (CR 615.5
     Spec.assertEqWith s "and no counters, since nothing was prevented" (countersOn CounterKind.PlusOnePlusOne capridor after) 0
     Spec.assertEqWith s "so it is still a 1/3" (S.powerToughnessOf capridor after) (Just (1, 3))
 
+-- Protean Hydra {X}{G} Creature -- Hydra, printed 0/0: "this creature enters with
+-- X +1/+1 counters on it. If damage would be dealt to this creature, prevent that
+-- damage and remove that many +1/+1 counters from it."
+--
+-- Two rules this group is the pool's only producer of. CR 107.3m puts the SPELL's
+-- announced X inside the permanent's own CR 614.1c entry replacement, where rule
+-- 107.3i would otherwise answer 0; and CR 615.5's additional effect on a printed
+-- ability names its own permanent by CR 113.7's reserved self slot, which is what
+-- Pawl.Types.RemoveCounters needs and Stormwild Capridor's PutCounters (an
+-- ObjectRef) does not.
+--
+-- Numbers all distinct: X is announced at 4, the Bolt is 3, one counter is left,
+-- and the Hydra goes from 4/4 to 1/1. A permanent's own X of 0 would answer no
+-- counters at all, an unrun rider would leave 4, and a per-event reading of "that
+-- many" would leave 3.
+proteanHydraSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+proteanHydraSpec s registry = Spec.describe s "Protean Hydra (CR 107.3m, CR 615.5)" $ do
+  Spec.it s "CR 107.3m the X announced for the spell is the X its entry replacement reads" $ do
+    forest <- S.printingOf s registry "Forest"
+    hydraPrinting <- S.printingOf s registry "Protean Hydra"
+    let (g1, spellId) = S.handOne hydraPrinting (S.landsInPlay forest 5)
+        -- CR 400.7 mints a new object, but under the same id: the permanent the
+        -- spell became is `spellId` on the battlefield.
+        after = castAndResolve (answerXOf 4) g1 spellId
+        -- CR 601.2a mints a new object as the card moves to the stack, so the
+        -- permanent is neither `spellId` nor any of the five lands: it is what
+        -- the battlefield gained.
+        hydra = case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield g1)) of
+          oid : _ -> oid
+          [] -> S.noSource
+    Spec.assertEqWith s "four +1/+1 counters, the announced X and not the permanent's 0" (countersOn CounterKind.PlusOnePlusOne hydra after) 4
+    Spec.assertEqWith s "so the printed 0/0 is a 4/4" (S.powerToughnessOf hydra after) (Just (4, 4))
+
+  -- CR 615.5's rider on the same card, on a board where the Hydra is PLACED
+  -- rather than cast: the counters are handed to it directly, so what the Bolt
+  -- proves is the removal alone.
+  Spec.it s "CR 615.5 the prevented three come off as three +1/+1 counters" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    hydraPrinting <- S.printingOf s registry "Protean Hydra"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let base = S.landsInPlay mountain 1
+        (hydra, g1) = S.addCreature hydraPrinting S.alice base
+        g2 = S.addCounter CounterKind.PlusOnePlusOne 4 hydra g1
+        (g3, spellId) = S.handOne bolt g2
+        after = castAndResolve (aimCreature hydra) g3 spellId
+    Spec.assertEqWith s "setup: a 4/4" (S.powerToughnessOf hydra g3) (Just (4, 4))
+    Spec.assertEqWith s "4 - 3: the rider found its own permanent through the self slot" (countersOn CounterKind.PlusOnePlusOne hydra after) 1
+    Spec.assertEqWith s "CR 615.6: nothing was marked, the damage having been prevented" (S.damageOf hydra after) (Just 0)
+    Spec.assertEqWith s "so the 4/4 is a 1/1" (S.powerToughnessOf hydra after) (Just (1, 1))
+
+-- Announces this value of X and answers every other prompt with the identity
+-- fallback. Pawl.CastSpec's answerXOf without its target arm, which the Hydra
+-- has no use for -- it targets nothing.
+answerXOf :: Natural.Natural -> Prompt.Prompt r -> r
+answerXOf n p = case p of
+  Prompt.ChooseX {} -> n
+  _ -> S.identityAnswer p
+
 -- CR 604.2's "as long as" clause on a PRINTED replacement ability, whose producer
 -- is Jared Carthalion, True Heir ({R}{G}{W} Legendary Creature -- Human Warrior
 -- 3/3): "If damage would be dealt to Jared Carthalion while you're the monarch,
@@ -4296,6 +4354,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   braceForImpactSpec s registry
   inkshieldSpec s registry
   stormwildCapridorSpec s registry
+  proteanHydraSpec s registry
   jaredCarthalionSpec s registry
   glitteringLionSpec s registry
   spiderPunkSpec s registry
