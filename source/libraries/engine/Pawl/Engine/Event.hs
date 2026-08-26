@@ -10942,10 +10942,13 @@ looksBack condition = case condition of
 -- creature you control dies" names each death, so the same sweep contains three,
 -- which is the rule's own Example.
 --
--- Read by eventTriggers alone, and only to decide how many pending triggers one
--- Pawl.Types.EventGroup may yield per (bearer, ability). matchesTriggerGiven sees
--- one event at a time and so answers the same for both readings -- that is its
--- contract, and this predicate is what keeps it intact.
+-- Read by the two scans that gather triggers -- eventTriggers for an object's own
+-- ability and delayedPending for a CR 603.7 entry -- and only to decide how many
+-- pending triggers one Pawl.Types.EventGroup may yield per (bearer, ability).
+-- matchesTriggerGiven sees one event at a time and so answers the same for both
+-- readings -- that is its contract, and this predicate is what keeps it intact.
+-- A gatherer that forgot to ask it fired a batch condition once per member; see
+-- #2384.
 --
 -- A total case over TriggerCondition and never a wildcard, for looksBack's reason:
 -- the fork is one CR 603.2c forces on every zone-change and event-watching
@@ -11078,6 +11081,24 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerBecomesMonarch _ -> False
   TriggerCondition.LoseControlOfBound _ -> False
   TriggerCondition.Reflexive -> False
+
+-- The log cut into its CR 704.3 / CR 608.2f events: one block per
+-- Pawl.Types.EventGroup, in log order, blocks and members alike.
+--
+-- Groups are non-decreasing along the log -- Event.recordEvent only mints a fresh
+-- one or repeats the frozen one -- so the members of one event are contiguous and
+-- an adjacent grouping is exact rather than approximate. That holds of any
+-- order-preserving SUBLIST of the log too, filtering dropping members and never
+-- reordering them, which is what lets delayedPending cut its already-matched
+-- events with this same knife.
+--
+-- One function because two scans ask the question. eventTriggers asks it of the
+-- whole batch and delayedPending of a CR 603.7 entry's matches, and a second
+-- reading of "which events happened at once" could drift from this one without
+-- anything noticing; see #2385. NonEmpty because a group with no members cannot
+-- occur, which spares both callers an impossible arm.
+eventGroups :: [LoggedEvent.LoggedEvent] -> [NonEmpty.NonEmpty LoggedEvent.LoggedEvent]
+eventGroups = NonEmpty.groupBy (\a b -> LoggedEvent.group a == LoggedEvent.group b)
 
 -- CR 603.6a: every event is checked against every permanent currently on the
 -- battlefield, not only the object the event names -- a step trigger belongs to a
@@ -11359,11 +11380,9 @@ eventTriggers events gs =
               )
               events
           )
-      -- The batch cut into its CR 704.3 / CR 608.2f events. Groups are
-      -- non-decreasing along the log (Event.recordEvent only mints a fresh one or
-      -- repeats the frozen one), so the members of one event are contiguous and
-      -- an adjacent grouping is exact rather than approximate.
-      groups = List.groupBy (\a b -> LoggedEvent.group a == LoggedEvent.group b) events
+      -- The batch cut into its CR 704.3 / CR 608.2f events, by the one reading of
+      -- simultaneity delayedPending shares (`eventGroups` above).
+      groups = eventGroups events
       departuresIn block = Map.unions (fmap (departedFrom battlefieldAbilitiesOf . LoggedEvent.event) block)
       -- CR 603.10's first sentence, per EVENT GROUP: the permanents still on the
       -- battlefield when each event happened that have left by the CR 117.5
@@ -11405,7 +11424,7 @@ eventTriggers events gs =
       -- The ids a graveyard arrival in this block minted, keyed by the ARRIVING
       -- incarnation -- ZoneChange.object, the key `inGraveyards` would hold them
       -- under, `arrivedInGraveyard` below arguing that the two ids coincide.
-      arrivalsIn block = Set.fromList (Maybe.mapMaybe (arrivedInGraveyardAt . LoggedEvent.event) block)
+      arrivalsIn block = Set.fromList (Maybe.mapMaybe (arrivedInGraveyardAt . LoggedEvent.event) (Foldable.toList block))
       arrivedInGraveyardAt event = case movedOf event of
         Just zc | ZoneChange.to zc == Zone.Graveyard -> Just (ZoneChange.object zc)
         _ -> Nothing
@@ -11930,10 +11949,8 @@ eventTriggers events gs =
             | otherwise -> trigger : oncePerBatch (Set.insert batch seen) rest
       -- The battlefield reading is per GROUP and so is hoisted out of the block:
       -- every event in one group happened at the same time, so they share it. A
-      -- group with no events cannot occur -- List.groupBy yields no empty block.
-      scanBlock block later same arrivedAfter = case block of
-        [] -> []
-        entry : _ -> oncePerBatch Set.empty (concatMap (scanOne (onBattlefieldAt (LoggedEvent.group entry)) later same arrivedAfter . LoggedEvent.event) block)
+      -- group with no events cannot occur, which `eventGroups` states in the type.
+      scanBlock block later same arrivedAfter = oncePerBatch Set.empty (concatMap (scanOne (onBattlefieldAt (LoggedEvent.group (NonEmpty.head block))) later same arrivedAfter . LoggedEvent.event) block)
    in concat (List.zipWith4 scanBlock groups laterGroups sameGroup arrivedLater)
 
 -- CR 113.6m, read off a TRIGGERED ability: "an ability whose cost or effect
@@ -12839,17 +12856,37 @@ delayedPending grouped gs =
             if armed entry
               then filter (matchesTriggerGiven (DelayedTrigger.bindings entry) gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond . LoggedEvent.event) grouped
               else []
+      -- CR 603.2c's FIRST sentence on the CR 603.7 path, which is eventTriggers'
+      -- `oncePerBatch` asked of a delayed entry: a batch-scoped condition names the
+      -- whole Pawl.Types.EventGroup as its trigger event, so the group is ONE
+      -- occurrence however many of its members matched, where a per-occurrence
+      -- condition's trigger event is each member and the whole match list stands.
+      --
+      -- Per GROUP and never per scan, `oncePerBatch`'s reason exactly: CR 704.3
+      -- makes each state-based-action pass its own single event, and several
+      -- groups can reach one CR 117.5 scan. Collapsing the scan would be the same
+      -- bug in the other direction.
+      --
+      -- matchesTriggerGiven cannot do this itself: it sees one event at a time and
+      -- so answers alike for both readings (`batchScoped` above states that
+      -- contract), which is why every gatherer owes the predicate a consultation;
+      -- see #2384.
+      occurrences entry
+        | batchScoped (TriggeredAbility.condition (DelayedTrigger.ability entry)) = fmap NonEmpty.head (eventGroups (matching entry))
+        | otherwise = matching entry
       -- CR 603.7b's exception, read through CR 603.2c. A stated duration lifts the
       -- one shot, and 603.2c then applies unmodified -- "it can trigger repeatedly
       -- if one event contains multiple occurrences" -- so every occurrence in the
       -- batch fires the entry once. Centaur Peacemaker's "each player gains 4 life"
       -- is that batch for False Cure, and Pawl.EventTriggerSpec's three-seat board
-      -- proves the count.
+      -- proves the count. What an OCCURRENCE is is `occurrences` above: three for
+      -- False Cure's per-seat condition, one for Synthetic Communal Reckoning's
+      -- batch one on the very same board.
       --
       -- Without a duration, CR 603.7b's two sentences read as two steps over the
       -- GROUPED batch. The first sentence -- "the next time its trigger event
       -- occurs" -- commits the entry to the EARLIEST Pawl.Types.EventGroup that
-      -- holds a match, so taking the first across groups stays right. The second
+      -- holds an occurrence, so taking the first block stays right. The second
       -- then decides WITHIN that group: occurrences sharing one group are
       -- simultaneous (CR 608.2f), and "the controller of the delayed triggered
       -- ability chooses which event causes the ability to trigger". A batch of
@@ -12857,19 +12894,24 @@ delayedPending grouped gs =
       -- share one EventGroup across the seats they name, which is what Synthetic
       -- Singular Cure reads in Pawl.EventTriggerSpec.
       --
-      -- The GROUP is the equality, not adjacency in the log: the events of one
-      -- group are recorded together today, and reading the tag rather than the
-      -- position keeps that an implementation detail of the recorder.
+      -- That second sentence turns on "its trigger event occurs MORE THAN ONCE",
+      -- so a batch-scoped condition never reaches it: `occurrences` has already
+      -- left one event per group, the block below is a singleton, and the prompt
+      -- is not raised. Asking would be a question the rule does not authorise.
+      --
+      -- Adjacency AND tag equality, which coincide by construction: `eventGroups`
+      -- above is where that argument lives, and both scans read that one function
+      -- rather than each cutting the log its own way.
       --
       -- One candidate is not a choice, so no prompt is raised -- which is every
-      -- board but the batched one.
+      -- board but a PER-OCCURRENCE condition's batch. A batch-scoped one is never
+      -- a choice, `occurrences` having left the block a singleton.
       firedBy entry
-        | Maybe.isJust (DelayedTrigger.expiry entry) = pure (fmap LoggedEvent.event (matching entry))
-        | otherwise = case matching entry of
+        | Maybe.isJust (DelayedTrigger.expiry entry) = pure (fmap LoggedEvent.event (occurrences entry))
+        | otherwise = case eventGroups (occurrences entry) of
             [] -> pure []
-            earliest : rest ->
-              let group = LoggedEvent.group earliest
-                  candidates = LoggedEvent.event earliest NonEmpty.:| fmap LoggedEvent.event (filter ((== group) . LoggedEvent.group) rest)
+            block : _ ->
+              let candidates = fmap LoggedEvent.event block
                in if null (NonEmpty.tail candidates)
                     then pure [NonEmpty.head candidates]
                     else do
