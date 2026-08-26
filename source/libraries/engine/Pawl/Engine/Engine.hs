@@ -182,9 +182,14 @@ checkSba :: Game ()
 checkSba = sampleWorldSince >> Sba.checkStateBasedActions
 
 -- CR 502.3's untap, and its own "effects can keep one or more of a player's
--- permanents from untapping": such an effect takes the permanent out of this fold
--- and leaves it as it was (Pawl.Engine.UntapRestriction), CR 101.2 being what
--- makes the "can't" beat the turn-based action.
+-- permanents from untapping": such an effect takes the permanent out of the set
+-- below and leaves it as it was (Pawl.Engine.UntapRestriction), CR 101.2 being
+-- what makes the "can't" beat the turn-based action.
+--
+-- CR 122.1d's stun counters are NOT one of those and are not subtracted here: a
+-- replacement effect does not stop the permanent being determined to untap, it
+-- takes the untap event once it happens (CR 614.6). That is Event.proposeUntap's
+-- job, one paragraph down.
 --
 -- THREE carriers, subtracted together. The printed static one is re-derived live;
 -- the other two are stored on the victim, and this is where each both applies and
@@ -197,8 +202,7 @@ checkSba = sampleWorldSince >> Sba.checkStateBasedActions
 untapAll :: PlayerId -> Game ()
 untapAll pid = do
   gs <- State.get
-  let untap obj = obj {Object.tapped = TapState.Untapped}
-      clear obj = obj {Object.doesNotUntapNext = False}
+  let clear obj = obj {Object.doesNotUntapNext = False}
       unexert obj = obj {Object.exertedBy = Set.delete pid (Object.exertedBy obj)}
       ids = Projection.controls pid gs
       prohibited = UntapRestriction.doesNotUntap ids gs
@@ -207,12 +211,25 @@ untapAll pid = do
       exerted = asks (Set.member pid . Object.exertedBy)
       untapping = filter (\oid -> not (Set.member oid prohibited) && not (oneShot oid) && not (exerted oid)) ids
       expiring = filter oneShot ids
-      untapped = foldr (Map.adjust clear) (foldr (Map.adjust untap) (GameState.objects gs) untapping) expiring
-      objects =
-        if any (Set.member pid . Object.exertedBy) untapped
-          then Map.map unexert untapped
-          else untapped
-  State.put gs {GameState.objects = objects}
+  -- CR 502.3's two sentences, in its own order: DETERMINE which permanents will
+  -- untap, then untap them all SIMULTANEOUSLY. Event.proposeUntap is the
+  -- determining half -- rule 701.26b's guard plus the CR 614 loop, which is where
+  -- CR 122.1d's stun counters take the event and are spent -- and the write below
+  -- is the untapping, one State.modify' over the survivors so no permanent is
+  -- upright while another is still being decided.
+  --
+  -- Event.untap is not called per permanent for exactly that reason: it writes as
+  -- it goes, which is right for CR 701.26b's one-at-a-time roads (an Effect.Untap,
+  -- an untap symbol) and wrong for this one.
+  survivors <- Monad.filterM Event.proposeUntap untapping
+  State.modify' $ \live ->
+    let untapped = foldr (Map.adjust clear) (foldr Event.writeUntappedIn (GameState.objects live) survivors) expiring
+     in live
+          { GameState.objects =
+              if any (Set.member pid . Object.exertedBy) untapped
+                then Map.map unexert untapped
+                else untapped
+          }
 
 -- CR 302.6: permanents the active player has controlled since their turn began
 -- are no longer summoning sick, and the untap step is where that becomes true.

@@ -131,6 +131,7 @@ asZoneChange event = case event of
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
+  ProposedEvent.WouldUntap _ -> Nothing
 
 -- Every replacement effect instance in the game, in the engine's canonical
 -- order, which is what the ChooseReplacement prompt indexes into:
@@ -505,6 +506,13 @@ applies gs event candidate =
         (ReplacementEffect.TurnUpR turnUpR, ProposedEvent.WouldTurnFaceUp oid procedure) ->
           matchesFiltered gs candidate (TurnUpR.matching turnUpR) oid
             && maybe True (\required -> procedure == Just required) (TurnUpR.requiring turnUpR)
+        -- CR 122.1d's "a permanent with a stun counter on it" is the self-scope
+        -- DestructionR's arm reads one event class over: the row is minted onto
+        -- the permanent holding the counters, so `src` IS the rule's subject and
+        -- UntapR needs no pattern. Rule 122.1d states no further restriction on
+        -- WHICH untaps it reaches -- unlike CR 122.1c's "as the result of an
+        -- effect" -- so there is no `admits` beside this.
+        (ReplacementEffect.UntapR _, ProposedEvent.WouldUntap oid) -> src == oid
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
         -- MISMATCHED class, where False is the correct answer rather than a
@@ -516,6 +524,7 @@ applies gs event candidate =
         (ReplacementEffect.CounterR {}, _) -> False
         (ReplacementEffect.TokenR {}, _) -> False
         (ReplacementEffect.TurnUpR {}, _) -> False
+        (ReplacementEffect.UntapR _, _) -> False
         (ReplacementEffect.PhaseR _, _) -> False
 
 -- Does the REWRITE itself admit this entry, over and above the pattern matching
@@ -1072,6 +1081,9 @@ bucketOfEffect re = case re of
   -- CR 616.1a-d are all about entering the battlefield and copying; turning face
   -- up is neither, so CR 616.1e.
   ReplacementEffect.TurnUpR {} -> ReplacementBucket.Other
+  -- CR 616.1a-d are all about entering the battlefield and copying; becoming
+  -- untapped is neither, so CR 616.1e.
+  ReplacementEffect.UntapR _ -> ReplacementBucket.Other
   -- CR 616.1a-d are all about entries and copies; a skip is none of those, so it
   -- falls to CR 616.1e.
   ReplacementEffect.PhaseR _ -> ReplacementBucket.Other
@@ -1218,6 +1230,9 @@ readsApplier re = case re of
   -- same question to the same player. The destination Filter is the effect's own
   -- field, inside `choose`'s comparison already.
   ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ _ (TurnUpRewrite.MayAttachTo _)) -> False
+  -- CR 122.1d acts on the permanent becoming untapped and names no player -- CR
+  -- 701.19a's answer one event class over, and for its reason.
+  ReplacementEffect.UntapR _ -> False
   -- CR 614.10: a skip replaces the step or phase with nothing. The player it is
   -- ABOUT is baked into PhasePattern.whosePhase, on the EFFECT, where this
   -- comparison already sees it.
@@ -1347,6 +1362,10 @@ chooserOf gs event = case event of
   -- CR 616.1's affected object is the permanent turning over, and its controller
   -- is CR 702.37e's "you" -- the player who took the special action.
   ProposedEvent.WouldTurnFaceUp oid _ -> Projection.controllerOf oid gs
+  -- CR 616.1's affected object is the permanent that would become untapped, and
+  -- CR 122.1d gives its controller the choice among applicable rows even at CR
+  -- 502.3's turn-based action, where that controller is the active player.
+  ProposedEvent.WouldUntap oid -> Projection.controllerOf oid gs
 
 -- CR 208.2b / 707.2: stamp a chosen entry shape into the object's copiable
 -- snapshot. Power and toughness are SET; keywords are UNIONED into whatever is
@@ -1961,6 +1980,7 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.CounterR {} -> Nothing
   ReplacementEffect.TokenR {} -> Nothing
   ReplacementEffect.TurnUpR {} -> Nothing
+  ReplacementEffect.UntapR _ -> Nothing
   ReplacementEffect.PhaseR _ -> Nothing
 
 asDamageEvent :: ProposedEvent -> Maybe DamageEvent.DamageEvent
@@ -1974,6 +1994,7 @@ asDamageEvent event = case event of
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
+  ProposedEvent.WouldUntap _ -> Nothing
 
 asDestruction :: ProposedEvent -> Maybe ObjectId
 asDestruction event = case event of
@@ -1981,6 +2002,22 @@ asDestruction event = case event of
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
+  ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldPutPlayerCounters {} -> Nothing
+  ProposedEvent.WouldCreateTokens {} -> Nothing
+  ProposedEvent.WouldBeginPhase {} -> Nothing
+  ProposedEvent.WouldTurnFaceUp {} -> Nothing
+  ProposedEvent.WouldUntap _ -> Nothing
+
+-- asDestruction's twin one event class over: the permanent that actually becomes
+-- untapped, or Nothing when a replacement took the event.
+asUntap :: ProposedEvent -> Maybe ObjectId
+asUntap event = case event of
+  ProposedEvent.WouldUntap oid -> Just oid
+  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldEnter _ -> Nothing
+  ProposedEvent.WouldDealDamage _ -> Nothing
+  ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldPutPlayerCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
@@ -1998,6 +2035,7 @@ asCounters event = case event of
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
+  ProposedEvent.WouldUntap _ -> Nothing
 
 -- asCounters' player half. The CAUSE is dropped by both, for the same reason: what
 -- the funnel needs back is the placement to carry out, and the provenance has
@@ -2013,6 +2051,7 @@ asPlayerCounters event = case event of
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
+  ProposedEvent.WouldUntap _ -> Nothing
 
 asTokens :: ProposedEvent -> Maybe (PlayerId, Card, Natural)
 asTokens event = case event of
@@ -2025,6 +2064,7 @@ asTokens event = case event of
   ProposedEvent.WouldPutPlayerCounters {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
+  ProposedEvent.WouldUntap _ -> Nothing
 
 -- CR 500.11 / 614.1b: an extra turn is beginning, so the steps and phases IT
 -- skips become floating replacement effects, one per selector. Called by
@@ -2100,3 +2140,4 @@ asPhaseBegin event = case event of
   ProposedEvent.WouldPutPlayerCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
+  ProposedEvent.WouldUntap _ -> Nothing

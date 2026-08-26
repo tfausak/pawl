@@ -8,6 +8,7 @@ import qualified Pawl.Codec.EntryR as EntryR
 import qualified Pawl.Codec.PhasePattern as PhasePattern
 import qualified Pawl.Codec.TokenR as TokenR
 import qualified Pawl.Codec.TurnUpR as TurnUpR
+import qualified Pawl.Codec.UntapRewrite as UntapRewrite
 import qualified Pawl.Codec.ZoneChangeR as ZoneChangeR
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -32,5 +33,6 @@ codec effectCodec =
       Arm.payload "CounterR" CounterR.codec ReplacementEffect.CounterR (\x -> case x of ReplacementEffect.CounterR y -> Just y; _ -> Nothing),
       Arm.payload "TokenR" TokenR.codec ReplacementEffect.TokenR (\x -> case x of ReplacementEffect.TokenR y -> Just y; _ -> Nothing),
       Arm.payload "TurnUpR" TurnUpR.codec ReplacementEffect.TurnUpR (\x -> case x of ReplacementEffect.TurnUpR y -> Just y; _ -> Nothing),
+      Arm.payload "UntapR" UntapRewrite.codec ReplacementEffect.UntapR (\x -> case x of ReplacementEffect.UntapR y -> Just y; _ -> Nothing),
       Arm.payload "PhaseR" PhasePattern.codec ReplacementEffect.PhaseR (\x -> case x of ReplacementEffect.PhaseR y -> Just y; _ -> Nothing)
     ]

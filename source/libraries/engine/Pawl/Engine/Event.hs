@@ -23,6 +23,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -127,6 +128,7 @@ import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
+import Pawl.Types.Object (Object)
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.Onset (Onset)
@@ -185,6 +187,7 @@ import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import Pawl.Types.TurnWindow (TurnWindow)
 import qualified Pawl.Types.TurnWindow as TurnWindow
+import qualified Pawl.Types.UntapRewrite as UntapRewrite
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.WithCounters as WithCounters
 import Pawl.Types.Zone (Zone)
@@ -432,6 +435,48 @@ tap oid = do
             . recordEvent (GameEvent.BecameTapped oid)
             $ gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
     _ -> pure ()
+
+-- CR 701.26b: rotate one permanent back upright from a sideways position, and
+-- let CR 614 have its say first. The single funnel every route that untaps goes
+-- through -- Pawl.Engine.Cost.payComponent's UntapThis for CR 107.6's untap
+-- symbol, Pawl.Engine.Resolve's Effect.Untap opcode, and CR 502.3's turn-based
+-- action in Pawl.Engine.Engine.untapAll, which calls `proposeUntap` directly so
+-- that its own write stays simultaneous.
+--
+-- Not implemented: no GameEvent is recorded here, so nothing can watch a
+-- permanent become untapped (#2236). The funnel this comment sits on is what
+-- that issue's remaining half hangs off.
+untap :: ObjectId -> Game ()
+untap oid = do
+  survives <- proposeUntap oid
+  Monad.when survives (State.modify' (\gs -> gs {GameState.objects = writeUntappedIn oid (GameState.objects gs)}))
+
+-- `untap`'s replacement half, split out so CR 502.3's simultaneous untap can run
+-- it over a whole set before writing any of them.
+--
+-- Rule 701.26b's SECOND sentence is the guard: "only tapped permanents can be
+-- untapped", so an already-untapped permanent proposes nothing. The write on its
+-- own is idempotent and the guard would be redundant for it; CR 122.1d's counter
+-- is not, and an untapped permanent that shed a stun counter every untap step
+-- would be the bug that guard prevents. `tap` above states the mirror of this.
+--
+-- False means a replacement took the event and has already done its own work.
+proposeUntap :: ObjectId -> Game Bool
+proposeUntap oid = do
+  gs <- State.get
+  case Game.lookupObject oid gs of
+    Just obj
+      | Object.tapped obj == TapState.Tapped -> do
+          outcome <- applyReplacements (ProposedEvent.WouldUntap oid)
+          pure (Maybe.isJust (outcome >>= Replacement.asUntap))
+    _ -> pure False
+
+-- The write itself, shared by `untap` and CR 502.3's batch so the two cannot
+-- disagree about what untapping is. Over the OBJECT MAP rather than the whole
+-- state, which is what lets Engine.untapAll fold it across a set inside one
+-- State.modify' and so untap them simultaneously.
+writeUntappedIn :: ObjectId -> Map ObjectId Object -> Map ObjectId Object
+writeUntappedIn = Map.adjust (\o -> o {Object.tapped = TapState.Untapped})
 
 -- The zone change an event describes, if it is one.
 movedOf :: GameEvent -> Maybe ZoneChange
@@ -2042,6 +2087,20 @@ apply batch candidate event =
         pure Nothing
     -- Unreachable: `applies` admits DestructionR only against WouldBeDestroyed.
     (ReplacementEffect.DestructionR _, _) -> pure (Just event)
+    -- CR 122.1d: "instead remove a stun counter from it". The untap does not
+    -- happen and nothing else does either -- the permanent keeps its tap state,
+    -- and rule 122.1d gives it none of regeneration's own work.
+    --
+    -- The counter comes off `oid`, which Replacement.applies has already made
+    -- this candidate's own source. `consume` is skipped for the shield arm's
+    -- reason: the counter IS the resource, so spending the row twice off one
+    -- counter is what removing the counter already prevents.
+    (ReplacementEffect.UntapR rewrite, ProposedEvent.WouldUntap oid) -> case rewrite of
+      UntapRewrite.RemoveStunCounter -> do
+        removeCounters oid CounterKind.Stun 1
+        pure Nothing
+    -- Unreachable: `applies` admits UntapR only against WouldUntap.
+    (ReplacementEffect.UntapR _, _) -> pure (Just event)
     -- CR 122.6/614.1: Hardened Scales/Doubling Season scale a counter placement.
     (ReplacementEffect.CounterR (CounterR.MkCounterR _ scaling), ProposedEvent.WouldPutCounters cause oid kind n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
