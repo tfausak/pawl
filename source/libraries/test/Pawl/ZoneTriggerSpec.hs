@@ -64,6 +64,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -99,7 +100,6 @@ import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
-import qualified Pawl.Types.PermanentsGetCounters as PermanentsGetCounters
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -1989,7 +1989,11 @@ representativeEvents cond =
         -- applied to rather than the bearer. The Filter below is the trivial one,
         -- so what decides the match is whether the subject can be viewed at all --
         -- and the floor is empty either way, a batch condition binding nothing.
-        TriggerCondition.PermanentsGetCounters (PermanentsGetCounters.MkPermanentsGetCounters kind _) -> one (GameEvent.CountersPut (CounterChange.MkCounterChange departed kind 0 1))
+        TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind _) -> one (GameEvent.CountersPut (CounterChange.MkCounterChange departed kind 0 1))
+        -- Its per-permanent scope, on the same event: the two share a payload and a
+        -- matcher, and the floor is empty for this one too -- no slot for the
+        -- permanent it names (#2342).
+        TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement kind _) -> one (GameEvent.CountersPut (CounterChange.MkCounterChange departed kind 0 1))
         -- CR 601.2i's own event, and the only one this condition admits. Both
         -- halves are bound whichever ids the event names -- the spell under
         -- `thatSpell`, the caster under `thatPlayer` -- so the two sides agree
@@ -2195,7 +2199,8 @@ everyTriggerCondition =
     TriggerCondition.SelfBecomesClassLevel (ClassLevel.MkClassLevel 2),
     TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
     TriggerCondition.SelfCountersRemoved CounterKind.Loyalty,
-    TriggerCondition.PermanentsGetCounters (PermanentsGetCounters.MkPermanentsGetCounters CounterKind.MinusOneMinusOne (Filter.Type.And [])),
+    TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement CounterKind.MinusOneMinusOne (Filter.Type.And [])),
+    TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement CounterKind.MinusOneMinusOne (Filter.Type.And [])),
     -- BOTH scopes, unlike StepBegins' one above: the TurnScope is new on this
     -- condition, and the pin below asserts eventBindingSlots against what
     -- eventBindings stamps for every event -- so an arm that had cased on the

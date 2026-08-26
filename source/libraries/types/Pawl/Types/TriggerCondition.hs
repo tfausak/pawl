@@ -6,11 +6,11 @@ import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
-import qualified Pawl.Types.PermanentsGetCounters as PermanentsGetCounters
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -822,16 +822,32 @@ data TriggerCondition
     -- the Pawl.Types.EventGroup the log stamps, read in
     -- Pawl.Engine.Event.eventTriggers.
     --
-    -- The batch spans OBJECTS, which is what separates this from the printed
-    -- "whenever one or more -1/-1 counters are put on A CREATURE" (Wickersmith's
-    -- Tools, Auntie Ool, Cursewretch). Those name one creature and so fire once
-    -- per creature however the placements are grouped; this names a set and fires
-    -- once for the set. Not implemented: the narrower form, which wants a sibling
-    -- constructor rather than this one (gap #2332).
+    -- The batch spans OBJECTS, which is what separates this from
+    -- PermanentGetsCounters below: that one names ONE permanent and fires once
+    -- per permanent, this names a set and fires once for the set.
     --
     -- Binds nothing, for PermanentsDie's reason: a batch may cover several
     -- permanents, so one slot could not name them all.
-    PermanentsGetCounters PermanentsGetCounters.PermanentsGetCounters
+    PermanentsGetCounters CounterPlacement.CounterPlacement
+  | -- | The printed "whenever one or more [kind] counters are put on A
+    -- [permanent]" (Wickersmith's Tools, Auntie Ool, Cursewretch) -- the arm
+    -- above's PER-PERMANENT reading, sharing its CounterPlacement payload and
+    -- its matcher and differing only in CR 603.2c's scope.
+    --
+    -- PermanentDies is to PermanentsDie exactly what this is to the arm above,
+    -- and that pair is why this is a second constructor rather than a flag on
+    -- the payload: Pawl.Engine.Event.batchScoped is a total case over THIS type
+    -- and nothing else, so the scope has to be readable off the constructor.
+    --
+    -- One creature taking several counters AT ONCE is one placement and so one
+    -- trigger, which is what "one or more" buys: Pawl.Engine.Event.settleCounters
+    -- records one GameEvent.CountersPut per settled placement, so the "one or
+    -- more" is spent inside the event rather than needing a conjunct here.
+    --
+    -- Binds nothing today, unlike PermanentDies, which binds what it names. Not
+    -- implemented: a slot for the permanent this condition names, which Auntie
+    -- Ool, Cursewretch's "if you control that creature" reads (#2342).
+    PermanentGetsCounters CounterPlacement.CounterPlacement
   | -- | CR 601.2i: "whenever you cast a [type] spell" (Young Pyromancer). That
     -- rule's second sentence is the trigger event in as many words. Matched
     -- against GameEvent.SpellCast.

@@ -13,13 +13,13 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
-import qualified Pawl.Types.PermanentsGetCounters as PermanentsGetCounters
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -533,13 +533,28 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       s
       TriggerCondition.codec
       ( TriggerCondition.PermanentsGetCounters
-          ( PermanentsGetCounters.MkPermanentsGetCounters
-              { PermanentsGetCounters.kind = CounterKind.MinusOneMinusOne,
-                PermanentsGetCounters.permanents = Filter.HasCardType CardType.Creature
+          ( CounterPlacement.MkCounterPlacement
+              { CounterPlacement.kind = CounterKind.MinusOneMinusOne,
+                CounterPlacement.permanents = Filter.HasCardType CardType.Creature
               }
           )
       )
       " {\"type\":\"PermanentsGetCounters\",\"value\":{\"kind\":{\"type\":\"MinusOneMinusOne\"},\"permanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  -- The same payload under CR 603.2c's OTHER scope, whose tag differs from the
+  -- arm above by one letter: a codec that crossed the two would round-trip the
+  -- value and hand back the wrong reading, which only a pair of cases can catch.
+  Spec.it s "PermanentGetsCounters round-trips under its own tag" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      ( TriggerCondition.PermanentGetsCounters
+          ( CounterPlacement.MkCounterPlacement
+              { CounterPlacement.kind = CounterKind.MinusOneMinusOne,
+                CounterPlacement.permanents = Filter.HasCardType CardType.Creature
+              }
+          )
+      )
+      " {\"type\":\"PermanentGetsCounters\",\"value\":{\"kind\":{\"type\":\"MinusOneMinusOne\"},\"permanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- CR 601.2i. A PAIR: a Filter over the SPELL, holding Young Pyromancer's two
   -- printed narrowings -- who cast it and what it was -- plus the TurnScope,
   -- which is the axis the Filter cannot carry. Young Pyromancer prints no turn,
