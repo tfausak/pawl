@@ -60,7 +60,11 @@ withInvalidUtf8Corpus label action = do
 -- the former's exact value, since MissingRoot carries only the one path. Once
 -- built, a card that fails to look up is a returned Nothing, asserted on
 -- directly by the cases below.
-expectException :: (Exception.Exception e, Eq e) => Spec.Spec IO n -> String -> e -> IO a -> IO ()
+--
+-- Takes the build itself rather than any IO action: fileRegistry's result is
+-- polymorphic in the lookup monad, and a case that only ever throws never
+-- settles it, so naming Registry IO here is what makes these calls unambiguous.
+expectException :: (Exception.Exception e, Eq e) => Spec.Spec IO n -> String -> e -> IO (Registry.Registry IO) -> IO ()
 expectException s label expected action = do
   result <- Exception.try action
   case result of
@@ -69,8 +73,10 @@ expectException s label expected action = do
 
 -- The problems an InvalidCorpus carries, for the cases that assert on their
 -- content. Pattern-matching the field fixes Exception.try's type, so no
--- ScopedTypeVariables is needed -- the `expectException` precedent.
-problemsOf :: Spec.Spec IO n -> String -> IO a -> IO [String]
+-- ScopedTypeVariables is needed -- the `expectException` precedent. Its
+-- argument is a registry build rather than any IO action for that helper's
+-- other reason: the lookup monad is otherwise ambiguous.
+problemsOf :: Spec.Spec IO n -> String -> IO (Registry.Registry IO) -> IO [String]
 problemsOf s label action = do
   result <- Exception.try action
   case result of
