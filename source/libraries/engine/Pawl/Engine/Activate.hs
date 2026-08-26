@@ -28,6 +28,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Card as Card
 import Pawl.Types.Cost (Cost)
+import qualified Pawl.Types.CostAdjustments as CostAdjustments
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
@@ -40,6 +41,7 @@ import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal.Type
+import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
@@ -51,6 +53,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Sickness as Sickness
+import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.TapState as TapState
@@ -317,13 +320,13 @@ loyaltyActivatedThisTurn srcId gs = elem (GameEvent.LoyaltyAbilityActivated srcI
 -- demands nothing at all (Mana.waysOf), so leaving it in place would answer the
 -- same as X=0 by accident rather than by rule -- the accident that made the {X}
 -- free (#544).
-payableCost :: Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCost = payableCostAt 0
+payableCost :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCost candidates = payableCostAt candidates 0
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
-payableCostGiven :: [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostGiven sources pcs = payableCostAtGiven sources pcs 0
+payableCostGiven :: Set.Set ObjectId -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostGiven candidates sources pcs = payableCostAtGiven candidates sources pcs 0
 
 -- The same question asked at some OTHER value of X -- `payableCost` is this at
 -- the floor and `affordableX` is this climbed.
@@ -346,24 +349,72 @@ payableCostGiven sources pcs = payableCostAtGiven sources pcs 0
 -- offers: CR 601.2b's completion comes before CR 601.2f's totalling, so a {2/R}
 -- totalled while still spelled {2/R} would hide the generic reduction the
 -- announcement exposes.
-payableCostAt :: Natural -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAt x family pid srcId gs cost =
-  let -- Not implemented: this gate is TARGET-BLIND, so a reduction that names
-      -- the ability's targets (Dwarven Mauler's "that target this creature") is
-      -- never counted here and the gate runs STRICTER than printed -- an
-      -- activation affordable only under that reduction is not offered (#2300).
-      -- CR 601.2e's legality check sits after CR 601.2c for exactly the reason
-      -- this cannot: measuring it honestly means searching Target.legalSets.
-      adjustments = Cost.activationAdjustments Set.empty family pid srcId gs
-   in Cost.canPaySomeCompletion (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
+payableCostAt :: Set.Set ObjectId -> Natural -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostAt candidates x family pid srcId gs cost =
+  aimingSomewhere candidates family pid srcId gs (\adjustments -> Cost.canPaySomeCompletion (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
-payableCostAtGiven :: [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAtGiven sources pcs x family pid srcId gs cost =
-  let -- Target-blind for payableCostAt's stated reason, and the same #2300.
-      adjustments = Cost.activationAdjustments Set.empty family pid srcId gs
-   in Cost.canPaySomeCompletionGiven (PaymentSubject.Activating srcId) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
+payableCostAtGiven :: Set.Set ObjectId -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostAtGiven candidates sources pcs x family pid srcId gs cost =
+  aimingSomewhere candidates family pid srcId gs (\adjustments -> Cost.canPaySomeCompletionGiven (PaymentSubject.Activating srcId) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
+
+-- CR 601.2f's totalling asked where CR 601.2c's targets do not exist yet: the
+-- predicate holds if SOME aiming this activation could still take leaves the
+-- cost payable. Dwarven Mauler's "equip abilities you activate that target this
+-- creature" is the reducer that makes the two answers differ.
+--
+-- The lookahead is the rules' own order rather than a shortcut past it: CR
+-- 601.2e's legality check sits after 601.2c, so no rule measures an activation
+-- cost without the targets in hand. Both gates that call this run earlier than
+-- that -- one enumerating what to offer, one at CR 601.2b's position -- so
+-- neither may refuse an activation that some legal choice of targets completes,
+-- which is what CR 602.2 makes the test of a legal activation.
+--
+-- `candidates` is the objects a legal target choice could name, and each is
+-- tried ON ITS OWN rather than all at once: only ReduceActivationCost reads the
+-- targets (Pawl.Engine.PlayerEffect.activationCostAdjustmentsGiven), so handing
+-- the whole set in would let two reducers wanting two different targets both
+-- apply where no one choice satisfies both, and the gate would offer an
+-- activation the payment then refuses. One at a time is exact for an ability
+-- with a single target slot -- which is every ability such a reducer names in
+-- the pool -- and for more slots it is STRICTER than the rules rather than
+-- weaker, since a real selection is a superset of the singleton, the criterion
+-- is asked of ANY target, and a reduction only reduces.
+--
+-- The empty aiming comes first: a player may always choose a target that reduces
+-- nothing, and it is the only aiming an ability with no target slot has. The
+-- union gather then guards the climb -- the gather is monotone in the target
+-- set, so a union that adjusts nothing leaves every singleton adjusting nothing
+-- too -- which keeps every board without a target-naming reducer at one gather
+-- and one payability search, as before.
+aimingSomewhere :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> (CostAdjustments.CostAdjustments -> Bool) -> Bool
+aimingSomewhere candidates family pid srcId gs payable =
+  let gather aimedAt = Cost.activationAdjustments aimedAt family pid srcId gs
+      blind = gather Set.empty
+   in payable blind
+        || (gather candidates /= blind && any (payable . gather . Set.singleton) (Set.toList candidates))
+
+-- The objects a chosen or offered target set names. CR 601.2c lets a player be a
+-- target too, and Recipient.objectOf drops those: a reduction's criterion is
+-- matched against an OBJECT's projection, so a player recipient is not something
+-- it could answer about.
+recipientObjects :: Map.Map SlotName (Set.Set Recipient.Recipient) -> Set.Set ObjectId
+recipientObjects = Set.fromList . concatMap (Maybe.mapMaybe Recipient.objectOf . Set.toList) . Map.elems
+
+-- The objects CR 601.2c could still name, for a gate that has to measure the
+-- cost before it asks. One mode at a time and unioned, rather than
+-- Modal.modesTargetSlots over the whole fillable set at once: two modes may
+-- print the same slot name, and a union of the SLOT MAPS would drop one of them.
+--
+-- Only the FILLABLE modes (CR 700.2a), which is the set activatableGiven's mode
+-- conjunct measures: a slot belonging to a mode this board cannot choose is not
+-- a target this activation could name.
+candidateTargetsGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Target.Pools -> PlayerId -> ObjectId -> Modal.Type.Modal Card.Card -> Set.Set ModeIndex.ModeIndex -> GameState -> Set.Set ObjectId
+candidateTargetsGiven pcs grants pools pid srcId modal fillable gs =
+  let slotsOf mi = Modal.modesTargetSlots (Seq.singleton mi) modal
+      setsOf slots = Target.legalSetsGiven pcs grants pools (Just pid) Map.empty srcId slots gs
+   in Set.unions (fmap (recipientObjects . setsOf . slotsOf) (Set.toList fillable))
 
 -- CR 601.2b via 602.2b: the greatest X this player could actually pay for, which
 -- is what Prompt.ChooseX carries. The climb itself is Cost.greatestPayableX,
@@ -378,8 +429,8 @@ payableCostAtGiven sources pcs x family pid srcId gs cost =
 -- Nightmare) (#1985). What that leaves is Cost.greatestPayableX's other ground
 -- for terminating -- a demand that grows -- which every {X} in an activation
 -- cost in the pool has.
-affordableX :: Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
-affordableX family pid srcId gs cost = Cost.greatestPayableX Nothing (\x -> payableCostAt x family pid srcId gs cost) cost
+affordableX :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
+affordableX candidates family pid srcId gs cost = Cost.greatestPayableX Nothing (\x -> payableCostAt candidates x family pid srcId gs cost) cost
 
 -- CR 602.2/602.5: the ability is a member of the source's abilities
 -- (abilitiesFor), it is not a mana ability, the whole activation cost is payable
@@ -432,29 +483,34 @@ activatable pid srcId ability gs =
 
 activatableGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Target.Pools -> [ObjectId] -> PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 activatableGiven grants pcs pools sources pid srcId ability gs =
-  activatorOfGiven grants srcId gs == Just pid
-    && elem ability (abilitiesForGiven pcs srcId gs)
-    && not (ManaAbility.isManaAbility ability)
-    -- CR 702.61a's other limb -- "players can't ... activate abilities that
-    -- aren't mana abilities" -- and it sits AFTER the mana conjunct on purpose:
-    -- CR 702.61b's exemption for mana abilities is then the same fact CR 605.3b
-    -- already established here, rather than a second reading of the rule. The
-    -- windows that do serve a mana ability (Action.ActivateManaAbility,
-    -- Cost.payMana) never reach this function, so neither is gated.
-    && not (SplitSecond.inForce gs)
-    -- CR 701.35a's third clause. UNLIKE split second one line up, this reaches a
-    -- mana ability too -- rule 701.35a says "its activated abilities" with no
-    -- carve-out where CR 702.61b writes one -- so Cost.manaActivations carries the
-    -- same conjunct for CR 605.3a's windows, exactly as sickness below and the
-    -- printed rider two lines down are asked in both places.
-    && not (Detain.detained srcId gs)
-    && sicknessOkGiven pcs pid srcId ability gs
-    && ActivationRestriction.restrictionsOk pid (ActivatedAbility.restrictions ability) gs
-    && loyaltyOk pid srcId ability gs
-    && Modal.selectionPossible
-      (Target.fillableModesGiven pcs grants pools (Just pid) Map.empty srcId Map.empty (ActivatedAbility.modal ability) gs)
-      (Modal.Type.selection (ActivatedAbility.modal ability))
-    && payableCostGiven sources pcs (familyGrantingGiven pcs srcId gs ability) pid srcId gs (ActivatedAbility.cost ability)
+  let modal = ActivatedAbility.modal ability
+      fillable = Target.fillableModesGiven pcs grants pools (Just pid) Map.empty srcId Map.empty modal gs
+      -- CR 601.2c's targets do not exist at an offer, so the cost conjunct is
+      -- handed the ones this activation could still name -- see
+      -- aimingSomewhere. Shared with the mode conjunct's own `fillable` rather
+      -- than taken twice: they are the same question (CR 700.2a).
+      candidates = candidateTargetsGiven pcs grants pools pid srcId modal fillable gs
+   in activatorOfGiven grants srcId gs == Just pid
+        && elem ability (abilitiesForGiven pcs srcId gs)
+        && not (ManaAbility.isManaAbility ability)
+        -- CR 702.61a's other limb -- "players can't ... activate abilities that
+        -- aren't mana abilities" -- and it sits AFTER the mana conjunct on purpose:
+        -- CR 702.61b's exemption for mana abilities is then the same fact CR 605.3b
+        -- already established here, rather than a second reading of the rule. The
+        -- windows that do serve a mana ability (Action.ActivateManaAbility,
+        -- Cost.payMana) never reach this function, so neither is gated.
+        && not (SplitSecond.inForce gs)
+        -- CR 701.35a's third clause. UNLIKE split second one line up, this reaches a
+        -- mana ability too -- rule 701.35a says "its activated abilities" with no
+        -- carve-out where CR 702.61b writes one -- so Cost.manaActivations carries the
+        -- same conjunct for CR 605.3a's windows, exactly as sickness below and the
+        -- printed rider two lines down are asked in both places.
+        && not (Detain.detained srcId gs)
+        && sicknessOkGiven pcs pid srcId ability gs
+        && ActivationRestriction.restrictionsOk pid (ActivatedAbility.restrictions ability) gs
+        && loyaltyOk pid srcId ability gs
+        && Modal.selectionPossible fillable (Modal.Type.selection modal)
+        && payableCostGiven candidates sources pcs (familyGrantingGiven pcs srcId gs ability) pid srcId gs (ActivatedAbility.cost ability)
 
 -- CR 602.2a: an ability activated from a hidden zone reveals the card that has
 -- it (CR 701.20a). Note what the rule does NOT say: there is no qualifier about
@@ -604,16 +660,27 @@ activateAbility pid srcId ability = do
       -- predicate rather than baked into the cost handed to it. Nothing filters
       -- the answer against the bound (see Prompt.ChooseX).
       let printedCost = ActivatedAbility.cost ability
+          -- CR 601.2c's slots and their legal recipients, taken HERE rather than
+          -- below where they are answered: the gate one step down has to measure
+          -- a cost the targets can still change, so it is handed what they could
+          -- be (aimingSomewhere). Read off `gs`, the same pre-stack board
+          -- Target.chooseTargets is offered from, so one binding serves both.
+          slots = Modal.modesTargetSlots chosenModes (ActivatedAbility.modal ability)
+          sets = Target.legalSets (Just pid) Map.empty srcId slots gs
+          candidates = recipientObjects sets
       mAmount <-
         if Cost.hasVariable printedCost
-          then fmap Just (Game.choose (Prompt.ChooseX decider pid abilId (affordableX family pid srcId gs printedCost)))
+          then fmap Just (Game.choose (Prompt.ChooseX decider pid abilId (affordableX candidates family pid srcId gs printedCost)))
           else pure Nothing
       let announcedAtX = maybe printedCost (\x -> Cost.substituteX x printedCost) mAmount
       -- CR 602.2: an activation a player cannot comply with is illegal, and the
       -- game returns to the moment before it started. The X just named is where
       -- that can first become true: `activatable` measured the cost at CR
       -- 601.2b's X=0 floor, the only value it can know before an announcement
-      -- exists.
+      -- exists. Both gates look ahead to CR 601.2c's candidate targets the same
+      -- way (aimingSomewhere); what the player actually aims at is charged
+      -- below, and a choice that reduces nothing loses the ability at the
+      -- payment rather than here.
       --
       -- Asked with the same predicate that floor was asked with, so a gate and an
       -- announcement cannot disagree about what a cost is. That matters beyond
@@ -628,7 +695,7 @@ activateAbility pid srcId ability = do
       -- Asked unconditionally rather than only when there is an {X}, which buys
       -- one predicate over one cost instead of two spellings of when the gate
       -- applies.
-      if not (payableCost family pid srcId gs announcedAtX)
+      if not (payableCost candidates family pid srcId gs announcedAtX)
         then State.put before -- reject: the whole activation is a no-op
         else do
           -- CR 118.13a's announcement, which names an activated ability's
@@ -653,21 +720,20 @@ activateAbility pid srcId ability = do
           -- offers are filtered against the claims a component makes on a zone,
           -- so a Phyrexian symbol offered without the added "Sacrifice a land"
           -- in view would be offered against a board that has one land too many.
-          -- TARGET-BLIND, and it has to be: CR 601.2c's targets are announced
-          -- below, so nothing at CR 601.2b's position can read them. What that
-          -- costs is nothing here -- CR 118.13a's announcement is a choice of
-          -- halves, every activation-cost reducer in the pool reduces by GENERIC
-          -- mana, and a target-aware reduction therefore cannot change which
-          -- nonhybrid equivalent or Phyrexian half a player would announce. The
-          -- reductions themselves are gathered again below, once the targets
-          -- exist.
+          -- TARGET-BLIND, unlike the gate above, and deliberately: that gate
+          -- asks whether SOME aiming pays and may look ahead, while this is a
+          -- CHOICE the player makes against one definite cost, and CR 601.2c's
+          -- targets are not announced until below. What that costs is nothing
+          -- here -- CR 118.13a's announcement is a choice of halves, every
+          -- activation-cost reducer in the pool reduces by GENERIC mana, and a
+          -- target-aware reduction therefore cannot change which nonhybrid
+          -- equivalent or Phyrexian half a player would announce. The reductions
+          -- themselves are gathered again below, once the targets exist.
           let gathered = Cost.activationAdjustments Set.empty family pid srcId gs
           -- The Phyrexian life record is DISCARDED here: CR 702.150a reads what
           -- the player who CAST a spell announced, and no rule asks the same of
           -- an activation cost.
           (announcedCost, _) <- Cost.announce (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
-          let slots = Modal.modesTargetSlots chosenModes (ActivatedAbility.modal ability)
-              sets = Target.legalSets (Just pid) Map.empty srcId slots gs
           chosen <- Target.chooseTargets decider pid abilId slots sets
           if not (Target.selectionLegal (Just pid) srcId slots sets chosen gs)
             then State.put before -- reject: the whole activation is a no-op
@@ -719,7 +785,7 @@ activateAbility pid srcId ability = do
               -- ReduceActivationCost is the one arm carrying a target criterion
               -- -- so the increases and the CR 601.2f components the announcement
               -- above measured are the same ones charged below.
-              let aimedAt = Set.fromList (concatMap (Maybe.mapMaybe Recipient.objectOf . Set.toList) (Map.elems chosen))
+              let aimedAt = recipientObjects chosen
                   targeted = Cost.activationAdjustments aimedAt family pid srcId gs
               adjustments <- Cost.announceReductions pid srcId gs announcedCost targeted
               let paidCost = Cost.totalWith adjustments announcedCost
