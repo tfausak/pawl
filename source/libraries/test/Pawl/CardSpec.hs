@@ -112,6 +112,7 @@ import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
+import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.CounterSubject as CounterSubject
 import qualified Pawl.Types.Counterability as Counterability
@@ -187,7 +188,6 @@ import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PerCreature as PerCreature
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
-import qualified Pawl.Types.PermanentsGetCounters as PermanentsGetCounters
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
@@ -789,8 +789,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- And so does its any-amount mirror.
   TriggerCondition.SelfCountersRemoved _ -> []
   -- CR 603.2c's batch placement carries a kind and a Filter, and neither holds a
-  -- Count.
+  -- Count. Its per-permanent scope carries the same payload.
   TriggerCondition.PermanentsGetCounters {} -> []
+  TriggerCondition.PermanentGetsCounters {} -> []
   -- CR 601.2i's Filter is a predicate over the spell that was cast, and a Filter
   -- holds no Count, exactly as CR 603.6a's does above. Its ordinal is a bare
   -- Natural, as CR 714.2b's is.
@@ -3287,7 +3288,10 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 603.2c's batch placement carries one, over the permanents the counters
   -- landed on -- swept like PermanentsDie's, so a card's "one or more creatures"
   -- is not exempt from the corpus filter lints.
-  TriggerCondition.PermanentsGetCounters (PermanentsGetCounters.MkPermanentsGetCounters _ f) -> [f]
+  TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement _ f) -> [f]
+  -- And its per-permanent scope, whose Filter is read against ONE permanent --
+  -- swept all the same, the lints being about the Filter and not the scope.
+  TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement _ f) -> [f]
   -- CR 601.2i's "whenever you cast a [type] spell" carries one directly, over
   -- the spell rather than over a permanent.
   TriggerCondition.SpellCast (SpellCast.MkSpellCast f _ _ _) -> [f]

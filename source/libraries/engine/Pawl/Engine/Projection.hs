@@ -55,6 +55,7 @@ import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
+import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
@@ -117,7 +118,6 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
-import qualified Pawl.Types.PermanentsGetCounters as PermanentsGetCounters
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
@@ -2231,7 +2231,10 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentLeavesTheBattlefield f -> TriggerCondition.PermanentLeavesTheBattlefield (Filter.rewrite pairs f)
   -- The Filter is rewritten and the counter kind is not: CR 612.1's pairs swap
   -- SUBTYPE words, and a counter kind names none.
-  TriggerCondition.PermanentsGetCounters (PermanentsGetCounters.MkPermanentsGetCounters kind f) -> TriggerCondition.PermanentsGetCounters (PermanentsGetCounters.MkPermanentsGetCounters kind (Filter.rewrite pairs f))
+  TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind f) -> TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind (Filter.rewrite pairs f))
+  -- The arm above's per-permanent scope, rewritten the same way and for the same
+  -- reason: same payload, and CR 612.1 knows nothing about the scope.
+  TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement kind f) -> TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement kind (Filter.rewrite pairs f))
   -- The TurnScope is carried through untouched, not dropped: a rebuild that
   -- forgot the field would reset a text-changed trigger to firing every turn.
   TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone ordinal) -> TriggerCondition.SpellCast (SpellCast.MkSpellCast (Filter.rewrite pairs f) scope fromZone ordinal)
