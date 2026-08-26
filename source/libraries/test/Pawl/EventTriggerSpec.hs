@@ -2142,9 +2142,9 @@ falseCureSpec s registry =
 -- Pawl.Types.EventGroup and an ability watching "one or more players gain life"
 -- finds one trigger event where the per-seat conditions above find one each.
 --
--- Only a batch condition can tell the two apart, which is why the grouping sat
--- unobservable (#1726): every other reader of a life gain answers per
--- occurrence.
+-- Only a batch condition can tell the two apart: every other reader of a life
+-- gain answers per occurrence, which is why the grouping went unobserved for as
+-- long as it did.
 --
 --   * Synthetic Communal Vigil {1}{W} Enchantment
 --     (data/cards/synthetic-communal-vigil.json): "Whenever one or more players

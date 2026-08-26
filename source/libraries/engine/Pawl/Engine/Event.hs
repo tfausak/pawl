@@ -7518,6 +7518,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
     GameEvent.CoinFlipped {} -> False
+  -- Its batch sibling delegates to it, PermanentsGetCounters' posture below:
+  -- which gains the condition admits is the same question either way, and what
+  -- separates the two is `batchScoped` plus eventTriggers' dedup, never this
+  -- matcher.
+  TriggerCondition.PlayersGainLife relation -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.PlayerGainsLife relation) event
   -- CR 119.9: a source caused a player the relation admits to gain life. The
   -- gaining player comes from the event; CR 109.5 / 603.3a fix "you" as the
   -- ability's controller, exactly as PlayerDiscards, SpellOrAbilityCounters and
@@ -7536,10 +7541,6 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- LOSING life is not a near miss but a different event, and the LifeLost arm
   -- below is where that shows: one damage event can record both, and only the
   -- gain fires this.
-  -- Its batch sibling delegates HERE, PermanentsGetCounters' posture below: which
-  -- gains the condition admits is the same question either way, and what separates
-  -- the two is `batchScoped` plus eventTriggers' dedup, never this matcher.
-  TriggerCondition.PlayersGainLife relation -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.PlayerGainsLife relation) event
   TriggerCondition.PlayerGainsLife relation -> case event of
     GameEvent.LifeGained (LifeChange.MkLifeChange pid _) -> PlayerRelation.holds relation you pid
     GameEvent.Moved {} -> False
@@ -10961,20 +10962,21 @@ batchScoped condition = case condition of
   -- DamageToPlayerPrevented arm above's reasoning, one identity over.
   TriggerCondition.SelfPreventsDamage _ -> False
   TriggerCondition.PlayerGainsLife _ -> False
+  -- The one True that is not about objects: "whenever one or more players gain
+  -- life" names the whole CR 608.2f batch as its trigger event, so "each player
+  -- gains 4 life" is one occurrence of it and not one per seat -- where the
+  -- PlayerGainsLife arm above is CR 603.2c's second sentence and fires once for
+  -- each.
+  TriggerCondition.PlayersGainLife _ -> True
   TriggerCondition.PlayerLosesLife _ -> False
   TriggerCondition.SelfCountersReached {} -> False
   TriggerCondition.SelfBecomesClassLevel _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
   TriggerCondition.SelfCountersRemoved _ -> False
-  -- The third True, and the one that is not about objects: "whenever one or more
-  -- players gain life" names the whole CR 608.2f batch as its trigger event, so
-  -- "each player gains 4 life" is one occurrence of it and not one per seat --
-  -- where the PlayerGainsLife arm above is CR 603.2c's second sentence and fires
-  -- once for each.
-  TriggerCondition.PlayersGainLife _ -> True
-  -- A True beside PermanentsDie and PlayersGainLife: CR 603.2c's FIRST sentence is what this
-  -- constructor exists for -- "one or more counters ... on one or more
-  -- permanents" names the whole group as the trigger event, which occurs once.
+  -- A True beside PermanentsDie and PlayersGainLife: CR 603.2c's FIRST sentence
+  -- is what this constructor exists for -- "one or more counters ... on one or
+  -- more permanents" names the whole group as the trigger event, which occurs
+  -- once.
   TriggerCondition.PermanentsGetCounters {} -> True
   -- And the SECOND sentence, which is the whole of the difference between this
   -- constructor and the one above: "on A creature" names each permanent the
@@ -12763,9 +12765,11 @@ delayedPending events gs =
       -- for occurrences the engine records in sequence: the ability triggers the
       -- NEXT time its event occurs, which is the earliest match in the batch. The
       -- controller's choice the rule's second sentence gives is not implemented
-      -- (#1711); it applies only to occurrences that are SIMULTANEOUS, and reaching
-      -- it needs both an event whose occurrences share an EventGroup (#1726) and a
-      -- delayedPending that takes grouped events rather than this flat list.
+      -- (#1711); it applies only to occurrences that are SIMULTANEOUS, and what is
+      -- left before it can be reached is a delayedPending that takes grouped
+      -- events rather than this flat list. A batch of simultaneous occurrences
+      -- exists now: Pawl.Engine.Resolve's life arms share one EventGroup across
+      -- the seats they name (CR 608.2f).
       firedBy entry
         | Maybe.isJust (DelayedTrigger.expiry entry) = matching entry
         | otherwise = take 1 (matching entry)

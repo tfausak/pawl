@@ -3988,6 +3988,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- order, then moved one at a time, each judged against the board the
             -- batch began on and against the siblings that have already arrived
             -- (see moveOne). CR 400.3 files a hand arrival under Object.owner.
+            --
+            -- Not implemented: CR 608.2f's single event for the MOVES themselves.
+            -- Nothing brackets the fold below, so the sweep records one event
+            -- group per arrival; the per-arrival CR 616.1 loop is no argument for
+            -- that, Event.destroyIn running exactly such a loop inside one
+            -- Event.simultaneously (#2350).
             ObjectRef.EachMatching _ -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
@@ -4589,6 +4595,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 608.2f's bracket, the GainLife arm's and for its reason: one instruction
     -- naming several players is one event, so every seat's loss shares a
     -- Pawl.Types.EventGroup.
+    --
+    -- A FENCE rather than a proved behaviour, and the same goes for the
+    -- SetLifeTotal, ExchangeLifeTotals and RedistributeLifeTotals brackets below:
+    -- only a life GAIN has a CR 603.2c batch condition watching it
+    -- (Pawl.Types.TriggerCondition.PlayersGainLife), so dropping this bracket
+    -- leaves the suite green. It is here because the rule says so.
     Event.simultaneously . Monad.forM_ losers $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
         Just n
