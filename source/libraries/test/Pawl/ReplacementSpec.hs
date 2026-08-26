@@ -7973,10 +7973,10 @@ dragonstormGlobeSpec s registry =
 --
 -- THE TWO LAND COUNTS ARE UNEQUAL, four Islands and six Swamps, and both are
 -- nonzero: a row read before the re-key answers four, a row read after answers
--- six, and neither is the other. Nonzero on both readings keeps CR 702.62's "when
--- the last is removed" and a 0/0 CR 704.5a death out of the leg -- the permanent
--- arrives either way, and what the pair tells apart is which word its own row
--- named.
+-- six, and neither is the other. Nonzero on both readings keeps CR 702.63b's
+-- "when the last time counter is removed" and a CR 704.5f death out of the leg
+-- -- the permanent arrives either way, and what the pair tells apart is which
+-- word its own row named.
 --
 -- Four Islands rather than the one the mana needs: {2}{U} spends at most three
 -- lands, so an Island is left untapped for the Hack however the payment picks,
@@ -7989,7 +7989,7 @@ tidewalkerSpec s registry = Spec.describe s "Tidewalker (CR 400.7a / 614.12)" $ 
       Nothing -> Spec.assertFailure s "the Tidewalker did not reach the battlefield"
       Just tideId -> do
         Spec.assertEqWith s "six time counters, one for each Swamp, not four for the printed Islands" (countersOn CounterKind.Time tideId after) 6
-        Spec.assertEqWith s "and CR 613.4c reads its power and toughness off that same tally" (S.powerToughnessOf tideId after) (Just (6, 6))
+        Spec.assertEqWith s "and CR 613.4a reads its power and toughness off that same tally" (S.powerToughnessOf tideId after) (Just (6, 6))
         Spec.assertEqWith s "the Hack was cast and resolved, leaving only the Tidewalker on the stack" (length (GameState.stack before)) 1
   -- The control: the same board and the same spell, no Magical Hack. It pins the
   -- printed reading, so the pair differs in exactly the text change.
