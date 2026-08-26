@@ -1590,7 +1590,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   -- Not implemented: rule 702.16n's and rule 702.16p's exceptions, where an Aura
   -- grants protection from a quality and says the effect does not remove Auras,
   -- or does not remove what is already attached. No card in the pool grants
-  -- protection at all, so nothing here can carry either rider (#2388).
+  -- protection at all, so nothing here can carry either rider (#2229).
   Keyword.Protection quality ->
     [ AttachRestriction.MkAttachRestriction
         { AttachRestriction.affected = Affected.Matching Filter.IsSource,
