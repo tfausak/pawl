@@ -27,7 +27,7 @@
 -- unlock this door" looks the same whether its text was subtracted or its
 -- trigger simply did not match. And Balemurk Leech, DSK 84, which is the pool's
 -- one CR 709.5i trigger and the one card whose ability watches a Room it is not.
--- And Keys to the House, DSK 254, which is the pool's producer of CR 709.5f's
+-- And Keys to the House, DSK 254, which is data/cards' producer of CR 709.5f's
 -- unlock and CR 709.5g's lock as EFFECTS rather than as CR 116.2m's special
 -- action, so the two rules the special action cannot reach get a card.
 --
@@ -378,9 +378,9 @@ spec s registry = Spec.describe s "Room" $ do
   --
   -- Keys to the House, DSK 254, {1} Artifact: "{3}, {T}, Sacrifice this
   -- artifact: Lock or unlock a door of target Room you control. Activate only as
-  -- a sorcery." The pool's producer, and the pool's only MANDATORY either-or
-  -- clause pair (Pawl.Types.Clause.orElse) -- it prints no "may" over the two
-  -- branches, unlike Twiddle.
+  -- a sorcery." The producer in data/cards, and the one card there whose
+  -- either-or clause pair (Pawl.Types.Clause.orElse) is MANDATORY -- it prints no
+  -- "may" over the two branches, where Twiddle and Teardrop Kami both do.
   --
   -- Starts from the board the CR 709.5e case above leaves: BOTH doors open. That
   -- is what makes the door choice a real one (rule 709.5g's "an unlocked half"

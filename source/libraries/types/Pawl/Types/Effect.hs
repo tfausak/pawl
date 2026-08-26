@@ -923,8 +923,9 @@ data Effect card
     Unsuspect ObjectRef.ObjectRef
   | -- | CR 709.5f and CR 709.5g: "lock" or "unlock" half of the slot's
     -- permanent. Keys to the House's "lock or unlock a door of target Room you
-    -- control" is the pool's producer, and it prints both settings as one
-    -- either-or clause pair (Pawl.Types.Clause.orElse).
+    -- control" is the producer in data/cards, and it prints both settings as one
+    -- either-or clause pair (Pawl.Types.Clause.orElse). Marina Vendrell prints
+    -- the same clause on a five-colour legend and is not transcribed.
     --
     -- ONE opcode over a payload and not one arm apiece, Designate's argument
     -- above: rules 709.5f and 709.5g are the same sentence with two words
