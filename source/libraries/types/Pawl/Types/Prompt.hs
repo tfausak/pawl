@@ -224,6 +224,9 @@ data Prompt r where
   ChooseBlight :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 122.5: which KIND of counter a move takes off the first object
   -- (Agent's Toolkit's "move a counter from this artifact onto that creature").
+  -- Raised only where the card names NO kind: Explorer's Cache's "move a +1\/+1
+  -- counter" settles it in the printed text, and a prompt offering the one option
+  -- the card already chose would be a decision the rules do not leave open.
   -- The first ObjectId is the object the counter leaves, the second the object
   -- it lands on; the NonEmpty is the kinds the first object actually HAS,
   -- engine-pre-filtered, so every candidate offered can really be moved.

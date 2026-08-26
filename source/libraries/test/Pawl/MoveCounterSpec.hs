@@ -8,6 +8,7 @@ module Pawl.MoveCounterSpec where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import qualified Data.Set as Set
@@ -27,10 +28,12 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- Agent's Toolkit {1}{G}{U} Artifact - Clue (New Capenna Commander; name, cost,
@@ -47,7 +50,9 @@ import qualified Pawl.Types.Zone as Zone
 -- names one object on each side, which is what CR 122.5's impossibilities are
 -- stated about. Its entry line is Pawl.ReplacementSpec's (CR 614.1c / 614.5).
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ moveCounterSpec s registry
+spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
+  moveCounterSpec s registry
+  namedKindSpec s registry
 
 -- Which counter the answerer takes, and whether it takes the printed "may" at
 -- all. Pinned by POSITION in the offered list rather than by naming a kind, so
@@ -313,3 +318,150 @@ moveCounterSpec s registry = Spec.describe s "CR 122.5 moving a counter" $ do
         Spec.assertEqWith s "and the creature the trigger named received none" (fmap (`kindsOn` after) (newestNamed pikerName after)) (Just (0, 0, 0, 0))
         Spec.assertEqWith s "and an impossible move is settled before the player is asked anything" asked 0
       _ -> Spec.assertFailure s "expected the artifact on the battlefield and Reality Ripple in hand"
+
+-- Explorer's Cache {1}{G} Artifact (The Lost Caverns of Ixalan; name, cost, type
+-- line and oracle text checked against Scryfall 2026-08-25):
+--
+--   This artifact enters with two +1/+1 counters on it.
+--   Whenever a creature you control with a +1/+1 counter on it dies, put a +1/+1
+--   counter on this artifact.
+--   {T}: Move a +1/+1 counter from this artifact onto target creature. Activate
+--   only as a sorcery.
+--
+-- The third line is this group's subject: it NAMES the kind, where Agent's
+-- Toolkit above leaves it to the player, so the two cards are CR 122.5's two
+-- readings and this module holds both.
+cacheName :: CardName.CardName
+cacheName = CardName.MkCardName (Text.pack "Explorer's Cache")
+
+-- Takes the LAST kind offered, which is what makes the cases below
+-- discriminating: the artifact bears a +1/+1 counter and a shield counter, and CR
+-- 122.1a's +1/+1 counter is the LEAST CounterKind, so an answerer taking the
+-- first would move a +1/+1 counter whether the card named a kind or not. Counts
+-- its calls for toolkitAnswer's reason, so a case whose point is that nothing was
+-- asked can say so.
+cacheAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+cacheAnswer wanted p = case p of
+  Prompt.ChooseMovedCounter _ _ _ _ offered -> do
+    State.modify' (+ 1)
+    pure (NonEmpty.last offered)
+  Prompt.ChooseTargets _ _ _ sets -> pure (S.preferring ((== Just wanted) . Recipient.objectOf) sets)
+  _ -> pure (S.identityAnswer p)
+
+-- The +1/+1 and shield tallies on one object -- the pair every case below reads,
+-- and the two kinds the artifact bears when its ability resolves.
+pairOn :: ObjectId.ObjectId -> GameState.GameState -> (Natural, Natural)
+pairOn oid gs = (S.counterOf CounterKind.PlusOnePlusOne oid gs, S.counterOf CounterKind.Shield oid gs)
+
+-- S.tapObject's inverse, and a fixture for the same reason: the third activation
+-- below needs the artifact untapped again, and nothing in this group's board
+-- untaps one. Touches the tap state and nothing else, so what the assertions read
+-- -- counters -- is the engine's.
+untapObject :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+untapObject oid gs =
+  gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) oid (GameState.objects gs)}
+
+namedKindSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+namedKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of a named kind" $ do
+  let -- alice: six lands (a Mountain among them, so Lightning Bolt is castable),
+      -- a Goblin Piker settled on the battlefield, Explorer's Cache and a
+      -- Lightning Bolt in hand, and two Plains in the library so nothing decks
+      -- her (CR 104.3c). `extra` is what a case adds on top of that.
+      board extra = do
+        forest <- S.printingOf s registry "Forest"
+        mountain <- S.printingOf s registry "Mountain"
+        plains <- S.printingOf s registry "Plains"
+        cache <- S.printingOf s registry "Explorer's Cache"
+        piker <- S.printingOf s registry "Goblin Piker"
+        bolt <- S.printingOf s registry "Lightning Bolt"
+        let lands = S.landsFor mountain S.alice 1 (S.landsFor forest S.alice 2 (S.landsInPlay plains 3))
+            (target, g1) = S.addCreature piker S.alice lands
+            (heldCache, g2) = S.addHandCard cache S.alice g1
+            (heldBolt, g3) = S.addHandCard bolt S.alice g2
+            (_, g4) = S.addLibraryCard plains S.alice (snd (S.addLibraryCard plains S.alice g3))
+        withExtra <- extra g4
+        pure (target, heldCache, heldBolt, withExtra)
+      -- Cast the artifact, let it resolve, and hand back the object it became
+      -- with a shield counter placed on it. THE SHIELD COUNTER IS THE POINT: with
+      -- only +1/+1 counters on the artifact both readings of the opcode name the
+      -- same kind and the case proves nothing.
+      enter target heldCache ready =
+        let ((_, mid), asked) =
+              State.runState (Engine.runGame (cacheAnswer target) ready (S.cast S.alice heldCache >> Stack.resolveTop)) 0
+         in fmap (\cache -> (cache, asked, S.addCounter CounterKind.Shield 1 cache mid)) (newestNamed cacheName mid)
+      -- Activate the artifact's one printed ability and resolve it. Exactly one,
+      -- not the first of however many, for the reason the Clue case above gives.
+      activate target cache (asked, gs) = case Projection.abilitiesOf cache gs of
+        [only] ->
+          let ((_, after), asked') =
+                State.runState
+                  (Engine.runGame (cacheAnswer target) gs (Activate.activateAbility S.alice cache only >> Stack.resolveTop))
+                  asked
+           in Just (asked', after)
+        _ -> Nothing
+  -- THE CASE THIS UNIT EXISTS FOR. The artifact bears two kinds, the card names
+  -- one, and the answerer above would take the other if it were ever asked.
+  Spec.it s "the kind the card names is the one that moves, and nothing is asked" $ do
+    (target, heldCache, _, ready) <- board pure
+    case enter target heldCache ready of
+      Just (cache, asked0, staged) -> do
+        Spec.assertEqWith s "the artifact entered with two +1/+1 counters and was given a shield counter" (pairOn cache staged) (2, 1)
+        case activate target cache (asked0, staged) of
+          Just (asked, after) -> do
+            -- THE GAMEPLAY-LEVEL ASSERTION: a +1/+1 counter, not the shield
+            -- counter the answerer prefers, is what the creature received.
+            Spec.assertEqWith s "the creature got a +1/+1 counter and no shield counter" (pairOn target after) (1, 0)
+            Spec.assertEqWith s "and the artifact is down one +1/+1 counter with its shield counter untouched" (pairOn cache after) (1, 1)
+            Spec.assertEqWith s "and a card that names the kind leaves nothing to ask" asked 0
+          Nothing -> Spec.assertFailure s "expected Explorer's Cache to offer exactly its one printed ability"
+      Nothing -> Spec.assertFailure s "the artifact did not reach the battlefield"
+  -- CR 122.5's SECOND impossibility read against a NAMED kind -- "the first object
+  -- doesn't have the appropriate kind of counter on it". The same board, activated
+  -- until the two +1/+1 counters are spent: the shield counter is still there and
+  -- is still not appropriate, so the third activation moves nothing rather than
+  -- putting a counter on the creature that came off nothing.
+  Spec.it s "an artifact left bearing only the wrong kind moves nothing" $ do
+    (target, heldCache, _, ready) <- board pure
+    case enter target heldCache ready of
+      Just (cache, asked0, staged) ->
+        case activate target cache (asked0, staged) >>= (activate target cache . fmap (untapObject cache)) of
+          Just spent -> do
+            Spec.assertEqWith s "two activations moved both +1/+1 counters, leaving only the shield counter" (pairOn cache (snd spent)) (0, 1)
+            Spec.assertEqWith s "and the creature holds both of them" (pairOn target (snd spent)) (2, 0)
+            case activate target cache (fmap (untapObject cache) spent) of
+              Just (asked, after) -> do
+                Spec.assertEqWith s "the third activation put nothing on the creature" (pairOn target after) (2, 0)
+                Spec.assertEqWith s "and took nothing off the artifact, the shield counter included" (pairOn cache after) (0, 1)
+                Spec.assertEqWith s "and an impossible move is settled before the player is asked anything" asked 0
+              Nothing -> Spec.assertFailure s "expected Explorer's Cache to offer exactly its one printed ability"
+          Nothing -> Spec.assertFailure s "expected Explorer's Cache to offer exactly its one printed ability"
+      Nothing -> Spec.assertFailure s "the artifact did not reach the battlefield"
+  -- The card's SECOND line, and the pair of boards that shows its filter reads the
+  -- counter and not merely the creature: one Lightning Bolt, aimed from the same
+  -- staged board at a Goblin Piker bearing a +1/+1 counter and at one bearing
+  -- none.
+  Spec.it s "the dies trigger reads the counter on the creature that died" $ do
+    let secondPiker gs = do
+          piker <- S.printingOf s registry "Goblin Piker"
+          pure (snd (S.addCreature piker S.alice gs))
+    (bare, heldCache, heldBolt, ready) <- board secondPiker
+    case enter bare heldCache ready of
+      Just (cache, asked0, staged) ->
+        case filter (/= bare) (filter (\o -> fmap Face.name (Game.faceOf o staged) == Just pikerName) (Set.toList (GameState.battlefield staged))) of
+          [countered] -> do
+            let bolted victim =
+                  snd
+                    ( fst
+                        ( State.runState
+                            ( Engine.runGame
+                                (cacheAnswer victim)
+                                (S.addCounter CounterKind.PlusOnePlusOne 1 countered staged)
+                                (S.cast S.alice heldBolt >> Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
+                            )
+                            asked0
+                        )
+                    )
+            Spec.assertEqWith s "the piker bearing a +1/+1 counter died and grew the artifact" (pairOn cache (bolted countered), Set.member countered (GameState.battlefield (bolted countered))) ((3, 1), False)
+            Spec.assertEqWith s "the piker bearing none died and did not" (pairOn cache (bolted bare), Set.member bare (GameState.battlefield (bolted bare))) ((2, 1), False)
+          _ -> Spec.assertFailure s "expected exactly two Goblin Pikers on the battlefield"
+      Nothing -> Spec.assertFailure s "the artifact did not reach the battlefield"

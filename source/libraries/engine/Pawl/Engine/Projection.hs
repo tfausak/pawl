@@ -1800,7 +1800,9 @@ rewriteEffect pairs effect = case effect of
   Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) ->
     Effect.PutCounters (PutCounters.MkPutCounters kind (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
   Effect.RemoveCounters {} -> effect
-  -- Two bare slots, and Filter.rewrite renames no slot: nothing here to rewrite.
+  -- Filter.rewrite renames no slot, so neither bare slot is rewritten.
+  -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
+  -- printed keyword through the swap, PutCounters' case above (#1840).
   Effect.MoveCounters {} -> effect
   Effect.GainPlayerCounters {} -> effect
   Effect.RemovePlayerCounters {} -> effect
