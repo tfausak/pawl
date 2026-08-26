@@ -72,7 +72,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-spec s registry = Spec.describe s "CR 101.2 counters that can't be put on" $ do
+spec s registry = Spec.describe s "CR 101.2 counter prohibitions" $ do
   solemnitySpec s registry
   meliraSpec s registry
   moveSpec s registry
