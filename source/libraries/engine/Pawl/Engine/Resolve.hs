@@ -4585,7 +4585,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         losers = playerRefPlayers legal controller gs ref
     -- PER PAYER (evaluateForRecipient): Shahrazad's "half THEIR life" reads each
     -- payer's own total, and every number is read off the SAME `gs`.
-    Monad.forM_ losers $ \pid ->
+    --
+    -- CR 608.2f's bracket, the GainLife arm's and for its reason: one instruction
+    -- naming several players is one event, so every seat's loss shares a
+    -- Pawl.Types.EventGroup.
+    Event.simultaneously . Monad.forM_ losers $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
         Just n
           | n > 0 ->
@@ -4597,12 +4601,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         _ -> pure ()
   -- CR 119.3's other half, LoseLife's mirror but for the sign. The `n > 0` guard
   -- is CR 119.9: a gain of 0 is no life gain event to trigger on.
+  --
+  -- CR 608.2f's bracket: "each player gains 4 life" is ONE action taken on
+  -- several players and is processed simultaneously, so every seat's gain shares
+  -- one Pawl.Types.EventGroup and a CR 603.2c batch condition watching life gain
+  -- across players sees one trigger event rather than one per seat. Nothing about
+  -- the WRITES moves: the amounts already come off the one pre-effect `gs`, and
+  -- what the bracket changes is the group the log stamps.
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
         gainers = playerRefPlayers legal controller gs ref
-    Monad.forM_ gainers $ \pid ->
+    Event.simultaneously . Monad.forM_ gainers $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
         Just n
           | n > 0 -> changeLife pid n
@@ -4629,8 +4640,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         let lifeOf pid = maybe 0 Player.life (Map.lookup pid (GameState.players gs))
             thisLife = lifeOf this
             thatLife = lifeOf that
-        changeLife this (thatLife - thisLife)
-        changeLife that (thisLife - thatLife)
+        -- CR 608.2f's bracket: an exchange is ONE action taken on two players --
+        -- CR 701.12a's "the entire exchange", which either happens or does not --
+        -- so the gain and the loss it decomposes into share one
+        -- Pawl.Types.EventGroup rather than reading as two events in sequence.
+        Event.simultaneously $ do
+          changeLife this (thatLife - thisLife)
+          changeLife that (thisLife - thatLife)
       -- CR 701.12a: if the entire exchange can't be completed, no part of it
       -- occurs.
       Nothing -> pure ()
@@ -4646,7 +4662,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
         recipients = playerRefPlayers legal controller gs ref
-    Monad.forM_ recipients $ \pid ->
+    -- CR 608.2f's bracket, the GainLife arm's: one instruction setting several
+    -- players' totals is one event, however the per-seat deltas fall out.
+    Event.simultaneously . Monad.forM_ recipients $ \pid ->
       -- A player with no row is nobody to move.
       Monad.forM_ (Map.lookup pid (GameState.players gs)) $ \player ->
         -- An undeterminable total is no instruction, asked per recipient: one
@@ -4679,7 +4697,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- Set equality also settles injectivity: a repeated giver makes
           -- `givers` smaller than `takers`.
           isPermutation = Set.isSubsetOf takers (Set.fromList candidates) && takers == givers
-      Monad.when isPermutation . Monad.forM_ (Map.toList assignment) $ \(taker, giver) ->
+      -- CR 608.2f's bracket, the ExchangeLifeTotals arm's: one redistribution is
+      -- one action taken on every seat it names, so the whole permutation's gains
+      -- and losses share one Pawl.Types.EventGroup.
+      Monad.when isPermutation . Event.simultaneously . Monad.forM_ (Map.toList assignment) $ \(taker, giver) ->
         changeLife taker (lifeOf giver - lifeOf taker)
   -- CR 702.179c: each named player's speed increases by this much. Its two
   -- readings -- a player who HAS speed goes up, a player with NONE has their

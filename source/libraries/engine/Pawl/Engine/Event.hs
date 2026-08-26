@@ -7536,6 +7536,10 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- LOSING life is not a near miss but a different event, and the LifeLost arm
   -- below is where that shows: one damage event can record both, and only the
   -- gain fires this.
+  -- Its batch sibling delegates HERE, PermanentsGetCounters' posture below: which
+  -- gains the condition admits is the same question either way, and what separates
+  -- the two is `batchScoped` plus eventTriggers' dedup, never this matcher.
+  TriggerCondition.PlayersGainLife relation -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.PlayerGainsLife relation) event
   TriggerCondition.PlayerGainsLife relation -> case event of
     GameEvent.LifeGained (LifeChange.MkLifeChange pid _) -> PlayerRelation.holds relation you pid
     GameEvent.Moved {} -> False
@@ -9554,6 +9558,9 @@ reactsToAbilityTriggering cond = case cond of
   -- not an ability triggering.
   TriggerCondition.SelfPreventsDamage _ -> False
   TriggerCondition.PlayerGainsLife _ -> False
+  -- A batch of life gains is not another ability triggering either, PermanentsDie's
+  -- answer one event family over.
+  TriggerCondition.PlayersGainLife _ -> False
   TriggerCondition.PlayerLosesLife _ -> False
   -- CR 714.2b's own condition is a counter placement, which is what makes a
   -- chapter ability itself a FIRST-pass trigger -- the other half of the pair
@@ -10433,6 +10440,13 @@ eventBindingSlots cond = case cond of
   -- GameEvent.LifeGained carries a PlayerId unconditionally, so the promise holds
   -- under every relation.
   TriggerCondition.PlayerGainsLife _ -> Set.fromList [Binding.eventAmount, Binding.triggerPlayer]
+  -- Nothing, PermanentsGetCounters' answer and for its reason: the trigger event
+  -- is a whole CR 608.2f batch, which may hold a gain by every seat at the table
+  -- and a different number for each, so neither reserved slot could name one.
+  -- Synthetic Communal Vigil, the card that landed the constructor, draws a card
+  -- and reads no part of the event; a printing whose payload said "that player"
+  -- would refute this, and the lint would reject it (#505).
+  TriggerCondition.PlayersGainLife _ -> Set.empty
   -- The loss condition's amount, guaranteed for the same reason:
   -- GameEvent.LifeLost carries a Natural unconditionally. Exquisite Blood's "you
   -- gain that much life" is what reads it.
@@ -10799,6 +10813,9 @@ looksBack condition = case condition of
   TriggerCondition.DamageToPlayerPrevented _ -> False
   TriggerCondition.SelfPreventsDamage _ -> False
   TriggerCondition.PlayerGainsLife _ -> False
+  -- CR 603.10a's list names no life change under either scope, so the batch
+  -- reading looks back no further than the per-seat one above.
+  TriggerCondition.PlayersGainLife _ -> False
   TriggerCondition.PlayerLosesLife _ -> False
   TriggerCondition.SelfCountersReached {} -> False
   TriggerCondition.SelfBecomesClassLevel _ -> False
@@ -10949,7 +10966,13 @@ batchScoped condition = case condition of
   TriggerCondition.SelfBecomesClassLevel _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
   TriggerCondition.SelfCountersRemoved _ -> False
-  -- The one True beside PermanentsDie: CR 603.2c's FIRST sentence is what this
+  -- The third True, and the one that is not about objects: "whenever one or more
+  -- players gain life" names the whole CR 608.2f batch as its trigger event, so
+  -- "each player gains 4 life" is one occurrence of it and not one per seat --
+  -- where the PlayerGainsLife arm above is CR 603.2c's second sentence and fires
+  -- once for each.
+  TriggerCondition.PlayersGainLife _ -> True
+  -- A True beside PermanentsDie and PlayersGainLife: CR 603.2c's FIRST sentence is what this
   -- constructor exists for -- "one or more counters ... on one or more
   -- permanents" names the whole group as the trigger event, which occurs once.
   TriggerCondition.PermanentsGetCounters {} -> True
@@ -12164,6 +12187,9 @@ zonesTriggeredFrom cond = case cond of
   -- CR 113.6's default once more: Ajani's Pridemate has to be on the battlefield
   -- to receive the counter its own ability puts on it.
   TriggerCondition.PlayerGainsLife _ -> battlefield
+  -- CR 113.6's default, the arm above's: Synthetic Communal Vigil is an
+  -- enchantment watching the table from the battlefield.
+  TriggerCondition.PlayersGainLife _ -> battlefield
   -- And once more: Exquisite Blood is an enchantment, and CR 113.6 leaves its
   -- ability functioning only where the permanent is.
   TriggerCondition.PlayerLosesLife _ -> battlefield
@@ -12384,6 +12410,8 @@ controllerTurnScoped cond = case cond of
   -- "during your turn" and this one does not, which is the two rules' own
   -- difference rather than an omission here.
   TriggerCondition.PlayerGainsLife _ -> False
+  -- The batch reading names no turn either.
+  TriggerCondition.PlayersGainLife _ -> False
   -- And life can be LOST on anybody's turn. This is the arm where CR 702.179d's
   -- condition is closest to being duplicated and is not: that one reads the very
   -- same GameEvent.LifeLost but only during its controller's turn, which is the
@@ -12573,6 +12601,7 @@ stateTriggers gs
               TriggerCondition.DamageToPlayerPrevented _ -> False
               TriggerCondition.SelfPreventsDamage _ -> False
               TriggerCondition.PlayerGainsLife _ -> False
+              TriggerCondition.PlayersGainLife _ -> False
               TriggerCondition.PlayerLosesLife _ -> False
               -- CR 603.3b's condition is an EVENT trigger too, and the event is
               -- another ability triggering: nothing about it is a state a settle

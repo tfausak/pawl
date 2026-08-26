@@ -718,6 +718,22 @@ data TriggerCondition
     -- Losing life is a different event entirely (PlayerLosesLife), so a card
     -- bearing this stays silent for a loss and for prevented damage (CR 615.6).
     PlayerGainsLife PlayerRelation.PlayerRelation
+  | -- | CR 603.2c's batch reading of the arm above: "whenever one or more players
+    -- gain life". PlayerGainsLife's relation, scoped to the whole CR 608.2f event
+    -- rather than to each gain -- "each player gains 4 life" (Centaur Peacemaker)
+    -- is one event containing a gain per seat, so this fires once for the set
+    -- where PlayerGainsLife fires once per seat.
+    --
+    -- PermanentsDie and PermanentsGetCounters are the same fork on the object
+    -- side, built the same way and for the same reason: the matcher answers per
+    -- occurrence, and what makes the group one trigger is the
+    -- Pawl.Types.EventGroup the log stamps, read in
+    -- Pawl.Engine.Event.eventTriggers.
+    --
+    -- Binds nothing where PlayerGainsLife binds the gaining player and the
+    -- amount: a batch may span several seats and several numbers, so one slot
+    -- could not name them.
+    PlayersGainLife PlayerRelation.PlayerRelation
   | -- | "Whenever [a player] loses life" (Exquisite Blood), against
     -- GameEvent.LifeLost. PlayerGainsLife's mirror in shape.
     --

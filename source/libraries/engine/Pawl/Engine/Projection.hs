@@ -2289,6 +2289,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.DamageToPlayerPrevented _ -> condition
   TriggerCondition.SelfPreventsDamage f -> TriggerCondition.SelfPreventsDamage (Filter.rewrite pairs f)
   TriggerCondition.PlayerGainsLife _ -> condition
+  TriggerCondition.PlayersGainLife _ -> condition
   TriggerCondition.PlayerLosesLife _ -> condition
   TriggerCondition.SelfCountersReached {} -> condition
   TriggerCondition.SelfBecomesClassLevel _ -> condition

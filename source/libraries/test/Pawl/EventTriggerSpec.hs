@@ -59,6 +59,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -2134,6 +2135,118 @@ falseCureSpec s registry =
           Spec.assertEqWith s "alice is at 24" (S.lifeOf S.alice after) (Just 24)
           Spec.assertEqWith s "bob is at 24" (S.lifeOf S.bob after) (Just 24)
           Spec.assertEqWith s "carol is at 24" (S.lifeOf S.carol after) (Just 24)
+
+-- CR 603.2c's FIRST sentence on the LIFE side, and the CR 608.2f bracket that
+-- makes it reachable: "each player gains 4 life" is ONE action taken on several
+-- players, processed simultaneously, so every seat's gain shares one
+-- Pawl.Types.EventGroup and an ability watching "one or more players gain life"
+-- finds one trigger event where the per-seat conditions above find one each.
+--
+-- Only a batch condition can tell the two apart, which is why the grouping sat
+-- unobservable (#1726): every other reader of a life gain answers per
+-- occurrence.
+--
+--   * Synthetic Communal Vigil {1}{W} Enchantment
+--     (data/cards/synthetic-communal-vigil.json): "Whenever one or more players
+--     gain life, draw a card."
+--
+-- WHY A SYNTHETIC. Scryfall o:/one or more [^.]*gain(s)? life/, 2026-08-26,
+-- matches one printing: Path of Bravery, whose "one or more" counts ATTACKING
+-- CREATURES and whose life gain is the ability's effect rather than its trigger
+-- event. So no printing reads a life gain in the batch scope, and a printing
+-- that did -- "whenever one or more players gain life" -- would refute this.
+-- Nothing in the CR forbids one: CR 603.2c's first sentence is written for
+-- exactly this shape, and PermanentsDie is the same wording one event family
+-- over.
+--
+-- The batch comes from Centaur Peacemaker, {1}{G}{W} Creature -- Centaur Cleric
+-- 3/3, "When this creature enters, each player gains 4 life." Every seat's LIFE
+-- TOTAL is the same under either reading, which is why what the cases read is
+-- how many CARDS the Vigil drew: one for the batch, where a seat-at-a-time
+-- reading draws one per seat.
+communalVigilSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+communalVigilSpec s registry =
+  let -- The distinct EventGroups the log's life gains carry, and how many gains
+      -- there were. The precondition every case below rests on, asserted rather
+      -- than assumed: were the seats' gains not one group, "once for the table"
+      -- would be proving nothing about CR 608.2f.
+      gainsIn gs =
+        Maybe.mapMaybe
+          ( \logged -> case LoggedEvent.event logged of
+              GameEvent.LifeGained _ -> Just (LoggedEvent.group logged)
+              _ -> Nothing
+          )
+          (Foldable.toList (GameState.events gs))
+      -- Settle and resolve until the stack is empty: the Peacemaker's entry
+      -- trigger gains the life, and the Vigil's own trigger only reaches the
+      -- stack at the CR 117.5 scan after it. Resolving the top alone would leave
+      -- the card undrawn.
+      resolveEverything gs =
+        let settled = S.runPure S.identityAnswer gs Engine.settleForPriority
+         in if null (GameState.stack settled)
+              then settled
+              else resolveEverything (S.runPure S.identityAnswer settled Stack.resolveTop)
+      -- alice's Vigil already on the battlefield and `gainer` entering with its
+      -- CR 603.6a trigger settled onto the stack. Six Plains in her library, so
+      -- the Vigil can draw four times over without CR 104.3c deciding a case for
+      -- it: a board that could not answer a per-seat reading's four cards would
+      -- pass the batch assertion for the wrong reason.
+      vigilBoard gainer base = do
+        plains <- S.printingOf s registry "Plains"
+        vigil <- S.printingOf s registry "Synthetic Communal Vigil"
+        entering <- S.printingOf s registry gainer
+        let stocked = foldr (\_ g -> snd (S.addLibraryCard plains S.alice g)) base [1 .. 6 :: Int]
+            withVigil = snd (S.addCreature vigil S.alice stocked)
+            (_, entered) = S.entersWithTrigger entering S.alice withVigil
+        pure (snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority))
+   in Spec.describe s "CR 603.2c Synthetic Communal Vigil" $ do
+        -- The proving case. Three seats gain 4 apiece out of one resolution, and
+        -- alice draws ONE card -- 3 is the seat-at-a-time reading and 0 is
+        -- silence.
+        Spec.it s "CR 608.2f three seats gaining at once are one event, so the Vigil draws one card" $ do
+          board <- vigilBoard "Centaur Peacemaker" S.threePlayerGame
+          let after = resolveEverything board
+          Spec.assertEqWith s "alice drew one card for the whole batch" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "alice held nothing before" (S.handSize S.alice board) 0
+          Spec.assertEqWith s "all three seats really gained their 4" (fmap (\pid -> S.lifeOf pid after) [S.alice, S.bob, S.carol]) [Just 24, Just 24, Just 24]
+          Spec.assertEqWith s "and the three gains were one event group" (length (List.nub (gainsIn after))) 1
+          Spec.assertEqWith s "three gains, not one" (length (gainsIn after)) 3
+        -- The other half of the pair, differing in exactly one thing -- how many
+        -- gains the batch holds. FOUR seats and still one card, where a
+        -- per-occurrence reading now draws four.
+        Spec.it s "CR 603.2c a fourth seat in the batch is not a fourth trigger" $ do
+          board <- vigilBoard "Centaur Peacemaker" S.fourPlayerGame
+          let after = resolveEverything board
+          Spec.assertEqWith s "alice still drew exactly one" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "dave gained his 4 too" (S.lifeOf S.dave after) (Just 24)
+          Spec.assertEqWith s "four gains in one event group" (length (gainsIn after), length (List.nub (gainsIn after))) (4, 1)
+        -- The plumbing control: ONE gain, from Radiant Fountain's "you gain 2
+        -- life", draws one card too -- the reading both implementations share.
+        -- Without it a Vigil that fired on nothing at all would read as a passing
+        -- 1 above.
+        Spec.it s "CR 119.3 a lone gain draws one card as well" $ do
+          board <- vigilBoard "Radiant Fountain" S.threePlayerGame
+          let after = resolveEverything board
+          Spec.assertEqWith s "alice drew her card" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "and she is the only seat that gained" (fmap (\pid -> S.lifeOf pid after) [S.alice, S.bob, S.carol]) [Just 22, Just 20, Just 20]
+          Spec.assertEqWith s "one gain, one group" (length (gainsIn after), length (List.nub (gainsIn after))) (1, 1)
+        -- The control that separates "once per event GROUP" from a dedup coarser
+        -- than the group -- once ever, or once per turn -- which the boards above
+        -- cannot tell apart, each holding one batch. A second Peacemaker enters,
+        -- every seat gains again, and that second batch is an event group of its
+        -- own: TWO cards, where a coarser dedup leaves the first card alone.
+        --
+        -- S.entersWithTrigger REWRITES the log, so the group count below reads
+        -- the second batch alone rather than both.
+        Spec.it s "CR 603.2c a second batch of gains is a second trigger event" $ do
+          peacemaker <- S.printingOf s registry "Centaur Peacemaker"
+          board <- vigilBoard "Centaur Peacemaker" S.threePlayerGame
+          let after = resolveEverything board
+              again = resolveEverything (snd (S.entersWithTrigger peacemaker S.alice after))
+          Spec.assertEqWith s "alice drew a second card for the second batch" (S.handSize S.alice again) 2
+          Spec.assertEqWith s "she held one after the first" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "every seat is 8 up over the two batches" (fmap (\pid -> S.lifeOf pid again) [S.alice, S.bob, S.carol]) [Just 28, Just 28, Just 28]
+          Spec.assertEqWith s "and the second batch was one event group" (length (List.nub (gainsIn again))) 1
 
 -- CR 120.3's event read by its RECIPIENT, which no condition could ask for
 -- before: every damage arm beside this one watches a permanent DEALING damage.
@@ -5109,6 +5222,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   abilitiesWhenTriggeredSpec s registry
   lifeGainAmountSpec s registry
   falseCureSpec s registry
+  communalVigilSpec s registry
   enrageSpec s registry
   belltowerSphinxSpec s registry
   lifeLossTriggerSpec s registry
