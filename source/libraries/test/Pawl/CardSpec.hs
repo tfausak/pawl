@@ -114,6 +114,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CounterR as CounterR
+import qualified Pawl.Types.CounterRestriction as CounterRestriction
 import qualified Pawl.Types.CounterSubject as CounterSubject
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Create as Create
@@ -307,6 +308,7 @@ vanillaFace name typeLine =
       Face.sacrificeRestrictions = [],
       Face.untapRestrictions = [],
       Face.attachRestrictions = [],
+      Face.counterRestrictions = [],
       Face.entryRestrictions = [],
       Face.attackCosts = [],
       Face.blockCosts = [],
@@ -3392,6 +3394,11 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 118.9's standing alternative cost, narrowed by the spell's own qualities
   -- exactly as the zone permission above is (Omniscience's is `And []`).
   PlayerEffect.CastFromHandWithoutPayingManaCost f -> [f]
+  -- CR 101.2's counter prohibition narrows by counter KIND, not by a Filter over
+  -- objects: the object-side half of the same printings is
+  -- Pawl.Types.CounterRestriction, whose affected filter this lint reaches
+  -- through Face.counterRestrictions instead.
+  PlayerEffect.CantGetCounters _ -> []
 
 -- Does this carrier pair CR 615.12's "damage can't be prevented" with a
 -- scope narrower than the whole table?
@@ -3449,6 +3456,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CastFromGraveyard _ -> False
   PlayerEffect.PlayLandsFromGraveyard -> False
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+  PlayerEffect.CantGetCounters _ -> False
 
 -- The OTHER half of the same carrier, now that CR 615.12's narrowing rides in a
 -- DamagePattern: does this card author a field of that pattern the engine bakes?
@@ -3497,6 +3505,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CastFromGraveyard _ -> False
   PlayerEffect.PlayLandsFromGraveyard -> False
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+  PlayerEffect.CantGetCounters _ -> False
 
 -- The non-vacuity half of both lints above: is this CR 615.12's effect at all?
 -- A wildcard is right here, where it is not above -- this asks "did the sweep
@@ -4073,9 +4082,10 @@ activatedAbilityFilters ability =
 --   * `combatRestrictions` (CR 508.1c / 509.1b), `sacrificeRestrictions` (CR
 --     701.21a / 101.2), `untapRestrictions` (CR 502.3 / 101.2),
 --     `entryRestrictions` (CR 400.4a / 101.2),
+--     `counterRestrictions` (CR 122.6 / 101.2),
 --     `attackRequirements` (CR 508.1d), `blockRequirements`
 --     (CR 509.1c), `attackCosts` (CR 508.1h) and `blockCosts` (CR 509.1d) --
---     eight more affected sets, plus each combat cost's Counted share, which is a
+--     nine more affected sets, plus each combat cost's Counted share, which is a
 --     Quantity, plus the CR 604.2 "as long as" clause an attacking requirement
 --     may carry (CR 508.1d's second reading).
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
@@ -4126,6 +4136,7 @@ cardFilters card =
         <> concatMap (affectedFilters . UntapRestriction.affected) (Face.untapRestrictions card)
         <> concatMap attachRestrictionFilters (Face.attachRestrictions card)
         <> concatMap (affectedFilters . EntryRestriction.affected) (Face.entryRestrictions card)
+        <> concatMap (affectedFilters . CounterRestriction.affected) (Face.counterRestrictions card)
     )
     <> concatMap staticAbilityFilters (Face.staticAbilities card)
     -- SOURCE-HOSTED for staticAbilityFilters' reason: a clause on a static

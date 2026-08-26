@@ -19,6 +19,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
@@ -351,4 +352,19 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.CastFromHandWithoutPayingManaCost (Filter.HasCardType CardType.Creature))
       " {\"type\":\"CastFromHandWithoutPayingManaCost\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+  -- Solemnity's first sentence, which names no kind, so the key is null -- the
+  -- wire form data/cards/solemnity.json writes.
+  Spec.it s "CantGetCounters, no kind named" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.CantGetCounters Nothing)
+      " {\"type\":\"CantGetCounters\",\"value\":null} "
+  -- Melira, Sylvok Outcast's first sentence, which names one.
+  Spec.it s "CantGetCounters, a named kind" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.CantGetCounters (Just PlayerCounterKind.Poison))
+      " {\"type\":\"CantGetCounters\",\"value\":{\"type\":\"Poison\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s PlayerEffect.codec

@@ -266,6 +266,8 @@ library codec
     Pawl.Codec.CounterPlacement
     Pawl.Codec.CounterPlacementSpec
     Pawl.Codec.CounterR
+    Pawl.Codec.CounterRestriction
+    Pawl.Codec.CounterRestrictionSpec
     Pawl.Codec.CounterRSpec
     Pawl.Codec.CounterSpec
     Pawl.Codec.CounterSubject
@@ -828,6 +830,7 @@ library engine
     Pawl.Engine.Condition
     Pawl.Engine.Cost
     Pawl.Engine.Count
+    Pawl.Engine.CounterRestriction
     Pawl.Engine.Damage
     Pawl.Engine.Daytime
     Pawl.Engine.Decide
@@ -1142,6 +1145,7 @@ library test
     Pawl.CopySpec
     Pawl.CoreSpec
     Pawl.CostSpec
+    Pawl.CounterRestrictionSpec
     Pawl.CounterspellSpec
     Pawl.CountSpec
     Pawl.CrewSpec
@@ -1320,6 +1324,7 @@ library types
     Pawl.Types.CounterPattern
     Pawl.Types.CounterPlacement
     Pawl.Types.CounterR
+    Pawl.Types.CounterRestriction
     Pawl.Types.CounterSubject
     Pawl.Types.Create
     Pawl.Types.CreateCopy

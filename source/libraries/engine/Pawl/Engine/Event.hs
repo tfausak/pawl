@@ -37,6 +37,7 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
+import qualified Pawl.Engine.CounterRestriction as CounterRestriction
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.EffectZone as EffectZone
 import qualified Pawl.Engine.EntryRestriction as EntryRestriction
@@ -2600,6 +2601,24 @@ settleCounters target settledKind settledCount
       -- the object exists, and how many counters of the kind it already had.
       case Game.lookupObject target gs of
         Nothing -> pure 0
+        -- CR 101.2 with CR 122.6: a permanent an effect in force says can't have
+        -- counters put on it takes none, whatever allowed or directed the
+        -- placement (Solemnity, Melira Sylvok Outcast). Asked HERE, on the settled
+        -- object and the settled kind, rather than ahead of resolveCounters: CR
+        -- 616.1's loop may redirect a placement onto a different object, so the
+        -- object the prohibition is about is the one that would actually receive
+        -- the counters. Rule 614 replaces events that would happen; rule 101.2
+        -- then refuses what rule 614 settled on.
+        --
+        -- Both of CR 122.6's roads reach this door -- a placement onto a permanent
+        -- already on the battlefield, and the counters an object is given as it
+        -- enters, which flushEnteringCounters places through here -- so one gate
+        -- answers the whole rule.
+        --
+        -- NOT a CR 614.16 replacement: that rule scales a placement that was
+        -- possible, and these cards say "can't". See
+        -- Pawl.Types.CounterRestriction.
+        Just _ | CounterRestriction.prohibited target settledKind gs -> pure 0
         Just obj -> do
           -- CR 613.7c: the counters arriving get a timestamp, and the ones of
           -- that kind already there get the same one.
@@ -2746,14 +2765,23 @@ putPlayerCounters cause pid kind n = do
     Just (target, settledKind, settledCount)
       | settledCount == 0 -> pure 0
       | otherwise -> do
-          -- Zero is the guard putCounters puts on its own write, and the two
-          -- shrinking scalings are what make it reachable here: half of one
-          -- counter, rounded down, and one counter minus one, are replacements
-          -- that remove the event.
-          State.modify' $ \gs ->
-            let bump p = p {Player.counters = Map.insertWith (+) settledKind settledCount (Player.counters p)}
-             in gs {GameState.players = Map.adjust bump target (GameState.players gs)}
-          pure settledCount
+          live <- State.get
+          -- CR 101.2 with CR 122.1: a player an effect in force says can't get
+          -- counters gets none, whatever allowed or directed the placement
+          -- (Solemnity, Melira Sylvok Outcast). settleCounters' gate on the player
+          -- axis, read the same way and at the same point -- after CR 616.1's
+          -- loop, about the SETTLED player and the settled kind.
+          if PlayerEffect.prohibitsCounters target settledKind live
+            then pure 0
+            else do
+              -- Zero is the guard putCounters puts on its own write, and the two
+              -- shrinking scalings are what make it reachable here: half of one
+              -- counter, rounded down, and one counter minus one, are replacements
+              -- that remove the event.
+              State.modify' $ \gs ->
+                let bump p = p {Player.counters = Map.insertWith (+) settledKind settledCount (Player.counters p)}
+                 in gs {GameState.players = Map.adjust bump target (GameState.players gs)}
+              pure settledCount
 
 -- CR 122.1: resolveCounters for a player recipient, and read the same way -- the
 -- cause rides the event and the rows decide which causes they reach.
