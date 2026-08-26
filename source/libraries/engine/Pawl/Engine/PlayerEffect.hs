@@ -55,6 +55,7 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import Pawl.Types.ManaUnit (ManaUnit)
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerEffect (PlayerEffect)
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import Pawl.Types.PlayerId (PlayerId)
@@ -465,6 +466,8 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.CastOnlyAtSorcerySpeed -> effect
   PlayerEffect.CantPlayLands -> effect
   PlayerEffect.PlayLandsFromGraveyard -> effect
+  -- A counter KIND is not a word CR 612.2's subtype pairs could reach either.
+  PlayerEffect.CantGetCounters _ -> effect
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over the
 -- whole event log, which is exactly "this turn" because Engine.handoffTurn clears
@@ -636,6 +639,7 @@ prohibitsCasting pid oid name gs =
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+        PlayerEffect.CantGetCounters _ -> False
    in any prohibits (applying pid gs)
 
 -- CR 305.1: does any effect prohibit `pid` from PLAYING a land with this name?
@@ -722,6 +726,7 @@ prohibitsPlayingLand pid names gs =
         -- never cast (CR 305.1) -- so this permission neither allows nor
         -- prohibits a land play, whatever its Filter reads.
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+        PlayerEffect.CantGetCounters _ -> False
    in any prohibits (applying pid gs)
 
 -- CR 701.23: does any effect prohibit `pid` from searching a library?
@@ -741,6 +746,58 @@ prohibitsSearching pid gs =
         -- while FOLLOWING an instruction that has already resolved, so none of
         -- them reaches it -- Silence stops the spell, never the search a
         -- resolved one performs.
+        PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.CantCastChosenName -> False
+        PlayerEffect.CantPlayLandChosenName -> False
+        PlayerEffect.IncreaseSpellCost {} -> False
+        PlayerEffect.IncreaseActivationCost {} -> False
+        PlayerEffect.ReduceSpellCost {} -> False
+        PlayerEffect.ReduceActivationCost {} -> False
+        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.AddSpellCost {} -> False
+        PlayerEffect.PlayAdditionalLands _ -> False
+        PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.SpendManaAsThough _ -> False
+        PlayerEffect.CantBeTargetedBy _ -> False
+        PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.CantBeCountered _ -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CastOnlyAtSorcerySpeed -> False
+        PlayerEffect.CantPlayLands -> False
+        PlayerEffect.CastFromGraveyard _ -> False
+        PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+        PlayerEffect.CantGetCounters _ -> False
+   in any (prohibits . snd) (applying pid gs)
+
+-- CR 101.2 with CR 122.1: does an effect in force right now say that `pid` CAN'T
+-- GET counters of `kind`? Solemnity's first sentence and Melira, Sylvok
+-- Outcast's first.
+--
+-- The PLAYER twin of Pawl.Engine.CounterRestriction.prohibited, and asked at the
+-- same point in the same story: Pawl.Engine.Event.putPlayerCounters, after CR
+-- 616.1's loop has settled the placement, about the SETTLED player and kind.
+--
+-- A DISJUNCTION for CR 101.2's reason: one effect saying it can't happen beats
+-- every rule and effect that allows or directs it, so a second row permitting
+-- nothing cannot undo the first.
+prohibitsCounters :: PlayerId -> PlayerCounterKind.PlayerCounterKind -> GameState -> Bool
+prohibitsCounters pid kind gs =
+  let prohibits effect = case effect of
+        -- Nothing is Solemnity's "counters", every kind; Just is Melira's "poison
+        -- counters" and refuses that kind alone.
+        PlayerEffect.CantGetCounters named -> Maybe.maybe True (== kind) named
+        -- Every other arm is about casting, playing, targeting, countering,
+        -- searching, paying or keeping mana. CR 122.1's counters are placed by an
+        -- effect that has already resolved or by a rule, so none of them reaches
+        -- one -- Silence stops the spell, never the counters a resolved one puts
+        -- on a player.
+        PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
@@ -821,6 +878,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+        PlayerEffect.CantGetCounters _ -> False
    in any (prohibits . snd) (applying pid gs)
 
 -- CR 201.4: the card names chosen for this effect's source, as it entered (CR
@@ -996,6 +1054,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
+        PlayerEffect.CantGetCounters _ -> Nothing
       reductionOf (source, effect) = case effect of
         PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost criterion amount coloredOnly) ->
           fmap (\a -> (a, coloredOnly)) (matching source criterion amount)
@@ -1029,6 +1088,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
+        PlayerEffect.CantGetCounters _ -> Nothing
       -- CR 601.2f's "plus all additional costs", the non-mana half, reaching a
       -- SPELL: CR 118.8's "or applied to a spell or ability from another effect"
       -- (Drought's "Spells cost an additional \"Sacrifice a Swamp\" to cast").
@@ -1065,6 +1125,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
+        PlayerEffect.CantGetCounters _ -> Nothing
       effects = applying pid gs
    in CostAdjustments.MkCostAdjustments
         { CostAdjustments.increases = Maybe.mapMaybe increaseOf effects,
@@ -1188,6 +1249,7 @@ activationCostAdjustmentsGiven effects targets family srcId gs =
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
+        PlayerEffect.CantGetCounters _ -> Nothing
       reductionOf (source, effect) = case effect of
         PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost criterion granted aimedAt amount floor_) ->
           -- Never confined to coloured mana: no printed activation-cost reducer
@@ -1227,6 +1289,7 @@ activationCostAdjustmentsGiven effects targets family srcId gs =
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
+        PlayerEffect.CantGetCounters _ -> Nothing
       -- CR 601.2f's "plus all additional costs", the non-mana half: Brutal
       -- Suppression's "Sacrifice a land". Gathered against the SAME criterion
       -- reading the reductions use -- the ability's source permanent -- and
@@ -1261,6 +1324,7 @@ activationCostAdjustmentsGiven effects targets family srcId gs =
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
+        PlayerEffect.CantGetCounters _ -> Nothing
    in CostAdjustments.MkCostAdjustments
         { CostAdjustments.increases = Maybe.mapMaybe increaseOf effects,
           CostAdjustments.reductions = Maybe.mapMaybe reductionOf effects,
@@ -1334,6 +1398,7 @@ mayCastAsThoughItHadFlash pid oid gs =
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+        PlayerEffect.CantGetCounters _ -> False
    in any allows (applying pid gs)
 
 -- CR 601.3: may `pid` cast `oid` from a graveyard because an EFFECT says so?
@@ -1403,6 +1468,7 @@ mayCastFromGraveyard pid oid gs =
         -- mayCastFromHandWithoutPayingManaCost below is its one reader, and CR
         -- 601.3's permission is still owed separately.
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+        PlayerEffect.CantGetCounters _ -> False
    in any allows (applying pid gs)
 
 -- CR 118.9 / Omniscience: may `pid` cast `oid` from their hand without paying
@@ -1429,6 +1495,7 @@ mayCastFromHandWithoutPayingManaCost :: PlayerId -> ObjectId -> GameState -> Boo
 mayCastFromHandWithoutPayingManaCost pid oid gs =
   let allows (source, effect) = case effect of
         PlayerEffect.CastFromHandWithoutPayingManaCost criterion -> matchesObjectFrom source criterion oid gs
+        PlayerEffect.CantGetCounters _ -> False
         -- The CR 601.3 permissions, which say WHERE a spell may be cast from and
         -- WHEN. Neither states a cost, which is the whole reason this arm is its
         -- own: Yawgmoth's Will's cast pays the card's printed cost.
@@ -1525,6 +1592,7 @@ mayPlayLandsFromGraveyard pid gs =
         -- A cost, not a zone: CR 118.9's grant says what a spell PAYS and
         -- widens no pile a land may be played from.
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+        PlayerEffect.CantGetCounters _ -> False
    in any (allows . snd) (applying pid gs)
 
 -- CR 702.18a / 702.11c: is `pid` protected from being the target of a spell or
@@ -1592,6 +1660,7 @@ protectedFromTargeting caster pid gs =
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+        PlayerEffect.CantGetCounters _ -> False
    in any (stops . snd) (applying pid gs)
 
 -- CR 305.2: the number of lands a player may normally play during their turn.
@@ -1653,6 +1722,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
+        PlayerEffect.CantGetCounters _ -> Nothing
    in defaultLandPlays + sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
 
 -- CR 402.2: a player's maximum hand size, normally seven cards. NOT CR 103.5's
@@ -1709,6 +1779,7 @@ maximumHandSize pid gs =
         PlayerEffect.CastFromGraveyard _ -> current
         PlayerEffect.PlayLandsFromGraveyard -> current
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> current
+        PlayerEffect.CantGetCounters _ -> current
    in List.foldl' (\current row -> apply current (snd row)) (Just defaultMaximumHandSize) (applying pid gs)
 
 -- CR 500.5 / 106.4 / 613.11: which of the unspent mana in this player's pool do
@@ -1767,6 +1838,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
+        PlayerEffect.CantGetCounters _ -> Nothing
       filters = Maybe.mapMaybe (keeps . snd) (applying pid gs)
    in \unit -> any (\f -> ManaFilter.matches f unit) filters
 
@@ -1816,6 +1888,7 @@ spendManaAsThough pid gs =
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
+        PlayerEffect.CantGetCounters _ -> Nothing
    in Maybe.mapMaybe (spends . snd) (applying pid gs)
 
 -- CR 701.6a / 613.11: can this spell or ability on the stack be countered
@@ -1882,6 +1955,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+        PlayerEffect.CantGetCounters _ -> False
    in any stops (applying pid gs)
 
 -- CR 615.12 / 613.11: every "damage can't be prevented" effect standing right
@@ -1937,6 +2011,7 @@ unpreventable gs =
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
+        PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing

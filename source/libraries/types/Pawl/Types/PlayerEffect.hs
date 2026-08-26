@@ -9,6 +9,7 @@ import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaFilter as ManaFilter
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
@@ -622,4 +623,28 @@ data PlayerEffect
     -- narrowing filter would see of a card in a hand is unobserved (#1859, the
     -- same gap the graveyard arm records).
     CastFromHandWithoutPayingManaCost (Filter.Filter Keyword.Keyword)
+  | -- | CR 101.2 / 122.1 / Solemnity, Melira Sylvok Outcast: this player can't get
+    -- counters. Solemnity's first sentence names no kind ("players can't get
+    -- counters"); Melira's names one ("you can't get poison counters"), which is
+    -- what the Maybe holds -- Nothing for every kind.
+    --
+    -- The PLAYER half of the two cards whose OBJECT half is
+    -- Pawl.Types.CounterRestriction. Two carriers rather than one because the two
+    -- kind domains are disjoint (Pawl.Types.PlayerCounterKind's header says why),
+    -- and because the object half is scoped by a Filter over objects while this
+    -- is scoped by the PlayerScope every row of this type already carries -- the
+    -- reason Pawl.Types.EntryRestriction gives for not being a PlayerEffect,
+    -- read the other way round.
+    --
+    -- Read by Pawl.Engine.PlayerEffect.prohibitsCounters at
+    -- Pawl.Engine.Event.putPlayerCounters, the one door a player's counters go
+    -- up through, and asked AFTER CR 616.1's loop has settled the placement for
+    -- Pawl.Engine.CounterRestriction's reason: rule 614 replaces events that
+    -- would happen, and rule 101.2 then refuses what rule 614 settled on.
+    --
+    -- A prohibition and not a replacement, the distinction
+    -- Pawl.Types.CounterRestriction's header draws: a CR 614.16 row scaling a
+    -- placement to zero describes an event that was possible and had something
+    -- put instead, where "can't" is CR 101.2's word.
+    CantGetCounters (Maybe PlayerCounterKind.PlayerCounterKind)
   deriving (Eq, Ord, Show)

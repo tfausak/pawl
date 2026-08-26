@@ -30,6 +30,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
+import qualified Pawl.Types.CounterRestriction as CounterRestriction
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
@@ -383,6 +384,21 @@ data Face card = MkFace
     -- reason that field gives: the two forbid unrelated game actions, and this
     -- one is read at the one funnel every battlefield entry reaches.
     entryRestrictions :: [EntryRestriction.EntryRestriction],
+    -- | CR 604.1\/604.2 \/ 122.6 \/ 101.2: this face's printed COUNTER
+    -- PROHIBITIONS -- "counters can't be put on artifacts, creatures,
+    -- enchantments, or lands" (Solemnity); read by
+    -- Pawl.Engine.CounterRestriction, never by Pawl.Engine.Projection, for
+    -- blockRequirements' CR 613.11 reason.
+    --
+    -- Its own field rather than an arm of entryRestrictions above, for the reason
+    -- that field gives about attachRestrictions: the two forbid unrelated game
+    -- actions, and this one is read at the funnel every counter placement
+    -- reaches.
+    --
+    -- The PLAYER half of the same printings is not here. "Players can't get
+    -- counters" is scoped to a player and reaches a disjoint kind domain, so it
+    -- is a playerAbilities row carrying PlayerEffect.CantGetCounters.
+    counterRestrictions :: [CounterRestriction.CounterRestriction],
     -- | CR 604.1/604.2 / 508.1c / 508.1h: this face's printed COSTS TO ATTACK --
     -- Ghostly Prison's {2} per attacking creature; read by Pawl.Engine.AttackCost,
     -- never by Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.
