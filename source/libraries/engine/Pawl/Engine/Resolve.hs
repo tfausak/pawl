@@ -696,6 +696,7 @@ replacementPatternSlots re = case re of
   ReplacementEffect.CounterR (CounterR.MkCounterR pat _) -> filterSlotsOf (CounterPattern.onWhat pat)
   ReplacementEffect.TokenR _ -> Map.empty
   ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat _ _) -> filterSlotsOf pat
+  ReplacementEffect.UntapR _ -> Map.empty
   ReplacementEffect.PhaseR _ -> Map.empty
 
 -- One Filter's slot reads, at arity One -- the same shape modeSlots folds over a
@@ -5918,16 +5919,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Tap ref -> do
     gs <- State.get
     Monad.forM_ (objectRefObjects legal resolving controller source gs ref) Event.tap
-  Effect.Untap ref ->
-    State.modify' $ \gs ->
-      -- CR 701.26b: rotate each named permanent back upright. The victims are
-      -- enumerated ONCE (CR 608.2f); an illegal slot (CR 608.2b), a player
-      -- recipient and an empty match all untap nothing.
-      let untap o = o {Object.tapped = TapState.Untapped}
-       in gs
-            { GameState.objects =
-                foldr (Map.adjust untap) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)
-            }
+  -- CR 701.26b: rotate each named permanent back upright. The victims are
+  -- enumerated ONCE (CR 608.2f) and off the board as it stands before any of them
+  -- is untapped, so an illegal slot (CR 608.2b), a player recipient and a set
+  -- that matched nothing all untap nothing.
+  --
+  -- Through Pawl.Engine.Event.untap rather than a direct write, Effect.Tap's
+  -- reason one rule clause over: rule 701.26b's "only tapped permanents can be
+  -- untapped" lives in that funnel, and CR 122.1d's replacement is offered the
+  -- event there.
+  Effect.Untap ref -> do
+    gs <- State.get
+    Monad.forM_ (objectRefObjects legal resolving controller source gs ref) Event.untap
   Effect.Detain ref ->
     State.modify' $ \gs ->
       -- CR 701.35a: detain each named permanent until the next turn of this

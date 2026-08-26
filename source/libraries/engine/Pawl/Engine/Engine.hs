@@ -197,8 +197,7 @@ checkSba = sampleWorldSince >> Sba.checkStateBasedActions
 untapAll :: PlayerId -> Game ()
 untapAll pid = do
   gs <- State.get
-  let untap obj = obj {Object.tapped = TapState.Untapped}
-      clear obj = obj {Object.doesNotUntapNext = False}
+  let clear obj = obj {Object.doesNotUntapNext = False}
       unexert obj = obj {Object.exertedBy = Set.delete pid (Object.exertedBy obj)}
       ids = Projection.controls pid gs
       prohibited = UntapRestriction.doesNotUntap ids gs
@@ -207,12 +206,25 @@ untapAll pid = do
       exerted = asks (Set.member pid . Object.exertedBy)
       untapping = filter (\oid -> not (Set.member oid prohibited) && not (oneShot oid) && not (exerted oid)) ids
       expiring = filter oneShot ids
-      untapped = foldr (Map.adjust clear) (foldr (Map.adjust untap) (GameState.objects gs) untapping) expiring
-      objects =
-        if any (Set.member pid . Object.exertedBy) untapped
-          then Map.map unexert untapped
-          else untapped
-  State.put gs {GameState.objects = objects}
+  -- CR 502.3's two sentences, in its own order: DETERMINE which permanents will
+  -- untap, then untap them all SIMULTANEOUSLY. Event.proposeUntap is the
+  -- determining half -- rule 701.26b's guard plus the CR 614 loop, which is where
+  -- CR 122.1d's stun counters take the event and are spent -- and the write below
+  -- is the untapping, one State.modify' over the survivors so no permanent is
+  -- upright while another is still being decided.
+  --
+  -- Event.untap is not called per permanent for exactly that reason: it writes as
+  -- it goes, which is right for CR 701.26b's one-at-a-time roads (an Effect.Untap,
+  -- an untap symbol) and wrong for this one.
+  survivors <- Monad.filterM Event.proposeUntap untapping
+  State.modify' $ \live ->
+    let untapped = foldr (Map.adjust clear) (foldr Event.writeUntappedIn (GameState.objects live) survivors) expiring
+     in live
+          { GameState.objects =
+              if any (Set.member pid . Object.exertedBy) untapped
+                then Map.map unexert untapped
+                else untapped
+          }
 
 -- CR 302.6: permanents the active player has controlled since their turn began
 -- are no longer summoning sick, and the untap step is where that becomes true.

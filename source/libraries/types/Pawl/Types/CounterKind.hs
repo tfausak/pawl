@@ -7,9 +7,9 @@ import qualified Pawl.Types.CounterName as CounterName
 -- rules core reads counts by kind (CR 613.4c, the CR 704.5q SBA) and never cases
 -- on a card. CR 122.1a for the P/T kinds, CR 122.1b for keyword, CR 122.1e for
 -- loyalty, rule 714 for lore, CR 702.63 for time and CR 702.32 for fade -- none
--- of which rule 122.1 lists at all, CR 122.1c for shield and CR 122.1h for
--- finality. What rule 122.1 names and this type does not is CR 122.1d's stun
--- counter (#2329); 122.1f's poison and 122.1i's rad are a PLAYER's and live in
+-- of which rule 122.1 lists at all, CR 122.1c for shield, CR 122.1d for stun and
+-- CR 122.1h for finality. Every object kind rule 122.1 names now has an arm;
+-- 122.1f's poison and 122.1i's rad are a PLAYER's and live in
 -- Pawl.Types.PlayerCounterKind.
 -- Ord is load-bearing: CounterKind is a Map key on Object.counters.
 --
@@ -121,6 +121,29 @@ data CounterKind keyword
     -- no keyword. What the rule does with it is replace an event, and CR 614 is
     -- where that lives.
     Finality
+  | -- | CR 122.1d: stun counters on a permanent create a single replacement
+    -- effect that stops it untapping -- "If a permanent with a stun counter on it
+    -- would become untapped, instead remove a stun counter from it."
+    --
+    -- SHIELD's posture rather than Finality's, and the rules say which: rule
+    -- 122.1d spells the removal into the effect itself, exactly as CR 122.1c
+    -- does and rule 122.1h does not, so the count is how many times the row may
+    -- still be applied rather than a number any rule reads.
+    -- Pawl.Engine.Projection.stunOf mints one row from the PRESENCE of any such
+    -- counter, however many there are.
+    --
+    -- NOT Pawl.Types.Effect's DoesNotUntapNext, which is CR 302.6's "doesn't
+    -- untap during its controller's next untap step": that one suppresses the CR
+    -- 502.3 turn-based action for one step and reaches nothing else, where this
+    -- replaces the untap EVENT wherever it comes from and spends a counter each
+    -- time.
+    --
+    -- Contributes nothing to the CR 613 layer system, so
+    -- Pawl.Engine.Projection.counterGathered grants nothing for this kind -- for
+    -- Shield's reason: this is not CR 122.1b's keyword counter and grants no
+    -- keyword. What the rule does with it is replace an event, and CR 614 is
+    -- where that lives.
+    Stun
   | -- | CR 711.2: the counters a leveler creature tracks its level with. Rule
     -- 122.1 gives level counters no lettered clause of their own -- 122.1a-j
     -- never name them -- so rule 711 is the whole citation, exactly as rule 714

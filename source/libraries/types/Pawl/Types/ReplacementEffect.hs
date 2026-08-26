@@ -7,6 +7,7 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TurnUpR as TurnUpR
+import qualified Pawl.Types.UntapRewrite as UntapRewrite
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
 -- | CR 614.1a: a replacement effect, classified by the EVENT CLASS it intercepts
@@ -20,8 +21,8 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- An (effect, event) pair whose arms disagree simply does not apply, so the type
 -- rules out "redirect a damage event" without a validity pass.
 --
--- DestructionR carries NO pattern: both producers are self-only, and each for its
--- own rule. CR 201.5 makes a card's reference to itself by name mean just that
+-- DestructionR and UntapR carry NO pattern: every producer is self-only, and each
+-- for its own rule. CR 201.5 makes a card's reference to itself by name mean just that
 -- object, so "regenerate this creature" (CR 701.19a) names no other; and CR
 -- 122.1c's replacement is minted onto the permanent whose counters create it, so
 -- "this permanent" is the object it was minted for. The field appears when a card
@@ -85,5 +86,16 @@ data ReplacementEffect effect
     -- Pawl.Engine.FaceDown.performTurnFaceUp raises the event between the status write
     -- and the CR 708.7 record.
     TurnUpR TurnUpR.TurnUpR
+  | -- | CR 614.1a / 122.1d: "If a permanent with a stun counter on it would
+    -- become untapped, instead remove a stun counter from it." A separate arm
+    -- from every other because becoming untapped is its own event class: CR
+    -- 701.26b's action, which CR 502.3's turn-based action, an Effect.Untap and
+    -- CR 107.6's untap symbol in a cost all perform.
+    --
+    -- Carries NO pattern, for DestructionR's reason exactly: rule 122.1d's
+    -- effect is minted onto the permanent whose counters create it, so "a
+    -- permanent with a stun counter on it" is the object it was minted for. The
+    -- field appears when a card needs it.
+    UntapR UntapRewrite.UntapRewrite
   | PhaseR PhasePattern.PhasePattern
   deriving (Eq, Ord, Show)

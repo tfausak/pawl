@@ -47,6 +47,8 @@ data CounterKindFamily
     Shield
   | -- | CR 122.1h: Pawl.Types.CounterKind.Finality.
     Finality
+  | -- | CR 122.1d: Pawl.Types.CounterKind.Stun.
+    Stun
   | -- | CR 711.2: Pawl.Types.CounterKind.Level.
     Level
   | -- | CR 122.1j: Pawl.Types.CounterKind.Hone.

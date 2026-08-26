@@ -116,6 +116,7 @@ spellings family = case family of
   CounterKindFamily.Fade -> one "fade"
   CounterKindFamily.Shield -> one "shield"
   CounterKindFamily.Finality -> one "finality"
+  CounterKindFamily.Stun -> one "stun"
   CounterKindFamily.Level -> one "level"
   CounterKindFamily.Hone -> one "hone"
   CounterKindFamily.Named -> Set.empty
@@ -148,6 +149,7 @@ familyOf kind = case kind of
   CounterKind.Fade -> CounterKindFamily.Fade
   CounterKind.Shield -> CounterKindFamily.Shield
   CounterKind.Finality -> CounterKindFamily.Finality
+  CounterKind.Stun -> CounterKindFamily.Stun
   CounterKind.Level -> CounterKindFamily.Level
   CounterKind.Hone -> CounterKindFamily.Hone
   CounterKind.Named _ -> CounterKindFamily.Named
