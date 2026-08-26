@@ -326,6 +326,24 @@ data Prompt r where
   -- the arrows out of their current room lead to. Choose, not target. Raised
   -- only for two or more arrows, which is CR 309.5a's own condition.
   ChooseRoom :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty RoomIndex.RoomIndex -> Prompt RoomIndex.RoomIndex
+  -- | CR 709.5f \/ 709.5g: WHICH HALF of a permanent an effect locks or
+  -- unlocks. The ObjectId is the permanent; the NonEmpty is the halves the
+  -- instruction admits -- rule 709.5g's "an unlocked half" for a lock and rule
+  -- 709.5f's "a locked half" for an unlock -- in printed order. Choose, not
+  -- target. Raised only for two or more, one half leaving nothing to ask.
+  --
+  -- HALVES and not doors, and no Room in sight: CR 709.5j makes "door" what a
+  -- card calls a half, and rules 709.5f\/g word both instructions over any
+  -- permanent with halves.
+  --
+  -- Nothing to do with ChooseRoom above, which is CR 309's dungeon and names a
+  -- room by index. By NAME, for the reason Object.unlockedHalves keys the
+  -- designations by name (CR 709.4a).
+  --
+  -- Not ChooseOfferedCastFace, which shares this type: that one settles which
+  -- half is being CAST, is asked as a spell goes on the stack, and is gated by
+  -- Cast.castableWhenOffered rather than by a designation.
+  ChooseHalf :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty CardName.CardName -> Prompt CardName.CardName
   -- | CR 704.5j: which of two or more same-named legendary permanents its
   -- controller keeps. One prompt per name, not per player. The answer is what
   -- is KEPT, as the rule is worded. Never elided: the group is always two or

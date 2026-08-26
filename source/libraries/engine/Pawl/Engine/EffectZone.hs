@@ -30,6 +30,7 @@ import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
+import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import Pawl.Types.Zone (Zone)
 
 -- CR 113.6m: "an ability whose cost or effect specifies that it moves the object
@@ -165,6 +166,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> Nothing
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> Nothing
   Effect.Unsuspect _ -> Nothing
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> Nothing
   Effect.Evolve _ -> Nothing
   Effect.Mentor _ -> Nothing
   Effect.Train _ -> Nothing

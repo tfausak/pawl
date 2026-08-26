@@ -210,6 +210,13 @@ data Response
     ChoseCardFromAmong ObjectId.ObjectId
   | -- | CR 309.5a: the room a venturing player chose to move their marker into.
     ChoseRoom RoomIndex.RoomIndex
+  | -- | CR 709.5f \/ 709.5g: the half of a permanent a player chose to unlock or
+    -- lock.
+    --
+    -- Its own constructor rather than ChoseOfferedCastFace reused, though both
+    -- carry a CardName: that one answers which half is being CAST, and a
+    -- transcript of one must not satisfy the other.
+    ChoseHalf CardName.CardName
   | -- | CR 704.5j: the legendary permanent its controller kept.
     ChoseLegend ObjectId.ObjectId
   | DeclaredAttackers [ObjectId.ObjectId]

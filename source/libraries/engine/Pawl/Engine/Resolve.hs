@@ -45,6 +45,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Ring as Ring
+import qualified Pawl.Engine.Room as Room
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Target as Target
@@ -223,6 +224,7 @@ import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
+import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
@@ -570,6 +572,9 @@ slotsOf effect = case effect of
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ slot) -> oneSlot slot
   -- A READ of whatever slot the ref names; CR 701.60a's ending can reach a set.
   Effect.Unsuspect ref -> objectRefSlots ref
+  -- A READ, Designate's: the slot names the permanent whose half is locked or
+  -- unlocked. WHICH half is chosen at resolution and is no slot of any kind.
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ slot) -> oneSlot slot
   -- A READ, Designate's: the slot names where rule 702.100a's counter goes.
   Effect.Evolve slot -> oneSlot slot
   Effect.Mentor slot -> oneSlot slot
@@ -836,6 +841,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> True
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> True
   Effect.Unsuspect _ -> True
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> True
   Effect.Evolve _ -> True
   Effect.Mentor _ -> True
   Effect.Train _ -> True
@@ -981,6 +987,7 @@ readsX = any effectReadsX
       Effect.Designate (Designate.MkDesignate _ _) -> False
       Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
       Effect.Unsuspect _ -> False
+      Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> False
       Effect.Evolve _ -> False
       Effect.Mentor _ -> False
       Effect.Train _ -> False
@@ -1178,6 +1185,7 @@ boundSlots effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> Set.empty
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> Set.empty
   Effect.Unsuspect _ -> Set.empty
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> Set.empty
   Effect.Evolve _ -> Set.empty
   Effect.Mentor _ -> Set.empty
   Effect.Train _ -> Set.empty
@@ -1615,7 +1623,9 @@ gateHolds controller source chosen groups clause = case Clause.condition clause 
 --
 -- Not implemented: CR 608.2d's "can't choose an option that's illegal or
 -- impossible" -- a branch whose own `condition` has already failed is offered
--- anyway, and choosing it leaves the pair doing nothing (#2167).
+-- anyway, as is one whose instruction has nothing legal to act on (Keys to the
+-- House offers its lock over a Room with every door already shut), and choosing
+-- either leaves the pair doing nothing (#2167).
 chosenBranch :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map ClauseIndex ClauseIndex -> Clause.Clause Card.Type.Card -> Game (Bool, Map.Map ClauseIndex ClauseIndex)
 chosenBranch resolving controller idx cIdx picked clause = case Clause.orElse clause of
   Nothing -> pure (True, picked)
@@ -5497,6 +5507,44 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             { GameState.objects =
                 foldr (Map.adjust unsuspect) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)
             }
+  -- CR 709.5f and CR 709.5g, one arm because the two rules are one sentence with
+  -- two words swapped: choose a half of the slot's permanent that the setting
+  -- admits, and give or take the appropriate unlocked designation.
+  --
+  -- The CANDIDATES come from Pawl.Engine.Room's CR 709.5c derivation -- rule
+  -- 709.5g's "an unlocked half" for a lock, rule 709.5f's "a locked half" for an
+  -- unlock -- so the prompt cannot offer a half the instruction forbids, and the
+  -- answer is FILTERED back through them rather than trusted. Rule 709.5c's own
+  -- scope is why an object that is not a permanent with a shared type line on the
+  -- battlefield offers nothing.
+  --
+  -- No candidate leaves the instruction doing nothing, CR 101.3: a Room with
+  -- every door already shut cannot be locked further. A SINGLE candidate is not
+  -- asked about, both rules leaving nothing to choose.
+  --
+  -- A player recipient, an illegal slot (CR 608.2b) and an id naming no object
+  -- all write nothing -- Designate's postures.
+  --
+  -- Casing on `locked` is not casing on an effect's identity: it is one payload
+  -- of one opcode, which is the argument Effect.Designate's own haddock makes.
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked locked slot) ->
+    case legalOne slot legal of
+      Just recipient -> case Recipient.objectOf recipient of
+        Nothing -> pure ()
+        Just target -> do
+          gs <- State.get
+          let halves = fmap Face.name (if locked then Room.unlockedHalves target gs else Room.lockedHalves target gs)
+          case halves of
+            [] -> pure ()
+            first : rest -> do
+              half <- case rest of
+                [] -> pure first
+                second : more -> do
+                  let offered = first NonEmpty.:| (second : more)
+                  answered <- Game.choose (Prompt.ChooseHalf (Decide.deciderFor controller gs) controller target offered)
+                  pure (if List.elem answered (NonEmpty.toList offered) then answered else first)
+              if locked then Event.lockHalf target half else Event.unlockHalf target half
+      _ -> pure ()
   -- CR 702.100a's counter and CR 702.100b's marker: the creature evolves only if
   -- the placement actually put one or more counters on it.
   Effect.Evolve slot ->

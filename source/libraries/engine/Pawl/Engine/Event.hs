@@ -2443,8 +2443,7 @@ designateProtector oid = do
 -- CR 709.5h is a fact about the designation being given, and this is where it is
 -- given.
 --
--- CR 709.5g's LOCK -- taking a designation back away -- has no counterpart
--- function: no card in the pool locks a door (#924).
+-- CR 709.5g's LOCK is lockHalf below, this function's inverse.
 unlockHalf :: ObjectId -> CardName.CardName -> Game ()
 unlockHalf oid half = do
   gs <- State.get
@@ -2457,6 +2456,26 @@ unlockHalf oid half = do
           let open o = o {Object.unlockedHalves = opened}
            in g {GameState.objects = Map.adjust open oid (GameState.objects g)}
         State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid half (fullyUnlockedAfter opened (Game.cardOf oid gs)))))
+
+-- CR 709.5g: take one unlocked designation back away -- "that permanent loses
+-- the appropriate unlocked designation". unlockHalf's inverse and the single
+-- door every lock goes through, so the two writers of Object.unlockedHalves that
+-- ADD a designation have exactly one that removes one.
+--
+-- NO EVENT, unlike unlockHalf: rules 709.5h and 709.5i are the only rules that
+-- ask a trigger about an unlocked designation and both ask about GAINING one, so
+-- there is nothing for a lock to fire. GameEvent.HalfUnlocked's own comment
+-- carries that argument for the type.
+--
+-- Unguarded, where unlockHalf guards: the deletion is idempotent on its own, and
+-- with no event to suppress there is no transition to detect. CR 709.5g's own
+-- "chooses an unlocked half" is what keeps a caller from reaching this with a
+-- door already shut.
+lockHalf :: ObjectId -> CardName.CardName -> Game ()
+lockHalf oid half =
+  State.modify' $ \g ->
+    let shut o = o {Object.unlockedHalves = Set.delete half (Object.unlockedHalves o)}
+     in g {GameState.objects = Map.adjust shut oid (GameState.objects g)}
 
 -- CR 709.5i's "fully unlocks", answered about the designations a permanent has
 -- ONCE a write has landed: "such an ability triggers when that permanent has one

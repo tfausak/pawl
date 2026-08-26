@@ -65,6 +65,7 @@ import qualified Pawl.Codec.Reveal as Reveal
 import qualified Pawl.Codec.RollDie as RollDie
 import qualified Pawl.Codec.Search as Search
 import qualified Pawl.Codec.SetClassLevel as SetClassLevel
+import qualified Pawl.Codec.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Codec.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Codec.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Codec.SlotName as SlotName
@@ -157,6 +158,7 @@ codec cardCodec =
       Arm.payload "Designate" Designate.codec Effect.Designate (\x -> case x of Effect.Designate y -> Just y; _ -> Nothing),
       Arm.payload "SetClassLevel" SetClassLevel.codec Effect.SetClassLevel (\x -> case x of Effect.SetClassLevel y -> Just y; _ -> Nothing),
       Arm.payload "Unsuspect" ObjectRef.codec Effect.Unsuspect (\x -> case x of Effect.Unsuspect y -> Just y; _ -> Nothing),
+      Arm.payload "SetHalfLocked" SetHalfLocked.codec Effect.SetHalfLocked (\x -> case x of Effect.SetHalfLocked y -> Just y; _ -> Nothing),
       Arm.payload "Evolve" SlotName.codec Effect.Evolve (\x -> case x of Effect.Evolve y -> Just y; _ -> Nothing),
       Arm.payload "Mentor" SlotName.codec Effect.Mentor (\x -> case x of Effect.Mentor y -> Just y; _ -> Nothing),
       Arm.payload "Train" SlotName.codec Effect.Train (\x -> case x of Effect.Train y -> Just y; _ -> Nothing),
