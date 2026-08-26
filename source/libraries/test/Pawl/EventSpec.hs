@@ -378,8 +378,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
 
   -- CR 704.5q / 122.3's annihilation is a REMOVAL -- rule 122.3 uses the word --
   -- so it records a GameEvent.CountersRemoved like every other removal, and a
-  -- card watching counters come off sees it (#900). Protean Hydra {X}{G} Creature
-  -- -- Hydra, printed 0/0, is the pool's reader: "whenever a +1/+1 counter is
+  -- card watching counters come off sees it (see #900). Protean Hydra {X}{G}
+  -- Creature -- Hydra, printed 0/0, is the pool's reader: "whenever a +1/+1 counter is
   -- removed from this creature, put two +1/+1 counters on it at the beginning of
   -- the next end step."
   --
