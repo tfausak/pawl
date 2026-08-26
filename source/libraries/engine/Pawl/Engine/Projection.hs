@@ -4277,7 +4277,7 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 
 -- CR 614.1: every replacement effect active on the battlefield, PAIRED WITH ITS
 -- SOURCE -- a ControllerRelation pattern (CR 109.5's "you") is unanswerable
--- without it. Short-circuits when no permanent's base card has one.
+-- without it. Short-circuits when no permanent has one in its copiable rules text.
 --
 -- The short-circuit reads COPIABLE values while the result reads the PROJECTION,
 -- sound only because every route to an unprinted replacement effect is covered:

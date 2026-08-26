@@ -21,6 +21,13 @@
 -- (Pawl.Engine.Projection.setLandSubtypeTo) -- plus the other order, where CR
 -- 614.12 leaves Vesuva no copy ability to apply at all.
 --
+-- And CR 707.2a's abilities half at the two BATTLEFIELD-WIDE SHORT-CIRCUITS that
+-- decide whether a walk is needed at all -- Pawl.Engine.Projection's
+-- copiableReplacementsOf and anyCopiableKeyword, in replacementsAffecting's
+-- baseHas, and Pawl.Engine.CombatRestriction's baseCouldMint -- on a board an
+-- Unstable Shapeshifter has left holding the only copy of the departed original's
+-- text (copiedAbilitySpec).
+--
 -- And Pawl.Engine.Resolve's CopySpell arm (CR 707.10's copy of a spell on the
 -- stack, Twincast) with the CR 707.10c re-target prompt it raises, the CR 704.5e
 -- state-based action in Pawl.Engine.Sba that removes the resolved copy, and
