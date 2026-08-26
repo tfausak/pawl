@@ -4085,8 +4085,9 @@ asksFor asks ref = case asks of
 --
 -- Exhaustive and hand-maintained with effectFilters' caveat, and the missing `_`
 -- is the whole point: a NEW opcode taking an ObjectRef is AsksNothing only by
--- being written so here, and the build breaks until somebody decides. The two
--- traversals are twins, which the cross-check below is what keeps from drifting.
+-- being written so here, and the build breaks until somebody decides. The one
+-- thing -Werror cannot catch is an arm written `[]` that does hold a ref, which
+-- is what the cross-check against effectFilters below is for.
 effectObjectRefs :: Effect.Effect Card.Type.Card -> [(Asks, ObjectRef.ObjectRef)]
 effectObjectRefs effect = case effect of
   Effect.AttachTarget {} -> []
@@ -6150,7 +6151,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- reach the Game monad and ask instead, over DIFFERENT subsets -- see Asks --
   -- and a chooser-shaped ref written anywhere else names no object, so that share
   -- of the instruction is skipped (CR 101.3, CR 609.3) with nothing on the wire
-  -- to show it. This is that lint (#1689).
+  -- to show it -- so the card is silently weaker than printed, which is what this
+  -- rejects at load time.
   Spec.it s "no effect asks for a chosen card where nothing can ask" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace (not . all (null . inertChoosers) . cardAuthoredEffects) . Printing.card) ps
