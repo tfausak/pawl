@@ -2200,7 +2200,7 @@ payManaExcept inFlight subject spending pid cost = do
     -- `PaymentSubject.castOf` is the object it goes on, and it answers Just only
     -- where the payment is for a spell being cast (see `pay`), which is the whole
     -- of what any printed card asks about ("if {S} was spent to CAST this
-    -- spell"). An activation's mana is not recorded (#2007) -- the narrowing is
+    -- spell"). An activation's mana is not recorded (#2404) -- the narrowing is
     -- deliberate and is why this reads `castOf` rather than the subject.
     --
     -- Written HERE rather than by the caller because this is the one place that
