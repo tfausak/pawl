@@ -7623,8 +7623,8 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
         Spec.assertEqWith s "setup: the counter is still there" (shields oid humbled) 1
         Spec.assertBool s (Set.member oid (GameState.battlefield once)) "and the shield still replaced the destruction"
         Spec.assertEqWith s "spending the counter" (shields oid once) 0
-  -- The gather's SHORT-CIRCUIT reads base faces, and a shield counter is on none of
-  -- them: Projection.replacementsAffecting would answer [] for a board whose only
+  -- The gather's SHORT-CIRCUIT reads copiable rules text, and a shield counter is
+  -- on none of it: Projection.replacementsAffecting would answer [] for a board whose only
   -- replacement is CR 122.1c's, so this case is what makes that disjunct
   -- load-bearing rather than a fence. Every producer in the pool is itself an entry
   -- replacement and so passes the short-circuit on its own printed text, which is

@@ -1369,9 +1369,9 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Undying -> []
 
 -- The SHORT-CIRCUIT's voice: Projection.replacementsAffecting skips the whole
--- board when no permanent's BASE card could hold a replacement effect, and a
--- minted row is not printed in a face's list, so the gate has to be told which
--- keywords mint one. Membership rather than a count, the gate asking whether
+-- board when no permanent's COPIABLE rules text could hold a replacement effect,
+-- and a minted row is not printed in a face's list, so the gate has to be told
+-- which keywords mint one. Membership rather than a count, the gate asking whether
 -- there is any.
 mintsReplacement :: Keyword -> Bool
 mintsReplacement keyword = not (null (mintedReplacementsFor keyword 1))
