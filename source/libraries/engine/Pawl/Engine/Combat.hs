@@ -382,17 +382,20 @@ attackCeilingGiven limit alone candidates gs =
               Just n -> Integer.toIntSaturating (min (toInteger (length rest)) (max 0 (toInteger n - toInteger held)))
             gains = take (room + 1) (List.scanl' (+) 0 (List.sortBy (flip compare) (fmap weightOf rest)))
             sized = [got + gain | (more, gain) <- zip [0 :: Int ..] gains, held + more /= 1]
-            -- CR 506.5's exception, the one size the prefix above may not take on
-            -- trust: a declaration of exactly one creature is illegal when that
-            -- creature can't attack alone, so size one is answered over the
-            -- creatures the restriction leaves rather than over the heaviest.
-            singled = case taken of
-              [only] -> [weightOf only | not (Set.member (fst only) alone)]
-              []
-                | room >= 1 -> case fmap weightOf (filter (\entry -> not (Set.member (fst entry) alone)) rest) of
-                    [] -> []
-                    ws -> [maximum ws]
-              _ -> []
+            -- CR 506.5's exception, the one size `sized` skips: a declaration of
+            -- exactly one creature is illegal when that creature can't attack
+            -- alone, so size one is answered over the creatures the restriction
+            -- leaves rather than over the heaviest. Either the prefix already IS
+            -- that one creature, or the prefix is empty and the one is drawn from
+            -- `rest`; any other prefix cannot reach size one at all. Both go
+            -- through ONE `alone` test, so no arm of it can go untested.
+            solo
+              | held == 1 = taken
+              | held == 0 && room >= 1 = rest
+              | otherwise = []
+            singled = case fmap weightOf (filter (\entry -> not (Set.member (fst entry) alone)) solo) of
+              [] -> []
+              ws -> [maximum ws]
          in case sized <> singled of
               [] -> Nothing
               scores -> Just (maximum scores)
