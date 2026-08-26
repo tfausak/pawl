@@ -38,7 +38,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 -- still "that mana ... spent on" the spell.
 --
 -- The condition is matched against the object's own view under its
--- CONTROLLER's perspective -- the context Pawl.Engine.Mana.spendableAmong
+-- CONTROLLER's perspective -- the context Pawl.Engine.Mana.admitsUnder
 -- builds for a restriction's filter, and honest here for the same reason: the
 -- clause names no source and binds no slot.
 uncounterable :: ObjectId.ObjectId -> GameState.GameState -> Bool
