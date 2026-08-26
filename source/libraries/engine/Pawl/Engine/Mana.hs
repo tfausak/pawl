@@ -640,7 +640,7 @@ data Demand = MkDemand
 -- payment: the cost being paid, and every nested mana ability's own activation
 -- cost (CR 602.2b, CR 605.3a). A Bool can only answer about one of them, and
 -- answering "restricted, so no" for the others refused Omen Hawker's {C} into
--- Chromatic Star's {1} (#2239). The set is finite and small --
+-- Chromatic Star's {1}; see #2239. The set is finite and small --
 -- payableResolutionsGiven builds it from the outer subject plus one
 -- PaymentSubject.Activating per source -- so `admits` asks a membership rather
 -- than re-reading a filter per demand, and `admitsUnder` stays the one reader of
@@ -809,9 +809,9 @@ ofTypes types = MkDemand {demandTypes = types, demandTags = Set.empty}
 -- supplies may serve it -- only what an earlier position supplies, and only mana
 -- that payment admits (payableResolutionsGiven's `admits`) -- and a plain count
 -- cannot say which supplies it may draw on. The generic part of the cost being
--- paid is said the same way, and for the second of those reasons. Chromatic Star's "{1}, {T}, Sacrifice this artifact"
--- and Coal Golem's "{3}, Sacrifice this creature" are the printings that reach
--- it.
+-- paid is said the same way, and for the second of those reasons. Chromatic
+-- Star's "{1}, {T}, Sacrifice this artifact" and Coal Golem's "{3}, Sacrifice
+-- this creature" are the printings that reach it.
 anyTypeDemand :: Demand
 anyTypeDemand = ofTypes everyManaType
 
@@ -1739,7 +1739,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
       -- 605.3a lets the player pay inside the outer one's mana window and CR
       -- 602.2b makes an activation like any other. Asking CR 106.6 of the outer
       -- subject alone dropped Omen Hawker's {C} before it could buy Chromatic
-      -- Star's {1} (#2239).
+      -- Star's {1}; see #2239.
       --
       -- Neither half of the board is FILTERED by the subject any more, then:
       -- every unit stays a supply and carries the set of payments that admit
@@ -1796,7 +1796,6 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
         [] -> [[]]
         [_] -> [taken]
         _ -> List.permutations taken
-      --
       -- WHOSE payment each position is, carried alongside: position k is the
       -- k-th eating option's source activating (CR 602.2b), and `costPosition`
       -- is the payment this walk was asked about. That map is CR 106.6's other

@@ -48,7 +48,7 @@ data ManaUnit = MkManaUnit
     -- be spent on anything, which is almost every mana. @Just r@ names the
     -- payment kinds it admits and the predicate each of them owes
     -- (Pawl.Types.ManaRestriction), read by
-    -- Pawl.Engine.Mana.spendableAmong against the payment's subject.
+    -- Pawl.Engine.Mana.admitsUnder against the payment's subject.
     --
     -- Stamped off the ADDITION (Pawl.Types.ManaAddition) rather than off the
     -- source, for CR 106.6a's reason: the restriction belongs to the spell or
@@ -70,7 +70,7 @@ data ManaUnit = MkManaUnit
     --
     -- READ off the spent units and not off this pool: CR 400.7d keeps the
     -- payment as Pawl.Types.Object.manaSpent, and Pawl.Engine.ManaRider is the
-    -- one reader. Deliberately NOT read by Pawl.Engine.Mana.spendableAmong: a
+    -- one reader. Deliberately NOT read by Pawl.Engine.Mana.admitsUnder: a
     -- rider narrows nothing about what the mana may pay for, so folding it in
     -- there would turn an unconditional rider into an unconditional restriction.
     --
