@@ -156,10 +156,11 @@ costsFor :: CardName.CardName -> ObjectId -> GameState -> [Cost Keyword.Type.Key
 costsFor name oid gs = fmap CandidateCost.cost (candidateCostsFor name oid gs)
 
 -- costsFor's list with WHICH ability offered each candidate recorded -- the fact
--- CR 702.34a's "if the flashback cost was paid" and CR 702.133a's jump-start
--- clause are conditioned on. THE GRAVEYARD ARM is the only one that tags: those
--- two are the only abilities asking which candidate cost was the one paid, where
--- CR 702.127a's aftermath asks about the ZONE instead.
+-- CR 702.34a's "if the flashback cost was paid", CR 702.133a's jump-start clause
+-- and CR 702.103b's rewrite of a spell cast bestowed are conditioned on. The
+-- GRAVEYARD arm tags the first two, and `bestowed` below tags from every zone,
+-- which is the zone half of rule 702.103a; CR 702.127a's aftermath asks about the
+-- ZONE instead and needs no tag of its own.
 candidateCostsFor :: CardName.CardName -> ObjectId -> GameState -> [CandidateCost.CandidateCost]
 candidateCostsFor name oid gs = case Game.lookupObject oid gs of
   Nothing -> []
@@ -193,7 +194,24 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
                   oid
                   cond
             alternatives = fmap (withAdditional . AlternativeCost.cost) (filter available (Face.alternativeCosts face))
-         in case Object.zone obj of
+            -- CR 702.103a: bestow, offered from EVERY zone rather than from one
+            -- arm of the case below -- "a static ability that functions in any
+            -- zone from which you could play the card it's on". So it is appended
+            -- to whatever that zone's own list is instead of replacing it, and
+            -- LAST, so `firstOffered` still reads the printed cost.
+            --
+            -- CR 118.9d wraps it in `withAdditional`, flashback's reason: an
+            -- alternative replaces only the mana cost.
+            --
+            -- The keywords are read off the PROJECTION for the graveyard arm's CR
+            -- 613.1 reason -- an ability granted where the card lies states rule
+            -- 702.103a's cost as much as a printed one -- which is the read the
+            -- hand arm below does not take for its own printed alternatives.
+            bestowed =
+              fmap
+                (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Bestow cost)) (withAdditional cost))
+                (Keyword.bestowCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+         in (<> bestowed) $ case Object.zone obj of
               -- Four shapes, differing in what they do to the printed cost.
               -- Flashback (CR 702.34a) REPLACES the mana cost, so it is wrapped by
               -- `withAdditional`; aftermath (CR 702.127a) replaces nothing, so it

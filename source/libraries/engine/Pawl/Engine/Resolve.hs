@@ -1260,7 +1260,7 @@ modesOf oid gs = case Game.lookupObject oid gs of
        in fmap (fmap rewriteMode) (Card.chosenModes chosen face)
 
 -- CR 608.2b: a target can stop being legal because an effect changed the spell's
--- text, so the re-check measures the printed slots with CR 612.1's changes
+-- text, so the re-check measures the spell's own slots with CR 612.1's changes
 -- applied. Off the face rather than off modesOf, which has no room for CR
 -- 303.4a's enchant slot. Both readers -- the fizzle test and resolveSpellWith's
 -- per-effect skip -- go through this, so they cannot disagree.
@@ -1268,7 +1268,12 @@ targetSlotsOf :: Object.Object -> ObjectId -> GameState -> Face.Face Card.Type.C
 targetSlotsOf obj oid gs face =
   fmap
     (Projection.rewriteTargetSlot (Projection.textChangesAffecting oid gs))
-    (Card.modesTargetSlots (Binding.modesOf (Object.bindings obj)) face)
+    -- CR 303.4a's slot comes off the PROJECTION and not off `face`, which is the
+    -- only reading that sees a granted enchant ability -- CR 702.103b gives a
+    -- spell cast bestowed one, and its printed face declares none. A printed
+    -- Aura's projection is seeded from that same printed list, so this is the
+    -- wider read rather than a different one.
+    (Card.modesTargetSlotsGiven (Projection.enchantOf oid gs) (Binding.modesOf (Object.bindings obj)) face)
 
 -- CR 405.4: who controls a SPELL on the stack -- both CR 608.2b's legality
 -- perspective and the effects' execution, which must name the same player. The

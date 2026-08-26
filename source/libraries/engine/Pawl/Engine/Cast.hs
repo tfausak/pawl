@@ -46,6 +46,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import Pawl.Types.ManaSpending (ManaSpending)
 import qualified Pawl.Types.ManaSpending as ManaSpending
@@ -448,6 +449,38 @@ stampKicked sid gs =
     { GameState.objects =
         Map.adjust (\o -> o {Object.kicked = True}) sid (GameState.objects gs)
     }
+
+-- CR 702.103b: "as a spell cast bestowed is put onto the stack, it becomes an
+-- Aura enchantment and gains enchant creature". The designation the projection
+-- mints those three modifications from (Projection.bestowGathered), stamped
+-- HERE -- the moment the announcement CR 601.2b settles on the bestow candidate,
+-- which is the earliest point anything knows -- and read from CR 601.2c's target
+-- choice one step below onward.
+--
+-- The rule says "as [it] is put onto the stack", one step earlier than this
+-- (CR 601.2a). Nothing can observe the difference: every rule that asks whether
+-- the spell is an Aura -- CR 601.2c's targets, CR 608.2b's re-check, CR 608.3c's
+-- move -- is asked after CR 601.2b, and a proposal that rewinds takes the stamp
+-- back with the spell (`reject` restores the pre-move state).
+--
+-- The TIMESTAMP is CR 613.7a's, taken fresh here, and carried on the object
+-- rather than re-derived, because the permanent CR 608.3c creates has a newer
+-- Object.timestamp of its own and the effect did not restart when it entered.
+stampBestowed :: ObjectId -> GameState -> GameState
+stampBestowed sid gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+   in gs1
+        { GameState.objects =
+            Map.adjust (\o -> o {Object.bestowed = Just ts}) sid (GameState.objects gs1)
+        }
+
+-- CR 702.103a: was this the bestow candidate? Asked of the keyword that offered
+-- the cost CR 601.2b's announcement settled on (Cast.castProposed's `castFor`),
+-- which is the record Pawl.Types.CandidateCost exists to keep.
+castBestowed :: Maybe Keyword -> Bool
+castBestowed castFor = case castFor of
+  Just (Keyword.Type.Bestow _) -> True
+  _ -> False
 
 -- CR 601.3: the zones a spell can be cast from at all, in the engine's
 -- canonical order -- what castableSpells scans, and the list castableZones
@@ -1418,9 +1451,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
           if notElem chosenCost payable
             then reject
             else do
-              let slots = Card.modesTargetSlots chosenModes face
-                  sets = Target.legalSets (Just pid) Map.empty sid slots gs
-                  -- WHICH of CR 601.2b's candidates the player just chose, as
+              let -- WHICH of CR 601.2b's candidates the player just chose, as
                   -- the keyword ability that offered it -- the record CR
                   -- 702.34a's "if the flashback cost was paid" reads once the
                   -- cast is complete. Recovered by matching the answer against
@@ -1437,6 +1468,25 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   -- and its exile is conditioned on the ZONE rather than on
                   -- this tag, so the tie changes no answer.
                   castFor = CandidateCost.keyword =<< List.find ((== chosenCost) . CandidateCost.cost) payableCandidates
+              -- CR 702.103b: the announcement has settled on the bestow
+              -- candidate, so the spell becomes an Aura enchantment with enchant
+              -- creature -- BEFORE CR 601.2c's targets below, which that rule's
+              -- own last sentence demands ("its controller must choose a legal
+              -- target for that spell as defined by its enchant creature ability
+              -- and rule 601.2c").
+              Monad.when (castBestowed castFor) (State.modify' (stampBestowed sid))
+              -- Re-read, because `gs` above predates the stamp and CR 601.2c has
+              -- to be judged on the spell as rule 702.103b left it. The two reads
+              -- below are the whole of what moves: every cost question was asked
+              -- and settled at CR 601.2b, one step up.
+              --
+              -- Not implemented: CR 702.103d's "only its characteristics as
+              -- modified by the bestow ability are evaluated to determine if it
+              -- can be cast" -- `castable` and CR 601.2f's cost adjustments both
+              -- still read the unbestowed spell (#2352).
+              bestowedGs <- State.get
+              let slots = Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) chosenModes face
+                  sets = Target.legalSets (Just pid) Map.empty sid slots bestowedGs
                   -- CR 101.1: the ceiling this card's own words put on the value
                   -- about to be announced -- "X can't be greater than the
                   -- greatest toughness among creatures you control". Read HERE
@@ -1526,7 +1576,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   -- slot draws from the pool CR 601.2a built -- with this spell in
                   -- it, and CR 115.5 taking it back out.
                   chosen <- Target.chooseTargets decider pid sid slots sets
-                  if not (Target.selectionLegal (Just pid) sid slots sets chosen gs)
+                  if not (Target.selectionLegal (Just pid) sid slots sets chosen bestowedGs)
                     then reject
                     else do
                       -- CR 601.2b then 601.2f: X substituted and the Phyrexian

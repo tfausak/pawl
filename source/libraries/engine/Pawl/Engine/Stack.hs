@@ -26,6 +26,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
@@ -115,7 +116,7 @@ resolveTopWith runSubgame = do
                     -- about the resolving spell rather than about which kind of
                     -- permanent it becomes, and an Aura back face would carry its
                     -- face for the same reason a creature one does.
-                    if not (Card.isAura face)
+                    if not (Set.member Subtype.Aura (Projection.subtypesOf oid gs))
                       then -- CR 708.4's last sentence: "the permanent the spell becomes
                       -- will be a face-down permanent". A STATUS carried across a
                       -- zone change, which CR 400.7 otherwise forgets -- so it is
@@ -124,15 +125,25 @@ resolveTopWith runSubgame = do
                       -- status, never the card's identity.
                       --
                       -- The Aura branch below carries FaceUp instead, and cannot
-                      -- need this: it is reached only for a spell `face` calls an
-                      -- Aura, and a face-down spell's `face` is
+                      -- need this: it is reached only for a spell the projection
+                      -- calls an Aura, and a face-down spell's face is
                       -- Card.faceDownFace -- whose subtypes are the ones the
                       -- listing names, and no listing in the pool names Aura.
                         carryOver oid =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just controller) entering (Object.facing obj) False
                       else -- CR 303.4a made this spell target, so CR 608.2b applies
-                      -- to it. THE INVARIANT: is-it-an-Aura is a SUBTYPE read off
-                      -- the type line (CR 205.3h), the same closed-half
-                      -- classification as is-it-a-permanent above it.
+                      -- to it. THE INVARIANT: is-it-an-Aura is a SUBTYPE read
+                      -- (CR 205.3h), the same closed-half classification as
+                      -- is-it-a-permanent above it.
+                      --
+                      -- Off the PROJECTION rather than off the printed type line,
+                      -- because CR 702.103b's bestow makes a spell an Aura on the
+                      -- stack that prints no such subtype -- the same read
+                      -- Pawl.Engine.Sba.cannotBeAttached and
+                      -- Pawl.Engine.Attach.attachmentFor already take one zone
+                      -- over. Resolve.targetSlotsOf, which the fizzle test below
+                      -- goes through, reads the enchant ability off that same
+                      -- projection, so the branch and its target check cannot
+                      -- disagree about what an Aura is.
                         if Resolve.targetsAllIllegal oid gs
                           then Event.changeZone oid Zone.Graveyard
                           else

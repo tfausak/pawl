@@ -735,6 +735,7 @@ createEmblem pid card = do
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.kicked = False,
+            Object.bestowed = Nothing,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -3431,6 +3432,17 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- about a permanent. Nothing else reads the flag off an object
                     -- outside the stack.
                     Object.kicked = Object.kicked obj && dest == Zone.Battlefield,
+                    -- CR 702.103b: "these effects last until the SPELL OR THE
+                    -- PERMANENT IT BECOMES ceases to be bestowed", so the
+                    -- designation crosses this one move with the object the rule
+                    -- is still about. `kicked`'s route above, but for a stronger
+                    -- reason than rule 400.7d's look-back: this is not a memory
+                    -- of the cast, it is the effect still running.
+                    --
+                    -- BATTLEFIELD ONLY, `kicked`'s gate and for a reason the rule
+                    -- states rather than implies: what a bestowed spell becomes
+                    -- anywhere else is a card, and a card is no bestowed Aura.
+                    Object.bestowed = if dest == Zone.Battlefield then Object.bestowed obj else Nothing,
                     -- CR 400.7d a third time, and rule 702.150a is the ability
                     -- that references it: how many of the spell's Phyrexian mana
                     -- symbols were announced to be paid with life (CR 601.2b).
@@ -4271,6 +4283,7 @@ createTokens controller card copy n tapped entering = do
                     Object.unlockedHalves = Set.empty,
                     Object.designations = Set.empty,
                     Object.kicked = False,
+                    Object.bestowed = Nothing,
                     Object.phyrexianLifePaid = 0,
                     Object.manaSpent = Mana.MkMana [],
                     Object.announcedX = Nothing,

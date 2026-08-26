@@ -36,6 +36,7 @@ import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.EndEffect as EndEffect
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -59,12 +60,15 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
@@ -826,6 +830,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   attachRestrictionSpec s registry
   couldEnchantSpec s registry
   grantedEnchantSpec s registry
+  bestowSpec s registry
   licidSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
@@ -2320,6 +2325,205 @@ cloudformBoard island piker cloudform =
 -- CR 704.3 never runs between the effects of one resolution, so the moment the
 -- Licid is an unattached Aura is not a moment CR 704.5m sees, exactly as
 -- grantedEnchantSpec's header says for Cloudform.
+-- CR 702.103: bestow. The one thing a choice made while casting could not do
+-- before this group -- change what the spell IS. Nyxborn Rollicker is the
+-- producer: {R} 1/1 Enchantment Creature -- Satyr, "Bestow {1}{R}", "Enchanted
+-- creature gets +1/+1", the cheapest bestow printing whose non-bestow clauses are
+-- a bare P/T buff (Scryfall keyword:bestow ordered by mana value, 2026-08-26; the
+-- other five at that tier each print a second keyword, a "can't block", a
+-- control change or prowess).
+--
+-- ONE board and two answerers, graveRecitalSpec's shape in Pawl.CastSpec: mana,
+-- seats, timing and stock cannot be the difference, only which candidate CR
+-- 601.2b's announcement settles on. Both costs are payable off the same four
+-- Mountains.
+--
+-- TWO creatures to enchant, so CR 601.2c's target choice is a real one -- a board
+-- with one collapses it, and then nothing separates "the granted enchant slot was
+-- consulted" from "the host was hardcoded".
+--
+-- Not implemented: CR 702.103c's copies, CR 702.103d's castability, CR 702.103e's
+-- illegal target on resolution and CR 702.103g's phasing, each with an elision
+-- comment at the site it belongs to.
+bestowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+bestowSpec s registry = Spec.describe s "Bestow" $ do
+  -- THE discriminating pair the issue asks for: the spell's own card types and
+  -- subtypes WHILE IT IS ON THE STACK. A shortcut that folded the Aura-ness in at
+  -- resolution reaches the same host power and the same attachment, and differs
+  -- here and only here.
+  Spec.it s "CR 702.103a/b: the bestow cost makes the spell an Aura enchantment on the stack; the printed cost leaves it a creature spell" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+    let base = S.landsInPlay mountain 4
+        (host, gs1) = S.addCreature piker S.alice base
+        (bystander, gs2) = S.addCreature mammoth S.alice gs1
+        (board, spellId) = S.handOne rollicker gs2
+        bestowed = S.runPure (bestowing host) board (S.cast S.alice spellId)
+        printed = S.runPure (payingPrinted host) board (S.cast S.alice spellId)
+    -- Both candidates really are on offer from the hand, so neither leg passes
+    -- for want of the other.
+    Spec.assertEqWith
+      s
+      "CR 702.103a: the printed cost and the bestow cost are both offered from the hand"
+      (fmap Cost.Type.mana (Cost.costsFor (S.printingName rollicker) spellId board))
+      [Just (ManaCost.MkManaCost [theRed]), Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, theRed])]
+    -- CR 702.103b, the gameplay-level pair, FIRST so nothing ahead of it absorbs
+    -- a mutation: a set of card types and a set of subtypes, both read off the
+    -- spell on the stack.
+    Spec.assertEqWith
+      s
+      "CR 702.103b: cast bestowed, the spell on the stack is an Enchantment and no longer a Creature"
+      (fmap (\oid -> Projection.cardTypesOf oid bestowed) (topOfStack bestowed))
+      (Just (Set.singleton CardType.Enchantment))
+    Spec.assertEqWith
+      s
+      "and CR 205.1a took Satyr with the Creature card type, leaving Aura"
+      (fmap (\oid -> Projection.subtypesOf oid bestowed) (topOfStack bestowed))
+      (Just (Set.singleton Subtype.Aura))
+    Spec.assertEqWith
+      s
+      "CR 702.103b: and it gained enchant creature, which is the slot CR 601.2c judged"
+      (fmap (\oid -> Card.foldEnchant (Projection.enchantOf oid bestowed)) (topOfStack bestowed))
+      (Just (Just (TargetSlot.required Pool.Creatures Nothing)))
+    -- The same spell cast the other way, which is what makes the three above a
+    -- fact about the CHOICE rather than about the card.
+    Spec.assertEqWith
+      s
+      "cast for its printed cost it is still a creature spell"
+      (fmap (\oid -> Projection.cardTypesOf oid printed) (topOfStack printed))
+      (Just (Set.fromList [CardType.Creature, CardType.Enchantment]))
+    Spec.assertEqWith
+      s
+      "keeping its Satyr subtype and gaining no Aura one"
+      (fmap (\oid -> Projection.subtypesOf oid printed) (topOfStack printed))
+      (Just (Set.singleton Subtype.Satyr))
+    Spec.assertEqWith
+      s
+      "and no enchant ability, so CR 601.2c asked it for no target"
+      (fmap (\oid -> Card.foldEnchant (Projection.enchantOf oid printed)) (topOfStack printed))
+      (Just Nothing)
+    Spec.assertBool s (bystander /= host) "the two creatures on the board are distinct"
+  -- CR 608.3c: the bestowed spell resolves as an Aura, entering attached to the
+  -- creature CR 601.2c chose; the same card cast for its printed cost enters as an
+  -- ordinary creature attached to nothing.
+  Spec.it s "CR 608.3c / 303.4: the bestowed spell enters attached and pumps its host; the printed cast enters as a creature" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+    let base = S.landsInPlay mountain 4
+        (host, gs1) = S.addCreature piker S.alice base
+        (bystander, gs2) = S.addCreature mammoth S.alice gs1
+        (board, spellId) = S.handOne rollicker gs2
+        resolveWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
+        resolveWith answer = S.settleSba (S.runPure answer (S.runPure answer board (S.cast S.alice spellId)) Stack.resolveTop)
+        bestowed = resolveWith (bestowing host)
+        printed = resolveWith (payingPrinted host)
+    -- Goblin Piker is a 2/1 and War Mammoth a 3/3, so the pumped host cannot be
+    -- confused with the bystander at any reading.
+    Spec.assertEqWith s "CR 702.103b: the enchanted Goblin Piker is a 3/2" (S.powerToughnessOf host bestowed) (Just (3, 2))
+    Spec.assertEqWith s "and the creature the player did NOT choose is untouched" (S.powerToughnessOf bystander bestowed) (Just (3, 3))
+    Spec.assertEqWith
+      s
+      "CR 303.4: the Rollicker entered attached to the host it targeted"
+      (fmap (\oid -> Object.attachedTo =<< Game.lookupObject oid bestowed) (rollickerOn rollicker bestowed))
+      (Just (Just (Recipient.ToCreature host)))
+    Spec.assertEqWith
+      s
+      "and is not itself a creature while bestowed"
+      (fmap (\oid -> Projection.cardTypesOf oid bestowed) (rollickerOn rollicker bestowed))
+      (Just (Set.singleton CardType.Enchantment))
+    Spec.assertEqWith s "cast for its printed cost it pumps nobody" (S.powerToughnessOf host printed) (Just (2, 1))
+    Spec.assertEqWith
+      s
+      "and enters attached to nothing"
+      (fmap (\oid -> Object.attachedTo =<< Game.lookupObject oid printed) (rollickerOn rollicker printed))
+      (Just Nothing)
+    Spec.assertEqWith s "as a 1/1 Satyr creature of its own" (rollickerOn rollicker printed >>= \oid -> S.powerToughnessOf oid printed) (Just (1, 1))
+  -- CR 702.103f, "an exception to rule 704.5m": the bestowed Aura is NOT buried
+  -- with its host. It becomes unattached, ceases to be bestowed, and is a creature
+  -- again.
+  --
+  -- Asserting the zone alone would not discriminate: an implementation that
+  -- suppressed Pawl.Engine.Sba.fallsOff and never ended CR 702.103b's effect
+  -- leaves an Enchantment Aura with no P/T on the battlefield, which CR 704.5f
+  -- does not bury either. So the card types and the P/T are read as well.
+  Spec.it s "CR 702.103f: when its host dies the bestowed Aura stays, unattached, and is a 1/1 Satyr creature again" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+    let base = S.landsInPlay mountain 4
+        (host, gs1) = S.addCreature piker S.alice base
+        (_, gs2) = S.addCreature mammoth S.alice gs1
+        (board, spellId) = S.handOne rollicker gs2
+        attached = S.settleSba (S.runPure (bestowing host) (S.runPure (bestowing host) board (S.cast S.alice spellId)) Stack.resolveTop)
+        -- The enchanted Piker is a 3/2, so three damage is lethal (CR 704.5g).
+        pass1 = S.settleSba (S.markDamage host 3 attached)
+        pass2 = S.settleSba pass1
+        pass3 = S.settleSba pass2
+    -- The control first, so nothing below passes because the Rollicker was never
+    -- on the battlefield at all.
+    Spec.assertBool s (Maybe.isJust (rollickerOn rollicker attached)) "control: with its host alive the bestowed Rollicker is on the battlefield"
+    Spec.assertEqWith s "and it is an Enchantment with no P/T of its own" (rollickerOn rollicker attached >>= \oid -> S.powerToughnessOf oid attached) Nothing
+    -- THE discriminating trio, after the host has gone.
+    Spec.assertEqWith s "the host died" (Game.lookupObject host pass1) Nothing
+    Spec.assertEqWith
+      s
+      "CR 702.103f: the Rollicker is a 1/1 creature again rather than buried by CR 704.5m"
+      (rollickerOn rollicker pass3 >>= \oid -> S.powerToughnessOf oid pass3)
+      (Just (1, 1))
+    Spec.assertEqWith
+      s
+      "and its card types and subtypes are the printed ones again"
+      (fmap (\oid -> (Projection.cardTypesOf oid pass3, Projection.subtypesOf oid pass3)) (rollickerOn rollicker pass3))
+      (Just (Set.fromList [CardType.Creature, CardType.Enchantment], Set.singleton Subtype.Satyr))
+    Spec.assertEqWith
+      s
+      "attached to nothing"
+      (fmap (\oid -> Object.attachedTo =<< Game.lookupObject oid pass3) (rollickerOn rollicker pass3))
+      (Just Nothing)
+    Spec.assertEqWith s "and alice's graveyard holds the host alone" (length (Game.zoneMembers Zone.Graveyard S.alice pass3)) 1
+
+-- The spell CR 601.2a put on the stack -- the incarnation every assertion above
+-- reads, since CR 400.7 makes it a different object from the card in the hand.
+topOfStack :: GameState.GameState -> Maybe ObjectId.ObjectId
+topOfStack gs = case GameState.stack gs of
+  oid : _ -> Just oid
+  [] -> Nothing
+
+-- The permanent that printing became, found by NAME rather than by the
+-- attachment under test: a reading that never attached and one that attached
+-- wrongly must both be found, or the assertion would compare two Nothings.
+rollickerOn :: Printing.Printing -> GameState.GameState -> Maybe ObjectId.ObjectId
+rollickerOn printing gs =
+  List.find
+    (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName printing))
+    (Game.zoneMembers Zone.Battlefield S.alice gs)
+
+-- CR 601.2b's announcement answered by NAMING a cost rather than an index, and CR
+-- 601.2c's target by FILTERING the offered set rather than building a recipient:
+-- an answerer that hands back a Recipient.ToObject of the same permanent is a
+-- different recipient, and CR 608.2b's re-read drops it silently.
+castingFor :: [ManaSymbol.ManaSymbol] -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+castingFor wanted host p = case p of
+  Prompt.ChooseCost _ _ _ candidates ->
+    Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just (ManaCost.MkManaCost wanted)) . Cost.Type.mana) candidates)
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just host) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
+
+-- The two answerers bestowSpec's boards differ by, and the only thing they differ
+-- by: Nyxborn Rollicker's bestow {1}{R} against its printed {R}.
+bestowing, payingPrinted :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+bestowing = castingFor [ManaSymbol.Generic 1, theRed]
+payingPrinted = castingFor [theRed]
+
+-- The one coloured symbol both of Nyxborn Rollicker's costs are written in.
+theRed :: ManaSymbol.ManaSymbol
+theRed = ManaSymbol.OfType (ManaType.Colored Color.Red)
+
 licidSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 licidSpec s registry = Spec.describe s "Licid" $ do
   -- The discrimination against Modification.LoseAllAbilities, which is the arm

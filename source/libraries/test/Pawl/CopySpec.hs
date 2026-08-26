@@ -1069,6 +1069,7 @@ handAppend printing pid gs =
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.kicked = False,
+            Object.bestowed = Nothing,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.Type.MkMana [],
             Object.announcedX = Nothing,
