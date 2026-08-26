@@ -2393,7 +2393,7 @@ communalVigilSpec s registry =
 -- per-occurrence reading for a delayed entry. Neither asks what a delayed entry
 -- whose condition is BATCH-scoped does with a batch, and the answer used to be
 -- "fire once per member" -- Event.eventTriggers consulted Event.batchScoped and
--- Event.delayedPending did not (#2384).
+-- Event.delayedPending did not; see #2384.
 --
 --   * Synthetic Communal Reckoning {B}{B} Instant
 --     (data/cards/synthetic-communal-reckoning.json): "Until end of turn,

@@ -10947,8 +10947,8 @@ looksBack condition = case condition of
 -- pending triggers one Pawl.Types.EventGroup may yield per (bearer, ability).
 -- matchesTriggerGiven sees one event at a time and so answers the same for both
 -- readings -- that is its contract, and this predicate is what keeps it intact.
--- A gatherer that forgot to ask it fires a batch condition once per member
--- (#2384).
+-- A gatherer that forgot to ask it fired a batch condition once per member; see
+-- #2384.
 --
 -- A total case over TriggerCondition and never a wildcard, for looksBack's reason:
 -- the fork is one CR 603.2c forces on every zone-change and event-watching
@@ -11095,7 +11095,7 @@ batchScoped condition = case condition of
 -- One function because two scans ask the question. eventTriggers asks it of the
 -- whole batch and delayedPending of a CR 603.7 entry's matches, and a second
 -- reading of "which events happened at once" could drift from this one without
--- anything noticing (#2385). NonEmpty because a group with no members cannot
+-- anything noticing; see #2385. NonEmpty because a group with no members cannot
 -- occur, which spares both callers an impossible arm.
 eventGroups :: [LoggedEvent.LoggedEvent] -> [NonEmpty.NonEmpty LoggedEvent.LoggedEvent]
 eventGroups = NonEmpty.groupBy (\a b -> LoggedEvent.group a == LoggedEvent.group b)
@@ -12869,8 +12869,8 @@ delayedPending grouped gs =
       --
       -- matchesTriggerGiven cannot do this itself: it sees one event at a time and
       -- so answers alike for both readings (`batchScoped` above states that
-      -- contract), which is why every gatherer owes the predicate a consultation
-      -- (#2384).
+      -- contract), which is why every gatherer owes the predicate a consultation;
+      -- see #2384.
       occurrences entry
         | batchScoped (TriggeredAbility.condition (DelayedTrigger.ability entry)) = fmap NonEmpty.head (eventGroups (matching entry))
         | otherwise = matching entry
