@@ -784,6 +784,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Rule 615.13's other reading carries a Filter, which holds no Count either.
   TriggerCondition.SelfPreventsDamage _ -> []
   TriggerCondition.PlayerGainsLife _ -> []
+  TriggerCondition.PlayersGainLife _ -> []
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
   TriggerCondition.SelfCountersReached {} -> []
@@ -3285,6 +3286,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- for PermanentExplores' reason.
   TriggerCondition.SelfPreventsDamage f -> [f]
   TriggerCondition.PlayerGainsLife _ -> []
+  TriggerCondition.PlayersGainLife _ -> []
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
   TriggerCondition.SelfCountersReached {} -> []
