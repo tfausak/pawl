@@ -1171,7 +1171,9 @@ spellCostAdjustments pid oid gs =
 -- A caller that has not reached CR 601.2c hands the empty set, and every reducer
 -- whose sentence names a target is then simply inapplicable -- see
 -- Pawl.Engine.Activate.activateAbility, which gathers once before the targets
--- exist and again after.
+-- exist and again after. A caller that has to MEASURE the cost before that
+-- moment hands one candidate target at a time instead, and takes the best
+-- answer (Pawl.Engine.Activate.aimingSomewhere).
 --
 -- The MANA increases are gathered too (Oppressive Rays), and CR 601.2f orders
 -- every one of them before any reduction -- which is Cost.applyAdjustments'
