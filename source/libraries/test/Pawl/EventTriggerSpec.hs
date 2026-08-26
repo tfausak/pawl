@@ -2387,6 +2387,217 @@ communalVigilSpec s registry =
           Spec.assertEqWith s "every seat is 8 up over the two batches" (fmap (\pid -> S.lifeOf pid again) [S.alice, S.bob, S.carol]) [Just 28, Just 28, Just 28]
           Spec.assertEqWith s "and the second batch was one event group" (length (List.nub (gainsIn again))) 1
 
+-- CR 603.2c's FIRST sentence on the CR 603.7 DELAYED path, which the two groups
+-- above cannot reach between them: Synthetic Communal Vigil proves the batch
+-- reading for an object's own triggered ability, and False Cure proves the
+-- per-occurrence reading for a delayed entry. Neither asks what a delayed entry
+-- whose condition is BATCH-scoped does with a batch, and the answer used to be
+-- "fire once per member" -- Event.eventTriggers consulted Event.batchScoped and
+-- Event.delayedPending did not (#2384).
+--
+--   * Synthetic Communal Reckoning {B}{B} Instant
+--     (data/cards/synthetic-communal-reckoning.json): "Until end of turn,
+--     whenever one or more players gain life, you lose 3 life."
+--   * Synthetic Communal Relapse {B}{B} Instant
+--     (data/cards/synthetic-communal-relapse.json): "The next time one or more
+--     players gain life, you lose 3 life."
+--
+-- WHY A SYNTHETIC. Three printings arm a delayed ability on a batch condition --
+-- Forth Eorlingas! ("whenever one or more creatures you control deal combat
+-- damage to one or more players this turn"), Aphelia, Viper Whisperer and
+-- Garruk, Curse Breaker -- and every one of them watches batched COMBAT DAMAGE
+-- or a batched ATTACK, which pawl has no TriggerCondition for: the neighbouring
+-- constructors PermanentDealsCombatDamageToPlayer and PlayerAttacksWith are both
+-- singular and both answer False to Event.batchScoped (#2389). On the LIFE axis
+-- the query is Scryfall o:/one or more [^.]*gain(s)? life/, 2026-08-26, which
+-- matches Path of Bravery alone -- its "one or more" counts attacking creatures.
+-- So no printing pawl can express reaches this, and Forth Eorlingas! is the card
+-- that refutes the synthetic the moment #2389 lands.
+--
+-- The PAYLOAD is slot-free on purpose, and the corpus lint "every slot a delayed
+-- ability reads is bound by its card" would reject any other: Event.eventBindingSlots
+-- gives a batch condition no slots, the trigger event being the whole batch, so
+-- False Cure's "that player" has nothing to name here. "You lose 3 life" reads
+-- CR 603.7d's controller off the entry instead, which is why the count is
+-- observable at all: alice's life total falls once per firing.
+--
+-- The batch is Centaur Peacemaker's "each player gains 4 life" once more, one
+-- EventGroup across the seats (CR 608.2f).
+communalReckoningSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+communalReckoningSpec s registry =
+  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      -- singularCureSpec's staging: the permanent is already placed, its Moved
+      -- event is recorded, and CR 603.6a's scan runs at the next settle.
+      entering oid gs =
+        let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
+         in resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project oid gs))] gs))
+      -- The distinct EventGroups the log's life gains carry, and how many gains
+      -- there were. The precondition every case rests on, asserted rather than
+      -- assumed: were the seats' gains not one group, "once for the batch" would
+      -- be indistinguishable from "once per group".
+      gainsIn gs =
+        Maybe.mapMaybe
+          ( \logged -> case LoggedEvent.event logged of
+              GameEvent.LifeGained _ -> Just (LoggedEvent.group logged)
+              _ -> Nothing
+          )
+          (Foldable.toList (GameState.events gs))
+      -- alice casts the named Instant off two Swamps with a Centaur Peacemaker
+      -- already on the battlefield, waiting to enter. Its own minimal board,
+      -- singularCureSpec's reason: any other life gain would be a second batch.
+      armed name base = do
+        swamp <- S.printingOf s registry "Swamp"
+        spell <- S.printingOf s registry name
+        peacemaker <- S.printingOf s registry "Centaur Peacemaker"
+        let lands = S.landsFor swamp S.alice 2 base
+            (peacemakerId, withPeacemaker) = S.addCreature peacemaker S.alice lands
+            (spellId, withSpell) = S.addHandCard spell S.alice withPeacemaker
+        pure (peacemakerId, resolveAll (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))))
+      -- The same Reckoning with a LONE gain to watch: bob's Radiant Fountain (CR
+      -- 119.3, "you gain 2 life") entering instead of the Peacemaker.
+      armedWithFountain = do
+        swamp <- S.printingOf s registry "Swamp"
+        spell <- S.printingOf s registry "Synthetic Communal Reckoning"
+        fountain <- S.printingOf s registry "Radiant Fountain"
+        let lands = S.landsFor swamp S.alice 2 S.threePlayerGame
+            (fountainId, withFountain) = S.addCreature fountain S.bob lands
+            (spellId, withSpell) = S.addHandCard spell S.alice withFountain
+        pure (fountainId, resolveAll (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))))
+   in Spec.describe s "CR 603.2c Synthetic Communal Reckoning" $ do
+        -- The proving case. Three seats gain 4 in ONE event group, which is one
+        -- trigger event, so the entry fires ONCE and alice pays 3: she is at 21,
+        -- 20 plus her own 4 less the one drain. A gatherer that fired per member
+        -- takes 9 and leaves her at 15.
+        Spec.it s "CR 603.2c three seats gaining at once are one trigger event, so the entry fires once" $ do
+          (peacemakerId, gs) <- armed "Synthetic Communal Reckoning" S.threePlayerGame
+          let after = entering peacemakerId gs
+          Spec.assertEqWith s "alice gained 4 and lost 3 once" (S.lifeOf S.alice after) (Just 21)
+          Spec.assertEqWith s "alice started at 20" (S.lifeOf S.alice gs) (Just 20)
+          Spec.assertEqWith s "bob gained his 4 and pays nothing" (S.lifeOf S.bob after) (Just 24)
+          Spec.assertEqWith s "and so did carol" (S.lifeOf S.carol after) (Just 24)
+          Spec.assertEqWith s "three gains, in one event group" (length (gainsIn after), length (List.nub (gainsIn after))) (3, 1)
+          Spec.assertEqWith s "and CR 603.7b's stated duration kept the entry armed" (Seq.length (GameState.delayedTriggers after)) 1
+        -- The other half of the pair, differing in exactly one thing -- how many
+        -- occurrences the batch holds. FOUR seats and still one firing, where a
+        -- per-member reading now takes 12 and leaves alice at 12. A fixed
+        -- number of firings passes at most one of the two boards.
+        Spec.it s "CR 603.2c a fourth seat in the batch is not a fourth firing" $ do
+          (peacemakerId, gs) <- armed "Synthetic Communal Reckoning" S.fourPlayerGame
+          let after = entering peacemakerId gs
+          Spec.assertEqWith s "alice still paid exactly 3" (S.lifeOf S.alice after) (Just 21)
+          Spec.assertEqWith s "dave gained his 4 too" (S.lifeOf S.dave after) (Just 24)
+          Spec.assertEqWith s "four gains in one event group" (length (gainsIn after), length (List.nub (gainsIn after))) (4, 1)
+        -- The control that separates "once per event GROUP" from a collapse
+        -- coarser than the group -- once per scan, which is the wrong-direction
+        -- fix the boards above cannot tell apart, each holding one group. TWO
+        -- life-gain groups reach ONE settle, and each is its own trigger event:
+        -- alice pays 6. A per-scan collapse takes 3.
+        --
+        -- The log is written directly, S.withEvents giving each event its own
+        -- group, because the only funnel that makes a second batch also settles
+        -- between them -- and then the two groups would be two scans, which is
+        -- not the reading under test.
+        Spec.it s "CR 704.3 two gain groups in one scan are two trigger events" $ do
+          (_, gs) <- armed "Synthetic Communal Reckoning" S.threePlayerGame
+          let staged = S.withEvents [GameEvent.LifeGained (LifeChange.MkLifeChange S.bob 4), GameEvent.LifeGained (LifeChange.MkLifeChange S.carol 5)] gs
+              after = resolveAll (settle staged)
+          Spec.assertEqWith s "alice paid 3 for each of the two groups" (S.lifeOf S.alice after) (Just 14)
+          Spec.assertEqWith s "alice was at 20 before the staged gains" (S.lifeOf S.alice gs) (Just 20)
+          Spec.assertEqWith s "two gains, in two event groups" (length (gainsIn staged), length (List.nub (gainsIn staged))) (2, 2)
+        -- The plumbing control: ONE gain drains alice once too -- the reading
+        -- both implementations share. bob gains his 2 and keeps it; the entry's
+        -- payload names its controller, not the gainer.
+        Spec.it s "CR 119.3 a lone gain is one trigger event as well" $ do
+          (fountainId, gs) <- armedWithFountain
+          let after = entering fountainId gs
+          Spec.assertEqWith s "alice paid her 3" (S.lifeOf S.alice after) (Just 17)
+          Spec.assertEqWith s "bob gained 2 and kept it" (S.lifeOf S.bob after) (Just 22)
+          Spec.assertEqWith s "carol neither gained nor paid" (S.lifeOf S.carol after) (Just 20)
+          Spec.assertEqWith s "one gain, one group" (length (gainsIn after), length (List.nub (gainsIn after))) (1, 1)
+        -- The vacuity guard, falseCureSpec's: the same Peacemaker with NO entry
+        -- armed leaves every seat holding its 4 (CR 119.3). Without it a board
+        -- where nobody actually gained would read as a passing 21 above, alice
+        -- never having gained her 4 nor paid her 3.
+        Spec.it s "CR 119.3 with no entry armed, each of the three seats keeps its 4" $ do
+          peacemaker <- S.printingOf s registry "Centaur Peacemaker"
+          let (peacemakerId, gs) = S.addCreature peacemaker S.alice S.threePlayerGame
+              after = entering peacemakerId gs
+          Spec.assertEqWith s "alice is at 24" (S.lifeOf S.alice after) (Just 24)
+          Spec.assertEqWith s "bob is at 24" (S.lifeOf S.bob after) (Just 24)
+          Spec.assertEqWith s "carol is at 24" (S.lifeOf S.carol after) (Just 24)
+
+-- CR 603.7b's SECOND sentence read the other way round: "if its trigger event
+-- occurs MORE THAN ONCE simultaneously". A batch-scoped condition's trigger
+-- event is the whole batch, which occurred ONCE, so there is nothing to choose
+-- and the question must not be asked -- an engine that asks it invents a
+-- decision the rules do not authorise, which is the elision bar design.md sets.
+--
+-- The observable is the PROMPT and nothing else, which is why this is its own
+-- group. Walk the unfixed engine to the end: it raises the question, the answer
+-- names one of the batch's members, and Event.eventBindings then binds NOTHING
+-- off that member -- eventBindingSlots gives a batch condition no slots. So the
+-- pending trigger, the life totals and the cards drawn are identical whichever
+-- member was named, and singularCureSpec's `choosingGain` trick cannot separate
+-- the seats here. Counting the questions is the only reading left.
+--
+-- BOTH LEGS, so the count cannot pass by the answerer never being reached: the
+-- batch entry (Synthetic Communal Relapse) is asked NOTHING on the very board
+-- where the per-occurrence entry (Synthetic Singular Cure) is asked once.
+communalRelapseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+communalRelapseSpec s registry =
+  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      counting :: Prompt.Prompt r -> State.State Int r
+      counting p = case p of
+        Prompt.ChooseDelayedTriggerEvent {} -> do
+          State.modify (+ 1)
+          pure (S.identityAnswer p)
+        _ -> pure (S.identityAnswer p)
+      -- communalReckoningSpec's board, and its staging -- but run through
+      -- Engine.runGame with a State answerer rather than the pure one, so the
+      -- questions can be counted as the Peacemaker's entry trigger resolves and
+      -- the delayed entry is gathered.
+      staged name base = do
+        swamp <- S.printingOf s registry "Swamp"
+        spell <- S.printingOf s registry name
+        peacemaker <- S.printingOf s registry "Centaur Peacemaker"
+        let lands = S.landsFor swamp S.alice 2 base
+            (peacemakerId, withPeacemaker) = S.addCreature peacemaker S.alice lands
+            (spellId, withSpell) = S.addHandCard spell S.alice withPeacemaker
+            gs = resolveAll (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId)))
+            moved = ZoneChange.MkZoneChange peacemakerId peacemakerId Zone.Stack Zone.Battlefield
+        pure (S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project peacemakerId gs))] gs)
+      played gs = State.runState (Engine.runGame counting gs (Engine.settleForPriority >> Engine.priorityLoop)) 0
+      -- How many times the question was asked, and the board it was asked on --
+      -- one run, read twice, so the count and the totals cannot come from
+      -- different games.
+      asks gs = snd (played gs)
+      after gs = snd (fst (played gs))
+   in Spec.describe s "CR 603.7b Synthetic Communal Relapse" $ do
+        -- The proving case. Three seats gain 4 in one event group; the batch
+        -- occurred once, so no question is raised and the entry fires on it.
+        -- An engine that gathers per member asks alice which of the three gains
+        -- triggered her ability.
+        Spec.it s "CR 603.7b a batch occurred once, so its controller is asked nothing" $ do
+          gs <- staged "Synthetic Communal Relapse" S.threePlayerGame
+          Spec.assertEqWith s "no question is raised" (asks gs) 0
+          Spec.assertEqWith s "and the entry fired once, alice paying 3 off her own 4" (S.lifeOf S.alice (after gs)) (Just 21)
+          Spec.assertEqWith s "the entry is spent, having no stated duration" (Seq.length (GameState.delayedTriggers (after gs))) 0
+        -- The other leg, differing in exactly one thing -- the entry's CONDITION.
+        -- Synthetic Singular Cure watches "a player gains life" per occurrence, so
+        -- on this same batch its trigger event occurred three times and CR 603.7b's
+        -- second sentence applies: one question. Without this leg a count of zero
+        -- above would pass on a board that never reached the answerer at all.
+        Spec.it s "CR 603.7b a per-occurrence entry on the same batch is asked once" $ do
+          gs <- staged "Synthetic Singular Cure" S.threePlayerGame
+          Spec.assertEqWith s "exactly one question" (asks gs) 1
+        -- A FOURTH seat, so the batch is bigger and the count still zero: a
+        -- reading that asked once per member would climb to three here.
+        Spec.it s "CR 603.7b a fourth seat in the batch is still not a question" $ do
+          gs <- staged "Synthetic Communal Relapse" S.fourPlayerGame
+          Spec.assertEqWith s "still no question" (asks gs) 0
+          Spec.assertEqWith s "and dave really gained his 4" (S.lifeOf S.dave (after gs)) (Just 24)
+
 -- CR 120.3's event read by its RECIPIENT, which no condition could ask for
 -- before: every damage arm beside this one watches a permanent DEALING damage.
 --
@@ -5363,6 +5574,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   falseCureSpec s registry
   singularCureSpec s registry
   communalVigilSpec s registry
+  communalReckoningSpec s registry
+  communalRelapseSpec s registry
   enrageSpec s registry
   belltowerSphinxSpec s registry
   lifeLossTriggerSpec s registry
