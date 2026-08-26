@@ -2415,9 +2415,9 @@ communalVigilSpec s registry =
 -- that refutes the synthetic the moment #2389 lands.
 --
 -- The PAYLOAD is slot-free on purpose, and the corpus lint "every slot a delayed
--- ability reads is bound by its card" would reject any other: Event.eventBindingSlots
--- gives a batch condition no slots, the trigger event being the whole batch, so
--- False Cure's "that player" has nothing to name here. "You lose 3 life" reads
+-- ability reads is bound by its card" would reject one that read an EVENT slot:
+-- Event.eventBindingSlots gives a batch condition none, the trigger event being
+-- the whole batch, so False Cure's "that player" has nothing to name here. "You lose 3 life" reads
 -- CR 603.7d's controller off the entry instead, which is why the count is
 -- observable at all: alice's life total falls once per firing.
 --
@@ -2591,8 +2591,9 @@ communalRelapseSpec s registry =
         Spec.it s "CR 603.7b a per-occurrence entry on the same batch is asked once" $ do
           gs <- staged "Synthetic Singular Cure" S.threePlayerGame
           Spec.assertEqWith s "exactly one question" (asks gs) 1
-        -- A FOURTH seat, so the batch is bigger and the count still zero: a
-        -- reading that asked once per member would climb to three here.
+        -- A FOURTH seat, so the batch is bigger and the count still zero. The
+        -- unfixed engine asked here too -- one question over four candidates
+        -- rather than three -- so the pair is not a coincidence of size.
         Spec.it s "CR 603.7b a fourth seat in the batch is still not a question" $ do
           gs <- staged "Synthetic Communal Relapse" S.fourPlayerGame
           Spec.assertEqWith s "still no question" (asks gs) 0

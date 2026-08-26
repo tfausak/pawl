@@ -12899,11 +12899,13 @@ delayedPending grouped gs =
       -- left one event per group, the block below is a singleton, and the prompt
       -- is not raised. Asking would be a question the rule does not authorise.
       --
-      -- The GROUP is the equality, not adjacency in the log -- `eventGroups` is
-      -- where the two coincide, and both scans read that one function.
+      -- Adjacency AND tag equality, which coincide by construction: `eventGroups`
+      -- above is where that argument lives, and both scans read that one function
+      -- rather than each cutting the log its own way.
       --
       -- One candidate is not a choice, so no prompt is raised -- which is every
-      -- board but the batched one.
+      -- board but a PER-OCCURRENCE condition's batch. A batch-scoped one is never
+      -- a choice, `occurrences` having left the block a singleton.
       firedBy entry
         | Maybe.isJust (DelayedTrigger.expiry entry) = pure (fmap LoggedEvent.event (occurrences entry))
         | otherwise = case eventGroups (occurrences entry) of
