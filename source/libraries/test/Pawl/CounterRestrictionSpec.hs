@@ -183,16 +183,25 @@ solemnitySpec s registry = Spec.describe s "Solemnity" $ do
 
 meliraSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 meliraSpec s registry = Spec.describe s "Melira, Sylvok Outcast" $ do
-  let -- alice: four Swamps and two Forests, a Goblin Piker (2/1) of her own and
-      -- Instill Infection ({3}{B} instant: put a -1/-1 counter on target
-      -- creature, draw a card) plus Battlegrowth in hand; bob: two Islands, a
-      -- Goblin Piker of his own and Prologue to Phyresis ({1}{U} instant: target
-      -- opponent gets a poison counter, draw a card) in hand. Both libraries hold
-      -- three Plains, since both spells draw. `outcast` says whether Melira is on
-      -- the battlefield under alice's control.
+  let -- alice: four Swamps, two Forests, two Mountains and two Islands, a Goblin
+      -- Piker (2/1) and a Glistener Elf (an infect creature) of her own, and four
+      -- spells in hand -- Instill Infection ({3}{B} instant: put a -1/-1 counter
+      -- on target creature, draw a card), Battlegrowth, Prologue to Phyresis
+      -- ({1}{U} instant: target opponent gets a poison counter, draw a card) and
+      -- Harnessed Lightning ({1}{R} instant: you get three energy counters, then
+      -- pay any amount of them to deal that much damage to target creature). bob:
+      -- two Islands, a Goblin Piker and a Glistener Elf of his own, and a Prologue
+      -- of his own. Both libraries hold three Plains, since three of those spells
+      -- draw. `outcast` says whether Melira is on the battlefield under alice's
+      -- control, and is the ONLY difference between the two boards.
+      --
+      -- Harnessed Lightning is here for the kind axis on the PLAYER side, which
+      -- poison alone cannot show: Melira names poison, so an energy counter must
+      -- still land on the very player who can get no poison counter.
       board outcast = do
         forest <- S.printingOf s registry "Forest"
         island <- S.printingOf s registry "Island"
+        mountain <- S.printingOf s registry "Mountain"
         plains <- S.printingOf s registry "Plains"
         swamp <- S.printingOf s registry "Swamp"
         piker <- S.printingOf s registry "Goblin Piker"
@@ -200,49 +209,69 @@ meliraSpec s registry = Spec.describe s "Melira, Sylvok Outcast" $ do
         infection <- S.printingOf s registry "Instill Infection"
         battlegrowth <- S.printingOf s registry "Battlegrowth"
         prologue <- S.printingOf s registry "Prologue to Phyresis"
+        lightning <- S.printingOf s registry "Harnessed Lightning"
         melira <- S.printingOf s registry "Melira, Sylvok Outcast"
-        let base = S.landsFor forest S.alice 2 (S.landsFor island S.bob 2 (S.landsInPlay swamp 4))
+        let base =
+              S.landsFor forest S.alice 2
+                . S.landsFor island S.alice 2
+                . S.landsFor mountain S.alice 2
+                . S.landsFor island S.bob 2
+                $ S.landsInPlay swamp 4
             (mine, g1) = S.addCreature piker S.alice base
             (theirs, g2) = S.addCreature piker S.bob g1
             (myElf, g3) = S.addCreature elf S.alice g2
             (theirElf, g4) = S.addCreature elf S.bob g3
             (heldInfection, g5) = S.addHandCard infection S.alice g4
             (heldGrowth, g6) = S.addHandCard battlegrowth S.alice g5
-            (heldPrologue, g7) = S.addHandCard prologue S.bob g6
-            g8 = stock plains S.alice (stock plains S.bob g7)
-            g9 = if outcast then snd (S.addCreature melira S.alice g8) else g8
-        pure (mine, theirs, myElf, theirElf, heldInfection, heldGrowth, heldPrologue, g9)
+            (heldLightning, g7) = S.addHandCard lightning S.alice g6
+            (myPrologue, g8) = S.addHandCard prologue S.alice g7
+            (theirPrologue, g9) = S.addHandCard prologue S.bob g8
+            g10 = stock plains S.alice (stock plains S.bob g9)
+            g11 = if outcast then snd (S.addCreature melira S.alice g10) else g10
+        pure ((mine, theirs, myElf, theirElf), (heldInfection, heldGrowth, heldLightning, myPrologue, theirPrologue), g11)
   -- THE KIND SCOPING, as a pair of casts on ONE board and ONE creature. A
   -- prohibition that ignored Pawl.Types.CounterRestriction's kind field would
   -- refuse both.
   Spec.it s "CR 101.2 a -1/-1 counter can't be put on a creature you control" $ do
-    (mine, _, _, _, heldInfection, _, _, ready) <- board True
+    ((mine, _, _, _), (heldInfection, _, _, _, _), ready) <- board True
     let after = S.runPure (aiming mine) ready (S.cast S.alice heldInfection >> Stack.resolveTop)
     Spec.assertEqWith s "no -1/-1 counter, and the creature is still the 2/1 it was printed" (seenOn CounterKind.MinusOneMinusOne mine after) (0, Just 2, Just 1)
   Spec.it s "while a +1/+1 counter on that same creature still lands" $ do
-    (mine, _, _, _, _, heldGrowth, _, ready) <- board True
+    ((mine, _, _, _), (_, heldGrowth, _, _, _), ready) <- board True
     let after = S.runPure (aiming mine) ready (S.cast S.alice heldGrowth >> Stack.resolveTop)
     Spec.assertEqWith s "one +1/+1 counter, and CR 613.4c shows it" (seenOn CounterKind.PlusOnePlusOne mine after) (1, Just 3, Just 2)
   -- THE CONTROLLER SCOPING. The same spell, the same board, a creature bob
   -- controls: "creatures YOU control" is a filter and not a wipe.
   Spec.it s "CR 101.2 a -1/-1 counter still lands on a creature an opponent controls" $ do
-    (_, theirs, _, _, heldInfection, _, _, ready) <- board True
+    ((_, theirs, _, _), (heldInfection, _, _, _, _), ready) <- board True
     let after = S.runPure (aiming theirs) ready (S.cast S.alice heldInfection >> Stack.resolveTop)
     Spec.assertEqWith s "one -1/-1 counter, and CR 613.4c shows it" (seenOn CounterKind.MinusOneMinusOne theirs after) (1, Just 1, Just 0)
   -- The card's FIRST line, on the player axis, and the same two scopings again:
   -- Melira names one player ("you") and one kind (poison).
   Spec.it s "CR 101.2 you can't get poison counters" $ do
-    (_, _, _, _, _, _, heldPrologue, ready) <- board True
-    let after = S.runPure S.identityAnswer ready (S.cast S.bob heldPrologue >> Stack.resolveTop)
+    ((_, _, _, _), (_, _, _, _, theirPrologue), ready) <- board True
+    let after = S.runPure S.identityAnswer ready (S.cast S.bob theirPrologue >> Stack.resolveTop)
     Spec.assertEqWith s "Melira's controller got none" (S.playerCounterOf PlayerCounterKind.Poison S.alice after) 0
   Spec.it s "and the same spell on the same board without her gives one" $ do
-    (_, _, _, _, _, _, heldPrologue, ready) <- board False
-    let after = S.runPure S.identityAnswer ready (S.cast S.bob heldPrologue >> Stack.resolveTop)
+    ((_, _, _, _), (_, _, _, _, theirPrologue), ready) <- board False
+    let after = S.runPure S.identityAnswer ready (S.cast S.bob theirPrologue >> Stack.resolveTop)
     Spec.assertEqWith s "one poison counter" (S.playerCounterOf PlayerCounterKind.Poison S.alice after) 1
+  -- THE PLAYER SCOPING. Melira says "YOU", so the same spell pointed the other
+  -- way lands: alice casts her own Prologue and bob is poisoned.
+  Spec.it s "CR 101.2 an opponent still gets poison counters" $ do
+    ((_, _, _, _), (_, _, _, myPrologue, _), ready) <- board True
+    let after = S.runPure S.identityAnswer ready (S.cast S.alice myPrologue >> Stack.resolveTop)
+    Spec.assertEqWith s "one poison counter on the player Melira does not name" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 1
+  -- THE PLAYER-COUNTER KIND SCOPING, which poison alone cannot show: Melira's
+  -- controller may get no poison counter and still gets energy counters.
+  Spec.it s "CR 101.2 and you still get counters of a kind she does not name" $ do
+    ((mine, _, _, _), (_, _, heldLightning, _, _), ready) <- board True
+    let after = S.runPure (aiming mine) ready (S.cast S.alice heldLightning >> Stack.resolveTop)
+    Spec.assertEqWith s "three energy counters" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 3
   -- The card's THIRD line, which is what makes the transcription whole. A pair
   -- of Glistener Elves, one on each side of the table.
   Spec.it s "CR 613.1f creatures your opponents control lose infect" $ do
-    (_, _, myElf, theirElf, _, _, _, ready) <- board True
+    ((_, _, myElf, theirElf), _, ready) <- board True
     Spec.assertEqWith s "bob's Elf lost it, alice's kept it" (Projection.hasKeyword Keyword.Infect theirElf ready, Projection.hasKeyword Keyword.Infect myElf ready) (False, True)
 
 moveSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
