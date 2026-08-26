@@ -3592,6 +3592,107 @@ ezuriExperienceSpec s registry =
           Spec.assertEqWith s "alice gets no experience counter" (experienceOf S.alice after) 0
           Spec.assertEqWith s "and neither does bob, who has no Ezuri" (experienceOf S.bob after) 0
 
+-- CR 122.1's OBJECT counters read WITHOUT NAMING A KIND, with Savanti Romero,
+-- Time's Exile {3}{B}{B} Legendary Creature -- Demon Wizard 4/4: "Trample. At the
+-- beginning of combat on your turn, put a +1/+1 counter on Savanti Romero. Then
+-- you draw X cards and lose X life, where X is the number of counters on Savanti
+-- Romero."
+--
+-- Quantity.ObjectCountersOfAnyKind is what "the number of counters" is, and it
+-- is a SUM over every kind rather than a lookup in one. Quantity.ObjectCounters
+-- -- the arm that names a kind, Promising Duskmage's "if it had a +1/+1 counter
+-- on it" (Pawl.ZoneTriggerSpec's counterLookBackSpec) -- cannot express this
+-- clause at all, which is why the arm exists; see #994.
+--
+-- STUN COUNTERS are what make the two readings disagree. CR 122.1d gives a stun
+-- counter its own rule and no relation to power or toughness, so a permanent
+-- carrying two of them plus one +1/+1 counter has THREE counters on it and ONE
+-- +1/+1 counter -- and a per-kind read of the +1/+1 kind answers the same 1 it
+-- would answer with no stun counters there at all. A board built only out of
+-- +1/+1 counters proves nothing here, since both readings agree on it.
+--
+-- Nothing untaps on these boards, so CR 122.1d's replacement effect never fires
+-- and the stun counters sit there being counted, which is all this card asks of
+-- them.
+--
+-- The step is staged and the trigger resolved by hand rather than run through
+-- the priority loop: the payload is a draw and a life loss, and a loop that
+-- reached alice's next draw step would move the same two numbers for a reason
+-- this group is not about.
+savantiRomeroSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+savantiRomeroSpec s registry =
+  let countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
+      -- Ezuri's staging above, for its reason: Engine.runStep is what writes the
+      -- CR 603.2b StepBegan record, and this group supplies the record directly
+      -- so that only the trigger and its resolution run.
+      atBeginningOfCombat pid gs =
+        gs
+          { GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+            GameState.activePlayer = pid,
+            GameState.priority = Just pid
+          }
+      -- alice's Savanti Romero alone, with seven Swamps in her library -- more
+      -- than any leg draws through, so CR 104.3c decks nobody -- and an empty
+      -- hand, so every card in it afterwards arrived from this trigger.
+      savantiBoard stuns = do
+        savanti <- S.printingOf s registry "Savanti Romero, Time's Exile"
+        swamp <- S.printingOf s registry "Swamp"
+        let (savantiId, withSavanti) = S.addCreature savanti S.alice (Setup.emptyGame S.bothPlayers)
+            stocked = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) withSavanti [1 .. 7 :: Int]
+            stunned = if stuns > 0 then S.addCounter CounterKind.Stun stuns savantiId stocked else stocked
+        pure (savantiId, stunned)
+      combatTrigger board =
+        let staged = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Combat CombatStep.BeginningOfCombat) S.alice)] (atBeginningOfCombat S.alice board)
+            settled = S.runPure S.identityAnswer staged Engine.settleForPriority
+         in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+      librarySize pid gs = length (Game.zoneMembers Zone.Library pid gs)
+   in Spec.describe s "Savanti Romero, Time's Exile" $ do
+        -- The gameplay-level discrimination. Two stun counters and the +1/+1
+        -- counter the trigger itself puts make THREE counters, so alice draws
+        -- three and loses three. A read that named the +1/+1 kind would draw one
+        -- and lose one on this very board.
+        Spec.it s "CR 122.1 the number of counters sums across kinds, so two stun counters and one +1/+1 counter draw three" $ do
+          (savantiId, board) <- savantiBoard 2
+          let (settled, after) = combatTrigger board
+          Spec.assertEqWith s "two stun counters and no +1/+1 counter to start" (countersOn savantiId board) (Map.singleton CounterKind.Stun 2)
+          Spec.assertEqWith s "an empty hand and seven cards in the library" (S.handSize S.alice board, librarySize S.alice board) (0, 7)
+          Spec.assertEqWith s "alice is at twenty life" (S.lifeOf S.alice board) (Just 20)
+          Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack settled)) 1
+          -- THE assertion this arm exists for: three cards, one per counter of
+          -- EITHER kind. One card is what the per-kind reading answers.
+          Spec.assertEqWith s "three cards drawn, one per counter of either kind" (S.handSize S.alice after, librarySize S.alice after) (3, 4)
+          Spec.assertEqWith s "and three life lost, off the same number" (S.lifeOf S.alice after) (Just 17)
+          Spec.assertEqWith s "the counters afterwards are one +1/+1 beside the two stun" (countersOn savantiId after) (Map.fromList [(CounterKind.PlusOnePlusOne, 1), (CounterKind.Stun, 2)])
+          -- CR 122.1a is a DIFFERENT fact from the tally: only the +1/+1 counter
+          -- touches power and toughness, so a 4/4 reads 5/5 and not 7/7.
+          Spec.assertEqWith s "CR 122.1a its printed 4/4 reads 5/5, the stun counters changing nothing" (S.powerToughnessOf savantiId after) (Just (5, 5))
+        -- The same board with the stun counters taken away and nothing else
+        -- changed: one counter, one card, one life. It is what stops a payload
+        -- that hardcodes three from passing the case above, and -- since the only
+        -- counter here is the one the trigger put -- what shows CR 608.2's "then"
+        -- reads the tally AFTER the placement rather than before it.
+        Spec.it s "CR 122.1 with no stun counters the same trigger draws one, counting the counter it just put" $ do
+          (savantiId, board) <- savantiBoard 0
+          let (settled, after) = combatTrigger board
+          Spec.assertEqWith s "no counters at all to start" (countersOn savantiId board) Map.empty
+          Spec.assertEqWith s "an empty hand and seven cards in the library" (S.handSize S.alice board, librarySize S.alice board) (0, 7)
+          Spec.assertEqWith s "the trigger reached the stack just the same" (length (GameState.stack settled)) 1
+          Spec.assertEqWith s "one card drawn, not three" (S.handSize S.alice after, librarySize S.alice after) (1, 6)
+          Spec.assertEqWith s "and one life lost, not three" (S.lifeOf S.alice after) (Just 19)
+          Spec.assertEqWith s "the only counter on it is the +1/+1 the trigger put" (countersOn savantiId after) (Map.singleton CounterKind.PlusOnePlusOne 1)
+          Spec.assertEqWith s "so its printed 4/4 reads 5/5 here too" (S.powerToughnessOf savantiId after) (Just (5, 5))
+        -- A THIRD kind, at a third count. Two stun and three shield counters plus
+        -- the +1/+1 make six, which is neither the number of KINDS on it (three)
+        -- nor the GREATEST per-kind tally (three) -- the two other folds of the
+        -- same map that would pass both cases above.
+        Spec.it s "CR 122.1 three kinds at three counts sum rather than being counted or maximized" $ do
+          (savantiId, board) <- savantiBoard 2
+          let shielded = S.addCounter CounterKind.Shield 3 savantiId board
+              (_, after) = combatTrigger shielded
+          Spec.assertEqWith s "two stun and three shield counters to start" (countersOn savantiId shielded) (Map.fromList [(CounterKind.Shield, 3), (CounterKind.Stun, 2)])
+          Spec.assertEqWith s "six cards drawn, not three" (S.handSize S.alice after, librarySize S.alice after) (6, 1)
+          Spec.assertEqWith s "and six life lost" (S.lifeOf S.alice after) (Just 14)
+
 -- CR 601.2i's cast trigger with a payload aimed at a TARGET PLAYER: the pool's
 -- first card to hand out poison counters (CR 122.1f, whose tenth loses the game
 -- under CR 704.5c) to a player who was CHOSEN rather than derived from the
@@ -5021,6 +5122,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   hermesSpec s registry
   seiferSpec s registry
   ezuriExperienceSpec s registry
+  savantiRomeroSpec s registry
   youngPyromancerSpec s registry
   whisperingWizardSpec s registry
   clarionSpiritSpec s registry

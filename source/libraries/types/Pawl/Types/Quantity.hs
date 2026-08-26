@@ -314,6 +314,31 @@ data Quantity
     --
     -- A LEAF: it holds no Quantity.
     ObjectCounters (CounterKind.CounterKind Keyword.Keyword)
+  | -- | CR 122.1: how many counters of EVERY kind are on the OBJECT this quantity
+    -- is evaluated against, summed -- Savanti Romero, Time's Exile's "where X is
+    -- the number of counters on Savanti Romero", and the Boolean reading of the
+    -- same sum in Angelic Sleuth's "if it had counters on it".
+    --
+    -- ObjectCounters above in every respect but the kind: the same object (the one
+    -- the evaluation is aimed at), the same injected ViewOf, and so the same CR
+    -- 608.2h substitution for an object that is gone.
+    --
+    -- A SEPARATE ARM rather than a Maybe inside ObjectCounters' payload. Two
+    -- reasons. The narrower question is not this one with a filter applied -- CR
+    -- 122.1a-j give each kind its own rule, and a card asking after +1/+1 counters
+    -- is asking about power and toughness where a card asking after counters is
+    -- asking about CR 122.2's marker -- so an absent payload standing for "every
+    -- kind" would make the field's absence the way a reader tells the two
+    -- questions apart, which is the untagged union Pawl.Types.PlayerQuantity's
+    -- haddock forbids. And every existing card's wire form stays exactly as
+    -- printed, ObjectCounters' payload remaining required.
+    --
+    -- An object with NO counters reads as 0 rather than as unanswered, ObjectCounters'
+    -- convention: an empty sum is a number. Nothing survives only for an object the
+    -- view cannot describe at all.
+    --
+    -- A LEAF: it holds no Quantity.
+    ObjectCountersOfAnyKind
   | -- | Does the OBJECT this quantity is evaluated against have this designation?
     -- 1 if so and 0 if not -- rule 702.112a's "if it isn't renowned", which CR
     -- 603.4 makes an intervening "if" and so a Pawl.Types.Condition; CR 701.37a's

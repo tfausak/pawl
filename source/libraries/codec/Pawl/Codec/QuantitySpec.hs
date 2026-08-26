@@ -263,6 +263,17 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.ObjectCounters (CounterKind.Keyword Keyword.Flying))
       " {\"type\":\"ObjectCounters\",\"value\":{\"type\":\"Keyword\",\"value\":{\"type\":\"Flying\"}}} "
+  -- The same tally with no kind named at all (CR 122.1): a bare tag, since the sum
+  -- is over every kind and the object is still whichever one the quantity is
+  -- evaluated against. Round-tripped separately from the arm above because
+  -- Pawl.JsonCodec.Arm's tagged list carries its own fallthrough, so a missing arm
+  -- is a decode failure rather than a compile error (#1715).
+  Spec.it s "ObjectCountersOfAnyKind, a bare tag" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.ObjectCountersOfAnyKind
+      " {\"type\":\"ObjectCountersOfAnyKind\"} "
   -- CR 508.3b, with a PlayerRef and nothing else on the wire: what is counted is
   -- the combat record. Rule 702.121a's melee is the Relative arm; the InSlot arm
   -- beside it is the one a recursive decoder could lose a payload through, as

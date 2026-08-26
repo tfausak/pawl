@@ -324,6 +324,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- means the VIEW could not describe the object -- it is gone and nothing was
   -- filed under its id.
   Quantity.ObjectCounters kind -> fmap (toInteger . Map.findWithDefault 0 kind . Filter.counters) mView
+  -- CR 122.1 without the kind: the SUM over every kind the object carries, off the
+  -- same field and the same view the arm above reads, so CR 608.2h answers this one
+  -- for a gone object too. An object with no counters at all sums to 0, which is the
+  -- answer "it had no counters on it" wants rather than a Nothing.
+  Quantity.ObjectCountersOfAnyKind -> fmap (toInteger . sum . Filter.counters) mView
   -- The designation as a 0/1, off the same view ObjectCounters reads -- so CR
   -- 608.2h's last known information answers for an object that is gone, which is
   -- what rule 702.112a's intervening "if" needs on resolution, and what CR 701.37a's
@@ -634,6 +639,7 @@ substituteStar star quantity = case quantity of
   Quantity.IsActivePlayer _ -> quantity
   Quantity.PlayerCounters {} -> quantity
   Quantity.ObjectCounters _ -> quantity
+  Quantity.ObjectCountersOfAnyKind -> quantity
   Quantity.HasDesignation _ -> quantity
   Quantity.ClassLevel -> quantity
   Quantity.WasKicked -> quantity
@@ -726,6 +732,9 @@ slots quantity = case quantity of
   -- A bare CounterKind, which names no slot at all -- this arm carries no
   -- reference of any sort, the object being the one the evaluation is aimed at.
   Quantity.ObjectCounters _ -> Set.empty
+  -- The kind-agnostic reading of that same arm, naming no slot for its reason and
+  -- carrying not even a CounterKind.
+  Quantity.ObjectCountersOfAnyKind -> Set.empty
   -- The designation, which carries no reference either -- ObjectCounters' position,
   -- with which designation in the kind's place.
   Quantity.HasDesignation _ -> Set.empty
@@ -793,6 +802,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.IsActivePlayer ref -> playerRefIsSlotless ref
   Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref _) -> playerRefIsSlotless ref
   Quantity.ObjectCounters _ -> True
+  Quantity.ObjectCountersOfAnyKind -> True
   Quantity.HasDesignation _ -> True
   Quantity.ClassLevel -> True
   Quantity.WasKicked -> True
@@ -941,6 +951,7 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.InSlot _ -> quantity
   Quantity.Star -> quantity
   Quantity.ObjectCounters _ -> quantity
+  Quantity.ObjectCountersOfAnyKind -> quantity
   Quantity.HasDesignation _ -> quantity
   Quantity.ClassLevel -> quantity
   Quantity.WasKicked -> quantity
@@ -1064,6 +1075,7 @@ readsX quantity = case quantity of
   Quantity.IsActivePlayer _ -> False
   Quantity.PlayerCounters {} -> False
   Quantity.ObjectCounters _ -> False
+  Quantity.ObjectCountersOfAnyKind -> False
   Quantity.HasDesignation _ -> False
   Quantity.ClassLevel -> False
   Quantity.WasKicked -> False

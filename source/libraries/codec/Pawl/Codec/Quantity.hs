@@ -61,6 +61,7 @@ codec =
       -- CR 122.1's OBJECT reading: only a kind on the wire, since the object is
       -- whichever one the quantity is evaluated against (Pawl.Types.Quantity).
       Arm.payload "ObjectCounters" (CounterKind.codec Keyword.codec) Quantity.ObjectCounters (\x -> case x of Quantity.ObjectCounters y -> Just y; _ -> Nothing),
+      Arm.nullary "ObjectCountersOfAnyKind" Quantity.ObjectCountersOfAnyKind,
       -- CR 702.112b's designation, read against the object the quantity is aimed
       -- at, so only the designation is on the wire.
       Arm.payload "HasDesignation" Designation.codec Quantity.HasDesignation (\x -> case x of Quantity.HasDesignation y -> Just y; _ -> Nothing),
