@@ -1064,10 +1064,10 @@ copiableCharacteristics oid gs = case copiableSnapshotOf oid gs of
   Nothing -> baseCharacteristics oid gs
 
 -- CR 707.3: the copy snapshot stamped onto this object, and Nothing for the
--- object that is copying nothing. The ONE read of Binding.copyOf, so the three
--- questions asked of a copiable value -- the whole record above, its static
--- abilities below, and its player abilities in Pawl.Engine.PlayerEffect --
--- cannot disagree about which objects have one.
+-- object that is copying nothing. The ONE read of Binding.copyOf, so no question
+-- asked of a copiable value -- the whole record above, the three field-at-a-time
+-- readers below, and its player abilities in Pawl.Engine.PlayerEffect -- can
+-- disagree with another about which objects have one.
 copiableSnapshotOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
 copiableSnapshotOf oid gs = Game.lookupObject oid gs >>= (Binding.copyOf . Object.bindings)
 
@@ -1087,6 +1087,23 @@ staticAbilitiesOf :: ObjectId -> GameState -> [StaticAbility.StaticAbility Card.
 staticAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
   Just snapshot -> PC.staticAbilities snapshot
   Nothing -> foldMap Face.staticAbilities (Game.faceOf oid gs)
+
+-- CR 707.2a: the replacement effects this object's copiable rules text gives it,
+-- staticAbilitiesOf's sibling for the ability kind CR 614 asks about, written
+-- the same way for the same two reasons.
+copiableReplacementsOf :: ObjectId -> GameState -> [PrintedReplacement.PrintedReplacement (Effect.Effect Card.Type.Card)]
+copiableReplacementsOf oid gs = case copiableSnapshotOf oid gs of
+  Just snapshot -> PC.replacementEffects snapshot
+  Nothing -> foldMap Face.replacementEffects (Game.faceOf oid gs)
+
+-- CR 707.2a: does any keyword this object's copiable rules text gives it satisfy
+-- `p`? The third of staticAbilitiesOf's shape, and a PREDICATE rather than a
+-- container because the two arms carry different ones -- a snapshot counts each
+-- keyword (CR 613 layer 6 gives multiplicity) where a face only lists them.
+anyCopiableKeyword :: (Keyword -> Bool) -> ObjectId -> GameState -> Bool
+anyCopiableKeyword p oid gs = case copiableSnapshotOf oid gs of
+  Just snapshot -> any p (Map.keys (PC.keywords snapshot))
+  Nothing -> any (any p . Face.keywords) (Game.faceOf oid gs)
 
 -- CR 208.2 / 604.3: the card's characteristic-defining P/T, with the printed star
 -- resolved to what the CDA counts. Nothing unless the card declares a CDA *and*
@@ -4258,19 +4275,21 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 
 -- CR 614.1: every replacement effect active on the battlefield, PAIRED WITH ITS
 -- SOURCE -- a ControllerRelation pattern (CR 109.5's "you") is unanswerable
--- without it. Short-circuits when no permanent's base card has one.
+-- without it. Short-circuits when no permanent has one in its copiable rules text.
 --
--- The short-circuit reads BASE cards while the result reads the PROJECTION,
+-- The short-circuit reads COPIABLE values while the result reads the PROJECTION,
 -- sound only because every route to an unprinted replacement effect is covered:
 -- `EntryR AsCopy` on a card that is itself a base card with one, CR 122.1c's
 -- shield counters, CR 122.1h's finality counters, or a minting keyword printed
--- on or granted by a face. The ability disjunct asks staticAbilitiesOf rather
--- than the face, so a copy's granting text is seen (CR 707.2a).
+-- on, copied by, or granted by a face. Three of the disjuncts are copy-aware --
+-- the printed-replacement and keyword ones through copiableReplacementsOf and
+-- anyCopiableKeyword, the ability one through staticAbilitiesOf -- so a copy
+-- answers off the text it copied rather than the copier's (CR 707.2a).
 --
 -- Not implemented: a minting keyword reaching a permanent through a stored
--- continuous effect or a keyword counter is on no base face (#833). Nor is a
--- copy's own KEYWORD, which the disjunct above this one still reads off the
--- copier's printed face (#2220).
+-- continuous effect or a keyword counter is on no base face (#833). Nor does a
+-- copy's CARD TYPE reach the three type-line disjuncts, which still read the
+-- copier's printed face (#2397).
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect (Effect.Effect Card.Type.Card))]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
@@ -4283,13 +4302,13 @@ replacementsAffecting gs =
         -- The planeswalker disjunct keeps CR 306.5b's intrinsic replacement
         -- inside the short-circuit: it appears in no base face's list.
         Just face ->
-          not (null (Face.replacementEffects face))
+          not (null (copiableReplacementsOf oid gs))
             || Set.member CardType.Planeswalker (TypeLine.types (Face.typeLine face))
             -- The Saga disjunct is the planeswalker one's twin, for CR 714.3a.
             || Set.member Subtype.Type.Saga (TypeLine.subtypes (Face.typeLine face))
             -- And the battle disjunct is the third, for CR 310.4b.
             || Set.member CardType.Battle (TypeLine.types (Face.typeLine face))
-            || any Keyword.mintsReplacement (Face.keywords face)
+            || anyCopiableKeyword Keyword.mintsReplacement oid gs
             || any (any (grantsKeywordWhere Keyword.mintsReplacement) . StaticAbility.modifications) (staticAbilitiesOf oid gs)
       forOne oid = fmap (\re -> (oid, re)) (replacementsOf oid gs)
    in if not (any baseHas onBattlefield)
