@@ -34,6 +34,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -783,6 +784,119 @@ blightSimultaneitySpec s registry =
           Spec.assertEqWith s "she held one after the first" (S.handSize S.alice after) 1
           Spec.assertEqWith s "both Walls took a second counter" (fmap (\oid -> minusCountersOn oid again) walls) [Just 2, Just 2]
           Spec.assertEqWith s "and the second batch was one event group" (length (placementGroups again)) 1
+
+-- CR 603.2c's SECOND sentence, where blightSimultaneitySpec above proves its
+-- first: "whenever one or more -1/-1 counters are put on A CREATURE" names each
+-- creature the placements touched, so one batch spanning two of them contains two
+-- occurrences and fires twice.
+--
+--   * Wickersmith's Tools {3} Artifact
+--     (data/cards/wickersmiths-tools.json): "Whenever one or more -1/-1 counters
+--     are put on a creature, put a charge counter on this artifact." Its two
+--     other abilities -- "{T}: Add one mana of any color", and the {5}, {T},
+--     sacrifice that makes X tapped 2/2 Scarecrows for X charge counters -- are
+--     transcribed whole and go unexercised here.
+--
+-- (Its name, cost, type line and oracle text checked against Scryfall.)
+--
+-- WHY THIS PRINTING and not Auntie Ool, Cursewretch, the other card of the
+-- wording: the Auntie reads "that creature" back off the trigger, and no slot
+-- names it (#2342). The Tools carry no rider at all, so the charge counters on
+-- them are a clean count of how many times the ability fired.
+--
+-- The -1/-1 COUNTERS are the same under either reading of the trigger, which is
+-- why what the cases read is the count on the Tools: two for a two-creature
+-- batch, where the batch reading gives one.
+perCreatureCountersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+perCreatureCountersSpec s registry =
+  let charge = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "charge"))
+      -- The distinct EventGroups the log's -1/-1 placements carry, blightSimultaneitySpec's
+      -- copy: the precondition the two-creature case rests on, asserted rather than
+      -- assumed. Were the placements not one group, "twice out of one batch" would
+      -- be proving nothing.
+      placementGroups gs =
+        List.nub
+          ( Maybe.mapMaybe
+              ( \logged -> case LoggedEvent.event logged of
+                  GameEvent.CountersPut change
+                    | CounterChange.kind change == CounterKind.MinusOneMinusOne -> Just (LoggedEvent.group logged)
+                  _ -> Nothing
+              )
+              (Foldable.toList (GameState.events gs))
+          )
+      -- alice's Wickersmith's Tools and her High Perfect Morcant entering with its
+      -- CR 603.6a trigger settled onto the stack, plus ONE Wall of Stone for each
+      -- opponent. A single candidate per seat, so rule 701.68a's choice raises no
+      -- prompt and nothing about the answerer is load-bearing here.
+      --
+      -- A Wall of Stone is an 0/8, so a -1/-1 counter is nowhere near CR 704.5f and
+      -- every blighted creature is still standing when the counters are read.
+      toolsBoard opponents game = do
+        tools <- S.printingOf s registry "Wickersmith's Tools"
+        morcant <- S.printingOf s registry "High Perfect Morcant"
+        wall <- S.printingOf s registry "Wall of Stone"
+        let (toolsId, withTools) = S.addCreature tools S.alice game
+            (walls, withWalls) = List.foldl' (\(acc, g) pid -> let (oid, g') = S.addCreature wall pid g in (acc <> [oid], g')) ([], withTools) opponents
+            (_, entered) = S.entersWithTrigger morcant S.alice withWalls
+        pure (toolsId, walls, snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority))
+      -- Settle and resolve until the stack is empty, blightSimultaneitySpec's copy:
+      -- the Morcant's trigger puts the counters, and the Tools' own triggers only
+      -- reach the stack at the CR 117.5 scan after it.
+      resolveEverything gs =
+        let settled = S.runPure S.identityAnswer gs Engine.settleForPriority
+         in if null (GameState.stack settled)
+              then settled
+              else resolveEverything (S.runPure S.identityAnswer settled Stack.resolveTop)
+   in Spec.describe s "PerCreatureCounters" $ do
+        -- The proving case, and the one the batch reading gets wrong: bob and carol
+        -- both blight, one batch touches two creatures, and the ability fires ONCE
+        -- PER CREATURE. 1 is the batch reading and 0 is silence.
+        Spec.it s "CR 603.2c a batch touching two creatures fires the per-creature trigger twice" $ do
+          (toolsId, walls, board) <- toolsBoard [S.bob, S.carol] S.threePlayerGame
+          let after = resolveEverything board
+          Spec.assertEqWith s "the Tools took a charge counter for each creature the batch touched" (S.counterOf charge toolsId after) 2
+          Spec.assertEqWith s "both opponents' Walls took a -1/-1 counter" (fmap (\oid -> minusCountersOn oid after) walls) [Just 1, Just 1]
+          Spec.assertEqWith s "and the two placements were one event group" (length (placementGroups after)) 1
+          Spec.assertEqWith s "the Tools carried no charge counter before" (S.counterOf charge toolsId board) 0
+        -- The same card with ONE blighter, which is the reading both implementations
+        -- share: one creature, one trigger. What it rules out is a Tools that fires
+        -- per SEAT or per batch member regardless of the count -- and it is why the
+        -- case above's 2 cannot be read as "fires twice whatever happened".
+        Spec.it s "CR 603.2c one creature in the batch fires it once" $ do
+          (toolsId, walls, board) <- toolsBoard [S.bob] (Setup.emptyGame S.bothPlayers)
+          let after = resolveEverything board
+          Spec.assertEqWith s "the Tools took one charge counter" (S.counterOf charge toolsId after) 1
+          Spec.assertEqWith s "bob's Wall took the counter" (fmap (\oid -> minusCountersOn oid after) walls) [Just 1]
+          Spec.assertEqWith s "one placement, one group" (length (placementGroups after)) 1
+        -- The other half of "ONE OR MORE counters ... on a creature": two counters
+        -- landing on ONE creature at once is one placement and so one trigger, where
+        -- a per-COUNTER reading would fire twice. Dawnhand Dissident's second
+        -- ability is the producer -- "{T}, Blight 2: Exile target card from a
+        -- graveyard" -- and rule 701.68a's blight 2 puts both counters on a single
+        -- creature in one go.
+        --
+        -- The blight is a COST (CR 602.1b), so the counters are on the board with
+        -- the exile still on the stack; resolveEverything below then lets the Tools'
+        -- trigger reach the stack and resolve.
+        Spec.it s "CR 603.2c two counters on one creature at once is one trigger" $ do
+          tools <- S.printingOf s registry "Wickersmith's Tools"
+          dissident <- S.printingOf s registry "Dawnhand Dissident"
+          wall <- S.printingOf s registry "Wall of Stone"
+          swamp <- S.printingOf s registry "Swamp"
+          let (toolsId, g1) = S.addCreature tools S.alice (Setup.emptyGame S.bothPlayers)
+              (dissidentId, g2) = S.addCreature dissident S.alice g1
+              (wallId, g3) = S.addCreature wall S.alice g2
+              (_, g4) = S.addGraveyardCard swamp S.bob g3
+              board = g4 {GameState.priority = Just S.alice}
+          activated <- case Projection.abilitiesOf dissidentId board of
+            _ : exile : _ -> do
+              Spec.assertBool s (Activate.activatable S.alice dissidentId exile board) "the blight 2 ability is activatable"
+              pure (S.runPure (blighting wallId) board (Activate.activateAbility S.alice dissidentId exile))
+            _ -> Spec.assertFailure s "expected the Dissident to carry two activated abilities"
+          let after = resolveEverything activated
+          Spec.assertEqWith s "the Tools took ONE charge counter for the two counters that landed together" (S.counterOf charge toolsId after) 1
+          Spec.assertEqWith s "the Wall took both -1/-1 counters" (minusCountersOn wallId after) (Just 2)
+          Spec.assertEqWith s "in one placement, so one event group" (length (placementGroups after)) 1
 
 -- CR 701.68 blight as a COST (CostComponent.Blight), which is the position most of
 -- the pool prints it in and the one CR 701.68b's "they can't choose to blight"
@@ -1650,6 +1764,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   blightSpec s registry
   blightPlayerSpec s registry
   blightSimultaneitySpec s registry
+  perCreatureCountersSpec s registry
   blightCostSpec s registry
   soulfireEruptionSpec s registry
   payAnyEnergySpec s registry

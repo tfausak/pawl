@@ -99,6 +99,7 @@ import qualified Pawl.Codec.CounterChangeSpec
 import qualified Pawl.Codec.CounterKindSpec
 import qualified Pawl.Codec.CounterNameSpec
 import qualified Pawl.Codec.CounterPatternSpec
+import qualified Pawl.Codec.CounterPlacementSpec
 import qualified Pawl.Codec.CounterRSpec
 import qualified Pawl.Codec.CounterSpec
 import qualified Pawl.Codec.CounterSubjectSpec
@@ -239,7 +240,6 @@ import qualified Pawl.Codec.PendingEntryEffectSpec
 import qualified Pawl.Codec.PermanentBecomesDesignatedSpec
 import qualified Pawl.Codec.PermanentCandidateSpec
 import qualified Pawl.Codec.PermanentSacrificedSpec
-import qualified Pawl.Codec.PermanentsGetCountersSpec
 import qualified Pawl.Codec.PhasePatternSpec
 import qualified Pawl.Codec.PhaseSelectorSpec
 import qualified Pawl.Codec.PhaseSpec
@@ -752,7 +752,7 @@ spec s registry = do
   Pawl.Codec.PayObligationSpec.spec s
   Pawl.Codec.PendingEntryEffectSpec.spec s
   Pawl.Codec.PermanentBecomesDesignatedSpec.spec s
-  Pawl.Codec.PermanentsGetCountersSpec.spec s
+  Pawl.Codec.CounterPlacementSpec.spec s
   Pawl.Codec.PermanentCandidateSpec.spec s
   Pawl.Codec.PermanentSacrificedSpec.spec s
   Pawl.Codec.PhasePatternSpec.spec s
