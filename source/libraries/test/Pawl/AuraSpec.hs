@@ -832,6 +832,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   grantedEnchantSpec s registry
   bestowSpec s registry
   licidSpec s registry
+  auraTextChangeSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
@@ -2777,3 +2778,73 @@ licidBoard island piker licid =
           let activated = S.runPure (aimAtOffered host) ready (Activate.activateAbility S.alice lic ability)
               after = S.runPure (aimAtOffered host) activated Stack.resolveTop
            in Just (lic, host, after)
+
+-- CR 400.7a through Pawl.Engine.Stack's AURA branch, the other of the two
+-- permanent-spell resolutions that carry a text change onto the permanent (the
+-- creature-spell one is Pawl.ReplacementSpec's Tidewalker case, and
+-- Pawl.ActivateSpec's Tidal Warrior is the same rule through an activated
+-- ability).
+--
+-- Aspect of Wolf {1}{G} Enchantment -- Aura, whole text: "Enchant creature /
+-- Enchanted creature gets +X/+Y, where X is half the number of Forests you
+-- control, rounded down, and Y is half the number of Forests you control,
+-- rounded up." (oracle checked on Scryfall 2026-08-26)
+--
+-- Magical Hack ({U}) swaps Forest -> Island on the Aura SPELL, so the static
+-- ability the Aura PERMANENT ends up with counts Islands (CR 612.1, CR 613.1c).
+-- The swap has to survive CR 400.7's new object, which is what CarryOver.Carried
+-- on that branch is for.
+--
+-- THE TWO COUNTS ARE UNEQUAL AND ODD -- three Forests and seven Islands -- so
+-- each leg exercises both roundings and no pair of numbers coincides: +1/+2 on a
+-- 2/1 Piker is 3/3, and +3/+4 is 5/5.
+auraTextChangeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+auraTextChangeSpec s registry = Spec.describe s "AuraTextChange" $ do
+  -- The control: the same board and the same Aura, no Magical Hack.
+  Spec.it s "unhacked, the Aura counts the Forests its printed text names" $ do
+    (creature, after) <- aspectChain s registry False
+    Spec.assertEqWith s "three Forests, so +1/+2 on the 2/1 Piker" (S.powerToughnessOf creature after) (Just (3, 3))
+  Spec.it s "CR 400.7a hacking the Aura SPELL leaves the permanent counting Islands" $ do
+    (creature, after) <- aspectChain s registry True
+    Spec.assertEqWith s "seven Islands, so +3/+4 on the 2/1 Piker" (S.powerToughnessOf creature after) (Just (5, 5))
+
+-- alice controls three Forests, seven Islands and a Goblin Piker (2/1), and holds
+-- Aspect of Wolf and Magical Hack. The Aura is cast at the Piker and left ON THE
+-- STACK; the Hack is then cast at the Aura SPELL and resolved; only then does the
+-- Aura resolve and enter attached (CR 303.4). Returns the Piker's id and the
+-- final state.
+aspectChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, GameState.GameState)
+aspectChain s registry hack = do
+  forest <- S.printingOf s registry "Forest"
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  aspect <- S.printingOf s registry "Aspect of Wolf"
+  magicalHack <- S.printingOf s registry "Magical Hack"
+  let base = S.landsFor island S.alice 7 (S.landsInPlay forest 3)
+      (creature, g1) = S.addCreature piker S.alice base
+      (auraId, g2) = S.addHandCard aspect S.alice g1
+      (hackId, g3) = S.addHandCard magicalHack S.alice g2
+      onStack = S.runPure (targetingOnly creature) g3 (S.cast S.alice auraId)
+      hacked = case (hack, GameState.stack onStack) of
+        (True, spellId : _) -> S.runPure (hackAt spellId Subtype.Forest Subtype.Island) onStack (S.cast S.alice hackId >> Stack.resolveTop)
+        _ -> onStack
+      after = S.runPure S.identityAnswer hacked Stack.resolveTop
+  pure (creature, after)
+
+-- Magical Hack aimed at one object, the Pawl.ReplacementSpec helper of the same
+-- name: the target is FILTERED out of the offered set rather than rebuilt, since
+-- a hand-built recipient of the wrong shape would be dropped at CR 608.2b's
+-- re-read with no error.
+hackAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
+hackAt oid from to p = case p of
+  Prompt.ChooseLandTypeSwap {} -> (from, to)
+  _ -> targetingOnly oid p
+
+-- hackAt's target half, which the Aura's own CR 303.4a enchant slot takes too:
+-- the offered set is NARROWED rather than rebuilt, because the recipient's TAG is
+-- the offer's (aimAt above hands back a ToObject, which a Pool.Creatures slot
+-- never offered and CR 608.2b silently drops).
+targetingOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+targetingOnly oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
