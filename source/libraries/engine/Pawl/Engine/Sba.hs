@@ -209,9 +209,8 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 --
 -- Read off the PROJECTED characteristics, which is the whole point: the card
 -- types this cases on are exactly what CR 613's layer 4 changes. "Aura" and
--- "Equipment" are subtypes (CR 205.3h, CR 301.5), so they come from PC.subtypes
--- -- unlike CR 704.5m's fallsOff, which asks the printed card for an enchant
--- ability because it needs that ability's target slot.
+-- "Equipment" are subtypes (CR 205.3h, CR 301.5), so they come from PC.subtypes,
+-- as CR 704.5m's fallsOff below reads PC.enchant for the same reason.
 --
 -- Subtype.Fortification is the one clause of the rule with no constructor to case
 -- on, and is therefore unreachable rather than elided. The BATTLE clause is
@@ -302,7 +301,7 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- rather than off `pcs`, because it is a record of a choice made while casting
 -- and no CR 613 layer computes it.
 isBestowed :: GameState -> ObjectId -> Bool
-isBestowed gs oid = Maybe.isJust (Object.bestowed =<< Game.lookupObject oid gs)
+isBestowed gs oid = maybe False Object.bestowed (Game.lookupObject oid gs)
 
 fallsOff :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 fallsOff pcs gs oid = case Map.lookup oid pcs of
@@ -766,7 +765,7 @@ performStateBasedActions = Event.simultaneously $ do
   --
   -- ONE WAY: no rule makes an object bestowed again, and CR 702.103a's choice is
   -- available only while casting.
-  State.modify' (\g -> g {GameState.objects = List.foldl' (flip (Map.adjust (\o -> o {Object.attachedTo = Nothing, Object.bestowed = Nothing}))) (GameState.objects g) unbestowing})
+  State.modify' (\g -> g {GameState.objects = List.foldl' (flip (Map.adjust (\o -> o {Object.attachedTo = Nothing, Object.bestowed = False}))) (GameState.objects g) unbestowing})
   -- CR 704.5g/h: destruction through the funnel, Regenerable -- the point rather
   -- than a default, since CR 701.19a's shield exists to replace exactly this
   -- destruction. ByRule for the mirror-image reason: no effect is destroying

@@ -634,12 +634,12 @@ data Object = MkObject
     -- Stored for `kicked` above's reason: nothing a CR 613 layer computes may
     -- move it, since it records a choice made while casting.
     --
-    -- The Timestamp is the effect's, CR 613.7a's "the time it started to exist"
-    -- -- the moment the spell was put onto the stack, which is when rule 702.103b
-    -- says the effect begins. Carried rather than re-derived from
-    -- Object.timestamp because the permanent the spell becomes has a NEWER
-    -- timestamp of its own (CR 613.7a again), and it is the effect's order
-    -- against other layer-4 effects that this settles.
+    -- A Bool and not the effect's timestamp, and CR 613.7a is why: rule 702.103a
+    -- makes bestow a STATIC ability, so the effect it generates "has the same
+    -- timestamp as the object the static ability is on" -- and when that object
+    -- receives a new one, so does the effect. bestowGathered reads
+    -- Object.timestamp for exactly that reason, which leaves nothing for this
+    -- field to carry but the designation itself.
     --
     -- Carried across the ONE move that matters -- stack to battlefield -- by
     -- Pawl.Engine.Event.changeZoneAttaching, `kicked`'s route, and for a
@@ -657,7 +657,7 @@ data Object = MkObject
     -- become, or stop being, bestowed. CR 702.103g's phasing in unattached
     -- reaches Pawl.Engine.Sba's CR 702.103f pass one pass later, since
     -- Pawl.Engine.Phasing.phaseIn detaches first; see #2358.
-    bestowed :: Maybe Timestamp.Timestamp,
+    bestowed :: Bool,
     -- | CR 601.2b with CR 107.4f: how many of the Phyrexian mana symbols in the
     -- cost of the SPELL that became this permanent its controller announced they
     -- would pay 2 life for. Rule 702.150a's compleated is the one reader, through
@@ -913,7 +913,7 @@ newIncarnation object =
       -- CR 400.7 forgets the designation, `kicked` above's route; rule 702.103b's
       -- record is written back by Pawl.Engine.Event.changeZoneAttaching's mkObj
       -- for the one move that keeps it.
-      bestowed = Nothing,
+      bestowed = False,
       -- CR 400.7 forgets the announcement, `kicked` above's route; CR 601.2b's
       -- record is written back by Pawl.Engine.Event.changeZoneAttaching's mkObj.
       phyrexianLifePaid = 0,

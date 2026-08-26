@@ -3193,27 +3193,29 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
 -- and a spell whose type line the effect has not reached is one CR 601.2c would
 -- have judged as a creature spell.
 --
--- CR 613.7a: the timestamp is the effect's own, carried on the object since the
--- cast, rather than Object.timestamp -- the permanent CR 608.3c creates is a new
--- object with a newer timestamp, and rule 702.103b's effect did not restart when
--- it entered.
+-- CR 613.7a: rule 702.103a makes bestow a STATIC ability, so the effect it
+-- generates takes the timestamp of the object that ability is on -- and takes a
+-- new one when that object does, which is what CR 608.3c's move gives the
+-- permanent. So Object.timestamp is the reading the rule asks for rather than a
+-- convenience, and designationGathered below reads it for the same reason.
 bestowGathered :: GameState -> [Gathered]
 bestowGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs) <> GameState.stack gs)
   where
-    fromObject oid = case Object.bestowed =<< Game.lookupObject oid gs of
-      Nothing -> []
-      Just ts ->
-        [ MkGathered
-            { gEffect = Nothing,
-              gSource = oid,
-              gAffected = Affected.TheseObjects (Set.singleton oid),
-              gLayer = layer m,
-              gLowest = layer m,
-              gTimestamp = ts,
-              gModification = m
-            }
-        | m <- Keyword.bestowModifications
-        ]
+    fromObject oid = case Game.lookupObject oid gs of
+      Just obj
+        | Object.bestowed obj ->
+            [ MkGathered
+                { gEffect = Nothing,
+                  gSource = oid,
+                  gAffected = Affected.TheseObjects (Set.singleton oid),
+                  gLayer = layer m,
+                  gLowest = layer m,
+                  gTimestamp = Object.timestamp obj,
+                  gModification = m
+                }
+            | m <- Keyword.bestowModifications
+            ]
+      _ -> []
 
 -- CR 701.60c / 613.1f: a SUSPECTED permanent has menace, emitted as a layer-6
 -- grant on the permanent itself. Read off Object.designations on every

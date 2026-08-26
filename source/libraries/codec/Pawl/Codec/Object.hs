@@ -87,7 +87,7 @@ codec = Fields.object $ do
   unlockedHalves <- Fields.required "unlockedHalves" (Common.set CardName.codec) Object.unlockedHalves
   designations <- Fields.required "designations" (Common.set Designation.codec) Object.designations
   kicked <- Fields.required "kicked" Common.boolean Object.kicked
-  bestowed <- Fields.required "bestowed" (Common.maybe Timestamp.codec) Object.bestowed
+  bestowed <- Fields.required "bestowed" Common.boolean Object.bestowed
   phyrexianLifePaid <- Fields.required "phyrexianLifePaid" Common.natural Object.phyrexianLifePaid
   manaSpent <- Fields.required "manaSpent" Mana.codec Object.manaSpent
   announcedX <- Fields.required "announcedX" (Common.maybe Common.natural) Object.announcedX

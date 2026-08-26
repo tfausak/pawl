@@ -735,7 +735,7 @@ createEmblem pid card = do
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.kicked = False,
-            Object.bestowed = Nothing,
+            Object.bestowed = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -3442,7 +3442,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- BATTLEFIELD ONLY, `kicked`'s gate and for a reason the rule
                     -- states rather than implies: what a bestowed spell becomes
                     -- anywhere else is a card, and a card is no bestowed Aura.
-                    Object.bestowed = if dest == Zone.Battlefield then Object.bestowed obj else Nothing,
+                    Object.bestowed = Object.bestowed obj && dest == Zone.Battlefield,
                     -- CR 400.7d a third time, and rule 702.150a is the ability
                     -- that references it: how many of the spell's Phyrexian mana
                     -- symbols were announced to be paid with life (CR 601.2b).
@@ -4283,7 +4283,7 @@ createTokens controller card copy n tapped entering = do
                     Object.unlockedHalves = Set.empty,
                     Object.designations = Set.empty,
                     Object.kicked = False,
-                    Object.bestowed = Nothing,
+                    Object.bestowed = False,
                     Object.phyrexianLifePaid = 0,
                     Object.manaSpent = Mana.MkMana [],
                     Object.announcedX = Nothing,

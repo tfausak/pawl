@@ -463,16 +463,15 @@ stampKicked sid gs =
 -- move -- is asked after CR 601.2b, and a proposal that rewinds takes the stamp
 -- back with the spell (`reject` restores the pre-move state).
 --
--- The TIMESTAMP is CR 613.7a's, taken fresh here, and carried on the object
--- rather than re-derived, because the permanent CR 608.3c creates has a newer
--- Object.timestamp of its own and the effect did not restart when it entered.
+-- An idempotent write of a field no layer computes, stampKicked's shape, and one
+-- direction only: rule 702.103a's choice is available while casting and never
+-- after, so nothing here can set it back.
 stampBestowed :: ObjectId -> GameState -> GameState
 stampBestowed sid gs =
-  let (ts, gs1) = Game.freshTimestamp gs
-   in gs1
-        { GameState.objects =
-            Map.adjust (\o -> o {Object.bestowed = Just ts}) sid (GameState.objects gs1)
-        }
+  gs
+    { GameState.objects =
+        Map.adjust (\o -> o {Object.bestowed = True}) sid (GameState.objects gs)
+    }
 
 -- CR 702.103a: was this the bestow candidate? Asked of the keyword that offered
 -- the cost CR 601.2b's announcement settled on (Cast.castProposed's `castFor`),

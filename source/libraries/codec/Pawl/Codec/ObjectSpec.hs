@@ -81,7 +81,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.unlockedHalves = Set.empty,
           Object.designations = Set.empty,
           Object.kicked = False,
-          Object.bestowed = Nothing,
+          Object.bestowed = False,
           Object.phyrexianLifePaid = 0,
           Object.manaSpent = Mana.MkMana [],
           Object.announcedX = Nothing,
@@ -100,14 +100,14 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"playableFromExile\":null,\"plotted\":null,\"foretold\":null"
           <> ",\"ringBearerFor\":null,\"protector\":null,\"ventureRoom\":null"
           <> ",\"classLevel\":null,\"unlockedHalves\":[],\"designations\":[]"
-          <> ",\"kicked\":false,\"bestowed\":null,\"phyrexianLifePaid\":0"
+          <> ",\"kicked\":false,\"bestowed\":false,\"phyrexianLifePaid\":0"
           <> ",\"manaSpent\":[]"
           <> ",\"announcedX\":null,\"detainedUntil\":[],\"goadedBy\":[]"
           <> ",\"doesNotUntapNext\":false,\"exertedBy\":[]} "
       )
   -- Every axis away from the case above, so no two same-typed fields hold the
   -- same value and a codec swapping a pair of them is caught: the six PlayerId
-  -- axes are six seats, the five Timestamp axes five numbers, and the three
+  -- axes are six seats, the four Timestamp axes four numbers, and the three
   -- Set PlayerId axes three different seats.
   --
   -- `counters` carries a kind at ZERO beside one at three. That is a state the
@@ -178,7 +178,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Fire")),
           Object.designations = Set.singleton Designation.Renowned,
           Object.kicked = True,
-          Object.bestowed = Just (Timestamp.MkTimestamp 24),
+          Object.bestowed = True,
           Object.phyrexianLifePaid = 19,
           Object.manaSpent =
             Mana.MkMana
@@ -215,7 +215,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"plotted\":0,\"foretold\":15,\"ringBearerFor\":16,\"protector\":17"
           <> ",\"ventureRoom\":18,\"classLevel\":2,\"unlockedHalves\":[\"Fire\"]"
           <> ",\"designations\":[{\"type\":\"Renowned\"}],\"kicked\":true"
-          <> ",\"bestowed\":24"
+          <> ",\"bestowed\":true"
           <> ",\"phyrexianLifePaid\":19"
           <> ",\"manaSpent\":[{\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}"
           <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null}]"
