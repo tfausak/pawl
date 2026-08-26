@@ -5664,9 +5664,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- counter") and the player's when it does not (Agent's Toolkit's "move a
     -- counter"), which is what `named` holds. ATOMIC -- "if either of these
     -- actions isn't possible, it's not possible to move a counter, and no counter
-    -- is removed from or put onto anything" -- so every impossibility is checked BEFORE
-    -- either half runs, and this arm is not a RemoveCounters followed by a
-    -- PutCounters however much its tail looks like one.
+    -- is removed from or put onto anything" -- so every impossibility the rule
+    -- names is checked BEFORE either half runs, and this arm is not a
+    -- RemoveCounters followed by a PutCounters however much its tail looks like
+    -- one.
     --
     -- Three of the rule's four impossibilities are checked here, in its own order.
     -- Its third, "the second object can't have counters put onto it", is a
