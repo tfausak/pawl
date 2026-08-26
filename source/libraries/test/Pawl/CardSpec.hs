@@ -531,6 +531,8 @@ quantityCounts quantity = case quantity of
   -- CR 122.1's per-OBJECT tally, read off the object the quantity is evaluated
   -- against: a bare CounterKind with no Count and no Filter beside it.
   Quantity.Type.ObjectCounters _ -> []
+  -- The kind-agnostic reading of that same tally: not even a CounterKind beside it.
+  Quantity.Type.ObjectCountersOfAnyKind -> []
   -- CR 508.3b's combat record, read as a tally of players: a PlayerRef and
   -- nothing else, so no Count and no Filter here either.
   Quantity.Type.OpponentsAttacked _ -> []
@@ -1373,6 +1375,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.IsActivePlayer {} -> False
   Quantity.Type.PlayerCounters {} -> False
   Quantity.Type.ObjectCounters {} -> False
+  Quantity.Type.ObjectCountersOfAnyKind -> False
   Quantity.Type.HasDesignation {} -> False
   Quantity.Type.ClassLevel -> False
   Quantity.Type.WasKicked -> False
