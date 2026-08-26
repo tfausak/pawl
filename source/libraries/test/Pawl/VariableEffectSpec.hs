@@ -689,7 +689,9 @@ blightingFor pins p = case p of
 -- kind is right and whose batch is scoped to "A CREATURE" -- one creature, so they
 -- fire once per creature however the placements are grouped, and two seats blight
 -- them twice under either reading. A printing refuting the synthetic is one whose
--- batch spans creatures AND whose kind is -1/-1.
+-- batch spans creatures AND whose kind is -1/-1. Wickersmith's Tools is in the
+-- pool for exactly that per-creature wording; perCreatureCountersSpec below is
+-- where it is proved, on this group's board.
 --
 -- The COUNTERS are the same either way, which is why the card drawn is what the
 -- cases read: one card for the batch, where a seat-at-a-time placement draws two.
@@ -875,7 +877,7 @@ perCreatureCountersSpec s registry =
         -- graveyard" -- and rule 701.68a's blight 2 puts both counters on a single
         -- creature in one go.
         --
-        -- The blight is a COST (CR 602.1b), so the counters are on the board with
+        -- The blight is a COST (CR 601.2h), so the counters are on the board with
         -- the exile still on the stack; resolveEverything below then lets the Tools'
         -- trigger reach the stack and resolve.
         Spec.it s "CR 603.2c two counters on one creature at once is one trigger" $ do
