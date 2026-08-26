@@ -304,6 +304,7 @@ import qualified Pawl.Codec.SearchSpec
 import qualified Pawl.Codec.SelfCountersReachedSpec
 import qualified Pawl.Codec.SetBasePowerToughnessSpec
 import qualified Pawl.Codec.SetClassLevelSpec
+import qualified Pawl.Codec.SetHalfLockedSpec
 import qualified Pawl.Codec.SetPowerToughnessSpec
 import qualified Pawl.Codec.ShuffleIntoLibrarySpec
 import qualified Pawl.Codec.SicknessSpec
@@ -823,6 +824,7 @@ spec s registry = do
   Pawl.Codec.SelfCountersReachedSpec.spec s
   Pawl.Codec.SetBasePowerToughnessSpec.spec s
   Pawl.Codec.SetClassLevelSpec.spec s
+  Pawl.Codec.SetHalfLockedSpec.spec s
   Pawl.Codec.SetPowerToughnessSpec.spec s
   Pawl.Codec.ShuffleIntoLibrarySpec.spec s
   Pawl.Codec.SicknessSpec.spec s

@@ -672,6 +672,8 @@ library codec
     Pawl.Codec.SetBasePowerToughnessSpec
     Pawl.Codec.SetClassLevel
     Pawl.Codec.SetClassLevelSpec
+    Pawl.Codec.SetHalfLocked
+    Pawl.Codec.SetHalfLockedSpec
     Pawl.Codec.SetPowerToughness
     Pawl.Codec.SetPowerToughnessSpec
     Pawl.Codec.ShuffleIntoLibrary
@@ -1557,6 +1559,7 @@ library types
     Pawl.Types.SelfCountersReached
     Pawl.Types.SetBasePowerToughness
     Pawl.Types.SetClassLevel
+    Pawl.Types.SetHalfLocked
     Pawl.Types.SetPowerToughness
     Pawl.Types.ShuffleIntoLibrary
     Pawl.Types.Sickness

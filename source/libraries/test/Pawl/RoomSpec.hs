@@ -1,3 +1,6 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+
 -- Covers CR 709.5's Room cards end to end: Pawl.Types.Layout's Room arm and the
 -- Pawl.Engine.Card functions that read it (CR 709.4's combined view, CR 709.3's
 -- castable halves, CR 709.5's roomFace subtraction, CR 709.5d's entering
@@ -6,14 +9,15 @@
 -- Pawl.Engine.Event.changeZoneAttaching writes the entering designation and
 -- records CR 709.5h's event, Pawl.Engine.Room offers and carries out CR
 -- 116.2m/709.5e's special action, and Pawl.Engine.Action/Pawl.Engine.Engine put
--- it on the menu. Pawl.Engine.Projection.namesOf gives the permanent one name
+-- it on the menu, and Pawl.Engine.Resolve's SetHalfLocked arm carries out CR
+-- 709.5f/g's instructions. Pawl.Engine.Projection.namesOf gives the permanent one name
 -- per UNLOCKED door (CR 709.4a), which makes a Room with both doors open the
 -- pool's only permanent with two names at once. CR 709.5i's "fully unlocks" is
 -- here too, which reaches
 -- Event.fullyUnlockedAfter at both writers of an unlocked designation and
 -- Event.matchesTrigger's RoomFullyUnlocked and AnyOf arms.
 --
--- TWO printed cards. Roaring Furnace // Steaming Sauna, DSK 230, picked because
+-- THREE printed cards. Roaring Furnace // Steaming Sauna, DSK 230, picked because
 -- its two doors disagree about everything a reader can see -- {1}{R} against
 -- {3}{U}{U}, a triggered ability that fires on the door opening against a
 -- persistent pair (a static "you have no maximum hand size" and an end-step
@@ -23,6 +27,13 @@
 -- unlock this door" looks the same whether its text was subtracted or its
 -- trigger simply did not match. And Balemurk Leech, DSK 84, which is the pool's
 -- one CR 709.5i trigger and the one card whose ability watches a Room it is not.
+-- And Keys to the House, DSK 254, which is the pool's producer of CR 709.5f's
+-- unlock and CR 709.5g's lock as EFFECTS rather than as CR 116.2m's special
+-- action, so the two rules the special action cannot reach get a card.
+--
+-- Pawl.Engine.Room's own coverage is here rather than beside Resolve's, since
+-- rule 709.5c's derivation is what both the action and the opcode filter their
+-- offers through.
 --
 -- THREE SEATS, so "target creature an opponent controls" cannot coincide with
 -- "a creature you control": bob holds the only legal target and carol holds
@@ -32,10 +43,12 @@ module Pawl.RoomSpec where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
@@ -51,9 +64,13 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
@@ -61,10 +78,14 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -160,6 +181,45 @@ plainEntry = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, 
 -- Every unlock this player is offered right now, as CR 709.5e's pair.
 unlocksOffered :: GameState.GameState -> [(ObjectId.ObjectId, CardName.CardName)]
 unlocksOffered gs = [(o, n) | A.Unlock o n <- Action.legalActions S.alice gs]
+
+-- Keys to the House's SECOND ability, "{3}, {T}, Sacrifice this artifact: Lock
+-- or unlock a door of target Room you control. Activate only as a sorcery." The
+-- first is an ordinary basic-land tutor and shares nothing with rule 709.5.
+lockAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+lockAbility keys = case drop 1 (Face.activatedAbilities (S.combinedFace keys)) of
+  ability : _ -> ability
+  -- Unreachable: the printing has two. A no-mode ability with an unpayable cost
+  -- keeps the helper total and is offered nowhere, so a card that lost its
+  -- second ability fails the case rather than silently activating the first.
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.MkCost Nothing []) (Modal.MkModal Seq.empty (ModeSelection.ChooseExactly 1)) [] Nothing Nothing
+
+-- Whether that ability is on alice's menu, which is what says the board really
+-- is in CR 307.5's sorcery-speed window with the cost payable -- and so that a
+-- case below asserting the effect is not passing on an ability nobody could
+-- have activated.
+lockOffered :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> Bool
+lockOffered keys keysId gs = elem (A.Activate keysId (lockAbility keys)) (Action.legalActions S.alice gs)
+
+-- Answers everything Keys to the House asks as it resolves: CR 601.2c's target,
+-- CR 608.2d's branch by ordinal, and CR 709.5f/g's door by name.
+--
+-- The TARGET is answered by FILTERING the offered recipients rather than by
+-- building one, since a hand-built recipient of another tag is dropped by CR
+-- 608.2b's re-read with no error. The BRANCH and the DOOR are answered by value:
+-- each is raised at most once per case here, and each answer is filtered back
+-- through the offer by the engine, which is what the lock case below turns on.
+keysAnswer :: ObjectId.ObjectId -> ClauseIndex.ClauseIndex -> CardName.CardName -> Prompt.Prompt r -> r
+keysAnswer room branch door p = case p of
+  Prompt.ChooseTargets _ _ _ asked -> fmap (Set.filter ((==) (Just room) . Recipient.objectOf) . snd) asked
+  Prompt.ChooseClause {} -> branch
+  Prompt.ChooseHalf {} -> door
+  _ -> S.identityAnswer p
+
+-- Activate the lock ability and resolve it, triggers and all.
+activateKeys :: Printing.Printing -> ObjectId.ObjectId -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+activateKeys keys keysId answer gs =
+  let activated = snd (Engine.runGamePure answer gs (Activate.activateAbility S.alice keysId (lockAbility keys)))
+   in resolveAll (settle (snd (Engine.runGamePure answer activated Stack.resolveTop)))
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Room" $ do
@@ -310,6 +370,119 @@ spec s registry = Spec.describe s "Room" $ do
         -- CR 709.5h's "a PARTICULAR half": the BLUE door opening is not the red
         -- door's trigger, so the wall takes no second helping of damage.
         Spec.assertEqWith s "and the other door's trigger did not fire again" (S.damageOf wallId opened) (Just 3)
+      other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
+  -- THE PROVING CASE for CR 709.5g: "Some spells and abilities instruct a player
+  -- to 'lock' half of a permanent. To lock half of a permanent, a player chooses
+  -- an unlocked half of that permanent, and that permanent loses the appropriate
+  -- unlocked designation."
+  --
+  -- Keys to the House, DSK 254, {1} Artifact: "{3}, {T}, Sacrifice this
+  -- artifact: Lock or unlock a door of target Room you control. Activate only as
+  -- a sorcery." The pool's producer, and the pool's only MANDATORY either-or
+  -- clause pair (Pawl.Types.Clause.orElse) -- it prints no "may" over the two
+  -- branches, unlike Twiddle.
+  --
+  -- Starts from the board the CR 709.5e case above leaves: BOTH doors open. That
+  -- is what makes the door choice a real one (rule 709.5g's "an unlocked half"
+  -- offers two), and it is what lets the assertions run the CR 709.5 subtraction
+  -- backwards -- every reading the unlock case flipped on flips back off, and
+  -- only for the door alice named.
+  --
+  -- alice locks STEAMING SAUNA, the SECOND candidate in printed order, so an
+  -- implementation that ignored her answer and took the head would shut the red
+  -- door instead and fail on the name, the mana value and the trigger count
+  -- alike.
+  Spec.it s "CR 709.5g locking a door takes its designation back away" $ do
+    (roomId, wallId, gs) <- setUp s registry
+    keys <- S.printingOf s registry "Keys to the House"
+    island <- S.printingOf s registry "Island"
+    let (keysId, withKeys) = S.addCreature keys S.alice gs
+        -- Eight spare Islands. The board pays for the cast, CR 709.5e's unlock,
+        -- the {3} here and then Steaming Sauna's {3}{U}{U} unlock cost a second
+        -- time, which is what the last assertion reads -- an unlock the board
+        -- could not afford is not offered whatever the designation says.
+        funded = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) withKeys [1 .. 8 :: Int]
+        after = castDoor furnaceName roomId funded
+    case roomPermanent after of
+      [permId] -> do
+        let opened = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer after (Room.unlock S.alice permId saunaName))))
+        -- The control: both doors are open and both halves are readable, which
+        -- is the state every assertion below is measured against.
+        Spec.assertEqWith
+          s
+          "the control: both designations before the lock"
+          (fmap Object.unlockedHalves (Game.lookupObject permId opened))
+          (Just (Set.fromList [furnaceName, saunaName]))
+        Spec.assertBool s (lockOffered keys keysId opened) "CR 307.5: the lock ability is on alice's menu"
+        let locked = activateKeys keys keysId (keysAnswer permId (ClauseIndex.MkClauseIndex 0) saunaName) opened
+        -- THE GAMEPLAY-LEVEL ASSERTION, and it is CR 709.5's subtraction rather
+        -- than a count: with the blue door shut the permanent stops having the
+        -- NAME of that half. A lock that took the wrong door leaves this set
+        -- {Steaming Sauna}; a lock that never happened leaves both.
+        Spec.assertEqWith s "the locked door's NAME is subtracted again" (Projection.namesOf permId locked) (Set.singleton furnaceName)
+        Spec.assertEqWith
+          s
+          "and its MANA COST with it"
+          (fmap Quantity.manaValueOf (Game.manaCostFaceOf permId locked))
+          (Just 2)
+        Spec.assertEqWith
+          s
+          "and its RULES TEXT: the static ability is gone"
+          (PlayerEffect.maximumHandSize S.alice locked)
+          (Just 7)
+        Spec.assertEqWith
+          s
+          "and the end-step draw with it"
+          (S.handSize S.alice (resolveAll (settle (beginEndStep locked))) - S.handSize S.alice locked)
+          0
+        -- CR 709.5c, underneath: the designation itself is what went away, and
+        -- only the one alice named.
+        Spec.assertEqWith
+          s
+          "CR 709.5g: the blue door's designation alone is gone"
+          (fmap Object.unlockedHalves (Game.lookupObject permId locked))
+          (Just (Set.singleton furnaceName))
+        -- CR 709.5e reads the same derivation backwards: a door that was locked
+        -- is one the special action may pay to open again.
+        Spec.assertEqWith s "and the shut door is offered for its unlock cost again" (unlocksOffered locked) [(permId, saunaName)]
+        -- No CR 709.5h trigger fires on a lock, and the red door's own trigger
+        -- did not fire a second time either: the wall's damage is where the cast
+        -- left it.
+        Spec.assertEqWith s "no trigger fired on the lock" (S.damageOf wallId locked) (Just 3)
+      other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
+  -- CR 709.5f, the same card's other branch: "To unlock half of a permanent, a
+  -- player chooses a LOCKED half of that permanent, and that permanent is given
+  -- the appropriate unlocked designation."
+  --
+  -- The same ability on a Room with one door open, with alice announcing CR
+  -- 608.2d's SECOND branch instead. Two things ride on it that the lock case
+  -- cannot show: that the pair is a real either-or -- the ordinal alice names is
+  -- what picks the branch, and Pawl.Engine.Replay's default would have picked
+  -- the first -- and that CR 709.5f's unlock reaches the same event CR 709.5e's
+  -- special action does, since Roaring Furnace's damage trigger is on the door
+  -- being opened rather than on how.
+  --
+  -- Cast the BLUE door, so the red one is what is shut and its trigger has not
+  -- fired yet; the damage is then unambiguous evidence of which door opened.
+  Spec.it s "CR 709.5f the other branch unlocks a door instead" $ do
+    (roomId, wallId, gs) <- setUp s registry
+    keys <- S.printingOf s registry "Keys to the House"
+    island <- S.printingOf s registry "Island"
+    let (keysId, withKeys) = S.addCreature keys S.alice gs
+        funded = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) withKeys [1 .. 4 :: Int]
+        after = castDoor saunaName roomId funded
+    Spec.assertEqWith s "the control: the blue door alone deals no damage" (S.damageOf wallId after) (Just 0)
+    case roomPermanent after of
+      [permId] -> do
+        Spec.assertBool s (lockOffered keys keysId after) "CR 307.5: the ability is on alice's menu"
+        let unlocked = activateKeys keys keysId (keysAnswer permId (ClauseIndex.MkClauseIndex 1) furnaceName) after
+        Spec.assertEqWith s "CR 709.5h: opening the red door fired its trigger" (S.damageOf wallId unlocked) (Just 3)
+        Spec.assertEqWith s "and both doors are readable now" (Projection.namesOf permId unlocked) (Set.fromList [furnaceName, saunaName])
+        Spec.assertEqWith
+          s
+          "CR 709.5f: the red door's designation was given"
+          (fmap Object.unlockedHalves (Game.lookupObject permId unlocked))
+          (Just (Set.fromList [furnaceName, saunaName]))
       other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
   -- CR 709.5h, on the door the special action opened rather than the one the
   -- cast did: "These abilities trigger when that permanent is given the

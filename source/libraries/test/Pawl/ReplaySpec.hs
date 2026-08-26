@@ -923,6 +923,39 @@ combatReplaySpec s =
                 )
             )
             (CardName.MkCardName (Text.pack "Embereth Shieldbreaker"))
+        -- CR 709.5f / 709.5g: which half an effect locked or unlocked is a
+        -- decision, so it has to survive a transcript like any other.
+        Spec.it s "ChooseHalf round-trips through the transcript" $ do
+          let a = CardName.MkCardName (Text.pack "Roaring Furnace")
+              b = CardName.MkCardName (Text.pack "Steaming Sauna")
+              p = Prompt.ChooseHalf decider S.alice oid (a NonEmpty.:| [b])
+          Spec.assertEqWith s "locking the right door round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          -- Discriminating: a decode that ignored the response and returned the
+          -- head would pass one leg by accident.
+          Spec.assertEqWith s "locking the left door round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        Spec.it s "a half choice does not decode as an offered-half choice" $ do
+          -- Discriminating: fails if ChooseHalf reuses ChoseOfferedCastFace rather
+          -- than getting its own constructor. Both are a Prompt over one CardName
+          -- picked out of a NonEmpty of them, so nothing but a distinct
+          -- constructor keeps a transcript of one from replaying as the other.
+          let a = CardName.MkCardName (Text.pack "Roaring Furnace")
+              p = Prompt.ChooseHalf decider S.alice oid (a NonEmpty.:| [])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseOfferedCastFace a)) Nothing
+        Spec.it s "a short transcript locks the first half offered" $
+          -- CR 709.5f / 709.5g: every offered half is one the instruction admits,
+          -- so the first in printed order is legal.
+          Spec.assertEqWith
+            s
+            "the head"
+            ( Replay.defaultAnswer
+                ( Prompt.ChooseHalf
+                    decider
+                    S.alice
+                    oid
+                    (CardName.MkCardName (Text.pack "Roaring Furnace") NonEmpty.:| [CardName.MkCardName (Text.pack "Steaming Sauna")])
+                )
+            )
+            (CardName.MkCardName (Text.pack "Roaring Furnace"))
         -- CR 701.39a: which creature a bolstering player put the counters on is a
         -- decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseBolster round-trips through the transcript" $ do

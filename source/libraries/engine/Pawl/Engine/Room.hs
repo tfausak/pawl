@@ -1,5 +1,8 @@
 -- Rule 709.5 in the one voice the rest of the engine cannot supply for itself:
--- CR 116.2m's special action that pays a locked door's mana cost to open it.
+-- CR 116.2m's special action that pays a locked door's mana cost to open it,
+-- plus CR 709.5c's locked/unlocked derivation, which the special action and the
+-- CR 709.5f/g opcode (Pawl.Engine.Resolve's SetHalfLocked arm) both filter their
+-- offers through.
 --
 -- Everything ELSE rule 709.5 says is arranged so that no module has to know this
 -- one exists. CR 709.5's subtraction lives at Pawl.Engine.Game.resolveFaceFor,
@@ -63,7 +66,25 @@ import qualified Pawl.Types.Zone as Zone
 -- that became a copy of another Room are the copy's -- which falls out of
 -- Game.cardOf answering with the card underneath (#925).
 lockedHalves :: ObjectId -> GameState -> [Face.Face Card.Type.Card]
-lockedHalves oid gs = Maybe.fromMaybe [] $ do
+lockedHalves = halvesWhere not
+
+-- CR 709.5c's other side, the halves that ARE unlocked -- the set CR 709.5g's
+-- lock chooses from ("a player chooses an unlocked half of that permanent"), as
+-- lockedHalves is the set CR 709.5e's special action and CR 709.5f's unlock both
+-- choose from.
+--
+-- The COMPLEMENT of lockedHalves under the same gate rather than
+-- Object.unlockedHalves read directly, so the two answers cannot disagree about
+-- what a half is: a name in that set naming no face of the object's own card is
+-- no half at all, and rule 709.5c scopes both questions to a permanent with a
+-- shared type line on the battlefield.
+unlockedHalves :: ObjectId -> GameState -> [Face.Face Card.Type.Card]
+unlockedHalves = halvesWhere id
+
+-- The two above, sharing rule 709.5c's gate and its printed order. The predicate
+-- reads whether the half has its unlocked designation.
+halvesWhere :: (Bool -> Bool) -> ObjectId -> GameState -> [Face.Face Card.Type.Card]
+halvesWhere keep oid gs = Maybe.fromMaybe [] $ do
   obj <- Game.lookupObject oid gs
   card <- Game.cardOf oid gs
   if Object.zone obj /= Zone.Battlefield || not (Card.hasSharedTypeLine card)
@@ -71,7 +92,7 @@ lockedHalves oid gs = Maybe.fromMaybe [] $ do
     else
       Just
         ( filter
-            (\face -> not (Set.member (Face.name face) (Object.unlockedHalves obj)))
+            (\face -> keep (Set.member (Face.name face) (Object.unlockedHalves obj)))
             (NonEmpty.toList (Card.Type.faces card))
         )
 

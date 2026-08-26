@@ -35,6 +35,7 @@ import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
+import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 605.1a: an activated ability is a mana ability if it could add mana AND
@@ -185,6 +186,7 @@ manaProduced effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> Nothing
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> Nothing
   Effect.Unsuspect _ -> Nothing
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> Nothing
   Effect.Evolve _ -> Nothing
   Effect.Mentor _ -> Nothing
   Effect.Train _ -> Nothing
@@ -377,6 +379,7 @@ movesLibraryCard effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> False
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
   Effect.Unsuspect _ -> False
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> False
   Effect.Evolve _ -> False
   Effect.Mentor _ -> False
   Effect.Train _ -> False

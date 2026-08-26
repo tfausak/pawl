@@ -52,6 +52,7 @@ import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
+import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotName as SlotName
@@ -920,6 +921,36 @@ data Effect card
     -- Not a designation-parameterised inverse of Designate: CR 701.60a's ending
     -- belongs to `Suspected` alone, no rule taking renowned or monstrous away.
     Unsuspect ObjectRef.ObjectRef
+  | -- | CR 709.5f and CR 709.5g: "lock" or "unlock" half of the slot's
+    -- permanent. Keys to the House's "lock or unlock a door of target Room you
+    -- control" is the pool's producer, and it prints both settings as one
+    -- either-or clause pair (Pawl.Types.Clause.orElse).
+    --
+    -- ONE opcode over a payload and not one arm apiece, Designate's argument
+    -- above: rules 709.5f and 709.5g are the same sentence with two words
+    -- swapped -- choose a half that is locked \/ unlocked, and give \/ take the
+    -- appropriate unlocked designation -- so the choice, its filter and the write
+    -- are one code path with a setting rather than two that can drift. Unsuspect
+    -- is the opposite precedent and does not apply here: it is an ending with no
+    -- general inverse, while this pair IS the inverse of itself.
+    --
+    -- GENERAL, never Room-shaped: rule 709.5f\/g say "half of a permanent", and
+    -- CR 709.5j's "door" is only what a card calls one. Nothing here, in
+    -- Prompt.ChooseHalf, or in Pawl.Engine.Event.lockHalf names a Room; CR
+    -- 709.5's shared type line is what leaves a Room the only permanent with
+    -- halves to address, which is a fact about the rules rather than about this
+    -- type.
+    --
+    -- WHICH half is not a payload: both rules make it a choice taken while the
+    -- effect is applied (CR 608.2d), so it is asked at resolution and filtered to
+    -- the halves the setting admits.
+    --
+    -- Writes Object.unlockedHalves, which holds DESIGNATIONS (CR 709.5c) rather
+    -- than characteristics, so nothing in CR 613 could carry it -- Designate's
+    -- reason one rule over. The locked side is derived from it
+    -- (Pawl.Engine.Room.lockedHalves), so a lock is a deletion and needs no
+    -- second field on the object.
+    SetHalfLocked SetHalfLocked.SetHalfLocked
   | -- | CR 702.100a and CR 702.100b together: put a +1/+1 counter on the slot's
     -- permanent, and if one or more actually land, that permanent EVOLVES.
     --
