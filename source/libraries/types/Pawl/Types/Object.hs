@@ -651,9 +651,12 @@ data Object = MkObject
     -- Cleared by Pawl.Engine.Sba when CR 702.103f's "becomes unattached" fires;
     -- that is what "ceases to be bestowed" IS, and it is one-way.
     --
-    -- Not implemented: CR 702.103c's copy of a bestowed Aura spell, CR 702.103e's
-    -- illegal target on resolution, and CR 702.103g's phasing in unattached --
-    -- three more ways to become, or stop being, bestowed (#2352, #2353, #2354).
+    -- Not implemented: CR 702.103c's copy of a bestowed Aura spell, which CR
+    -- 707.10 never sends through the casting path that writes this (#2355), and
+    -- CR 702.103e's illegal target on resolution (#2357) -- two more ways to
+    -- become, or stop being, bestowed. CR 702.103g's phasing in unattached
+    -- reaches Pawl.Engine.Sba's CR 702.103f pass one pass later, since
+    -- Pawl.Engine.Phasing.phaseIn detaches first; see #2358.
     bestowed :: Maybe Timestamp.Timestamp,
     -- | CR 601.2b with CR 107.4f: how many of the Phyrexian mana symbols in the
     -- cost of the SPELL that became this permanent its controller announced they

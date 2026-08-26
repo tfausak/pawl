@@ -1483,7 +1483,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
               -- Not implemented: CR 702.103d's "only its characteristics as
               -- modified by the bestow ability are evaluated to determine if it
               -- can be cast" -- `castable` and CR 601.2f's cost adjustments both
-              -- still read the unbestowed spell (#2352).
+              -- still read the unbestowed spell (#2356).
               bestowedGs <- State.get
               let slots = Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) chosenModes face
                   sets = Target.legalSets (Just pid) Map.empty sid slots bestowedGs

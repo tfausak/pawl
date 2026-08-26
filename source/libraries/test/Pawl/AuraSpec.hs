@@ -2342,9 +2342,9 @@ cloudformBoard island piker cloudform =
 -- with one collapses it, and then nothing separates "the granted enchant slot was
 -- consulted" from "the host was hardcoded".
 --
--- Not implemented: CR 702.103c's copies, CR 702.103d's castability, CR 702.103e's
--- illegal target on resolution and CR 702.103g's phasing, each with an elision
--- comment at the site it belongs to.
+-- Not implemented: CR 702.103c's copies (#2355), CR 702.103d's castability
+-- (#2356) and CR 702.103e's illegal target on resolution (#2357), each with an
+-- elision comment at the site it belongs to.
 bestowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 bestowSpec s registry = Spec.describe s "Bestow" $ do
   -- THE discriminating pair the issue asks for: the spell's own card types and

@@ -144,6 +144,11 @@ resolveTopWith runSubgame = do
                       -- goes through, reads the enchant ability off that same
                       -- projection, so the branch and its target check cannot
                       -- disagree about what an Aura is.
+                      --
+                      -- Not implemented: CR 702.103e / 608.3b's exception -- a
+                      -- bestowed Aura spell whose target has become illegal
+                      -- ceases to be bestowed and resolves as a creature spell,
+                      -- where the fizzle below bins it (#2357).
                         if Resolve.targetsAllIllegal oid gs
                           then Event.changeZone oid Zone.Graveyard
                           else
