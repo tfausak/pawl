@@ -478,6 +478,16 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerGainsLife PlayerRelation.Opponent)
       " {\"type\":\"PlayerGainsLife\",\"value\":{\"type\":\"Opponent\"}} "
+  -- CR 603.2c's batch reading of the arm above. A DIFFERENT tag carrying the SAME
+  -- payload, which is the whole hazard: a codec that folded the two would make
+  -- "each player gains 4 life" fire a per-seat card once and a batch card three
+  -- times, or the other way about.
+  Spec.it s "PlayersGainLife round-trips under its own tag" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayersGainLife PlayerRelation.AnyPlayer)
+      " {\"type\":\"PlayersGainLife\",\"value\":{\"type\":\"AnyPlayer\"}} "
   -- The life-LOSS trigger. A DIFFERENT tag from PlayerGainsLife above and the
   -- same payload shape, so the two must never decode to each other -- the same
   -- hazard GameEvent's LifeLost/LifeGained pair carries.
