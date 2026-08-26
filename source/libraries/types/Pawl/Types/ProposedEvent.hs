@@ -56,8 +56,8 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- nothing and pays nothing. Nothing is what a reader gating on a paid cost -- CR
 -- 702.37b's megamorph counter, the only such reader -- correctly declines.
 --
--- Nine arms, not every replaceable event class the rules define: each of the
--- rest is one more arm plus the funnel that raises it.
+-- Ten arms, not every replaceable event class the rules define: each of the rest
+-- is one more arm plus the funnel that raises it.
 data ProposedEvent
   = WouldChangeZone ZoneChange.ZoneChange
   | WouldEnter ObjectId.ObjectId
@@ -107,4 +107,17 @@ data ProposedEvent
     -- engine that turns anything face up -- the one funnel CR 116.2b's special
     -- action and Effect.TurnFaceUp both go through.
     WouldTurnFaceUp ObjectId.ObjectId (Maybe TurnUpProcedure.TurnUpProcedure)
+  | -- | CR 701.26b / 122.1d: a permanent would become untapped. Raised by
+    -- Pawl.Engine.Event.resolveUntap, the one funnel CR 502.3's turn-based
+    -- action, Effect.Untap and CR 107.6's untap symbol in a cost all go through.
+    --
+    -- The ObjectId and nothing else: rule 701.26b's action has no other content
+    -- -- no source, no amount, no destination -- and the one property a
+    -- replacement can change about it is whether it happens at all.
+    --
+    -- Rule 701.26b's second sentence ("only tapped permanents can be untapped")
+    -- is the funnel's guard rather than a field here, so this event is never
+    -- proposed for an already-untapped permanent and a stun counter is never
+    -- spent on one.
+    WouldUntap ObjectId.ObjectId
   deriving (Eq, Ord, Show)

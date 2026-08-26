@@ -1181,6 +1181,7 @@ rewriteCounterKind pairs kind = case kind of
   CounterKind.Fade -> kind
   CounterKind.Shield -> kind
   CounterKind.Finality -> kind
+  CounterKind.Stun -> kind
   CounterKind.Level -> kind
   CounterKind.Hone -> kind
   -- CR 612.1 swaps a WORD, and this pair is [(Subtype, Subtype)]. A counter's

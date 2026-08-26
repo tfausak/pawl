@@ -760,6 +760,8 @@ library codec
     Pawl.Codec.TypeLineSpec
     Pawl.Codec.UntapRestriction
     Pawl.Codec.UntapRestrictionSpec
+    Pawl.Codec.UntapRewrite
+    Pawl.Codec.UntapRewriteSpec
     Pawl.Codec.Uses
     Pawl.Codec.UsesSpec
     Pawl.Codec.VentureMarkerEntered
@@ -1598,6 +1600,7 @@ library types
     Pawl.Types.TurnWindow
     Pawl.Types.TypeLine
     Pawl.Types.UntapRestriction
+    Pawl.Types.UntapRewrite
     Pawl.Types.Uses
     Pawl.Types.VentureMarkerEntered
     Pawl.Types.While

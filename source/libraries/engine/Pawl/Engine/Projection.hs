@@ -157,6 +157,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.UntapRewrite as UntapRewrite
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -2055,8 +2056,10 @@ rewriteReplacementEffect pairs effect = case effect of
           DamageR.riders = fmap (rewriteEffect pairs) (DamageR.riders r)
         }
   -- CR 701.19a's regeneration and CR 122.1c's shield: two nullary rewrites with
-  -- no pattern beside them, so there is nothing to swap.
+  -- no pattern beside them, so there is nothing to swap. CR 122.1d's untap
+  -- replacement is the same shape one event class over.
   ReplacementEffect.DestructionR _ -> effect
+  ReplacementEffect.UntapR _ -> effect
   ReplacementEffect.CounterR r ->
     ReplacementEffect.CounterR
       r
@@ -3151,6 +3154,9 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- reason -- it is not CR 122.1b's keyword counter and grants
               -- nothing. finalityOf mints its replacement effect instead.
               CounterKind.Finality -> []
+              -- CR 122.1d: nor a stun counter, for the same reason. stunOf
+              -- mints its replacement effect instead.
+              CounterKind.Stun -> []
               -- Nor a level counter: CR 711.2a states a leveler's grants as
               -- static abilities of the card, which gatherStatic applies.
               CounterKind.Level -> []
@@ -3981,7 +3987,7 @@ abilitiesFromCharacteristics peers pc oid gs =
 
 -- CR 614 / 613 layer 6: an object's replacement effects after the layer system.
 -- A Humility'd creature has none -- except the counter-minted rows, which no
--- layer can reach; see shieldOf and finalityOf. CR 604.2's "as long as" clause
+-- layer can reach; see shieldOf, finalityOf and stunOf. CR 604.2's "as long as" clause
 -- is asked HERE, against a finished projection, with the source's own controller
 -- for CR 109.5's "you".
 -- Nothing is latched, so Jared Carthalion's shield goes away the moment the
@@ -4002,6 +4008,7 @@ replacementsOf oid gs =
         <> intrinsicReplacementsOf (announcedXOf oid gs) (phyrexianLifePaidOf oid gs) pc
         <> shieldOf oid gs
         <> finalityOf oid gs
+        <> stunOf oid gs
 
 -- CR 107.3m: the value of X for this object's enters-the-battlefield replacement
 -- effects, and 0 for every object no such spell stands behind. Read off the
@@ -4110,6 +4117,39 @@ finalityCounters oid gs = case Game.lookupObject oid gs of
   Nothing -> 0
   Just obj -> Map.findWithDefault 0 CounterKind.Finality (Object.counters obj)
 
+-- CR 122.1d: the replacement effect one or more stun counters create -- "If a
+-- permanent with a stun counter on it would become untapped, instead remove a
+-- stun counter from it."
+--
+-- ONE row however many counters, per the rule's own "a single replacement
+-- effect", which is shieldOf's and finalityOf's reading of the same phrase. What
+-- makes this SHIELD's shape rather than finality's is the rule's own second
+-- sentence: it spells the removal into the effect, so applying the row spends a
+-- counter and the count is how many times it may still apply. Rule 122.1h names
+-- no removal at all, which is why finalityOf's row survives its own use.
+--
+-- Read off Object.counters rather than the projection, for shieldOf's reason:
+-- counters are not a characteristic (CR 122.1) and this is a rule rather than an
+-- ability, so the layer system has nothing to remove.
+--
+-- No pattern is needed: rule 701.26b's event names one permanent, and
+-- Replacement.applies matches this row against its own source alone, which is
+-- rule 122.1d's "a permanent with a stun counter on it" -- the counters that
+-- create the effect are the ones on the permanent it protects.
+stunOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
+stunOf oid gs =
+  if stunCounters oid gs == 0
+    then []
+    else [ReplacementEffect.UntapR UntapRewrite.RemoveStunCounter]
+
+-- CR 122.1d: how many stun counters this object has. shieldCounters' shape, and
+-- for its reason -- the count is what the board stores, and only whether it is
+-- positive decides that the row exists.
+stunCounters :: ObjectId -> GameState -> Natural
+stunCounters oid gs = case Game.lookupObject oid gs of
+  Nothing -> 0
+  Just obj -> Map.findWithDefault 0 CounterKind.Stun (Object.counters obj)
+
 -- CR 306.5b / 614.1c: a planeswalker's intrinsic "enters with loyalty counters"
 -- replacement, CR 310.4b's twin for a battle's defense, and rule 702.136a's riot
 -- and CR 714.3a's Saga lore counter beside them. The keyword call at the end
@@ -4183,10 +4223,10 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect (Effect.Effect Card.Type.Card))]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
-      -- CR 122.1c's pair and CR 122.1h's row are minted from COUNTERS, so
-      -- neither is on any base face -- which is why both are asked before the
-      -- face is looked up at all.
-      baseHas oid | shieldCounters oid gs > 0 || finalityCounters oid gs > 0 = True
+      -- CR 122.1c's pair, CR 122.1h's row and CR 122.1d's row are minted from
+      -- COUNTERS, so none of them is on any base face -- which is why all three
+      -- are asked before the face is looked up at all.
+      baseHas oid | shieldCounters oid gs > 0 || finalityCounters oid gs > 0 || stunCounters oid gs > 0 = True
       baseHas oid = case Game.faceOf oid gs of
         Nothing -> False
         -- The planeswalker disjunct keeps CR 306.5b's intrinsic replacement

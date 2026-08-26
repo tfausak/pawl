@@ -38,6 +38,7 @@ import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
+import qualified Pawl.Types.UntapRewrite as UntapRewrite
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -137,6 +138,14 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       codec
       (ReplacementEffect.DestructionR DestructionRewrite.Regenerate)
       " {\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}} "
+  -- CR 122.1d, UntapR's sole producer -- engine-minted, so this is the only
+  -- place its wire form is pinned.
+  Spec.it s "UntapR (a stun counter's replacement)" $
+    Common.assertCodec
+      s
+      codec
+      (ReplacementEffect.UntapR UntapRewrite.RemoveStunCounter)
+      " {\"type\":\"UntapR\",\"value\":{\"type\":\"RemoveStunCounter\"}} "
   -- A fixed kind, a real filter, and CR 614.16's AddMore.
   Spec.it s "CounterR (Hardened Scales)" $
     Common.assertCodec

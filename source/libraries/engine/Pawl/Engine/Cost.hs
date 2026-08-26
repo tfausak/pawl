@@ -2367,14 +2367,17 @@ payComponent moment pid oid component = case component of
   CostComponent.TapThis -> do
     tapObject oid
     pure bindsNothing
-  -- A direct edit, where TapThis above now goes through Pawl.Engine.Event.tap --
-  -- and rule 701.26b draws no such distinction between the two.
+  -- Through Pawl.Engine.Event.untap, the CR 701.26b funnel, exactly as TapThis
+  -- above goes through Event.tap -- and rule 701.26b draws no such distinction
+  -- between the two. A permanent with a stun counter therefore stays tapped and
+  -- sheds a counter (CR 122.1d) when this cost is paid.
   --
-  -- Not implemented: an untap funnel, so nothing can watch a permanent become
-  -- untapped and rule 701.26b's "only tapped permanents can be untapped" has no
-  -- place to live (#2236).
+  -- The payment is still MADE when CR 122.1d takes the untap, which is the rule
+  -- rather than a shortcut: CR 614.6 replaces the EVENT the paying produces, and
+  -- CR 601.2h's "partial payments are not allowed" is about what the player
+  -- performs, not about what the event turns into.
   CostComponent.UntapThis -> do
-    State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) oid (GameState.objects gs)})
+    Event.untap oid
     pure bindsNothing
   -- Through Event.sacrifice, the CR 701.21 funnel, and never a direct zone poke:
   -- a cost payment is a game event, so dies-triggers, replacement effects and the

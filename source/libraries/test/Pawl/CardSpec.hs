@@ -262,6 +262,7 @@ import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UntapRestriction as UntapRestriction
+import qualified Pawl.Types.UntapRewrite as UntapRewrite
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -1539,6 +1540,7 @@ replacementEntryEffects replacement = case replacement of
   ReplacementEffect.DestructionR _ -> []
   ReplacementEffect.TokenR {} -> []
   ReplacementEffect.TurnUpR {} -> []
+  ReplacementEffect.UntapR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 615.5: the additional effect a replacement PRINTS -- DamageR's riders, and
@@ -1558,6 +1560,7 @@ replacementEffectRiders replacement = case replacement of
   ReplacementEffect.DestructionR _ -> []
   ReplacementEffect.TokenR {} -> []
   ReplacementEffect.TurnUpR {} -> []
+  ReplacementEffect.UntapR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- Every ReplacementEffect one effect authors: the one an Effect.Replace installs
@@ -1715,6 +1718,7 @@ phasePatternOffends replacement = case replacement of
   ReplacementEffect.DestructionR _ -> False
   ReplacementEffect.TokenR {} -> False
   ReplacementEffect.TurnUpR {} -> False
+  ReplacementEffect.UntapR _ -> False
 
 -- Every replacement shape the codec accepts and no card may author, for
 -- phasePatternOffends' reason and one more. A card cannot name an ObjectId or a
@@ -1739,6 +1743,11 @@ engineOnlyOffends replacement = case replacement of
   -- half is, so the sweep reaches it through this arm rather than through a lint
   -- of its own.
   ReplacementEffect.DestructionR rewrite -> engineMintedDestruction rewrite
+  -- CR 122.1d's row is engine-minted for CR 122.1c's reason, and the WHOLE arm
+  -- rather than one rewrite of it: printed regeneration shares DestructionR, so
+  -- that arm needs a per-rewrite test, where nothing a card may print replaces an
+  -- untap at all.
+  ReplacementEffect.UntapR _ -> True
   ReplacementEffect.PhaseR _ -> False
   ReplacementEffect.CounterR {} -> False
   ReplacementEffect.ZoneChangeR {} -> False
@@ -1798,6 +1807,7 @@ turnUpRequiringOffends replacement = case replacement of
   ReplacementEffect.DamageR {} -> False
   ReplacementEffect.DestructionR _ -> False
   ReplacementEffect.TokenR {} -> False
+  ReplacementEffect.UntapR _ -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- isPhaseR's twin: did the sweep above have anything to look at? A wildcard for
@@ -1824,6 +1834,7 @@ riderWithoutPreventionOffends replacement = case replacement of
   ReplacementEffect.DestructionR _ -> False
   ReplacementEffect.TokenR {} -> False
   ReplacementEffect.TurnUpR {} -> False
+  ReplacementEffect.UntapR _ -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- CR 615.1a: does this rewrite use the word "prevent"? engineMintedDamage's
@@ -2584,6 +2595,7 @@ canHostSubjects predicate = case predicate of
     CounterKind.Fade -> 0
     CounterKind.Shield -> 0
     CounterKind.Finality -> 0
+    CounterKind.Stun -> 0
     CounterKind.Level -> 0
     CounterKind.Hone -> 0
     CounterKind.Named _ -> 0
@@ -2685,6 +2697,7 @@ counterKindFilters kind = case kind of
   CounterKind.Fade -> []
   CounterKind.Shield -> []
   CounterKind.Finality -> []
+  CounterKind.Stun -> []
   CounterKind.Level -> []
   CounterKind.Hone -> []
   CounterKind.Named _ -> []
@@ -3623,6 +3636,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.DestructionR _ -> []
   ReplacementEffect.TokenR {} -> []
   ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern _ turnUpRewrite) -> turnUpPattern : turnUpRewriteFilters turnUpRewrite
+  ReplacementEffect.UntapR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- A face's printed replacement ability reaches a Filter on a second axis beside
@@ -6097,6 +6111,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any (engineOnlyOffends . bakeCounterShield) printed) "and so is one removing a shield counter"
     Spec.assertBool s (engineOnlyOffends (ReplacementEffect.DestructionR DestructionRewrite.RemoveShieldCounter)) "and so is CR 122.1c's destruction half"
     Spec.assertBool s (not (engineOnlyOffends (ReplacementEffect.DestructionR DestructionRewrite.Regenerate))) "while CR 701.19a's printed regeneration is accepted"
+    -- CR 122.1d's row, which only Projection.stunOf may mint -- the whole arm,
+    -- with no printed rewrite beside it to accept.
+    Spec.assertBool s (engineOnlyOffends (ReplacementEffect.UntapR UntapRewrite.RemoveStunCounter)) "and so is CR 122.1d's untap replacement"
   -- CR 615.5's rider is a PREVENTION effect's, which the type cannot say. See
   -- riderWithoutPreventionOffends.
   Spec.it s "no card hangs CR 615.5's additional effect off a rewrite that prevents nothing" $ do
