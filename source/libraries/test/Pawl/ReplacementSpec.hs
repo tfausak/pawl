@@ -3005,8 +3005,6 @@ aimCreature oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
   _ -> S.identityAnswer p
 
--- CR 614.5's applied set is what makes the CR 616.1 loop TERMINATE, not merely
--- correct: a regression there (an effect invoking itself repeatedly, e.g. two
 -- CR 122.1h: a finality counter's replacement effect, gameplay-level.
 --
 -- Queen's Bay Paladin {3}{B}{B} Creature -- Vampire Knight 5/4, "Whenever this
@@ -3022,9 +3020,9 @@ aimCreature oid p = case p of
 --     damage -- a real destruction, not a hand-built proposed event -- and both
 --     zones are asserted at once, so an engine that never redirected and one
 --     that lost the card entirely are different answers.
---   * A VAMPIRE CARD versus any card. A Goblin Piker is buried beside it and
---     must still be in the graveyard afterwards, which is also what makes the
---     graveyard half of that assertion non-empty on the green run.
+--   * EXILED versus THE GRAVEYARD EMPTIED. A Goblin Piker is buried beside the
+--     Vampire and never leaves, so the graveyard half of that assertion reads
+--     [Goblin Piker] rather than [] and the two are told apart.
 --   * ITS mana value versus the Paladin's. The Vampire's is 3 and the Paladin's
 --     is 5, so a LoseLife reading the trigger's own source rather than the
 --     returned permanent would take 5.
@@ -3073,6 +3071,8 @@ queensBayPaladinSpec s registry = Spec.describe s "Queen's Bay Paladin (CR 122.1
               Spec.assertEqWith s "setup: alice lost life equal to ITS mana value, not the Paladin's" (S.lifeOf S.alice resolved) (Just 17)
               Spec.assertBool s (S.onBattlefield paladinId killed) "and the Paladin itself never moved"
 
+-- CR 614.5's applied set is what makes the CR 616.1 loop TERMINATE, not merely
+-- correct: a regression there (an effect invoking itself repeatedly, e.g. two
 -- Hardened Scales re-triggering each other forever) manifests as this group
 -- hanging, not failing. "CR 614.5 two Hardened Scales are two instances" below
 -- is the case that asserts the CORRECTNESS half (each gets exactly one

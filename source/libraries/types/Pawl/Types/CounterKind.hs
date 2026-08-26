@@ -113,8 +113,7 @@ data CounterKind keyword
     -- PRESENCE of any such counter, one row however many counters), with the one
     -- difference the two rules state: CR 122.1c spends a counter on each
     -- application and rule 122.1h names no removal at all, so the row survives
-    -- its own use. A permanent that is somehow put into a graveyard twice is
-    -- exiled both times.
+    -- its own use.
     --
     -- Contributes nothing to the CR 613 layer system, so
     -- Pawl.Engine.Projection.counterGathered grants nothing for this kind -- for

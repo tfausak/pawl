@@ -3968,8 +3968,9 @@ abilitiesFromCharacteristics peers pc oid gs =
 
 -- CR 614 / 613 layer 6: an object's replacement effects after the layer system.
 -- A Humility'd creature has none -- except the counter-minted rows, which no
--- layer can reach; see shieldOf and finalityOf. CR 604.2's "as long as" clause is asked HERE, against a
--- finished projection, with the source's own controller for CR 109.5's "you".
+-- layer can reach; see shieldOf and finalityOf. CR 604.2's "as long as" clause
+-- is asked HERE, against a finished projection, with the source's own controller
+-- for CR 109.5's "you".
 -- Nothing is latched, so Jared Carthalion's shield goes away the moment the
 -- monarchy does, with no trigger and no resolution in between.
 replacementsOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
@@ -4159,9 +4160,8 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- sound only because every route to an unprinted replacement effect is covered:
 -- `EntryR AsCopy` on a card that is itself a base card with one, CR 122.1c's
 -- shield counters, CR 122.1h's finality counters, or a minting keyword printed
--- on or granted by a face. The
--- ability disjunct asks staticAbilitiesOf rather than the face, so a copy's
--- granting text is seen (CR 707.2a).
+-- on or granted by a face. The ability disjunct asks staticAbilitiesOf rather
+-- than the face, so a copy's granting text is seen (CR 707.2a).
 --
 -- Not implemented: a minting keyword reaching a permanent through a stored
 -- continuous effect or a keyword counter is on no base face (#833). Nor is a
@@ -4170,13 +4170,10 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect (Effect.Effect Card.Type.Card))]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
-      -- CR 122.1c's pair is minted from COUNTERS, so it is on no base face --
-      -- which is why it and its CR 122.1h sibling are asked before the face is
-      -- looked up at all.
-      baseHas oid | shieldCounters oid gs > 0 = True
-      -- CR 122.1h's row is minted from counters too, and so is on no base face
-      -- either.
-      baseHas oid | finalityCounters oid gs > 0 = True
+      -- CR 122.1c's pair and CR 122.1h's row are minted from COUNTERS, so
+      -- neither is on any base face -- which is why both are asked before the
+      -- face is looked up at all.
+      baseHas oid | shieldCounters oid gs > 0 || finalityCounters oid gs > 0 = True
       baseHas oid = case Game.faceOf oid gs of
         Nothing -> False
         -- The planeswalker disjunct keeps CR 306.5b's intrinsic replacement
