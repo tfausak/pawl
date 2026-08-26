@@ -73,6 +73,12 @@ spec s = Spec.describe s "Pawl.Codec.CounterName" $ do
               if family == CounterKindFamily.Named
                 then Set.null (CounterName.spellings family)
                 else
+                  -- The subset conjunct is tautological given CounterName.reserved's
+                  -- definition (foldMap spellings over this same enumeration) --
+                  -- it cannot fail under any mutation of spellings. It pins that
+                  -- DEFINITION instead: it would redden if reserved were rewritten
+                  -- to something other than the full fold. The null check beside
+                  -- it is the one with force, tripping a lazy `-> Set.empty` arm.
                   not (Set.null (CounterName.spellings family))
                     && Set.isSubsetOf (CounterName.spellings family) CounterName.reserved
           )

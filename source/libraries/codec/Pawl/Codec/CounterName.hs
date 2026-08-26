@@ -125,6 +125,12 @@ spellings family = case family of
 -- PARAMETRIC in the keyword, since the answer never reads the payload -- CR
 -- 122.1b's arm reserves all fifteen spellings at once, and CR 122.1's named arm
 -- reserves none.
+--
+-- No production caller; the spec is its only user, and that is deliberate.
+-- Deleting it as unused removes the only thing that asks a new kind for its
+-- spelling, silently reopening #2062. Nothing else will catch that: this
+-- module has no export list (project-wide -Wno-missing-export-lists), so no
+-- unused-binding warning ever fires here.
 familyOf :: CounterKind.CounterKind keyword -> CounterKindFamily.CounterKindFamily
 familyOf kind = case kind of
   CounterKind.PlusOnePlusOne -> CounterKindFamily.PlusOnePlusOne

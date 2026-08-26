@@ -35,7 +35,7 @@ data CounterKindFamily
     Keyword
   | -- | CR 122.1e: Pawl.Types.CounterKind.Loyalty.
     Loyalty
-  | -- | Rule 714: Pawl.Types.CounterKind.Lore.
+  | -- | CR 714.3: Pawl.Types.CounterKind.Lore.
     Lore
   | -- | CR 122.1g: Pawl.Types.CounterKind.Defense.
     Defense
