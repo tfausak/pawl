@@ -29,6 +29,8 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
@@ -180,6 +182,54 @@ drainThrough gs =
     S.aggressiveAnswer
     (intoCombat gs)
     (Combat.declareBlockers >> Damage.dealCombatDamage >> Monad.replicateM_ (4 :: Int) (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority)
+
+-- Answers CR 701.9b's discard with `wanted`, delegating everything else to
+-- S.aggressiveAnswer.
+--
+-- FILTERED, NOT TRUSTED, Ring.tempt's own posture: the answer is intersected with
+-- the hand the prompt offered, so a card that was never held names nothing and the
+-- engine's CR 609.3 filler decides instead. What that buys the cases below is
+-- IDENTITY -- which card reached the graveyard, not merely how many did.
+discardThe :: ObjectId -> Prompt.Prompt r -> r
+discardThe wanted p = case p of
+  Prompt.ChooseDiscard _ _ held _ -> filter (== wanted) held
+  _ -> S.aggressiveAnswer p
+
+-- The attackers CR 508.1 declared, off Pawl.Types.Combat's record -- the same
+-- field TriggerCondition.PlayerAttacksWith is read against, so a case asserting
+-- who attacked is asserting what the condition saw.
+declaredAttackers :: GameState.GameState -> [ObjectId]
+declaredAttackers gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
+
+-- The card NAMES in this player's graveyard, unsorted -- the zone the loot's
+-- discard writes and the escapes themselves land in.
+graveyardNames :: PlayerId -> GameState.GameState -> [CardName.CardName]
+graveyardNames pid gs =
+  Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Graveyard pid gs)
+
+-- How many cards this player has left to draw.
+librarySize :: PlayerId -> GameState.GameState -> Int
+librarySize pid gs = length (Game.zoneMembers Zone.Library pid gs)
+
+-- Drive a main-phase board through the declaration of attackers ALONE, then let CR
+-- 117.5 put what triggered on the stack and resolve the whole stack. No blockers
+-- and no damage: CR 508.3's conditions all trigger at the declaration, so a driver
+-- that reached damage would prove the loot fires somewhere in combat rather than
+-- when the rule says.
+--
+-- Two settle-and-resolve rounds, not one, for drainThrough's reason -- slack over
+-- the one trigger any board below can raise, and Stack.resolveTop is a no-op on an
+-- empty stack, so a board where nothing triggers runs the IDENTICAL sequence. The
+-- trailing settle performs the consequences.
+--
+-- Takes its answerer, where drainThrough hardcodes one: CR 701.9b's discard is a
+-- real choice, and which card it takes is half of what the cases below assert.
+lootThrough :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+lootThrough answer gs =
+  S.runPure
+    answer
+    (intoCombat gs)
+    (Monad.replicateM_ (2 :: Int) (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
@@ -578,3 +628,108 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
       [_, bearer] -> Spec.assertEqWith s "the Piker is the Ring-bearer" (markedFor S.alice after) [bearer]
       _ -> Spec.assertFailure s "fixture should have two attackers"
     Spec.assertEqWith s "alice was tempted four times" (temptationsOf S.alice after) (Just 4)
+
+  -- CR 701.54c's SECOND sentence: "as long as the Ring has tempted that player two
+  -- or more times, it has 'Whenever your Ring-bearer attacks, draw a card, then
+  -- discard a card.'"
+  --
+  -- HAND SIZE CANNOT TELL THE TWO READINGS APART: draw one, discard one is net zero
+  -- on the hand, so alice holds the same number of cards whether the loot fired or
+  -- not. What the two readings part on is the LIBRARY and the GRAVEYARD, which the
+  -- draw and the discard move in opposite directions -- and the graveyard is read by
+  -- CARD NAME, so WHICH card was discarded is asserted rather than only how many.
+  --
+  -- alice holds a Llanowar Elves she never casts and cannot cast (no {G}), which is
+  -- what `discardThe` pins CR 701.9b's choice to: a named card in the graveyard is a
+  -- discard the player CHOSE, where a count alone would also pass for an engine that
+  -- picked for her.
+  Spec.it s "CR 701.54c two temptations loot when the Ring-bearer attacks" $ do
+    island <- S.printingOf s registry "Island"
+    escape <- S.printingOf s registry "Birthday Escape"
+    piker <- S.printingOf s registry "Goblin Piker"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let (spells, mine, _, board) = ringCombatBoard island escape piker 2 [piker] []
+        -- Two library cards beyond the one per Birthday Escape ringCombatBoard
+        -- stocks: the loot DRAWS, and CR 104.3c takes a player who draws from an
+        -- empty library out of the game before anything can be asserted.
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) board [1 .. (2 :: Int)]
+        (elvesId, prepared) = S.addHandCard elves S.alice stocked
+        -- S.identityAnswer is enough for the designation: alice controls one
+        -- creature, so CR 701.54a leaves nothing to ask.
+        before = castEscapes S.identityAnswer 2 spells prepared
+        after = lootThrough (discardThe elvesId) before
+    -- The GAMEPLAY assertion, and first: the chosen card is in the graveyard beside
+    -- the two spent Escapes, which is the discard half of the rule.
+    Spec.assertEqWith
+      s
+      "the card alice chose joined the two spent Escapes in her graveyard"
+      (List.sort (graveyardNames S.alice after))
+      (List.sort [S.printingName escape, S.printingName escape, S.printingName elves])
+    -- The draw half, which nothing above reads: one card left the library across the
+    -- declaration of attackers.
+    Spec.assertEqWith s "and one card left the library" (librarySize S.alice before, librarySize S.alice after) (4 - 2, 4 - 3)
+    -- Anti-vacuity, AFTER the claims so neither can absorb a mutation of them.
+    Spec.assertEqWith s "the hand is net unchanged, which is why it cannot tell the loot happened" (S.handSize S.alice before, S.handSize S.alice after) (3, 3)
+    Spec.assertEqWith s "alice was tempted twice" (temptationsOf S.alice after) (Just 2)
+    Spec.assertEqWith s "and her Ring-bearer is what attacked" (declaredAttackers after) mine
+  Spec.it s "CR 701.54c one temptation does not" $ do
+    -- THE THRESHOLD DISCRIMINATOR. Without it the case above passes for an emblem
+    -- carrying the ability at every count, which is the whole of what CR 701.54c's
+    -- "two or more times" prevents. The same board, one casting instead of two.
+    island <- S.printingOf s registry "Island"
+    escape <- S.printingOf s registry "Birthday Escape"
+    piker <- S.printingOf s registry "Goblin Piker"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let (spells, mine, _, board) = ringCombatBoard island escape piker 2 [piker] []
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) board [1 .. (2 :: Int)]
+        (elvesId, prepared) = S.addHandCard elves S.alice stocked
+        before = castEscapes S.identityAnswer 1 spells prepared
+        after = lootThrough (discardThe elvesId) before
+    Spec.assertEqWith
+      s
+      "only the one spent Escape is in the graveyard"
+      (List.sort (graveyardNames S.alice after))
+      [S.printingName escape]
+    Spec.assertEqWith s "and nothing was drawn" (librarySize S.alice before, librarySize S.alice after) (4 - 1, 4 - 1)
+    Spec.assertEqWith s "alice was tempted once" (temptationsOf S.alice after) (Just 1)
+    Spec.assertEqWith s "and her Ring-bearer attacked all the same" (declaredAttackers after) mine
+  Spec.it s "CR 701.54c the loot reaches the Ring-bearer alone" $ do
+    -- CR 701.54c says "YOUR RING-BEARER", not "a creature you control". A board with
+    -- two attackers cannot show that here: rule 508.3c fires once per DECLARATION,
+    -- so an ability whose Filter admitted every attacker would still fire exactly
+    -- once and the two readings would agree. What tells them apart is a declaration
+    -- the Ring-bearer is NOT in, so alice's Ring-bearer is tapped (CR 508.1a) and
+    -- her Llanowar Elves attacks alone.
+    --
+    -- A PAIR of boards differing in exactly one thing: the tap. Both are tempted
+    -- twice, both designate the Piker, and both declare whatever CR 508.1a leaves
+    -- legal.
+    island <- S.printingOf s registry "Island"
+    escape <- S.printingOf s registry "Birthday Escape"
+    piker <- S.printingOf s registry "Goblin Piker"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let (spells, mine, _, board) = ringCombatBoard island escape piker 2 [elves, piker] []
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) board [1 .. (2 :: Int)]
+        -- The LAST candidate, so the designation lands on the Piker rather than on
+        -- the first creature a never-prompting implementation would take.
+        tempted = castEscapes lastCandidate 2 spells stocked
+    case mine of
+      [other, bearer] -> do
+        let withBearer = lootThrough S.aggressiveAnswer tempted
+            withoutBearer = lootThrough S.aggressiveAnswer (S.tapObject bearer tempted)
+        Spec.assertEqWith
+          s
+          "the loot fires when the Ring-bearer attacks and not when only the Elves does"
+          (librarySize S.alice withBearer, librarySize S.alice withoutBearer)
+          (1, 2)
+        Spec.assertEqWith
+          s
+          "so only the first board buried a discarded card beside the two Escapes"
+          (length (graveyardNames S.alice withBearer), length (graveyardNames S.alice withoutBearer))
+          (3, 2)
+        -- Anti-vacuity: the tapped board really did attack, with the creature that
+        -- is not the Ring-bearer, so "nothing looted" is not "nothing attacked".
+        Spec.assertEqWith s "the Piker is the Ring-bearer" (markedFor S.alice tempted) [bearer]
+        Spec.assertEqWith s "both attacked with the Ring-bearer untapped" (List.sort (declaredAttackers withBearer)) (List.sort mine)
+        Spec.assertEqWith s "and the Elves attacked alone with it tapped" (declaredAttackers withoutBearer) [other]
+      _ -> Spec.assertFailure s "fixture should have two creatures"

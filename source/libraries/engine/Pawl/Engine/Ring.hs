@@ -29,6 +29,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -39,7 +40,10 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
+import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.Discard as Discard
+import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter
@@ -55,6 +59,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -103,12 +108,14 @@ theRingName = CardName.MkCardName (Text.pack "The Ring")
 -- emblem's card at every temptation, which is why the count needs to reach no
 -- reader but this one.
 --
--- Not implemented: the two- and three-temptation abilities (#706). Both need a
--- TriggerCondition arm that does not exist -- a bystander "a permanent the Filter
--- admits attacks" and a bystander "becomes blocked by a creature"; every attack
--- and block arm the type has today is self-scoped. The scan that gathers the
--- four-temptation one gathers those too once they exist: Event.eventTriggers'
--- `inCommand` source offers every triggered ability of an emblem, unfiltered.
+-- Not implemented: the three-temptation ability (#706). It needs a
+-- TriggerCondition arm that does not exist -- one that FILTERS the attacking
+-- creature and BINDS the blocking one, where TriggerCondition.SelfBecomesBlockedBy
+-- is self-scoped and CreatureBecomesBlockedByAtLeast keys on the attacked player
+-- and a blocker count -- plus CR 603.7's delayed "at end of combat" sacrifice. The
+-- scan that gathers the other two gathers it too once it exists:
+-- Event.eventTriggers' `inCommand` source offers every triggered ability of an
+-- emblem, unfiltered.
 theRingEmblem :: Natural.Natural -> Card.Card
 theRingEmblem temptations =
   Card.MkCard
@@ -130,12 +137,16 @@ theRingEmblem temptations =
               Face.spell = Face.defaultSpell,
               Face.activatedAbilities = [],
               Face.replacementEffects = [],
-              -- CR 701.54c's fourth sentence, and only once its threshold is
-              -- met: "as long as the Ring has tempted that player four or more
-              -- times, it has ...". Written as the rule's own inequality rather
-              -- than an equality, so a fifth temptation does not take the ability
-              -- away again.
-              Face.triggeredAbilities = [theRingDrainsOnCombatDamage | temptations >= 4],
+              -- CR 701.54c's second and fourth sentences, each only once its own
+              -- threshold is met: "as long as the Ring has tempted that player N
+              -- or more times, it has ...". Written as the rule's own inequality
+              -- rather than an equality, so a further temptation does not take an
+              -- ability away again, and in the rule's own order -- CR 603.3b lets
+              -- the controller order a batch, so nothing rides on it, but the
+              -- printed order is the one a reader can check.
+              Face.triggeredAbilities =
+                [theRingLootsOnAttack | temptations >= 2]
+                  <> [theRingDrainsOnCombatDamage | temptations >= 4],
               Face.delayedAbilities = Map.empty,
               Face.rooms = Seq.empty,
               Face.castingPermissions = [],
@@ -188,6 +199,73 @@ yourRingBearer =
     [ Filter.IsRingBearer,
       Filter.ControlledBy PlayerRelation.You
     ]
+
+-- | CR 701.54c's two-temptation sentence: "Whenever your Ring-bearer attacks,
+-- draw a card, then discard a card." Minted here rather than carried in card data
+-- for theRingIsLegendary's reason.
+--
+-- TriggerCondition.PlayerAttacksWith is CR 508.3c ("whenever [a player] attacks
+-- with [a creature]") where rule 701.54c prints CR 508.3a ("whenever [a creature]
+-- attacks"), and the two coincide HERE for a reason the rules give rather than for
+-- one pawl's model gives. Rule 508.3c fires once per DECLARATION over the
+-- creatures the Filter admits; rule 508.3a fires once per admitted creature. CR
+-- 701.54a gives a player at most one Ring-bearer ("until another creature becomes
+-- your Ring-bearer"), which `designate`'s scoped clear enforces, and
+-- `yourRingBearer` admits only a creature carrying that designation under the
+-- emblem's controller -- so the admitted set is empty or a singleton and the two
+-- arities are the same number. CR 508.3a's last sentence holds too: rule 508.3c is
+-- read off Pawl.Types.Combat's DECLARATION record, which
+-- Pawl.Engine.Combat.putOntoBattlefieldAttacking does not write, so a creature put
+-- onto the battlefield attacking triggers neither reading.
+--
+-- The declaring player is PlayerRelation.You, CR 109.5's -- the emblem's
+-- controller, whom CR 114.2 makes the tempted player. That is the same seat
+-- `yourRingBearer`'s ControlledBy conjunct names, and CR 508.1a lets only the
+-- active player declare, so a Ring-bearer of ANOTHER player's cannot reach this
+-- through the wrong relation.
+--
+-- The two halves of "draw a card, then discard a card" are two effects of ONE
+-- clause, in that order, which is what makes the hand the discard reads the one
+-- the draw just filled -- CR 701.9b then has a card to choose among even from an
+-- empty hand, so the discard is never a forced no-op.
+--
+-- They spell their player differently because the two payloads offer different
+-- spellings of it and neither offers the other's: Pawl.Types.Draw takes a
+-- Pawl.Types.PlayerRef, so Relative You reaches CR 109.5's seat with no slot
+-- (Pawl.Engine.Monarch.endStepDraw's shape), while Pawl.Types.CountedDiscard takes
+-- a SlotName, so it reaches the same seat through Pawl.Engine.Binding.you --
+-- which Pawl.Engine.Engine stamps on every triggered ability as it places it. No
+-- `discarded` slot: nothing here looks back at what was discarded.
+--
+-- No intervening "if" (CR 603.4) and TriggerLimit.Unlimited, for
+-- theRingDrainsOnCombatDamage's reasons.
+theRingLootsOnAttack :: TriggeredAbility.TriggeredAbility Card.Card
+theRingLootsOnAttack =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition =
+        TriggerCondition.PlayerAttacksWith
+          PlayerAttacksWith.MkPlayerAttacksWith
+            { PlayerAttacksWith.player = PlayerRelation.You,
+              PlayerAttacksWith.filter = yourRingBearer
+            },
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [draw, discard]))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
+    }
+  where
+    draw = Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) Nothing)
+    discard =
+      Effect.Discard
+        ( Discard.Counted
+            CountedDiscard.MkCountedDiscard
+              { CountedDiscard.slot = Binding.you,
+                CountedDiscard.quantity = Quantity.Literal 1,
+                CountedDiscard.discarded = Nothing
+              }
+        )
 
 -- | CR 701.54c's four-temptation sentence: "Whenever your Ring-bearer deals combat
 -- damage to a player, each opponent loses 3 life." Minted here rather than carried
