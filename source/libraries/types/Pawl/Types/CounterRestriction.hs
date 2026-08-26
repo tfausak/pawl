@@ -16,7 +16,9 @@ import qualified Pawl.Types.Keyword as Keyword
 -- the 'can't' effect takes precedence". CR 122.6 says WHICH placements the
 -- printed phrase reaches: counters put on the object while it is on the
 -- battlefield, and counters an object is given as it enters. Both roads reach
--- Pawl.Engine.Event.settleCounters, which is the one place this is read.
+-- Pawl.Engine.Event.settleCounters, which is where a PLACEMENT consults this;
+-- CR 122.5's third impossibility is the second reader, in Pawl.Engine.Resolve's
+-- Effect.MoveCounters arm.
 --
 -- NOT a Pawl.Types.ReplacementEffect, and this type exists to draw that line. CR
 -- 614.16 replaces a PLACEMENT -- a row scaling one to zero still describes an
@@ -42,8 +44,8 @@ import qualified Pawl.Types.Keyword as Keyword
 -- lifts its prohibition with nothing to unwind.
 --
 -- Open-half card data, classified rather than identified:
--- Pawl.Engine.CounterRestriction is the only module that may read it, and it
--- answers a Bool about one object and one kind.
+-- Pawl.Engine.CounterRestriction is the only module that may read this type, and
+-- it answers a Bool about one object and one kind.
 data CounterRestriction = MkCounterRestriction
   { -- | Which objects can't have counters put on them. An Affected, not a bare
     -- ObjectId, so the set is re-derived on every placement -- the field name
