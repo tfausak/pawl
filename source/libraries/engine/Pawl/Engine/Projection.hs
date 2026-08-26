@@ -395,6 +395,10 @@ applyModification viewOf src gs oid unitTypes m pc =
         -- 702's minted abilities are built after this fold, so the pair is
         -- recorded in PC.subtypeWordChanges for the mint, in CR 613.1 order.
         --
+        -- rewriteWithCounters below guards the same hazard on an ENTRY ROW's
+        -- counter kinds, where the values are Quantities and the combiner is
+        -- Quantity.Plus rather than (+).
+        --
         Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to) ->
           let pairs = [(from, to)]
               pc' =
@@ -2143,22 +2147,28 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
 -- graveyards" (Undergrowth Scavenger), and a Count inside it names a card type or
 -- a subtype CR 612.2 licenses swapping.
 --
--- EVERY KIND on the row, since the row carries a map of them (#2314). Map.mapKeys
--- rather than a rebuild: two keys colliding onto one loses a row silently
--- (Map.mapKeys keeps an arbitrary survivor), the hazard Projection's
--- Modification.ChangeSubtypeWord arm above guards against with
--- 'Map.mapKeysWith (+)' for the same reason (islandwalk/swampwalk hacked
--- Island -> Swamp). Left as 'Map.mapKeys' here rather than matching that guard:
--- CR 122.1b's fifteen eligible keywords admit only one word a CR 612.2 swap can
--- reach (Hexproof's quality, rewriteKeyword's Hexproof arm), so a collision would
--- need two keyword counters both naming a quality the swap maps to the same word
--- -- no printing this pool holds does. Quantity has no principled combiner to
--- give 'mapKeysWith' if that ever changes (Pawl.Types.Quantity is deliberately
--- Num-free), so a printing that does collide is unimplemented (#2318).
+-- EVERY KIND on the row, since the row carries a map of them, see #2314.
+-- 'Map.mapKeysWith' and not 'Map.mapKeys': the swap can map two kinds onto one --
+-- a hexproof from Islands counter and a hexproof from Swamps counter, hacked
+-- Island -> Swamp -- and 'Map.mapKeys' would keep an arbitrary survivor, losing a
+-- row. CR 122.1's last sentence is why merging is what the rules ask for rather
+-- than a convenience: counters with the same name are interchangeable, so the two
+-- rows are one tally of that one kind. Projection's
+-- Modification.ChangeSubtypeWord arm above guards the same hazard the same way,
+-- over a permanent's projected keywords instead of an entry row.
+--
+-- The combiner is Quantity.Plus, CR 208.2's composition: it needs no Num instance
+-- (Pawl.Types.Quantity has none, deliberately), and it leaves the two amounts
+-- unevaluated exactly as the rewrite found them, so a Count that must be read
+-- against a board is still read against the board the entry happens on.
+-- 'Map.mapKeysWith' passes the value at the GREATER of the two original keys
+-- first, so the map's own ascending order is what Plus's left and right hold --
+-- addition commutes (Pawl.Types.Plus), so this reads true rather than computing
+-- anything different.
 rewriteWithCounters :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> WithCounters.WithCounters -> WithCounters.WithCounters
 rewriteWithCounters pairs w =
   WithCounters.MkWithCounters
-    . Map.mapKeys (Filter.rewriteCounterKind pairs)
+    . Map.mapKeysWith (\greater lesser -> Quantity.Type.Plus (Plus.MkPlus lesser greater)) (Filter.rewriteCounterKind pairs)
     . fmap (rewriteQuantity pairs)
     $ WithCounters.counters w
 
