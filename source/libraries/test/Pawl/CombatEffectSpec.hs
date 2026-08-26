@@ -195,6 +195,15 @@ attacksAloneSpec s registry = Spec.describe s "AttacksAlone" $ do
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] control)) "a required Piker may not decline"
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] gs) "but a required Construct with no company may"
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] gs)) "and attacking alone stays illegal, requirement or no requirement"
+        -- The witness, pinned: attackCeilingGiven's search reaches size one only
+        -- over the creatures CR 506.5 leaves, and here it leaves none -- so the
+        -- declaration it hands back is the empty one, and not the Construct's
+        -- illegal attack. The control's is the Piker's attack, which is what
+        -- keeps this from passing on a ceiling that answers empty everywhere.
+        let offered = Combat.legalAttackers S.alice gs
+            controlOffered = Combat.legalAttackers S.alice control
+        Spec.assertEqWith s "and the forced declaration is empty" (fmap fst (Combat.forcedAttackDeclaration (Combat.attackCeiling offered gs) offered)) []
+        Spec.assertEqWith s "while the control's names its Piker" (fmap fst (Combat.forcedAttackDeclaration (Combat.attackCeiling controlOffered control) controlOffered)) controlOffered
       _ -> Spec.assertFailure s "fixture should have one creature"
   Spec.it s "CR 508.1d with company the maximum is BOTH, and the Piker alone no longer attains it" $ do
     -- The other side of the same interaction. One Curse over two able creatures
@@ -212,6 +221,29 @@ attacksAloneSpec s registry = Spec.describe s "AttacksAlone" $ do
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] gs)) "the Construct alone is illegal twice over, on the restriction and on the count"
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [construct, other] gs) "only both together is legal"
       _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 508.1d a wide board carrying both shapes still answers, and answers correctly" $ do
+    -- #714's board: a set-shaped restriction in force (the Construct's) alongside
+    -- an attack requirement, which is the pair that used to take CR 508.1d's
+    -- maximum off its closed form and onto an enumeration of every declaration --
+    -- O((1 + targets) ^ candidates), so twenty-four candidates was tens of
+    -- millions of declarations and the step did not finish.
+    --
+    -- Twenty-four is chosen to be past the old search's reach rather than for any
+    -- rules reason. What it proves about SPEED it proves only by finishing inside
+    -- the suite's timeout, which is a weak instrument; the assertions below are
+    -- the load-bearing half, and they are the same three answers the two-creature
+    -- board above gives.
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = cursing curse S.alice (bondedConstruct : replicate 23 piker) []
+    case mine of
+      construct : pikers@(_ : _) -> do
+        Spec.assertEqWith s "all twenty-four are offered" (Combat.legalAttackers S.alice gs) mine
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice mine gs) "attacking with every one of them obeys every requirement"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice (construct : drop 1 pikers) gs)) "leaving one Piker home obeys one requirement fewer"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] gs)) "and the Construct alone is still illegal on the restriction"
+      _ -> Spec.assertFailure s "fixture should have twenty-four creatures"
   Spec.it s "CR 508.1d a Ghostly Prison excuses the whole maximum even where attacking together is legal" $ do
     -- The cost clause reaching the ENUMERATION, which is the one path of
     -- attackCeiling the cases above leave untested: the restriction is in force,
@@ -265,7 +297,9 @@ attacksAloneSpec s registry = Spec.describe s "AttacksAlone" $ do
 -- Construct 1/5, No more than one creature can attack each combat. No more than
 -- one creature can block each combat.") -- the restriction that forbids a
 -- declaration for its SIZE, and the third shape of combat restriction after
--- Pacifism's per-creature one and Bonded Construct's set-shaped one.
+-- Pacifism's per-creature one and Bonded Construct's set-shaped one. Caverns of
+-- Despair is the same restriction at a bound of TWO, which is the smallest bound
+-- that makes CR 508.1d choose WHICH creatures rather than merely how many.
 --
 -- What makes it a different kind again from Bonded Construct's: that one NAMES
 -- creatures and asks what the declaration holds, so a board of two of them
@@ -394,6 +428,12 @@ boundedDeclarationSpec s registry = Spec.describe s "BoundedDeclaration" $ do
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] gs)) "and declining obeys neither requirement"
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [first] control)) "without the Arbiter one Piker no longer attains it"
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [first, second] control) "and both together do"
+        -- The TIE-BREAK, pinned: both Pikers attain the maximum and CR 508.1d
+        -- chooses neither, so which one `best` names is pawl's own call. It is the
+        -- LATER candidate, and the assertion is here because it is the only thing
+        -- fencing that choice -- the case below discriminates on WEIGHT and so
+        -- cannot see it.
+        Spec.assertEqWith s "and the forced declaration names the second Piker" (fmap fst (Combat.forcedAttackDeclaration (Combat.attackCeiling mine gs) mine)) [second]
       _ -> Spec.assertFailure s "fixture should have two creatures"
   Spec.it s "CR 508.1d two requirements on ONE creature count twice" $ do
     -- CR 508.1d counts REQUIREMENTS being obeyed, not the creatures they name.
@@ -408,12 +448,11 @@ boundedDeclarationSpec s registry = Spec.describe s "BoundedDeclaration" $ do
     -- above is this one's control rather than its equal -- there each Piker
     -- carries one requirement and the multiset changes no answer.
     --
-    -- The Berserkers is declared FIRST deliberately. candidateAttackDeclarations
-    -- folds so that the LATER candidate's singleton is enumerated first, and ties
-    -- in attackCeilingGiven's fold go to the earlier entry -- so under a
-    -- creature-counting reading `best` is the Piker alone, and the two
-    -- discriminating assertions bite. With the Berserkers last they would agree
-    -- with both readings.
+    -- The Berserkers is declared FIRST deliberately. attackCeilingGiven breaks a
+    -- tie towards the LATER candidate (pinned by the case above), so under a
+    -- creature-counting reading -- where the two tie at one apiece -- `best` would
+    -- be the Piker alone, and the two discriminating assertions bite. With the
+    -- Berserkers last they would agree with both readings.
     berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
     curse <- S.printingOf s registry "Curse of the Nightly Hunt"
     silentArbiter <- S.printingOf s registry "Silent Arbiter"
@@ -439,6 +478,45 @@ boundedDeclarationSpec s registry = Spec.describe s "BoundedDeclaration" $ do
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [bers, plain] control) "without the Arbiter, both together is legal"
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [bers] control)) "and the Berserkers alone no longer attains the maximum"
       _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 508.1d under a bound of TWO the maximum takes the HEAVIEST creatures, not any two" $ do
+    -- The case that separates CR 508.1d's maximum from "as many creatures as the
+    -- bound allows". Caverns of Despair ("{2}{R}{R} World Enchantment, No more
+    -- than two creatures can attack each combat. / No more than two creatures can
+    -- block each combat.") allows two, a Curse of the Nightly Hunt requires all
+    -- three of alice's creatures, and Berserkers of Blood Ridge carries its own
+    -- requirement on top of the Curse's -- so the weights are two, one and one,
+    -- and the maximum is THREE requirements rather than the two that any pair of
+    -- Pikers obeys.
+    --
+    -- A bound of one cannot see this: there the only sizes are zero and one, so
+    -- ORDERING the weights decides nothing and picking the largest is the same as
+    -- picking any. Two is the smallest bound at which the choice among sizes and
+    -- the choice among creatures come apart, which is why this case wants a second
+    -- printing rather than another Arbiter board.
+    caverns <- S.printingOf s registry "Caverns of Despair"
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = cursing curse S.alice [berserkers, piker, piker] [caverns]
+        (control, _, _) = cursing curse S.alice [berserkers, piker, piker] []
+    case mine of
+      [bers, first, second] -> do
+        Spec.assertEqWith s "all three are still offered" (Combat.legalAttackers S.alice gs) mine
+        -- The proving assertion: two Pikers is a full declaration under the bound
+        -- and still illegal, because the pair obeying the MOST is the Berserkers
+        -- and either Piker.
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [first, second] gs)) "two Pikers fill the bound and obey two of three"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [bers, first] gs) "the Berserkers with a Piker attains the maximum"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [bers, second] gs) "and so does the Berserkers with the other one"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [bers] gs)) "the Berserkers alone leaves a requirement obeyable"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] gs)) "and declining obeys none of the three"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice mine gs)) "while all three together is over the bound"
+        Spec.assertEqWith s "and the forced declaration is the Berserkers and the later Piker" (fmap fst (Combat.forcedAttackDeclaration (Combat.attackCeiling mine gs) mine)) [bers, second]
+        -- Control: strip the Caverns and the bound stops choosing, so all three
+        -- attack and every proper subset is illegal.
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice mine control) "without the Caverns all three attack"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [bers, first] control)) "and the pair no longer attains the maximum"
+      _ -> Spec.assertFailure s "fixture should have three creatures"
   Spec.it s "CR 509.1c a Lure under a bound of one: the maximum is ONE blocker" $ do
     -- The blocking twin of the case above, over blockCeiling's fold. Lure makes
     -- every creature able to block the enchanted attacker do so, which is all

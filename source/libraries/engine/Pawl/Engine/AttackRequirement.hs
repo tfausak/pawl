@@ -73,7 +73,15 @@ import Pawl.Types.ObjectId (ObjectId)
 -- number: a creature restricted by its declaration's SIZE (Bonded Construct) is
 -- a candidate and mints an instance, yet the declaration obeying every instance
 -- at once can be one no player may make. The bound and the maximum coincide on a
--- board with no such card, which is what attackCeiling's closed form exploits.
+-- board with no such card, which is the case attackCeiling's search reduces to
+-- when no restriction binds.
+--
+-- A FENCE on the KEY, because nothing else is one: attackCeiling's search is
+-- greedy, and it is exact only while a requirement is a weight on ONE (creature,
+-- target) pair, so that a declaration's obedience is a sum of independent
+-- non-negative terms. A requirement spanning two creatures -- anything that
+-- widened this key -- would break that, and -Werror would say nothing. Re-derive
+-- the argument at Combat.attackCeilingGiven before widening it.
 --
 -- No `able` predicate BESIDE the candidate list, where the blocking twin has
 -- one: there, CR 509.1b's restrictions are pairwise (flying, fear) and cannot
