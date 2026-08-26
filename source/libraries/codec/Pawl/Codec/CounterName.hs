@@ -65,9 +65,13 @@ make text
 -- 'CounterKind.CounterKind', so a new kind cannot reach a card without someone
 -- answering what a card would print for it.
 --
--- Not implemented: CR 122.1b's "as well as any variants of those keywords" is
--- not a closed list, so 'spellings' reserves the fifteen the rule spells out and
--- a variant spelling -- "hexproof from black" -- is not fenced (#2334).
+-- A blocklist fences only what it can name, and CR 122.1b's list of keyword
+-- counters ends in "as well as any variants of those keywords" -- an open clause,
+-- so no enumeration written here can be complete. 'spellings' reserves the
+-- fifteen the rule spells out, and a variant spelling -- "hexproof from black" --
+-- goes through. That is a standing property of a blocklist against an open rule
+-- rather than a slot left unbuilt: a card naming a variant is caught where the
+-- card is reviewed.
 reserved :: Set.Set Text.Text
 reserved = foldMap spellings [minBound .. maxBound]
 
