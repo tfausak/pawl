@@ -3737,11 +3737,10 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
 -- Pawl.Types.CarryOver is how the move says whether CR 400.7a's exception is
 -- the one it is making. Scoped to Pawl.Engine.Stack's two permanent-spell
 -- branches. Not implemented: CR 400.7b's static-ability ability grants (CR
--- 611.3d) and CR 400.7c's prevention effects, the other two exceptions about an
--- effect CONTINUING to apply across the spell-to-permanent boundary, which this
--- carrier owes and no move can ask for (#2394). CR 400.7's remaining exceptions
--- are about an ability FINDING an object rather than an effect continuing, and
--- live on other carriers; see #2398.
+-- 611.3d) and CR 400.7c's prevention effects, the two exceptions this carrier
+-- owes beside CR 400.7a and which no move can ask for (#2394). CR 400.7g and CR
+-- 400.7i are unimplemented as well, on other carriers -- Pawl.Engine.Cast and
+-- the land-play path (gap #2398).
 carryOver :: CarryOver.CarryOver -> ObjectId -> ObjectId -> Game ()
 carryOver carrying oldId newId = case carrying of
   CarryOver.NotCarried -> pure ()
