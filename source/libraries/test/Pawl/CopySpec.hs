@@ -21,6 +21,13 @@
 -- (Pawl.Engine.Projection.setLandSubtypeTo) -- plus the other order, where CR
 -- 614.12 leaves Vesuva no copy ability to apply at all.
 --
+-- And CR 707.2a's abilities half at the two BATTLEFIELD-WIDE SHORT-CIRCUITS that
+-- decide whether a walk is needed at all -- Pawl.Engine.Projection's
+-- copiableReplacementsOf and anyCopiableKeyword, in replacementsAffecting's
+-- baseHas, and Pawl.Engine.CombatRestriction's baseCouldMint -- on a board an
+-- Unstable Shapeshifter has left holding the only copy of the departed original's
+-- text (copiedAbilitySpec).
+--
 -- And Pawl.Engine.Resolve's CopySpell arm (CR 707.10's copy of a spell on the
 -- stack, Twincast) with the CR 707.10c re-target prompt it raises, the CR 704.5e
 -- state-based action in Pawl.Engine.Sba that removes the resolved copy, and
@@ -36,6 +43,8 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -52,6 +61,8 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
@@ -1332,3 +1343,126 @@ copyTargetSpec s registry =
               Spec.assertEqWith s "alice's Piker, whom nothing named, is untouched" (S.powerToughnessOf pikerId after) (Just (2, 1))
               Spec.assertEqWith s "TWO ward triggers stand over the copy and the Growth" (length (GameState.stack copied)) 4
               Spec.assertEqWith s "and everything resolved" (length (GameState.stack after)) 0
+
+-- alice's Unstable Shapeshifter becomes a copy of `original`, and the original
+-- then LEAVES the battlefield.
+--
+-- The departure is the point. Pawl.Engine.Projection.replacementsAffecting and
+-- Pawl.Engine.CombatRestriction.cantBlock are whole-board short-circuits, so
+-- while the original is still there its own printed face answers for every
+-- permanent and the printed read and the copiable read cannot be told apart. CR
+-- 707.2b is what makes the board after its departure legal: "once an object has
+-- been copied, changing the copiable values of the original object won't cause
+-- the copy to change."
+--
+-- Every other permanent is chosen to trip neither short-circuit: bob's Cabal
+-- Evangel is a black 2/2 with no abilities at all, alice's Giant Spider a green
+-- 2/4 whose one keyword (reach) mints nothing, and Setup.emptyGame puts no land
+-- down. Returns the Shapeshifter, the Evangel, the Spider and the board.
+becameCopyBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId, ObjectId, ObjectId, GameState.GameState)
+becameCopyBoard shapeshifter evangel spider original =
+  let (shifterId, board0) = S.addCreature shapeshifter S.alice (Setup.emptyGame S.bothPlayers)
+      (evangelId, board1) = S.addCreature evangel S.bob board0
+      (spiderId, board2) = S.addCreature spider S.alice board1
+      -- addCreature alone arranges a board and fires nothing; the original is the
+      -- one permanent that ENTERS, which is what raises CR 707.4's trigger.
+      (originalId, entered) = S.entersWithTrigger original S.alice board2
+      copied = resolveAndSettle S.identityAnswer (settle S.identityAnswer entered)
+      gone = S.runPure S.identityAnswer copied (Event.changeZone originalId Zone.Graveyard)
+   in (shifterId, evangelId, spiderId, gone)
+
+-- Mark `amount` damage on one permanent through the funnel that consults the
+-- replacement effects, then run CR 704's state-based actions.
+dealTo :: ObjectId -> ObjectId -> Natural.Natural -> GameState.GameState -> GameState.GameState
+dealTo src victim amount gs =
+  S.settleSba
+    ( S.runPure
+        S.identityAnswer
+        gs
+        (Damage.applyDamage [DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) amount False False False 0 Nothing DamageKind.Noncombat])
+    )
+
+cardNamed :: String -> CardName.CardName
+cardNamed = CardName.MkCardName . Text.pack
+
+-- CR 707.2 / 707.2a: "the copiable values are the values derived from the text
+-- printed on the object ... A copy acquires the abilities of the object it's
+-- copying because those values are derived from its rules text." Three readers
+-- asked that question off the COPIER's printed face rather than the copied one,
+-- each behind a whole-board short-circuit that a copy could take out entirely.
+copiedAbilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+copiedAbilitySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
+  -- Site one: the KEYWORD disjunct of Projection.replacementsAffecting's
+  -- baseHas. Protection is the only keyword in Keyword.mintsReplacement's set
+  -- that mints something a permanent which became a copy AFTER entering can
+  -- still use -- every other one mints an entry or turn-up rewrite, which that
+  -- permanent's entry is long past.
+  --
+  -- A PAIR OF SOURCES on ONE board, differing only in colour, so the survival
+  -- below is rule 702.16e and not the Apostle's toughness: the black Cabal
+  -- Evangel and the red Goblin Piker each deal the same 2 to the same 2/1 copy.
+  Spec.it s "CR 707.2a a copy's protection is minted off the COPIED face" $ do
+    shapeshifter <- S.printingOf s registry "Unstable Shapeshifter"
+    apostle <- S.printingOf s registry "Apostle of Purifying Light"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (shifterId, evangelId, pikerId, board) = becameCopyBoard shapeshifter evangel piker apostle
+        black = dealTo evangelId shifterId 2 board
+        red = dealTo pikerId shifterId 2 board
+    Spec.assertBool s (S.onBattlefield shifterId black) "CR 702.16e the copy survives the black source's lethal 2"
+    Spec.assertEqWith s "CR 615.6 with nothing marked on it" (S.damageOf shifterId black) (Just 0)
+    Spec.assertBool s (not (S.onBattlefield shifterId red)) "and the same 2 from the red source kills it, so 2 really is lethal here"
+    -- The fixture's own preconditions, after the behaviour so neither can absorb
+    -- a mutation aimed at it.
+    Spec.assertEqWith s "the Shapeshifter is the Apostle by name (CR 707.2)" (Projection.namesOf shifterId board) (Set.singleton (cardNamed "Apostle of Purifying Light"))
+    Spec.assertEqWith s "and the printed Apostle has left the battlefield, so nothing else answers for the board" (length (printedOnBattlefield "Apostle of Purifying Light" board)) 0
+
+  -- Site two: CombatRestriction.baseCouldMint. Unleash is the ONLY keyword
+  -- Keyword.mintsCombatRestriction answers True for.
+  --
+  -- CR 707.2's last sentence -- "counters ... are not copied" -- is why the
+  -- counter is placed by hand: rule 702.98a restricts the permanent "as long as
+  -- it has a +1/+1 counter on it", and unleash's own entry replacement fired as
+  -- the CHAINWALKER entered, long after the Shapeshifter did. Without the
+  -- counter both readings say "can block" and the case is vacuous, which is what
+  -- the untouched leg below asserts.
+  --
+  -- The Spider carries the SAME counter and no unleash, so a reading that
+  -- restricted every counter-bearing creature is distinguished too.
+  Spec.it s "CR 707.2a a copy's unleash restricts blocking off the COPIED face" $ do
+    shapeshifter <- S.printingOf s registry "Unstable Shapeshifter"
+    chainwalker <- S.printingOf s registry "Gore-House Chainwalker"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    spider <- S.printingOf s registry "Giant Spider"
+    let (shifterId, _, spiderId, board) = becameCopyBoard shapeshifter evangel spider chainwalker
+        counted = S.addCounter CounterKind.PlusOnePlusOne 1 spiderId (S.addCounter CounterKind.PlusOnePlusOne 1 shifterId board)
+    Spec.assertBool s (not (Combat.canBlock S.alice shifterId counted)) "CR 509.1b / 702.98a the copy with a +1/+1 counter cannot block"
+    Spec.assertBool s (Combat.canBlock S.alice spiderId counted) "while the Spider with the same counter can"
+    Spec.assertEqWith s "so only the Spider is offered as a blocker" (Combat.legalBlockers S.alice counted) [spiderId]
+    -- Rule 702.98a's own condition, which is what keeps the leg above from
+    -- passing for a copy that lost blocking outright.
+    Spec.assertBool s (Combat.canBlock S.alice shifterId board) "and without the counter the same copy blocks"
+    Spec.assertEqWith s "the Shapeshifter is the Chainwalker by name (CR 707.2)" (Projection.namesOf shifterId board) (Set.singleton (cardNamed "Gore-House Chainwalker"))
+    Spec.assertEqWith s "and the printed Chainwalker has left the battlefield" (length (printedOnBattlefield "Gore-House Chainwalker" board)) 0
+
+  -- Site three: the PRINTED-replacement disjunct of the same baseHas. Glittering
+  -- Lion prints CR 615.1's shield rather than minting it from a keyword, so it
+  -- separates this disjunct from the one the first case proves.
+  --
+  -- The Evangel takes the same kind of damage on the same board and marks it,
+  -- which is what says the shield is the Shapeshifter's own rather than a board
+  -- on which no damage lands at all. Three against one, so no arithmetic
+  -- coincidence pairs the two readings.
+  Spec.it s "CR 707.2a a copy's PRINTED replacement effect is gathered too" $ do
+    shapeshifter <- S.printingOf s registry "Unstable Shapeshifter"
+    lion <- S.printingOf s registry "Glittering Lion"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    spider <- S.printingOf s registry "Giant Spider"
+    let (shifterId, evangelId, _, board) = becameCopyBoard shapeshifter evangel spider lion
+        shielded = dealTo evangelId shifterId 3 board
+        bystander = dealTo shifterId evangelId 1 board
+    Spec.assertEqWith s "CR 615.1 the Lion's printed shield prevents all 3" (S.damageOf shifterId shielded) (Just 0)
+    Spec.assertBool s (S.onBattlefield shifterId shielded) "so the 2/2 copy survives what would otherwise be lethal"
+    Spec.assertEqWith s "while the Evangel beside it marks its 1" (S.damageOf evangelId bystander) (Just 1)
+    Spec.assertEqWith s "the Shapeshifter is the Lion by name (CR 707.2)" (Projection.namesOf shifterId board) (Set.singleton (cardNamed "Glittering Lion"))
+    Spec.assertEqWith s "and the printed Lion has left the battlefield" (length (printedOnBattlefield "Glittering Lion" board)) 0
