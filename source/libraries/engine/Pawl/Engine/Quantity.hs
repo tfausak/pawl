@@ -6,6 +6,7 @@ import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
@@ -655,6 +656,33 @@ substituteStar star quantity = case quantity of
   -- ability with no resolution and so no slots, and Pawl.CardSpec's
   -- powerToughnessSlots keeps a slot-naming quantity out of a printed P/T.
   Quantity.AgainstSlot {} -> quantity
+
+-- CR 107.3m: substitute the value of X that was announced for the SPELL that
+-- became this permanent into a quantity an enters-the-battlefield replacement
+-- effect reads -- "if an object's enters-the-battlefield triggered ability or
+-- replacement effect refers to X, and the spell that became that object as it
+-- resolved had a value of X chosen for any of its costs, the value of X for that
+-- ability is the same as the value of X for that spell". Protean Hydra's "this
+-- creature enters with X +1/+1 counters on it" is the pool's reader.
+--
+-- A SUBSTITUTION at the entry site rather than a fallback inside
+-- evaluateAgainst's InSlot arm, because rule 107.3m states the exception and its
+-- limit in one sentence: "although the value of X for that permanent is 0". A
+-- fallback would answer the announcement everywhere the permanent is asked --
+-- for an activated ability of its own, where that same clause says 0.
+--
+-- Cost.substituteX's twin, one type over. The descent is substituteStar's, for
+-- the same reason: a composed quantity (1 + X) is still a reader of X. No
+-- descent into Count -- its per-member quantity is read against ANOTHER object,
+-- so an X inside it would be that object's and not this entry's -- nor into
+-- AgainstSlot, which re-aims the fold the same way.
+substituteAnnouncedX :: Natural -> Quantity -> Quantity
+substituteAnnouncedX n quantity = case quantity of
+  Quantity.InSlot slot | slot == Binding.variableX -> Quantity.Literal (toInteger n)
+  Quantity.Plus (Plus.MkPlus a b) -> Quantity.Plus (Plus.MkPlus (substituteAnnouncedX n a) (substituteAnnouncedX n b))
+  Quantity.Halved (Halved.MkHalved rounding inner) -> Quantity.Halved (Halved.MkHalved rounding (substituteAnnouncedX n inner))
+  Quantity.Negate a -> Quantity.Negate (substituteAnnouncedX n a)
+  _ -> quantity
 
 -- Does a printed box hold CR 208.2's star anywhere inside it? The three
 -- calculations descend for substituteStar's reason: 1+* is a star box, and the

@@ -26,11 +26,13 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
+import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -834,11 +836,43 @@ performStateBasedActions = Event.simultaneously $ do
       outcome = Departure.outcomeAfterLeaving leaving departed
       drained = vanished {GameState.damageScannedThrough = watermark}
       balanced = List.foldl' balance drained annihilations
+      -- CR 704.5q's removal is a REMOVAL (rule 122.3 uses the word), so it owes
+      -- the same GameEvent.CountersRemoved every other removal records --
+      -- Protean Hydra's "whenever a +1/+1 counter is removed from this creature"
+      -- is the pool's reader.
+      --
+      -- A BEFORE/AFTER DIFF and not a call to Pawl.Engine.Event.removeCounters,
+      -- CR 122's funnel, for the reason Pawl.Engine.Damage's removalsBetween
+      -- gives at its own site: that funnel is a Game action and `balance` above
+      -- is a pure fold inside the CR 704.3 single-event pass, so routing it would
+      -- sequence what the rule performs simultaneously.
+      --
+      -- Read off `drained` and `balanced` rather than off the pre-pass board the
+      -- classification used, so the pair describes what actually came off: a
+      -- permanent this pass already buried is no longer in GameState.objects, and
+      -- `balance`'s Map.adjust is then a silent no-op that must record nothing.
+      --
+      -- ONE RECORD PER PERMANENT PER KIND, whatever N is -- CR 704.3 makes the
+      -- whole check one event, so a permanent with three +1/+1 and two -1/-1
+      -- counters had two +1/+1 counters removed ONCE, and Protean Hydra's trigger
+      -- fires once. Two records rather than one because the constructor carries a
+      -- single kind and rule 704.5q removes both, which is Damage's posture for a
+      -- permanent that is a battle and a planeswalker at once.
+      countersOn kind oid g = maybe 0 (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid g)
+      annihilationRemovals =
+        [ GameEvent.CountersRemoved (CounterChange.MkCounterChange oid kind was now)
+        | (oid, _) <- annihilations,
+          kind <- [CounterKind.PlusOnePlusOne, CounterKind.MinusOneMinusOne],
+          let was = countersOn kind oid drained,
+          let now = countersOn kind oid balanced,
+          was > now
+        ]
+      recorded = List.foldl' (flip Event.recordEvent) balanced annihilationRemovals
       -- CR 704.5aa: "that player's speed becomes 1", applied to the players
       -- classified from the pre-pass board above. Applied LATE like every other
       -- action in this pass, so a permanent this same pass destroyed still starts
       -- its controller's engines -- CR 704.3 makes the whole check one event.
-      revved = List.foldl' (flip Speed.startEngines) balanced revving
+      revved = List.foldl' (flip Speed.startEngines) recorded revving
       -- CR 704.5t / 309.6: "the dungeon card's owner removes it from the game",
       -- applied to the dungeons classified from the pre-pass board. Applied late
       -- like every other action in this pass.

@@ -21,8 +21,11 @@ import qualified Pawl.Types.SlotName as SlotName
 -- Pawl.Types.ActiveReplacement.controller takes, and for the same reason.
 --
 -- `targets` is the installing resolution's chosen map, snapshotted -- what makes
--- "that creature" nameable turns later. `controller` is who performs the rider,
--- which is the shield's controller and not the damage's source.
+-- "that creature" nameable turns later. A PRINTED ability chose no targets (CR
+-- 115.10a) and carries CR 113.7's reserved self slot there instead, which is what
+-- lets its rider say "it" (Protean Hydra); see Pawl.Engine.Replacement
+-- .printedRider. `controller` is who performs the rider, which is the shield's
+-- controller and not the damage's source.
 --
 -- `source` is CR 113.7's source of the effect that created the prevention: the
 -- resolving spell or ability for a floating shield, and the permanent itself for

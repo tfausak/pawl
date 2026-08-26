@@ -510,8 +510,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
 -- comment gives).
 --
 -- Chandra, Fire Artisan -- {2}{R}{R} Legendary Planeswalker -- Chandra, printed
--- loyalty 4 -- is the group's card and the pool's only producer of
--- TriggerCondition.SelfCountersRemoved: "whenever one or more loyalty counters are
+-- loyalty 4 -- is the group's card, and the pool's loyalty producer of
+-- TriggerCondition.SelfCountersRemoved (Protean Hydra is its +1\/+1 one): "whenever one or more loyalty counters are
 -- removed from Chandra, she deals that much damage to target opponent or
 -- planeswalker". Her +1 and -7 exile the top of the library and grant CR 601.1a's
 -- permission to play what was exiled; the -7 is what drives the cost half.

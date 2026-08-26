@@ -4167,8 +4167,10 @@ stunCounters oid gs = case Game.lookupObject oid gs of
 -- keyed on the PROJECTED card type and reads the PROJECTED loyalty, a copiable
 -- value under CR 707.2 (CR 707.5). Minting AFTER the layer fold puts loyalty out
 -- of LoseAllAbilities' reach, CR 306.5b giving it as a rule, while riot, being a
--- keyword, is inside it. `announcedX` is CR 107.3m's, and the loyalty arm is its
--- one reader: a printed loyalty of X is settled at CR 601.2b before it arrives.
+-- keyword, is inside it. `announcedX` is CR 107.3m's, and the loyalty arm is this
+-- function's reader of it: a printed loyalty of X is settled at CR 601.2b before
+-- it arrives. The rule's other reader is a CR 614.1c row a card writes, which
+-- Pawl.Engine.Event's entry loop substitutes into (Protean Hydra).
 --
 -- CR 702.150a's compleated is a ROW OF ITS OWN below rather than arithmetic
 -- inside the loyalty arm, so CR 616.1e can order it against CR 614.16's counter

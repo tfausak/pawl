@@ -263,6 +263,14 @@ collect sources floating =
 -- `src` is CR 113.7's source, which for a static ability is the permanent that
 -- prints it -- so the rider runs against the same object today's shielded
 -- recipient is (Stormwild Capridor shields itself).
+--
+-- CR 115.1 / 113.7: the RESERVED self slot is bound to that source, which is not
+-- a target and so does not contradict the paragraph above -- Pawl.Engine.Resolve
+-- .performHandAction binds the same slot the same way for the same reason. It is
+-- what lets a rider naming its own permanent by slot say "it": Protean Hydra's
+-- "prevent that damage and remove that many +1/+1 counters from it", where
+-- Pawl.Types.RemoveCounters names a slot and Pawl.Types.PutCounters (Stormwild
+-- Capridor) names an ObjectRef and needs no binding.
 printedRider :: ObjectId -> Maybe PlayerId -> ReplacementEffect (Effect.Effect Card) -> Maybe PreventionRider.PreventionRider
 printedRider src you re = case re of
   ReplacementEffect.DamageR damageR
@@ -271,7 +279,7 @@ printedRider src you re = case re of
         Just
           PreventionRider.MkPreventionRider
             { PreventionRider.effects = DamageR.riders damageR,
-              PreventionRider.targets = Map.empty,
+              PreventionRider.targets = Map.singleton Binding.triggerSource (Set.singleton (Recipient.ToObject src)),
               PreventionRider.controller = controller,
               PreventionRider.source = src
             }
