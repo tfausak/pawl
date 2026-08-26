@@ -2582,6 +2582,7 @@ canHostSubjects predicate = case predicate of
     CounterKind.Time -> 0
     CounterKind.Fade -> 0
     CounterKind.Shield -> 0
+    CounterKind.Finality -> 0
     CounterKind.Level -> 0
     CounterKind.Hone -> 0
     CounterKind.Named _ -> 0
@@ -2682,6 +2683,7 @@ counterKindFilters kind = case kind of
   CounterKind.Time -> []
   CounterKind.Fade -> []
   CounterKind.Shield -> []
+  CounterKind.Finality -> []
   CounterKind.Level -> []
   CounterKind.Hone -> []
   CounterKind.Named _ -> []

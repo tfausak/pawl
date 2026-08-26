@@ -23,6 +23,7 @@ codec keywordCodec =
       Arm.nullary "Time" CounterKind.Time,
       Arm.nullary "Fade" CounterKind.Fade,
       Arm.nullary "Shield" CounterKind.Shield,
+      Arm.nullary "Finality" CounterKind.Finality,
       Arm.nullary "Level" CounterKind.Level,
       Arm.nullary "Hone" CounterKind.Hone,
       Arm.payload "Named" CounterName.codec CounterKind.Named (\x -> case x of CounterKind.Named y -> Just y; _ -> Nothing)

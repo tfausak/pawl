@@ -7,10 +7,10 @@ import qualified Pawl.Types.CounterName as CounterName
 -- rules core reads counts by kind (CR 613.4c, the CR 704.5q SBA) and never cases
 -- on a card. CR 122.1a for the P/T kinds, CR 122.1b for keyword, CR 122.1e for
 -- loyalty, rule 714 for lore, CR 702.63 for time and CR 702.32 for fade -- none
--- of which rule 122.1 lists at all, and CR 122.1c for shield. What rule 122.1
--- names and this type does not are CR 122.1d's stun counter (#2329) and CR
--- 122.1h's finality counter (#2330); 122.1f's poison and 122.1i's rad are a
--- PLAYER's and live in Pawl.Types.PlayerCounterKind.
+-- of which rule 122.1 lists at all, CR 122.1c for shield and CR 122.1h for
+-- finality. What rule 122.1 names and this type does not is CR 122.1d's stun
+-- counter (#2329); 122.1f's poison and 122.1i's rad are a PLAYER's and live in
+-- Pawl.Types.PlayerCounterKind.
 -- Ord is load-bearing: CounterKind is a Map key on Object.counters.
 --
 -- PARAMETRIC in the keyword, for the reason Pawl.Types.Filter is and only that
@@ -105,6 +105,23 @@ data CounterKind keyword
     -- keyword. What the rule does with it is replace two events, and CR 614/615
     -- is where that lives.
     Shield
+  | -- | CR 122.1h: finality counters on a permanent create a single replacement
+    -- effect that stops it going to the graveyard -- "If this permanent would be
+    -- put into a graveyard from the battlefield, exile it instead."
+    --
+    -- Shield's posture (Pawl.Engine.Projection.finalityOf mints the row from the
+    -- PRESENCE of any such counter, one row however many counters), with the one
+    -- difference the two rules state: CR 122.1c spends a counter on each
+    -- application and rule 122.1h names no removal at all, so the row survives
+    -- its own use. A permanent that is somehow put into a graveyard twice is
+    -- exiled both times.
+    --
+    -- Contributes nothing to the CR 613 layer system, so
+    -- Pawl.Engine.Projection.counterGathered grants nothing for this kind -- for
+    -- Shield's reason: this is not CR 122.1b's indestructible counter and grants
+    -- no keyword. What the rule does with it is replace an event, and CR 614 is
+    -- where that lives.
+    Finality
   | -- | CR 711.2: the counters a leveler creature tracks its level with. Rule
     -- 122.1 gives level counters no lettered clause of their own -- 122.1a-j
     -- never name them -- so rule 711 is the whole citation, exactly as rule 714

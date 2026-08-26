@@ -45,6 +45,8 @@ data CounterKindFamily
     Fade
   | -- | CR 122.1c: Pawl.Types.CounterKind.Shield.
     Shield
+  | -- | CR 122.1h: Pawl.Types.CounterKind.Finality.
+    Finality
   | -- | CR 711.2: Pawl.Types.CounterKind.Level.
     Level
   | -- | CR 122.1j: Pawl.Types.CounterKind.Hone.

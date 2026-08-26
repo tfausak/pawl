@@ -108,6 +108,7 @@ representative family = case family of
   CounterKindFamily.Time -> CounterKind.Time
   CounterKindFamily.Fade -> CounterKind.Fade
   CounterKindFamily.Shield -> CounterKind.Shield
+  CounterKindFamily.Finality -> CounterKind.Finality
   CounterKindFamily.Level -> CounterKind.Level
   CounterKindFamily.Hone -> CounterKind.Hone
   CounterKindFamily.Named -> CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "conqueror"))
