@@ -3017,11 +3017,13 @@ spellCopyOf source = case source of
 
 -- The TARGETS a spell or ability on the stack currently has, per slot. Every
 -- recipient-valued binding restricted to the slots the object actually declares
--- a target in: Binding.targetsOf also reports the reserved ones -- CR 109.5's
--- `you` above all -- and CR 115.10b says outright that "you" is not a target.
+-- a target in: Binding.targetsOf reports the reserved ones too -- CR 109.5's
+-- `you` above all -- and CR 115.10b says outright that "you" indicates no
+-- target. Restricted for legalSlot's own reason as well: a slot declaring no
+-- target was never targeted, so CR 608.2b has nothing to re-check there.
 --
--- Read off the LIVE bindings rather than what an announcement chose, which is
--- what makes it answer for a copy whose targets CR 707.10c has just changed.
+-- Read off the LIVE bindings rather than off what an announcement chose, which
+-- is what makes it answer for a copy whose targets CR 707.10c has just changed.
 targetsOnStack :: ObjectId -> GameState -> Map.Map SlotName (Set Recipient)
 targetsOnStack oid gs =
   Maybe.fromMaybe Map.empty $ do
