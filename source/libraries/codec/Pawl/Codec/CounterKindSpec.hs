@@ -75,6 +75,13 @@ spec s = Spec.describe s "Pawl.Codec.CounterKind" $ do
       (CounterKind.codec Keyword.codec)
       CounterKind.Shield
       " {\"type\":\"Shield\"} "
+  -- CR 122.1h, Shield's sibling: minted from presence, but never spent.
+  Spec.it s "Finality" $
+    Common.assertCodec
+      s
+      (CounterKind.codec Keyword.codec)
+      CounterKind.Finality
+      " {\"type\":\"Finality\"} "
   -- CR 711.2, the kind a leveler's level symbols read through a condition.
   Spec.it s "Level" $
     Common.assertCodec

@@ -49,6 +49,7 @@ import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CopySpell as CopySpell
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Counter as Counter
@@ -3143,6 +3144,10 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- CR 122.1c: a shield counter is not a keyword counter, so it must
               -- make no grant here. shieldOf mints its effects instead.
               CounterKind.Shield -> []
+              -- CR 122.1h: nor a finality counter, for the shield counter's
+              -- reason -- it is not CR 122.1b's keyword counter and grants
+              -- nothing. finalityOf mints its replacement effect instead.
+              CounterKind.Finality -> []
               -- Nor a level counter: CR 711.2a states a leveler's grants as
               -- static abilities of the card, which gatherStatic applies.
               CounterKind.Level -> []
@@ -3972,9 +3977,10 @@ abilitiesFromCharacteristics peers pc oid gs =
         )
 
 -- CR 614 / 613 layer 6: an object's replacement effects after the layer system.
--- A Humility'd creature has none -- except the shield pair, which no layer can
--- reach; see shieldOf. CR 604.2's "as long as" clause is asked HERE, against a
--- finished projection, with the source's own controller for CR 109.5's "you".
+-- A Humility'd creature has none -- except the counter-minted rows, which no
+-- layer can reach; see shieldOf and finalityOf. CR 604.2's "as long as" clause
+-- is asked HERE, against a finished projection, with the source's own controller
+-- for CR 109.5's "you".
 -- Nothing is latched, so Jared Carthalion's shield goes away the moment the
 -- monarchy does, with no trigger and no resolution in between.
 replacementsOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
@@ -3992,6 +3998,7 @@ replacementsOf oid gs =
    in fmap PrintedReplacement.effect (filter lives (PC.replacementEffects pc))
         <> intrinsicReplacementsOf (announcedXOf oid gs) (phyrexianLifePaidOf oid gs) pc
         <> shieldOf oid gs
+        <> finalityOf oid gs
 
 -- CR 107.3m: the value of X for this object's enters-the-battlefield replacement
 -- effects, and 0 for every object no such spell stands behind. Read off the
@@ -4052,6 +4059,53 @@ shieldCounters :: ObjectId -> GameState -> Natural
 shieldCounters oid gs = case Game.lookupObject oid gs of
   Nothing -> 0
   Just obj -> Map.findWithDefault 0 CounterKind.Shield (Object.counters obj)
+
+-- CR 122.1h: the replacement effect one or more finality counters create --
+-- "If this permanent would be put into a graveyard from the battlefield, exile
+-- it instead."
+--
+-- ONE row however many counters, per the rule's own "a single replacement
+-- effect", which is shieldOf's reading of CR 122.1c one clause over. Where the
+-- two rules PART is the spending: rule 122.1c's effects each "remove a shield
+-- counter", and rule 122.1h names no removal, so this row is not consumed by
+-- being applied and no DestructionRewrite-style rewrite is wanted. A permanent
+-- put into a graveyard a second time is exiled a second time.
+--
+-- Read off Object.counters rather than the projection, for shieldOf's reason:
+-- counters are not a characteristic (CR 122.1) and this is a rule rather than an
+-- ability, so the layer system has nothing to remove.
+--
+-- The rule's FROM-ZONE is not in the pattern -- Pawl.Types.ZoneChangePattern has
+-- no such field -- and does not need to be: replacementsAffecting gathers only
+-- battlefield permanents, so a row minted here can only ever be a candidate
+-- while its source is on the battlefield, which is exactly "from the
+-- battlefield". Filter.IsSource is the rule's "this permanent", the self-scope
+-- CR 614.1c's entry rows use.
+finalityOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
+finalityOf oid gs =
+  if finalityCounters oid gs == 0
+    then []
+    else
+      [ ReplacementEffect.ZoneChangeR
+          ( ZoneChangeR.MkZoneChangeR
+              ZoneChangePattern.MkZoneChangePattern
+                { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
+                  -- CR 122.1h says nothing about whose graveyard, and CR 400.3
+                  -- makes it the owner's whoever controlled the permanent.
+                  ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+                  ZoneChangePattern.whatObject = Filter.Type.IsSource
+                }
+              Zone.Exile
+          )
+      ]
+
+-- CR 122.1h: how many finality counters this object has. Only whether it is zero
+-- is ever asked -- the rule's effect is one row at any positive count -- but the
+-- count is what the board stores, so shieldCounters' shape is kept.
+finalityCounters :: ObjectId -> GameState -> Natural
+finalityCounters oid gs = case Game.lookupObject oid gs of
+  Nothing -> 0
+  Just obj -> Map.findWithDefault 0 CounterKind.Finality (Object.counters obj)
 
 -- CR 306.5b / 614.1c: a planeswalker's intrinsic "enters with loyalty counters"
 -- replacement, CR 310.4b's twin for a battle's defense, and rule 702.136a's riot
@@ -4115,9 +4169,9 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- The short-circuit reads BASE cards while the result reads the PROJECTION,
 -- sound only because every route to an unprinted replacement effect is covered:
 -- `EntryR AsCopy` on a card that is itself a base card with one, CR 122.1c's
--- shield counters, or a minting keyword printed on or granted by a face. The
--- ability disjunct asks staticAbilitiesOf rather than the face, so a copy's
--- granting text is seen (CR 707.2a).
+-- shield counters, CR 122.1h's finality counters, or a minting keyword printed
+-- on or granted by a face. The ability disjunct asks staticAbilitiesOf rather
+-- than the face, so a copy's granting text is seen (CR 707.2a).
 --
 -- Not implemented: a minting keyword reaching a permanent through a stored
 -- continuous effect or a keyword counter is on no base face (#833). Nor is a
@@ -4126,9 +4180,10 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect (Effect.Effect Card.Type.Card))]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
-      -- CR 122.1c's pair is minted from COUNTERS, so it is on no base face --
-      -- which is why it is asked before the face is looked up at all.
-      baseHas oid | shieldCounters oid gs > 0 = True
+      -- CR 122.1c's pair and CR 122.1h's row are minted from COUNTERS, so
+      -- neither is on any base face -- which is why both are asked before the
+      -- face is looked up at all.
+      baseHas oid | shieldCounters oid gs > 0 || finalityCounters oid gs > 0 = True
       baseHas oid = case Game.faceOf oid gs of
         Nothing -> False
         -- The planeswalker disjunct keeps CR 306.5b's intrinsic replacement

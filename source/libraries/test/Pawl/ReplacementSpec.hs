@@ -3005,6 +3005,72 @@ aimCreature oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
   _ -> S.identityAnswer p
 
+-- CR 122.1h: a finality counter's replacement effect, gameplay-level.
+--
+-- Queen's Bay Paladin {3}{B}{B} Creature -- Vampire Knight 5/4, "Whenever this
+-- creature enters or attacks, return up to one target Vampire card from your
+-- graveyard to the battlefield with a finality counter on it. You lose life
+-- equal to its mana value." (name, cost, type line, P/T and Oracle text checked
+-- against api.scryfall.com 2026-08-25). Its whole text is that one trigger, so
+-- nothing else on the card can be what these assertions read.
+--
+-- The board is built so the readings come apart:
+--
+--   * EXILED versus DIED. The returned Vampire is killed by CR 704.5g lethal
+--     damage -- a real destruction, not a hand-built proposed event -- and both
+--     zones are asserted at once, so an engine that never redirected and one
+--     that lost the card entirely are different answers.
+--   * EXILED versus THE GRAVEYARD EMPTIED. A Goblin Piker is buried beside the
+--     Vampire and never leaves, so the graveyard half of that assertion reads
+--     [Goblin Piker] rather than [] and the two are told apart.
+--   * ITS mana value versus the Paladin's. The Vampire's is 3 and the Paladin's
+--     is 5, so a LoseLife reading the trigger's own source rather than the
+--     returned permanent would take 5.
+queensBayPaladinSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+queensBayPaladinSpec s registry = Spec.describe s "Queen's Bay Paladin (CR 122.1h)" $ do
+  Spec.it s "CR 122.1h a permanent with a finality counter is exiled instead of dying" $ do
+    paladin <- S.printingOf s registry "Queen's Bay Paladin"
+    vampirePrinting <- S.printingOf s registry "Bloodrage Vampire"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    let (buriedVampire, g1) = S.addGraveyardCard vampirePrinting S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addGraveyardCard pikerPrinting S.alice g1
+        (paladinId, entered) = S.entersWithTrigger paladin S.alice g2
+        -- Announce the one target the slot allows, then FILTER the offered set
+        -- down to the buried Vampire rather than handing back a recipient built
+        -- here: CR 608.2b re-reads the declared targets at resolution, and a
+        -- hand-built one of a different shape would be dropped with no error.
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.AnnounceTargets _ _ _ offers -> fmap (const 1) offers
+          Prompt.ChooseTargets _ _ _ offers -> fmap (Set.filter (== Recipient.ToObject buriedVampire) . snd) offers
+          _ -> S.identityAnswer p
+        placed = S.runPure answer entered Engine.placePendingTriggers
+        resolved = S.runPure answer placed Stack.resolveTop
+        -- The CR 400.7 incarnation the return minted: the battlefield permanent
+        -- that is not the Paladin.
+        returned = case filter (/= paladinId) (Set.toList (GameState.battlefield resolved)) of
+          [only] -> Just only
+          _ -> Nothing
+        named = Just . CardName.MkCardName . Text.pack
+        namesIn zone pid gs = List.sort (fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
+        exiledNames gs = List.sort (fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Set.toList (GameState.exile gs)))
+    case returned of
+      Nothing -> Spec.assertFailure s "expected the trigger to return exactly one Vampire"
+      Just vampireId ->
+        let -- CR 704.5g: a 3/1 with one damage marked on it is destroyed by a
+            -- state-based action, which is the destruction CR 122.1h's row
+            -- replaces. Nothing here proposes the zone change directly.
+            killed = S.settleSba (S.markDamage vampireId 1 resolved)
+         in do
+              Spec.assertEqWith
+                s
+                "CR 122.1h the Vampire was exiled, and the graveyard holds only the card that never left it"
+                (exiledNames killed, namesIn Zone.Graveyard S.alice killed)
+                ([named "Bloodrage Vampire"], [named "Goblin Piker"])
+              Spec.assertEqWith s "setup: it came back carrying one finality counter" (S.counterOf CounterKind.Finality vampireId resolved) 1
+              Spec.assertEqWith s "setup: alice lost life equal to ITS mana value, not the Paladin's" (S.lifeOf S.alice resolved) (Just 17)
+              Spec.assertBool s (S.onBattlefield paladinId killed) "and the Paladin itself never moved"
+
 -- CR 614.5's applied set is what makes the CR 616.1 loop TERMINATE, not merely
 -- correct: a regression there (an effect invoking itself repeatedly, e.g. two
 -- Hardened Scales re-triggering each other forever) manifests as this group
@@ -4174,6 +4240,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   samiteMinistrationSpec s registry
   turnTheTablesSpec s registry
   oraclesAttendantsSpec s registry
+  queensBayPaladinSpec s registry
   gatherSpecimensSpec s registry
   kismetSpec s registry
   shimatsuSpec s registry
