@@ -12790,8 +12790,8 @@ delayedPending grouped gs =
       -- one shot, and 603.2c then applies unmodified -- "it can trigger repeatedly
       -- if one event contains multiple occurrences" -- so every occurrence in the
       -- batch fires the entry once. Centaur Peacemaker's "each player gains 4 life"
-      -- is that batch for False Cure, and TriggerSpec's three-seat board proves the
-      -- count.
+      -- is that batch for False Cure, and Pawl.EventTriggerSpec's three-seat board
+      -- proves the count.
       --
       -- Without a duration, CR 603.7b's two sentences read as two steps over the
       -- GROUPED batch. The first sentence -- "the next time its trigger event
@@ -12896,7 +12896,9 @@ delayedPending grouped gs =
    in do
         -- One pass, in store order, because `triggered` can now ASK: the prompt
         -- must be raised once per entry, and `spent` reads the answer rather than
-        -- recomputing it.
+        -- recomputing it. Not implemented: CR 101.4's APNAP order over two
+        -- entries with different controllers, which are asked in arming order
+        -- instead (#2380).
         outcomes <- traverse (\entry -> fmap ((,) entry) (triggered entry)) store
         pure (concatMap snd outcomes, fmap fst (Seq.filter (not . spent) outcomes))
 

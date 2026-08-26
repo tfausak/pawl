@@ -140,14 +140,6 @@ import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
--- CR 702.29c: "'When you cycle this card' means 'When you discard this card to
--- pay an activation cost of a cycling ability.' These abilities trigger from
--- whatever zone the card winds up in after it's cycled."
---
--- Windcaller Aven is the card: a {4}{U}{U} 4/3 with flying, Cycling {U}, and
--- "When you cycle this card, target creature gains flying until end of turn".
--- The trigger is mandatory and its effect is Serpent's Gift's exact shape, so
--- the only new thing any test below can be passing on is the trigger itself.
 -- Pawl.Engine.Event.gatherTriggers runs in Game since CR 603.7b's second
 -- sentence became a question for the controller of a delayed entry that matched
 -- two SIMULTANEOUS occurrences. No board in this module arms a delayed entry at
@@ -156,6 +148,14 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 gathered :: GameState.GameState -> [PendingTrigger.PendingTrigger]
 gathered gs = fst (fst (S.runPureWith S.identityAnswer gs (Event.gatherTriggers (Event.unscannedGrouped gs) gs)))
 
+-- CR 702.29c: "'When you cycle this card' means 'When you discard this card to
+-- pay an activation cost of a cycling ability.' These abilities trigger from
+-- whatever zone the card winds up in after it's cycled."
+--
+-- Windcaller Aven is the card: a {4}{U}{U} 4/3 with flying, Cycling {U}, and
+-- "When you cycle this card, target creature gains flying until end of turn".
+-- The trigger is mandatory and its effect is Serpent's Gift's exact shape, so
+-- the only new thing any test below can be passing on is the trigger itself.
 cyclingTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cyclingTriggerSpec s registry =
   Spec.describe s "CyclingTrigger" $ do

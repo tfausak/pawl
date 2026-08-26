@@ -2136,8 +2136,8 @@ falseCureSpec s registry =
           Spec.assertEqWith s "bob is at 24" (S.lifeOf S.bob after) (Just 24)
           Spec.assertEqWith s "carol is at 24" (S.lifeOf S.carol after) (Just 24)
 
--- CR 603.7b's answer to that question, pinned BY INDEX and by nothing else. An
--- answerer that searched the candidates for a legal one would find the earliest
+-- An answer to CR 603.7b's question below, pinned BY INDEX and by nothing else.
+-- An answerer that searched the candidates for a legal one would find the earliest
 -- again under any mutation, and Pawl.Engine.Replay.defaultAnswer -- what
 -- S.identityAnswer and every other fallthrough answerer reaches -- IS the
 -- earliest. A board answered by one of those cannot tell the rule from its

@@ -112,7 +112,6 @@ castWave tidalWave island =
       (gs, oid) = S.handOne tidalWave (S.landsInPlay island 3)
    in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice oid)))
 
--- CR 608.2i: the log records; it is never emptied by a reader.
 -- Pawl.Engine.Event.gatherTriggers runs in Game since CR 603.7b's second
 -- sentence became a question for the controller of a delayed entry that matched
 -- two SIMULTANEOUS occurrences. No board in this module puts two matches into
@@ -133,6 +132,7 @@ delayedFrom events gs =
   let grouped = zipWith (\group event -> LoggedEvent.MkLoggedEvent {LoggedEvent.group = group, LoggedEvent.event = event}) (iterate EventGroup.next EventGroup.first) events
    in fst (S.runPureWith S.identityAnswer gs (Event.delayedPending grouped gs))
 
+-- CR 608.2i: the log records; it is never emptied by a reader.
 logSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 logSpec s registry =
   Spec.describe s "EventLog" $ do

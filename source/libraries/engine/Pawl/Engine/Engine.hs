@@ -524,13 +524,18 @@ placePendingTriggers = do
   -- occurrences -- and it is asked BEFORE the watermark below moves, so the game
   -- the question carries is the one the batch occurred in.
   (pending, surviving) <- Event.gatherTriggers (Event.unscannedGrouped gs) gs
-  State.put
-    gs
-      { GameState.scannedThrough = Natural.length (GameState.events gs),
+  -- MODIFY rather than put the snapshot back: the gather above may have asked a
+  -- question, and Game.choose stamps GameState.lastChoice, which CR 104.4b's
+  -- mandatory-loop watchdog reads. Putting `gs` would drop that stamp. Nothing
+  -- else can have moved -- the gather records no events -- so every field below
+  -- reads the same value either way.
+  State.modify' $ \g ->
+    g
+      { GameState.scannedThrough = Natural.length (GameState.events g),
         -- CR 702.179d's "this ability triggers only once each turn", marked as the
         -- trigger is GATHERED rather than as it resolves, so an instance countered
         -- on the stack has still spent the turn's one. Cleared at beginTurnOf.
-        GameState.speedIncreasedThisTurn = List.foldl' (flip Set.insert) (GameState.speedIncreasedThisTurn gs) (fmap PendingTrigger.controller revving),
+        GameState.speedIncreasedThisTurn = List.foldl' (flip Set.insert) (GameState.speedIncreasedThisTurn g) (fmap PendingTrigger.controller revving),
         -- CR 603.10's per-group samples are spent with the batch they were taken
         -- for. Cleared rather than left standing, which bounds both the map and
         -- the game states its unforced thunks retain.
