@@ -7040,7 +7040,7 @@ ordersEntry seasonFirst seasonId p = case p of
 -- IT WATCHES OTHER OBJECTS, Dragonstorm Globe's shape rather than an IsSource
 -- row, and for globeChain's reason: the permanent holding the row has to be on
 -- the battlefield for a text change to point at, where an entering permanent's
--- own row is read before CR 400.7a's carry-over re-keys anything (see #634).
+-- own row is read before CR 400.7a's carry-over re-keys anything (gap #2338).
 -- Same rewrite either way -- Projection's TurnUpRewrite.WithCounters arm and its
 -- EntryRewrite.WithCounters arm both call rewriteWithCounters.
 --
@@ -7671,9 +7671,10 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
 -- CR 612.1's REPLACEMENT-EFFECT carrier, and the first producer in the pool that
 -- reaches it: a CR 604.2 replacement watching OTHER objects, so the permanent
 -- holding it is on the battlefield for a text change to point at. Every earlier
--- replacement naming a subtype matches Filter.IsSource instead, and CR 400.7
--- gives the new incarnation of an entering permanent no continuous effect the
--- spell had.
+-- replacement naming a subtype matches Filter.IsSource instead, and an entering
+-- permanent's own row is read before CR 400.7a's carry-over re-keys the effect
+-- onto it (gap #2338) -- so this shape is the one that can be tested today, not
+-- the only one the rule reaches.
 --
 -- CR 612.2 licenses the swap: "Dragon" here is a creature type word used as a
 -- creature type, on an artifact that is not itself a Dragon. CR 613.1c puts the
