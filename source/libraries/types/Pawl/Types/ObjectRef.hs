@@ -457,10 +457,10 @@ data ObjectRef
     -- by CR 701.20a's reveal, CR 701.20e's look, CR 701.17c's mill or a move, and
     -- it sits wherever that effect left it -- which for a look or a reveal is the
     -- LIBRARY, since neither moves anything (CR 701.20b). No zone-keyed arm can
-    -- offer a choice there: a library still has no filtered sweep, nor is owed
-    -- one (see #1309 and EachMatching above), and
-    -- TopOfLibraryUntil's walk is not one either -- it names a prefix, which
-    -- stops at the match that completes its count rather than at the deepest one.
+    -- offer a choice there: a library still has no filtered sweep, and is owed
+    -- none for EachMatching's reason above; see #1309. TopOfLibraryUntil's walk
+    -- is not one either -- it names a prefix, which stops at the match that
+    -- completes its count rather than at the deepest one.
     -- Where the batch DID move to a graveyard, Midnight Tilling writes the same
     -- sentence as ChosenCardInGraveyard narrowed by Filter.IsBound; this arm
     -- reads the slot directly instead, so it needs no such sweep.
