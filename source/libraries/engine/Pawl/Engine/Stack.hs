@@ -1,5 +1,6 @@
 module Pawl.Engine.Stack where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -14,8 +15,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
-import qualified Pawl.Types.Affected as Affected
-import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.CarryOver as CarryOver
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
@@ -116,6 +116,13 @@ resolveTopWith runSubgame = do
                     -- about the resolving spell rather than about which kind of
                     -- permanent it becomes, and an Aura back face would carry its
                     -- face for the same reason a creature one does.
+                    --
+                    -- CarryOver.Carried is on both for CR 400.7a, and these two
+                    -- branches are the only places in the engine that pass it: an
+                    -- effect that changed the permanent SPELL keeps applying to the
+                    -- permanent it becomes. The move itself performs the re-key,
+                    -- before the CR 614.1c entry loop reads the entering
+                    -- permanent's own rows (Event.carryOver, CR 614.12).
                     if not (Set.member Subtype.Aura (Projection.subtypesOf oid gs))
                       then -- CR 708.4's last sentence: "the permanent the spell becomes
                       -- will be a face-down permanent". A STATUS carried across a
@@ -129,7 +136,7 @@ resolveTopWith runSubgame = do
                       -- calls an Aura, and a face-down spell's face is
                       -- Card.faceDownFace -- whose subtypes are the ones the
                       -- listing names, and no listing in the pool names Aura.
-                        carryOver oid =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just controller) entering (Object.facing obj) False
+                        Monad.void (Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just controller) entering (Object.facing obj) False CarryOver.Carried)
                       else -- CR 303.4a made this spell target, so CR 608.2b applies
                       -- to it. THE INVARIANT: is-it-an-Aura is a SUBTYPE read
                       -- (CR 205.3h), the same closed-half classification as
@@ -155,7 +162,7 @@ resolveTopWith runSubgame = do
                             -- CR 303.4: an Aura ENTERS attached, so the target is
                             -- seeded into the new incarnation rather than written
                             -- after the move (see Event.changeZoneAttaching).
-                            carryOver oid =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False
+                            Monad.void (Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False CarryOver.Carried)
         -- A token is never on the stack (created onto the battlefield, never
         -- cast).
         Source.OfToken _ -> State.put gs {GameState.stack = rest}
@@ -255,40 +262,6 @@ resolveTopWith runSubgame = do
               let chosen = Binding.modesOf (Object.bindings obj)
                   modal = TriggeredAbility.modal ability
                in Resolve.resolveModesWith runSubgame oid oid (Modal.chosenModes chosen modal)
-
--- CR 400.7a: effects that change a permanent spell's characteristics or
--- controller keep applying to the permanent it becomes. CR 400.7 mints a fresh
--- id for that permanent, so an effect stored against the SPELL's id would stop
--- naming it; this re-keys the ones that do. Nothing when the move did not
--- happen (a cancelled CR 616.1 replacement), in which case the spell's id is
--- still the live one.
---
--- THE INVARIANT: no case on any effect's identity. Every stored
--- ContinuousEffect qualifies by CLASSIFICATION -- Projection.layer puts each
--- modification in one of CR 613.1's layers, and every layer either changes a
--- characteristic (CR 109.3) or the controller (CR 613.1b), which are exactly
--- what this rule carries over.
---
--- Only Affected.TheseObjects is re-keyed, because that is the only arm a
--- resolution effect ever stores (CR 611.2c locks the set); the dynamic arms
--- belong to static abilities and are re-derived each projection.
---
--- Scoped to the two permanent-spell branches above. CR 400.7b (static-ability
--- ability grants) and CR 400.7c (prevention effects) are separate exceptions
--- with separate carriers and are not claimed here (#634).
-carryOver :: ObjectId -> Maybe ObjectId -> Game ()
-carryOver _ Nothing = pure ()
-carryOver oldId (Just newId) = State.modify' $ \gs ->
-  gs {GameState.continuousEffects = fmap (reanchor oldId newId) (GameState.continuousEffects gs)}
-
--- carryOver's per-effect half: swap oldId for newId in a locked affected set
--- that names it, and leave every other effect alone.
-reanchor :: ObjectId -> ObjectId -> ContinuousEffect.ContinuousEffect card -> ContinuousEffect.ContinuousEffect card
-reanchor oldId newId eff = case ContinuousEffect.affected eff of
-  Affected.TheseObjects oids
-    | Set.member oldId oids ->
-        eff {ContinuousEffect.affected = Affected.TheseObjects (Set.insert newId (Set.delete oldId oids))}
-  _ -> eff
 
 -- The no-subgame resolve-top (every existing caller and test): a resolving spell
 -- or ability with a PlaySubgame effect would draw. Engine's live loop uses

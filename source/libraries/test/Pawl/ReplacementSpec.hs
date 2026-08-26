@@ -4395,6 +4395,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   shieldCounterSpec s registry
   warLeechSpec s registry
   dragonstormGlobeSpec s registry
+  tidewalkerSpec s registry
   hurrJackalSpec s registry
 
 -- Monstrous War-Leech {3}{B} Creature -- Leech Horror \*/*, whole text: "Kicker
@@ -7236,9 +7237,9 @@ ordersEntry seasonFirst seasonId p = case p of
 -- land type word used as a land type.
 --
 -- IT WATCHES OTHER OBJECTS, Dragonstorm Globe's shape rather than an IsSource
--- row, and for globeChain's reason: the permanent holding the row has to be on
--- the battlefield for a text change to point at, where an entering permanent's
--- own row is read before CR 400.7a's carry-over re-keys anything (gap #2338).
+-- row, and for globeChain's reason: the permanent holding the row is on the
+-- battlefield for the text change to point at, where hacking the SPELL and
+-- letting its own row see the swap is tidewalkerSpec's shape below.
 -- Same rewrite either way -- Projection's TurnUpRewrite.WithCounters arm and its
 -- EntryRewrite.WithCounters arm both call rewriteWithCounters.
 --
@@ -7869,10 +7870,9 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
 -- CR 612.1's REPLACEMENT-EFFECT carrier, and the first producer in the pool that
 -- reaches it: a CR 604.2 replacement watching OTHER objects, so the permanent
 -- holding it is on the battlefield for a text change to point at. Every earlier
--- replacement naming a subtype matches Filter.IsSource instead, and an entering
--- permanent's own row is read before CR 400.7a's carry-over re-keys the effect
--- onto it (gap #2338) -- so this shape is the one that can be tested today, not
--- the only one the rule reaches.
+-- replacement naming a subtype matches Filter.IsSource instead, and hacking the
+-- SPELL that holds such a row is tidewalkerSpec's shape below -- so this is one
+-- of the two shapes the rule reaches, not the only one.
 --
 -- CR 612.2 licenses the swap: "Dragon" here is a creature type word used as a
 -- creature type, on an artifact that is not itself a Dragon. CR 613.1c puts the
@@ -7955,6 +7955,83 @@ dragonstormGlobeSpec s registry =
         Just dragonId -> do
           Spec.assertEqWith s "CR 614.1c the printed row applies to a Dragon" (Projection.powerOf dragonId after) (Just 5)
           Spec.assertEqWith s "through one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne dragonId after) 1
+
+-- Tidewalker {2}{U} Creature -- Elemental */*, whole text: "This creature enters
+-- with a time counter on it for each Island you control. / Vanishing (At the
+-- beginning of your upkeep, remove a time counter from this creature. When the
+-- last is removed, sacrifice it.) / Tidewalker's power and toughness are each
+-- equal to the number of time counters on it." (oracle checked on Scryfall
+-- 2026-08-26)
+--
+-- The shape the Globe and the Beacon above route AROUND: the row is the ENTERING
+-- permanent's own (Filter.IsSource), and the text change is on the SPELL it was a
+-- moment earlier. CR 400.7a keeps that change applying to the permanent the spell
+-- becomes, and CR 614.12 says the entry row is decided against "continuous
+-- effects that already exist and would apply to the permanent" -- so the swapped
+-- word is the one the CR 616.1 loop must read. The re-key runs inside
+-- Event.changeZoneAttaching, before the entry loop, for exactly this.
+--
+-- THE TWO LAND COUNTS ARE UNEQUAL, four Islands and six Swamps, and both are
+-- nonzero: a row read before the re-key answers four, a row read after answers
+-- six, and neither is the other. Nonzero on both readings keeps CR 702.62's "when
+-- the last is removed" and a 0/0 CR 704.5a death out of the leg -- the permanent
+-- arrives either way, and what the pair tells apart is which word its own row
+-- named.
+--
+-- Four Islands rather than the one the mana needs: {2}{U} spends at most three
+-- lands, so an Island is left untapped for the Hack however the payment picks,
+-- and a leg cannot pass because the Hack was uncastable.
+tidewalkerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tidewalkerSpec s registry = Spec.describe s "Tidewalker (CR 400.7a / 614.12)" $ do
+  Spec.it s "CR 614.12 the hacked spell's own entry row counts the swapped land type" $ do
+    (before, after, entered) <- tidewalkerChain s registry True
+    case entered of
+      Nothing -> Spec.assertFailure s "the Tidewalker did not reach the battlefield"
+      Just tideId -> do
+        Spec.assertEqWith s "six time counters, one for each Swamp, not four for the printed Islands" (countersOn CounterKind.Time tideId after) 6
+        Spec.assertEqWith s "and CR 613.4c reads its power and toughness off that same tally" (S.powerToughnessOf tideId after) (Just (6, 6))
+        Spec.assertEqWith s "the Hack was cast and resolved, leaving only the Tidewalker on the stack" (length (GameState.stack before)) 1
+  -- The control: the same board and the same spell, no Magical Hack. It pins the
+  -- printed reading, so the pair differs in exactly the text change.
+  Spec.it s "unhacked, the printed Island is what its row counts" $ do
+    (before, after, entered) <- tidewalkerChain s registry False
+    case entered of
+      Nothing -> Spec.assertFailure s "the Tidewalker did not reach the battlefield"
+      Just tideId -> do
+        Spec.assertEqWith s "four time counters, one for each Island" (countersOn CounterKind.Time tideId after) 4
+        Spec.assertEqWith s "a 4/4" (S.powerToughnessOf tideId after) (Just (4, 4))
+        Spec.assertEqWith s "the Tidewalker is the only thing on the stack" (length (GameState.stack before)) 1
+
+-- alice controls four Islands and six Swamps and holds the Tidewalker and Magical
+-- Hack ({U}). The Tidewalker is CAST and left ON THE STACK -- that is the whole
+-- point, since hacking it after it resolved is the Globe's shape and reads the
+-- same either way -- then the Hack is cast at the SPELL and resolved, and only
+-- then does the Tidewalker resolve. Returns the state with the Tidewalker alone
+-- on the stack, the state after it resolves, and the permanent it became.
+tidewalkerChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, GameState.GameState, Maybe ObjectId.ObjectId)
+tidewalkerChain s registry hack = do
+  island <- S.printingOf s registry "Island"
+  swamp <- S.printingOf s registry "Swamp"
+  tidewalker <- S.printingOf s registry "Tidewalker"
+  magicalHack <- S.printingOf s registry "Magical Hack"
+  let base = S.landsFor swamp S.alice 6 (S.landsInPlay island 4)
+      (tideId, g1) = S.addHandCard tidewalker S.alice base
+      (hackId, g2) = S.addHandCard magicalHack S.alice g1
+      ready =
+        g2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      onStack = S.runPure S.identityAnswer ready (S.cast S.alice tideId)
+      -- The Hack's target is FILTERED out of the offered set rather than rebuilt,
+      -- hackAt's reason: a hand-built recipient would be dropped at CR 608.2b's
+      -- re-read with no error.
+      before = case (hack, GameState.stack onStack) of
+        (True, spellId : _) -> castAndResolve (hackAt spellId Subtype.Island Subtype.Swamp) onStack hackId
+        _ -> onStack
+      after = S.runPure S.identityAnswer before Stack.resolveTop
+  pure (before, after, newestNamed (S.printingName tidewalker) after)
 
 -- Hurr Jackal {R} Creature -- Jackal 1/1, whole text: "{T}: Target creature
 -- can't be regenerated this turn." (oracle checked on Scryfall)

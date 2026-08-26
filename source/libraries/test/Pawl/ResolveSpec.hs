@@ -757,7 +757,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     -- keeps applying to the permanent that spell becomes, and rules text is a
     -- characteristic (CR 109.3). So the hacked Blood Moon reads "Nonbasic lands
     -- are Islands" on the battlefield, and Urborg -- a nonbasic land -- is an
-    -- Island. Stack.carryOver is what re-keys the stored effect.
+    -- Island. Event.carryOver, which the move calls, is what re-keys the stored
+    -- effect.
     Spec.assertEqWith s "hack carried over: nonbasic land is Island" (Projection.subtypesOf nonbasicId after) (Set.singleton Subtype.Island)
   Spec.it s "CR 608.2n a resolving ability deals its damage and ceases" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
