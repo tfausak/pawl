@@ -182,9 +182,14 @@ checkSba :: Game ()
 checkSba = sampleWorldSince >> Sba.checkStateBasedActions
 
 -- CR 502.3's untap, and its own "effects can keep one or more of a player's
--- permanents from untapping": such an effect takes the permanent out of this fold
--- and leaves it as it was (Pawl.Engine.UntapRestriction), CR 101.2 being what
--- makes the "can't" beat the turn-based action.
+-- permanents from untapping": such an effect takes the permanent out of the set
+-- below and leaves it as it was (Pawl.Engine.UntapRestriction), CR 101.2 being
+-- what makes the "can't" beat the turn-based action.
+--
+-- CR 122.1d's stun counters are NOT one of those and are not subtracted here: a
+-- replacement effect does not stop the permanent being determined to untap, it
+-- takes the untap event once it happens (CR 614.6). That is Event.proposeUntap's
+-- job, one paragraph down.
 --
 -- THREE carriers, subtracted together. The printed static one is re-derived live;
 -- the other two are stored on the victim, and this is where each both applies and
