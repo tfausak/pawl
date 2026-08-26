@@ -1,11 +1,15 @@
 -- Answering one question: given a card's name, what card is that?
 --
 -- The registry is that function and nothing else. It is parameterized over the
--- caller's monad, so a caller who already has the cards -- a fixture map, a
--- pool compiled in, a generated one -- can supply their own without pretending
--- to do IO. Failure is a returned value rather than an exception for the same
--- reason: a pure registry cannot throw. How a registry answers is not part of
--- the type.
+-- monad a LOOKUP works in, which is what lets a registry that does no work to
+-- answer -- a fixture map, a pool compiled in, a generated one, or the
+-- file-backed one below, which reads everything before the registry exists --
+-- be used at whatever monad the caller has, without pretending to do IO. The
+-- parameter earns its keep at the other end: a registry fetching cards on
+-- demand from a remote source genuinely needs effects at lookup time, and m is
+-- the difference (see #1676). Failure is a returned value rather than an
+-- exception for the same reason: a pure registry cannot throw. How a registry
+-- answers is not part of the type.
 --
 -- Enumerating the pool is deliberately NOT in the INTERFACE: every caller that
 -- wanted it was linting the corpus pawl ships, which is a claim about the data
@@ -70,7 +74,13 @@ defaultRoot = Paths.getDataFileName "cards"
 -- the test suite already reads it whole many times over per run --
 -- Pawl.Support.allPrintings alone is unmemoized and is called repeatedly from
 -- CardSpec, CardsSpec and CodecIntegrationSpec.
-fileRegistry :: FilePath -> IO (Registry IO)
+--
+-- The two halves of the signature are construction and lookup, and they are not
+-- the same monad: building the registry reads the directory, so construction is
+-- IO, while a lookup that has already been paid for is a Map.lookup wrapped in
+-- pure, so it works in any Applicative. Applicative rather than Monad because
+-- pure is the only thing the body needs of m.
+fileRegistry :: (Applicative m) => FilePath -> IO (Registry m)
 fileRegistry root = do
   exists <- Directory.doesDirectoryExist root
   if not exists
