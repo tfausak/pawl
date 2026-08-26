@@ -79,7 +79,7 @@ import qualified Pawl.Types.Zone as Zone
 -- zone are what this file is about.
 commanderBoard :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
 commanderBoard mountain shimatsu lands =
-  let deck = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just shimatsu, Deck.dungeon = Nothing}
+  let deck = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just shimatsu, Deck.dungeons = Set.empty}
       -- A precombat main phase with alice holding priority and an empty stack,
       -- which is Support.handOne's shape. CR 302.1 -- a creature card is cast
       -- "during a main phase of their turn when the stack is empty" -- is a
@@ -143,7 +143,7 @@ designationSpec s registry = Spec.describe s "Designation" $ do
   -- IS the commander is one card, not zero.
   Spec.it s "CR 903.5 the commander counts toward the deck's size" $ do
     shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
-    let deck = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just shimatsu, Deck.dungeon = Nothing}
+    let deck = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just shimatsu, Deck.dungeons = Set.empty}
     Spec.assertEqWith s "one card" (Setup.deckSize deck) 1
     Spec.assertEqWith s "and none without a commander" (Setup.deckSize (Deck.fromCards Map.empty)) 0
 
@@ -385,7 +385,7 @@ designating :: [(PlayerId.PlayerId, Printing.Printing)] -> GameState.GameState -
 designating seats gs0 =
   let one g (pid, printing) =
         S.runPure S.identityAnswer g $
-          Setup.createDeck pid Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just printing, Deck.dungeon = Nothing}
+          Setup.createDeck pid Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just printing, Deck.dungeons = Set.empty}
    in List.foldl' one gs0 seats
 
 -- Move a player's commander out of the command zone onto the battlefield through
@@ -534,7 +534,7 @@ castAndSettle answer oid gs =
 -- from the command zone, and give the parent non-library survivors besides.
 subgameParent :: Printing.Printing -> Printing.Printing -> GameState.GameState
 subgameParent mountain shimatsu =
-  let deck = Deck.MkDeck {Deck.cards = Map.singleton mountain 5, Deck.commander = Just shimatsu, Deck.dungeon = Nothing}
+  let deck = Deck.MkDeck {Deck.cards = Map.singleton mountain 5, Deck.commander = Just shimatsu, Deck.dungeons = Set.empty}
    in S.runPure S.identityAnswer (S.landsInPlay mountain 2) (Setup.createDeck S.alice deck)
 
 -- The subgame as playSubgame builds it: CR 729.2 / 729.2c's move in, then CR

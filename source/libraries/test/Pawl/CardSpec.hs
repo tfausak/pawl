@@ -2548,21 +2548,28 @@ reservedBindings = Set.intersection reservedSlots . boundSlots
 -- on spaces would not. The factorial is bounded by a token's subtype count, at
 -- most two here.
 --
--- Narrow this the first time a card DOES specify a token's name, at which point
--- the rule supplies nothing and the name is whatever the card says: CR 111.9's
--- legendary tokens ("create Boo, a legendary 1/1 red Hamster creature token"),
--- CR 111.10's predefined tokens (111.10d's Walker, 111.10j-r's Roles), and the
--- copy tokens of CR 111.4's own Spitting Image example (named Doomed Dissenter,
--- "not Human Token or Doomed Dissenter Token") are each correctly named
--- something this lint would reject.
+-- EXEMPT: CR 111.9's legendary tokens, "create [name], a . . ." -- Tomb of
+-- Annihilation's "create The Atropal, a legendary 4/4 black God Horror creature
+-- token with deathtouch". That wording is rule 111.4's "the spell or ability
+-- specifies the name", so the rule supplies nothing and the name is whatever the
+-- card says. Keyed on the Legendary supertype, which is the only mark the card
+-- data carries of having been written in rule 111.9's form.
+--
+-- Narrow this further the first time a NONLEGENDARY card names its token: CR
+-- 111.10's predefined tokens (111.10d's Walker, 111.10j-r's Roles) and the copy
+-- tokens of CR 111.4's own Spitting Image example (named Doomed Dissenter, "not
+-- Human Token or Doomed Dissenter Token") are each correctly named something this
+-- lint would reject, and none is legendary.
 tokenNameOffends :: Face.Face Card.Type.Card -> Bool
-tokenNameOffends token =
-  case traverse (fmap (Text.pack . fst) . Common.asTagged . Codec.encode Subtype.codec) (Set.toList (TypeLine.subtypes (Face.typeLine token))) of
-    Left _ -> True
-    Right subtypes ->
-      notElem
-        (CardName.unwrap $ Face.name token)
-        (fmap (\ordering -> Text.unwords (ordering <> [Text.pack "Token"])) (List.permutations subtypes))
+tokenNameOffends token
+  | Set.member Supertype.Legendary (TypeLine.supertypes (Face.typeLine token)) = False
+  | otherwise =
+      case traverse (fmap (Text.pack . fst) . Common.asTagged . Codec.encode Subtype.codec) (Set.toList (TypeLine.subtypes (Face.typeLine token))) of
+        Left _ -> True
+        Right subtypes ->
+          notElem
+            (CardName.unwrap $ Face.name token)
+            (fmap (\ordering -> Text.unwords (ordering <> [Text.pack "Token"])) (List.permutations subtypes))
 
 -- CR 701.3a's Filter.CanHostSubject, counted wherever it appears inside ONE
 -- Filter: under And/Or/Not, and inside the typecycling predicate a HasKeyword
@@ -5012,6 +5019,20 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       [token] -> do
         Spec.assertBool s (not (tokenNameOffends token)) "the real token passes"
         Spec.assertBool s (tokenNameOffends token {Face.name = CardName.MkCardName $ Text.pack "Inkling"}) "misnamed token detected"
+      other -> Spec.assertFailure s ("expected exactly one Create, got " <> show (length other))
+  -- CR 111.9's exemption, and the proof it is not a hole: The Atropal is named by
+  -- Tomb of Annihilation rather than by rule 111.4, and the SAME face stripped of
+  -- its Legendary supertype is an offender -- so the exemption turns on rule
+  -- 111.9's mark and nothing else.
+  Spec.it s "CR 111.9 a legendary token is named by the card, not by CR 111.4" $ do
+    tomb <- S.printingOf s registry "Tomb of Annihilation"
+    case concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create (Create.MkCreate _ token _ _ _) <- cardResolutionEffects (S.combinedFace tomb)] of
+      [token] -> do
+        let typeLine = Face.typeLine token
+            mundane = token {Face.typeLine = typeLine {TypeLine.supertypes = Set.delete Supertype.Legendary (TypeLine.supertypes typeLine)}}
+        Spec.assertEqWith s "it is The Atropal" (Face.name token) (CardName.MkCardName (Text.pack "The Atropal"))
+        Spec.assertBool s (not (tokenNameOffends token)) "the legendary token passes"
+        Spec.assertBool s (tokenNameOffends mundane) "and the same face without Legendary does not"
       other -> Spec.assertFailure s ("expected exactly one Create, got " <> show (length other))
   -- The countdown shield's rider, the same limb one opcode over: Test of Faith
   -- hangs CR 615.5's counters off a PreventNextDamage where Inkshield hangs its

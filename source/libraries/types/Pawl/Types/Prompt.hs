@@ -42,6 +42,7 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.RoomIndex as RoomIndex
@@ -321,6 +322,19 @@ data Prompt r where
   -- this at the reveal and moves what the reveal bound, so the printed "and"
   -- stays one choice rather than two.
   ChooseCardFromAmong :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 309.2a \/ 701.49a: which dungeon card a venturing player who owns no
+  -- dungeon in the command zone brings in from outside the game. The NonEmpty is
+  -- the printings they own (Pawl.Types.Player's dungeons), in interning order.
+  -- Choose, not target. Raised only for two or more, one dungeon owned leaving
+  -- nothing to ask.
+  --
+  -- NO source ObjectId, ChooseRingBearer's shape rather than ChooseRoom's: the
+  -- dungeon object does not exist until the answer is given, and CR 400.11 puts
+  -- the card outside the game until then, so there is nothing yet to name.
+  --
+  -- A PRINTING and not an ObjectId, for the reason Pawl.Types.Player's field is
+  -- one: the card is outside the game and no object stands for it.
+  ChooseDungeon :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty PrintingId.PrintingId -> Prompt PrintingId.PrintingId
   -- | CR 309.5a \/ 701.49b: which arrow a venturing player follows. The
   -- ObjectId is the dungeon card their marker is on; the NonEmpty is the rooms
   -- the arrows out of their current room lead to. Choose, not target. Raised

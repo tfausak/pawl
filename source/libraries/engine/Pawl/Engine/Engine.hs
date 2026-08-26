@@ -1564,7 +1564,7 @@ playGame =
 -- Not implemented: cards brought into a subgame from the main game, and the
 -- main-game triggers their removal queues (#152). Of CR 729.2a-c and CR
 -- 729.5a-c's command-zone residents, commanders are the kind Setup carries both
--- ways, and a dungeon rides Player.dungeon rather than the command zone; planes
+-- ways, and dungeons ride Player.dungeons rather than the command zone; planes
 -- and phenomena (#934), schemes (#935), vanguards (#936) and conspiracies (#937)
 -- do not exist.
 playSubgame :: Game Result
