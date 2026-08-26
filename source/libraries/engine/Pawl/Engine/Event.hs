@@ -1446,13 +1446,22 @@ apply batch candidate event =
       -- reads that off a board where the two orders disagree. The amounts are
       -- evaluated against the SAME board for the same reason: the row applies
       -- once, so its amounts are read once.
+      --
+      -- CR 107.3m: an X inside the amount is the value announced for the SPELL
+      -- that became this permanent, not the permanent's own 0 -- Protean Hydra's
+      -- "this creature enters with X +1/+1 counters on it". Substituted in rather
+      -- than read as a binding, because CR 400.7 left the permanent none: the
+      -- announcement rides across the move on Object.announcedX, which
+      -- Quantity.substituteAnnouncedX puts back where the rule says it belongs and
+      -- nowhere else.
       EntryRewrite.WithCounters (WithCounters.MkWithCounters counters) -> do
         gs <- State.get
         let viewOf = Projection.viewWithLastKnown oid gs
             context = Replacement.candidateContext candidate
+            announcedX = Projection.announcedXOf oid gs
         Replacement.consume (ReplacementCandidate.identity candidate)
         Foldable.for_ (Map.toList counters) $ \(kind, quantity) ->
-          case Quantity.evaluate viewOf context gs oid quantity of
+          case Quantity.evaluate viewOf context gs oid (Quantity.substituteAnnouncedX announcedX quantity) of
             Nothing -> pure () -- unevaluable quantity: no counters (Resolve's PutCounters posture)
             Just n -> addEnteringCounters oid kind (Integer.toNaturalSaturating n)
         pure (Just event)
@@ -2695,9 +2704,14 @@ addEnteringCounters oid kind n =
 -- rather than negative, which is what keeps Object.counters a tally of what is
 -- there. CR 122 states no rule making an over-large removal fail.
 --
--- This is not the only place counters leave an object -- CR 704.5q's
--- annihilation and CR 122.2's zone change do not route through here, so #900's
--- "record a removal event for every removal" is advanced by this and not closed.
+-- This is not the only place counters leave an object, and the two others are
+-- each other's opposite. CR 704.5q's annihilation IS a removal (rule 122.3 says
+-- so) and records its own CountersRemoved, from a before/after diff rather than
+-- through this door -- Pawl.Engine.Sba's `balance` is a pure fold inside the CR
+-- 704.3 single-event pass, and its comment gives the argument. CR 122.2's zone
+-- change is NOT one and records nothing: "the counters are not 'removed'; they
+-- simply cease to exist", so an event there would fire a counter-watching
+-- trigger off something the rule denies happened.
 removeCounters :: ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game ()
 removeCounters oid kind n =
   Monad.when (n > 0) . State.modify' $ \gs ->
@@ -3394,9 +3408,9 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- but a resolving {X} permanent spell's.
                     --
                     -- That gate is a regression fence rather than proven
-                    -- behaviour: the field's only reader is the entry
-                    -- replacement mint, which asks it of a permanent, so
-                    -- dropping the gate leaves the suite green.
+                    -- behaviour: both readers are entry replacements, which ask
+                    -- it of a permanent, so dropping the gate leaves the suite
+                    -- green.
                     Object.announcedX = if dest == Zone.Battlefield then Binding.amountOf Binding.variableX (Object.bindings obj) else Nothing,
                     -- CR 400.7d: "an ability of a permanent can reference
                     -- information about the spell that became that permanent as

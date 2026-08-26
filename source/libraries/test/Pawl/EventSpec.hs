@@ -2,6 +2,7 @@ module Pawl.EventSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Engine as Engine
@@ -19,14 +20,17 @@ import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.Zone as Zone
@@ -41,6 +45,23 @@ counteringsOf gs =
         GameEvent.SpellCountered c -> Just c
         _ -> Nothing
    in Maybe.mapMaybe counteringOf (S.eventsOf gs)
+
+-- CR 513.1 / 603.7b: hand the board its end step, so a delayed ability armed
+-- "at the beginning of the next end step" has its trigger event. The three
+-- helpers below are Pawl.TriggerSpec's tokenSetSpec's, kept local because the
+-- Protean Hydra cases are this module's only users.
+beginEndStep :: GameState.GameState -> GameState.GameState
+beginEndStep gs =
+  let endStep = Phase.Ending EndingStep.EndStep
+   in Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
+
+-- CR 117.5: state-based actions, then the trigger scan -- the pass that performs
+-- rule 704.5q's annihilation and puts what it triggers on the stack.
+settle :: GameState.GameState -> GameState.GameState
+settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+
+settleAndResolve :: GameState.GameState -> GameState.GameState
+settleAndResolve gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
@@ -354,6 +375,63 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     -- Net P/T unchanged by annihilation: base 2/1 + net +1/+1 = 3/2.
     Spec.assertEqWith s "power still 3" (Projection.powerOf oid after) (Just 3)
     Spec.assertEqWith s "toughness still 2" (Projection.toughnessOf oid after) (Just 2)
+
+  -- CR 704.5q / 122.3's annihilation is a REMOVAL -- rule 122.3 uses the word --
+  -- so it records a GameEvent.CountersRemoved like every other removal, and a
+  -- card watching counters come off sees it (see #900). Protean Hydra {X}{G}
+  -- Creature -- Hydra, printed 0/0, is the pool's reader: "whenever a +1/+1 counter is
+  -- removed from this creature, put two +1/+1 counters on it at the beginning of
+  -- the next end step."
+  --
+  -- The assertion is the CARD's, never the log's: what the delayed ability puts
+  -- back is what proves the event reached a trigger, where an assertion over
+  -- GameState.events would pass off an event nothing reads.
+  --
+  -- Every board here leaves +1/+1 counters BEHIND after the annihilation, so the
+  -- Hydra survives its own state-based check and the end step can be reached.
+  Spec.it s "CR 704.5q the annihilated pair fires Protean Hydra's removal trigger, and two counters come back at the end step" $ do
+    forest <- S.printingOf s registry "Forest"
+    hydra <- S.printingOf s registry "Protean Hydra"
+    let (oid, gs0) = S.addCreature hydra S.alice (S.landsInPlay forest 0)
+        gs1 = S.addCounter CounterKind.MinusOneMinusOne 1 oid (S.addCounter CounterKind.PlusOnePlusOne 2 oid gs0)
+        armed = settleAndResolve (settle gs1)
+        after = settleAndResolve (settle (beginEndStep armed))
+    Spec.assertEqWith s "the end step put two back: 2 - 1 annihilated, then + 2" (S.counterOf CounterKind.PlusOnePlusOne oid after) 3
+    Spec.assertEqWith s "one delayed ability was armed by the removal" (Seq.length (GameState.delayedTriggers armed)) 1
+    Spec.assertEqWith s "CR 704.5q took the -1/-1 counter with it" (S.counterOf CounterKind.MinusOneMinusOne oid after) 0
+
+  -- The control for the case above, one board differing in exactly one thing: no
+  -- -1/-1 counter, so rule 704.5q annihilates nothing and there is no removal to
+  -- watch. Same card, same +1/+1 count, same two settles.
+  Spec.it s "CR 704.5q with nothing to annihilate, Protean Hydra's trigger does not fire" $ do
+    forest <- S.printingOf s registry "Forest"
+    hydra <- S.printingOf s registry "Protean Hydra"
+    let (oid, gs0) = S.addCreature hydra S.alice (S.landsInPlay forest 0)
+        gs1 = S.addCounter CounterKind.PlusOnePlusOne 2 oid gs0
+        armed = settleAndResolve (settle gs1)
+        after = settleAndResolve (settle (beginEndStep armed))
+    Spec.assertEqWith s "the two it was given are the two it has" (S.counterOf CounterKind.PlusOnePlusOne oid after) 2
+    Spec.assertEqWith s "nothing was armed" (Seq.length (GameState.delayedTriggers armed)) 0
+
+  -- CR 704.3's simultaneity, which is the property the before/after diff in
+  -- Pawl.Engine.Sba exists to keep: FOUR +1/+1 counters against two -1/-1
+  -- counters annihilate TWO pairs in one check, so two +1/+1 counters came off
+  -- ONCE and the Hydra's trigger fires once, for two counters back and not four.
+  --
+  -- A per-counter loop is the wrong reading this board exists to catch, and only
+  -- a board with more than one pair can tell the two apart: it would arm two
+  -- delayed abilities and end at six. Every number is distinct -- four given, two
+  -- annihilated, two left, four at the end step -- so neither wrong reading lands
+  -- on the right total by coincidence.
+  Spec.it s "CR 704.3 two pairs annihilating together are ONE removal, so Protean Hydra's trigger fires once" $ do
+    forest <- S.printingOf s registry "Forest"
+    hydra <- S.printingOf s registry "Protean Hydra"
+    let (oid, gs0) = S.addCreature hydra S.alice (S.landsInPlay forest 0)
+        gs1 = S.addCounter CounterKind.MinusOneMinusOne 2 oid (S.addCounter CounterKind.PlusOnePlusOne 4 oid gs0)
+        armed = settleAndResolve (settle gs1)
+        after = settleAndResolve (settle (beginEndStep armed))
+    Spec.assertEqWith s "4 - 2 annihilated, then + 2 once: not + 2 twice" (S.counterOf CounterKind.PlusOnePlusOne oid after) 4
+    Spec.assertEqWith s "one delayed ability, not one per counter" (Seq.length (GameState.delayedTriggers armed)) 1
 
   Spec.it s "CR 603.2 SelfDealsCombatDamageToPlayer matches the bearer's combat damage to a player" $ do
     let bearer = ObjectId.MkObjectId 1

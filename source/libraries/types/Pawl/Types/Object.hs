@@ -674,9 +674,11 @@ data Object = MkObject
     manaSpent :: Mana.Mana,
     -- | CR 107.3m: the value of X chosen for the SPELL that became this
     -- permanent, which is the value of X for the permanent's
-    -- enters-the-battlefield replacement effects -- Nissa, Steward of Elements'
-    -- CR 306.5b intrinsic loyalty ability being the one reader today, through
-    -- Pawl.Engine.Projection.intrinsicReplacementsOf.
+    -- enters-the-battlefield replacement effects. Two readers: CR 306.5b's
+    -- intrinsic loyalty ability (Nissa, Steward of Elements), through
+    -- Pawl.Engine.Projection.intrinsicReplacementsOf, and a CR 614.1c row a CARD
+    -- writes (Protean Hydra's "enters with X +1\/+1 counters"), through
+    -- Pawl.Engine.Quantity.substituteAnnouncedX at Pawl.Engine.Event's entry loop.
     --
     -- The one exception CR 400.7 admits on this path, and the rule states it as
     -- one: `bindings` above carries the announcement while the spell is on the
@@ -687,8 +689,10 @@ data Object = MkObject
     -- fixed the number as the spell was cast and nothing can change it after.
     --
     -- NOT the permanent's own X, which rule 107.3m puts at 0 in the same
-    -- sentence. Nothing reads this as a Quantity, and Quantity.InSlot cannot
-    -- reach it -- it is not a binding.
+    -- sentence. Quantity.InSlot cannot reach it -- it is not a binding -- which
+    -- is exactly why substituteAnnouncedX puts it into an entry row's quantity at
+    -- that row and nowhere else: a fallback inside Quantity.evaluate would answer
+    -- the announcement for the permanent's own abilities too.
     --
     -- Nothing for every object that did not enter the battlefield as a cast
     -- spell with an announced X: a token, a permanent an effect put onto the
