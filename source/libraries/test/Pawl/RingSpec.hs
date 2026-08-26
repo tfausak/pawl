@@ -188,18 +188,19 @@ drainThrough gs =
 --
 -- FILTERED, NOT TRUSTED, Ring.tempt's own posture: the answer is intersected with
 -- the hand the prompt offered, so a card that was never held names nothing and the
--- engine's CR 609.3 filler decides instead. What that buys the cases below is
--- IDENTITY -- which card reached the graveyard, not merely how many did.
+-- engine's own filler picks instead. What that buys the cases below is IDENTITY --
+-- which card reached the graveyard, not merely how many did.
 discardThe :: ObjectId -> Prompt.Prompt r -> r
 discardThe wanted p = case p of
   Prompt.ChooseDiscard _ _ held _ -> filter (== wanted) held
   _ -> S.aggressiveAnswer p
 
--- The attackers CR 508.1 declared, off Pawl.Types.Combat's record -- the same
--- field TriggerCondition.PlayerAttacksWith is read against, so a case asserting
--- who attacked is asserting what the condition saw.
+-- The creatures CR 508.1 DECLARED as attackers, off Combat.declaredAttackers --
+-- the very field TriggerCondition.PlayerAttacksWith's arm folds, so a case
+-- asserting who attacked asserts what the condition saw. Not Combat.attackers,
+-- which CR 508.4 also fills with creatures that never attacked.
 declaredAttackers :: GameState.GameState -> [ObjectId]
-declaredAttackers gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
+declaredAttackers gs = Set.toAscList (Combat.Type.declaredAttackers (GameState.combat gs))
 
 -- The card NAMES in this player's graveyard, unsorted -- the zone the loot's
 -- discard writes and the escapes themselves land in.

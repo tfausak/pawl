@@ -213,10 +213,10 @@ yourRingBearer =
 -- your Ring-bearer"), which `designate`'s scoped clear enforces, and
 -- `yourRingBearer` admits only a creature carrying that designation under the
 -- emblem's controller -- so the admitted set is empty or a singleton and the two
--- arities are the same number. CR 508.3a's last sentence holds too: rule 508.3c is
--- read off Pawl.Types.Combat's DECLARATION record, which
--- Pawl.Engine.Combat.putOntoBattlefieldAttacking does not write, so a creature put
--- onto the battlefield attacking triggers neither reading.
+-- arities are the same number. CR 508.3a's last sentence holds too -- "such
+-- abilities won't trigger if a creature is put onto the battlefield attacking" --
+-- because that arm is read off Combat.declaredAttackers, which CR 508.4 keeps
+-- Pawl.Engine.Combat.putOntoBattlefieldAttacking out of.
 --
 -- The declaring player is PlayerRelation.You, CR 109.5's -- the emblem's
 -- controller, whom CR 114.2 makes the tempted player. That is the same seat
@@ -226,8 +226,9 @@ yourRingBearer =
 --
 -- The two halves of "draw a card, then discard a card" are two effects of ONE
 -- clause, in that order, which is what makes the hand the discard reads the one
--- the draw just filled -- CR 701.9b then has a card to choose among even from an
--- empty hand, so the discard is never a forced no-op.
+-- the draw just filled: the hand holds at least the drawn card by then, so CR
+-- 609.3 never clamps this discard to nothing and CR 701.9b's choice is a real one
+-- whenever the hand held anything else.
 --
 -- They spell their player differently because the two payloads offer different
 -- spellings of it and neither offers the other's: Pawl.Types.Draw takes a
