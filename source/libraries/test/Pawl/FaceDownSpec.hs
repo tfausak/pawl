@@ -18,8 +18,8 @@
 -- other written form, and Soul Summons reaches rule 708 without a cast at all.
 -- Manifest is no longer Soul Summons' alone: Cloudform manifests too, and
 -- Pawl.AuraSpec's GrantedEnchant group is where that one is proved. Manifest
--- Dread is the third, and the one that reaches CR 701.62 -- manifest chosen from
--- a looked-at group rather than off the top of the library.
+-- Dread is the third, and the one that reaches CR 701.62 -- manifest of a card
+-- CHOSEN from a looked-at group rather than off the top of the library.
 --
 -- Ainok Tracker is the SUBSTITUTION's card. {5}{R} Creature -- Dog Scout 3/3,
 -- "First strike / Morph {4}{R}". Every axis CR 708.2a substitutes is observable
@@ -78,10 +78,11 @@
 -- {4}{W}", the pool's plainest disguise creature. It is the only card here whose
 -- face-down listing is not CR 708.2a's default, the ward {2} CR 702.168b names.
 --
--- Soul Summons is MANIFEST's card, and the only one here whose permanent never
--- passes through the stack. {1}{W} Sorcery, "Manifest the top card of your
--- library" (CR 701.40a) -- one clause, transcribed whole, and preferred over
--- Write into Being, whose look-at-two-and-choose prompt is beside CR 708.3.
+-- Soul Summons is MANIFEST's card, one of the two here whose permanent never
+-- passes through the stack (Manifest Dread below is the other). {1}{W} Sorcery,
+-- "Manifest the top card of your library" (CR 701.40a) -- one clause,
+-- transcribed whole, and preferred over Write into Being, whose
+-- look-at-two-and-choose prompt is beside CR 708.3.
 -- Thragtusk is the card underneath it; summonsBoard says why that one, and
 -- Ainok Tracker is the card underneath it again for CR 701.40c, where the
 -- Tracker's {5}{R} against its morph {4}{R} is the only thing that tells the
