@@ -4191,6 +4191,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   perennationSpec s registry
   toolkitSpec s registry
   unevenToolkitSpec s registry
+  wardingBeaconSpec s registry
   dustAnimusSpec s registry
   printlifterSpec s registry
   shieldCounterSpec s registry
@@ -7010,6 +7011,99 @@ ordersEntry seasonFirst seasonId p = case p of
       )
   _ -> pure (S.identityAnswer p)
 
+-- CR 612.2 reaching an entry row's counter KINDS, at the one place a swap can
+-- land two of them on the same key. CR 122.1b's keyword counter is the only kind
+-- holding a word, and of the fifteen keywords that rule admits only hexproof
+-- carries a payload a pair can reach: Pawl.Engine.Filter.rewriteKeyword descends
+-- into a Filter for landwalk, [type]cycling, hexproof and protection, and
+-- hexproof is the only one of those four CR 122.1b lists. So a collision needs
+-- one permanent entering with two hexproof counters whose qualities the same pair
+-- maps together.
+--
+-- CR 122.1's last sentence is what the merge owes: "Counters with the same name
+-- or description are interchangeable", so after the swap the two rows are one
+-- tally of one kind rather than a choice of which row survives. Map.mapKeys kept
+-- an arbitrary survivor, which is the tally this proves is not what happens.
+--
+-- Synthetic Warding Beacon -- {2}{U} Artifact, whole text: "Each creature you
+-- control enters with a hexproof from Islands counter and two hexproof from
+-- Swamps counters on it." SYNTHETIC because no printing enters with two keyword
+-- counters that one swap can collide: Scryfall `o:"hexproof counter"`,
+-- 2026-08-25, answers four cards, and the only one placing a second keyword
+-- counter beside a hexproof one is Perennation, whose other is indestructible --
+-- a keyword with no payload, so no pair can bring the two together. Nothing in
+-- the CR forbids the card: CR 702.11d makes "hexproof from [quality]" a variant
+-- of hexproof, which is what CR 122.1b's closing "as well as any variants of
+-- those keywords" admits as a counter, and CR 612.2 swaps the Island in it as a
+-- land type word used as a land type.
+--
+-- IT WATCHES OTHER OBJECTS, Dragonstorm Globe's shape rather than an IsSource
+-- row, and for globeChain's reason: the permanent holding the row has to be on
+-- the battlefield for a text change to point at, where an entering permanent's
+-- own row is read before CR 400.7a's carry-over re-keys anything (gap #2338).
+-- Same rewrite either way -- Projection's TurnUpRewrite.WithCounters arm and its
+-- EntryRewrite.WithCounters arm both call rewriteWithCounters.
+--
+-- THE COUNTS ARE UNEQUAL, one and two, so an arbitrary survivor is caught
+-- whichever row it kept: the merged tally is three and neither printed count is.
+wardingBeaconSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wardingBeaconSpec s registry = Spec.describe s "Synthetic Warding Beacon (CR 612.2)" $ do
+  let wardFrom subtype = CounterKind.Keyword (Keyword.Hexproof (Just (Filter.Type.HasSubtype subtype)))
+      -- Both kinds the row names, read off the creature that entered.
+      wardsOn oid gs = (countersOn (wardFrom Subtype.Island) oid gs, countersOn (wardFrom Subtype.Swamp) oid gs)
+  -- The control: unhacked, the two qualities are two kinds at their printed
+  -- counts.
+  Spec.it s "CR 614.1c unhacked, the two hexproof counters stay two kinds" $ do
+    (after, entered) <- beaconChain s registry False
+    case entered of
+      Nothing -> Spec.assertFailure s "the Goblin Piker did not reach the battlefield"
+      Just pikerId -> Spec.assertEqWith s "one hexproof from Islands counter and two hexproof from Swamps counters" (wardsOn pikerId after) (1, 2)
+  -- The rule. Hacked Island -> Swamp, both kinds map onto one key and CR 122.1
+  -- makes that one tally of three.
+  Spec.it s "CR 612.2/122.1 hacked Island -> Swamp, the two rows merge into one tally of three" $ do
+    (after, entered) <- beaconChain s registry True
+    case entered of
+      Nothing -> Spec.assertFailure s "the Goblin Piker did not reach the battlefield"
+      Just pikerId -> Spec.assertEqWith s "no hexproof from Islands counter left, and all three counters on hexproof from Swamps" (wardsOn pikerId after) (0, 3)
+
+-- globeChain's board with Magical Hack ({U}) in place of Artificial Evolution:
+-- alice controls the Beacon, an Island and six Mountains, and holds the Hack and
+-- a Goblin Piker ({2}{R} Creature -- Goblin Warrior). The Beacon is on the
+-- battlefield before either spell is cast, which is what makes its row live when
+-- the entry loop runs, and hacking the PERMANENT needs no CR 400.7 exception at
+-- all. The lands are Islands and Mountains and the swap names Island: it reaches
+-- neither, since CR 612.1 applies a text change to the object it is on.
+beaconChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, Maybe ObjectId.ObjectId)
+beaconChain s registry hack = do
+  island <- S.printingOf s registry "Island"
+  mountain <- S.printingOf s registry "Mountain"
+  beacon <- S.printingOf s registry "Synthetic Warding Beacon"
+  magicalHack <- S.printingOf s registry "Magical Hack"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let base = S.landsFor mountain S.alice 6 (S.landsInPlay island 1)
+      (beaconId, g1) = S.addCreature beacon S.alice base
+      (hackId, g2) = S.addHandCard magicalHack S.alice g1
+      (pikerId, g3) = S.addHandCard piker S.alice g2
+      ready =
+        g3
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      hacked = if hack then castAndResolve (hackAt beaconId Subtype.Island Subtype.Swamp) ready hackId else ready
+      after = castAndResolve S.identityAnswer hacked pikerId
+  pure (after, newestNamed (S.printingName piker) after)
+
+-- evolveAt's land-type twin, and the target is FILTERED out of the offered set
+-- rather than rebuilt: a hand-built recipient of the wrong shape would be dropped
+-- at CR 608.2b's re-read with no error, where an empty offered set fails the cast
+-- where a reader can see it.
+hackAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
+hackAt oid from to p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
+  Prompt.ChooseLandTypeSwap {} -> (from, to)
+  _ -> S.identityAnswer p
+
 -- CR 614.1c's counter row with a CARD-AUTHORED condition on it, which is CR
 -- 604.2's clause on Pawl.Types.PrintedReplacement -- the same clause Monstrous
 -- War-Leech's "if it was kicked" rides above, over a WithCounters rewrite
@@ -7577,9 +7671,10 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
 -- CR 612.1's REPLACEMENT-EFFECT carrier, and the first producer in the pool that
 -- reaches it: a CR 604.2 replacement watching OTHER objects, so the permanent
 -- holding it is on the battlefield for a text change to point at. Every earlier
--- replacement naming a subtype matches Filter.IsSource instead, and CR 400.7
--- gives the new incarnation of an entering permanent no continuous effect the
--- spell had.
+-- replacement naming a subtype matches Filter.IsSource instead, and an entering
+-- permanent's own row is read before CR 400.7a's carry-over re-keys the effect
+-- onto it (gap #2338) -- so this shape is the one that can be tested today, not
+-- the only one the rule reaches.
 --
 -- CR 612.2 licenses the swap: "Dragon" here is a creature type word used as a
 -- creature type, on an artifact that is not itself a Dragon. CR 613.1c puts the
