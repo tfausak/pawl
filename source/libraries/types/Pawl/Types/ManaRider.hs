@@ -18,7 +18,7 @@ import qualified Pawl.Types.ManaRiderEffect as ManaRiderEffect
 --
 -- The condition is the printed "if that mana is spent on ..." clause, evaluated
 -- against the object being paid for, exactly as a restriction's filter is
--- (Pawl.Engine.Mana.spendableAmong) -- so Boseiju's is
+-- (Pawl.Engine.Mana.admitsUnder) -- so Boseiju's is
 -- @Or [HasCardType Instant, HasCardType Sorcery]@. It is ONE filter and not
 -- Pawl.Types.ManaRestriction's two halves, because no printing riding a payment
 -- distinguishes the two payment kinds: every one of them says "that spell".

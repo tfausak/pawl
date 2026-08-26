@@ -402,8 +402,8 @@ manaOptionsOfGiven pcs oid gs =
       -- The RIDER is stamped by the same sentence and copied the same way
       -- (Boseiju, Who Shelters All). It is not consulted here or anywhere on the
       -- offer side: a rider narrows nothing about what the mana may pay for, so
-      -- folding it into supplyRestricted would make Boseiju's colourless refuse
-      -- a nested mana ability's own cost. Pawl.Engine.ManaRider reads it off the
+      -- folding it into the restriction would make Boseiju's colourless refuse
+      -- the payments it belongs to. Pawl.Engine.ManaRider reads it off the
       -- payment CR 400.7d recorded, long after this.
       --
       -- Not implemented: the retention the same instruction may carry
@@ -630,20 +630,25 @@ data Demand = MkDemand
   deriving (Eq, Ord, Show)
 
 -- ONE mana the player could put toward a cost, as what it could be: the types it
--- might have, the tags it would carry, and whether CR 106.6 restricts what it
--- may be spent on. A pool unit is the settled case (its type is already fixed);
--- an untapped source is the open one, where the choice has not been made yet.
+-- might have, the tags it would carry, and WHICH of the board's payments CR
+-- 106.6 lets it be spent on. A pool unit is the settled case (its type is
+-- already fixed); an untapped source is the open one, where the choice has not
+-- been made yet.
 --
--- The RESTRICTION is a Bool and not the restriction itself, because the units
--- reaching here have already been asked about the object THIS payment is for
--- (`spendableAmong`): what is left to know is whether this mana is admissible to
--- a payment that is a different one -- a nested mana ability's own activation
--- cost -- and `payableResolutionsGiven`'s `admits` answers no for every
--- restricted unit, exactly and over-strictly as its own comment argues.
+-- The RESTRICTION is carried as the SET of payments that admit it, rather than
+-- as the restriction itself or as a Bool, because a board holds more than one
+-- payment: the cost being paid, and every nested mana ability's own activation
+-- cost (CR 602.2b, CR 605.3a). A Bool can only answer about one of them, and
+-- answering "restricted, so no" for the others refused Omen Hawker's {C} into
+-- Chromatic Star's {1}; see #2239. The set is finite and small --
+-- payableResolutionsGiven builds it from the outer subject plus one
+-- PaymentSubject.Activating per source -- so `admits` asks a membership rather
+-- than re-reading a filter per demand, and `admitsUnder` stays the one reader of
+-- Pawl.Types.ManaUnit.restriction.
 data Supply = MkSupply
   { supplyTypes :: Set.Set ManaType,
     supplyTags :: Set.Set ProductionTag.ProductionTag,
-    supplyRestricted :: Bool
+    supplyAdmits :: Set.Set PaymentSubject.PaymentSubject
   }
   deriving (Eq, Ord, Show)
 
@@ -657,14 +662,15 @@ data Supply = MkSupply
 --
 -- The RESTRICTION is not read here: a demand carries no record of which payment
 -- it belongs to, and that is what CR 106.6 asks about.
--- payableResolutionsGiven's `admits` is where the two meet.
+-- payableResolutionsGiven's `admits` is where the two meet, pairing a demand
+-- with the payment it belongs to before asking `supplyAdmits`.
 serves :: Supply -> Demand -> Bool
 serves supply demand =
   not (Set.disjoint (supplyTypes supply) (demandTypes demand))
     && Set.isSubsetOf (demandTags demand) (supplyTags supply)
 
 -- CR 106.6, split over one player's pool: the units this payment may draw on,
--- and the ones it may not. Built on `spendableAmong` below, which is THE one reader
+-- and the ones it may not. Built on `admitsUnder` below, which is THE one reader
 -- of Pawl.Types.ManaUnit.restriction, so payment and payability cannot disagree
 -- about which mana is available -- the reason `serves` just above gives for
 -- being one relation.
@@ -692,41 +698,46 @@ spendableFor subject pid gs = spendableAmong subject pid gs (unitsOf (Game.poolO
 -- The same split asked of units that are NOT in the pool: what an untapped
 -- source's yield would be worth to this payment. CR 605.3b's mana ability adds
 -- its mana inline, restriction and all (manaOptionsOfGiven's stamp), so
--- payableResolutionsGiven has to ask this of a yield before counting it as
--- supply -- otherwise the offer admits a payment it then refuses.
+-- Pawl.Engine.Cost's payment road has to ask this of a yield before spending it.
+spendableAmong :: PaymentSubject.PaymentSubject -> PlayerId -> GameState -> [ManaUnit] -> ([ManaUnit], [ManaUnit])
+spendableAmong subject pid gs = List.partition (admitsUnder subject pid gs)
+
+-- CR 106.6 asked of ONE payment: may this mana be spent on it? THE one reader of
+-- Pawl.Types.ManaUnit.restriction, which is what keeps the payment road
+-- (`spendableAmong` above) and the offer road (payableResolutionsGiven's
+-- `supplyAdmits`) from ever disagreeing -- the reason `serves` gives for being
+-- one relation.
 --
--- THE one reader of Pawl.Types.ManaUnit.restriction, which is what keeps the two
--- roads' answers the same.
---
--- The subject's view is built ONCE per call and shared across the units, the
+-- The subject's view is built ONCE and shared across every unit asked, the
 -- restriction being a question about the object being paid for rather than about
 -- the mana. WHICH half of Pawl.Types.ManaRestriction is read is settled by the
--- subject for the same reason, once for the whole call.
-spendableAmong :: PaymentSubject.PaymentSubject -> PlayerId -> GameState -> [ManaUnit] -> ([ManaUnit], [ManaUnit])
-spendableAmong subject pid gs units =
+-- subject for the same reason. That is what the partial application buys, so
+-- keep the unit as the last argument and apply it separately.
+admitsUnder :: PaymentSubject.PaymentSubject -> PlayerId -> GameState -> ManaUnit -> Bool
+admitsUnder subject pid gs =
   let paidFor = case subject of
         PaymentSubject.ForNeither -> Nothing
         PaymentSubject.Casting oid -> Just (ManaRestriction.casts, oid)
         PaymentSubject.Activating oid -> Just (ManaRestriction.activations, oid)
       asked = fmap (\(half, oid) -> (half, Filter.contextFor (Just pid) Nothing, Projection.viewOfObject oid gs)) paidFor
-      admits unit = case ManaUnit.restriction unit of
+   in \unit -> case ManaUnit.restriction unit of
         Nothing -> True
         Just restriction -> case asked of
           Nothing -> False
           Just (half, context, view) -> case half restriction of
             Nothing -> False
             Just wanted -> Filter.matches context view wanted
-   in List.partition admits units
 
 -- A pool unit as a supply. Its type is settled, so the option set is a
 -- singleton, and its tags are the ones production stamped on it
--- (manaOptionsOfGiven).
-supplyOf :: ManaUnit -> Supply
-supplyOf unit =
+-- (manaOptionsOfGiven). `admitting` is CR 106.6's answer for every payment the
+-- board holds (payableResolutionsGiven builds it).
+supplyOf :: (ManaUnit -> Set.Set PaymentSubject.PaymentSubject) -> ManaUnit -> Supply
+supplyOf admitting unit =
   MkSupply
     { supplyTypes = Set.singleton (ManaUnit.manaType unit),
       supplyTags = ManaUnit.tags unit,
-      supplyRestricted = Maybe.isJust (ManaUnit.restriction unit)
+      supplyAdmits = admitting unit
     }
 
 -- CR 609.4b, applied to ONE mana type: what a mana of this type may be spent as
@@ -794,13 +805,13 @@ ofTypes types = MkDemand {demandTypes = types, demandTags = Set.empty}
 -- A GENERIC symbol of a SOURCE's own activation cost, said as a demand: CR
 -- 106.1b's six types and no tag, so any supply's TYPE serves it.
 --
--- A demand rather than a count, unlike the generic part of the cost being paid,
--- because a source's own mana is the half CR 605.3c and CR 106.6 both narrow --
--- only what an earlier position supplies, and never a restricted unit
--- (payableResolutionsGiven's `admits`) -- and a plain count cannot say which
--- supplies it may draw on. Chromatic Star's "{1}, {T}, Sacrifice this artifact"
--- and Coal Golem's "{3}, Sacrifice this creature" are the printings that reach
--- it.
+-- A demand rather than a count, because CR 605.3c and CR 106.6 both narrow which
+-- supplies may serve it -- only what an earlier position supplies, and only mana
+-- that payment admits (payableResolutionsGiven's `admits`) -- and a plain count
+-- cannot say which supplies it may draw on. The generic part of the cost being
+-- paid is said the same way, and for the second of those reasons. Chromatic
+-- Star's "{1}, {T}, Sacrifice this artifact" and Coal Golem's "{3}, Sacrifice
+-- this creature" are the printings that reach it.
 anyTypeDemand :: Demand
 anyTypeDemand = ofTypes everyManaType
 
@@ -969,9 +980,16 @@ removals :: [SpendManaAsThough.SpendManaAsThough] -> Demand -> [ManaUnit] -> [[M
 removals clauses wanted units = Maybe.mapMaybe without (zip [0 :: Int ..] units)
   where
     without (i, u) =
-      if serves (rewriteSupply clauses (supplyOf u)) wanted
+      if servesUnit clauses u wanted
         then Just (take i units <> drop (i + 1) units)
         else Nothing
+
+-- Could this one unit, under the payer's CR 609.4b permissions, serve that one
+-- demand? The PAYMENT road's shape of `serves`: CR 106.6 was settled before a
+-- unit reached here (`spendableFor` withheld what this payment may not spend),
+-- so the admitting set is never asked and is left empty rather than invented.
+servesUnit :: [SpendManaAsThough.SpendManaAsThough] -> ManaUnit -> Demand -> Bool
+servesUnit clauses unit = serves (rewriteSupply clauses (supplyOf (const Set.empty) unit))
 
 -- Spend one unit per demand, or Nothing if no assignment covers them all.
 --
@@ -1006,7 +1024,7 @@ paymentSteps demands generic = fmap Just demands <> replicate (Natural.toIntSatu
 paysStep :: [SpendManaAsThough.SpendManaAsThough] -> Maybe Demand -> ManaUnit -> Bool
 paysStep clauses step unit = case step of
   Nothing -> True
-  Just wanted -> serves (rewriteSupply clauses (supplyOf unit)) wanted
+  Just wanted -> servesUnit clauses unit wanted
 
 -- Every pool these steps could leave behind, as a SET of sorted pools -- which is
 -- what makes it a count of outcomes a player could tell apart rather than of
@@ -1525,16 +1543,18 @@ data SourceOption = MkSourceOption
   }
   deriving (Eq, Ord, Show)
 
-sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> Bool -> [(Activations.Activations, Mana, ManaCost)] -> [SourceOption]
-sourceOptions clauses contended supplies =
+sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> (ManaUnit -> Set.Set PaymentSubject.PaymentSubject) -> Bool -> [(Activations.Activations, Mana, ManaCost)] -> [SourceOption]
+sourceOptions clauses admitting contended supplies =
   let -- CR 106.6 joins the key the narrow yields are grouped by, so the collapse
-      -- below never unions a restricted mana with an unrestricted one into a
+      -- below never unions a mana one payment admits with one it does not into a
       -- supply that is neither. Such a source offers the two as separate
       -- OPTIONS, which is what they are: one activation makes one or the other.
-      unitLists = [((activations, manaCost, any (Maybe.isJust . ManaUnit.restriction) (unitsOf yield)), unitsOf yield) | (activations, yield, manaCost) <- supplies]
+      -- A narrow yield holds at most one unit, so the fold is that unit's own
+      -- answer and the key is exact.
+      unitLists = [((activations, manaCost, foldMap admitting (unitsOf yield)), unitsOf yield) | (activations, yield, manaCost) <- supplies]
       (narrow, wide) = List.partition (\(_, units) -> length units <= 1) unitLists
-      grouped = [(key, collapsed restricted units) | (key@(_, _, restricted), units) <- Map.toList (Map.fromListWith (<>) narrow)]
-      apart = [(key, fmap (rewriteSupply clauses . supplyOf) units) | (key, units) <- wide]
+      grouped = [(key, collapsed admits units) | (key@(_, _, admits), units) <- Map.toList (Map.fromListWith (<>) narrow)]
+      apart = [(key, fmap (rewriteSupply clauses . supplyOf admitting) units) | (key, units) <- wide]
    in List.nub (concatMap optionsFor (grouped <> apart))
   where
     optionsFor ((activations, manaCost, _), offered) =
@@ -1565,7 +1585,7 @@ sourceOptions clauses contended supplies =
           | k <- counts,
             (demands, generic, owed) <- resolved
           ]
-    collapsed restricted units =
+    collapsed admits units =
       if null units
         then []
         else
@@ -1574,7 +1594,7 @@ sourceOptions clauses contended supplies =
               MkSupply
                 { supplyTypes = Set.fromList (fmap ManaUnit.manaType units),
                   supplyTags = Set.unions (fmap ManaUnit.tags units),
-                  supplyRestricted = restricted
+                  supplyAdmits = admits
                 }
           ]
 
@@ -1714,33 +1734,29 @@ payableResolutions subject capacity spending pid committed claimed cost gs =
 -- exact: `Cost.canPay` asks this before any part of the cost is paid.
 payableResolutionsGiven :: PaymentSubject.PaymentSubject -> Capacity -> ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
 payableResolutionsGiven subject capacity spending sources pcs pid committed claimed cost gs =
-  let -- CR 106.6, resolved for BOTH halves of the board: mana this payment may
-      -- not spend is no supply for it, whether it is already in the pool or
-      -- would be added by tapping a source (`spendableSupply` below). The two
-      -- halves have to be filtered by the same question, or the offer and the
-      -- payment disagree -- Mishra's Workshop's three colourless would buy a
-      -- creature spell the payment then cannot pay for.
-      (units, _) = spendableFor subject pid gs
+  let -- EVERY payment a board can hold, and not just the one this walk is for:
+      -- the outer cost's, plus each source's own activation cost, which CR
+      -- 605.3a lets the player pay inside the outer one's mana window and CR
+      -- 602.2b makes an activation like any other. Asking CR 106.6 of the outer
+      -- subject alone dropped Omen Hawker's {C} before it could buy Chromatic
+      -- Star's {1}; see #2239.
+      --
+      -- Neither half of the board is FILTERED by the subject any more, then:
+      -- every unit stays a supply and carries the set of payments that admit
+      -- it, which `admits` reads per demand. Mishra's Workshop's three
+      -- colourless are still no supply for the instant it may not buy, because
+      -- the cost's own demands -- typed and generic alike -- ask that same set.
+      subjects = List.nub (subject : fmap PaymentSubject.Activating sources)
+      admittedBy = fmap (\each -> (each, admitsUnder each pid gs)) subjects
+      admitting unit = Set.fromList [each | (each, ok) <- admittedBy, ok unit]
       -- CR 609.4b, resolved ONCE for this whole question and applied to both
       -- halves of the board: a rewrite reaching the pool but not the untapped
       -- sources (or the other way round) would make this disagree with `spend`
       -- about what is payable, and the symptom is an action the engine offers and
       -- then cannot pay.
       clauses = PlayerEffect.spendManaAsThough pid gs
-      pooled = fmap (rewriteSupply clauses . supplyOf) units
-      suppliesPer = fmap (\oid -> fmap spendableSupply (manaSuppliesGiven capacity pcs pid oid gs)) sources
-      -- One activation's yield narrowed to the units this payment could spend,
-      -- keeping its COUNT and its own mana cost: a restricted yield is still an
-      -- activation the board may take (its other units may serve), and taking it
-      -- still costs what it costs.
-      --
-      -- What survives is admitted for the CAST and no further: CR 106.6's
-      -- restriction is asked a SECOND time of the demands a source's own
-      -- activation makes, which are no cast, and `Supply.supplyRestricted`
-      -- carries the answer down to `admits` below. Pawl.ManaSpec's "CR 106.6 the
-      -- restricted red cannot pay the Star's {1}" is what proves it.
-      spendableSupply (activations, yield, manaCost) =
-        (activations, Mana.MkMana (fst (spendableAmong subject pid gs (unitsOf yield))), manaCost)
+      pooled = fmap (rewriteSupply clauses . supplyOf admitting) (unitsOf (Game.poolOf pid gs))
+      suppliesPer = fmap (\oid -> manaSuppliesGiven capacity pcs pid oid gs) sources
       activationsOf (activations, _, _) = Activations.claims activations
       -- WHICH sources are worth taking fewer times: the ones whose claims meet
       -- another source's, or the cost's own. Asked GROUPWISE, one group per
@@ -1748,7 +1764,10 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
       -- not contention -- Cost.repeatsOf has already measured that, and it is
       -- what `times` is.
       contested = Claim.contested (claimed : fmap (concatMap activationsOf) suppliesPer)
-      options = fmap (\supplies -> sourceOptions clauses (Claim.contends contested (concatMap activationsOf supplies)) supplies) suppliesPer
+      -- Each option paired with the SOURCE it came from, which is what says
+      -- whose activation cost its demands are: CR 602.2b's subject for the
+      -- position that option occupies below.
+      options = zipWith (\oid supplies -> fmap ((,) oid) (sourceOptions clauses admitting (Claim.contends contested (concatMap activationsOf supplies)) supplies)) sources suppliesPer
       -- One option taken from each source, appended to the pool: `sequenceA` over
       -- the list applicative is that product, and it is [[]] -- one board, the
       -- pool alone -- when the player controls no source at all. Each board
@@ -1777,46 +1796,54 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
         [] -> [[]]
         [_] -> [taken]
         _ -> List.permutations taken
+      -- WHOSE payment each position is, carried alongside: position k is the
+      -- k-th eating option's source activating (CR 602.2b), and `costPosition`
+      -- is the payment this walk was asked about. That map is CR 106.6's other
+      -- half -- `admits` pairs a demand with the payment it belongs to before
+      -- asking whether the mana admits it.
       boards =
-        [ ( fmap ((,) (0 :: Natural)) (pooled <> concatMap optionSupplies free)
-              <> concat [fmap ((,) k) (optionSupplies option) | (k, option) <- ranked],
-            concat [fmap ((,) k) (optionDemands option) | (k, option) <- ranked],
+        [ ( fmap ((,) (0 :: Natural)) (pooled <> concatMap (optionSupplies . snd) free)
+              <> concat [fmap ((,) k) (optionSupplies option) | (k, (_, option)) <- ranked],
+            concat [fmap ((,) k) (optionDemands option) | (k, (_, option)) <- ranked],
             costPosition,
-            sum (fmap optionLife taken)
+            Map.fromList ((costPosition, subject) : [(k, PaymentSubject.Activating oid) | (k, (oid, _)) <- ranked]),
+            sum (fmap (optionLife . snd) taken)
           )
         | taken <- sequenceA options,
-          Claim.satisfiable (claimed <> concatMap optionClaims taken),
-          let (eating, free) = List.partition (not . null . optionDemands) taken,
+          Claim.satisfiable (claimed <> concatMap (optionClaims . snd) taken),
+          let (eating, free) = List.partition (not . null . optionDemands . snd) taken,
           order <- orderings eating,
           let ranked = zip [1 :: Natural ..] order,
           let costPosition = 1 + Natural.length eating
         ]
       payable (demands, generic, life) =
-        let fits (supplies, eaten, costPosition, spent) =
+        let fits (supplies, eaten, costPosition, subjectAt, spent) =
               let -- Both sides tagged with their position, so Hall's condition
                   -- reads ONE bipartite graph over the whole board: the cost's
                   -- own demands sit past every option's, and an option's supplies
                   -- and demands share a position.
-                  wanted_ = fmap ((,) costPosition) demands <> eaten
-                  -- CR 106.6 asked of the demand rather than of the mana: a
-                  -- restricted unit pays the payment this walk is about and
-                  -- nothing else, so it serves the cost's own demands and never a
-                  -- nested mana ability's activation cost.
                   --
-                  -- Exact for a CAST and for a payment that is neither: a mana
-                  -- restricted to casts can never pay an activation cost, and
-                  -- one restricted at all can never pay for a special action.
-                  -- Not implemented: mana whose restriction admits ACTIVATIONS
-                  -- paying a nested mana ability's own cost, which CR 602.2b
-                  -- makes an activation like any other -- Omen Hawker's {C} into
-                  -- Chromatic Star's {1} is refused here, where
-                  -- Pawl.Engine.Cost.payActivation's own subject would admit it.
-                  -- The disagreement is the STRICT way round, so the gate offers
-                  -- less than the payment would take rather than more (#2239).
+                  -- The cost's GENERIC part joins the demands rather than staying
+                  -- a count, which is what makes CR 106.6 reach it: a generic
+                  -- symbol takes any mana (`anyTypeDemand`), but only mana this
+                  -- payment may spend, and a count cannot say which supplies it
+                  -- may draw on. Multiplicity is what `demandedIn` reads, so the
+                  -- copies cost `List.nub` one element however large the symbol.
+                  wanted_ = fmap ((,) costPosition) (demands <> List.genericReplicate generic anyTypeDemand) <> eaten
+                  -- CR 106.6 asked of the demand rather than of the mana: WHICH
+                  -- payment a demand belongs to is what the restriction asks
+                  -- about, and `subjectAt` is the board's answer. So a mana
+                  -- restricted to casts pays the spell being cast and not the
+                  -- Star's {1} it would have to buy first, and Omen Hawker's mana
+                  -- pays that {1} -- CR 602.2b's activation -- whether the outer
+                  -- payment is an activation or a cast whose CR 601.2g window
+                  -- this is (CR 605.3a). Pawl.ManaSpec's "CR 106.6 the restricted
+                  -- seven cannot pay a mana ability's own {1}" and its two Omen
+                  -- Hawker siblings are the pair that proves both directions.
                   admits (from, supply) (wantedAt, demand) =
                     serves supply demand
                       && from < wantedAt
-                      && (not (supplyRestricted supply) || wantedAt == costPosition)
+                      && maybe False (`Set.member` supplyAdmits supply) (Map.lookup wantedAt subjectAt)
                   -- "The supplies that could serve this set of demands" and "the
                   -- demands in it", the two sides of Hall's condition for one
                   -- subset.
@@ -1824,10 +1851,10 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
                   demandedIn subset = length (filter (`elem` subset) wanted_)
                   hallHolds subset = demandedIn subset <= couldServe subset
                in Event.canPayLife pid (committed + life + spent) gs
-                    -- Clause 2 is untouched by the positions: every supply sits
-                    -- strictly before `costPosition`, so every one of them can
-                    -- serve a generic symbol of the cost.
-                    && Natural.length supplies >= Natural.length wanted_ + generic
+                    -- A cheap necessary condition, and nothing more: Hall's own
+                    -- clause over the whole demand set implies it, since a supply
+                    -- serving nothing is still counted here.
+                    && Natural.length supplies >= Natural.length wanted_
                     && all hallHolds (List.subsequences (List.nub wanted_))
          in any fits boards
    in filter payable (resolutions spending cost)

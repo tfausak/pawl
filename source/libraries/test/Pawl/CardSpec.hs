@@ -3848,7 +3848,7 @@ effectFilters effect = case effect of
   -- half, its activation half, and the rider's condition are each an ordinary
   -- Filter, and collecting one of them would take every lint in this module off
   -- the others. UNFRAMED: each is evaluated against the object being paid for
-  -- (Pawl.Engine.Mana.spendableAmong for the restriction,
+  -- (Pawl.Engine.Mana.admitsUnder for the restriction,
   -- Pawl.Engine.ManaRider.uncounterable for the rider), which is neither an
   -- attach destination nor a target slot.
   Effect.AddMana addition ->

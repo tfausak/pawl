@@ -28,7 +28,7 @@ import qualified Pawl.Types.Keyword as Keyword
 -- (Pawl.Types.ManaAddition, Pawl.Types.ManaUnit), where Nothing is "no CR 106.6
 -- clause at all" -- almost every mana ever made.
 --
--- Pawl.Engine.Mana.spendableAmong is the one reader, and it picks the field by
+-- Pawl.Engine.Mana.admitsUnder is the one reader, and it picks the field by
 -- the payment's Pawl.Types.PaymentSubject rather than by anything about the
 -- mana.
 data ManaRestriction = MkManaRestriction

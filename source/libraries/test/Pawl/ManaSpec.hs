@@ -3803,6 +3803,58 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
         Spec.assertBool s (S.castable S.alice recallId board) "and the Island casts the instant"
         Spec.assertBool s (S.castable S.alice ringId board) "and the artifact spell too, so neither demand is what refused above"
 
+  -- CR 602.2b's own reading, one level in: paying a mana ability's activation
+  -- cost is an activation, so mana restricted to activations may pay it. Omen
+  -- Hawker taps for {C}{U}, one of those buys Chromatic Star's "{1}, {T},
+  -- Sacrifice this artifact", and the any-colour mana the Star mints pays Greed's
+  -- "{B}, Pay 2 life: Draw a card". alice has no lands, so the Hawker's yield is
+  -- the only mana in the game and the Star's {1} has nothing else to draw on.
+  --
+  -- Greed's {B} is a colour the Hawker cannot make, which is what stops the
+  -- outer cost being payable off the yield directly -- the Star's minted mana is
+  -- the only route to it. The CONTROL is one untapped Island, which is one
+  -- unrestricted mana and exactly what the Star's {1} wants: it pays that same
+  -- {1} by another road, so the refusal above cannot be the phase, the Hawker's
+  -- CR 302.6 settle, or a missing black.
+  Spec.it s "CR 602.2b the mana pays a nested mana ability's own activation cost" $ do
+    hawker <- S.printingOf s registry "Omen Hawker"
+    star <- S.printingOf s registry "Chromatic Star"
+    greed <- S.printingOf s registry "Greed"
+    island <- S.printingOf s registry "Island"
+    let (_, g1) = S.addCreature hawker S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addCreature star S.alice g1
+        (greedId, board) = S.addCreature greed S.alice g2
+        drawable gs = any (\ability -> Activate.activatable S.alice greedId ability gs) (Projection.abilitiesOf greedId gs)
+    Spec.assertBool s (drawable board) "CR 106.6 the Hawker's {C} buys the Star, whose mana pays Greed's {B}"
+    Spec.assertBool s (drawable (S.landsFor island S.alice 1 board)) "one untapped Island pays that same {1}, so the board is otherwise fine"
+
+  -- The same mana in CR 601.2g's window, which is the board the restriction's
+  -- OWN subject does not name: alice is CASTING Doomed Traveler ({W} Creature),
+  -- so the Hawker's mana may not pay the spell -- and CR 605.3a still lets her
+  -- activate the Star inside that window, where its {1} is an activation cost
+  -- (CR 602.2b) the Hawker's mana may pay. Geosurge's "spend this mana only to
+  -- cast artifact or creature spells" is the mirror image a few groups up: it
+  -- pays the creature spell and refuses the Star's {1}, where these two refuse
+  -- the spell and pay the {1}.
+  --
+  -- Same control, and it discriminates for the same reason: the Island cannot
+  -- pay the white pip either, so the Star is still the only source of it.
+  Spec.it s "CR 605.3a the same mana pays it inside a cast's mana window" $ do
+    hawker <- S.printingOf s registry "Omen Hawker"
+    star <- S.printingOf s registry "Chromatic Star"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    island <- S.printingOf s registry "Island"
+    let (_, g1) = S.addCreature hawker S.alice (Setup.emptyGame S.bothPlayers)
+        (_, board) = S.addCreature star S.alice g1
+        -- S.handOne rather than S.addHandCard: it is what puts the board in a
+        -- MAIN PHASE with priority, which the creature spell's sorcery timing
+        -- needs (CR 601.3a).
+        casts gs =
+          let (held, travelerId) = S.handOne traveler gs
+           in S.castable S.alice travelerId held
+    Spec.assertBool s (casts board) "CR 605.3a the Star is activated inside the cast's mana window and mints the {W}"
+    Spec.assertBool s (casts (S.landsFor island S.alice 1 board)) "one untapped Island pays that same {1}, so the board is otherwise fine"
+
 -- One of the Hawker's two: from a source that is not snow, lost as the phase
 -- ends, and spendable only to activate an ability -- any ability, the card
 -- naming none, which is Pawl.Types.Filter's trivial @And []@.
