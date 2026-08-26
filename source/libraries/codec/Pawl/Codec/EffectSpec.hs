@@ -112,6 +112,7 @@ import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
+import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotName as SlotName
@@ -1408,6 +1409,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Unsuspect (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
       " {\"type\":\"Unsuspect\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  -- CR 709.5g's lock. Keys to the House prints both settings, so the one wire
+  -- key that tells them apart is what a round trip has to carry.
+  Spec.it s "SetHalfLocked" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked True (SlotName.MkSlotName (Text.pack "target"))))
+      " {\"type\":\"SetHalfLocked\",\"value\":{\"locked\":true,\"slot\":\"target\"}} "
   Spec.it s "Evolve" $
     Common.assertJsonCodec
       s

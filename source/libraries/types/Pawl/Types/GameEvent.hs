@@ -597,8 +597,10 @@ data GameEvent
     -- ability's own controller is CR 603.3a's, read off the source as every other
     -- trigger's is.
     --
-    -- NOT emitted for a LOCK (CR 709.5g): nothing in the pool locks a door, and no
-    -- rule asks a trigger about one (#924).
+    -- NOT emitted for a LOCK (CR 709.5g), and that is the rule rather than an
+    -- omission: rules 709.5h and 709.5i are the only rules that ask a trigger
+    -- about an unlocked designation, and both ask about a permanent GAINING one.
+    -- Pawl.Engine.Event.lockHalf is the write, and it records nothing.
     --
     -- The Bool is CR 709.5i's "fully unlocks": True when the permanent has ALL of
     -- its halves unlocked once this designation has been written. Carried on the

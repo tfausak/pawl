@@ -78,6 +78,7 @@ encode p answer = case p of
   Prompt.ChooseCardInHand {} -> Response.ChoseCardInHand answer
   Prompt.ChooseCardFromAmong {} -> Response.ChoseCardFromAmong answer
   Prompt.ChooseRoom {} -> Response.ChoseRoom answer
+  Prompt.ChooseHalf {} -> Response.ChoseHalf answer
   Prompt.ChooseLegend {} -> Response.ChoseLegend answer
   Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
   Prompt.ChooseAttackTarget {} -> Response.ChoseAttackTarget answer
@@ -249,6 +250,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseRoom {} -> case response of
     Response.ChoseRoom room -> Just room
+    _ -> Nothing
+  Prompt.ChooseHalf {} -> case response of
+    Response.ChoseHalf half -> Just half
     _ -> Nothing
   Prompt.ChooseLegend {} -> case response of
     Response.ChoseLegend oid -> Just oid
@@ -759,6 +763,10 @@ defaultAnswer p = case p of
   -- dropped is not on offer at all. A deterministic fallback, not a
   -- recommendation.
   Prompt.ChooseOfferedCastFace _ _ _ names -> NonEmpty.head names
+  -- CR 709.5f / 709.5g: every offered half is one the instruction admits, and
+  -- the prompt is raised only where two or more are, so the first in printed
+  -- order is a deterministic fallback rather than a recommendation.
+  Prompt.ChooseHalf _ _ _ halves -> NonEmpty.head halves
   -- CR 702.94a: declining the reveal is always legal, and it leaves the drawn
   -- card an ordinary card in hand.
   Prompt.OfferedMiracleReveal {} -> OptionalDecision.Declines

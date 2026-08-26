@@ -140,6 +140,7 @@ import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
+import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -1847,6 +1848,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> effect
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> effect
   Effect.Unsuspect ref -> Effect.Unsuspect (rewriteObjectRef pairs ref)
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> effect
   Effect.Evolve _ -> effect
   Effect.Mentor _ -> effect
   Effect.Train _ -> effect
