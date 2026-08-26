@@ -829,7 +829,9 @@ data GameEvent
     -- `targeted` is a Recipient. Emitted by Pawl.Engine.Event.becameTarget, once
     -- per targeted recipient, as the targets are announced -- which is the moment that rule names, and the reason
     -- nothing here fires for an object merely CHOSEN at resolution (CR 115.10a
-    -- makes such a choice no target at all).
+    -- makes such a choice no target at all). CR 115.1 puts a second moment
+    -- alongside it: a copy of a spell reaches the stack with targets under CR
+    -- 707.10c without ever having been announced, and those become targets too.
     --
     -- Not derivable from GameEvent.SpellCast, which is why it is its own
     -- constructor: that event says a spell was cast and names none of its

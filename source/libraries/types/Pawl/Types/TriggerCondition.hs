@@ -906,9 +906,11 @@ data TriggerCondition
     -- GameEvent.BecameTarget; self-scoped, plus a relation reading the targeting
     -- object's controller.
     --
-    -- Fires once per ANNOUNCEMENT of the bearer as a target, which is rule
-    -- 601.2c's arity: one object may be chosen once per instance of the word
-    -- "target", and each choice is a becoming.
+    -- Fires once per instance of the word "target" the bearer is chosen for,
+    -- which is rule 601.2c's arity: one object may be chosen once per instance,
+    -- and each choice is a becoming. Once more for a copy of that spell, CR
+    -- 115.1 and CR 707.10c putting the copy on the stack with targets of its
+    -- own.
     --
     -- Not implemented: CR 115.7's re-targeting effects, which would make a new
     -- object become a target (#1525).
