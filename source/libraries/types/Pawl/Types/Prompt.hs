@@ -23,6 +23,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
@@ -291,6 +292,24 @@ data Prompt r where
   -- different questions, and Pawl.Engine.Replay's transcript must not let one
   -- prompt's answer satisfy another.
   ChooseDamageSource :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 603.7b, second sentence: which of several SIMULTANEOUS occurrences of
+  -- its trigger event causes a delayed triggered ability with no stated duration
+  -- to trigger. The PlayerId is the entry's controller, whom the rule names as
+  -- the chooser and who need not be the active player; the ObjectId is the
+  -- ability's source; the NonEmpty is the matching events inside the earliest
+  -- Pawl.Types.EventGroup that holds one, in log order.
+  --
+  -- The answer INDEXES that list rather than naming the event, ChooseEntryOption's
+  -- shape: one group can hold two occurrences that compare equal -- the same seat
+  -- gaining the same amount twice -- and a position tells them apart where the
+  -- event cannot.
+  --
+  -- ChooseBolster's posture: choose, not target (CR 115.1 declares nothing here);
+  -- the candidates are already filtered to the events that matched, so every one
+  -- is legal; raised only where two or more make it a real choice. An entry WITH
+  -- a stated duration never reaches it -- CR 603.7b's second sentence excludes
+  -- one, and CR 603.2c fires it once per occurrence instead.
+  ChooseDelayedTriggerEvent :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty GameEvent.GameEvent -> Prompt Natural.Natural
   -- | CR 608.2d: which card in a graveyard a player chooses for a
   -- Pawl.Types.ObjectRef.ChosenCardInGraveyard. The PlayerId is the CHOOSER,
   -- which the ref's Pawl.Types.Chooser decides and who need not own the

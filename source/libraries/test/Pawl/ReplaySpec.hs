@@ -39,11 +39,13 @@ import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.KickerDecision as KickerDecision
+import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
@@ -1073,6 +1075,46 @@ combatReplaySpec s =
             "the head"
             (Replay.defaultAnswer (Prompt.ChooseDamageSource decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
             (ObjectId.MkObjectId 7)
+        -- CR 603.7b: which of several simultaneous occurrences the controller of
+        -- a duration-less delayed ability named. The answer is a POSITION in the
+        -- offer, so it round-trips as one.
+        Spec.it s "ChooseDelayedTriggerEvent round-trips through the transcript" $ do
+          let p =
+                Prompt.ChooseDelayedTriggerEvent
+                  decider
+                  S.alice
+                  oid
+                  (GameEvent.LifeGained (LifeChange.MkLifeChange S.alice 4) NonEmpty.:| [GameEvent.LifeGained (LifeChange.MkLifeChange S.bob 4)])
+          Spec.assertEqWith s "choosing the second round trips" (Replay.decode p (Replay.encode p 1)) (Just 1)
+          Spec.assertEqWith s "choosing the first round trips" (Replay.decode p (Replay.encode p 0)) (Just 0)
+        Spec.it s "a chosen simultaneous occurrence does not decode as a read-ahead chapter" $ do
+          -- Discriminating: fails if ChooseDelayedTriggerEvent reuses another
+          -- Natural-shaped response rather than getting its own. The two index
+          -- different things entirely, so replaying one as the other would fire
+          -- a delayed ability off an occurrence nobody named.
+          let p =
+                Prompt.ChooseDelayedTriggerEvent
+                  decider
+                  S.alice
+                  oid
+                  (GameEvent.LifeGained (LifeChange.MkLifeChange S.alice 4) NonEmpty.:| [GameEvent.LifeGained (LifeChange.MkLifeChange S.bob 4)])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseReadAheadChapter 1)) Nothing
+        Spec.it s "a short delayed-occurrence transcript returns the earliest offered" $
+          -- CR 603.7b: every offered occurrence already matched the entry's
+          -- condition, so the earliest is legal -- and it is what the engine did
+          -- before the rule's second sentence was implemented.
+          Spec.assertEqWith
+            s
+            "the head"
+            ( Replay.defaultAnswer
+                ( Prompt.ChooseDelayedTriggerEvent
+                    decider
+                    S.alice
+                    oid
+                    (GameEvent.LifeGained (LifeChange.MkLifeChange S.alice 4) NonEmpty.:| [GameEvent.LifeGained (LifeChange.MkLifeChange S.bob 4)])
+                )
+            )
+            0
         -- CR 122.5: which KIND of counter a player moved is a decision like any
         -- other, and the only one whose answer is not an object at all.
         Spec.it s "ChooseMovedCounter round-trips through the transcript" $ do

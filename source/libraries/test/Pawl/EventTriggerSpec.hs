@@ -2136,6 +2136,145 @@ falseCureSpec s registry =
           Spec.assertEqWith s "bob is at 24" (S.lifeOf S.bob after) (Just 24)
           Spec.assertEqWith s "carol is at 24" (S.lifeOf S.carol after) (Just 24)
 
+-- An answer to CR 603.7b's question below, pinned BY INDEX and by nothing else.
+-- An answerer that searched the candidates for a legal one would find the earliest
+-- again under any mutation, and Pawl.Engine.Replay.defaultAnswer -- what
+-- S.identityAnswer and every other fallthrough answerer reaches -- IS the
+-- earliest. A board answered by one of those cannot tell the rule from its
+-- absence.
+choosingGain :: Natural -> Prompt.Prompt r -> r
+choosingGain n prompt = case prompt of
+  Prompt.ChooseDelayedTriggerEvent {} -> n
+  _ -> S.identityAnswer prompt
+
+-- CR 603.7b's SECOND sentence, which the group above cannot reach: "if its
+-- trigger event occurs more than once simultaneously and the ability doesn't
+-- have a stated duration, the controller of the delayed triggered ability
+-- chooses which event causes the ability to trigger."
+--
+-- False Cure states "until end of turn", which is exactly the duration that
+-- sentence excludes: CR 603.2c then fires it once per occurrence and there is
+-- nothing to choose. The producer has to be the same delayed entry WITHOUT one.
+--
+--   * Synthetic Singular Cure {B}{B} Instant
+--     (data/cards/synthetic-singular-cure.json): "The next time a player gains
+--     life, that player loses 2 life for each 1 life they gained."
+--
+-- WHY A SYNTHETIC. Scryfall o:/[Ww]hen(ever)? a player gains life/, 2026-08-26,
+-- matches one printing -- False Cure, whose duration disqualifies it. Off the
+-- life axis, o:/[Tt]he next time/ -o:"this turn" -o:"until end of turn"
+-- -o:"each turn", same date, matches four: Five-Finger Discount, Ria Ivor, Spire
+-- Phantasm and The Big Idea, each watching a single named object or a single die
+-- roll, none of which can occur twice at once. So no printing arms a
+-- duration-less delayed ability on an event one batch can hold two of, and a
+-- printing that did -- "the next time a player gains life", with no duration --
+-- would refute this. Nothing in the CR forbids one: 603.7b's second sentence is
+-- written for exactly this shape.
+--
+-- The batch is Centaur Peacemaker's "each player gains 4 life" again, one
+-- EventGroup across the seats (CR 608.2f). What the cases read is WHICH SEAT is
+-- drained: the entry has no duration, so CR 603.7b's first sentence spends it on
+-- one occurrence, exactly one seat pays 8 and the rest keep their 4. The
+-- amounts are equal on purpose -- identity is then the only separator, so an
+-- assertion about the drained seat cannot pass on an arithmetic coincidence.
+singularCureSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+singularCureSpec s registry =
+  let resolveAll n gs = snd (Engine.runGamePure (choosingGain n) gs Engine.priorityLoop)
+      settle n gs = snd (Engine.runGamePure (choosingGain n) gs Engine.settleForPriority)
+      -- falseCureSpec's staging: the permanent is already placed, its Moved
+      -- event is recorded, and CR 603.6a's scan runs at the next settle.
+      entering n oid gs =
+        let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
+         in resolveAll n (settle n (S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project oid gs))] gs))
+      -- The distinct EventGroups the log's life gains carry. The precondition
+      -- the whole group rests on, asserted rather than assumed: were the seats'
+      -- gains not one group, the earliest-group step would already have picked a
+      -- seat and CR 603.7b's second sentence would never be reached.
+      gainsIn gs =
+        Maybe.mapMaybe
+          ( \logged -> case LoggedEvent.event logged of
+              GameEvent.LifeGained _ -> Just (LoggedEvent.group logged)
+              _ -> Nothing
+          )
+          (Foldable.toList (GameState.events gs))
+      -- alice casts the Cure off two Swamps with a Centaur Peacemaker already on
+      -- the battlefield, waiting to enter. Its own minimal board, peacemakerArmed's
+      -- reason: any other life gain would be a second batch.
+      armed base = do
+        swamp <- S.printingOf s registry "Swamp"
+        cure <- S.printingOf s registry "Synthetic Singular Cure"
+        peacemaker <- S.printingOf s registry "Centaur Peacemaker"
+        let lands = S.landsFor swamp S.alice 2 base
+            (peacemakerId, withPeacemaker) = S.addCreature peacemaker S.alice lands
+            (spellId, withSpell) = S.addHandCard cure S.alice withPeacemaker
+        pure (peacemakerId, resolveAll 0 (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))))
+      -- The same Cure with a LONE gain to watch: bob's Radiant Fountain (CR
+      -- 119.3, "you gain 2 life") entering instead of the Peacemaker.
+      armedWithFountain = do
+        swamp <- S.printingOf s registry "Swamp"
+        cure <- S.printingOf s registry "Synthetic Singular Cure"
+        fountain <- S.printingOf s registry "Radiant Fountain"
+        let lands = S.landsFor swamp S.alice 2 S.threePlayerGame
+            (fountainId, withFountain) = S.addCreature fountain S.bob lands
+            (spellId, withSpell) = S.addHandCard cure S.alice withFountain
+        pure (fountainId, resolveAll 0 (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))))
+   in Spec.describe s "CR 603.7b Synthetic Singular Cure" $ do
+        -- The proving case. Three seats gain 4 in one event group and alice, who
+        -- controls the entry, names the THIRD of them: carol pays 8 and nobody
+        -- else pays anything. An engine that takes the earliest match drains
+        -- alice and leaves carol at 24.
+        Spec.it s "CR 603.7b the controller names carol's gain out of three simultaneous ones" $ do
+          (peacemakerId, gs) <- armed S.threePlayerGame
+          let after = entering 2 peacemakerId gs
+          Spec.assertEqWith s "carol gained 4 and lost 8" (S.lifeOf S.carol after) (Just 16)
+          Spec.assertEqWith s "alice gained 4 and kept it" (S.lifeOf S.alice after) (Just 24)
+          Spec.assertEqWith s "so did bob" (S.lifeOf S.bob after) (Just 24)
+          Spec.assertEqWith s "every seat started at 20" (fmap (\pid -> S.lifeOf pid gs) [S.alice, S.bob, S.carol]) [Just 20, Just 20, Just 20]
+          Spec.assertEqWith s "three gains" (length (gainsIn after)) 3
+          Spec.assertEqWith s "in one event group, so the choice is CR 603.7b's" (length (List.nub (gainsIn after))) 1
+          Spec.assertEqWith s "and the entry is spent, having no stated duration" (Seq.length (GameState.delayedTriggers after)) 0
+        -- The other half of the pair, differing in exactly one thing -- the
+        -- answer. Same board, same batch, bob named instead: an engine that
+        -- ignores the answer cannot pass both cases.
+        Spec.it s "CR 603.7b the same batch answered differently drains bob instead" $ do
+          (peacemakerId, gs) <- armed S.threePlayerGame
+          let after = entering 1 peacemakerId gs
+          Spec.assertEqWith s "bob gained 4 and lost 8" (S.lifeOf S.bob after) (Just 16)
+          Spec.assertEqWith s "alice kept her 4" (S.lifeOf S.alice after) (Just 24)
+          Spec.assertEqWith s "and so did carol" (S.lifeOf S.carol after) (Just 24)
+        -- A FOURTH seat, so the candidate list is longer than any three-seat
+        -- board can offer: naming dave is an answer no collapse onto "the last
+        -- opponent" of the boards above reaches.
+        Spec.it s "CR 603.7b a fourth seat is a fourth candidate" $ do
+          (peacemakerId, gs) <- armed S.fourPlayerGame
+          let after = entering 3 peacemakerId gs
+          Spec.assertEqWith s "dave gained 4 and lost 8" (S.lifeOf S.dave after) (Just 16)
+          Spec.assertEqWith s "alice kept her 4" (S.lifeOf S.alice after) (Just 24)
+          Spec.assertEqWith s "bob kept his" (S.lifeOf S.bob after) (Just 24)
+          Spec.assertEqWith s "carol kept hers" (S.lifeOf S.carol after) (Just 24)
+          Spec.assertEqWith s "four gains in one event group" (length (gainsIn after), length (List.nub (gainsIn after))) (4, 1)
+        -- The plumbing control, and the elision: ONE gain is not a choice, so no
+        -- question is raised and the answer above cannot reach it. bob's own
+        -- Radiant Fountain gains him 2 and the Cure takes 4, whatever index the
+        -- answerer would have given.
+        Spec.it s "CR 603.7b one occurrence is not a choice, so bob pays for his own gain" $ do
+          (fountainId, gs) <- armedWithFountain
+          let after = entering 2 fountainId gs
+          Spec.assertEqWith s "bob gained 2 and lost 4" (S.lifeOf S.bob after) (Just 18)
+          Spec.assertEqWith s "alice is untouched" (S.lifeOf S.alice after) (Just 20)
+          Spec.assertEqWith s "and so is carol" (S.lifeOf S.carol after) (Just 20)
+          Spec.assertEqWith s "one gain, one group" (length (gainsIn after), length (List.nub (gainsIn after))) (1, 1)
+        -- The vacuity guard, falseCureSpec's: the same Peacemaker with NO entry
+        -- armed leaves every seat holding its 4 (CR 119.3). Without it a board
+        -- where nobody actually gained would read as a passing 24 above.
+        Spec.it s "CR 119.3 with no entry armed, each of the three seats keeps its 4" $ do
+          peacemaker <- S.printingOf s registry "Centaur Peacemaker"
+          let (peacemakerId, gs) = S.addCreature peacemaker S.alice S.threePlayerGame
+              after = entering 2 peacemakerId gs
+          Spec.assertEqWith s "alice is at 24" (S.lifeOf S.alice after) (Just 24)
+          Spec.assertEqWith s "bob is at 24" (S.lifeOf S.bob after) (Just 24)
+          Spec.assertEqWith s "carol is at 24" (S.lifeOf S.carol after) (Just 24)
+
 -- CR 603.2c's FIRST sentence on the LIFE side, and the CR 608.2f bracket that
 -- makes it reachable: "each player gains 4 life" is ONE action taken on several
 -- players, processed simultaneously, so every seat's gain shares one
@@ -5222,6 +5361,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   abilitiesWhenTriggeredSpec s registry
   lifeGainAmountSpec s registry
   falseCureSpec s registry
+  singularCureSpec s registry
   communalVigilSpec s registry
   enrageSpec s registry
   belltowerSphinxSpec s registry

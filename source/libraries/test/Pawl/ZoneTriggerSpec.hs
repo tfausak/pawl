@@ -140,6 +140,14 @@ import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
+-- Pawl.Engine.Event.gatherTriggers runs in Game since CR 603.7b's second
+-- sentence became a question for the controller of a delayed entry that matched
+-- two SIMULTANEOUS occurrences. No board in this module arms a delayed entry at
+-- all, so nothing here is ever asked; Pawl.EventTriggerSpec's Synthetic Singular
+-- Cure is where the question is.
+gathered :: GameState.GameState -> [PendingTrigger.PendingTrigger]
+gathered gs = fst (fst (S.runPureWith S.identityAnswer gs (Event.gatherTriggers (Event.unscannedGrouped gs) gs)))
+
 -- CR 702.29c: "'When you cycle this card' means 'When you discard this card to
 -- pay an activation cost of a cycling ability.' These abilities trigger from
 -- whatever zone the card winds up in after it's cycled."
@@ -338,7 +346,7 @@ graveyardTriggerSpec s registry =
           narcomoeba <- S.printingOf s registry "Narcomoeba"
           let (handCard, gs) = S.addHandCard narcomoeba S.alice (Setup.emptyGame S.bothPlayers)
               buried = S.runPure S.identityAnswer gs (Event.changeZone handCard Zone.Graveyard)
-          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped buried) buried))) []
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (gathered buried)) []
           Spec.assertBool s (Set.member narcomoebaName (namesIn Zone.Graveyard S.alice buried)) "it is in the graveyard"
         -- "from your library" doing real work, half two: dying is a move to
         -- the same graveyard from the battlefield, and is not this trigger.
@@ -346,7 +354,7 @@ graveyardTriggerSpec s registry =
           narcomoeba <- S.printingOf s registry "Narcomoeba"
           let (creature, gs) = S.addCreature narcomoeba S.alice (Setup.emptyGame S.bothPlayers)
               died = S.runPure S.identityAnswer gs (Event.changeZone creature Zone.Graveyard)
-          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped died) died))) []
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (gathered died)) []
           Spec.assertBool s (Set.member narcomoebaName (namesIn Zone.Graveyard S.alice died)) "it is in the graveyard"
         -- The zone half, isolated from the mill: a graveyard card whose only
         -- trigger functions on the battlefield (CR 113.6's default) is not
@@ -359,7 +367,7 @@ graveyardTriggerSpec s registry =
               (pikerCard, gs1) = S.addHandCard piker S.alice buried
               entered = S.runPure S.identityAnswer gs1 (Event.changeZone pikerCard Zone.Battlefield)
           Spec.assertBool s (Set.member (CardName.MkCardName $ Text.pack "Soul Warden") (namesIn Zone.Graveyard S.alice entered)) "the Warden is in the graveyard"
-          Spec.assertEqWith s "and a creature entering fires nothing" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped entered) entered))) []
+          Spec.assertEqWith s "and a creature entering fires nothing" (fmap PendingTrigger.source (gathered entered)) []
         -- CR 603.10's first sentence against a card that is NOT in the graveyard
         -- at the CR 117.5 boundary: Corpse Churn mills Narcomoeba and returns it
         -- to the hand in one resolution, with no boundary in between.
@@ -376,7 +384,7 @@ graveyardTriggerSpec s registry =
               resolved = S.runPure returnsIt cast Stack.resolveTop
               -- The NARROW path: the scan itself, no priority loop and no settle,
               -- which cannot tell "never triggered" from "triggered and swept".
-              scanned = fst (Event.gatherTriggers (Event.unscannedGrouped resolved) resolved)
+              scanned = gathered resolved
           Spec.assertEqWith s "the graveyard holds only Corpse Churn at the boundary" (namesIn Zone.Graveyard S.alice resolved) (Set.singleton (CardName.MkCardName $ Text.pack "Corpse Churn"))
           Spec.assertBool s (Set.member narcomoebaName (namesIn Zone.Hand S.alice resolved)) "Narcomoeba is in alice's hand instead"
           Spec.assertEqWith s "exactly one trigger, from the departed graveyard card" (length scanned) 1
@@ -409,7 +417,7 @@ graveyardTriggerSpec s registry =
               cast = S.runPure returnsIt gs (S.cast S.alice spellId)
               resolved = S.runPure returnsIt cast Stack.resolveTop
           Spec.assertBool s (Set.member narcomoebaName (namesIn Zone.Hand S.alice resolved)) "Narcomoeba left the graveyard for the hand"
-          Spec.assertEqWith s "and nothing triggered -- it never arrived from a library in this batch" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped resolved) resolved))) []
+          Spec.assertEqWith s "and nothing triggered -- it never arrived from a library in this batch" (fmap PendingTrigger.source (gathered resolved)) []
         -- The FILTER on that source, which is CR 113.6k itself: a departed
         -- graveyard card is offered only the abilities that function in a
         -- graveyard. Come Back Wrong ("Destroy target creature. If a creature
@@ -446,7 +454,7 @@ graveyardTriggerSpec s registry =
               after = S.runPure answer settled Stack.resolveTop
           Spec.assertEqWith s "CR 113.6k alice takes no experience counter: her Meren did not see her own death from the graveyard" (experienceOf S.alice after) 0
           Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack settled)) 0
-          Spec.assertEqWith s "and the narrow scan of that batch offered nothing" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped resolved) resolved))) []
+          Spec.assertEqWith s "and the narrow scan of that batch offered nothing" (fmap PendingTrigger.source (gathered resolved)) []
           -- The board really is the one the case needs: she died, and she is not
           -- in the graveyard the CR 117.5 boundary would have scanned.
           Spec.assertEqWith s "CR 400.7 the permanent that died is gone" (Game.lookupObject merenId resolved) Nothing
@@ -650,7 +658,7 @@ graveyardEffectZoneTriggerSpec s registry =
           Spec.assertEqWith
             s
             "exactly one trigger, from Squee"
-            (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped gs) gs)))
+            (fmap PendingTrigger.source (gathered gs))
             [TriggerSource.OfObject squeeId]
         -- End to end through the real engine: the trigger is placed, resolves,
         -- and CR 400.7's funnel moves the card to alice's hand.
@@ -682,7 +690,7 @@ graveyardEffectZoneTriggerSpec s registry =
           squee <- S.printingOf s registry "Squee, Goblin Nabob"
           let (_, gs) = S.addCreature squee S.alice (Setup.emptyGame S.bothPlayers)
               begun = beginUpkeep gs
-          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped begun) begun))) []
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (gathered begun)) []
 
 -- CR 114.4: "abilities of emblems function in the command zone" -- the third zone
 -- Pawl.Engine.Event.eventTriggers scans, and the only one whose membership is
@@ -743,7 +751,7 @@ commandZoneTriggerSpec s registry =
           Spec.assertEqWith
             s
             "exactly one trigger, borne by the emblem"
-            (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped atEnd) atEnd)))
+            (fmap PendingTrigger.source (gathered atEnd))
             (fmap TriggerSource.OfObject emblems)
         -- End to end through the real engine: placed, resolved, three Cats.
         Spec.it s "CR 114.4 whole card: three Cat tokens arrive at its controller's end step" $ do
@@ -758,7 +766,7 @@ commandZoneTriggerSpec s registry =
           (_, gs) <- emblemBoard
           let atBobs = beginEndStepOf S.bob gs
               after = resolveAll (settle atBobs)
-          Spec.assertEqWith s "no trigger gathered" (length (fst (Event.gatherTriggers (Event.unscannedGrouped atBobs) atBobs))) 0
+          Spec.assertEqWith s "no trigger gathered" (length (gathered atBobs)) 0
           Spec.assertEqWith s "no Cats" (cats after) 0
 
 -- Serra Avatar ({4}{W}{W}{W} Creature -- Avatar, printed */*), second line: "When
@@ -860,7 +868,7 @@ serraAvatarSpec s registry =
         Spec.it s "CR 603.6 a Serra Avatar EXILED from the battlefield triggers nothing" $ do
           (creature, gs) <- cardIn S.addCreature
           let exiled = S.runPure S.identityAnswer gs (Event.changeZone creature Zone.Exile)
-          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped exiled) exiled))) []
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (gathered exiled)) []
           Spec.assertBool s (Set.member avatarName (namesIn Zone.Exile S.alice exiled)) "it is in exile"
 
 -- CR 603.6c: leaves-the-battlefield abilities "trigger when a permanent moves
@@ -934,7 +942,7 @@ diesTriggerSpec s registry =
           doomedTraveler <- S.printingOf s registry "Doomed Traveler"
           let (traveler, gs) = S.addCreature doomedTraveler S.alice (Setup.emptyGame S.bothPlayers)
               exiled = S.runPure S.identityAnswer gs (Event.changeZone traveler Zone.Exile)
-          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped exiled) exiled))) []
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (gathered exiled)) []
           Spec.assertBool s (Set.member travelerName (namesIn Zone.Exile S.alice exiled)) "it is in exile"
         -- The other half of "from the battlefield": the same card discarded
         -- reaches the same graveyard and has not died (CR 700.4).
@@ -942,7 +950,7 @@ diesTriggerSpec s registry =
           doomedTraveler <- S.printingOf s registry "Doomed Traveler"
           let (traveler, gs) = S.addHandCard doomedTraveler S.alice (Setup.emptyGame S.bothPlayers)
               discarded = S.runPure S.identityAnswer gs (Event.changeZone traveler Zone.Graveyard)
-          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped discarded) discarded))) []
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (gathered discarded)) []
         -- Self-scoped: SOME OTHER creature dying is not this Traveler's
         -- death, even though the Traveler is right there to see it.
         Spec.it s "CR 603.6c another creature dying does not fire the Traveler's trigger" $ do
@@ -951,7 +959,7 @@ diesTriggerSpec s registry =
           let (_, withTraveler) = S.addCreature doomedTraveler S.alice (Setup.emptyGame S.bothPlayers)
               (pikerId, gs) = S.addCreature piker S.alice withTraveler
               died = S.runPure S.identityAnswer gs (Event.changeZone pikerId Zone.Graveyard)
-          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped died) died))) []
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (gathered died)) []
         -- CR 603.3a through CR 603.10a's look-back: "the player who controlled
         -- the ability's source at the time it triggered" is read from the game
         -- as it was immediately BEFORE the death, so a Traveler bob owns but
@@ -965,7 +973,7 @@ diesTriggerSpec s registry =
               stolen = S.attach aura traveler withAura
               died = S.runPure S.identityAnswer stolen (Event.changeZone traveler Zone.Graveyard)
           Spec.assertEqWith s "alice controlled it as it died" (Projection.controllerOf traveler stolen) (Just S.alice)
-          Spec.assertEqWith s "so the trigger is hers, not its owner's" (fmap PendingTrigger.controller (fst (Event.gatherTriggers (Event.unscannedGrouped died) died))) [S.alice]
+          Spec.assertEqWith s "so the trigger is hers, not its owner's" (fmap PendingTrigger.controller (gathered died)) [S.alice]
 
 -- CR 603.6c's SECOND written form with a BYSTANDER bearer -- "Whenever
 -- [something] is put into a graveyard from the battlefield", narrowed by CR
@@ -1013,7 +1021,7 @@ permanentDiesSpec s registry =
             Filter.Type.ControlledBy PlayerRelation.You,
             Filter.Type.Not Filter.Type.IsSource
           ]
-      sourcesOf gs = fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped gs) gs))
+      sourcesOf gs = fmap PendingTrigger.source (gathered gs)
       experienceOf = S.playerCounterOf PlayerCounterKind.Experience
       -- alice's Meren beside one creature of `victim`'s printing, controlled by
       -- `owner`.
@@ -4177,7 +4185,7 @@ bystanderSpec s registry =
       let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
           began = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)] gs0
           dead = S.runPure S.identityAnswer began (Event.destroy Regenerability.Regenerable [ghoul])
-          triggers = fst (Event.gatherTriggers (Event.unscannedGrouped dead) dead)
+          triggers = gathered dead
       Spec.assertEqWith s "the Ghoul really did leave the battlefield" (Game.lookupObject ghoul dead) Nothing
       Spec.assertEqWith s "its step trigger still fired" (fmap PendingTrigger.source triggers) [TriggerSource.OfObject ghoul]
       Spec.assertEqWith s "under alice, who controlled it as it left (CR 603.3a)" (fmap PendingTrigger.controller triggers) [S.alice]
@@ -4189,7 +4197,7 @@ bystanderSpec s registry =
       let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
           dead = S.runPure S.identityAnswer gs0 (Event.destroy Regenerability.Regenerable [ghoul])
           began = S.runPure S.identityAnswer dead (State.modify' (Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice))))
-          triggers = fst (Event.gatherTriggers (Event.unscannedGrouped began) began)
+          triggers = gathered began
       Spec.assertEqWith s "the Ghoul is gone" (Game.lookupObject ghoul began) Nothing
       Spec.assertEqWith s "and nothing triggered" (fmap PendingTrigger.source triggers) []
 
@@ -4252,7 +4260,7 @@ bystanderZoneSpec s registry =
                 [GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)]
                 (g2 {GameState.phase = upkeep, GameState.activePlayer = S.alice})
             after = S.runPure S.identityAnswer began (remove [squeeId, blossomId])
-        pure (squeeId, blossomId, after, fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped after) after)))
+        pure (squeeId, blossomId, after, fmap PendingTrigger.source (gathered after))
    in Spec.describe s "BystanderZone" $ do
         -- The proving leg. EXILE rather than a graveyard on purpose: it leaves
         -- the bystander reading as the only source that could offer Squee's

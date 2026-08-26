@@ -12762,8 +12762,8 @@ stateTriggers gs
 -- against 603.7b's one shot, and it stays armed for the next occurrence. No other
 -- 603.7 subrule evicts an entry, so triggering and a stated duration remain its
 -- only two exits.
-delayedPending :: [GameEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
-delayedPending events gs =
+delayedPending :: [LoggedEvent.LoggedEvent] -> GameState -> Game ([PendingTrigger], Seq.Seq DelayedTrigger)
+delayedPending grouped gs =
   let -- CR 603.7a's floor is the watermark's job, and is all an ordinary entry
       -- needs. This is the card's OWN further restriction: an ability printed "on
       -- your next turn" fires on that one turn and no other, whatever its
@@ -12787,27 +12787,48 @@ delayedPending events gs =
             -- arming spell resolved, and the store is the only thing that still
             -- remembers it.
             if armed entry
-              then filter (matchesTriggerGiven (DelayedTrigger.bindings entry) gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond) events
+              then filter (matchesTriggerGiven (DelayedTrigger.bindings entry) gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond . LoggedEvent.event) grouped
               else []
       -- CR 603.7b's exception, read through CR 603.2c. A stated duration lifts the
       -- one shot, and 603.2c then applies unmodified -- "it can trigger repeatedly
       -- if one event contains multiple occurrences" -- so every occurrence in the
       -- batch fires the entry once. Centaur Peacemaker's "each player gains 4 life"
-      -- is that batch for False Cure, and TriggerSpec's three-seat board proves the
-      -- count.
+      -- is that batch for False Cure, and Pawl.EventTriggerSpec's three-seat board
+      -- proves the count.
       --
-      -- Without a duration, `take 1` is CR 603.7b's first sentence and is CORRECT
-      -- for occurrences the engine records in sequence: the ability triggers the
-      -- NEXT time its event occurs, which is the earliest match in the batch. The
-      -- controller's choice the rule's second sentence gives is not implemented
-      -- (#1711); it applies only to occurrences that are SIMULTANEOUS, and what is
-      -- left before it can be reached is a delayedPending that takes grouped
-      -- events rather than this flat list. A batch of simultaneous occurrences
-      -- exists now: Pawl.Engine.Resolve's life arms share one EventGroup across
-      -- the seats they name (CR 608.2f).
+      -- Without a duration, CR 603.7b's two sentences read as two steps over the
+      -- GROUPED batch. The first sentence -- "the next time its trigger event
+      -- occurs" -- commits the entry to the EARLIEST Pawl.Types.EventGroup that
+      -- holds a match, so taking the first across groups stays right. The second
+      -- then decides WITHIN that group: occurrences sharing one group are
+      -- simultaneous (CR 608.2f), and "the controller of the delayed triggered
+      -- ability chooses which event causes the ability to trigger". A batch of
+      -- simultaneous occurrences is producible: Pawl.Engine.Resolve's life arms
+      -- share one EventGroup across the seats they name, which is what Synthetic
+      -- Singular Cure reads in Pawl.EventTriggerSpec.
+      --
+      -- The GROUP is the equality, not adjacency in the log: the events of one
+      -- group are recorded together today, and reading the tag rather than the
+      -- position keeps that an implementation detail of the recorder.
+      --
+      -- One candidate is not a choice, so no prompt is raised -- which is every
+      -- board but the batched one.
       firedBy entry
-        | Maybe.isJust (DelayedTrigger.expiry entry) = matching entry
-        | otherwise = take 1 (matching entry)
+        | Maybe.isJust (DelayedTrigger.expiry entry) = pure (fmap LoggedEvent.event (matching entry))
+        | otherwise = case matching entry of
+            [] -> pure []
+            earliest : rest ->
+              let group = LoggedEvent.group earliest
+                  candidates = LoggedEvent.event earliest NonEmpty.:| fmap LoggedEvent.event (filter ((== group) . LoggedEvent.group) rest)
+               in if null (NonEmpty.tail candidates)
+                    then pure [NonEmpty.head candidates]
+                    else do
+                      let controller = DelayedTrigger.controller entry
+                      -- Filtered rather than trusted: every candidate offered
+                      -- already matched the entry's condition, and an answer off
+                      -- the end falls back to the earliest.
+                      answer <- Game.choose (Prompt.ChooseDelayedTriggerEvent (Decide.deciderFor controller gs) controller (DelayedTrigger.source entry) candidates)
+                      pure [Replacement.at (NonEmpty.toList candidates) answer (NonEmpty.head candidates)]
       pend entry event =
         PendingTrigger.MkPendingTrigger
           (TriggerSource.OfObject (DelayedTrigger.source entry))
@@ -12863,16 +12884,26 @@ delayedPending events gs =
       -- CR 603.2 plus CR 603.4: the event matched AND the intervening "if" held,
       -- which together are what "triggered" means. Per occurrence, since CR 603.4
       -- asks about the moment the event occurs. AFTER firedBy rather than inside
-      -- it, so an entry with no stated duration still commits to the earliest
-      -- match and then triggers or does not: this docstring's CR 603.4 paragraph
-      -- has the entry survive an occurrence whose "if" was false, not skip past it
-      -- to a later one in the same batch.
+      -- it, so an entry with no stated duration still commits -- to the earliest
+      -- group, and within it to the occurrence CR 603.7b's chooser named -- and
+      -- then triggers or does not: this docstring's CR 603.4 paragraph has the
+      -- entry survive an occurrence whose "if" was false, not skip past it to a
+      -- later one in the same batch. Nor is the choice narrowed to the
+      -- occurrences whose "if" holds: CR 603.7b gives the controller every event
+      -- that OCCURRED, and CR 603.4 then answers for the one they picked.
       triggered entry
-        | reflexive entry = filter (interveningHolds gs) [bare entry | armed entry]
-        | otherwise = filter (interveningHolds gs) (fmap (pend entry) (firedBy entry))
+        | reflexive entry = pure (filter (interveningHolds gs) [bare entry | armed entry])
+        | otherwise = fmap (filter (interveningHolds gs) . fmap (pend entry)) (firedBy entry)
       -- Triggering spends the one shot only for an entry with no stated duration.
-      spent entry = not (null (triggered entry)) && Maybe.isNothing (DelayedTrigger.expiry entry)
-   in (concatMap triggered store, Seq.filter (not . spent) store)
+      spent (entry, fired) = not (null fired) && Maybe.isNothing (DelayedTrigger.expiry entry)
+   in do
+        -- One pass, in store order, because `triggered` can now ASK: the prompt
+        -- must be raised once per entry, and `spent` reads the answer rather than
+        -- recomputing it. Not implemented: CR 101.4's APNAP order over two
+        -- entries with different controllers, which are asked in arming order
+        -- instead (#2380).
+        outcomes <- traverse (\entry -> fmap ((,) entry) (triggered entry)) store
+        pure (concatMap snd outcomes, fmap fst (Seq.filter (not . spent) outcomes))
 
 -- CR 603.7a: the printed Onset as the game first stores it. The delayed-trigger
 -- twin of Expiry.arm, deliberately blind to the board -- unlike a duration, an
@@ -12936,16 +12967,19 @@ settleOnsets gs =
 -- Takes the GROUPED events, because eventTriggers is the one gatherer whose
 -- answer depends on which of them were simultaneous (CR 603.10a). The other two
 -- take the events alone.
-gatherTriggers :: [LoggedEvent.LoggedEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
-gatherTriggers grouped gs =
-  let events = fmap LoggedEvent.event grouped
-      -- Already CR 603.4-filtered: delayedPending has to run the check itself,
-      -- since which entries survive in its second component depends on the
-      -- answer. Running it over these again would be a redundant no-op, the
-      -- GameState being the same one, so only the other two are filtered here.
-      (fromDelayed, surviving) = delayedPending events gs
-      undecided = eventTriggers grouped gs <> stateTriggers gs
-   in (filter (interveningHolds gs) undecided <> fromDelayed, surviving)
+gatherTriggers :: [LoggedEvent.LoggedEvent] -> GameState -> Game ([PendingTrigger], Seq.Seq DelayedTrigger)
+gatherTriggers grouped gs = do
+  -- Already CR 603.4-filtered: delayedPending has to run the check itself,
+  -- since which entries survive in its second component depends on the
+  -- answer. Running it over these again would be a redundant no-op, the
+  -- GameState being the same one, so only the other two are filtered here.
+  --
+  -- In Game rather than pure because CR 603.7b's second sentence is a QUESTION
+  -- for the entry's controller, and every prompt goes through Game.ask. The
+  -- other two gatherers stay pure and are merged in here.
+  (fromDelayed, surviving) <- delayedPending grouped gs
+  let undecided = eventTriggers grouped gs <> stateTriggers gs
+  pure (filter (interveningHolds gs) undecided <> fromDelayed, surviving)
 
 -- | CR 603.3b: the abilities a round of GameEvent.AbilityTriggered records fires,
 -- for Pawl.Engine.Engine.reactions to fold into the same batch.
