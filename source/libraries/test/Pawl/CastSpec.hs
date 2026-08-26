@@ -4183,11 +4183,12 @@ offeredTo pid gs = Action.legalActions pid (gs {GameState.priority = Just pid})
 -- who controls it.
 --
 -- It is the effect DSL's road out of the stack into exile: a Pool.Spells target
--- slot feeding Effect.MoveToZone with a zone of Exile, which no other card in
--- data/cards writes -- reprieve.json is the same slot into Hand, and CR 724.1b's
--- Time Stop sweep reaches exile without a slot or a target. The group is here
--- rather than beside Kellan Joins Up's plot cases because what it proves is a
--- SPELL leaving the stack; the plot stamp rides along on the same MoveToZone.
+-- slot feeding Effect.MoveToZone with a zone of Exile. The two nearest things
+-- data/cards had before it reach neither end of that -- reprieve.json is the
+-- same slot into Hand, and CR 724.1b's Time Stop sweep reaches exile with no
+-- slot and no target. The group is here rather than beside Kellan Joins Up's
+-- plot cases because what it proves is a SPELL leaving the stack; the plot stamp
+-- rides along on the same MoveToZone.
 --
 -- Each seat gets three basics of its OWN colour, so neither seat's mana pays for
 -- the other's spell and bob's three are all tapped by the victim he casts --
@@ -4284,10 +4285,15 @@ avenInterrupterSpec s registry = Spec.describe s "Aven Interrupter" $ do
   -- live on this board at all -- without it, "the Serpopard was exiled" would
   -- pass on an engine that had never heard of Counterability.
   --
-  -- Prowling Serpopard {1}{G}{G} rather than Blurred Mongoose, the pool's other
-  -- printed "this spell can't be countered": the Mongoose also prints shroud, so
-  -- a refusal to target it would be CR 702.18a rather than CR 113.6g and the two
-  -- readings would be indistinguishable.
+  -- Prowling Serpopard {1}{G}{G} rather than Blurred Mongoose, which prints the
+  -- same "this spell can't be countered" beside a shroud that would give a
+  -- refusal to TARGET it a second reading (CR 702.18a).
+  --
+  -- What refuses the countering here is the Serpopard's own FACE. Its other
+  -- sentence, "creature spells you control can't be countered", is a static
+  -- ability of the permanent and does not reach its own spell on the stack:
+  -- disabling Pawl.Engine.Event.protectedFromCountering leaves this case green,
+  -- and only forcing Face.counterability to Counterable reddens it.
   Spec.it s "CR 701.6a exiling a spell is not countering it, so a spell that can't be countered is exiled anyway" $ do
     plains <- S.printingOf s registry "Plains"
     island <- S.printingOf s registry "Island"
