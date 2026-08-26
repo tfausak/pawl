@@ -4016,7 +4016,10 @@ counterOne source controller oid = do
 -- abilities that trigger when those objects ... become the target of a spell
 -- trigger at this point ...)". CR 602.2b and CR 603.3d route an activated and a
 -- triggered ability through the same rule, so all three announcement sites call
--- this and none of them knows what watches.
+-- this and none of them knows what watches. Pawl.Engine.Resolve's CopySpell arm
+-- is the fourth caller and the one that announces nothing: CR 115.1 declares a
+-- spell's targets as part of putting it on the stack, and CR 707.10c puts the
+-- copy there with the targets its controller settled on.
 --
 -- ONE EVENT PER SLOT PER RECIPIENT, which is rule 601.2c's own arity: that rule
 -- lets one object be chosen once for each instance of the word "target" and

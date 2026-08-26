@@ -1242,3 +1242,93 @@ copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "alice takes the COPY's 2, being the copy's you" (S.lifeOf S.alice after) (Just 18)
         Spec.assertEqWith s "bob takes only his own Char's 2" (S.lifeOf S.bob after) (Just 18)
         Spec.assertEqWith s "carol takes 4 from each, the target having been copied" (S.lifeOf S.carol after) (Just 12)
+
+-- CR 702.21a's observer for a copy's targets: bob's Tomakul Honor Guard, {1}{G}
+-- 3/1 whose whole text box is "Ward {2}", against alice's Twincast.
+--
+-- THREE SEATS, and each holds one role: alice copies, bob controls the warded
+-- creature, and carol is neither -- so "a spell an opponent controls" is not the
+-- same sentence as "a spell alice controls".
+--
+-- alice's own Goblin Piker is what the ORIGINAL Giant Growth names in the
+-- re-target case, so the Guard is a target of the COPY and of nothing else there.
+--
+-- FIVE LANDS: one Forest and two Islands are the Growth and the Twincast exactly,
+-- and the two Forests left over are the ward cost alice CAN pay and declines --
+-- so a countered copy is her declining rather than her being unable.
+wardedCopyBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId, ObjectId, ObjectId, ObjectId, GameState.GameState)
+wardedCopyBoard forest island guard piker growth twincast =
+  let lands = S.landsFor island S.alice 2 (S.landsFor forest S.alice 3 S.threePlayerGame)
+      (withGrowth, growthId) = S.handOne growth lands
+      (twincastId, withTwincast) = S.addHandCard twincast S.alice withGrowth
+      (guardId, withGuard) = S.addCreature guard S.bob withTwincast
+      (pikerId, gs) = S.addCreature piker S.alice withGuard
+   in (guardId, pikerId, growthId, twincastId, gs)
+
+-- Resolve until the stack is empty. The two readings of a copy's targets put
+-- DIFFERENT numbers of objects on the stack -- one ward trigger more under the
+-- rule -- so a fixed count of resolutions would leave the two boards at
+-- different depths and the assertion would be reading two different moments.
+drainStack :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+drainStack answer = go (10 :: Int)
+  where
+    go fuel gs
+      | fuel <= 0 || null (GameState.stack gs) = gs
+      | otherwise = go (fuel - 1) (resolveOne answer gs)
+
+copyTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+copyTargetSpec s registry =
+  let boardOf = do
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        guard <- S.printingOf s registry "Tomakul Honor Guard"
+        piker <- S.printingOf s registry "Goblin Piker"
+        growth <- S.printingOf s registry "Giant Growth"
+        twincast <- S.printingOf s registry "Twincast"
+        pure (wardedCopyBoard forest island guard piker growth twincast)
+   in Spec.describe s "Pawl.Engine.Copy" $ do
+        -- CR 115.1: "these targets are declared as part of the process of putting
+        -- the spell or ability on the stack", and CR 707.10c puts the copy on the
+        -- stack WITH the targets its controller has just decided on. So the
+        -- Guard becomes a target of the copy, and CR 702.21a's ward fires on it.
+        --
+        -- The Growth's own target is alice's Piker, so nothing but the copy ever
+        -- names the Guard: 3/1 against 6/4 is the copy having been countered,
+        -- and the Piker's 5/4 is the original resolving either way.
+        Spec.it s "CR 115.1 the copy's NEW target becomes a target, and ward fires" $ do
+          (guardId, pikerId, growthId, twincastId, board) <- boardOf
+          let castGrowth = S.runPure (pinTarget (Recipient.ToCreature pikerId)) board (S.cast S.alice growthId)
+          case topOfStack castGrowth of
+            Nothing -> Spec.assertFailure s "Giant Growth never reached the stack"
+            Just growthSpell -> do
+              let cast = S.runPure (pinTarget (Recipient.ToObject growthSpell)) castGrowth (S.cast S.alice twincastId)
+                  -- Twincast resolves, and CR 707.10c's prompt sends the copy at
+                  -- the Guard instead of the Piker.
+                  copied = resolveOne (pinTarget (Recipient.ToCreature guardId)) cast
+                  after = drainStack S.identityAnswer copied
+              Spec.assertEqWith s "CR 702.21a countered the copy, so the Guard is still a 3/1" (S.powerToughnessOf guardId after) (Just (3, 1))
+              Spec.assertEqWith s "and alice's Piker took the ORIGINAL Growth" (S.powerToughnessOf pikerId after) (Just (5, 4))
+              Spec.assertEqWith s "the ward trigger went on the stack over the copy and the Growth" (length (GameState.stack copied)) 3
+              Spec.assertEqWith s "and everything resolved" (length (GameState.stack after)) 0
+        -- The same rule for a target the copy KEPT. CR 707.10 copies the
+        -- decisions and CR 707.10c leaves an unchanged target unchanged, but the
+        -- copy is "itself a spell" and the Guard becomes a target of THAT spell
+        -- too, so ward fires a second time.
+        --
+        -- Here the Growth names the Guard, so ward fires once as it is cast; the
+        -- copy's own trigger is the second. Both are declined, so 3/1 is both
+        -- spells countered and 6/4 is the copy having resolved -- which is what
+        -- an engine that recorded only a CHANGED target reads.
+        Spec.it s "CR 707.10 a target the copy KEPT becomes a target of the copy too" $ do
+          (guardId, pikerId, growthId, twincastId, board) <- boardOf
+          let castGrowth = S.runPure (pinTarget (Recipient.ToCreature guardId)) board (S.cast S.alice growthId)
+          case topOfStack castGrowth of
+            Nothing -> Spec.assertFailure s "Giant Growth never reached the stack"
+            Just growthSpell -> do
+              let cast = S.runPure (pinTarget (Recipient.ToObject growthSpell)) castGrowth (S.cast S.alice twincastId)
+                  copied = resolveOne (pinTarget (Recipient.ToCreature guardId)) cast
+                  after = drainStack S.identityAnswer copied
+              Spec.assertEqWith s "both the copy and the Growth were countered, so the Guard is a 3/1" (S.powerToughnessOf guardId after) (Just (3, 1))
+              Spec.assertEqWith s "alice's Piker, whom nothing named, is untouched" (S.powerToughnessOf pikerId after) (Just (2, 1))
+              Spec.assertEqWith s "TWO ward triggers stand over the copy and the Growth" (length (GameState.stack copied)) 4
+              Spec.assertEqWith s "and everything resolved" (length (GameState.stack after)) 0

@@ -233,6 +233,7 @@ import qualified Pawl.Types.SlotArity as SlotArity
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
+import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
@@ -3014,6 +3015,22 @@ spellCopyOf source = case source of
   Source.OfEmblem _ -> Nothing
   Source.OfInherentTrigger _ -> Nothing
 
+-- The TARGETS a spell or ability on the stack currently has, per slot. Every
+-- recipient-valued binding restricted to the slots the object actually declares
+-- a target in: Binding.targetsOf reports the reserved ones too -- CR 109.5's
+-- `you` above all -- and CR 115.10b says outright that "you" indicates no
+-- target. Restricted for legalSlot's own reason as well: a slot declaring no
+-- target was never targeted, so CR 608.2b has nothing to re-check there.
+--
+-- Read off the LIVE bindings rather than off what an announcement chose, which
+-- is what makes it answer for a copy whose targets CR 707.10c has just changed.
+targetsOnStack :: ObjectId -> GameState -> Map.Map SlotName (Set Recipient)
+targetsOnStack oid gs =
+  Maybe.fromMaybe Map.empty $ do
+    obj <- Game.lookupObject oid gs
+    face <- Game.faceOf oid gs
+    pure (Map.restrictKeys (Binding.targetsOf (Object.bindings obj)) (Map.keysSet (targetSlotsOf obj oid gs face)))
+
 -- CR 707.10c: "the player may leave any number of the targets unchanged, even if
 -- those targets would be illegal. If the player chooses to change some or all of
 -- the targets, the new targets must be legal."
@@ -3044,12 +3061,9 @@ chooseNewTargetsFor controller copyId = do
   Monad.forM_ (Game.lookupObject copyId gs) $ \copy ->
     Monad.forM_ (Game.faceOf copyId gs) $ \face -> do
       let slots = targetSlotsOf copy copyId gs face
-          -- TARGET slots only. Binding.targetsOf reports every recipient-valued
-          -- binding, and the reserved ones -- CR 109.5's `you` above all -- are
-          -- not targets and are not CR 707.10c's to change. Restricted for CR
-          -- 608.2b's own reason, given at Resolve's legalSlot: a slot declaring
-          -- no target was never targeted.
-          current = Map.restrictKeys (Binding.targetsOf (Object.bindings copy)) (Map.keysSet slots)
+          -- TARGET slots only, which targetsOnStack is: the reserved slots are
+          -- not targets and are not CR 707.10c's to change.
+          current = targetsOnStack copyId gs
           -- CR 608.2b's own derivation, made against the CURRENT board: this is
           -- a fresh choice of targets rather than a re-check of the old one, so
           -- it reads what the board can supply now.
@@ -5028,6 +5042,24 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   }
           State.put (Game.insertIntoZone Zone.Stack LibraryPosition.defaultValue controller copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
           Monad.when newTargets (chooseNewTargetsFor controller copyId)
+          -- CR 115.1: "these targets are declared as part of the process of
+          -- putting the spell or ability on the stack", and CR 707.10c puts the
+          -- copy on the stack once its controller has decided what its targets
+          -- will be -- so each of them becomes a target of the copy, and CR
+          -- 702.21a's ward fires on it.
+          --
+          -- EVERY target, not only the ones CR 707.10c changed: the copy "is
+          -- itself a spell" (CR 707.10), so an object the copy kept is a target
+          -- of a spell it was not a target of before. Read back off the board
+          -- AFTER the re-target above rather than from the copied bindings, for
+          -- the same reason.
+          --
+          -- The KIND is Spell because the guard two steps up established it:
+          -- Game.isSpell classified the copied object, and CR 707.10 makes a
+          -- copy of a spell a spell. A copy of an ABILITY does not reach here
+          -- (#2208).
+          gsCopied <- State.get
+          Event.becameTarget copyId StackObjectKind.Spell controller (targetsOnStack copyId gsCopied)
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name onset duration) -> do
     gs <- State.get
     -- CR 608.2h's last-known fallback, and not belt and braces: the source can
