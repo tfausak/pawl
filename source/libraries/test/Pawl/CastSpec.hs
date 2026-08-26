@@ -56,6 +56,7 @@ import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
@@ -3647,6 +3648,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   drannithMagistrateSpec s registry
   teferiSorcerySpeedSpec s registry
   grafdiggersCageCastSpec s registry
+  avenInterrupterSpec s registry
 
 -- CR 115.6's "up to one target", read at cast time. Rat Out {B} Instant is "Up
 -- to one target creature gets -1/-1 until end of turn. You create a 1/1 black
@@ -4166,3 +4168,174 @@ withMagistrate magistrate gs = snd (S.addCreature magistrate S.alice gs)
 -- player holding priority, and every seat here is asked the same question.
 offeredTo :: PlayerId.PlayerId -> GameState.GameState -> [A.Action]
 offeredTo pid gs = Action.legalActions pid (gs {GameState.priority = Just pid})
+
+-- Aven Interrupter (OTJ 5) {1}{W}{W} Creature -- Bird Rogue 2/2, "Flash /
+-- Flying / When this creature enters, exile target spell. It becomes plotted.
+-- (Its owner may cast it as a sorcery on a later turn without paying its mana
+-- cost.) / Spells your opponents cast from graveyards or from exile cost {2}
+-- more to cast."
+--
+-- Not implemented: the third sentence. Nothing in Pawl.Types.Filter reads the
+-- zone a spell was cast FROM, and IsInZone -- which reads the current one -- is
+-- priced against the stack by the time CR 601.2f asks, so writing it would give
+-- the card a gate and a payment that disagree (#2363). The omission takes a tax
+-- OFF pawl's opponents, which leaves the card weaker than printed for the player
+-- who controls it.
+--
+-- It is the effect DSL's road out of the stack into exile: a Pool.Spells target
+-- slot feeding Effect.MoveToZone with a zone of Exile, which no other card in
+-- data/cards writes -- reprieve.json is the same slot into Hand, and CR 724.1b's
+-- Time Stop sweep reaches exile without a slot or a target. The group is here
+-- rather than beside Kellan Joins Up's plot cases because what it proves is a
+-- SPELL leaving the stack; the plot stamp rides along on the same MoveToZone.
+--
+-- Each seat gets three basics of its OWN colour, so neither seat's mana pays for
+-- the other's spell and bob's three are all tapped by the victim he casts --
+-- which is what makes the cast from exile below discriminating. `answer` is
+-- alice's card in hand: the Bird in the cases about exiling, and a Cancel in the
+-- controls that show the same board countering.
+avenBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+avenBoard aliceLand bobLand answer victim =
+  let (gs0, answerId) = S.handOne answer (S.landsFor bobLand S.bob 3 (S.landsInPlay aliceLand 3))
+      (victimId, gs1) = S.addHandCard victim S.bob gs0
+   in (answerId, victimId, gs1)
+
+-- Aims every target choice at the named object and passes on everything else.
+-- The aim is PINNED though the victim spell is the stack's only spell when the
+-- trigger goes on it: an answerer that searched for a legal recipient would find
+-- it again after a mutation, which is the repair Pawl.Support's default answerer
+-- would silently make.
+avenAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+avenAnswer victimId prompt = case prompt of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just victimId) . Recipient.objectOf) sets
+  _ -> S.identityAnswer prompt
+
+-- avenAnswer, plus CR 603.5's "may" taken: Baral's trigger draws only if its
+-- optional is exercised, and Pawl.Support's default answerer declines every one.
+-- The Bird's own trigger is mandatory, so this changes nothing on its board.
+baralAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+baralAnswer victimId prompt = case prompt of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> avenAnswer victimId prompt
+
+-- The cards of one name a player owns in one zone, by name rather than by id:
+-- CR 400.7 mints a new incarnation on every move, so the id the spell had on the
+-- stack names nothing in exile.
+avenNamed :: Printing.Printing -> Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> Int
+avenNamed printing zone pid gs =
+  length (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName printing)) (Game.zoneMembers zone pid gs))
+
+avenInterrupterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+avenInterrupterSpec s registry = Spec.describe s "Aven Interrupter" $ do
+  -- The headline road: bob's spell is on the stack, alice flashes the Bird in,
+  -- and the spell it targets goes to bob's EXILE instead of resolving. Every
+  -- other destination the rules could have sent it to is asserted empty, since
+  -- a move to the wrong zone is the failure this proves against.
+  Spec.it s "CR 400.7 the targeted spell leaves the stack for its owner's exile, and CR 702.170c plots it there" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    aven <- S.printingOf s registry "Aven Interrupter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (avenId, pikerId, gs) = avenBoard plains mountain aven piker
+        waiting = S.runPure (avenAnswer pikerId) gs (S.cast S.bob pikerId)
+        after = S.runPure (avenAnswer pikerId) waiting (S.cast S.alice avenId >> Engine.priorityLoop)
+        -- CR 702.170d's "any turn after the turn in which it became plotted", on
+        -- bob's own turn, with every land he has still tapped for the Piker.
+        later =
+          after
+            { GameState.turnNumber = GameState.turnNumber after + 1,
+              GameState.activePlayer = S.bob,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.bob
+            }
+        -- The control that says the permission came from the plot stamp rather
+        -- than from the card merely being in exile.
+        unplotted = later {GameState.objects = Map.map (\o -> o {Object.plotted = Nothing}) (GameState.objects later)}
+    -- CR 702.8a, without which the whole case is unreachable: a creature with no
+    -- flash could not be cast with bob's spell waiting on the stack, and there is
+    -- no other moment at which a spell is there to target.
+    Spec.assertBool s (S.castable S.alice avenId waiting) "CR 702.8a flash: the Bird is castable with bob's spell on the stack"
+    Spec.assertEqWith s "the Piker left the stack without resolving: bob has no creature" (S.countOnBattlefieldByName (S.printingName piker) S.bob after) 0
+    Spec.assertEqWith s "CR 406.2 it was exiled, and CR 108.4a files an exiled card under its owner" (avenNamed piker Zone.Exile S.bob after) 1
+    Spec.assertEqWith s "and not under the player whose card exiled it" (avenNamed piker Zone.Exile S.alice after) 0
+    Spec.assertEqWith s "and not in a graveyard, which is where CR 701.6a's countering would have put it" (avenNamed piker Zone.Graveyard S.bob after) 0
+    Spec.assertEqWith s "the Bird itself resolved" (S.countOnBattlefieldByName (S.printingName aven) S.alice after) 1
+    Spec.assertEqWith s "and the stack is empty, so the trigger resolved" (GameState.stack after) []
+    case filter (\oid -> fmap S.nameOf (Game.cardOf oid after) == Just (S.printingName piker)) (Game.zoneMembers Zone.Exile S.bob after) of
+      [exiledId] -> do
+        -- Every land bob has is tapped for the Piker, so a permission that
+        -- granted nothing and one that waived no cost both fail this.
+        Spec.assertBool s (S.castable S.bob exiledId later) "CR 702.170d bob casts it from exile on a later turn, with all three of his lands still tapped"
+        Spec.assertBool s (not (S.castable S.bob exiledId unplotted)) "the control: the same card in the same exile, unplotted, is castable by nobody"
+        Spec.assertEqWith
+          s
+          "CR 702.170c the exiled card is stamped with the turn it became plotted"
+          (fmap Object.plotted (Game.lookupObject exiledId after))
+          (Just (Just (GameState.turnNumber after)))
+      other -> Spec.assertFailure s ("expected one exiled Piker, got " <> show (length other))
+  -- CR 701.6a's negative, as a PAIR that differs in one thing: the same
+  -- Prowling Serpopard spell, on the same seats with the same mana, removed once
+  -- by Cancel and once by the Bird. Cancel is the control that says CR 113.6g is
+  -- live on this board at all -- without it, "the Serpopard was exiled" would
+  -- pass on an engine that had never heard of Counterability.
+  --
+  -- Prowling Serpopard {1}{G}{G} rather than Blurred Mongoose, the pool's other
+  -- printed "this spell can't be countered": the Mongoose also prints shroud, so
+  -- a refusal to target it would be CR 702.18a rather than CR 113.6g and the two
+  -- readings would be indistinguishable.
+  Spec.it s "CR 701.6a exiling a spell is not countering it, so a spell that can't be countered is exiled anyway" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    aven <- S.printingOf s registry "Aven Interrupter"
+    cancel <- S.printingOf s registry "Cancel"
+    serpopard <- S.printingOf s registry "Prowling Serpopard"
+    let (avenId, victimA, boardA) = avenBoard plains forest aven serpopard
+        (cancelId, victimB, boardB) = avenBoard island forest cancel serpopard
+        exiled = S.runPure (avenAnswer victimA) boardA (S.cast S.bob victimA >> S.cast S.alice avenId >> Engine.priorityLoop)
+        countered = S.runPure (avenAnswer victimB) boardB (S.cast S.bob victimB >> S.cast S.alice cancelId >> Engine.priorityLoop)
+    Spec.assertEqWith s "the exile took the Serpopard off the stack, so it never resolved" (S.countOnBattlefieldByName (S.printingName serpopard) S.bob exiled) 0
+    Spec.assertEqWith s "CR 701.6a and put it in exile, CR 113.6g notwithstanding: this was never a countering" (avenNamed serpopard Zone.Exile S.bob exiled) 1
+    Spec.assertEqWith s "CR 113.6g the control: Cancel does not counter the same spell, so it resolves" (S.countOnBattlefieldByName (S.printingName serpopard) S.bob countered) 1
+    Spec.assertEqWith s "and nothing of it is in exile there" (avenNamed serpopard Zone.Exile S.bob countered) 0
+  -- CR 701.6a's other negative, the same way: nothing counters a spell that is
+  -- exiled off the stack, so a "whenever a spell you control counters a spell"
+  -- trigger must stay silent. Baral, Chief of Compliance is the observer, and
+  -- alice's LIBRARY is where his trigger shows: he draws, so a fired trigger
+  -- costs her a card off the top and a silent one does not.
+  --
+  -- The pair again: the same Goblin Piker, removed by Cancel on one board and by
+  -- the Bird on the other. The Cancel half is what says Baral is watching -- an
+  -- engine that never recorded the event at all would leave alice's library
+  -- untouched on BOTH boards and the negative would be vacuous.
+  Spec.it s "CR 701.6a a spell exiled off the stack was not countered, so a counter trigger stays silent" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    aven <- S.printingOf s registry "Aven Interrupter"
+    cancel <- S.printingOf s registry "Cancel"
+    baral <- S.printingOf s registry "Baral, Chief of Compliance"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let watched land answer =
+          let (answerId, victimId, gs0) = avenBoard land mountain answer piker
+              (_, gs1) = S.addCreature baral S.alice gs0
+              (_, gs2) = S.addLibraryCard mountain S.alice gs1
+              (_, gs3) = S.addLibraryCard mountain S.alice gs2
+           in (answerId, victimId, gs3)
+        (avenId, victimA, boardA) = watched plains aven
+        (cancelId, victimB, boardB) = watched island cancel
+        exiled = S.runPure (baralAnswer victimA) boardA (S.cast S.bob victimA >> S.cast S.alice avenId >> Engine.priorityLoop)
+        countered = S.runPure (baralAnswer victimB) boardB (S.cast S.bob victimB >> S.cast S.alice cancelId >> Engine.priorityLoop)
+        librarySize gs = length (Game.zoneMembers Zone.Library S.alice gs)
+        wasCountered gs = any (\e -> case e of GameEvent.SpellCountered _ -> True; _ -> False) (S.eventsOf gs)
+    Spec.assertEqWith s "both boards start alice on two library cards" (librarySize boardA, librarySize boardB) (2, 2)
+    Spec.assertEqWith s "CR 701.6a the control: Cancel counters the Piker, Baral's trigger draws, and alice's library is one shorter" (librarySize countered) 1
+    Spec.assertEqWith s "CR 701.6a the Bird exiled the same spell instead, so Baral never triggered and alice drew nothing" (librarySize exiled) 2
+    Spec.assertEqWith s "the Piker is in bob's exile rather than his graveyard" (avenNamed piker Zone.Exile S.bob exiled, avenNamed piker Zone.Graveyard S.bob exiled) (1, 0)
+    Spec.assertEqWith s "where the countered one went to his graveyard rather than exile" (avenNamed piker Zone.Exile S.bob countered, avenNamed piker Zone.Graveyard S.bob countered) (0, 1)
+    Spec.assertEqWith s "and the record agrees: a countering happened on the one board and not on the other" (wasCountered countered, wasCountered exiled) (True, False)
