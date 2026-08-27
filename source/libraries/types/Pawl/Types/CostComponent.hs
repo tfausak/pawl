@@ -12,9 +12,16 @@ import qualified Pawl.Types.TapPermanents as TapPermanents
 -- | One component of a Pawl.Types.Cost's non-mana part, alongside its mana part
 -- (CR 601.2f).
 --
--- Open-half card data. Pawl.Engine.Cost is the ONLY module that may case on it:
--- the rules core reads the classification (can this be paid? does it require the
--- tap symbol?) and never the identity of a component.
+-- Open-half card data. Pawl.Engine.Cost is where every reading of it lives but
+-- one: CR 605.1a's "its cost and effect don't move any card to or from a
+-- library" is Pawl.Engine.ManaAbility.costMovesLibraryCard, which cannot route
+-- through Pawl.Engine.Cost without a module cycle (see that function).
+-- Pawl.Engine.Filter.rewriteComponent cases on it too and reads nothing -- CR
+-- 612.1's word swap is a traversal that reconstructs every arm.
+--
+-- Either way what the rules core takes from it is a CLASSIFICATION (can this be
+-- paid? does it require the tap symbol? does it touch a library?) and never the
+-- identity of a component.
 --
 -- PARAMETRIC in the keyword for the Filter it carries, and for that type's
 -- reason alone -- see Pawl.Types.Filter.
@@ -413,4 +420,39 @@ data CostComponent keyword
     -- The zone, the owner and the printed-not-projected matching are all
     -- ExileCardsFromGraveyard's, for its reasons.
     ExileTopFromGraveyard (Filter.Filter keyword)
+  | -- | CR 701.17a as a cost: the paying player puts that many cards from the top
+    -- of their library into their graveyard. Millikin's "{T}, Mill a card: Add
+    -- {C}" is the printing. CR 601.2f's list of what a cost may include ends in
+    -- "and so on" and never names milling, so this is a cost by CR 118.1's
+    -- general reading -- "an action or payment necessary to take another action"
+    -- -- exactly as ReturnThis and the three exile arms above are.
+    --
+    -- The ONLY component that moves a card out of a LIBRARY, which two rules
+    -- then read. CR 605.1a stops an ability carrying it from being a mana
+    -- ability, whatever the ability's effect does
+    -- (Pawl.Engine.ManaAbility.costMovesLibraryCard) -- which is why Millikin's
+    -- own reminder text says "Activate only as an instant". And CR 601.2h puts
+    -- it in the payment's SECOND pass, a library being hidden and a graveyard
+    -- public (CR 400.2) -- Pawl.Engine.Cost.paidInSecondPass.
+    --
+    -- A COUNT and no criterion, which is ExileTopFromGraveyard's side of the axis
+    -- rather than DiscardCards': CR 701.17a takes the cards off the TOP, so
+    -- nothing is chosen and there is nothing to prompt for. CR 701.17b's own cost
+    -- sentence is phrased over "a number of cards", so the count is the whole
+    -- payload.
+    --
+    -- "THEIR library", per CR 400.3 and CR 108.4: a library is a per-player zone
+    -- whose members are its owner's, so the cards are the paying player's own.
+    -- Whose library is fixed by the constructor for the reason the zone is in
+    -- ExileCardsFromGraveyard's, so a cost milling somebody else would be a
+    -- second constructor rather than a field here.
+    --
+    -- NO Pawl.Types.Mill payload, which the EFFECT side carries: that type's
+    -- tally and slot are CR 701.17c's and rule 728.1's look-backs, read by a
+    -- later clause of the same resolution. A cost has no later clause -- see
+    -- Pawl.Engine.Cost.payComponent, which binds no slot for it -- so both fields
+    -- would be permanently Nothing.
+    --
+    -- A Natural and not a Quantity, for PayLife's reason.
+    MillCards Natural.Natural
   deriving (Eq, Ord, Show)

@@ -868,11 +868,12 @@ data Prompt r where
   --
   -- Asked once for the whole cost rather than once per part, losing nothing:
   -- each component's own choices are still asked when it is paid, against the
-  -- board the earlier ones left. One prompt, not two, because CR 601.2h's
-  -- second pass is empty in this vocabulary -- no component involves a random
-  -- element or moves an object from a library to a public zone.
+  -- board the earlier ones left. Once per PASS: CR 601.2h pays the parts that
+  -- move no card out of a library into a public zone first and the rest after,
+  -- and each pass is ordered on its own
+  -- (Pawl.Engine.Cost.paidInSecondPass).
   --
-  -- Asked only where the order is observable, which
+  -- Asked only where the order is observable within a pass, which
   -- Pawl.Engine.Cost.orderObservable decides.
   OrderCostComponents :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [CostComponent.CostComponent Keyword.Keyword] -> Prompt [Natural.Natural]
   -- | CR 608.2f's secondary sentence: the controller of the RESOLVING spell or

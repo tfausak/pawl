@@ -31,6 +31,7 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.FaceDown as FaceDown
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
@@ -1725,6 +1726,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   morcantSpec s registry
   unerringSlingSpec s registry
   barkhideTrollSpec s registry
+  millikinSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
 -- `granted` is True, with priority in her own precombat main phase so a sorcery
@@ -2756,3 +2758,99 @@ barkhideTrollSpec s registry =
           Spec.assertEqWith s "CR 613.4c a 3/3 on arrival, not the printed 2/2" (S.powerToughnessOf trollId resolved) (Just (3, 3))
           Spec.assertEqWith s "one +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne trollId resolved) 1
         _ -> Spec.assertFailure s "Barkhide Troll should have resolved onto the battlefield"
+
+-- Millikin {2} Artifact Creature -- Construct 0/1, "{T}, Mill a card: Add {C}"
+-- (Oracle text checked against Scryfall): the pool's producer of a cost that
+-- MILLS, and so of CR 601.2h's second pass. Pawl.ManaSpec's Millikin group
+-- carries CR 605.1a, which is the other rule its cost reaches.
+--
+-- Three things are proved here and nowhere else: CR 701.17b's refusal of a mill
+-- bigger than the library, the two-pass split -- the payment asks the payer to
+-- order NOTHING, where one undivided list would have asked -- and CR 701.17a's
+-- record, which is what makes a cost-side mill a mill to anything watching.
+millikinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+millikinSpec s registry =
+  Spec.describe s "Millikin" $ do
+    -- CR 701.17b's last sentence, which is about a COST rather than about an
+    -- instruction. The two boards differ in the library and in nothing else, so
+    -- the refusal is the library's doing: Millikin is untapped and settled on
+    -- both, which is the whole of the other component's payability.
+    --
+    -- The OFFER is guarded twice over -- Cost.canPayComponent's arm and the
+    -- Zone.Library claim Cost.claimOf states, either of which alone withholds it
+    -- -- so the two component assertions below are what pin the arm itself.
+    Spec.it s "CR 701.17b a mill cost is unpayable out of an empty library, so the ability is not offered" $ do
+      millikin <- S.printingOf s registry "Millikin"
+      let (stockedId, stocked) = millikinBoard millikin 1
+          (emptyId, emptied) = millikinBoard millikin 0
+          offers oid gs = length (filter (isActivateOf oid) (Action.legalActions S.alice gs))
+      Spec.assertEqWith s "CR 602.2b offered with one card in the library" (offers stockedId stocked) 1
+      Spec.assertEqWith s "and not offered with none" (offers emptyId emptied) 0
+      Spec.assertBool s (Cost.canPayComponent S.alice stockedId (CostComponent.MillCards 1) stocked) "the component alone is payable at one card"
+      Spec.assertBool s (not (Cost.canPayComponent S.alice emptyId (CostComponent.MillCards 1) emptied)) "and unpayable at none"
+      Spec.assertBool s (not (Cost.canPayComponent S.alice stockedId (CostComponent.MillCards 2) stocked)) "and one card does not pay a two-card mill"
+
+    -- CR 601.2h's two passes. Millikin's cost holds exactly one part of each --
+    -- {T} moves no card out of a library, the mill moves one into a public
+    -- graveyard (CR 400.2) -- so each pass has a single part and the payer is
+    -- given no order to choose. The recorder's control is the second run: the
+    -- same board and the same answerer, over two parts that share the FIRST
+    -- pass, which is asked.
+    Spec.it s "CR 601.2h the {T} and the mill are paid in different passes, so nothing is ordered" $ do
+      millikin <- S.printingOf s registry "Millikin"
+      let (millikinId, board) = millikinBoard millikin 3
+          ability = theAbility millikin
+          ((_, after), asked) = State.runState (Engine.runGame recordingOrders board (Activate.activateAbility S.alice millikinId ability)) []
+          sharedPass = State.execState (Engine.runGame recordingOrders board (Cost.payComponents PaymentMoment.OutsideResolution S.alice millikinId [CostComponent.TapThis, CostComponent.SacrificeThis])) []
+      Spec.assertEqWith s "CR 601.2h the payer was asked to order nothing" (length asked) 0
+      Spec.assertEqWith s "CR 701.17a and both parts were still paid: one card is in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+      Spec.assertEqWith s "CR 107.5 with Millikin tapped for the other part" (fmap Object.tapped (Game.lookupObject millikinId after)) (Just TapState.Tapped)
+      Spec.assertBool
+        s
+        (Cost.orderObservable [CostComponent.TapThis, CostComponent.MillCards 1])
+        "both parts are order-sensitive, so it is the CR 601.2h partition and not orderSensitive that leaves nothing to ask"
+      Spec.assertEqWith s "the control: two parts of the ONE pass are ordered by the payer" (length sharedPass) 1
+
+    -- CR 701.17a makes an action a mill wherever it happens, so the payment
+    -- records one exactly as a resolution does. The Master, Transcendent's
+    -- "target creature card in a graveyard that was milled this turn" is what
+    -- reads that record (Filter.MilledThisTurn), and a payment that moved the
+    -- card without recording would leave it invisible to that card while sitting
+    -- in the same graveyard.
+    --
+    -- A PAIR differing in one thing: the cards the mill took answer, the ones it
+    -- left in the library do not.
+    Spec.it s "CR 701.17a a card milled to pay a cost was milled this turn" $ do
+      millikin <- S.printingOf s registry "Millikin"
+      let (millikinId, board) = millikinBoard millikin 3
+          after = S.runPure S.identityAnswer board (Activate.activateAbility S.alice millikinId (theAbility millikin))
+          context = Filter.contextFor (Just S.alice) Nothing
+          milledThisTurn oid = Filter.matches context (Projection.viewOfObject oid after) Filter.Type.MilledThisTurn
+      Spec.assertEqWith s "the mill put one card in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+      Spec.assertBool s (all milledThisTurn (Game.zoneMembers Zone.Graveyard S.alice after)) "which answers CR 701.17a's look-back"
+      Spec.assertBool s (not (any milledThisTurn (Game.zoneMembers Zone.Library S.alice after))) "where the two cards it left in the library do not"
+
+-- Millikin on the battlefield, settled and untapped, with `cards` copies of it
+-- in alice's library, and alice holding priority in her own precombat main
+-- phase. Nothing else is on the board, so a refusal below is the library's.
+millikinBoard :: Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+millikinBoard millikin cards =
+  let (millikinId, g1) = S.addCreature millikin S.alice (Setup.emptyGame S.bothPlayers)
+      stocked = foldr (\p gs -> snd (S.addLibraryCard p S.alice gs)) g1 (replicate cards millikin)
+   in ( millikinId,
+        stocked
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Every CR 601.2h ordering prompt raised, in order, by the components it
+-- offered. A pure answerer cannot tell one prompt from none at all, so this
+-- threads State -- Pawl.ManaSpec's recordingManaSources' shape.
+recordingOrders :: Prompt.Prompt r -> State.State [[CostComponent.CostComponent Keyword.Keyword]] r
+recordingOrders p = case p of
+  Prompt.OrderCostComponents _ _ _ components -> do
+    State.modify' (<> [components])
+    pure (Replay.defaultAnswer p)
+  _ -> pure (S.identityAnswer p)
