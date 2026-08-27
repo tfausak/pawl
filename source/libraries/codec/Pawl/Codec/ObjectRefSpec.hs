@@ -283,7 +283,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.RandomCardInHand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))))
       " {\"type\":\"RandomCardInHand\",\"value\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"}} "
-  -- The one Arm.tagged risk this file exists for (#1715): the arm's payload is a
+  -- The one Arm.tagged risk this file exists for (#2262): the arm's payload is a
   -- bare Filter, exactly EachMatching's above, so a MISSING codec arm would
   -- compile and only this case would notice. The distinct-tag case below is what
   -- catches the other half -- an arm copying EachMatching's tag, which would turn

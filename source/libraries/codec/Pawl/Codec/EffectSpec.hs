@@ -1193,7 +1193,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
   -- CR 724.2: nullary for the same reason, and hand-written for the reason every
   -- arm here is -- Arm.tagged's list ends in `_ -> Nothing`, so a constructor
   -- with no arm encodes to nothing and decodes from nothing without a warning
-  -- (#1715).
+  -- (#2262).
   Spec.it s "EndCombatPhase" $
     Common.assertJsonCodec
       s

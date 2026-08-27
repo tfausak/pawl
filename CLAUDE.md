@@ -225,7 +225,7 @@ to agents as written. What it doesn't say:
     hand-kept `everyTriggerCondition` and `representativeEvents`, and
     `Pawl.CardSpec`'s filter and keyword traversals. No `Arm.tagged` codec is
     forced --- every such list carries its own `_ -> Nothing`, so a new
-    constructor compiles with no codec arm and no round-trip test (#1715). An
+    constructor compiles with no codec arm and no round-trip test (#2262). An
     `Arm.enum` codec derives and needs neither; dozens of modules use one, so
     check which kind the type has rather than assuming. Grep the sibling
     constructor, read every hit, and record in the PR which ones you read and
