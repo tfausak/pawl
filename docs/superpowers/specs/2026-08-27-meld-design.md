@@ -27,43 +27,62 @@ arranges the two cards in a graveyard or library), 712.21b (relative timestamp
 order on exile), 712.21d (one replacement effect applying to both cards), 712.21e
 (one object, two cards, for anything that counts), CR 903.3b and 903.9c (a melded
 commander), CR 123.5a/c (stickers, unmodelled anyway). CR 712.19/201.4e -- a
-player choosing the combined back face's name -- is expected to work already,
-since the result card is keyed by its own name; it gets an issue only if the
-implementation shows otherwise.
+player choosing the combined back face's name -- needs nothing: see *Where the
+combined face lives*.
 
 Mutate (#874) stays out, but the departure machinery below is built for it; see
 *What meld shares with merging*.
 
 ## The cards
 
-Two new files under `data/cards/`, both verified against Scryfall on 2026-08-27.
+One new file under `data/cards/`, verified against Scryfall on 2026-08-27, and a
+one-line change to a card already in the pool.
 
-`hanweir-battlements.json` -- a Land, layout `Normal`, three activated abilities:
+`hanweir-battlements.json` -- a Land, layout `Meld`, three activated abilities:
 `{T}: Add {C}.`; `{R}, {T}: Target creature gains haste until end of turn.`;
 `{3}{R}{R}, {T}: If you both own and control this land and a creature named
 Hanweir Garrison, exile them, then meld them into Hanweir, the Writhing
 Township.`
 
-`hanweir-the-writhing-township.json` -- layout `Meld`, one face: a colorless
-Legendary Creature -- Eldrazi Ooze, 7/4, trample and haste, "Whenever Hanweir
-attacks, create two 3/2 colorless Eldrazi Horror creature tokens that are tapped
-and attacking." No mana cost; CR 202.3c computes the melded permanent's mana value
-instead.
+`hanweir-garrison.json` gains `"layout": "Meld"` and nothing else.
 
-Hanweir Garrison is untouched. CR 712.4b makes a meld card's back face meaningless
-except while melded ("If a rule or effect references the back face of a meld card
-when not part of a melded permanent on the battlefield, it fails to determine its
-characteristics"), so a component card that prints only its front face loses
-nothing.
+`Pawl.Types.Layout` gains a `Meld` arm, and it marks a COMPONENT meld card
+rather than the combined face. That is CR 712.4's own subject -- "meld cards have
+a Magic card face on one side and half of an oversized card face on the other" --
+and it is what Scryfall reports for both halves of the pair. Two rules need the
+classification: CR 701.42b ("cards that aren't meld cards ... can't be melded")
+and CR 712.4c ("meld cards cannot be transformed or converted"). Each printed
+half carries its front face alone: CR 712.4b makes a meld card's back face
+meaningless except as part of a melded permanent, so nothing is lost.
 
-There is deliberately no `components` list in card data. The pair is named by the
-ability that melds, which is where the printed text names it, so nothing needs a
-second index and `Pawl.Types.Card` gains no field -- a new field there would be
-absorbed silently by positional record construction in the test suite, the trap
-CLAUDE.md records from PRs #2009 and #2021.
+The codec is `Arm.enum`, so the wire format derives and every `case layout of` in
+the tree goes red. A `Pawl.CardSpec` lint holds a `Meld` card to exactly one
+face.
 
-`Pawl.Types.Layout` gains a `Meld` arm. Its codec is `Arm.enum`, so the wire
-format derives and every `case layout of` in the tree goes red.
+## Where the combined face lives
+
+Inline in the meld ability, as `Effect.Meld`'s own `Card` payload -- the shape
+`Effect.Create` already uses to carry a token's characteristics -- and interned
+at resolution with `Game.intern`, exactly as `Pawl.Engine.Event.createTokens`
+interns a token card.
+
+Not a card file, and not a registry lookup, because the engine cannot do one: no
+`Pawl.Engine` module imports `Pawl.Registry` and `GameState` holds no name-keyed
+map, so an `Effect.Meld` naming its result by name would have nothing to resolve
+the name against. Every card an effect brings into being in pawl today is either
+already an object in the game or is carried inline.
+
+This is also what dissolves the obstacle #369's body calls the first one an
+implementer meets: the combined face is never a key in the pool, so it cannot
+collide with anything in `Pawl.Registry.index`. CR 712.19 and CR 201.4e survive
+it -- `Prompt.ChooseCardName` answers with whatever name the decider names and
+never enumerates the pool, so a player may already choose the combined back
+face's name.
+
+The pair is named by the ability that melds, which is where the printed text
+names it, so no card gains a `components` list. `Pawl.Types.Card` gains no field
+either -- one there would be absorbed silently by positional record construction
+in the test suite, the trap CLAUDE.md records from PRs #2009 and #2021.
 
 ## The melded permanent
 
@@ -119,15 +138,15 @@ battlefield, "a creature named Hanweir Garrison" is a choice, and the two are
 distinguishable (counters, Auras, summoning sickness), so eliding it would be an
 observable divergence rather than a sound elision.
 
-`Effect.Meld` carries `objects :: ObjectRef` and `result :: CardName`, and
-performs CR 701.42a alone: put those cards onto the battlefield as one permanent
+`Effect.Meld` carries `objects :: ObjectRef` and `result :: card` -- the combined
+face inline, per *Where the combined face lives* -- and performs CR 701.42a alone: put those cards onto the battlefield as one permanent
 whose source is `OfMeld`. The card is written as the two steps it prints:
 
 ```
 MoveToZone { objects = [Self, <chosen creature named Hanweir Garrison>]
            , to = Exile, slot = "melding" }
 Meld       { objects = InSlot "melding"
-           , result  = "Hanweir, the Writhing Township" }
+           , result  = <the combined face, inline> }
 ```
 
 `MoveToZone` already binds its destination objects to a slot (CR 400.7j), so this
@@ -136,8 +155,8 @@ happen -- a token copy, a card that is not the counterpart -- the cards stay whe
 the exile left them, which is the rule's own Graf Rats example.
 
 `Meld` refuses and leaves the cards alone (CR 701.42b/c) unless every named object
-is a card (not a token, not a copy), the objects are the components of the named
-result, and they share an owner.
+is a card (not a token, not a copy) whose layout is `Meld`, and they share an
+owner.
 
 ## The departure (CR 712.21)
 
