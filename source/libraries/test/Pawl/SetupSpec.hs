@@ -674,6 +674,11 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     -- battlefield would never see the early one go.
     Spec.assertEqWith s "CR 603.10: the early crossing's event was sampled while the late one still stood" (fmap (Set.member lateCrosser . sampledAt) (groupOf earlyCrosser)) (Just True)
     Spec.assertEqWith s "CR 603.10: the late crossing's event was sampled after the early one had gone" (fmap (Set.member earlyCrosser . sampledAt) (groupOf lateCrosser)) (Just False)
+    -- CR 603.10's "objects that exist immediately after the event": a group's own
+    -- departure is not among the objects existing after it, so each crosser is
+    -- absent from its OWN group's sample -- neither assertion above checks that.
+    Spec.assertEqWith s "CR 603.10: the early crosser is absent from its own group's sample" (fmap (Set.member earlyCrosser . sampledAt) (groupOf earlyCrosser)) (Just False)
+    Spec.assertEqWith s "CR 603.10: the late crosser is absent from its own group's sample" (fmap (Set.member lateCrosser . sampledAt) (groupOf lateCrosser)) (Just False)
 
   -- CR 608.2h against a RUNNING board, which is the whole reason applyCrossings
   -- is a fold and not a batch: the anthem crosses first, so by the instant the

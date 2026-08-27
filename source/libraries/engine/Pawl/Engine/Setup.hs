@@ -621,6 +621,11 @@ subgameStateFrom starter parent =
       -- Not implemented: an object's face-down status is not carried, so a
       -- face-down main-game permanent is offered by its PRINTED face rather than
       -- by CR 708.2's characteristics (#2467).
+      --
+      -- Not implemented: this reach is not scoped away from the parent's STACK,
+      -- so a wish can name the very spell that is resolving it (correct per CR
+      -- 729.4/729.5), but what Pawl.Engine.Resolve.resolveSpellWith does
+      -- afterwards, once that spell's own object is gone, is untested (#2473).
       outside =
         Map.union
           (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.union libIds cmdIds)))

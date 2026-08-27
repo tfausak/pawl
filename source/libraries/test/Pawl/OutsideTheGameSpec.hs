@@ -45,6 +45,7 @@ import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
@@ -236,6 +237,30 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
     Spec.assertEqWith s "CR 729.4/400.11c: the main-game creature arrives in her subgame hand" (printingsIn Zone.Hand S.alice after) [bear]
     Spec.assertEqWith s "CR 729.4a: the crossing is recorded for the outer frame to apply" (Foldable.toList (GameState.broughtIn after)) [bearId]
     Spec.assertEqWith s "and it is no longer offered" (Map.member bearId (GameState.outsideObjects after)) False
+  -- The discrimination OutsideCard exists for: BOTH of CR 400.11c's sources on
+  -- offer at once, and the answer names the pool one, not the main-game one.
+  Spec.it s "CR 400.11c/729.4: the pool and the main game are offered together, and the answer picks the pool card" $ do
+    bear <- S.printingOf s registry "Prodigal Sorcerer"
+    dragon <- S.printingOf s registry "Hoarding Dragon"
+    let (bearId, parent0) = S.addCreature bear S.alice (Setup.emptyGame S.bothPlayers)
+        (dragonId, parent1) = Game.intern dragon parent0
+        stock p = p {Player.outsideTheGame = Map.singleton dragonId 1}
+        parent = parent1 {GameState.players = Map.adjust stock S.alice (GameState.players parent1)}
+        sub = Setup.subgameStateFrom S.alice parent
+        predicate = Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Land]
+        offered = OutsideTheGame.eligible predicate bearId S.alice sub
+        isPool candidate = case candidate of
+          OutsideCard.InPool _ -> True
+          OutsideCard.InAnotherGame _ -> False
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseFromOutsideTheGame _ _ candidates -> Maybe.fromMaybe (NonEmpty.head candidates) (List.find isPool (NonEmpty.toList candidates))
+          _ -> S.identityAnswer p
+        after = snd (Engine.runGamePure answer sub (OutsideTheGame.reveal predicate bearId S.alice))
+    Spec.assertEqWith s "the pool and the main game were both on offer" (length offered) 2
+    Spec.assertEqWith s "the pool card is what arrived" (printingsIn Zone.Hand S.alice after) [dragon]
+    Spec.assertEqWith s "the main-game creature is untouched: the answer did not take it" (Map.member bearId (GameState.outsideObjects after)) True
+    Spec.assertEqWith s "and the pool entry was spent" (poolOf S.alice after) Map.empty
   -- CR 108.3b: the reach outside the game is scoped to the acting player's OWN
   -- cards. Bob's creature sits in the same outsideObjects map; alice's wish must
   -- not see it.
@@ -314,8 +339,10 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
           Prompt.RandomFirstPlayer _ -> S.alice
           _ -> S.castAnswer p
         after = snd (Engine.runGamePure answer before Engine.priorityLoop)
+        -- Scoped to bob, the player CR 729.1b makes pay: today he is the only
+        -- main-game life-loser, but an unscoped match would also catch alice's.
         isLifeLoss e = case e of
-          GameEvent.LifeLost {} -> True
+          GameEvent.LifeLost change -> LifeChange.player change == S.bob
           _ -> False
         isShredderCounter e = case e of
           GameEvent.CountersPut change -> CounterChange.object change == shredderId

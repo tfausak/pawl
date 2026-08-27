@@ -1622,13 +1622,22 @@ playSubgame = do
   --
   -- BEFORE the funnel, so funnelBack's keptParentObjects reads a parent the card
   -- has already left rather than one it has to be kept out of. The order is
-  -- deliberate but is NOT observable today, and swapping the two lines leaves the
-  -- whole suite green: funnelBack keeps the crossed object rather than reviving
-  -- it, so applying the crossings afterwards deletes exactly the same id from
-  -- exactly the same zones. What would end the coincidence is funnelBack ever
-  -- MINTING for a parent id -- the recovery path already does that for a player
-  -- who departed inside the subgame (`recovered`), and it would resurrect a
-  -- crossed card the moment one of those ids could also cross.
+  -- load-bearing on two counts, not one. First, the deletion itself: swapping
+  -- the two lines still leaves the whole suite green, since funnelBack keeps
+  -- the crossed object rather than reviving it, so applying the crossings
+  -- afterwards deletes exactly the same id from exactly the same zones -- what
+  -- would end THAT coincidence is funnelBack ever MINTING for a parent id, the
+  -- way the recovery path already does for a player who departed inside the
+  -- subgame (`recovered`), which would resurrect a crossed card the moment one
+  -- of those ids could also cross. Second, and observable today: applyCrossings'
+  -- `filed` takes CR 608.2h last known information by projecting the crossed
+  -- object against the running board (Pawl.Engine.Setup.applyCrossings), and
+  -- funnelBack rebuilds every library from scratch and merges the subgame's
+  -- returned cards into GameState.objects. Run applyCrossings after funnelBack
+  -- and `filed` would file last known power/toughness for any
+  -- characteristic-defining ability that counts cards in a library, hand or
+  -- graveyard (CR 604.3) against a board that already has the wrong contents
+  -- for those zones.
   State.modify' (Setup.applyCrossings finalSub)
   State.modify' (Setup.funnelBack finalSub)
   -- CR 729.5: each player who was IN the subgame takes the traditional cards they
