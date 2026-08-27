@@ -31,6 +31,7 @@ import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -50,6 +51,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -2275,6 +2277,128 @@ singularCureSpec s registry =
           Spec.assertEqWith s "alice is at 24" (S.lifeOf S.alice after) (Just 24)
           Spec.assertEqWith s "bob is at 24" (S.lifeOf S.bob after) (Just 24)
           Spec.assertEqWith s "carol is at 24" (S.lifeOf S.carol after) (Just 24)
+
+-- CR 101.4: two delayed entries with DIFFERENT controllers matched by one batch
+-- are choices made at the same time, so the active player makes theirs first and
+-- the nonactive players follow in turn order. CR 101.4b is what makes the order
+-- load-bearing rather than cosmetic, the later chooser knowing what the earlier
+-- one named, and CR 603.7d fixes each entry's chooser as the player who
+-- controlled the spell that created it.
+--
+-- The two entries are two copies of Synthetic Singular Cure, one cast by each of
+-- two seats; no second card is needed. GameState.delayedTriggers appends in
+-- RESOLUTION order and the stack is last-in-first-out (CR 405.2 / 608.1), so the seat who
+-- casts LAST arms FIRST -- which is how arming order and APNAP order come apart
+-- on a two-seat board at all. The first case below asserts that gap on the board
+-- rather than assuming it.
+--
+-- The batch is singularCureSpec's: Centaur Peacemaker entering, "each player
+-- gains 4 life", one EventGroup across the seats (CR 608.2f), so each entry's
+-- per-occurrence condition matches three times and each controller is asked.
+--
+-- The answerer has to be able to SEE the order or nothing here is observable: a
+-- pure Prompt r -> r answers two structurally alike prompts alike whatever the
+-- engine did, and both orders then drain the same seats. `laterKnows` is CR
+-- 101.4b turned into an answer -- the seat asked FIRST names its own gain, and
+-- the seat asked SECOND names carol's, carol controlling no entry of her own --
+-- so which seat drains itself is exactly the ordering question.
+apnapDelayedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+apnapDelayedSpec s registry =
+  let -- Which candidate is the named seat's own gain. FILTERED rather than
+      -- guessed: the answer indexes the offered list, so it is built from the
+      -- candidates the engine handed over.
+      indexOf pid candidates =
+        let gained event = case event of
+              GameEvent.LifeGained lc -> LifeChange.player lc == pid
+              _ -> False
+         in maybe 0 Int.toNaturalSaturating (List.findIndex gained (NonEmpty.toList candidates))
+      -- The state is the sequence of controllers asked, which is both what the
+      -- later answer depends on and what `asked` below reads.
+      laterKnows :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+      laterKnows p = case p of
+        Prompt.ChooseDelayedTriggerEvent _ controller _ candidates -> do
+          earlier <- State.get
+          State.put (earlier <> [controller])
+          pure (indexOf (if null earlier then controller else S.carol) candidates)
+        _ -> pure (S.identityAnswer p)
+      -- The distinct EventGroups the log's life gains carry. singularCureSpec's
+      -- precondition, for the same reason: were the seats' gains not one group,
+      -- the earliest-group step would have picked a seat and CR 603.7b's second
+      -- sentence -- and so the prompt this group orders -- would never be reached.
+      gainsIn gs =
+        Maybe.mapMaybe
+          ( \logged -> case LoggedEvent.event logged of
+              GameEvent.LifeGained _ -> Just (LoggedEvent.group logged)
+              _ -> Nothing
+          )
+          (Foldable.toList (GameState.events gs))
+      -- `first` casts a Cure, then `second` does, then both resolve: the stack
+      -- being last-in-first-out, `second` arms first. alice is the active player
+      -- either way, and the Peacemaker is already placed with its Moved event
+      -- recorded, so the CR 603.6a scan runs at the next settle.
+      armed first second = do
+        swamp <- S.printingOf s registry "Swamp"
+        cure <- S.printingOf s registry "Synthetic Singular Cure"
+        peacemaker <- S.printingOf s registry "Centaur Peacemaker"
+        let lands = S.landsFor swamp S.bob 2 (S.landsFor swamp S.alice 2 S.threePlayerGame)
+            (peacemakerId, withPeacemaker) = S.addCreature peacemaker S.alice lands
+            (firstSpell, withFirst) = S.addHandCard cure first withPeacemaker
+            (secondSpell, withSecond) = S.addHandCard cure second withFirst
+            cast = S.cast first firstSpell >> S.cast second secondSpell
+            resolved = snd (Engine.runGamePure S.identityAnswer (snd (Engine.runGamePure S.identityAnswer withSecond cast)) Engine.priorityLoop)
+            moved = ZoneChange.MkZoneChange peacemakerId peacemakerId Zone.Stack Zone.Battlefield
+        pure (S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project peacemakerId resolved))] resolved)
+      -- One run, read twice, so the controllers asked and the life totals cannot
+      -- come from different games.
+      played gs = State.runState (Engine.runGame laterKnows gs (Engine.settleForPriority >> Engine.priorityLoop)) []
+      asked gs = snd (played gs)
+      after gs = snd (fst (played gs))
+      -- The store's own order, which the reordering must NOT disturb: it is the
+      -- arming order every later gather reads. Read on the pre-batch board, where
+      -- it is both this group's precondition -- arming order is not APNAP order,
+      -- or nothing here is observable -- and the fence on that half of the change.
+      armingOrder gs = fmap DelayedTrigger.controller (Foldable.toList (GameState.delayedTriggers gs))
+   in Spec.describe s "CR 101.4 simultaneous delayed triggers" $ do
+        -- The proving case. alice casts first, so BOB's entry is armed first, and
+        -- an engine that walks the store asks bob before alice. Under CR 101.4 the
+        -- active player is asked first: alice names her own gain and drains
+        -- herself, and bob, knowing that, names carol's. Ask in arming order
+        -- instead and it is bob who drains himself while alice keeps her 4.
+        Spec.it s "CR 101.4 the active player is asked first even though the other seat armed first" $ do
+          gs <- armed S.alice S.bob
+          Spec.assertEqWith s "alice was asked first, so she drained her own gain" (S.lifeOf S.alice (after gs)) (Just 16)
+          Spec.assertEqWith s "bob was asked second, so he kept his 4 and drained carol instead" (S.lifeOf S.bob (after gs)) (Just 24)
+          Spec.assertEqWith s "carol paid for the second answer" (S.lifeOf S.carol (after gs)) (Just 16)
+          Spec.assertEqWith s "and the two questions were raised in APNAP order" (asked gs) [S.alice, S.bob]
+          Spec.assertEqWith s "bob's entry was armed first, so arming order is not APNAP order, and the store still holds it" (armingOrder gs) [S.bob, S.alice]
+          Spec.assertEqWith s "setup: every seat started at 20" (fmap (\pid -> S.lifeOf pid gs) [S.alice, S.bob, S.carol]) [Just 20, Just 20, Just 20]
+          Spec.assertEqWith s "three gains, in one event group" (length (gainsIn (after gs)), length (List.nub (gainsIn (after gs)))) (3, 1)
+          Spec.assertEqWith s "and both entries are spent, neither having a stated duration" (Seq.length (GameState.delayedTriggers (after gs))) 0
+        -- The other half of the pair, differing in exactly one thing -- which seat
+        -- cast first, and so which entry was armed first. bob casts first, alice
+        -- second, and the arming order is now APNAP order already: the same seats
+        -- drain the same amounts. An engine that merely REVERSED the store passes
+        -- the case above and fails this one; one that sorted the wrong way round
+        -- fails both.
+        Spec.it s "CR 101.4 arming the other way round changes nothing" $ do
+          gs <- armed S.bob S.alice
+          Spec.assertEqWith s "alice is still asked first and still drains herself" (S.lifeOf S.alice (after gs)) (Just 16)
+          Spec.assertEqWith s "bob still keeps his 4" (S.lifeOf S.bob (after gs)) (Just 24)
+          Spec.assertEqWith s "carol still pays" (S.lifeOf S.carol (after gs)) (Just 16)
+          Spec.assertEqWith s "the same two questions in the same order" (asked gs) [S.alice, S.bob]
+          Spec.assertEqWith s "setup: alice's entry was armed first this time" (armingOrder gs) [S.alice, S.bob]
+        -- The vacuity guard: the same Peacemaker with NO entry armed asks nobody
+        -- anything and leaves all three seats holding their 4 (CR 119.3). Without
+        -- it an empty question list above would read as a passing order.
+        Spec.it s "CR 119.3 with no entry armed, nobody is asked and each seat keeps its 4" $ do
+          peacemaker <- S.printingOf s registry "Centaur Peacemaker"
+          let (peacemakerId, placed) = S.addCreature peacemaker S.alice S.threePlayerGame
+              moved = ZoneChange.MkZoneChange peacemakerId peacemakerId Zone.Stack Zone.Battlefield
+              gs = S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project peacemakerId placed))] placed
+          Spec.assertEqWith s "no question is raised" (asked gs) []
+          Spec.assertEqWith s "alice is at 24" (S.lifeOf S.alice (after gs)) (Just 24)
+          Spec.assertEqWith s "bob is at 24" (S.lifeOf S.bob (after gs)) (Just 24)
+          Spec.assertEqWith s "carol is at 24" (S.lifeOf S.carol (after gs)) (Just 24)
 
 -- CR 603.2c's FIRST sentence on the LIFE side, and the CR 608.2f bracket that
 -- makes it reachable: "each player gains 4 life" is ONE action taken on several
@@ -5706,6 +5830,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   lifeGainAmountSpec s registry
   falseCureSpec s registry
   singularCureSpec s registry
+  apnapDelayedSpec s registry
   communalVigilSpec s registry
   communalReckoningSpec s registry
   communalRelapseSpec s registry
