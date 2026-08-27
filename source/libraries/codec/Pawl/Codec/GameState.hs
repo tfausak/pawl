@@ -88,6 +88,7 @@ codec = Fields.object $ do
   ambientAmounts <- Fields.required "ambientAmounts" (Common.textMap SlotName.Type.unwrap (Right . SlotName.Type.MkSlotName) Common.natural) GameState.ambientAmounts
   pendingEntryEffects <- Fields.required "pendingEntryEffects" (Common.seq PendingEntryEffect.codec) GameState.pendingEntryEffects
   enteringBeside <- Fields.required "enteringBeside" (Common.set ObjectId.codec) GameState.enteringBeside
+  enteringSubjects <- Fields.required "enteringSubjects" (Common.set ObjectId.codec) GameState.enteringSubjects
   enteringCounters <- Fields.required "enteringCounters" (Common.naturalMap ObjectId.codec (Common.multiset (CounterKind.codec Keyword.codec))) GameState.enteringCounters
   playerEffects <- Fields.required "playerEffects" (Common.list ActivePlayerEffect.codec) GameState.playerEffects
   blockRequirements <- Fields.required "blockRequirements" (Common.list ActiveBlockRequirement.codec) GameState.blockRequirements
@@ -153,6 +154,7 @@ codec = Fields.object $ do
         GameState.ambientAmounts = ambientAmounts,
         GameState.pendingEntryEffects = pendingEntryEffects,
         GameState.enteringBeside = enteringBeside,
+        GameState.enteringSubjects = enteringSubjects,
         GameState.enteringCounters = enteringCounters,
         GameState.playerEffects = playerEffects,
         GameState.blockRequirements = blockRequirements,

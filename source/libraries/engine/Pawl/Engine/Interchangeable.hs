@@ -107,6 +107,7 @@ quiet gs =
     && Seq.null (GameState.pendingPreventionRiders gs)
     && Seq.null (GameState.pendingEntryEffects gs)
     && Set.null (GameState.enteringBeside gs)
+    && Set.null (GameState.enteringSubjects gs)
     && Map.null (GameState.phasedOut gs)
     && Map.null (GameState.haunting gs)
     && Map.null (GameState.exiledWith gs)

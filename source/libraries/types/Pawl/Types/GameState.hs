@@ -307,6 +307,31 @@ data GameState = MkGameState
     -- Empty at every priority window the engine reaches, exactly as the two
     -- queues above are: it is non-empty only for the span of one entry loop.
     enteringBeside :: Set.Set ObjectId.ObjectId,
+    -- | CR 614.12: the SUBJECT of every entry loop currently running -- the one
+    -- permanent `enteringBeside` above deliberately leaves out. Materialized on
+    -- the battlefield, so that CR 614.12's "characteristics of the permanent as it
+    -- would exist on the battlefield" is a plain projection, but not on it as far
+    -- as the rules are concerned: Frontier Mastodon's ferocious row "checks if you
+    -- control a creature with power 4 or greater as Frontier Mastodon enters the
+    -- battlefield. Because Frontier Mastodon isn't on the battlefield at this
+    -- time, it won't count itself" (Gatherer, 2014-11-24).
+    --
+    -- Together with `enteringBeside` this is every permanent that is
+    -- materialized but not entered, which is what
+    -- Pawl.Engine.Projection.boardAsEntering subtracts from the battlefield before
+    -- a CR 614.12 determination reads it. Neither field subsumes the other: a
+    -- subject's own static abilities DO apply to it (which
+    -- is why abilitySources subtracts only the siblings), and a sibling is no more
+    -- countable than the subject (which is why the board subtracts both).
+    --
+    -- A SET rather than one id because an entry rewrite can reach another entry --
+    -- the SacrificeAnyNumber arm sacrifices, RunEffects resolves -- and an outer
+    -- subject has not entered while an inner one runs. `enteringCounters` is keyed
+    -- per object for the same nesting.
+    --
+    -- Empty at every priority window the engine reaches, exactly as the queues
+    -- above are: it is non-empty only for the span of an entry loop.
+    enteringSubjects :: Set.Set ObjectId.ObjectId,
     -- | CR 614.1c: the counters each entering permanent is so far going to enter
     -- WITH, pending. Written by Pawl.Engine.Event's entry rewrites and by the two
     -- doors that dress a permanent before its entry loop, rewritten by the
