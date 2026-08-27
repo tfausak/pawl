@@ -3612,9 +3612,9 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               --
               -- Not implemented: a gate on `dest`, so a CR 614.6 redirect that
               -- sent this permanent spell somewhere other than the battlefield
-              -- carries anyway -- rule 400.7a's exception is for "the permanent
-              -- that spell becomes", and a spell that became nothing makes none
-              -- (#2399).
+              -- carries anyway -- both exceptions carryOver makes are for "the
+              -- permanent that spell becomes", and a spell that became no
+              -- permanent makes neither (#2399).
               carryOver carrying oid newId
               -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
               -- nowhere else. CR 616.1g's nesting of one event inside another is
@@ -3766,7 +3766,12 @@ carryOver carrying oldId newId = case carrying of
 -- watching the spell watches the permanent instead. DamagePattern.whichSource is
 -- the one field that can name a permanent spell -- CR 609.7a's chosen source is
 -- baked into it, and the rule's own last sentence is what follows the choice
--- across the zone change.
+-- across the zone change. Its `whichRecipient` neighbour cannot hold one: CR
+-- 120.3's recipient is a player or a permanent, and a spell is neither.
+--
+-- DamageR is the only arm of Pawl.Types.ReplacementEffect carrying a
+-- DamagePattern, which is what makes the fallthrough below exhaustive rather
+-- than lazy -- a new arm would have to grow a baked id before it wanted one.
 --
 -- THE INVARIANT: no case on any effect's identity. DamageR is CR 614.1a's
 -- CLASSIFICATION of a replacement -- which damage events it intercepts -- and

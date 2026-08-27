@@ -1155,7 +1155,7 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
   -- object that no longer exists.
   --
   -- The card cast is a SECOND Auriok Replica, so the spell is a permanent spell
-  -- (CR 111.4c) and Pawl.Engine.Stack's permanent-spell branch is the one that
+  -- (CR 110.4b) and Pawl.Engine.Stack's permanent-spell branch is the one that
   -- runs. Four Plains: three pay the spell's {3}, the fourth the ability's {W}.
   Spec.it s "CR 400.7c the shield follows the chosen permanent spell onto the battlefield" $ do
     plains <- S.printingOf s registry "Plains"
