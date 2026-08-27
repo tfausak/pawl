@@ -10,6 +10,7 @@ import qualified Pawl.Types.DamageDirection as DamageDirection
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.SlotName as SlotName
@@ -23,7 +24,7 @@ codec = PreventAllDamage.codec Common.text
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
   -- CR 615.1's shield naming no kind and carrying no CR 615.5 clause -- Selfless
-  -- Squire's. All four optional keys are elided, so this is byte for byte what
+  -- Squire's. All five optional keys are elided, so this is byte for byte what
   -- Pawl.Codec.DurationRef used to write for this arm.
   Spec.it s "MkPreventAllDamage, kind, direction and riders elided" $
     Common.assertCodec
@@ -35,6 +36,7 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
             PreventAllDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you")),
             PreventAllDamage.direction = DamageDirection.DealtTo,
             PreventAllDamage.chosenSource = Nothing,
+            PreventAllDamage.whatSource = Filter.And [],
             PreventAllDamage.riders = Seq.empty
           }
       )
@@ -52,6 +54,7 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
             PreventAllDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
             PreventAllDamage.direction = DamageDirection.DealtBy,
             PreventAllDamage.chosenSource = Nothing,
+            PreventAllDamage.whatSource = Filter.And [],
             PreventAllDamage.riders = Seq.singleton (Text.pack "a rider")
           }
       )
@@ -71,8 +74,29 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
             PreventAllDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you")),
             PreventAllDamage.direction = DamageDirection.DealtTo,
             PreventAllDamage.chosenSource = Just (Filter.And []),
+            PreventAllDamage.whatSource = Filter.And [],
             PreventAllDamage.riders = Seq.empty
           }
       )
       " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"you\"},\"chosenSource\":{\"type\":\"And\",\"value\":[]}} "
+  -- CR 609.7b's PROPERTY-named source, which is Scarecrow's "by creatures with
+  -- flying": the key is written and NO chosen source sits beside it, which is
+  -- what tells this shield apart from Auriok Replica's above. The trivial
+  -- predicate is what every other shield writes, so a non-trivial Filter is what
+  -- proves the key decodes.
+  Spec.it s "MkPreventAllDamage, CR 609.7b's property-named source" $
+    Common.assertCodec
+      s
+      codec
+      ( PreventAllDamage.MkPreventAllDamage
+          { PreventAllDamage.duration = Duration.UntilEndOfTurn,
+            PreventAllDamage.kind = Nothing,
+            PreventAllDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you")),
+            PreventAllDamage.direction = DamageDirection.DealtTo,
+            PreventAllDamage.chosenSource = Nothing,
+            PreventAllDamage.whatSource = Filter.HasKeyword Keyword.Flying,
+            PreventAllDamage.riders = Seq.empty
+          }
+      )
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"you\"},\"whatSource\":{\"type\":\"HasKeyword\",\"value\":{\"type\":\"Flying\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

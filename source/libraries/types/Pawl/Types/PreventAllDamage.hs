@@ -52,6 +52,24 @@ data PreventAllDamage effect = MkPreventAllDamage
     -- of Control) -- and Pawl.Engine.Resolve resolves it by asking CR 609.7a's
     -- choice only on the DealtTo side.
     chosenSource :: Maybe (Filter.Filter Keyword.Keyword),
+    -- | CR 609.7b's property-named source: the shield watches every source with
+    -- these characteristics, and NOBODY is asked to choose one -- Scarecrow's
+    -- "by creatures with flying". @chosenSource@ above is the other question
+    -- entirely: that one names the properties CR 609.7a's chooser is held to,
+    -- and the shield then watches the ONE object the choice landed on.
+    --
+    -- `And []` is the trivial predicate, so a shield saying nothing about its
+    -- source needs no "any source" arm and the key is elided -- the shape
+    -- Pawl.Types.DamagePattern.whatSource takes, which is where
+    -- Pawl.Engine.Resolve writes this. Evaluated at the damage event rather than
+    -- here, which is what makes CR 609.7b's recheck fall out.
+    --
+    -- Unlike @chosenSource@ it is read on BOTH sides of @direction@: a property
+    -- is a predicate the row can carry beside a DealtBy ref's id, where a CR
+    -- 609.7a choice beside one would be naming two different sources. No card in
+    -- data\/cards\/ writes it beside DealtBy, so every by-direction row still
+    -- gets the trivial predicate.
+    whatSource :: Filter.Filter Keyword.Keyword,
     -- | CR 615.5's additional effect -- Brace for Impact's "for each 1 damage
     -- prevented this way, put a +1/+1 counter on that creature". Unlike CR
     -- 615.7's countdown shield this one has no amount to spend, so "the damage

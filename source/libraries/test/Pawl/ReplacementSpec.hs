@@ -1204,6 +1204,68 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
     Spec.assertEqWith s "setup: the shield is a floating replacement" (length (GameState.replacements shielded)) 1
     Spec.assertEqWith s "alice was asked which source, and answered the spell" (chosenSourcesIn (answersFor (chooseDamageSourceOf spellId) afterCast (Activate.activateAbility S.alice replicaId (theAbility replica) Monad.>> Stack.resolveTop Monad.>> Stack.resolveTop))) [spellId]
 
+-- CR 609.7b's PROPERTY-named source on a shield covering a PLAYER, whose
+-- producer is Scarecrow ({5} Artifact Creature -- Scarecrow, 2/2: "{6}, {T}:
+-- Prevent all damage that would be dealt to you this turn by creatures with
+-- flying").
+--
+-- Auriok Replica above names its source the other way: CR 609.7a's chooser picks
+-- ONE object and the shield watches that id. This one asks nobody -- CR 609.7b
+-- names a class, so the shield rechecks the properties of whatever source turns
+-- up. The two together are what this card proves are separable, since before it
+-- a player-covering shield could only reach a source through the chooser.
+--
+-- Two seats is enough: no relational text is under test -- the card says "you"
+-- and names no opponent -- so the three-seat trap does not apply. Both of bob's
+-- creatures are HIS, so control is not what the source half discriminates on.
+scarecrowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+scarecrowSpec s registry = Spec.describe s "Scarecrow (CR 609.7b)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+  Spec.it s "CR 609.7b the shield covering a player watches every source with the printed properties, and no other" $ do
+    plains <- S.printingOf s registry "Plains"
+    scarecrow <- S.printingOf s registry "Scarecrow"
+    flierPrinting <- S.printingOf s registry "Bird Maiden"
+    groundPrinting <- S.printingOf s registry "Goblin Piker"
+    let base = S.landsInPlay plains 6
+        (scarecrowId, g1) = S.addCreature scarecrow S.alice base
+        (flier, g2) = S.addCreature flierPrinting S.bob g1
+        (ground, g3) = S.addCreature groundPrinting S.bob g2
+        activate = Activate.activateAbility S.alice scarecrowId (theAbility scarecrow) Monad.>> Stack.resolveTop
+        shielded = S.runPure S.identityAnswer g3 activate
+        strike src recipient n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src recipient n])
+    -- THE gameplay assertion: a source nobody chose is shielded against, on the
+    -- strength of its printed properties alone.
+    Spec.assertEqWith s "the flier's 3 to alice is prevented whole" (S.lifeOf S.alice (strike flier (Recipient.ToPlayer S.alice) 3 shielded)) (Just 20)
+    -- The source half discriminates: same controller, same board, no flying.
+    Spec.assertEqWith s "the ground creature's 2 to alice lands in full" (S.lifeOf S.alice (strike ground (Recipient.ToPlayer S.alice) 2 shielded)) (Just 18)
+    -- CR 615.3: nothing but the duration spends this shield, so the flier's
+    -- second 3 is prevented too.
+    Spec.assertEqWith s "CR 615.3 the flier's second 3 is prevented too" (S.lifeOf S.alice (strike flier (Recipient.ToPlayer S.alice) 3 (strike flier (Recipient.ToPlayer S.alice) 3 shielded))) (Just 20)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "setup: the shield is a floating replacement" (length (GameState.replacements shielded)) 1
+    -- CR 609.7b names a class rather than an object, so no CR 609.7a choice is
+    -- raised -- the engine asks nobody.
+    Spec.assertEqWith s "nobody was asked to choose a source" (chosenSourcesIn (answersFor S.identityAnswer g3 activate)) []
+  -- The recipient half of the same shield, on the same board and the same
+  -- source: "to YOU" is a player, and a shield that named its source by
+  -- property alone would prevent this too. The case above cannot show it, since
+  -- both of its readings shield alice.
+  Spec.it s "CR 615.1 the shield covers the player it names and no other" $ do
+    plains <- S.printingOf s registry "Plains"
+    scarecrow <- S.printingOf s registry "Scarecrow"
+    flierPrinting <- S.printingOf s registry "Bird Maiden"
+    let base = S.landsInPlay plains 6
+        (scarecrowId, g1) = S.addCreature scarecrow S.alice base
+        (flier, g2) = S.addCreature flierPrinting S.bob g1
+        shielded = S.runPure S.identityAnswer g2 (Activate.activateAbility S.alice scarecrowId (theAbility scarecrow) Monad.>> Stack.resolveTop)
+        strike recipient n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit flier recipient n])
+    Spec.assertEqWith s "the flier's 4 to bob lands in full" (S.lifeOf S.bob (strike (Recipient.ToPlayer S.bob) 4 shielded)) (Just 16)
+    -- Its twin, differing in the RECIPIENT alone: the same flier's damage to
+    -- alice is prevented, so the case cannot pass on a board where no shield was
+    -- installed at all.
+    Spec.assertEqWith s "and the same flier's 4 to alice is prevented whole" (S.lifeOf S.alice (strike (Recipient.ToPlayer S.alice) 4 shielded)) (Just 20)
+
 -- CR 615.5's ADDITIONAL EFFECT, whose producer is Test of Faith ({1}{W} Instant:
 -- "Prevent the next 3 damage that would be dealt to target creature this turn.
 -- For each 1 damage prevented this way, put a +1/+1 counter on that creature").
@@ -4408,6 +4470,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   mendingHandsSpec s registry
   healingGraceSpec s registry
   auriokReplicaSpec s registry
+  scarecrowSpec s registry
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
   braceForImpactSpec s registry

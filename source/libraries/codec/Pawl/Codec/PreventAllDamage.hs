@@ -14,12 +14,13 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.DamageDirection as DamageDirection
+import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 
 -- | A bare object keyed by the record's field names, as
 -- Pawl.Codec.PreventNextDamage writes the countdown shield's.
 --
--- All four optional keys are 'Fields.defaulted', which is what lets every
+-- All five optional keys are 'Fields.defaulted', which is what lets every
 -- unbounded shield already in the pool round trip unchanged: a card naming no
 -- kind, shielding a recipient and carrying no CR 615.5 clause writes exactly the
 -- two keys Pawl.Codec.DurationRef used to.
@@ -37,6 +38,7 @@ codec effectCodec = Fields.object $ do
   ref <- Fields.required "ref" ObjectRef.codec PreventAllDamage.ref
   direction <- Fields.defaulted "direction" DamageDirection.DealtTo DamageDirection.codec PreventAllDamage.direction
   chosenSource <- Fields.defaulted "chosenSource" Nothing (Common.maybe (Filter.codec Keyword.codec)) PreventAllDamage.chosenSource
+  whatSource <- Fields.defaulted "whatSource" (Filter.Type.And []) (Filter.codec Keyword.codec) PreventAllDamage.whatSource
   riders <- Fields.defaulted "riders" Seq.empty (Common.seq effectCodec) PreventAllDamage.riders
   pure
     PreventAllDamage.MkPreventAllDamage
@@ -45,5 +47,6 @@ codec effectCodec = Fields.object $ do
         PreventAllDamage.ref = ref,
         PreventAllDamage.direction = direction,
         PreventAllDamage.chosenSource = chosenSource,
+        PreventAllDamage.whatSource = whatSource,
         PreventAllDamage.riders = riders
       }
