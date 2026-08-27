@@ -7,6 +7,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
+import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
@@ -19,15 +20,15 @@ spec s = Spec.describe s "Pawl.Codec.TurnFaceDown" $ do
     Common.assertCodec
       s
       TurnFaceDown.codec
-      (TurnFaceDown.MkTurnFaceDown (SlotName.MkSlotName (Text.pack "target")) FaceDownCharacteristics.defaultValue)
-      " {\"slot\":\"target\"} "
+      (TurnFaceDown.MkTurnFaceDown (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) FaceDownCharacteristics.defaultValue)
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- Cyber Conversion: CR 708.2's listed set, written.
   Spec.it s "MkTurnFaceDown, a listed set: the key is written" $
     Common.assertCodec
       s
       TurnFaceDown.codec
       ( TurnFaceDown.MkTurnFaceDown
-          (SlotName.MkSlotName (Text.pack "target"))
+          (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))
           FaceDownCharacteristics.defaultValue
             { FaceDownCharacteristics.typeLine =
                 TypeLine.MkTypeLine
@@ -37,5 +38,5 @@ spec s = Spec.describe s "Pawl.Codec.TurnFaceDown" $ do
                   }
             }
       )
-      " {\"characteristics\":{\"typeLine\":{\"subtypes\":[{\"type\":\"Cyberman\"}],\"types\":[{\"type\":\"Artifact\"},{\"type\":\"Creature\"}]}},\"slot\":\"target\"} "
+      " {\"characteristics\":{\"typeLine\":{\"subtypes\":[{\"type\":\"Cyberman\"}],\"types\":[{\"type\":\"Artifact\"},{\"type\":\"Creature\"}]}},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s TurnFaceDown.codec
