@@ -476,7 +476,7 @@ slotsOf effect = case effect of
   -- below.
   Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> objectRefSlots ref
   Effect.Sacrifice slot -> oneSlot slot
-  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown slot _) -> oneSlot slot
+  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref _) -> objectRefSlots ref
   Effect.TurnFaceUp slot -> oneSlot slot
   Effect.RemoveFromCombat ref -> objectRefSlots ref
   Effect.BecomesBlocked slot -> oneSlot slot
@@ -3920,33 +3920,44 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Just target -> Event.sacrifice controller target
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> pure ()
-  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown slot listed) ->
+  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref listed) ->
     State.modify' $ \gs ->
-      case legalOne slot legal of
-        Just recipient -> case Recipient.objectOf recipient of
-          Nothing -> gs -- a player is not a permanent and has no face
-          -- CR 708.2: ONE assignment to Object.facing is the whole effect. What
-          -- the permanent becomes is the list the effect carries (CR 708.2a's 2/2
-          -- when it lists nothing); the rule calls those copiable values, so this
-          -- is a copiable swap rather than a CR 613 layer, performed by
-          -- Game.faceOf. FaceDownReason.TurnedFaceDown is CR 708.6's other half:
-          -- it closes CR 701.40b's turn-face-up procedure and leaves CR 702.37e's
-          -- open. No CR 400.7 incarnation is minted, so the object id, marked
-          -- damage, counters, attachments, statuses and the CR 613.7d timestamp
-          -- all ride through -- the mirror of FaceDown.performTurnFaceUp.
-          --
-          -- CR 708.2b is the guard below: an effect that LISTS its own values
-          -- would otherwise overwrite the list already there. No event is
-          -- recorded, so nothing triggers on the turning-over (#984).
-          Just target
-            | maybe False (Facing.isFaceDown . Object.facing) (Map.lookup target (GameState.objects gs)) -> gs
-            | otherwise ->
-                gs
+      -- CR 708.2: ONE assignment to Object.facing per victim is the whole effect.
+      -- What each permanent becomes is the list the effect carries (CR 708.2a's
+      -- 2/2 when it lists nothing); the rule calls those copiable values, so this
+      -- is a copiable swap rather than a CR 613 layer, performed by Game.faceOf.
+      -- FaceDownReason.TurnedFaceDown is CR 708.6's other half: it closes CR
+      -- 701.40b's turn-face-up procedure and leaves CR 702.37e's open. No CR 400.7
+      -- incarnation is minted, so the object id, marked damage, counters,
+      -- attachments, statuses and the CR 613.7d timestamp all ride through -- the
+      -- mirror of FaceDown.performTurnFaceUp.
+      --
+      -- Not implemented: CR 613.7f's new timestamp for a permanent that turns face
+      -- down (#2477).
+      --
+      -- CR 708.2b is the guard below: an effect that LISTS its own values would
+      -- otherwise overwrite the list already there. It reads the FOLD's state
+      -- rather than the enumeration's, so a permanent this same instruction has
+      -- already turned over is guarded too. No event is recorded, so nothing
+      -- triggers on the turning-over (#984).
+      --
+      -- The victims are enumerated ONCE (CR 608.2f), as RemoveFromCombat's fold
+      -- below does; an illegal slot (CR 608.2b), a player recipient and an empty
+      -- match all turn nothing over. Unprompted and undirected: turning A face
+      -- down cannot change whether B may be, so the rule's ordering clause never
+      -- engages and there is nothing to ask.
+      foldr
+        ( \target g ->
+            if maybe False (Facing.isFaceDown . Object.facing) (Map.lookup target (GameState.objects g))
+              then g
+              else
+                g
                   { GameState.objects =
-                      Map.adjust (\o -> o {Object.facing = Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.TurnedFaceDown, FaceDownState.listed = listed}}) target (GameState.objects gs)
+                      Map.adjust (\o -> o {Object.facing = Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.TurnedFaceDown, FaceDownState.listed = listed}}) target (GameState.objects g)
                   }
-        -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
-        _ -> gs
+        )
+        gs
+        (objectRefObjects legal resolving controller source gs ref)
   -- CR 708 through FaceDown.turnFaceUpByEffect, the funnel CR 116.2b's special
   -- action shares: this arm decides only WHICH permanent, never what turning it
   -- over does. CR 701.40g lives inside that funnel and so applies here without

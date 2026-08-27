@@ -48,7 +48,10 @@
                           ]
                         }
                       },
-                      "slot": "target"
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     }
                   }
                 ]

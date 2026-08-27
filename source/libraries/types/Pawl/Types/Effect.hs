@@ -781,17 +781,20 @@ data Effect card ability
     -- Stores NO duration, CR 702.26a fixing when it ends. No PhaseIn twin, that
     -- same rule being the only thing that phases anything in.
     PhaseOut ObjectRef.ObjectRef
-  | -- | CR 708.2: turn the named permanent face down with the characteristics the
-    -- effect LISTS for it. Backslide lists none, so CR 708.2a's 2/2 supplies
+  | -- | CR 708.2: turn the named permanents face down with the characteristics the
+    -- effect LISTS for them. Backslide lists none, so CR 708.2a's 2/2 supplies
     -- them; Cyber Conversion lists a set and carries it.
+    --
+    -- A SET and not one permanent, the payload's ObjectRef says which: Weaver of
+    -- Lies' "any number of target creatures with morph abilities" fills one slot
+    -- with several, and Ixidron's "all other nontoken creatures" names no slot at
+    -- all. CR 608.2f's simultaneity is the fold in Pawl.Engine.Resolve, which
+    -- enumerates the victims once.
     --
     -- NOT the same act as Transform, which CR 701.27b keeps separate in as many
     -- words. The listed values are "the COPIABLE values of that object's
     -- characteristics" (CR 708.2), which is why the whole of it is one status
     -- field that Pawl.Engine.Game.faceOf substitutes for.
-    --
-    -- Not implemented: turning a SET face down, which Ixidron's "turn all other
-    -- nontoken creatures face down" would want.
     TurnFaceDown TurnFaceDown.TurnFaceDown
   | -- | CR 708: turn the slot's target permanent face up. The mirror of
     -- TurnFaceDown and NOT of CR 116.2b's special action: no procedure is taken

@@ -166,6 +166,7 @@ import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
@@ -1926,7 +1927,16 @@ rewriteEffect pairs effect = case effect of
   Effect.ControlPlayerNextTurn _ -> effect
   Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot mBuried mPermanents) -> Effect.Destroy (Destroy.MkDestroy (rewriteObjectRef pairs ref) regenerability mSlot mBuried mPermanents)
   Effect.Sacrifice _ -> effect
-  Effect.TurnFaceDown _ -> effect
+  -- CR 612.1: the ref carries a Filter of printed card text, so a text-changer
+  -- reaches it exactly as Destroy's above. The listed characteristics hold no word
+  -- this rewrites: a type line is CR 205's, not CR 201.4a's changeable text.
+  --
+  -- A REGRESSION FENCE rather than a proven behaviour, the shape
+  -- RevealFromOutsideTheGame above records: the two filters this opcode carries in
+  -- data/cards name a keyword family (Backslide, Weaver of Lies) and the source,
+  -- neither of which rule 612 changes, so both readings leave the same board and
+  -- mutating this line reddens nothing.
+  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref listed) -> Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown (rewriteObjectRef pairs ref) listed)
   Effect.TurnFaceUp _ -> effect
   Effect.RemoveFromCombat ref -> Effect.RemoveFromCombat (rewriteObjectRef pairs ref)
   Effect.BecomesBlocked _ -> effect

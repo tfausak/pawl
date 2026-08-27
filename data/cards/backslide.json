@@ -47,7 +47,10 @@
                   {
                     "type": "TurnFaceDown",
                     "value": {
-                      "slot": "target"
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     }
                   }
                 ]

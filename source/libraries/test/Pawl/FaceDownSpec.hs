@@ -79,6 +79,19 @@
 -- to prove: it is a creature in the same pool and only the family filter keeps
 -- Backslide off it.
 --
+-- Weaver of Lies is the GROUP form's card, and the only one here whose single
+-- slot names more than one permanent. {5}{U}{U} Creature -- Beast 4/4, "Morph
+-- {4}{U} / When this creature is turned face up, turn any number of target
+-- creatures with morph abilities other than this creature face down."
+-- Transcribed whole. Backslide's family filter with CR 601.2c's unbounded count
+-- on top and "other than this creature" beside it, which is why it can say what
+-- Backslide's one slot cannot -- and it says the exclusion about ITSELF, a
+-- face-up morph creature by the time its own trigger goes on the stack (CR
+-- 708.7). Putrid Raptor (4/4, morph, no abilities to confound anything) is the
+-- third candidate the board offers and the announcement leaves alone; Brine
+-- Elemental (5/4) is the second victim, its own trigger being a turned-face-UP
+-- one that turning it face DOWN cannot fire.
+--
 -- Defenestrated Phantom is DISGUISE's card, and the reason the disguise group
 -- below says the rest: {4}{W}{W} Creature -- Spirit 4/3, "Flying / Disguise
 -- {4}{W}", the pool's plainest disguise creature. It is the only card here whose
@@ -114,6 +127,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -388,6 +402,138 @@ turnFaceDownSpec s registry = Spec.describe s "Turning face down" $ do
     Spec.assertEqWith s "CR 708.2a the +1/+1 counter survives" (S.counterOf CounterKind.PlusOnePlusOne morphling after) 1
     Spec.assertEqWith s "CR 708.2a it is still tapped" (fmap Object.tapped (Game.lookupObject morphling after)) (Just TapState.Tapped)
     Spec.assertEqWith s "CR 613.4c the counter applies over the 2/2" (S.powerToughnessOf morphling after) (Just (3, 3))
+
+  -- THE PROVING TEST for the GROUP form of CR 708.2, and the case the singular
+  -- Backslide board above cannot reach: one slot, several recipients. Two of the
+  -- three offered creatures are announced, and both go face down.
+  --
+  -- A ONE-TARGET BOARD CANNOT DISCRIMINATE. The arm used to read its slot through
+  -- Binding.onlyOne, which answers Just for a one-element set and Nothing for a
+  -- larger one -- so a single announcement turned its creature over under either
+  -- reading, and a plural one turned over NOTHING rather than one thing. The count
+  -- of face-down creatures is asserted FIRST for that reason: 2 under the fix and
+  -- 0 under the old read, where every per-permanent assertion below would also
+  -- fail but only after the cheap one had already told the story.
+  --
+  -- THREE candidates for two announcements, so the choice is real and cannot
+  -- short-circuit. The Raptor is the one left alone: it is a morph creature alice
+  -- controls, offered by the same slot, and only the announcement keeps it face
+  -- up.
+  Spec.it s "CR 601.2c / 708.2a Weaver of Lies turns both announced creatures face down at once" $ do
+    island <- S.printingOf s registry "Island"
+    weaver <- S.printingOf s registry "Weaver of Lies"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    brine <- S.printingOf s registry "Brine Elemental"
+    raptor <- S.printingOf s registry "Putrid Raptor"
+    piker <- S.printingOf s registry "Goblin Piker"
+    case weaverBoard island weaver ainok brine raptor piker of
+      Nothing -> Spec.assertFailure s "the morph cast of Weaver of Lies did not reach the battlefield"
+      Just (before, hidden, tracker, elemental, third, vanilla) -> do
+        -- THE BEFORE control: nothing on this board is face down except the Weaver
+        -- itself, so every count below is the turning-over's doing.
+        Spec.assertEqWith s "only the morph-cast Weaver is face down to begin with" (faceDownIds before) (Set.singleton hidden)
+        Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice before) [(hidden, TurnUpProcedure.Morph)]
+        let after = S.runPure (aimedAtAll (Set.fromList [tracker, elemental])) before (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph hidden >> Engine.priorityLoop)
+        -- The gameplay-level assertion, ahead of every per-permanent one: BOTH
+        -- announced creatures are face down, and the Weaver that turned face up is
+        -- not.
+        Spec.assertEqWith s "CR 708.2a both announced creatures are face down" (faceDownIds after) (Set.fromList [tracker, elemental])
+        Spec.assertEqWith s "CR 708.2a the Tracker is a 2/2, not its printed 3/3" (S.powerToughnessOf tracker after) (Just (2, 2))
+        Spec.assertEqWith s "CR 708.2a the Elemental is a 2/2, not its printed 5/4" (S.powerToughnessOf elemental after) (Just (2, 2))
+        Spec.assertEqWith s "CR 708.2a neither has a name" (Projection.namesOf tracker after <> Projection.namesOf elemental after) noNames
+        -- The unannounced morph creature and the creature with no morph ability
+        -- are untouched, which is CR 115.1: the slot names who is affected.
+        Spec.assertEqWith s "the unannounced Raptor is still its printed 4/4" (S.powerToughnessOf third after) (Just (4, 4))
+        Spec.assertEqWith s "the Piker is still its printed 2/1" (S.powerToughnessOf vanilla after) (Just (2, 1))
+        Spec.assertEqWith s "CR 708.7 the Weaver itself is face up" (fmap Object.facing (Game.lookupObject hidden after)) (Just Facing.FaceUp)
+
+  -- The slot's OWN half, asserted by announcing every candidate the engine offers
+  -- rather than a set this file chose: exactly the three other morph creatures
+  -- turn over. That is both halves of Weaver's printed restriction at once --
+  -- "creatures with morph abilities" keeps the Piker off, and "other than this
+  -- creature" (Filter.Not Filter.IsSource) keeps the Weaver off its own trigger,
+  -- which it would otherwise be a candidate for, being a face-up morph creature by
+  -- the time the trigger goes on the stack (CR 708.7).
+  --
+  -- Taking the WHOLE offer is what makes this an assertion about the engine's
+  -- candidate set: a filter that admitted the Weaver or the Piker would put four
+  -- or five permanents face down here, and no answer of this file's would hide it.
+  Spec.it s "CR 601.2c the offer is every OTHER morph creature, and all three turn over" $ do
+    island <- S.printingOf s registry "Island"
+    weaver <- S.printingOf s registry "Weaver of Lies"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    brine <- S.printingOf s registry "Brine Elemental"
+    raptor <- S.printingOf s registry "Putrid Raptor"
+    piker <- S.printingOf s registry "Goblin Piker"
+    case weaverBoard island weaver ainok brine raptor piker of
+      Nothing -> Spec.assertFailure s "the morph cast of Weaver of Lies did not reach the battlefield"
+      Just (before, hidden, tracker, elemental, third, vanilla) -> do
+        let after = S.runPure aimedAtEveryCandidate before (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph hidden >> Engine.priorityLoop)
+        Spec.assertEqWith s "CR 702.37e / 601.2c the three other morph creatures, and only those" (faceDownIds after) (Set.fromList [tracker, elemental, third])
+        Spec.assertEqWith s "CR 702.37e the Piker has no morph ability, so it kept its printed 2/1" (S.powerToughnessOf vanilla after) (Just (2, 1))
+        Spec.assertEqWith s "CR 708.7 'other than this creature' leaves the Weaver face up" (fmap Object.facing (Game.lookupObject hidden after)) (Just Facing.FaceUp)
+
+-- Every permanent on the battlefield whose face is down. Read off Object.facing
+-- rather than counted, so an assertion says WHICH permanents turned over and not
+-- merely how many.
+faceDownIds :: GameState.GameState -> Set.Set ObjectId.ObjectId
+faceDownIds gs =
+  Set.filter
+    (\oid -> maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs))
+    (GameState.battlefield gs)
+
+-- CR 601.2c's whole announcement, answered with exactly `oids`. PhasingSpec's
+-- helper of the same name and for its reason: FILTERS the offered set rather than
+-- preferring within it, so an announcement that had degraded to one recipient
+-- becomes a count mismatch the engine reacts to instead of a silently smaller
+-- answer.
+aimedAtAll :: Set.Set ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAtAll oids p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const (Natural.length oids)) offers
+  Prompt.ChooseTargets _ _ _ sets ->
+    fmap (\(_, legal) -> Set.filter (maybe False (`Set.member` oids) . Recipient.objectOf) legal) sets
+  _ -> S.identityAnswer p
+
+-- CR 601.2c answered with the ENGINE's whole offer: announce as many targets as
+-- the slot has candidates, then take all of them. Names no object of its own, so
+-- what it proves is the candidate set rather than this file's opinion of it.
+aimedAtEveryCandidate :: Prompt.Prompt r -> r
+aimedAtEveryCandidate p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (\(_, legal) -> Natural.length legal) offers
+  Prompt.ChooseTargets _ _ _ sets -> fmap snd sets
+  _ -> S.identityAnswer p
+
+-- alice with eight untapped Islands, Weaver of Lies cast FACE DOWN for CR
+-- 702.37a's {3}, and four other creatures of her own on the battlefield: three
+-- with morph abilities -- Ainok Tracker 3/3, Brine Elemental 5/4, Putrid Raptor
+-- 4/4 -- and Goblin Piker 2/1, which has none. Eight Islands is EXACTLY {3} for
+-- the face-down cast plus {4}{U} for the morph cost, so a board that could not pay
+-- would leave the Weaver face down and the assertions downstream would pass for
+-- the wrong reason.
+--
+-- Three P/Ts that differ from CR 708.2a's 2/2 on BOTH axes, and from each other,
+-- so no permanent's reading can be mistaken for another's or for the default.
+-- Brine Elemental's own trigger is a turned-face-UP one, so nothing it carries
+-- fires when it is turned face DOWN.
+--
+-- Returns the board, the face-down Weaver, then the Tracker, the Elemental, the
+-- Raptor and the Piker.
+weaverBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+weaverBoard island weaver ainok brine raptor piker =
+  let (gs0, spell) = S.handOne weaver (S.landsInPlay island 8)
+      (tracker, gs1) = S.addCreature ainok S.alice gs0
+      (elemental, gs2) = S.addCreature brine S.alice gs1
+      (third, gs3) = S.addCreature raptor S.alice gs2
+      (vanilla, gs4) = S.addCreature piker S.alice gs3
+      (after, entered) = castAndResolve weaver (Facing.faceDown FaceDownReason.Morphed) gs4 spell
+   in fmap (\hidden -> (after, hidden, tracker, elemental, third, vanilla)) entered
 
 -- alice with two untapped Islands, Backslide in hand, and two creatures on the
 -- battlefield: the morph printing and the one with no keywords.

@@ -1126,8 +1126,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown (SlotName.MkSlotName (Text.pack "target")) FaceDownCharacteristics.defaultValue))
-      " {\"type\":\"TurnFaceDown\",\"value\":{\"slot\":\"target\"}} "
+      (Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) FaceDownCharacteristics.defaultValue))
+      " {\"type\":\"TurnFaceDown\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
   -- CR 708, and no payload beyond the slot: the permanent regains its own
   -- copiable values (CR 708.8), so there is nothing to list.
   Spec.it s "TurnFaceUp" $
