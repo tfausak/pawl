@@ -968,7 +968,11 @@ legalSetsGiven pcs grants pools perspective seed source slots gs =
 -- else is deliberately not a sibling read: CR 603.2's trigger bindings reach
 -- legalSetsGiven as `seed` and reach selectionLegal not at all, so re-deriving
 -- such a slot against `chosen` alone would answer it off an empty binding rather
--- than off the trigger's, and reject an announcement the rule allows.
+-- than off the trigger's, and reject an announcement the rule allows. Harness the
+-- Storm's twin slot is the shape (its filter names `thatSpell`), and that half is
+-- a REGRESSION FENCE rather than a proven behaviour: every card in the pool whose
+-- slot filter names a seed is on a triggered ability, and no trigger reaches
+-- selectionLegal at all (#2472), so dropping `declared` reddens nothing.
 --
 -- Only the JOINT CHECK reads this, never legalSetsGiven's second pass. That pass
 -- is a WIDENING -- it offers the union over what a named slot could still take --
@@ -1096,11 +1100,11 @@ selectionLegal perspective source slots sets chosen gs =
 -- lives in the slot's own Filter. Shared by spells (Cast) and abilities
 -- (Activate/Engine).
 --
--- Each slot is asked INDEPENDENTLY, so a mode whose slots exclude each other
--- (Fall of the Hammer's, through selectionLegal's joint check) is judged
--- fillable off a board holding one creature, where no coherent announcement
--- exists; the cast is then reversed at CR 601.2e. That is the same overcount
--- selectionLegal's own header records (#1296).
+-- Each slot is asked INDEPENDENTLY. Not implemented: narrowing a mode's
+-- fillability to what a COHERENT announcement could reach, so a mode whose slots
+-- exclude each other (Fall of the Hammer's, through selectionLegal's joint
+-- check) is judged fillable off a board holding one creature and the cast is
+-- then reversed at CR 601.2e (#1296).
 --
 -- `extra` is the slots EVERY mode carries in addition to its own -- CR 303.4a's
 -- enchant slot, declared by the card rather than by a mode, which castability

@@ -19,8 +19,9 @@ import qualified Pawl.Types.TargetCount as TargetCount
 --
 -- WHAT it excludes is what the printed word points at, and the two readings are
 -- different atoms: Filter.IsSource for the ability's own source (Flensing
--- Raptor's "another target creature you control"), and Filter.IsBound for a SIBLING slot of
--- the same announcement (Fall of the Hammer's second slot). Rule 601.2c makes
+-- Raptor's "another target creature you control"), and Filter.IsBound for a
+-- SIBLING slot of the same announcement (Fall of the Hammer's second slot,
+-- "another target creature"). Rule 601.2c makes
 -- sharing between two instances of "target" the default, so the second is a
 -- restriction the card writes rather than one the machinery imposes;
 -- Pawl.Engine.Target.jointlyJudged is where an announcement carrying one is
