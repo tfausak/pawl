@@ -12,8 +12,10 @@ module Pawl.Types.CarryOver where
 -- cannot tell apart at a call site.
 --
 -- Carried is Pawl.Engine.Stack's two permanent-spell branches and nothing else.
--- CR 400.7b (static-ability ability grants) and CR 400.7c (prevention effects)
--- are separate exceptions with separate carriers and are not this (#634).
+-- Not implemented: CR 400.7b (static-ability ability grants, CR 611.3d) and CR
+-- 400.7c (prevention effects), the two exceptions this carrier owes beside CR
+-- 400.7a; no constructor here says either (#2394). CR 400.7g and CR 400.7i are
+-- unimplemented as well, on other carriers (gap #2398).
 data CarryOver
   = Carried
   | NotCarried
