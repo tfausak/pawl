@@ -450,6 +450,33 @@ data Filter keyword
     -- the closed half already owns (CR 506-511, Pawl.Types.Combat), so reading it
     -- is the same kind of act as reading a card type.
     IsAttacking
+  | -- | CR 508.3b / 508.1b: the candidate WAS DECLARED ATTACKED this COMBAT
+    -- PHASE -- one or more creatures were declared as attackers attacking it.
+    -- DeclaredAttackerThisCombat's mirror: that atom asks whether the candidate
+    -- was declared as an attacker, this one whether it was declared attacked BY
+    -- one, and they read the two halves of the same record
+    -- (Combat.declaredAttackers, Combat.declaredAttacked).
+    --
+    -- Answers for a PLAYER as well as for a permanent, alone among the combat
+    -- atoms, because CR 508.3b's subject list is "[a player, planeswalker, or
+    -- battle]" -- Ever-Watching Threshold's "they attacked you and/or a
+    -- planeswalker you control" is this atom asked twice, once over
+    -- Scope.OverPlayers and once over the battlefield.
+    --
+    -- DECLARED, so CR 508.4's creature put onto the battlefield attacking never
+    -- makes it True: that rule says such a creature never "attacked", for trigger
+    -- events AND effects, and Combat.declaredAttacked is the field written by the
+    -- declaration alone. A LOOK-BACK read for that reason too -- CR 506.4's
+    -- removal from combat leaves the declaration standing, exactly as it does for
+    -- DeclaredAttackerThisCombat, so this stays True for the rest of the combat
+    -- phase and CR 603.4's second check at CR 608.2a cannot disagree with its
+    -- first.
+    --
+    -- Scoped to the COMBAT PHASE and not the turn, for
+    -- DeclaredAttackerThisCombat's reason: CR 511.3 clears the record, so CR
+    -- 500.8's additional combat phase asks the question again from empty.
+    -- Uncharacteristic for IsAttacking's reason.
+    DeclaredAttackedThisCombat
   | -- | CR 509.1g: the candidate is a BLOCKING creature -- declared as a blocker
     -- this combat phase and not since removed under CR 506.4. Labyrinth of
     -- Skophos' "target attacking or blocking creature" is spelled

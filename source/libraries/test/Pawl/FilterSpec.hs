@@ -53,6 +53,7 @@ blackCreature =
       Filter.identity = Just (ObjectId.MkObjectId 7),
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
+      Filter.declaredAttackedThisCombat = False,
       Filter.blocking = False,
       Filter.blocked = False,
       Filter.attackedThisTurn = False,
@@ -98,6 +99,7 @@ devoidBigCreature =
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
+      Filter.declaredAttackedThisCombat = False,
       Filter.blocking = False,
       Filter.blocked = False,
       Filter.attackedThisTurn = False,
@@ -837,6 +839,29 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- CR 506.3: only a creature is ever declared as an attacker.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.DeclaredAttackerThisCombat)) "player"
+
+  Spec.describe s "DeclaredAttackedThisCombat" $ do
+    Spec.it s "matches a view whose combat record says so" $ do
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.declaredAttackedThisCombat = True}) Filter.Type.DeclaredAttackedThisCombat) "declared attacked"
+
+    Spec.it s "does not match a permanent nobody was declared attacking" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.DeclaredAttackedThisCombat)) "not declared attacked"
+
+    -- The two halves of Combat's declaration record, and independent in BOTH
+    -- directions: CR 508.1a's subject is the attacking creature and CR 508.3b's
+    -- is what it was declared attacking, and CR 508.1b lets no creature be both
+    -- at once.
+    Spec.it s "is not the attacker half of the same record" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.declaredAttackerThisCombat = True}) Filter.Type.DeclaredAttackedThisCombat)) "declared attacker does not imply declared attacked"
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.declaredAttackedThisCombat = True}) Filter.Type.DeclaredAttackerThisCombat)) "and the other way round"
+
+    -- CR 508.3b's subject list is "a player, planeswalker, or battle", so unlike
+    -- every other combat atom this one really does answer for a player -- off the
+    -- field Pawl.Engine.Count.playerView fills from the board, which this
+    -- hand-built view sets directly.
+    Spec.it s "a player candidate answers rather than being vacuously false" $ do
+      Spec.assertBool s (Filter.matches self (aPlayer {Filter.declaredAttackedThisCombat = True}) Filter.Type.DeclaredAttackedThisCombat) "player attacked"
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.DeclaredAttackedThisCombat)) "player nobody attacked"
 
   Spec.describe s "DeclaredBlockerThisCombat" $ do
     Spec.it s "matches a view whose combat record says so" $ do

@@ -132,6 +132,18 @@ data View = MkView
     -- with no combat status to read: a printed card off the battlefield, a
     -- player, an event snapshot -- the vacuous posture power and controller take.
     attacking :: Bool,
+    -- CR 508.3b: was this candidate DECLARED ATTACKED this COMBAT PHASE? Read
+    -- from GameState.combat like `attacking`, off Combat.declaredAttacked -- the
+    -- half of the record `declaredAttackerThisCombat` below reads the other half
+    -- of. A LOOK-BACK read within the phase, so CR 506.4's removal from combat
+    -- leaves it standing.
+    --
+    -- The one combat field a PLAYER candidate can answer, which is CR 508.3b's
+    -- own subject list ("a player, planeswalker, or battle"). Filled from the
+    -- board by Pawl.Engine.Count.playerView for that candidate, exactly as
+    -- `dealtDamageThisTurn` below is and for its reason: this builder holds a
+    -- PlayerId and no board.
+    declaredAttackedThisCombat :: Bool,
     -- CR 509.1g: is this candidate a blocking creature right now? Read from
     -- GameState.combat alongside `attacking` -- but from the OTHER map:
     -- Combat.blockers is keyed by attacker, and a blocking creature is a MEMBER
@@ -464,6 +476,13 @@ playerView pid =
       playerIdentity = Just pid,
       -- CR 506.3: only a creature can attack, and a player is not one.
       attacking = False,
+      -- CR 508.3b lets a PLAYER be declared attacked, so unlike the field above
+      -- this one asks a question a player candidate really can answer -- just not
+      -- from here, this view being built from a PlayerId alone and holding no
+      -- combat record to read. False is therefore the DEFAULT and not the answer,
+      -- exactly as `dealtDamageThisTurn` below is: Pawl.Engine.Count.playerView
+      -- overwrites it from GameState.combat.
+      declaredAttackedThisCombat = False,
       -- CR 509.1a: only a creature can block, either.
       blocking = False,
       -- CR 509.1h: blocked-ness is a status of an ATTACKING creature, and by CR
@@ -948,6 +967,10 @@ matches context view predicate = case predicate of
   -- turn's log, which is what keeps it apart from the atom above -- CR 511.3
   -- empties it, so CR 500.8's second combat phase starts over.
   Filter.DeclaredAttackerThisCombat -> declaredAttackerThisCombat view
+  -- CR 508.3b: the other half of the same record, and the same look-back read.
+  -- CR 508.4 keeps a creature put onto the battlefield attacking out of it, so
+  -- this is the past-tense "was attacked" and never "is being attacked".
+  Filter.DeclaredAttackedThisCombat -> declaredAttackedThisCombat view
   -- CR 509.1a: the same read off the blocking half of that record.
   Filter.DeclaredBlockerThisCombat -> declaredBlockerThisCombat view
   -- CR 701.17a: the same look-back, over the mills rather than the attacks. Like
@@ -1133,6 +1156,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
   Filter.DeclaredAttackerThisCombat -> predicate
+  Filter.DeclaredAttackedThisCombat -> predicate
   Filter.DeclaredBlockerThisCombat -> predicate
   Filter.MilledThisTurn -> predicate
   Filter.DealtDamageThisTurn -> predicate
@@ -1521,6 +1545,7 @@ bakeBound players predicate = case predicate of
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
   Filter.DeclaredAttackerThisCombat -> predicate
+  Filter.DeclaredAttackedThisCombat -> predicate
   Filter.DeclaredBlockerThisCombat -> predicate
   Filter.MilledThisTurn -> predicate
   Filter.DealtDamageThisTurn -> predicate
@@ -1609,6 +1634,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsBlocked -> []
   Filter.AttackedThisTurn -> []
   Filter.DeclaredAttackerThisCombat -> []
+  Filter.DeclaredAttackedThisCombat -> []
   Filter.DeclaredBlockerThisCombat -> []
   Filter.MilledThisTurn -> []
   Filter.DealtDamageThisTurn -> []
@@ -1709,6 +1735,7 @@ statesAQuality predicate = case predicate of
   Filter.IsBlocked -> True
   Filter.AttackedThisTurn -> True
   Filter.DeclaredAttackerThisCombat -> True
+  Filter.DeclaredAttackedThisCombat -> True
   Filter.DeclaredBlockerThisCombat -> True
   Filter.MilledThisTurn -> True
   Filter.DealtDamageThisTurn -> True

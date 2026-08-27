@@ -95,9 +95,12 @@ data Combat = MkCombat
     -- same principle worked out for the trigger case only, so it is
     -- corroboration rather than authority.
     --
-    -- So anything asking whether a PLAYER was attacked THIS COMBAT PHASE reads
-    -- this one: Pawl.Engine.Quantity's OpponentsAttacked arm, rule 702.121a's
-    -- "for each opponent you attacked with a creature this combat".
+    -- So anything asking whether a PLAYER OR PERMANENT was attacked THIS COMBAT
+    -- PHASE reads this one: Pawl.Engine.Quantity's OpponentsAttacked arm, rule
+    -- 702.121a's "for each opponent you attacked with a creature this combat",
+    -- and Filter.DeclaredAttackedThisCombat, which answers CR 508.3b's whole
+    -- subject list -- a permanent through Pawl.Engine.Projection and a player
+    -- through Pawl.Engine.Count.playerView.
     --
     -- Same lifetime and same never-cleared posture as `attacked`, for that
     -- field's reasons. A reader wanting one STEP wants the field below.
