@@ -515,23 +515,23 @@ elspethEmblemBoard s registry ultimate = do
         _ -> armed
   pure (mine, theirs, carols, used {GameState.activePlayer = S.bob})
 
--- Synthetic Warding Beacon, an artifact whose one ability is
+-- Synthetic Emblem Forge, an artifact whose one ability is
 -- "{T}: You get an emblem with 'Creatures you control have protection from
--- red.'" (data/cards/synthetic-warding-beacon.json). alice puts it out and taps
+-- red.'" (data/cards/synthetic-emblem-forge.json). alice puts it out and taps
 -- it, so CR 114.2's emblem is in the command zone.
 --
 -- Activated rather than cast, elspethEmblemBoard's route: no fixture here has
 -- mana, and the ability states no timing restriction, so it also reaches a board
 -- already sitting in the declare attackers step.
 --
--- The Beacon STAYS on the battlefield, and trips neither short-circuit while it
+-- The Forge STAYS on the battlefield, and trips neither short-circuit while it
 -- is there: an artifact is none of copiableMintsType's three card types, and an
 -- activated ability is not a static one.
-wardedBoard :: Printing.Printing -> GameState.GameState -> GameState.GameState
-wardedBoard beacon gs =
-  let (beaconId, placed) = S.addCreature beacon S.alice gs
-   in case Face.activatedAbilities (S.combinedFace beacon) of
-        ability : _ -> S.runPure S.identityAnswer placed (do Activate.activateAbility S.alice beaconId ability; Stack.resolveTop)
+forgedBoard :: Printing.Printing -> GameState.GameState -> GameState.GameState
+forgedBoard forge gs =
+  let (forgeId, placed) = S.addCreature forge S.alice gs
+   in case Face.activatedAbilities (S.combinedFace forge) of
+        ability : _ -> S.runPure S.identityAnswer placed (do Activate.activateAbility S.alice forgeId ability; Stack.resolveTop)
         [] -> placed
 
 -- Mark `amount` damage on one permanent through the funnel that consults the
@@ -3184,7 +3184,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- Every other object on both boards is chosen to trip neither gate, which is
   -- the whole trap: Cabal Evangel is a black 2/2 with no abilities and Goblin
   -- Piker a red 2/1 with none, Setup.emptyGame and S.combatBoardOf put no land
-  -- down, and the Beacon carries an activated ability rather than a static one.
+  -- down, and the Forge carries an activated ability rather than a static one.
   -- Elspeth's fixture above cannot show this -- a planeswalker trips `baseHas`
   -- through copiableMintsType (CR 306.5b) on its own.
   --
@@ -3193,13 +3193,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- Nothing in CR 114.3 bounds what abilities an emblem may have, so the card is
   -- one the rules permit.
   Spec.it s "CR 702.16e an emblem's granted protection still prevents the damage" $ do
-    beacon <- S.printingOf s registry "Synthetic Warding Beacon"
+    forge <- S.printingOf s registry "Synthetic Emblem Forge"
     evangel <- S.printingOf s registry "Cabal Evangel"
     piker <- S.printingOf s registry "Goblin Piker"
     let (mineId, g1) = S.addCreature evangel S.alice (Setup.emptyGame S.bothPlayers)
         (blackId, g2) = S.addCreature evangel S.bob g1
         (redId, g3) = S.addCreature piker S.bob g2
-        board = wardedBoard beacon g3
+        board = forgedBoard forge g3
         red = dealTo redId mineId 2 board
         black = dealTo blackId mineId 2 board
     Spec.assertBool s (S.onBattlefield mineId red) "the red source's 2 is prevented"
@@ -3211,11 +3211,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Projection.hasKeyword fromRed mineId board) "and the layer fold gave alice's creature the protection"
     Spec.assertBool s (not (Projection.hasKeyword fromRed redId board)) "which bob's creature does not have"
   Spec.it s "CR 702.16f an emblem's granted protection still bars the red blocker" $ do
-    beacon <- S.printingOf s registry "Synthetic Warding Beacon"
+    forge <- S.printingOf s registry "Synthetic Emblem Forge"
     evangel <- S.printingOf s registry "Cabal Evangel"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, theirs) = S.combatBoardOf [evangel] [evangel, piker]
-        warded = wardedBoard beacon gs
+        warded = forgedBoard forge gs
         board = snd (Engine.runGamePure S.aggressiveAnswer warded (Combat.declareAttackers S.alice))
     case (mine, theirs) of
       (attacker : _, [black, red]) -> do
