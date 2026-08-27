@@ -2357,11 +2357,17 @@ runEntry batch oid = do
   -- -- the SacrificeAnyNumber arm below runs a sacrifice, and RunEffects runs a
   -- card's effects -- and the outer batch has to survive that.
   before <- State.gets GameState.enteringBeside
-  State.modify' (\gs -> gs {GameState.enteringBeside = batch})
+  -- CR 614.12's OTHER half, one field over: the subject is materialized but not
+  -- on the battlefield either, so a determination about it counts neither its
+  -- siblings nor itself (Projection.boardAsEntering). INSERTED rather than
+  -- written, so a nested entry leaves the outer subject uncountable too, and
+  -- restored wholesale below for the reason `before` is.
+  beforeSubjects <- State.gets GameState.enteringSubjects
+  State.modify' (\gs -> gs {GameState.enteringBeside = batch, GameState.enteringSubjects = Set.insert oid beforeSubjects})
   Monad.void (applyReplacementsIn Nothing batch (ProposedEvent.WouldEnter oid))
   flushEnteringCounters oid
   designateProtector oid
-  State.modify' (\gs -> gs {GameState.enteringBeside = before})
+  State.modify' (\gs -> gs {GameState.enteringBeside = before, GameState.enteringSubjects = beforeSubjects})
 
 -- CR 614.1c: the counters the entering permanent turned out to be entering WITH,
 -- placed once, after CR 616.1's loop has finished deciding how many that is.

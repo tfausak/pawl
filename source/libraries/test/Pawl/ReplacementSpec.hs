@@ -4511,6 +4511,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   unevenToolkitSpec s registry
   wardingBeaconSpec s registry
   dustAnimusSpec s registry
+  frontierMastodonSpec s registry
   printlifterSpec s registry
   shieldCounterSpec s registry
   warLeechSpec s registry
@@ -7487,6 +7488,102 @@ dustAnimusSpec s registry = Spec.describe s "Dust Animus (CR 614.1c)" $ do
         Spec.assertEqWith s "so it is the printed 2/3" (S.powerToughnessOf oid after) (Just (2, 3))
         Spec.assertEqWith s "and three of the seven Plains are tapped, leaving four untapped" (S.tappedCount S.alice after) 3
       _ -> Spec.assertFailure s "the Spirit did not reach the battlefield"
+
+-- CR 614.12's OTHER reading of the same clause dustAnimusSpec above rides: WHICH
+-- BOARD a card-authored entry condition counts over. A permanent being
+-- materialized before its entry loop runs (Pawl.Engine.Event.runEntry) is what
+-- lets CR 614.12's "characteristics of the permanent as it would exist on the
+-- battlefield" be a plain projection, and it is exactly what must not make the
+-- permanent countable -- Pawl.Engine.Projection.boardAsEntering.
+--
+-- Frontier Mastodon {2}{G} Creature -- Elephant 3/2, whole text: "Ferocious --
+-- This creature enters with a +1/+1 counter on it if you control a creature with
+-- power 4 or greater." (oracle checked on Scryfall 2026-08-26; "Ferocious" is an
+-- ability word and means nothing). The card carries the rulings for BOTH
+-- directions: "Frontier Mastodon's ferocious ability checks if you control a
+-- creature with power 4 or greater as Frontier Mastodon enters the battlefield.
+-- Because Frontier Mastodon isn't on the battlefield at this time, it won't count
+-- itself" (Gatherer 2014-11-24), and the batch half is the fast lands' "if one of
+-- these lands enters the battlefield at the same time as one or more other lands
+-- ... it doesn't take those lands into consideration" (Blackcleave Cliffs,
+-- Gatherer 2023-02-04).
+--
+-- TWO PAIRS, one per direction, because either exclusion alone would leave the
+-- other's pair green:
+--
+--   * THE BATCH. Rise of the Dark Realms reanimates Jedit Ojanen (5/5) and the
+--     Mastodon out of one graveyard, as one CR 608.2f sweep. The printed 3/2
+--     cannot reach power 4 on this board, so only the SIBLING is in question.
+--     The positive board moves the Ojanen: same nine Swamps, same cast, same
+--     reanimated Mastodon, but the Cat is already on the battlefield.
+--   * THE SUBJECT. Glorious Anthem makes the entering Mastodon a 4/3, so a board
+--     that could see it would answer its own condition. Nothing else alice
+--     controls is a creature. The positive board adds the Ojanen, which under the
+--     same Anthem is a 6/6 -- so the pair differs in one permanent, and the
+--     numbers 3, 4, 5 and 6 stay distinct.
+--
+-- The readout is doubled throughout, as dustAnimusSpec's is: the counter itself,
+-- and the CR 613.4c power and toughness it moves in layer 613.1g.
+frontierMastodonSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+frontierMastodonSpec s registry = Spec.describe s "Frontier Mastodon (CR 614.12)" $ do
+  let mastodonName = CardName.MkCardName (Text.pack "Frontier Mastodon")
+      -- alice's nine Swamps, Rise of the Dark Realms in her hand, the Mastodon in
+      -- her graveyard, and Jedit Ojanen wherever `buried` says. Buried BEFORE the
+      -- Mastodon so that the sweep has already put the Cat onto the battlefield
+      -- when the Mastodon's own entry loop runs; that ordering is what the
+      -- negative rests on, and mutating boardAsEntering away reddens it.
+      reanimated buried = do
+        swamp <- S.printingOf s registry "Swamp"
+        rise <- S.printingOf s registry "Rise of the Dark Realms"
+        mastodon <- S.printingOf s registry "Frontier Mastodon"
+        ojanen <- S.printingOf s registry "Jedit Ojanen"
+        let lands = List.foldl' (\g _ -> snd (S.addCreature swamp S.alice g)) S.threePlayerGame [1 .. (9 :: Int)]
+            withCat = if buried then snd (S.addGraveyardCard ojanen S.alice lands) else snd (S.addCreature ojanen S.alice lands)
+            (_, withMastodon) = S.addGraveyardCard mastodon S.alice withCat
+            (ready, held) = S.handOne rise withMastodon
+            after = S.runPure S.identityAnswer ready (S.cast S.alice held >> Stack.resolveTop)
+        pure (newestNamed mastodonName after, after)
+      -- Three Forests for the {2}{G}, Glorious Anthem, and the Mastodon cast from
+      -- hand -- one entry, no batch, so only the subject is in question.
+      castUnderAnthem withCat = do
+        forest <- S.printingOf s registry "Forest"
+        anthem <- S.printingOf s registry "Glorious Anthem"
+        mastodon <- S.printingOf s registry "Frontier Mastodon"
+        ojanen <- S.printingOf s registry "Jedit Ojanen"
+        let (_, enchanted) = S.addCreature anthem S.alice (S.landsInPlay forest 3)
+            withOjanen = if withCat then snd (S.addCreature ojanen S.alice enchanted) else enchanted
+            (ready, held) = S.handOne mastodon withOjanen
+            after = S.runPure S.identityAnswer ready (S.cast S.alice held >> Stack.resolveTop)
+        pure (newestNamed mastodonName after, after)
+  Spec.it s "CR 614.12 the 5/5 reanimated in the same sweep is not on the battlefield yet, so the row does not apply" $ do
+    (found, after) <- reanimated True
+    case found of
+      Just oid -> do
+        Spec.assertEqWith s "no +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 0
+        Spec.assertEqWith s "so it is the printed 3/2" (S.powerToughnessOf oid after) (Just (3, 2))
+        Spec.assertEqWith s "and the Cat was reanimated beside it" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jedit Ojanen")) S.alice after) 1
+      _ -> Spec.assertFailure s "the Elephant did not reach the battlefield"
+  Spec.it s "CR 614.12 the same 5/5 already on the battlefield does count, so the row applies" $ do
+    (found, after) <- reanimated False
+    case found of
+      Just oid -> do
+        Spec.assertEqWith s "one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 1
+        Spec.assertEqWith s "so the printed 3/2 is a 4/3" (S.powerToughnessOf oid after) (Just (4, 3))
+      _ -> Spec.assertFailure s "the Elephant did not reach the battlefield"
+  Spec.it s "CR 614.12 a 4/3 under Glorious Anthem does not count itself, so the row does not apply" $ do
+    (found, after) <- castUnderAnthem False
+    case found of
+      Just oid -> do
+        Spec.assertEqWith s "no +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 0
+        Spec.assertEqWith s "so the Anthem alone makes the printed 3/2 a 4/3" (S.powerToughnessOf oid after) (Just (4, 3))
+      _ -> Spec.assertFailure s "the Elephant did not reach the battlefield"
+  Spec.it s "CR 614.12 another creature under the same Anthem does count, so the row applies" $ do
+    (found, after) <- castUnderAnthem True
+    case found of
+      Just oid -> do
+        Spec.assertEqWith s "one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 1
+        Spec.assertEqWith s "so the Anthem and the counter make it a 5/4" (S.powerToughnessOf oid after) (Just (5, 4))
+      _ -> Spec.assertFailure s "the Elephant did not reach the battlefield"
 
 -- CR 122.6 with CR 107.3c: an entry rider whose COUNT is not a number. Printlifter
 -- Ooze -- {1}{G} 2/2 Creature -- Ooze with deathtouch and disguise {3}{G} --

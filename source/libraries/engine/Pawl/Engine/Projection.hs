@@ -2568,6 +2568,43 @@ conditionHolds cands gs src lowest =
 abilitySources :: GameState -> [ObjectId]
 abilitySources gs = Set.toList (Set.difference (GameState.battlefield gs) (GameState.enteringBeside gs))
 
+-- CR 614.12: the board a determination about an entering permanent reads --
+-- this state with every materialized-but-not-entered permanent taken out of the
+-- battlefield index, both the subject of a running entry loop
+-- (GameState.enteringSubjects) and its batch (GameState.enteringBeside).
+--
+-- The BATTLEFIELD INDEX rather than a filtered candidate list, because the rule
+-- is about what is on the battlefield rather than about one kind of question:
+-- Game.zoneMembers is the road every Filter, Quantity and Count takes to the
+-- board, so subtracting there reaches a card-authored condition however it
+-- counts. GameState.objects is left alone -- the ids still name objects, which
+-- is what lets `fullView` describe the entering permanent while this makes it
+-- uncountable.
+--
+-- The two shapes the rules state, and this engine's third:
+--
+--   * "If one of these lands enters the battlefield at the same time as one or
+--     more other lands ... it doesn't take those lands into consideration"
+--     (Blackcleave Cliffs, Gatherer 2023-02-04) -- the batch.
+--   * "Because Frontier Mastodon isn't on the battlefield at this time, it
+--     won't count itself" (Gatherer 2014-11-24) -- the subject.
+--   * A NESTED entry's outer subject, which no card reaches: an entry rewrite
+--     that runs another entry (SacrificeAnyNumber, RunEffects) leaves the outer
+--     permanent uncountable too, because runEntry inserts rather than writes.
+--     Nothing in data/cards puts a board-counting entry condition under one, so
+--     that leg is a regression fence rather than a proven behaviour. Its
+--     sibling's outer BATCH is not covered: runEntry writes enteringBeside, as
+--     abilitySources has always read it.
+--
+-- Answers `gs` unchanged outside an entry loop, where both sets are empty, so
+-- the ordinary board is untouched.
+boardAsEntering :: GameState -> GameState
+boardAsEntering gs =
+  let entering = Set.union (GameState.enteringBeside gs) (GameState.enteringSubjects gs)
+   in if Set.null entering
+        then gs
+        else gs {GameState.battlefield = Set.difference (GameState.battlefield gs) entering}
+
 -- gather's body with both ability gates left open. Called twice by gather --
 -- once wired shut to build the list the gates read, once with the real answers.
 gatherGiven :: (ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> Maybe [Gathered] -> GameState -> [Gathered]
@@ -4075,15 +4112,19 @@ abilitiesFromCharacteristics peers pc oid gs =
 replacementsOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 replacementsOf oid gs =
   let pc = project oid gs
-      -- CR 614.12: a card-authored condition must read the board as though only
-      -- this permanent were entering. `fullView gs` reads the batch's OTHER
-      -- members too when a Quantity.Count condition counts over a battlefield
-      -- Filter -- GameState.enteringBeside only suppresses static-ability
-      -- SOURCES (abilitySources), not a Count's own Filter over the battlefield
-      -- (#2324).
+      -- CR 614.12: a card-authored condition reads the board an entering
+      -- permanent would arrive on, which holds neither the permanent itself nor
+      -- the ones arriving beside it -- boardAsEntering. The VIEW stays `fullView
+      -- gs`: what the rule takes off the board is membership, not
+      -- characteristics, and the permanent's own are exactly what CR 614.12 asks
+      -- to be read "as it would exist on the battlefield".
+      --
+      -- Proven by Pawl.ReplacementSpec's Frontier Mastodon pairs, one per
+      -- direction: reanimated beside Jedit Ojanen, and entering at 4/3 under
+      -- Glorious Anthem.
       lives pr = case PrintedReplacement.condition pr of
         Nothing -> True
-        Just cond -> Condition.holds (fullView gs) (Filter.contextFor (controllerOf oid gs) (Just oid)) gs oid cond
+        Just cond -> Condition.holds (fullView gs) (Filter.contextFor (controllerOf oid gs) (Just oid)) (boardAsEntering gs) oid cond
    in fmap PrintedReplacement.effect (filter lives (PC.replacementEffects pc))
         <> intrinsicReplacementsOf (announcedXOf oid gs) (phyrexianLifePaidOf oid gs) pc
         <> shieldOf oid gs
