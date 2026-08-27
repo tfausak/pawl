@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 
--- Covers Pawl.Engine.Resolve's Effect.MoveCounters arm -- CR 122.5's move of a
--- counter from one object onto a second, and the atomicity that makes it one
+-- Covers Pawl.Engine.Resolve's Effect.MoveCounters arm -- CR 122.5's move of
+-- counters from one object onto a second, and the atomicity that makes it one
 -- action rather than a removal written beside a placement.
 module Pawl.MoveCounterSpec where
 
@@ -504,19 +504,22 @@ batchSpec s registry = Spec.describe s "CR 122.5 moving a whole tally of counter
   let -- alice: four Forests (the {3} has to come from somewhere), one Mountain,
       -- Black Panther and a Goblin Piker settled on the battlefield, and two
       -- Plains in her library so the card the rider draws is there and nothing
-      -- decks her (CR 104.3c). `counters` is what a case puts on the Mountain,
-      -- and is the ONLY difference between the two boards below.
-      board counters = do
+      -- decks her (CR 104.3c). `counters` is what a case puts on the Mountain and
+      -- `extra` seats a further printing by name; between them they are the ONLY
+      -- difference between the three boards below.
+      board extra counters = do
         forest <- S.printingOf s registry "Forest"
         mountain <- S.printingOf s registry "Mountain"
         plains <- S.printingOf s registry "Plains"
         panther <- S.printingOf s registry "Black Panther, Wakandan King"
         piker <- S.printingOf s registry "Goblin Piker"
+        extras <- mapM (\(name, pid) -> fmap (\p -> (p, pid)) (S.printingOf s registry name)) extra
         let lands = S.landsFor mountain S.alice 1 (S.landsInPlay forest 4)
             (pantherId, g1) = S.addCreature panther S.alice lands
             (pikerId, g2) = S.addCreature piker S.alice g1
             (_, g3) = S.addLibraryCard plains S.alice (snd (S.addLibraryCard plains S.alice g2))
-            ready = g3 {GameState.priority = Just S.alice}
+            seated = foldl (\gs (p, pid) -> snd (S.addCreature p pid gs)) g3 extras
+            ready = seated {GameState.priority = Just S.alice}
         pure $ do
           landId <- newestNamed mountainName ready
           -- The SHIELD counter is why the land bears two kinds: the card names
@@ -534,7 +537,7 @@ batchSpec s registry = Spec.describe s "CR 122.5 moving a whole tally of counter
   -- move of the tally are three different boards apart, and both ends are read:
   -- a fix that put three without taking three leaves the land at three.
   Spec.it s "all three +1/+1 counters cross in one batch, and the rider counts them" $ do
-    built <- board (S.addCounter CounterKind.PlusOnePlusOne 3)
+    built <- board [] (S.addCounter CounterKind.PlusOnePlusOne 3)
     case built of
       Just staged@(_, pikerId, landId, before) -> do
         Spec.assertEqWith s "the land bears three +1/+1 counters and a shield counter" (pairOn landId before) (3, 1)
@@ -554,7 +557,7 @@ batchSpec s registry = Spec.describe s "CR 122.5 moving a whole tally of counter
   -- rider's "if one or more" read against the zero the move binds -- an
   -- unbound slot would leave the gate unevaluable rather than false.
   Spec.it s "a land bearing no counter of the named kind moves nothing and pays no rider" $ do
-    built <- board (const id)
+    built <- board [] (const id)
     case built of
       Just staged@(_, pikerId, landId, before) -> do
         Spec.assertEqWith s "the land bears the shield counter and no +1/+1 counter" (pairOn landId before) (0, 1)
@@ -564,5 +567,26 @@ batchSpec s registry = Spec.describe s "CR 122.5 moving a whole tally of counter
             Spec.assertEqWith s "and the land kept its shield counter" (pairOn landId after) (0, 1)
             Spec.assertEqWith s "alice gained no life" (S.lifeOf S.alice after) (S.lifeOf S.alice before)
             Spec.assertEqWith s "and drew nothing" (S.handSize S.alice after) (S.handSize S.alice before)
+          Nothing -> Spec.assertFailure s "expected Black Panther to offer exactly its one printed activated ability"
+      Nothing -> Spec.assertFailure s "the Mountain did not reach the battlefield"
+  -- CR 614.16 read at gameplay level, and the case that makes the BATCH visible:
+  -- the rule replaces a placement of "one or more counters" once, so bob's
+  -- Vorinclex sees one placement of three and halves it to one. Three placements
+  -- of one each would each halve to nothing and the creature would end at zero, so
+  -- the two readings are two different boards -- which they are not on any board
+  -- without a counter-scaling row. The removal is not replaced (no CR 614 class
+  -- pairs with one), so the land still loses all three, and "moved this way" is
+  -- what completed the journey rather than what came off.
+  Spec.it s "CR 614.16 an opponent's Vorinclex halves the whole batch once, not each counter" $ do
+    built <- board [("Vorinclex, Monstrous Raider", S.bob)] (S.addCounter CounterKind.PlusOnePlusOne 3)
+    case built of
+      Just staged@(_, pikerId, landId, before) -> do
+        Spec.assertEqWith s "the land bears three +1/+1 counters and a shield counter" (pairOn landId before) (3, 1)
+        case mine staged of
+          Just after -> do
+            Spec.assertEqWith s "half of three, rounded down, landed on the creature" (pairOn pikerId after) (1, 0)
+            Spec.assertEqWith s "and the land lost all three, the removal being unreplaceable" (pairOn landId after) (0, 1)
+            Spec.assertEqWith s "alice gained one life, the counters that completed the move" (S.lifeOf S.alice after) (fmap (+ 1) (S.lifeOf S.alice before))
+            Spec.assertEqWith s "and drew the one card the rider names" (S.handSize S.alice after) (S.handSize S.alice before + 1)
           Nothing -> Spec.assertFailure s "expected Black Panther to offer exactly its one printed activated ability"
       Nothing -> Spec.assertFailure s "the Mountain did not reach the battlefield"

@@ -5920,7 +5920,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- the correct zone for THIS opcode because every producer names a
           -- permanent on each side (Agent's Toolkit binds the artifact itself and
           -- the creature that entered; Explorer's Cache binds the artifact and a
-          -- targeted creature). A slot bound as the ability triggered may name an
+          -- targeted creature; Black Panther, Wakandan King binds a targeted land
+          -- and a targeted creature). A slot bound as the ability triggered may name an
           -- object CR 400.7 has since moved, and a targeted one may have become
           -- illegal, which is CR 608.2b's re-read in legalOne above.
           --
@@ -5951,8 +5952,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     (\kind n -> n > 0 && not (CounterRestriction.prohibited to kind gs))
                     (maybe Map.empty Object.counters (Game.lookupObject from gs))
                 -- CR 609.3 for a count larger than the object has: "it does only
-                -- as much as possible", so the batch is clamped to what is there
-                -- rather than removing a number the object cannot supply.
+                -- as much as possible". The clamp is load-bearing rather than
+                -- defensive -- Event.removeCounters saturates where
+                -- Event.putCounters does not, so an unclamped pair would place
+                -- more counters than it took off -- but it is a REGRESSION FENCE
+                -- and not a proven behaviour: every producer's count is the tally
+                -- of that kind on the very object the removal reads, so nothing in
+                -- the corpus can make the two differ, and a mutation removing the
+                -- clamp leaves the suite green.
                 --
                 -- ANSWERS how many counters made the whole journey, which is
                 -- neither half on its own: Event.putCounters reports what landed
@@ -5973,7 +5980,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                           pure (min taken landed)
              in -- A count of zero moves nothing and ASKS nothing: the prompt below
                 -- picks which kind crosses, and no kind crossing makes that a
-                -- question whose answer cannot matter.
+                -- question whose answer cannot matter. A REGRESSION FENCE, not a
+                -- proven behaviour -- the prompt is reachable only where the card
+                -- names no kind, and the one such producer's count is a literal
+                -- one, so a mutation dropping this guard leaves the suite green.
                 if asked == 0
                   then pure 0
                   else case named of
