@@ -61,6 +61,7 @@ import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -1466,7 +1467,7 @@ soulfireSpec s registry = Spec.describe s "SoulfireEruption" $ do
 -- half bakes it into whichSource and names no recipient at all. The last two
 -- cases below are the two halves, and the by-direction one is what proves the
 -- second row watches a source rather than a recipient.
-dovinAbility :: Printing.Printing -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
+dovinAbility :: Printing.Printing -> [ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 dovinAbility p = take 1 (Face.activatedAbilities (S.combinedFace p))
 
 -- Fill every target slot with the offered candidates that name `oid`, FILTERING

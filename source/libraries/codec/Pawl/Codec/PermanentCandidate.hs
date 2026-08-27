@@ -4,6 +4,7 @@ module Pawl.Codec.PermanentCandidate where
 
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Effect as Effect
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.InstanceOrdinal as InstanceOrdinal
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
@@ -16,7 +17,7 @@ import qualified Pawl.Types.PermanentCandidate as PermanentCandidate
 codec :: Codec.Codec PermanentCandidate.PermanentCandidate
 codec = Fields.object $ do
   source <- Fields.required "source" ObjectId.codec PermanentCandidate.source
-  effect <- Fields.required "effect" (ReplacementEffect.codec (Effect.codec Card.codec)) PermanentCandidate.effect
+  effect <- Fields.required "effect" (ReplacementEffect.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) PermanentCandidate.effect
   ordinal <- Fields.required "ordinal" InstanceOrdinal.codec PermanentCandidate.ordinal
   pure
     PermanentCandidate.MkPermanentCandidate

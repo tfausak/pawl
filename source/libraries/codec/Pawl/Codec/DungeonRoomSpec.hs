@@ -15,6 +15,7 @@ import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -38,7 +39,7 @@ toJson = Codec.encode codec
 fromJson :: Value.Value -> Either Text.Text (DungeonRoom.DungeonRoom Text.Text)
 fromJson = Codec.decode codec
 
-drawOne :: Modal.Modal Text.Text
+drawOne :: Modal.Modal Text.Text (GrantedAbility.GrantedAbility Text.Text)
 drawOne =
   Modal.MkModal
     ( Seq.singleton

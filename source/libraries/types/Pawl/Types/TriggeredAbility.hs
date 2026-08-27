@@ -8,9 +8,9 @@ import qualified Pawl.Types.TriggerLimit as TriggerLimit
 -- | CR 603.1 / 700.2b / 603.3c: "[condition], [effect]", modal-capable and
 -- parametric in `card` for the reason ActivatedAbility is. On the stack it shares
 -- Resolve's executor with an activated ability.
-data TriggeredAbility card = MkTriggeredAbility
+data TriggeredAbility card ability = MkTriggeredAbility
   { condition :: TriggerCondition.TriggerCondition,
-    modal :: Modal.Modal card,
+    modal :: Modal.Modal card ability,
     -- | CR 603.4: an intervening "if" clause. The SAME predicate vocabulary a CR
     -- 603.8 state trigger uses, with two customers: checked when the trigger event
     -- occurs (the ability does not trigger AT ALL if it is false) and checked

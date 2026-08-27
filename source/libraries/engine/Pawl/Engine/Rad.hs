@@ -42,6 +42,7 @@ import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
@@ -131,7 +132,7 @@ hasRadCounters =
 -- Single mode, no targets, mandatory: rule 728.1 fixes the whole text and
 -- chooses nothing, which is what lets Monarch.placeInherent put it on the stack
 -- unprompted.
-ability :: TriggeredAbility Card
+ability :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 ability =
   TriggeredAbility.MkTriggeredAbility
     { -- CR 500.1 / 505.1a: a turn has exactly one precombat main phase and it is

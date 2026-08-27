@@ -19,9 +19,9 @@ import qualified Pawl.Types.Modal as Modal
 -- controller -- is what Pawl.Engine.Activate enforces for every ability here, so
 -- Glittering Lion's "Any player may activate this ability" is absent and that
 -- card runs stricter than printed (#2213).
-data ActivatedAbility card = MkActivatedAbility
+data ActivatedAbility card ability = MkActivatedAbility
   { cost :: Cost.Cost Keyword.Keyword,
-    modal :: Modal.Modal card,
+    modal :: Modal.Modal card ability,
     -- | CR 602.5: every clause of the "activate only ..." rider the ability
     -- carries, ALL of which must hold. Empty for an ability without one, which is
     -- most of them: the riders in the pool are the sorcery-speed ones rule 702

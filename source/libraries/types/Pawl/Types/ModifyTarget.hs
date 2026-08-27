@@ -1,6 +1,5 @@
 module Pawl.Types.ModifyTarget where
 
-import qualified Data.Void as Void
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -8,20 +7,17 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- | The payload of Pawl.Types.Effect's ModifyTarget arm (#1305): apply this
 -- modification to the objects the ObjectRef names, for this duration.
 --
--- The Modification is instantiated at Void, which says in the type that a
--- modification created by a RESOLUTION cannot grant a quoted ability. That is a
--- module-graph fact and not a rules one: Modification's grant carries a whole
--- Pawl.Types.GrantedAbility, an ability carries Effects, and an Effect carrying
--- an ability back would close a cycle that no type parameter can open. A card
--- worded "target creature gains '[ability]' until end of turn" therefore has no
--- home here yet (#1642).
---
--- The widening in the other direction is total and lives at
--- Pawl.Engine.Projection.widenModification: what a resolution stores can go
--- anywhere a card's grant can.
-data ModifyTarget = MkModifyTarget
+-- Parametric in `ability` for Pawl.Types.Modification's reason, and it is the
+-- same variable Pawl.Types.Effect threads down to here: this module cannot NAME
+-- an ability, because an ability carries Effects and an Effect carries one of
+-- these, so a concrete Pawl.Types.GrantedAbility here would close a module
+-- cycle. Pawl.Types.GrantedAbility ties the knot instead, exactly as
+-- Pawl.Types.Card ties the `card` one -- which is what lets a card worded
+-- "target creature gains '[ability]' until end of turn" resolve into the same
+-- Modification a printed static ability grants.
+data ModifyTarget ability = MkModifyTarget
   { duration :: Duration.Duration,
-    modification :: Modification.Modification Void.Void,
+    modification :: Modification.Modification ability,
     ref :: ObjectRef.ObjectRef
   }
   deriving (Eq, Ord, Show)

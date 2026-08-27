@@ -77,6 +77,7 @@ import qualified Pawl.Types.FloatingCandidate as FloatingCandidate
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InstanceOrdinal as InstanceOrdinal
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.Object as Object
@@ -271,7 +272,7 @@ collect sources floating =
 -- "prevent that damage and remove that many +1/+1 counters from it", where
 -- Pawl.Types.RemoveCounters names a slot and Pawl.Types.PutCounters (Stormwild
 -- Capridor) names an ObjectRef and needs no binding.
-printedRider :: ObjectId -> Maybe PlayerId -> ReplacementEffect (Effect.Effect Card) -> Maybe PreventionRider.PreventionRider
+printedRider :: ObjectId -> Maybe PlayerId -> ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Maybe PreventionRider.PreventionRider
 printedRider src you re = case re of
   ReplacementEffect.DamageR damageR
     | not (Seq.null (DamageR.riders damageR)),
@@ -302,7 +303,7 @@ printedRider src you re = case re of
 -- replacement's position mid-loop. What the ordinal DOES prove is the duplicate
 -- itself -- dropping it to a constant reddens Pawl.ReplacementSpec's two
 -- "CR 702.136b riot twice" cases.
-numberInstances :: [(ObjectId, ReplacementEffect (Effect.Effect Card))] -> [(InstanceOrdinal.InstanceOrdinal, (ObjectId, ReplacementEffect (Effect.Effect Card)))]
+numberInstances :: [(ObjectId, ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card)))] -> [(InstanceOrdinal.InstanceOrdinal, (ObjectId, ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card))))]
 numberInstances =
   let step seen row =
         let n = Map.findWithDefault 0 row seen
@@ -1002,7 +1003,7 @@ bucketOf candidate = case ReplacementCandidate.origin candidate of
   ReplacementOrigin.Other -> bucketOfEffect (ReplacementCandidate.effect candidate)
 
 -- CR 616.1b-e: which bucket an effect that is NOT CR 614.15's falls in.
-bucketOfEffect :: ReplacementEffect (Effect.Effect Card) -> ReplacementBucket
+bucketOfEffect :: ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> ReplacementBucket
 bucketOfEffect re = case re of
   ReplacementEffect.ZoneChangeR {} -> ReplacementBucket.Other
   -- CR 616.1c: entering as a copy is its own, HIGHER bucket. The split only
@@ -1113,7 +1114,7 @@ bucketOfEffect re = case re of
 -- bucketOfEffect and Event.apply. A wildcard defaulting to False would hand an
 -- author who teaches Event.apply a new controller-reading rewrite an unasked choice
 -- instead of a build failure.
-readsApplier :: ReplacementEffect (Effect.Effect Card) -> Bool
+readsApplier :: ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Bool
 readsApplier re = case re of
   -- The destination zone is the effect's own second field, and the pattern is
   -- matched before Event.apply runs (Rest in Peace, Leyline of the Void).
@@ -1511,7 +1512,7 @@ consume identity_ = case identity_ of
 -- are deliberately NOT reduced, since they apply separately to each event. No
 -- card can print a PreventNext at all (see Pawl.Types.DamageRewrite), so this
 -- arm has no producer.
-setShield :: CandidateId -> DamageR.DamageR (Effect.Effect Card) -> Natural -> Game ()
+setShield :: CandidateId -> DamageR.DamageR (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Natural -> Game ()
 setShield identity_ damageR left = case identity_ of
   CandidateId.OfPermanent {} -> pure ()
   CandidateId.OfFloating floating ->

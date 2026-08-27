@@ -3,6 +3,7 @@ module Pawl.Types.HandActionPerformer where
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Game as Game
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 
@@ -23,4 +24,4 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- Deliberately has NO default: "no subgame runner" is a real state of the world
 -- (Resolve.noSubgame), but "no mulligan performer" is not -- it would silently
 -- disable every CR 103.5b card at whichever call site forgot one.
-type HandActionPerformer = ObjectId.ObjectId -> PlayerId.PlayerId -> [Effect.Effect Card.Card] -> Game.Game ()
+type HandActionPerformer = ObjectId.ObjectId -> PlayerId.PlayerId -> [Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)] -> Game.Game ()

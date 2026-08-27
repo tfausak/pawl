@@ -54,6 +54,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
@@ -1772,7 +1773,7 @@ denethorBoard ::
   (Monad m) =>
   Spec.Spec m n ->
   Registry.Registry m ->
-  m (ActivatedAbility.ActivatedAbility Card.Type.Card, ObjectId.ObjectId, GameState.GameState)
+  m (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card), ObjectId.ObjectId, GameState.GameState)
 denethorBoard s registry = do
   denethor <- S.printingOf s registry "Denethor, Stone Seer"
   mountain <- S.printingOf s registry "Mountain"

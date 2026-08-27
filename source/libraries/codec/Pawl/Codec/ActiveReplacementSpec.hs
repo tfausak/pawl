@@ -31,7 +31,7 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- | Rest in Peace's rewrite, borrowed from Pawl.Codec.ReplacementEffectSpec: the
 -- payload is not what this module has to prove, so the same value serves both
 -- cases below.
-effect :: ReplacementEffect.ReplacementEffect (Effect.Effect card)
+effect :: ReplacementEffect.ReplacementEffect (Effect.Effect card ability)
 effect =
   ReplacementEffect.ZoneChangeR
     ( ZoneChangeR.MkZoneChangeR

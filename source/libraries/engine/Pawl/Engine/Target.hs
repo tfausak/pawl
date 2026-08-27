@@ -22,6 +22,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modal as Modal
@@ -1058,7 +1059,7 @@ selectionLegal perspective source slots sets chosen gs =
 -- enchant slot, declared by the card rather than by a mode, which castability
 -- must see or an Aura with no legal creature would be castable and then countered
 -- on resolution (CR 601.2c). An ability has no enchant slot and passes Map.empty.
-fillableModes :: Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> Map SlotName TargetSlot -> Modal.Modal Card -> GameState -> Set ModeIndex
+fillableModes :: Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> Map SlotName TargetSlot -> Modal.Modal Card (GrantedAbility.GrantedAbility Card) -> GameState -> Set ModeIndex
 fillableModes perspective seed source extra modal gs =
   let pcs = Projection.projectAll gs
    in fillableModesGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective seed source extra modal gs
@@ -1067,7 +1068,7 @@ fillableModes perspective seed source extra modal gs =
 -- This is the half Action.legalActions' activation gate wants: it asks this
 -- question once per permanent, and the wrapper above takes a whole-board sweep
 -- apiece to answer it (#716).
-fillableModesGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> Map SlotName TargetSlot -> Modal.Modal Card -> GameState -> Set ModeIndex
+fillableModesGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> Map SlotName TargetSlot -> Modal.Modal Card (GrantedAbility.GrantedAbility Card) -> GameState -> Set ModeIndex
 fillableModesGiven pcs grants pools perspective seed source extra modal gs =
   let ms = Foldable.toList (Modal.modes modal)
       fillable i m =
@@ -1106,6 +1107,6 @@ bakeSlot players slot = slot {TargetSlot.filter = fmap (Filter.bakeBound players
 -- modes are chosen: CR 700.2b's mode selection asks which modes are fillable
 -- (fillableModes), and an unbaked slot admits nothing, which would take a
 -- perfectly fillable trigger off the stack under CR 603.3c.
-bakeModal :: Map SlotName PlayerId -> Modal.Modal Card -> Modal.Modal Card
+bakeModal :: Map SlotName PlayerId -> Modal.Modal Card (GrantedAbility.GrantedAbility Card) -> Modal.Modal Card (GrantedAbility.GrantedAbility Card)
 bakeModal players modal =
   modal {Modal.modes = fmap (\m -> m {Mode.targetSlots = bakeSlots players (Mode.targetSlots m)}) (Modal.modes modal)}

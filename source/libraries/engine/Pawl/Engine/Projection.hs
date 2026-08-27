@@ -11,7 +11,6 @@ import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Data.Void as Void
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
@@ -168,38 +167,6 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- CR 613.1f's grant carries a whole quoted ability, and a card's abilities are
 -- written against a whole Card (CR 707.8a).
 type Modification = Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card)
-
--- CR 611.2: a modification a RESOLUTION created, widened. Exhaustive rather than
--- a catch-all, so a later arm carrying an ability has to be widened deliberately.
-widenModification :: Modification.Modification Void.Void -> Modification
-widenModification m = case m of
-  Modification.GainAbility a -> Void.absurd a
-  Modification.GainKeyword k -> Modification.GainKeyword k
-  Modification.GainFlashbackAtManaCost -> Modification.GainFlashbackAtManaCost
-  Modification.GainEnchant x -> Modification.GainEnchant x
-  Modification.LoseAllAbilities -> Modification.LoseAllAbilities
-  Modification.LoseNamedAbility n -> Modification.LoseNamedAbility n
-  Modification.LoseKeyword k -> Modification.LoseKeyword k
-  Modification.SetBasePowerToughness x -> Modification.SetBasePowerToughness x
-  Modification.ModifyPowerToughness x -> Modification.ModifyPowerToughness x
-  Modification.SetLandSubtype x -> Modification.SetLandSubtype x
-  Modification.SetLandSubtypeToChosen -> Modification.SetLandSubtypeToChosen
-  Modification.AddLandSubtype x -> Modification.AddLandSubtype x
-  Modification.SetCreatureSubtype x -> Modification.SetCreatureSubtype x
-  Modification.AddCreatureSubtype x -> Modification.AddCreatureSubtype x
-  Modification.AddEveryCreatureSubtype -> Modification.AddEveryCreatureSubtype
-  Modification.AddSubtype x -> Modification.AddSubtype x
-  Modification.AddCardType x -> Modification.AddCardType x
-  Modification.SetCardType x -> Modification.SetCardType x
-  Modification.AddSupertype x -> Modification.AddSupertype x
-  Modification.RemoveSupertype x -> Modification.RemoveSupertype x
-  Modification.ChangeSubtypeWord x -> Modification.ChangeSubtypeWord x
-  Modification.SetController x -> Modification.SetController x
-  Modification.SetControllerToSource -> Modification.SetControllerToSource
-  Modification.SetColor x -> Modification.SetColor x
-  Modification.AddColor x -> Modification.AddColor x
-  Modification.AddChosenColor -> Modification.AddChosenColor
-  Modification.SwitchPowerToughness -> Modification.SwitchPowerToughness
 
 -- CR 613.1: the layer a modification applies in. A classification, never the
 -- modification's identity.
@@ -1114,7 +1081,7 @@ staticAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
 -- CR 707.2a: the replacement effects this object's copiable rules text gives it,
 -- staticAbilitiesOf's sibling for the ability kind CR 614 asks about, written
 -- the same way for the same two reasons.
-copiableReplacementsOf :: ObjectId -> GameState -> [PrintedReplacement.PrintedReplacement (Effect.Effect Card.Type.Card)]
+copiableReplacementsOf :: ObjectId -> GameState -> [PrintedReplacement.PrintedReplacement (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 copiableReplacementsOf oid gs = case copiableSnapshotOf oid gs of
   Just snapshot -> PC.replacementEffects snapshot
   Nothing -> foldMap Face.replacementEffects (Game.faceOf oid gs)
@@ -1655,13 +1622,11 @@ textChangesAffecting oid gs =
 -- PAIR's family is read off the word being replaced, which is why no family tag
 -- rides on the stored ChangeSubtypeWord. Exhaustive rather than a catch-all, which
 -- is what had let GainKeyword go unrewritten while carrying a land-type word.
--- Polymorphic in the granted ability, and takes ITS rewriter, since a card's grant
--- descends into the quoted ability while ModifyTarget's Void one cannot occur.
+-- Descends into the quoted ability a CR 613.1f grant carries, through
+-- rewriteGrantedAbility below -- which is mutually recursive with this, since
+-- that ability's own clauses hold effects that can grant again.
 rewriteModification :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modification -> Modification
-rewriteModification = rewriteModificationWith rewriteGrantedAbility
-
-rewriteModificationWith :: ([(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ability -> ability) -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modification.Modification ability -> Modification.Modification ability
-rewriteModificationWith rewriteAbility pairs m =
+rewriteModification pairs m =
   let -- `inFamily from` is CR 612.2's gate.
       swap inFamily from to s = if s == from && inFamily from then to else s
       apply1 acc (from, to) = case acc of
@@ -1692,7 +1657,7 @@ rewriteModificationWith rewriteAbility pairs m =
         Modification.GainEnchant slot -> Modification.GainEnchant (rewriteTargetSlot [(from, to)] slot)
         -- CR 612.1 over the whole quoted ability: the words are printed on the
         -- GRANTER, so a text change affecting it rewrites them before the grant.
-        Modification.GainAbility a -> Modification.GainAbility (rewriteAbility [(from, to)] a)
+        Modification.GainAbility a -> Modification.GainAbility (rewriteGrantedAbility [(from, to)] a)
         -- Carries no word: the type is read off the source at projection time.
         Modification.SetLandSubtypeToChosen -> acc
         -- A control op carries no subtype word either.
@@ -1759,10 +1724,15 @@ rewriteAffected pairs a = case a of
 -- CR 612's subtype word swap over an effect's AST. Cases on an effect's
 -- STRUCTURE -- does this arm carry a word a swap could reach -- never on which
 -- effect it is.
-rewriteEffect :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Effect.Effect Card.Type.Card -> Effect.Effect Card.Type.Card
+rewriteEffect :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 rewriteEffect pairs effect = case effect of
+  -- CR 612.1 / 612.3 through rewriteModification, whose other arms Tidal Warrior
+  -- proves and whose GRANT arm Presence of Gond proves. What no pooled card
+  -- proves is the two together -- a text change reaching a quoted ability a
+  -- RESOLUTION granted -- since the one card that grants on resolution quotes no
+  -- subtype word (#2420).
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
-    Effect.ModifyTarget (ModifyTarget.MkModifyTarget (rewriteDuration pairs duration) (rewriteModificationWith (const Void.absurd) pairs modification) (rewriteObjectRef pairs ref))
+    Effect.ModifyTarget (ModifyTarget.MkModifyTarget (rewriteDuration pairs duration) (rewriteModification pairs modification) (rewriteObjectRef pairs ref))
   Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer excess) -> Effect.DealDamage (DealDamage.MkDealDamage (rewriteObjectRef pairs ref) quantity dealer excess)
   -- Two SlotNames and nothing else: no word a swap could reach.
   Effect.Fight _ -> effect
@@ -2033,7 +2003,7 @@ rewriteTokenName from to name = case (Subtype.creatureTypeWord from, Subtype.cre
 -- 702.178a's "as long as" gate, and the ACTIVATION COST (CR 118.1, CR 602.1a),
 -- so a Magical Hack naming Forest moves which land Dark Heart of the Wood's cost
 -- demands.
-rewriteActivatedAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ActivatedAbility.ActivatedAbility Card.Type.Card -> ActivatedAbility.ActivatedAbility Card.Type.Card
+rewriteActivatedAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 rewriteActivatedAbility pairs ability =
   ability
     { ActivatedAbility.modal = rewriteModal pairs (ActivatedAbility.modal ability),
@@ -2052,7 +2022,7 @@ rewriteGrantedAbility pairs granted = case granted of
 -- CR 612.1 over a TRIGGERED ability printed on a permanent. Three parts, not
 -- just the payload: the CR 603.8 condition is where the word usually is, and CR
 -- 603.4's intervening "if" shares rewriteCondition.
-rewriteTriggeredAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> TriggeredAbility Card.Type.Card -> TriggeredAbility Card.Type.Card
+rewriteTriggeredAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 rewriteTriggeredAbility pairs ability =
   ability
     { TriggeredAbility.condition = rewriteTriggerCondition pairs (TriggeredAbility.condition ability),
@@ -2064,7 +2034,7 @@ rewriteTriggeredAbility pairs ability =
 -- makes a static ability's continuous effect and so text in the same text box as
 -- a triggered ability's. Two carriers: the ability's own "as long as" clause, and
 -- the effect itself.
-rewritePrintedReplacement :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> PrintedReplacement.PrintedReplacement (Effect.Effect Card.Type.Card) -> PrintedReplacement.PrintedReplacement (Effect.Effect Card.Type.Card)
+rewritePrintedReplacement :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> PrintedReplacement.PrintedReplacement (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> PrintedReplacement.PrintedReplacement (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 rewritePrintedReplacement pairs printed =
   printed
     { PrintedReplacement.condition = fmap (rewriteCondition pairs) (PrintedReplacement.condition printed),
@@ -2078,7 +2048,7 @@ rewritePrintedReplacement pairs printed =
 --
 -- Classification, not identity: every arm is a CR 614.1 event class, and the
 -- descent is by the field shapes those classes carry.
-rewriteReplacementEffect :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ReplacementEffect (Effect.Effect Card.Type.Card) -> ReplacementEffect (Effect.Effect Card.Type.Card)
+rewriteReplacementEffect :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 rewriteReplacementEffect pairs effect = case effect of
   -- CR 400.3's owner and the destination Zone name no word; the moving object's
   -- Filter does.
@@ -2141,7 +2111,7 @@ rewriteReplacementEffect pairs effect = case effect of
 
 -- CR 612.1 through what a CR 614.1c/614.1d entry replacement does. Exhaustive for
 -- rewriteReplacementEffect's reason.
-rewriteEntryRewrite :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card) -> EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card)
+rewriteEntryRewrite :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 rewriteEntryRewrite pairs rewrite = case rewrite of
   -- CR 707.9's exceptions set power and toughness; only the "which permanents"
   -- clause names a word.
@@ -2234,7 +2204,7 @@ rewriteWithCounters pairs w =
 -- effects, and its TARGET SLOTS, whose Filter is the candidate set CR 601.2c
 -- (imported by CR 602.2b) reads. The Pool is not an omission: it names a rules
 -- category (CR 115) rather than a word printed on the card.
-rewriteModal :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modal.Modal Card.Type.Card -> Modal.Modal Card.Type.Card
+rewriteModal :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 rewriteModal pairs modal =
   let rewriteClause c =
         c
@@ -4065,10 +4035,10 @@ colorsGiven pcs oid gs = PC.colors (projectGiven pcs oid gs)
 -- than sampled (CR 604.1). viewOfCharacteristics asks the same gate from INSIDE
 -- the fold against a layer-bounded board; neither half of this pair is inside
 -- it, so it takes the full view.
-abilitiesOf :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
+abilitiesOf :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 abilitiesOf = abilitiesGiven Map.empty
 
-abilitiesGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
+abilitiesGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 abilitiesGiven pcs oid gs = abilitiesFromCharacteristics (fullView gs) (projectGiven pcs oid gs) oid gs
 
 -- abilitiesGiven with the projection already in hand -- the half
@@ -4081,7 +4051,7 @@ abilitiesGiven pcs oid gs = abilitiesFromCharacteristics (fullView gs) (projectG
 -- CR 613.1: the gate's board comes in as a parameter. Taking fullView here would
 -- not terminate for a caller inside the fold -- it re-enters `gather`, with no
 -- memo and no descending bound.
-abilitiesFromCharacteristics :: Count.ViewOf -> ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
+abilitiesFromCharacteristics :: Count.ViewOf -> ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 abilitiesFromCharacteristics peers pc oid gs =
   let granted ability = case ActivatedAbility.condition ability of
         Nothing -> True
@@ -4102,7 +4072,7 @@ abilitiesFromCharacteristics peers pc oid gs =
 -- for CR 109.5's "you".
 -- Nothing is latched, so Jared Carthalion's shield goes away the moment the
 -- monarchy does, with no trigger and no resolution in between.
-replacementsOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
+replacementsOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 replacementsOf oid gs =
   let pc = project oid gs
       -- CR 614.12: a card-authored condition must read the board as though only
@@ -4146,7 +4116,7 @@ phyrexianLifePaidOf oid gs = maybe 0 Object.phyrexianLifePaid (Game.lookupObject
 -- half's self-scope is likewise read off its SOURCE in Replacement.applies
 -- rather than baked into DamagePattern.whichRecipient, which is compared to the
 -- event's Recipient TAG (CR 510.1b) and not to which permanent was hit.
-shieldOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
+shieldOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 shieldOf oid gs =
   if shieldCounters oid gs == 0
     then []
@@ -4201,7 +4171,7 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 -- while its source is on the battlefield, which is exactly "from the
 -- battlefield". Filter.IsSource is the rule's "this permanent", the self-scope
 -- CR 614.1c's entry rows use.
-finalityOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
+finalityOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 finalityOf oid gs =
   if finalityCounters oid gs == 0
     then []
@@ -4246,7 +4216,7 @@ finalityCounters oid gs = case Game.lookupObject oid gs of
 -- Replacement.applies matches this row against its own source alone, which is
 -- rule 122.1d's "a permanent with a stun counter on it" -- the counters that
 -- create the effect are the ones on the permanent it protects.
-stunOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
+stunOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 stunOf oid gs =
   if stunCounters oid gs == 0
     then []
@@ -4284,7 +4254,7 @@ stunCounters oid gs = case Game.lookupObject oid gs of
 -- where the two orders disagree. Read off the same finished projection, so a
 -- compleated ability the CR 613 fold removed is gone -- which is what a keyword
 -- needs, where CR 306.5b's loyalty itself is a rule and stays.
-intrinsicReplacementsOf :: Natural -> Natural -> ProjectedCharacteristics -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
+intrinsicReplacementsOf :: Natural -> Natural -> ProjectedCharacteristics -> [ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
   [ -- CR 614.1c: the entering object is the ability's own source, so the pattern
   -- is Filter.IsSource.
@@ -4334,7 +4304,7 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- continuous effect or a keyword counter is on no base face (#833). Nor does a
 -- copy's CARD TYPE reach the three type-line disjuncts, which still read the
 -- copier's printed face (#2397).
-replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect (Effect.Effect Card.Type.Card))]
+replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
       -- CR 122.1c's pair, CR 122.1h's row and CR 122.1d's row are minted from
@@ -4416,7 +4386,7 @@ grantsKeywordWhere p m = case m of
 --
 -- Not the whole list: rule 702's minted ones come from mintedTriggeredAbilitiesOf
 -- below, and a reader wanting every triggered ability must add them.
-triggeredAbilitiesOf :: ObjectId -> GameState -> [TriggeredAbility Card.Type.Card]
+triggeredAbilitiesOf :: ObjectId -> GameState -> [TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 
 -- The other half of that list: the triggered abilities rule 702 MINTS from a
@@ -4428,7 +4398,7 @@ triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 -- Over-reaches by CR 612.3 for a keyword GRANTED at layer 6, which arrives after
 -- the layer-3 swap and should keep the printed word. No card grants afterlife,
 -- fabricate or soulshift (gap #1600).
-mintedTriggeredAbilitiesOf :: ProjectedCharacteristics -> [TriggeredAbility Card.Type.Card]
+mintedTriggeredAbilitiesOf :: ProjectedCharacteristics -> [TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 mintedTriggeredAbilitiesOf pc =
   let pairs = fmap (\c -> (ChangeSubtypeWord.from c, ChangeSubtypeWord.to c)) (PC.subtypeWordChanges pc)
    in fmap (rewriteTriggeredAbility pairs) (Keyword.triggeredAbilitiesOf (PC.keywords pc))

@@ -30,9 +30,10 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 -- than concrete because this module cannot NAME an ability: an ActivatedAbility
 -- carries Effects and Pawl.Types.Effect carries a Pawl.Types.ModifyTarget, which
 -- carries one of these. Pawl.Types.StaticAbility and Pawl.Types.ContinuousEffect
--- instantiate the variable at `GrantedAbility card`, which is every position a
--- card's grant reaches; ModifyTarget instantiates it at Void, and says there
--- why.
+-- instantiate the variable at `GrantedAbility card`, and so does the
+-- Pawl.Types.ModifyTarget an Effect carries, which is threaded the whole way
+-- down: a modification a RESOLUTION creates reaches exactly the positions a
+-- printed grant does. Pawl.Types.GrantedAbility ties the knot.
 data Modification ability
   = GainKeyword Keyword.Keyword -- layer 6 (Serpent's Gift)
   | -- | layer 6, CR 613.1f / CR 702.34a: this object gains flashback, priced at
@@ -60,9 +61,7 @@ data Modification ability
     --
     -- Its own arm rather than GainAbility, and legitimately so: enchant is a rule
     -- 702 keyword, hence a closed-half CITATION exactly as the Keyword GainKeyword
-    -- carries is. It cannot ride GainAbility in any case -- Pawl.Types.ModifyTarget
-    -- instantiates the ability variable at Void (#1642), and this is the arm a
-    -- RESOLUTION needs.
+    -- carries is.
     --
     -- Carries a whole TargetSlot rather than a Filter, for Pawl.Types.Face.enchant's
     -- reason: CR 702.5d's enchant-player Auras need the Pool axis, so the printed
@@ -86,6 +85,11 @@ data Modification ability
     -- a 1/1 green Elf Warrior creature token.'", Sixth Sense's "Enchanted
     -- creature has 'Whenever this creature deals combat damage to a player, you
     -- may draw a card.'").
+    --
+    -- A RESOLUTION reaches this arm too, through Pawl.Types.ModifyTarget's own
+    -- ability variable: Retraction Helix's "Until end of turn, target creature
+    -- gains '{T}: Return target nonland permanent to its owner's hand.'" stores
+    -- exactly what an Aura's static ability grants.
     --
     -- Folded into the ProjectedCharacteristics list CR 113.3 puts its kind in,
     -- which is what decides everything about the granted ability's identity: it
@@ -112,7 +116,7 @@ data Modification ability
     -- Rejected: an arm per ability kind. The ability variable is the one this
     -- module cannot name, so two arms would need two variables, and every
     -- position instantiating them -- StaticAbility, ContinuousEffect,
-    -- ModifyTarget's Void -- would carry both. The sum lives one module out
+    -- ModifyTarget -- would carry both. The sum lives one module out
     -- instead, in Pawl.Types.GrantedAbility.
     GainAbility ability
   | LoseAllAbilities -- layer 6 (Humility)

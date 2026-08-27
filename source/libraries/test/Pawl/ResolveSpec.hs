@@ -70,6 +70,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layout as Layout
@@ -2472,7 +2473,7 @@ optionalsAnswered responses = [d | Response.ChoseOptional d <- responses]
 -- target, tapped or not as the case needs. The Kami is itself a legal target
 -- until its own sacrifice cost is paid (CR 601.2c chooses targets before CR
 -- 601.2h pays), so the offer again holds more than the answerer takes.
-kamiBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card), ObjectId.ObjectId, ObjectId.ObjectId)
+kamiBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)), ObjectId.ObjectId, ObjectId.ObjectId)
 kamiBoard s registry startTapped = do
   kami <- S.printingOf s registry "Teardrop Kami"
   piker <- S.printingOf s registry "Goblin Piker"
@@ -2484,7 +2485,7 @@ kamiBoard s registry startTapped = do
 -- One activation and resolution of that board, keeping the transcript for
 -- twiddleResolved's reason. The ability is read off the PRINTING rather than
 -- conjured, so what is proved is the card in data/cards/.
-kamiResolved :: ClauseIndex.ClauseIndex -> OptionalDecision.OptionalDecision -> GameState.GameState -> ActivatedAbility.ActivatedAbility Card.Type.Card -> ObjectId.ObjectId -> ObjectId.ObjectId -> ([Response.Response], GameState.GameState)
+kamiResolved :: ClauseIndex.ClauseIndex -> OptionalDecision.OptionalDecision -> GameState.GameState -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> ObjectId.ObjectId -> ObjectId.ObjectId -> ([Response.Response], GameState.GameState)
 kamiResolved branch decision gs ability kamiId pikerId =
   let ((_, after), asked) = Replay.record (twiddleAnswer branch decision pikerId) gs (Activate.activateAbility S.alice kamiId ability >> Stack.resolveTop)
    in (asked, after)
@@ -2870,7 +2871,7 @@ atCreature oid p = case p of
 -- every player who did not win lose 3. A flat 3 rather than Shahrazad's half-life
 -- rider because what these three cases pin is WHO is in the set, and a per-player
 -- amount would let a wrong set and a wrong amount cancel out.
-nonWinnersLose3 :: [Effect.Effect Card.Type.Card]
+nonWinnersLose3 :: [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 nonWinnersLose3 =
   let slot = SlotName.MkSlotName (Text.pack "winner")
    in [ Effect.PlaySubgame slot,
@@ -2883,7 +2884,7 @@ nonWinnersLose3 =
 -- Result decides the outcome outright and no nested game runs -- which is what
 -- lets a test name a DRAWN subgame at all. `borrowed` supplies the type line, so
 -- the object is a spell like any other.
-subgameSpellOn :: Printing.Printing -> String -> [Effect.Effect Card.Type.Card] -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+subgameSpellOn :: Printing.Printing -> String -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 subgameSpellOn borrowed name effects gs0 =
   let (spellPrintingId, gs0b) = Game.intern (Printing.MkPrinting card) gs0
       (spellId, gs1) = Game.freshObjectId gs0b

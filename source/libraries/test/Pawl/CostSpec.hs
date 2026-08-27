@@ -67,6 +67,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
@@ -104,7 +105,7 @@ import qualified Pawl.Types.Zone as Zone
 -- The single activated ability of a printing. Total: the fallback is unreachable
 -- in these fixtures. Duplicated per this suite's convention of group-local
 -- helpers (ActivateSpec and ReplacementSpec each carry their own).
-theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Face.spell (S.combinedFace p)) [] Nothing Nothing
@@ -1361,7 +1362,7 @@ namesIn zone gs =
 -- Jarad's SECOND activated ability, "Sacrifice a Swamp and a Forest". The file-local
 -- `theAbility` names the FIRST, which on this card is the drain the group below
 -- proves. Total: the fallback is unreachable on this printing.
-swampAndForest :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+swampAndForest :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 swampAndForest p = case Face.activatedAbilities (S.combinedFace p) of
   _ : ability : _ -> ability
   _ -> theAbility p

@@ -49,13 +49,18 @@ import qualified Pawl.Types.Zone as Zone
 cardCodec :: Codec.Codec Text.Text
 cardCodec = Common.text
 
-codec :: Codec.Codec (TriggeredAbility.TriggeredAbility Text.Text)
-codec = TriggeredAbility.codec cardCodec
+-- | And the `ability` parameter likewise: it too is reached only through the
+-- codec supplied here, so any type proves the shape.
+abilityCodec :: Codec.Codec Text.Text
+abilityCodec = Common.text
 
-toJson :: TriggeredAbility.TriggeredAbility Text.Text -> Value.Value
+codec :: Codec.Codec (TriggeredAbility.TriggeredAbility Text.Text Text.Text)
+codec = TriggeredAbility.codec cardCodec abilityCodec
+
+toJson :: TriggeredAbility.TriggeredAbility Text.Text Text.Text -> Value.Value
 toJson = Codec.encode codec
 
-fromJson :: Value.Value -> Either Text.Text (TriggeredAbility.TriggeredAbility Text.Text)
+fromJson :: Value.Value -> Either Text.Text (TriggeredAbility.TriggeredAbility Text.Text Text.Text)
 fromJson = Codec.decode codec
 
 -- One constructor, so three cases: both states of CR 603.4's `intervening`
@@ -111,8 +116,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
   Spec.it s "toJsonDelayed/fromJsonDelayed sorts by name (Full Throttle, Tidal Wave)" $
     Common.assertJsonCodec
       s
-      (Codec.encode (TriggeredAbility.codecDelayed cardCodec))
-      (Codec.decode (TriggeredAbility.codecDelayed cardCodec))
+      (Codec.encode (TriggeredAbility.codecDelayed cardCodec abilityCodec))
+      (Codec.decode (TriggeredAbility.codecDelayed cardCodec abilityCodec))
       ( Map.fromList
           [ ( AbilityName.MkAbilityName (Text.pack "sacrifice it"),
               TriggeredAbility.MkTriggeredAbility

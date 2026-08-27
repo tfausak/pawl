@@ -43,6 +43,7 @@ import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Object as Object
@@ -129,7 +130,7 @@ chapterTriggers restricted before after n = crossed before after n && (after == 
 -- is the one rule 714.2b writes. CR 714.2c's "{rN1}, {rN2}--[Effect]" needs no
 -- representation at all: that rule says the shorthand MEANS two abilities, so a
 -- card prints two entries sharing one modal.
-chapterOf :: TriggeredAbility card -> Maybe Natural
+chapterOf :: TriggeredAbility card ability -> Maybe Natural
 chapterOf = chapterOfCondition . TriggeredAbility.condition
 
 -- | The same question asked of a trigger CONDITION alone, which is where the
@@ -221,7 +222,7 @@ tracksLore pc = isSaga pc && not (null (chaptersOf pc))
 -- modifying one entry compete for a CR 616.1e order chosen by the applying
 -- player, so the counter-placing row could be applied before the number was
 -- chosen.
-entryReplacementsOf :: PC.ProjectedCharacteristics -> [ReplacementEffect (Effect.Effect Card)]
+entryReplacementsOf :: PC.ProjectedCharacteristics -> [ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 entryReplacementsOf pc
   | not (isSaga pc) = []
   -- CR 614.1c on both branches: the entering object is the ability's own source.

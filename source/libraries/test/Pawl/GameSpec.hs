@@ -60,6 +60,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -1452,7 +1453,7 @@ declareAttackersAskAnswer p = case p of
 -- unreachable in this fixture. Duplicated per this suite's convention of
 -- group-local helpers (CostSpec, ActivateSpec, ReplacementSpec each carry
 -- their own).
-theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Face.spell (S.combinedFace p)) [] Nothing Nothing
@@ -1465,7 +1466,7 @@ theAbility p = case Face.activatedAbilities (S.combinedFace p) of
 -- else, so the recorded order IS the order priority moved in -- including a
 -- stale holder who has already departed, which is exactly what the CR 800.4a
 -- guard below is for.
-greedThenPassAnswer :: ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+greedThenPassAnswer :: ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
 greedThenPassAnswer greedId ability p = case p of
   Prompt.Concede asked -> do
     State.modify' (\seen -> seen <> [asked])
@@ -2231,7 +2232,7 @@ controlCombatAnswer p = case p of
 -- ChooseAction never lets the priority loop terminate. This one names the
 -- activation once and passes forever after, which is also the honest model of an
 -- interpreter that tries something illegal and then gives up.
-illegalActivationAnswer :: ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Prompt.Prompt r -> State.State Bool r
+illegalActivationAnswer :: ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Prompt.Prompt r -> State.State Bool r
 illegalActivationAnswer oid ability p = case p of
   Prompt.ChooseAction {} -> do
     tried <- State.get
@@ -2303,7 +2304,7 @@ aimingAt oid p = case p of
 -- pawl now writes all three, so an ability taken BY POSITION out of the
 -- printing's list is whichever one the card file happens to list first -- the
 -- cost is the thing that actually tells them apart.
-loyaltyChange :: ActivatedAbility.ActivatedAbility Card.Type.Card -> Maybe Integer
+loyaltyChange :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Integer
 loyaltyChange ability = Maybe.listToMaybe (Maybe.mapMaybe change (Cost.Type.components (ActivatedAbility.cost ability)))
   where
     change c = case c of

@@ -54,6 +54,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -101,14 +102,14 @@ chooseNoModes p = case p of
 -- The single ability of a printing (all M3e gates have exactly one). Total: the
 -- empty-ability fallback is unreachable in these fixtures, and honors the
 -- no-partial-functions rule (no `error`).
-theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Nothing Nothing
 
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) -- the fixture
 -- shape every pre-M4h single-mode ActivatedAbility now takes.
-singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSlot.TargetSlot -> Modal.Modal card
+singleModeAbility :: [Effect.Effect card ability] -> Map.Map SlotName.SlotName TargetSlot.TargetSlot -> Modal.Modal card ability
 singleModeAbility effects slots =
   Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots)) (ModeSelection.ChooseExactly 1)
 
@@ -134,6 +135,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   droughtActivationSpec s registry
   goldenEggSpec s registry
   presenceOfGondSpec s registry
+  retractionHelixSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -1942,7 +1944,7 @@ tovolarBackName = CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge"
 --
 -- Total for theAbility's reason, and the fallback is inert: it costs nothing and
 -- does nothing, so a fixture that reached it would fail its own assertions.
-shownAbility :: ObjectId.ObjectId -> GameState.GameState -> ActivatedAbility.ActivatedAbility Card.Type.Card
+shownAbility :: ObjectId.ObjectId -> GameState.GameState -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 shownAbility oid gs = case Game.faceOf oid gs >>= Maybe.listToMaybe . Face.activatedAbilities of
   Just ab -> ab
   Nothing -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Nothing Nothing
@@ -2319,7 +2321,7 @@ soleCreatureOf pid gs = case filter (`Projection.isCreatureOf` gs) (Game.zoneMem
 -- Face.activatedAbilities, which is the printed list a text change has not
 -- reached. Projection.abilitiesGiven is the list Activate itself offers from, so
 -- this is the same ability a player would be given.
-soleProjectedAbility :: ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+soleProjectedAbility :: ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 soleProjectedAbility oid gs = case Projection.abilitiesOf oid gs of
   [only] -> Just only
   _ -> Nothing
@@ -2934,7 +2936,7 @@ activationCostReductionSpec s registry = Spec.describe s "ActivationCostReductio
 -- Mishra's Foundry's {2}. `theAbility` takes the first, which on both is the mana
 -- ability CR 605.3b keeps off the stack -- and one with no mana in its cost, so
 -- nothing could be measured on it.
-animationAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+animationAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 animationAbility p = case drop 1 (Face.activatedAbilities (S.combinedFace p)) of
   ab : _ -> ab
   [] -> theAbility p
@@ -3309,8 +3311,10 @@ droughtActivationSpec s registry = Spec.describe s "DroughtActivation" $ do
 -- CR 613.1f layer 6, the ability-GRANTING half: Presence of Gond ({2}{G}
 -- Enchantment -- Aura, "Enchant creature. Enchanted creature has '{T}: Create a
 -- 1/1 green Elf Warrior creature token.'", checked against Scryfall) is the
--- cheapest card in data/cards that hands another object a whole quoted ACTIVATED
--- ability. Sixth Sense is the triggered half of the same arm, and cheaper --
+-- cheapest PRINTED STATIC ABILITY in data/cards that hands another object a whole
+-- quoted ACTIVATED ability -- Retraction Helix, this module's group of that name,
+-- is the same grant made by a RESOLUTION instead, and is cheaper. Sixth Sense is
+-- the triggered half of the same arm, and cheaper --
 -- Pawl.EventTriggerSpec's "CR 613.1f a granted triggered ability" is its group.
 --
 -- Three seats, and the two that matter are DIFFERENT players: alice controls the
@@ -3482,10 +3486,131 @@ evolveAt oid from to p = case p of
   _ -> S.identityAnswer p
 
 -- The one ability on the object that the printing did not print: the grant.
-grantedAbility :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+grantedAbility :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 grantedAbility printed oid gs = case filter (/= theAbility printed) (Projection.abilitiesOf oid gs) of
   ability : _ -> Just ability
   [] -> Nothing
+
+-- CR 611.2 / 613.1f, the RESOLUTION half of the grant Presence of Gond makes
+-- from a printed static ability: Retraction Helix ({U} Instant, "Until end of
+-- turn, target creature gains '{T}: Return target nonland permanent to its
+-- owner's hand.'", checked against Scryfall) is the cheapest card in
+-- data/cards whose EFFECT, created as the spell resolves, hands another object a
+-- whole quoted activated ability. Banishing Knack is the same sentence on
+-- another {U} instant.
+--
+-- Three seats, and all three matter: alice casts the Helix, BOB's Prodigal
+-- Sorcerer receives the ability, and CAROL owns what the granted ability
+-- bounces. CR 113.7 makes the Sorcerer the granted ability's source, CR 602.2
+-- and CR 113.8 make bob -- not alice -- the only player who may activate it and
+-- the controller of the ability on the stack, and CR 400.3 sends the bounced
+-- permanent to its OWNER's hand, which is carol's rather than bob's.
+--
+-- The Sorcerer is the receiver because it PRINTS an activated ability of its own
+-- ("{T}: This creature deals 1 damage to any target"), so the granted one has to
+-- be told apart from an ability the creature already had.
+--
+-- carol also controls an Island, which the granted ability's "nonland permanent"
+-- may not name -- so the target the fixture pins is one the board could have got
+-- wrong.
+retractionHelixSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+retractionHelixSpec s registry = Spec.describe s "Retraction Helix" $ do
+  -- The negative half of the pair below, on the same board bar the cast: bob's
+  -- Sorcerer has its printed ability and nothing else, so the second ability the
+  -- positive board finds is the grant rather than the fixture.
+  Spec.it s "CR 611.2 without the spell the creature has its printed ability alone" $ do
+    board <- helixBoard s registry
+    Spec.assertEqWith s "the printed ability alone" (length (Projection.abilitiesOf (helixSorcerer board) (helixState board))) 1
+
+  Spec.it s "CR 613.1f the resolved spell adds the quoted ability ALONGSIDE the printed one" $ do
+    board <- helixBoard s registry
+    let granted = helixCast board
+    Spec.assertEqWith s "two abilities" (length (Projection.abilitiesOf (helixSorcerer board) granted)) 2
+    Spec.assertBool s (elem (theAbility (helixSorcererPrinting board)) (Projection.abilitiesOf (helixSorcerer board) granted)) "the printed one survives the grant"
+    -- CR 611.2c froze the effect onto the one creature the spell targeted, so
+    -- the other creature on the board is untouched.
+    Spec.assertEqWith s "and the creature the spell did not target gains nothing" (Projection.abilitiesOf (helixPiker board) granted) []
+
+  -- The gameplay-level proof. bob activates the ability his creature was GIVEN
+  -- and aims it at carol's Goblin Piker: the Piker ends up in CAROL's hand (CR
+  -- 400.3's owner, not the activating player's), bob's Sorcerer paid the {T},
+  -- and carol's Island -- which the quoted "nonland permanent" excludes -- is
+  -- untouched.
+  Spec.it s "CR 400.3 whole card: the granted {T} bounces a nonland permanent to its OWNER's hand" $ do
+    board <- helixBoard s registry
+    let granted = helixCast board
+    -- Falls back to the PRINTED ability rather than failing when the grant is
+    -- missing, so a board that never granted anything is answered by the bounce
+    -- assertion below rather than by a structural one ahead of it.
+    let ability = Maybe.fromMaybe (theAbility (helixSorcererPrinting board)) (grantedAbility (helixSorcererPrinting board) (helixSorcerer board) granted)
+        resolved =
+          S.runPure (aimAtObject (helixPiker board)) granted $ do
+            Activate.activateAbility S.bob (helixSorcerer board) ability
+            Stack.resolveTop
+    -- CR 400.7: the move makes a NEW object, so the Piker is named rather
+    -- than tracked by id -- which is also what makes the OWNER claim below
+    -- readable off the board.
+    Spec.assertEqWith s "the Piker is in carol's hand" (fmap (`S.soleFaceName` resolved) (Game.zoneMembers Zone.Hand S.carol resolved)) [S.printingName (helixPikerPrinting board)]
+    Spec.assertEqWith s "and the activating player's hand is empty" (length (Game.zoneMembers Zone.Hand S.bob resolved)) 0
+    Spec.assertEqWith s "it left the battlefield" (S.countOnBattlefieldByName (S.printingName (helixPikerPrinting board)) S.carol resolved) 0
+    Spec.assertEqWith s "carol's Island stayed on the battlefield" (fmap Object.zone (Game.lookupObject (helixCarolIsland board) resolved)) (Just Zone.Battlefield)
+    Spec.assertEqWith s "the receiving creature paid the {T}" (fmap Object.tapped (Game.lookupObject (helixSorcerer board) resolved)) (Just TapState.Tapped)
+    Spec.assertBool s (any (\a -> case a of A.Activate _ ab -> ab == ability; _ -> False) (activationsOf (helixSorcerer board) (Action.legalActions S.bob granted))) "the granted ability is offered to its controller"
+    Spec.assertEqWith s "and not to the spell's controller" (activationsOf (helixSorcerer board) (Action.legalActions S.alice granted)) []
+    Spec.assertBool s (ability /= theAbility (helixSorcererPrinting board)) "and what was activated is the granted ability, not the printed one"
+
+-- Aims every announced target slot at one object, filtering the OFFERED set so a
+-- recipient the engine did not offer can never stand in for one it did.
+aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just oid) . Recipient.objectOf) sets
+  _ -> S.identityAnswer p
+
+-- alice's Island and Retraction Helix in hand, bob's settled Prodigal Sorcerer,
+-- carol's Goblin Piker and Island.
+data HelixBoard = MkHelixBoard
+  { helixState :: GameState.GameState,
+    helixSorcererPrinting :: Printing.Printing,
+    helixHelix :: ObjectId.ObjectId,
+    helixSorcerer :: ObjectId.ObjectId,
+    helixPiker :: ObjectId.ObjectId,
+    helixPikerPrinting :: Printing.Printing,
+    helixCarolIsland :: ObjectId.ObjectId
+  }
+
+helixBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m HelixBoard
+helixBoard s registry = do
+  helix <- S.printingOf s registry "Retraction Helix"
+  island <- S.printingOf s registry "Island"
+  sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (sorcererId, g0) = S.addCreature sorcerer S.bob (S.landsFor island S.alice 1 S.threePlayerGame)
+      -- CR 302.6: the receiver has to have settled before the granted {T} is
+      -- payable, since the cost is the RECEIVER's to pay.
+      settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.bob)
+      (pikerId, g1) = S.addCreature piker S.carol settled
+      (carolIslandId, g2) = S.addCreature island S.carol g1
+      (helixId, g3) = S.addHandCard helix S.alice g2
+   in pure
+        MkHelixBoard
+          { helixState = g3 {GameState.priority = Just S.alice},
+            helixSorcererPrinting = sorcerer,
+            helixHelix = helixId,
+            helixSorcerer = sorcererId,
+            helixPiker = pikerId,
+            helixPikerPrinting = piker,
+            helixCarolIsland = carolIslandId
+          }
+
+-- alice casts the Helix at bob's Sorcerer and it resolves, leaving bob with
+-- priority.
+helixCast :: HelixBoard -> GameState.GameState
+helixCast board =
+  let after =
+        S.runPure (aimAtObject (helixSorcerer board)) (helixState board) $ do
+          S.cast S.alice (helixHelix board)
+          Stack.resolveTop
+   in after {GameState.priority = Just S.bob}
 
 goldenEggSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 goldenEggSpec s registry = Spec.describe s "Golden Egg" $ do
@@ -3539,7 +3664,7 @@ goldenEggSpec s registry = Spec.describe s "Golden Egg" $ do
 -- Golden Egg's SECOND activated ability -- the life gain, not the mana ability
 -- theAbility above would pick. Total: the fallback is unreachable for a printing
 -- with two.
-lifeGainAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+lifeGainAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 lifeGainAbility p = case Face.activatedAbilities (S.combinedFace p) of
   _ : ab : _ -> ab
   _ -> theAbility p
@@ -3716,7 +3841,7 @@ hoistMixedBoard printings n =
 -- Activate.activatableGiven fed everything Action.legalActions hoists for it.
 -- One expression, so the spec below reads as a differential rather than as a
 -- pile of arguments.
-threadedGate :: PlayerId.PlayerId -> ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> GameState.GameState -> Bool
+threadedGate :: PlayerId.PlayerId -> ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> GameState.GameState -> Bool
 threadedGate pid oid ability gs =
   let grants = Projection.controlGrants gs
       pcs = Projection.projectAll gs

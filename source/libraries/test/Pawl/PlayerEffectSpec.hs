@@ -115,6 +115,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -3982,7 +3983,7 @@ cancelRun victimId cancelId gs =
 -- has had its chance to resolve too.
 abilityRun ::
   ObjectId.ObjectId ->
-  ActivatedAbility.ActivatedAbility Card.Type.Card ->
+  ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) ->
   ObjectId.ObjectId ->
   GameState.GameState ->
   (GameState.GameState, GameState.GameState)

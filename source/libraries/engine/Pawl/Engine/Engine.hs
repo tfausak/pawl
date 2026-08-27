@@ -76,6 +76,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Modal as Modal.Type
@@ -880,7 +881,7 @@ interchangeable entries = case entries of
 -- conservative -- Binding.you and Binding.triggerSource are constant across a
 -- batch of equal entries -- so do not widen it without a card that needs the
 -- width. Not a case on any effect's IDENTITY.
-orderInert :: TriggeredAbility.TriggeredAbility Card.Card -> Bool
+orderInert :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Bool
 orderInert ability =
   let modal = TriggeredAbility.modal ability
    in Maybe.isNothing (TriggeredAbility.intervening ability)

@@ -80,7 +80,7 @@ import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 -- one-shots under CR 608.2c/608.2f store nothing. An opcode takes a PlayerRef
 -- rather than a SlotName once a rule reaches players the card did not target
 -- (Draw's `Relative You` beside Ancestral Recall's `InSlot`).
-data Effect card
+data Effect card ability
   = -- | CR 120.1: deal this much damage to what the ObjectRef names. CR 120.1a /
     -- 115.4 let damage reach a PLAYER, which no ObjectRef can name, so the
     -- InSlot arm reads a Recipient rather than an ObjectId. WHO deals it is the
@@ -108,7 +108,7 @@ data Effect card
     -- ONCE and freezes the result as Affected.TheseObjects -- never the Filter,
     -- which re-evaluated per projection would pump a creature that became
     -- attacking later.
-    ModifyTarget ModifyTarget.ModifyTarget
+    ModifyTarget (ModifyTarget.ModifyTarget ability)
   | -- | CR 612: rewrite subtype words in the target spell or permanent. The
     -- SubtypeFamily is which words the card's own text names, and so which words
     -- the player is asked for; the Set is what the NEW word may not be. Resolve
@@ -514,7 +514,7 @@ data Effect card
     -- opcode's ONE object, so the effect list stays a straight-line sequence,
     -- where an `If` arm would put a BRANCH between two effect lists. NOT
     -- Pawl.Types.Clause.condition, which gates whether a clause runs at all.
-    Replace (Replace.Replace (Effect card))
+    Replace (Replace.Replace (Effect card ability))
   | -- | CR 614.10a: each player the PlayerRef names skips their NEXT occurrence
     -- of this step or phase. Fatigue names a step; Stonehorn Dignitary names a
     -- whole phase (CR 500.1).
@@ -546,7 +546,7 @@ data Effect card
     -- prevented (Pawl.Engine.Binding.eventAmount).
     --
     -- Not implemented: a shield naming more than one recipient (gap #1108).
-    PreventNextDamage (PreventNextDamage.PreventNextDamage (Effect card))
+    PreventNextDamage (PreventNextDamage.PreventNextDamage (Effect card ability))
   | -- | CR 615.1 / 615.3: install an UNBOUNDED prevention shield over the
     -- recipients an ObjectRef names, for a duration (Selfless Squire).
     --
@@ -555,7 +555,7 @@ data Effect card
     -- duration does, hence a DamageRewrite.PreventAll rather than a PreventNext
     -- of some large number. With no running count, CR 615.5's "the damage
     -- prevented this way" is per APPLICATION here (Brace for Impact).
-    PreventAllDamage (PreventAllDamage.PreventAllDamage (Effect card))
+    PreventAllDamage (PreventAllDamage.PreventAllDamage (Effect card ability))
   | -- | CR 614.9: install a floating REDIRECTION effect (Turn the Tables).
     -- RedirectDamage.from is the damage's original recipient,
     -- RedirectDamage.to where it goes instead. NOT a Replace carrying a DamageR,
@@ -1309,5 +1309,5 @@ data Effect card
     -- ORDER: APNAP (CR 608.2f's primary determination) and then, within one
     -- controller, that rule's secondary sentence -- the RESOLVING controller's
     -- choice, asked as Prompt.OrderForEach.
-    ForEach (ForEach.ForEach (Effect card))
+    ForEach (ForEach.ForEach (Effect card ability))
   deriving (Eq, Ord, Show)

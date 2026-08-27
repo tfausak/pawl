@@ -1,6 +1,7 @@
 module Pawl.Types.TriggeredAbilitySource where
 
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -18,7 +19,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 -- ability too.
 data TriggeredAbilitySource = MkTriggeredAbilitySource
   { source :: ObjectId.ObjectId,
-    ability :: TriggeredAbility.TriggeredAbility Card.Card,
+    ability :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card),
     -- | CR 603.7a: when the DELAYED ability this object came from was created,
     -- and Nothing for an ability the source itself has. That is a
     -- CLASSIFICATION of how the object got here rather than which ability it

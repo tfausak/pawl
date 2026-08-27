@@ -6,6 +6,7 @@ import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PreventionRider as PreventionRider
@@ -27,7 +28,7 @@ import qualified Pawl.Types.Uses as Uses
 -- bucketOf answer CR 616.1a without the rules core asking what an effect IS.
 data ReplacementCandidate = MkReplacementCandidate
   { identity :: CandidateId.CandidateId,
-    effect :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card),
+    effect :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)),
     source :: ObjectId.ObjectId,
     -- | CR 109.5's "you" for this instance, from whichever of the two segments
     -- can answer it: a permanent's static ability derives it from `source`'s

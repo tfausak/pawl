@@ -26,6 +26,7 @@ import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -947,7 +948,7 @@ faceNamed n card = List.find (\f -> Face.name f == n) (NonEmpty.toList (Card.fac
 -- reaches them instead, and holds them to the dataflow rule on their own terms
 -- -- they declare no target slots -- so leaving them out here costs no lint
 -- coverage.
-allEffects :: Face.Face Card.Card -> [Effect Card.Card]
+allEffects :: Face.Face Card.Card -> [Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)]
 allEffects face = Modal.allEffects (Face.spell face)
 
 -- The union of every mode's target slots, plus the enchant slot. CR 303.4a: an
@@ -972,7 +973,7 @@ modeTargetSlots idx face = Modal.modeTargetSlots idx (Face.spell face)
 -- the casting path. Out-of-range indices contribute nothing (total via
 -- Seq.lookup). Modes rather than a flat effect list, for the reason
 -- Modal.chosenModes gives: the mode is the unit CR 603.5's "may" covers.
-chosenModes :: Seq.Seq ModeIndex.ModeIndex -> Face.Face Card.Card -> [(ModeInstance.ModeInstance, Mode.Mode Card.Card)]
+chosenModes :: Seq.Seq ModeIndex.ModeIndex -> Face.Face Card.Card -> [(ModeInstance.ModeInstance, Mode.Mode Card.Card (GrantedAbility.GrantedAbility Card.Card))]
 chosenModes chosen face = Modal.chosenModes chosen (Face.spell face)
 
 -- CR 601.2c/700.2c: the target slots of the CHOSEN modes only (union), plus

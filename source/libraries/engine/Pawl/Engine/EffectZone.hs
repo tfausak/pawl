@@ -27,6 +27,7 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
@@ -50,7 +51,7 @@ import Pawl.Types.Zone (Zone)
 -- move of anything but its own source states something nothing reads. That is a
 -- card-data error rather than a rules question, and it is inert: this function
 -- answers Nothing for it, which is the same answer the effect had before.
-zoneFunctionedFrom :: Effect Card.Type.Card -> Maybe Zone
+zoneFunctionedFrom :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Zone
 zoneFunctionedFrom effect = case effect of
   -- Only an InSlot naming the reserved source slot can be "the object it's on".
   -- A swept set is never one object, so no sweeping arm can be; a library's

@@ -200,7 +200,7 @@ atNextUpkeep gs =
 -- the permanent's own ability asks -- Moonmist's "transform all Humans" with a
 -- wider filter. The two cases below that need a permanent turned over without
 -- its own ability use this, because Stonewing Antagonizer prints no way back.
-transformEveryCreature :: Effect.Effect card
+transformEveryCreature :: Effect.Effect card ability
 transformEveryCreature = Effect.Transform (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature))
 
 -- alice and bob, nothing on the battlefield: the base every case here builds on.
@@ -998,7 +998,7 @@ transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
 
 -- "Destroy each Fungus", which on this board is the Thallid alone -- the
 -- Saproling the transform limb made is a Phyrexian Saproling and not one.
-destroyEveryFungus :: Effect.Effect card
+destroyEveryFungus :: Effect.Effect card ability
 destroyEveryFungus =
   Effect.Destroy
     Destroy.MkDestroy

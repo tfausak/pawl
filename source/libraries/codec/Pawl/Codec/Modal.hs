@@ -25,9 +25,9 @@ defaultSelection = ModeSelection.ChooseExactly 1
 -- The at-least-one-mode invariant is 'Fields.objectWith''s check rather than a
 -- field's: it reads the assembled record, and it is a rule of Magic rather than
 -- a property of the wire, so it has no schema representation.
-codec :: (Typeable.Typeable card, Eq card) => Codec.Codec card -> Codec.Codec (Modal.Modal card)
-codec cardCodec = Fields.objectWith check $ do
-  modes <- Fields.required "modes" (Common.seq (Mode.codec cardCodec)) Modal.modes
+codec :: (Typeable.Typeable card, Eq card, Typeable.Typeable ability, Eq ability) => Codec.Codec card -> Codec.Codec ability -> Codec.Codec (Modal.Modal card ability)
+codec cardCodec abilityCodec = Fields.objectWith check $ do
+  modes <- Fields.required "modes" (Common.seq (Mode.codec cardCodec abilityCodec)) Modal.modes
   selection <- Fields.defaulted "selection" defaultSelection ModeSelection.codec Modal.selection
   pure Modal.MkModal {Modal.modes = modes, Modal.selection = selection}
   where

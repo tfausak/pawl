@@ -1,6 +1,7 @@
 module Pawl.Types.InherentTriggerSource where
 
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
@@ -18,6 +19,6 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 -- of the difference.
 data InherentTriggerSource = MkInherentTriggerSource
   { controller :: PlayerId.PlayerId,
-    ability :: TriggeredAbility.TriggeredAbility Card.Card
+    ability :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
   }
   deriving (Eq, Ord, Show)

@@ -2,6 +2,7 @@ module Pawl.Types.ActivatedAbilitySource where
 
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ObjectId as ObjectId
 
 -- | CR 602: an activated ability on the stack -- the source permanent's id plus
@@ -20,6 +21,6 @@ import qualified Pawl.Types.ObjectId as ObjectId
 -- a codec needs. Pawl.Types.Source is what this is an arm of.
 data ActivatedAbilitySource = MkActivatedAbilitySource
   { source :: ObjectId.ObjectId,
-    ability :: ActivatedAbility.ActivatedAbility Card.Card
+    ability :: ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
   }
   deriving (Eq, Ord, Show)

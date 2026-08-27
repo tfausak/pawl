@@ -19,10 +19,10 @@ import qualified Pawl.Types.Optionality as Optionality
 -- the schema. Every rider is the marked case and so is elided when absent: CR
 -- 608.2c's "If you do", CR 701.46a's "if", CR 608.2d's "or", CR 603.5's "may",
 -- and CR 118.12's resolution cost.
-codec :: (Typeable.Typeable card, Eq card) => Codec.Codec card -> Codec.Codec (Clause.Clause card)
-codec cardCodec = Fields.object $ do
+codec :: (Typeable.Typeable card, Eq card, Typeable.Typeable ability, Eq ability) => Codec.Codec card -> Codec.Codec ability -> Codec.Codec (Clause.Clause card ability)
+codec cardCodec abilityCodec = Fields.object $ do
   condition <- Fields.defaulted "condition" Nothing (Common.maybe Condition.codec) Clause.condition
-  effects <- Fields.defaulted "effects" Seq.empty (Common.seq (Effect.codec cardCodec)) Clause.effects
+  effects <- Fields.defaulted "effects" Seq.empty (Common.seq (Effect.codec cardCodec abilityCodec)) Clause.effects
   ifTaken <- Fields.defaulted "ifTaken" Nothing (Common.maybe ClauseIndex.codec) Clause.ifTaken
   optionality <- Fields.defaulted "optionality" Optionality.Mandatory Optionality.codec Clause.optionality
   orElse <- Fields.defaulted "orElse" Nothing (Common.maybe ClauseIndex.codec) Clause.orElse

@@ -3,6 +3,7 @@ module Pawl.Types.PendingEntryEffect where
 import qualified Data.Sequence as Seq
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 
@@ -27,6 +28,6 @@ import qualified Pawl.Types.PlayerId as PlayerId
 data PendingEntryEffect = MkPendingEntryEffect
   { object :: ObjectId.ObjectId,
     controller :: PlayerId.PlayerId,
-    effects :: Seq.Seq (Effect.Effect Card.Card)
+    effects :: Seq.Seq (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card))
   }
   deriving (Eq, Ord, Show)

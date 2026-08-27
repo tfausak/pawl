@@ -63,6 +63,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
@@ -125,7 +126,7 @@ resolvedCreature land creature nLands =
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) wrapping one
 -- ability's effects and target slots -- the fixture shape every pre-M4h
 -- single-mode ActivatedAbility now takes.
-singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSlot.TargetSlot -> Modal.Modal card
+singleModeAbility :: [Effect.Effect card ability] -> Map.Map SlotName.SlotName TargetSlot.TargetSlot -> Modal.Modal card ability
 singleModeAbility effects slots =
   Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots)) (ModeSelection.ChooseExactly 1)
 
@@ -5537,7 +5538,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
 -- Dragon's "{R/P}: This creature gets +1/+0 until end of turn." Total because
 -- the spec needs a value; a printing with no ability would fail the assertions that
 -- follow rather than this lookup.
-theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Nothing Nothing
@@ -5939,7 +5940,7 @@ activateAndResolve ::
   (forall r. Prompt.Prompt r -> r) ->
   GameState.GameState ->
   ObjectId.ObjectId ->
-  ActivatedAbility.ActivatedAbility Card.Type.Card ->
+  ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) ->
   ([Response.Response], GameState.GameState)
 activateAndResolve answer gs oid ability =
   let ((_, activated), asked) = Replay.record answer gs (Activate.activateAbility S.alice oid ability)

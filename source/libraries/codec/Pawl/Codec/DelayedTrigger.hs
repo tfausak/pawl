@@ -6,6 +6,7 @@ import qualified Data.Map.Strict as Map
 import qualified Pawl.Codec.Binding as Binding
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Expiry as Expiry
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Timestamp as Timestamp
@@ -20,7 +21,7 @@ import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 -- the schema.
 codec :: Codec.Codec DelayedTrigger.DelayedTrigger
 codec = Fields.object $ do
-  ability <- Fields.required "ability" (TriggeredAbility.codec Card.codec) DelayedTrigger.ability
+  ability <- Fields.required "ability" (TriggeredAbility.codec Card.codec (GrantedAbility.codec Card.codec)) DelayedTrigger.ability
   source <- Fields.required "source" ObjectId.codec DelayedTrigger.source
   controller <- Fields.required "controller" PlayerId.codec DelayedTrigger.controller
   bindings <- Fields.defaulted "bindings" Map.empty Binding.codecMap DelayedTrigger.bindings

@@ -49,6 +49,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.Modal as Modal
@@ -240,7 +241,7 @@ yourRingBearer =
 --
 -- No intervening "if" (CR 603.4) and TriggerLimit.Unlimited, for
 -- theRingDrainsOnCombatDamage's reasons.
-theRingLootsOnAttack :: TriggeredAbility.TriggeredAbility Card.Card
+theRingLootsOnAttack :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 theRingLootsOnAttack =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition =
@@ -289,7 +290,7 @@ theRingLootsOnAttack =
 -- Not proved in a two-player suite, which is the only one Pawl.RingSpec builds
 -- here: "each opponent" and "the defending player" are one seat there, so the
 -- clause is a regression fence rather than a proved behaviour.
-theRingDrainsOnCombatDamage :: TriggeredAbility.TriggeredAbility Card.Card
+theRingDrainsOnCombatDamage :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 theRingDrainsOnCombatDamage =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.PermanentDealsCombatDamageToPlayer yourRingBearer,

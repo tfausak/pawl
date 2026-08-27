@@ -131,13 +131,18 @@ import qualified Pawl.Types.Zone as Zone
 cardCodec :: Codec.Codec Text.Text
 cardCodec = Common.text
 
-codec :: Codec.Codec (Effect.Effect Text.Text)
-codec = Effect.codec cardCodec
+-- | And the `ability` parameter likewise: it too is reached only through the
+-- codec supplied here, so any type proves the shape.
+abilityCodec :: Codec.Codec Text.Text
+abilityCodec = Common.text
 
-toJson :: Effect.Effect Text.Text -> Value.Value
+codec :: Codec.Codec (Effect.Effect Text.Text Text.Text)
+codec = Effect.codec cardCodec abilityCodec
+
+toJson :: Effect.Effect Text.Text Text.Text -> Value.Value
 toJson = Codec.encode codec
 
-fromJson :: Value.Value -> Either Text.Text (Effect.Effect Text.Text)
+fromJson :: Value.Value -> Either Text.Text (Effect.Effect Text.Text Text.Text)
 fromJson = Codec.decode codec
 
 -- | A card codec that ignores its argument, at whatever type the use site
@@ -1360,8 +1365,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
     Spec.assertEqWith
       s
       "the emblem payload comes from the argument, not the card"
-      (Codec.encode (Effect.codec (constCodec sentinel)) (Effect.CreateEmblem (Text.pack "a wholly different card type")))
-      (Codec.encode (Effect.codec (constCodec sentinel)) (Effect.CreateEmblem (0 :: Int)))
+      (Codec.encode (Effect.codec (constCodec sentinel) abilityCodec) (Effect.CreateEmblem (Text.pack "a wholly different card type")))
+      (Codec.encode (Effect.codec (constCodec sentinel) abilityCodec) (Effect.CreateEmblem (0 :: Int)))
   Spec.it s "BecomeMonarch" $
     Common.assertJsonCodec
       s

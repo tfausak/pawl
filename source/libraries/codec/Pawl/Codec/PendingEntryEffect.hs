@@ -4,6 +4,7 @@ module Pawl.Codec.PendingEntryEffect where
 
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Effect as Effect
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -17,7 +18,7 @@ codec :: Codec.Codec PendingEntryEffect.PendingEntryEffect
 codec = Fields.object $ do
   object <- Fields.required "object" ObjectId.codec PendingEntryEffect.object
   controller <- Fields.required "controller" PlayerId.codec PendingEntryEffect.controller
-  effects <- Fields.required "effects" (Common.seq (Effect.codec Card.codec)) PendingEntryEffect.effects
+  effects <- Fields.required "effects" (Common.seq (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) PendingEntryEffect.effects
   pure
     PendingEntryEffect.MkPendingEntryEffect
       { PendingEntryEffect.object = object,

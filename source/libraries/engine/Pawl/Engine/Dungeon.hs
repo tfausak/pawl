@@ -33,6 +33,7 @@ import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Object as Object
@@ -99,7 +100,7 @@ isBottommost rooms room = RoomIndex.unwrap room + 1 == Natural.length rooms
 --
 -- intervening = Nothing because CR 309.4c states no "if" clause; the full text of
 -- a room ability is the sentence above and nothing else.
-roomAbility :: RoomIndex.RoomIndex -> DungeonRoom.DungeonRoom Card.Card -> TriggeredAbility.TriggeredAbility Card.Card
+roomAbility :: RoomIndex.RoomIndex -> DungeonRoom.DungeonRoom Card.Card -> TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 roomAbility room dungeonRoom =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.RoomEntered room,

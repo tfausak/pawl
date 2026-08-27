@@ -58,6 +58,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Moved as Moved
@@ -5195,7 +5196,7 @@ attachmentsOn host gs =
     (\oid -> (Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf) == Just host)
     (Set.toList (GameState.battlefield gs))
 
-firstActivatedOf :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+firstActivatedOf :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 firstActivatedOf printing = case Face.activatedAbilities (S.combinedFace printing) of
   ability : _ -> Just ability
   [] -> Nothing

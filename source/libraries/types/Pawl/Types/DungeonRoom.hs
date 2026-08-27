@@ -2,6 +2,7 @@ module Pawl.Types.DungeonRoom where
 
 import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.RoomIndex as RoomIndex
 
@@ -27,7 +28,7 @@ data DungeonRoom card = MkDungeonRoom
     name :: AbilityName.AbilityName,
     -- | CR 309.4c: the effect printed on this room, which its room ability puts on
     -- the stack when the venture marker arrives.
-    ability :: Modal.Modal card,
+    ability :: Modal.Modal card (GrantedAbility.GrantedAbility card),
     -- | CR 309.4 \/ 309.5a: the arrows pointing AWAY from this room, as the rooms
     -- they lead to. Empty for the bottommost room, which is where CR 309.6 ends the
     -- dungeon. A Set because the arrows out of a room are unordered -- CR 309.5a

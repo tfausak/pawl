@@ -39,6 +39,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modal as ModalT
 import qualified Pawl.Types.Mode as Mode
@@ -251,7 +252,7 @@ modalReaderSpec s = Spec.describe s "M4h Modal reader" $ do
                 ]
             )
             (ModeSelection.ChooseExactly 1) ::
-            ModalT.Modal Card.Type.Card
+            ModalT.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
         chosen = Seq.singleton (ModeIndex.MkModeIndex 1)
     Spec.assertEqWith s "only mode 1's effect" (Modal.modesEffects chosen m) [Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2) Nothing)]
     Spec.assertEqWith s "an exact instruction's two bounds are its count" (fmap ($ ModalT.selection m) [Modal.leastOf, Modal.mostOf]) [1, 1]
@@ -315,7 +316,7 @@ activationModalSpec s registry = Spec.describe s "M4h activation modal (CR 602.2
 -- via S.addCreature and the SelfEnters trigger is fed to Engine.placePendingTriggers
 -- through S.entersWithTrigger's hand-built enters event (the same shape
 -- EventSpec uses), then the placed ability resolves off the stack.
-triggerModalOf :: Printing.Printing -> Maybe (ModalT.Modal Card.Type.Card)
+triggerModalOf :: Printing.Printing -> Maybe (ModalT.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 triggerModalOf acPrinting = case Face.triggeredAbilities (S.combinedFace acPrinting) of
   [ab] -> Just (TriggeredAbility.modal ab)
   _ -> Nothing

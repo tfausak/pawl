@@ -2,6 +2,7 @@ module Pawl.Types.HandAction where
 
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 
 -- | CR 103.5b / CR 103.6: one action a card grants from its owner's HAND before
 -- the game begins -- what taking it does, and the clause that says when it may
@@ -32,6 +33,6 @@ data HandAction card = MkHandAction
     -- | What taking the action does, in written order. A list rather than a Seq
     -- for the reason the field it replaced was one: this is read straight off the
     -- face and folded once.
-    effects :: [Effect.Effect card]
+    effects :: [Effect.Effect card (GrantedAbility.GrantedAbility card)]
   }
   deriving (Eq, Ord, Show)

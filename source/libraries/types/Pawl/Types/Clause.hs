@@ -25,7 +25,7 @@ import qualified Pawl.Types.PayGate as PayGate
 -- Parametric in `card` for Pawl.Types.Effect's reason -- Card embeds the
 -- payload, so a concrete `Effect Card` here would make the two modules mutually
 -- importing.
-data Clause card = MkClause
+data Clause card ability = MkClause
   { -- | CR 608.2c's "If you do": which EARLIER clause of this mode this one
     -- hangs off, so that declining that one skips this one too. Tweeze's "you
     -- may discard a card. If you do, draw a card" is the witness -- the draw is
@@ -148,6 +148,6 @@ data Clause card = MkClause
     -- branch), then the "may", then this -- a declined clause has no instruction
     -- left for a payment to qualify.
     payGate :: Maybe PayGate.PayGate,
-    effects :: Seq.Seq (Effect.Effect card)
+    effects :: Seq.Seq (Effect.Effect card ability)
   }
   deriving (Eq, Ord, Show)

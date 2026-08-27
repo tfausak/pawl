@@ -14,8 +14,8 @@ import qualified Pawl.Types.Mode as Mode
 
 -- | The wire format is unchanged by the conversion to a bundle; what it adds is
 -- the schema.
-codec :: (Typeable.Typeable card, Eq card) => Codec.Codec card -> Codec.Codec (Mode.Mode card)
-codec cardCodec = Fields.object $ do
-  clauses <- Fields.defaulted "clauses" Seq.empty (Common.seq (Clause.codec cardCodec)) Mode.clauses
+codec :: (Typeable.Typeable card, Eq card, Typeable.Typeable ability, Eq ability) => Codec.Codec card -> Codec.Codec ability -> Codec.Codec (Mode.Mode card ability)
+codec cardCodec abilityCodec = Fields.object $ do
+  clauses <- Fields.defaulted "clauses" Seq.empty (Common.seq (Clause.codec cardCodec abilityCodec)) Mode.clauses
   targetSlots <- Fields.defaulted "targetSlots" Map.empty TargetSlot.codecMap Mode.targetSlots
   pure Mode.MkMode {Mode.clauses = clauses, Mode.targetSlots = targetSlots}

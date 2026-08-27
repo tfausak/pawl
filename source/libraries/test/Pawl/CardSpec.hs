@@ -338,7 +338,7 @@ instantLine = spellLine CardType.Instant Set.empty Set.empty
 
 -- "You draw this many cards" -- the smallest payload an ability can carry, used
 -- below only so that two abilities can be told apart by their effect.
-youDraw :: Integer -> Effect.Effect Card.Type.Card
+youDraw :: Integer -> Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 youDraw n = Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal n) Nothing)
 
 -- "This object has [keyword]" as a static ability (CR 604.1), the smallest
@@ -582,10 +582,10 @@ conditionCounts condition = case condition of
 -- boundaries by design, so every lint that reaches a card through them needs
 -- this beside it, or the gate's Counts -- and through them its Filters -- go
 -- unswept.
-modeClauseConditions :: Mode.Mode Card.Type.Card -> [Condition.Type.Condition]
+modeClauseConditions :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Condition.Type.Condition]
 modeClauseConditions = Maybe.mapMaybe Clause.condition . Foldable.toList . Mode.clauses
 
-modalClauseConditions :: Modal.Modal Card.Type.Card -> [Condition.Type.Condition]
+modalClauseConditions :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Condition.Type.Condition]
 modalClauseConditions = concatMap modeClauseConditions . Modal.modes
 
 -- Every Count reachable from a Duration: only ForAsLongAs (CR 611.2b) carries
@@ -815,10 +815,10 @@ triggerConditionCounts triggerCondition = case triggerCondition of
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
 -- card (the same nesting Pawl.Codec's round trip walks).
-effectCounts :: Effect.Effect Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
+effectCounts :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Count.Type.Count Quantity.Type.Quantity]
 effectCounts effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage _ quantity _ _) -> quantityCounts quantity
-  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationCounts duration <> modificationCounts (Projection.widenModification modification)
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationCounts duration <> modificationCounts modification
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
   -- The search's count is a Quantity like any other -- Explosive Vegetation's
@@ -970,13 +970,13 @@ effectCounts effect = case effect of
 -- CR 702.178a's "as long as" gate is a Condition like any other, so it reaches a
 -- Count and through it a Filter -- triggeredAbilityCounts' treatment of CR 603.4's
 -- intervening "if", one field over.
-activatedAbilityCounts :: ActivatedAbility.ActivatedAbility Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
+activatedAbilityCounts :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Count.Type.Count Quantity.Type.Quantity]
 activatedAbilityCounts ability =
   foldMap conditionCounts (ActivatedAbility.condition ability)
     <> concatMap effectCounts (Modal.allEffects (ActivatedAbility.modal ability))
     <> concatMap conditionCounts (modalClauseConditions (ActivatedAbility.modal ability))
 
-triggeredAbilityCounts :: TriggeredAbility.TriggeredAbility Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
+triggeredAbilityCounts :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Count.Type.Count Quantity.Type.Quantity]
 triggeredAbilityCounts ability =
   triggerConditionCounts (TriggeredAbility.condition ability)
     <> foldMap conditionCounts (TriggeredAbility.intervening ability)
@@ -1036,7 +1036,7 @@ spellCostsOf face =
 -- every clause. A READER of X rather than a declarer: Clash of Wills' "unless its
 -- controller pays {X}" spends the value its own {X}{U} announced (CR 107.3a),
 -- which is what Pawl.Engine.Resolve.announcedXOn substitutes in.
-payGateCostsOf :: Modal.Modal Card.Type.Card -> [Cost.Type.Cost Keyword.Keyword]
+payGateCostsOf :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Cost.Type.Cost Keyword.Keyword]
 payGateCostsOf =
   fmap PayGate.cost
     . concatMap (Maybe.mapMaybe Clause.payGate . Foldable.toList . Mode.clauses)
@@ -1082,7 +1082,7 @@ perCreatureCounts perCreature = case perCreature of
 -- Not the effects a token or emblem this card MINTS prints: those belong to
 -- another object, and the sweeps that want them take `card : mintedFaces card`
 -- and ask this question of each face separately.
-cardResolutionEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card]
+cardResolutionEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 cardResolutionEffects = concatMap effectWithNested . cardCarrierEffects
 
 -- The zone set of every search a face authors (CR 701.23a). A wildcard rather
@@ -1098,7 +1098,7 @@ searchZoneSets = Maybe.mapMaybe zonesOf . cardResolutionEffects
 -- One effect and everything nested inside it, transitively. Terminates on card
 -- data of any shape: Pawl.Types.Effect nests structurally and a JSON document is
 -- finite, so the depth is whatever the card printed.
-effectWithNested :: Effect.Effect Card.Type.Card -> [Effect.Effect Card.Type.Card]
+effectWithNested :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 effectWithNested effect = effect : concatMap effectWithNested (effectNestedEffects effect)
 
 -- The effects one effect carries in its own payload -- exactly the four arms
@@ -1113,7 +1113,7 @@ effectWithNested effect = effect : concatMap effectWithNested (effectNestedEffec
 -- Exhaustive and hand-maintained, with effectReplacements' caveat: a NEW effect
 -- carrying effects of its own must be added here too, and the build breaks until
 -- it is.
-effectNestedEffects :: Effect.Effect Card.Type.Card -> [Effect.Effect Card.Type.Card]
+effectNestedEffects :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 effectNestedEffects effect = case effect of
   -- CR 615.5's rider and CR 614.1c's as-enters instruction, on the replacement a
   -- resolution INSTALLS; the PRINTED twin arrives through cardCarrierEffects'
@@ -1224,17 +1224,24 @@ effectNestedEffects effect = case effect of
 -- The carriers themselves, before the nesting closure above: one limb per field
 -- of a Face that holds effects. Hand-maintained, with cardCounts' caveat: a NEW
 -- Face field holding effects must be added here too.
-cardCarrierEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card]
+cardCarrierEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 cardCarrierEffects card =
-  Card.allEffects card
-    <> concatMap (Modal.allEffects . ActivatedAbility.modal) (Face.activatedAbilities card)
-    <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Face.triggeredAbilities card)
-    <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
+  printedCarrierEffects card
     -- CR 613.1f's quoted abilities, the seventh and eighth carriers: the text is
     -- printed on THIS card even though the ability ends up on another object, so
     -- every lint below has to read it here or nowhere.
     <> concatMap (Modal.allEffects . ActivatedAbility.modal) (grantedActivatedAbilities card)
     <> concatMap (Modal.allEffects . TriggeredAbility.modal) (grantedTriggeredAbilities card)
+
+-- The limbs of cardCarrierEffects that do NOT go through a grant. Split out so
+-- grantedModifications below can walk them without closing a loop with the two
+-- limbs above, which are defined in terms of it.
+printedCarrierEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
+printedCarrierEffects card =
+  Card.allEffects card
+    <> concatMap (Modal.allEffects . ActivatedAbility.modal) (Face.activatedAbilities card)
+    <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Face.triggeredAbilities card)
+    <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
     -- CR 309.4c: a room ability's effects, which no other limb above reaches --
     -- Pawl.Types.Face.rooms is the fifth carrier.
     <> concatMap (Modal.allEffects . DungeonRoom.ability) (Face.rooms card)
@@ -1259,7 +1266,7 @@ cardCarrierEffects card =
 -- the game begins, and each runs on its own -- so folding them into one flat
 -- list would hand a dozen lints a slot-sharing claim that is false of them. The
 -- sweep below and ownBoundSlots are the two readers, and both want the split.
-handActions :: Face.Face Card.Type.Card -> [[Effect.Effect Card.Type.Card]]
+handActions :: Face.Face Card.Type.Card -> [[Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]]
 handActions card = fmap HandAction.effects (Face.mulliganActions card <> Face.openingHandActions card)
 
 -- Every effect a card AUTHORS, its two pregame windows included: what
@@ -1271,7 +1278,7 @@ handActions card = fmap HandAction.effects (Face.mulliganActions card <> Face.op
 -- narrower view saw a declared entry that nothing appeared to arm. Flattening the
 -- actions is sound HERE and not for ownBoundSlots -- these lints ask which names
 -- and slots a card MENTIONS, never which of them share a scope.
-cardAuthoredEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card]
+cardAuthoredEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 cardAuthoredEffects card =
   cardResolutionEffects card <> concatMap effectWithNested (concat (handActions card))
 
@@ -1450,7 +1457,7 @@ printedBoxOffends card =
 -- Resolve.definedSlots is per mode for the mirror reason: under a ChooseExactly
 -- 1 selection mode B is never resolved alongside mode A, so a token mode A mints
 -- is not there for mode B to read.
-modalSlotsOffend :: Set.Set SlotName.SlotName -> Modal.Modal Card.Type.Card -> Bool
+modalSlotsOffend :: Set.Set SlotName.SlotName -> Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 modalSlotsOffend abilityBound modal =
   let modeOffends mode =
         let effects = Foldable.toList (Mode.allEffects mode)
@@ -1508,7 +1515,7 @@ handActionSlotsOffend card =
 --
 -- Read off the same Resolve.modeSlots the D4 lint reads, whose join keeps the
 -- narrower arity: a slot two effects of one mode read both ways is One.
-modalCountsOffend :: Modal.Modal Card.Type.Card -> Bool
+modalCountsOffend :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 modalCountsOffend modal =
   let modeOffends mode =
         let read_ = Resolve.modeSlots mode
@@ -1524,7 +1531,7 @@ modalCountsOffend modal =
 -- them come out of card JSON, which is the whole of what the lint below is
 -- about; a replacement the ENGINE bakes reaches GameState without passing
 -- through a Card and is not swept here.
-cardReplacementEffects :: Face.Face Card.Type.Card -> [ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card)]
+cardReplacementEffects :: Face.Face Card.Type.Card -> [ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 cardReplacementEffects card =
   fmap PrintedReplacement.effect (Face.replacementEffects card)
     <> concatMap effectReplacements (cardResolutionEffects card)
@@ -1534,14 +1541,14 @@ cardReplacementEffects card =
 -- enters, [do something]". Swept as one list wherever a card's effects are, since
 -- what the lints downstream ask is whether a card authored the effect rather than
 -- which field it sat in.
-replacementPrintedEffects :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> [Effect.Effect Card.Type.Card]
+replacementPrintedEffects :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 replacementPrintedEffects replacement = replacementEffectRiders replacement <> replacementEntryEffects replacement
 
 -- CR 614.1c: the effects an as-enters rewrite runs -- Monstrous War-Leech's mill.
 -- Kept apart from the riders below rather than folded in, because CR 615.5's
 -- rider is a lint's subject in its own right (riderWithoutPreventionOffends) and
 -- these are not one.
-replacementEntryEffects :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> [Effect.Effect Card.Type.Card]
+replacementEntryEffects :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 replacementEntryEffects replacement = case replacement of
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.RunEffects effects)) -> Foldable.toList effects
   ReplacementEffect.EntryR {} -> []
@@ -1562,7 +1569,7 @@ replacementEntryEffects replacement = case replacement of
 -- the rider a SPELL authors on Effect.PreventAllDamage or
 -- Effect.PreventNextDamage through effectNestedEffects, which is what lets the CR
 -- 111.4 naming case below see Inkshield's nested token face.
-replacementEffectRiders :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> [Effect.Effect Card.Type.Card]
+replacementEffectRiders :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 replacementEffectRiders replacement = case replacement of
   ReplacementEffect.DamageR (DamageR.MkDamageR _ _ riders) -> Foldable.toList riders
   ReplacementEffect.CounterR {} -> []
@@ -1583,7 +1590,7 @@ replacementEffectRiders replacement = case replacement of
 -- Exhaustive and hand-maintained, with effectCounts' caveat: a NEW effect
 -- carrying a ReplacementEffect or embedding a Card must be added here too, and
 -- the build breaks until it is.
-effectReplacements :: Effect.Effect Card.Type.Card -> [ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card)]
+effectReplacements :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 effectReplacements effect = case effect of
   Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> replacement : concatMap effectReplacements (replacementPrintedEffects replacement)
   Effect.Create (Create.MkCreate _ token _ _ _) -> overFaces cardReplacementEffects token
@@ -1720,7 +1727,7 @@ effectReplacements effect = case effect of
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum: a second
 -- pattern-carrying replacement must break this build rather than silently pass.
-phasePatternOffends :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
+phasePatternOffends :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 phasePatternOffends replacement = case replacement of
   ReplacementEffect.PhaseR phasePattern -> Maybe.isJust (PhasePattern.whosePhase phasePattern)
   ReplacementEffect.CounterR {} -> False
@@ -1744,7 +1751,7 @@ phasePatternOffends replacement = case replacement of
 -- printing either half would be claiming an ability no rule gives it.
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum.
-engineOnlyOffends :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
+engineOnlyOffends :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 engineOnlyOffends replacement = case replacement of
   -- `whatRecipient` beside it is the PRINTED half and is not swept: a card may
   -- describe the recipient it shields (Stormwild Capridor), it just may not name
@@ -1797,7 +1804,7 @@ engineMintedDestruction rewrite = case rewrite of
 -- The non-vacuity half of the same lint: is this the replacement that carries a
 -- PhasePattern at all? A wildcard is right here, where it is not above -- this
 -- asks "did the sweep have anything to look at", not "is it well-formed".
-isPhaseR :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
+isPhaseR :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 isPhaseR replacement = case replacement of
   ReplacementEffect.PhaseR _ -> True
   _ -> False
@@ -1810,7 +1817,7 @@ isPhaseR replacement = case replacement of
 --
 -- Exhaustive rather than a wildcard, phasePatternOffends' discipline: a second
 -- engine-baked field on this class must break this build rather than pass.
-turnUpRequiringOffends :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
+turnUpRequiringOffends :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 turnUpRequiringOffends replacement = case replacement of
   ReplacementEffect.TurnUpR turnUpR -> Maybe.isJust (TurnUpR.requiring turnUpR)
   ReplacementEffect.CounterR {} -> False
@@ -1824,7 +1831,7 @@ turnUpRequiringOffends replacement = case replacement of
 
 -- isPhaseR's twin: did the sweep above have anything to look at? A wildcard for
 -- the same reason.
-isTurnUpR :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
+isTurnUpR :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 isTurnUpR replacement = case replacement of
   ReplacementEffect.TurnUpR _ -> True
   _ -> False
@@ -1837,7 +1844,7 @@ isTurnUpR replacement = case replacement of
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum: an arm
 -- that gains a riders field of its own must be classified here.
-riderWithoutPreventionOffends :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
+riderWithoutPreventionOffends :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 riderWithoutPreventionOffends replacement = case replacement of
   ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite riders) -> not (null riders) && not (preventsDamage rewrite)
   ReplacementEffect.CounterR {} -> False
@@ -1863,11 +1870,11 @@ preventsDamage rewrite = case rewrite of
   DamageRewrite.Redirect _ -> False
 
 -- The non-vacuity half of riderWithoutPreventionOffends' lint, isPhaseR's shape.
-hasRider :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
+hasRider :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 hasRider = not . null . replacementEffectRiders
 
 -- The non-vacuity half of engineOnlyOffends' lint, isPhaseR's shape.
-isDamageR :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
+isDamageR :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 isDamageR replacement = case replacement of
   ReplacementEffect.DamageR {} -> True
   _ -> False
@@ -1875,7 +1882,7 @@ isDamageR replacement = case replacement of
 -- Every modal one face carries, in the four scopes cardSlotNamesCollide sweeps
 -- plus its rooms -- the list that lint spells out inline, hoisted because the
 -- either-or lint below needs the same one and a second copy would drift.
-faceModals :: Face.Face Card.Type.Card -> [Modal.Modal Card.Type.Card]
+faceModals :: Face.Face Card.Type.Card -> [Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 faceModals card =
   Face.spell card
     : fmap ActivatedAbility.modal (Face.activatedAbilities card)
@@ -1903,7 +1910,7 @@ cardBranchesAreAsymmetric = any (any modeBranchesOffend . Modal.modes) . faceMod
 -- One mode's half of that lint: a clause naming ITSELF offends (there is no pair
 -- to choose between), and so does one whose named sibling is missing or names
 -- somebody else.
-modeBranchesOffend :: Mode.Mode Card.Type.Card -> Bool
+modeBranchesOffend :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 modeBranchesOffend mode =
   let indexed = zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode))
       byIndex = Map.fromList indexed
@@ -1987,7 +1994,7 @@ cardSlotNamesCollide card =
 --
 -- The first two are what this passes to modalSlotsOffend as `abilityBound`: they
 -- are stamped for the ability, not for a mode, so every mode gets them.
-triggeredAbilityOffends :: TriggeredAbility.TriggeredAbility Card.Type.Card -> Bool
+triggeredAbilityOffends :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 triggeredAbilityOffends ability =
   modalSlotsOffend
     ( Set.unions
@@ -2055,7 +2062,7 @@ triggeredAbilityOffends ability =
 -- NOTHING is bound for one and none of its other effects runs (#1118). No mana
 -- ability in the pool reads a slot, so applying the same
 -- available side to one is uniformity rather than a claim.
-activatedAbilityOffends :: ActivatedAbility.ActivatedAbility Card.Type.Card -> Bool
+activatedAbilityOffends :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 activatedAbilityOffends ability =
   let announcedX =
         if declaresVariable (ActivatedAbility.cost ability)
@@ -2140,8 +2147,8 @@ onsetOffends card =
 -- sees it.
 oneEffectTrigger ::
   TriggerCondition.TriggerCondition ->
-  Effect.Effect Card.Type.Card ->
-  TriggeredAbility.TriggeredAbility Card.Type.Card
+  Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) ->
+  TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 oneEffectTrigger condition effect =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = condition,
@@ -2164,8 +2171,8 @@ oneEffectTrigger condition effect =
 -- reads.
 oneEffectActivated ::
   Maybe ManaCost.ManaCost ->
-  Effect.Effect Card.Type.Card ->
-  ActivatedAbility.ActivatedAbility Card.Type.Card
+  Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) ->
+  ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 oneEffectActivated mana effect =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = mana, Cost.Type.components = []},
@@ -2180,7 +2187,7 @@ oneEffectActivated mana effect =
 
 -- One CR 700.2 mode for the fixtures below: the effects it runs and the target
 -- slots it declares. Always mandatory -- no read lint asks about optionality.
-lintMode :: [Effect.Effect Card.Type.Card] -> [SlotName.SlotName] -> Mode.Mode Card.Type.Card
+lintMode :: [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> [SlotName.SlotName] -> Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 lintMode effects slots =
   Mode.MkMode
     (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects)))
@@ -2191,7 +2198,7 @@ lintMode effects slots =
 -- helpers cannot express: only a multi-mode ability can have a mode read a slot
 -- that only another mode declares (#570). Kept out of data/cards for the same
 -- reason they are -- a card that offends a lint must not be loadable.
-modalActivated :: [Mode.Mode Card.Type.Card] -> ActivatedAbility.ActivatedAbility Card.Type.Card
+modalActivated :: [Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 modalActivated modes =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
@@ -2207,7 +2214,7 @@ modalActivated modes =
 -- Does any of these abilities DECLARE a target slot under a name already in
 -- `defined`? Split from the sweep below so the rejecting direction can be put to
 -- a hand-built ability, which no committed card supplies.
-shadowsSlots :: Set.Set SlotName.SlotName -> [TriggeredAbility.TriggeredAbility Card.Type.Card] -> Bool
+shadowsSlots :: Set.Set SlotName.SlotName -> [TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Bool
 shadowsSlots defined abilities =
   let declaredOf ability =
         foldMap (Map.keysSet . Mode.targetSlots) (Modal.modes (TriggeredAbility.modal ability))
@@ -2223,8 +2230,8 @@ shadowsDefinedSlot card =
 
 modalTrigger ::
   TriggerCondition.TriggerCondition ->
-  [Mode.Mode Card.Type.Card] ->
-  TriggeredAbility.TriggeredAbility Card.Type.Card
+  [Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] ->
+  TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 modalTrigger condition modes =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = condition,
@@ -2310,7 +2317,7 @@ data MintedKind
 -- The faces one effect mints. Exhaustive and hand-maintained, with
 -- effectReplacements' caveat: a NEW effect embedding a Card must be added here
 -- too, and the build breaks until it is.
-effectMintedFaces :: Effect.Effect Card.Type.Card -> [(MintedKind, Face.Face Card.Type.Card)]
+effectMintedFaces :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(MintedKind, Face.Face Card.Type.Card)]
 effectMintedFaces effect = case effect of
   Effect.Create (Create.MkCreate _ token _ _ _) -> fmap ((,) MintedToken) (NonEmpty.toList (Card.Type.faces token))
   -- Mints no face of its own: the token's text is the copied permanent's.
@@ -3576,7 +3583,7 @@ printedPlayerScope ability = (AffectedPlayers.Scoped (PlayerStaticAbility.scope 
 -- wildcard here rather than one arm per effect, matching the control lint's own
 -- sweep over this sum: Pawl.Types.Effect is the open half's alphabet, and a new
 -- resolution effect is not a new player carrier.
-storedPlayerScope :: Effect.Effect Card.Type.Card -> Maybe (AffectedPlayers.AffectedPlayers SlotName.SlotName, PlayerEffect.PlayerEffect)
+storedPlayerScope :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe (AffectedPlayers.AffectedPlayers SlotName.SlotName, PlayerEffect.PlayerEffect)
 storedPlayerScope effect = case effect of
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ scope playerEffect) -> Just (scope, playerEffect)
   _ -> Nothing
@@ -3591,7 +3598,7 @@ storedPlayerScope effect = case effect of
 -- reveal carries a third, over a CARD IN A HAND (Rustic Clachan's "a Kithkin
 -- card"). CR 707.5's copy choice carries a fourth, over permanents on the
 -- battlefield (Copy Enchantment's "any enchantment"). None of the four is framed.
-entryRewriteFilters :: EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card) -> [Filter.Type.Filter Keyword.Keyword]
+entryRewriteFilters :: EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Filter.Type.Filter Keyword.Keyword]
 entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseCardNames f -> [f]
   EntryRewrite.RevealOrTapped f -> [f]
@@ -3658,7 +3665,7 @@ turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
 -- turnUpRewriteFilters above say which cards a name choice inside it may name,
 -- which permanents an as-enters sacrifice may take, and where CR 303.4k's
 -- attachment may land.
-replacementEffectFilters :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> [Filter.Type.Filter Keyword.Keyword]
+replacementEffectFilters :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Filter.Type.Filter Keyword.Keyword]
 replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.CounterR (CounterR.MkCounterR counterPattern _) -> [CounterPattern.onWhat counterPattern]
   ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern _) -> [ZoneChangePattern.whatObject zoneChangePattern]
@@ -3680,7 +3687,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
 -- the rewrite's: CR 604.2's "as long as" clause counts objects, exactly as the
 -- clause on Effect.Replace does (effectFilters' Replace arm) and as a static
 -- ability's does (staticAbilityFilters).
-printedReplacementFilters :: PrintedReplacement.PrintedReplacement (Effect.Effect Card.Type.Card) -> [Filter.Type.Filter Keyword.Keyword]
+printedReplacementFilters :: PrintedReplacement.PrintedReplacement (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Filter.Type.Filter Keyword.Keyword]
 printedReplacementFilters printedReplacement =
   foldMap conditionFilters (PrintedReplacement.condition printedReplacement)
     <> replacementEffectFilters (PrintedReplacement.effect printedReplacement)
@@ -3838,7 +3845,7 @@ manaRiderFilters rider = [ManaRider.condition rider]
 -- subject for CR 701.3a to be about. The MIRROR question, whose fixed object is
 -- the host rather than the moving permanent, is Filter.CanAttachToSubject, and
 -- SearchFramed marks the one position that answers it.
-effectFilters :: Effect.Effect Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+effectFilters :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 effectFilters effect = case effect of
   -- THE one attach-framed position. CR 701.3a: "An Aura, Equipment, or
   -- Fortification can't be attached to an object or player it couldn't enchant,
@@ -3851,7 +3858,7 @@ effectFilters effect = case effect of
   -- The dealer is a SlotName and carries no Filter.
   Effect.DealDamage (DealDamage.MkDealDamage ref quantity _ _) -> sourceHosted (objectRefFilters ref) <> unframed (quantityFilters quantity)
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
-    unframed (durationFilters duration <> modificationFilters (Projection.widenModification modification)) <> sourceHosted (objectRefFilters ref)
+    unframed (durationFilters duration <> modificationFilters modification) <> sourceHosted (objectRefFilters ref)
   Effect.ChangeText {} -> []
   -- CR 106.6's two clauses, and every predicate in them: the restriction's cast
   -- half, its activation half, and the rider's condition are each an ordinary
@@ -4123,7 +4130,7 @@ asksFor asks ref = case asks of
 -- being written so here, and the build breaks until somebody decides. The one
 -- thing -Werror cannot catch is an arm written `[]` that does hold a ref, which
 -- is what the cross-check against effectFilters below is for.
-effectObjectRefs :: Effect.Effect Card.Type.Card -> [(Asks, ObjectRef.ObjectRef)]
+effectObjectRefs :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Asks, ObjectRef.ObjectRef)]
 effectObjectRefs effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
@@ -4241,7 +4248,7 @@ effectObjectRefs effect = case effect of
 -- lint's offenders. Each is a CR 608.2d choice nobody makes, so the ref names no
 -- object, that share of the instruction is silently skipped, and the card is
 -- weaker than printed with nothing on the wire to show it.
-inertChoosers :: Effect.Effect Card.Type.Card -> [ObjectRef.ObjectRef]
+inertChoosers :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [ObjectRef.ObjectRef]
 inertChoosers effect =
   [ref | (asks, ref) <- effectObjectRefs effect, chooserRef ref, not (asksFor asks ref)]
 
@@ -4249,7 +4256,7 @@ inertChoosers effect =
 -- collapses two modes declaring the same slot name (#475) -- the cross-check
 -- below counts occurrences, and a collapse there would read as a Filter this
 -- traversal cannot see.
-modalFilters :: Modal.Modal Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+modalFilters :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 modalFilters modal =
   concatMap
     ( \mode ->
@@ -4265,7 +4272,7 @@ modalFilters modal =
 -- (CR 613.1f). Swept alongside the printed ones: the quoted text is this card's,
 -- so every corpus lint that reads a printed activated ability has to read these
 -- too.
-grantedActivatedAbilities :: Face.Face Card.Type.Card -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
+grantedActivatedAbilities :: Face.Face Card.Type.Card -> [ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 grantedActivatedAbilities card =
   [ ability
   | Modification.GainAbility (GrantedAbility.Activated ability) <- grantedModifications card
@@ -4274,22 +4281,48 @@ grantedActivatedAbilities card =
 -- The TRIGGERED half of the same grant, swept for the same reason: Sixth Sense's
 -- quoted "whenever this creature deals combat damage to a player" is text
 -- printed on the Aura.
-grantedTriggeredAbilities :: Face.Face Card.Type.Card -> [TriggeredAbility.TriggeredAbility Card.Type.Card]
+grantedTriggeredAbilities :: Face.Face Card.Type.Card -> [TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 grantedTriggeredAbilities card =
   [ ability
   | Modification.GainAbility (GrantedAbility.Triggered ability) <- grantedModifications card
   ]
 
--- Every modification this face's static abilities carry, the shared walk both
--- grant sweeps above index into.
+-- Every modification this face carries, the shared walk both grant sweeps above
+-- index into. TWO sources, not one: a PRINTED static ability's modifications (CR
+-- 613.1f as card text), and the modifications a RESOLUTION stores through
+-- Effect.ModifyTarget (CR 611.2) -- Retraction Helix's quoted "{T}: Return
+-- target nonland permanent to its owner's hand" is the second kind, and reading
+-- only the first would let it escape every lint below.
+--
+-- Iterated, because a granted ability's own effects may store a grant in turn:
+-- each round feeds the abilities just found back through the ModifyTarget walk,
+-- and it bottoms out because every round descends strictly further into one
+-- card's finite text. Seeded from printedCarrierEffects rather than
+-- cardCarrierEffects, which is what keeps this out of a loop with the two grant
+-- limbs that function ends with.
 grantedModifications :: Face.Face Card.Type.Card -> [Projection.Modification]
 grantedModifications card =
-  [ modification
-  | static <- Face.staticAbilities card,
-    modification <- Foldable.toList (StaticAbility.modifications static)
-  ]
+  let printed =
+        [ modification
+        | static <- Face.staticAbilities card,
+          modification <- Foldable.toList (StaticAbility.modifications static)
+        ]
+      -- The WILDCARD-free read of the one Effect arm carrying a Modification;
+      -- namedRemovals' caveat applies, a second such arm would escape this.
+      storedIn effects =
+        [ ModifyTarget.modification modify
+        | Effect.ModifyTarget modify <- concatMap effectWithNested effects
+        ]
+      effectsOf modifications =
+        concatMap (Modal.allEffects . ActivatedAbility.modal) [a | Modification.GainAbility (GrantedAbility.Activated a) <- modifications]
+          <> concatMap (Modal.allEffects . TriggeredAbility.modal) [t | Modification.GainAbility (GrantedAbility.Triggered t) <- modifications]
+      deeper modifications =
+        if null modifications
+          then []
+          else modifications <> deeper (storedIn (effectsOf modifications))
+   in deeper (printed <> storedIn (printedCarrierEffects card))
 
-triggeredAbilityFilters :: TriggeredAbility.TriggeredAbility Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+triggeredAbilityFilters :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 triggeredAbilityFilters ability =
   unframed (triggerConditionFilters (TriggeredAbility.condition ability))
     -- THE CR 603.4 position: Pawl.Engine.Event.interveningHolds and
@@ -4299,7 +4332,7 @@ triggeredAbilityFilters ability =
     <> sourceHosted (concatMap conditionFilters (Maybe.maybeToList (TriggeredAbility.intervening ability)))
     <> modalFilters (TriggeredAbility.modal ability)
 
-activatedAbilityFilters :: ActivatedAbility.ActivatedAbility Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+activatedAbilityFilters :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 activatedAbilityFilters ability =
   unframed
     ( costFilters (ActivatedAbility.cost ability)
@@ -5946,7 +5979,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no card authors a control modification into a resolving effect (#199)" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
-          Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> Projection.layer (Projection.widenModification modification) == Layer.Control
+          Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> Projection.layer modification == Layer.Control
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     Spec.assertEqWith s "control belongs on a static ability, never in a stored effect" (fmap (S.nameOf . Printing.card) offenders) []
@@ -5979,7 +6012,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           Modification.AddSubtype subtype -> [subtype]
           _ -> []
         stored effect = case effect of
-          Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> addedSubtypes (Projection.widenModification modification)
+          Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> addedSubtypes modification
           _ -> []
         added card = concatMap addedSubtypes (grantedModifications card) <> concatMap stored (cardResolutionEffects card)
         misfiled subtype = Subtype.Engine.isLandType subtype || Subtype.Engine.isCreatureType subtype
@@ -6242,7 +6275,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         anyNumber = ObjectRef.AnyNumberMatching anyCard
         moves ref = Effect.MoveToZone (MoveToZone.MkMoveToZone ref Zone.Battlefield EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
         reveals ref = Effect.Reveal (Reveal.MkReveal ref Nothing)
-        inert :: [Effect.Effect Card.Type.Card] -> [Bool]
+        inert :: [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> [Bool]
         inert = fmap (not . null . inertChoosers)
     Spec.assertEqWith
       s
@@ -7804,7 +7837,7 @@ castHalf land printing half =
 namedRemovals :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityName
 namedRemovals face =
   let stored effect = case effect of
-        Effect.ModifyTarget modify -> [Projection.widenModification (ModifyTarget.modification modify)]
+        Effect.ModifyTarget modify -> [ModifyTarget.modification modify]
         _ -> []
       printed ability = Foldable.toList (StaticAbility.modifications ability)
       removals modification = case modification of

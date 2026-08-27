@@ -50,6 +50,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -64,7 +65,7 @@ import qualified Pawl.Types.Zone as Zone
 -- is minted by Pawl.Engine.Keyword and appended by
 -- Pawl.Engine.Projection.abilitiesGiven, so a card file that declares no
 -- activatedAbilities still offers one.
-crewAbility :: ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+crewAbility :: ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 crewAbility oid gs = case Projection.abilitiesOf oid gs of
   ability : _ -> Just ability
   [] -> Nothing

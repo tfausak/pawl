@@ -63,6 +63,7 @@ import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword
@@ -160,13 +161,13 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- Order is the Map's, which is Keyword's Ord -- rule-number order, and stable. The
 -- CR 603.3b ordering prompt indexes into the scan's canonical order, so this being
 -- deterministic is what keeps that prompt reproducible.
-triggeredAbilitiesOf :: Map Keyword Natural -> [TriggeredAbility Card]
+triggeredAbilitiesOf :: Map Keyword Natural -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 triggeredAbilitiesOf counts = concatMap (uncurry abilitiesFor) (Map.toAscList counts)
 
 -- The abilities one keyword, held `count` times, contributes. The ROSTER of the
 -- keywords rule 702 states as triggered abilities, exhaustive under -Werror so it
 -- cannot fall behind rule 702 the way a count in prose can.
-abilitiesFor :: Keyword -> Natural -> [TriggeredAbility Card]
+abilitiesFor :: Keyword -> Natural -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 abilitiesFor keyword count = case keyword of
   Keyword.Poisonous n -> List.genericReplicate count (poisonous n)
   -- TWO abilities per instance -- hence the `concat`: rule 702.45a's ability
@@ -289,12 +290,12 @@ abilitiesFor keyword count = case keyword of
 -- rather than to keywords at large -- Teferi, Mage of Zhalfir does grant a
 -- keyword to a card in a hand, and Cast.instantSpeed reads that one through the
 -- projection.
-handAbilitiesOf :: Set Keyword -> [ActivatedAbility Card]
+handAbilitiesOf :: Set Keyword -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
 handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 
 -- Exhaustive for the reason permissionsFor is: the next keyword that functions
 -- from a hand must break this build rather than silently produce nothing.
-handAbilitiesFor :: Keyword -> [ActivatedAbility Card]
+handAbilitiesFor :: Keyword -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
 handAbilitiesFor keyword = case keyword of
   Keyword.Cycling (Cycling.MkCycling cost searchFor) -> [cycling cost searchFor]
   Keyword.Reinforce (Reinforce.MkReinforce n cost) -> [reinforce n cost]
@@ -395,7 +396,7 @@ handAbilitiesFor keyword = case keyword of
 -- that rule means by "an activation cost of a cycling ability", and it covers rule
 -- 702.29e's typecycling too, rule 702.29f making those cycling abilities and this
 -- one function minting both.
-cycling :: Cost Keyword -> Maybe (Filter Keyword) -> ActivatedAbility Card
+cycling :: Cost Keyword -> Maybe (Filter Keyword) -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 cycling cost searchFor =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.ToPayCyclingCost]},
@@ -448,7 +449,7 @@ cycling cost searchFor =
 --
 -- Quantity.Literal and not a counter reading: N is written on the card, where
 -- modular's count is measured off the dying permanent.
-reinforce :: Natural -> Cost Keyword -> ActivatedAbility Card
+reinforce :: Natural -> Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 reinforce n cost =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.Ordinary]},
@@ -489,11 +490,11 @@ reinforceTarget = SlotName.MkSlotName (Text.pack "reinforced")
 -- 702.122a states a whole self-contained ability, so a permanent with crew twice
 -- has two of them to activate and two thresholds. Order is the Map's, for
 -- triggeredAbilitiesOf's reason.
-battlefieldAbilitiesOf :: Map Keyword Natural -> [ActivatedAbility Card]
+battlefieldAbilitiesOf :: Map Keyword Natural -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
 battlefieldAbilitiesOf counts = concatMap (uncurry battlefieldAbilitiesFor) (Map.toAscList counts)
 
 -- Exhaustive, exactly as handAbilitiesFor is, and for the same reason.
-battlefieldAbilitiesFor :: Keyword -> Natural -> [ActivatedAbility Card]
+battlefieldAbilitiesFor :: Keyword -> Natural -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
 battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Crew n -> List.genericReplicate count (crew n)
   Keyword.Fabricate _ -> []
@@ -612,7 +613,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
 -- Binding.triggerSource, so the Vehicle is named and never TARGETED (CR 115.10a):
 -- a targeted crew would fizzle to shroud and fire "becomes the target" triggers
 -- the printed ability does not.
-crew :: Natural -> ActivatedAbility Card
+crew :: Natural -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 crew n =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost =
@@ -663,7 +664,7 @@ crew n =
 -- CR 602.5d is the timing clause and the ONLY restriction. The condition is
 -- Nothing because CR 711.4 says so outright, so the ability is still offered past
 -- the last level symbol's range.
-levelUp :: Cost Keyword -> ActivatedAbility Card
+levelUp :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 levelUp cost =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = cost,
@@ -689,7 +690,7 @@ levelUp cost =
 -- THE EFFECT names the permanent through Binding.triggerSource, so rule 702.107a's
 -- "this creature" is named and never TARGETED (CR 115.10a). CR 602.5d is the
 -- timing clause and the ONLY restriction.
-outlast :: Cost Keyword -> ActivatedAbility Card
+outlast :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 outlast cost =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.TapThis]},
@@ -727,7 +728,7 @@ outlast cost =
 --
 -- Not implemented: CR 702.6c's "equip [quality] creature" and CR 702.6e's "equip
 -- planeswalker", neither of which Pawl.Types.Keyword's bare Cost can say (#2291).
-equip :: Cost Keyword -> ActivatedAbility Card
+equip :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 equip cost =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = cost,
@@ -1127,7 +1128,7 @@ foretellCost keywords =
 -- paid" and rule 702.133a's jump-start clause each ask about; rule 702.127a asks
 -- only whether the cast came from a graveyard. Pawl.Engine.Cast installs what this
 -- returns without ever inspecting it.
-castFromGraveyardReplacementsOf :: Set Keyword -> Maybe Keyword -> [ReplacementEffect (Effect.Effect Card)]
+castFromGraveyardReplacementsOf :: Set Keyword -> Maybe Keyword -> [ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 castFromGraveyardReplacementsOf keywords castFor =
   let paidFor keyword = castFor == Just keyword
    in -- The cost the cast PAID FOR, and not merely a flashback the card has:
@@ -1150,7 +1151,7 @@ castFromGraveyardReplacementsOf keywords castFor =
         -- which a permission offering the printed cost alone is not.
         <> [castFromGraveyardExile | hasJumpStart keywords, paidFor Keyword.JumpStart]
 
-castFromGraveyardExile :: ReplacementEffect (Effect.Effect Card)
+castFromGraveyardExile :: ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card))
 castFromGraveyardExile =
   ReplacementEffect.ZoneChangeR
     ( ZoneChangeR.MkZoneChangeR
@@ -1176,12 +1177,12 @@ castFromGraveyardExile =
 -- "Minted" rather than "entry" because CR 702.37b's megamorph rides the same
 -- function with a CR 614.1e replacement, so this answers with rows of two event
 -- classes; the CR 616.1 loop matches each against the event it is offered.
-mintedReplacementsOf :: Map Keyword Natural -> [ReplacementEffect (Effect.Effect Card)]
+mintedReplacementsOf :: Map Keyword Natural -> [ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 mintedReplacementsOf counts = concatMap (uncurry mintedReplacementsFor) (Map.toAscList counts)
 
 -- Exhaustive for abilitiesFor's reason: the next keyword that rewrites an entry
 -- must break this build rather than silently produce nothing.
-mintedReplacementsFor :: Keyword -> Natural -> [ReplacementEffect (Effect.Effect Card)]
+mintedReplacementsFor :: Keyword -> Natural -> [ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 mintedReplacementsFor keyword count = case keyword of
   Keyword.Riot -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Riot))
   -- CR 702.98a's FIRST static ability, riot's row with the declining half deleted.
@@ -1693,7 +1694,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
 -- happens to be byte-identical to one -- a card printing "{2}, Discard this card:
 -- Draw a card" functioning from a hand would be read as cycling here. No printing
 -- in data/cards/ is such a twin (gap #2072).
-familyGranting :: Map Keyword Natural -> ActivatedAbility Card -> Maybe KeywordFamily.KeywordFamily
+familyGranting :: Map Keyword Natural -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card) -> Maybe KeywordFamily.KeywordFamily
 familyGranting counts ability =
   Maybe.listToMaybe
     ( Maybe.mapMaybe
@@ -1820,7 +1821,7 @@ familyOf keyword = case keyword of
 -- the payload is an ordinary slot read and needs no opcode. NOT the ability's
 -- controller: CR 603.3a makes that the creature's controller, and the poison goes
 -- to their victim.
-poisonous :: Natural -> TriggeredAbility Card
+poisonous :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 poisonous n =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer,
@@ -1852,7 +1853,7 @@ poisonous n =
 -- LibraryPlacement are inert for an exile destination, no slot is bound since
 -- nothing later reads what arrived, and the origin zone is Nothing because
 -- TopOfLibrary can only name a card already in that library.
-ingest :: TriggeredAbility Card
+ingest :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 ingest =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer,
@@ -1894,7 +1895,7 @@ ingest =
 -- The sacrifice is CR 701.21a's edict, so the SACRIFICING PLAYER chooses which
 -- permanents go. The Filter is the empty conjunction: rule 702.86a says "N
 -- permanents" with no qualification.
-annihilator :: Natural -> TriggeredAbility Card
+annihilator :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 annihilator n =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
@@ -1921,7 +1922,7 @@ annihilator n =
 -- printed words; OTHER is `Not IsSource`, which is why a battle-crying creature
 -- never pumps itself, and CR 611.2c fixing the set as the effect begins is why a
 -- token that arrives afterwards is not pumped.
-battleCry :: TriggeredAbility Card
+battleCry :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 battleCry =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
@@ -1962,7 +1963,7 @@ battleCry =
 --
 -- Effect.Evolve rather than Effect.PutCounters, which is rule 702.100b: one opcode
 -- is what ties the "evolves" marker to the placement. Renegade Krasis reads it.
-evolve :: TriggeredAbility Card
+evolve :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 evolve =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition =
@@ -1997,7 +1998,7 @@ evolve =
 --
 -- "THIS CREATURE" is the bearer, so the payload is battle cry's with
 -- Filter.IsSource rather than its negation.
-prowess :: TriggeredAbility Card
+prowess :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 prowess =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition =
@@ -2038,7 +2039,7 @@ prowess =
 -- Zero is an ordinary answer. CR 611.2d freezes it as this resolves, which the
 -- printed duration needs: CR 511.3 clears the record at end of combat, so a live
 -- re-read would shrink the pump to 0 the moment combat ended.
-melee :: TriggeredAbility Card
+melee :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 melee =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
@@ -2070,7 +2071,7 @@ melee =
 --
 -- CR 702.23b's "calculated only once per combat" is CR 611.2d's freeze and needs
 -- nothing of its own.
-rampage :: Natural -> TriggeredAbility Card
+rampage :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 rampage n =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfBecomesBlocked,
@@ -2103,7 +2104,7 @@ rampage n =
 -- "THE BLOCKING CREATURE" is the object the event named, bound under
 -- Binding.blockingCreature -- an ordinary slot read, and NOT a set sweep over
 -- whoever is blocking at resolution.
-flanking :: TriggeredAbility Card
+flanking :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 flanking =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition =
@@ -2118,7 +2119,7 @@ flanking =
     }
 
 -- The -1/-1 rule 702.25a hands the blocker, read out of the slot CR 509.3d bound.
-flankingEffect :: Effect.Effect Card
+flankingEffect :: Effect.Effect Card (GrantedAbility.GrantedAbility Card)
 flankingEffect =
   Effect.ModifyTarget
     ( ModifyTarget.MkModifyTarget
@@ -2139,7 +2140,7 @@ flankingEffect =
 -- "THAT CREATURE" is the creature the event named, read out of
 -- Binding.attackingCreature -- NOT Filter.IsSource, which would pump the wrong
 -- permanent whenever a card other than the exalted bearer attacks.
-exalted :: TriggeredAbility Card
+exalted :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 exalted =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition =
@@ -2172,19 +2173,19 @@ exalted =
 --
 -- The payload is prowess' with N in place of its 1, and both abilities carry it,
 -- rule 702.45a stating one.
-bushido :: Natural -> [TriggeredAbility Card]
+bushido :: Natural -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 bushido n = [bushidoBlocks n, bushidoBecomesBlocked n]
 
 -- CR 509.3a's half of rule 702.45a.
-bushidoBlocks :: Natural -> TriggeredAbility Card
+bushidoBlocks :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 bushidoBlocks = bushidoHalf TriggerCondition.SelfBlocks
 
 -- CR 509.3c's half of rule 702.45a.
-bushidoBecomesBlocked :: Natural -> TriggeredAbility Card
+bushidoBecomesBlocked :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 bushidoBecomesBlocked = bushidoHalf TriggerCondition.SelfBecomesBlocked
 
 -- The +N/+N the two halves share.
-bushidoHalf :: TriggerCondition.TriggerCondition -> Natural -> TriggeredAbility Card
+bushidoHalf :: TriggerCondition.TriggerCondition -> Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 bushidoHalf condition n =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = condition,
@@ -2215,7 +2216,7 @@ bushidoHalf condition n =
 -- the declare blockers step, after the declaration, rather than with CR 508.2's
 -- attack triggers. Rule 509.1h's last sentence keeps a creature whose only blocker
 -- left combat from getting it.
-frenzy :: Natural -> TriggeredAbility Card
+frenzy :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 frenzy n =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfAttacksUnblocked,
@@ -2242,7 +2243,7 @@ frenzy n =
 --
 -- Effect.LoseLife and not damage: rule 702.130a says "loses N life", so this is CR
 -- 119.3's life loss and none of CR 120's damage machinery sees it.
-afflict :: Natural -> TriggeredAbility Card
+afflict :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 afflict n =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfBecomesBlocked,
@@ -2272,7 +2273,7 @@ afflict n =
 -- 702.134c makes "a creature mentors another creature" a trigger event, so the
 -- placement has to be distinguishable from every other +1/+1 counter. The counter
 -- still goes through Event.putCounters, so CR 122.6's funnel is unaffected.
-mentor :: TriggeredAbility Card
+mentor :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 mentor =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
@@ -2305,7 +2306,7 @@ mentorTarget = SlotName.MkSlotName (Text.pack "mentored")
 -- Through Effect.Train, evolve's opcode one rule over: rule 702.149c makes "when
 -- this creature trains" mean the placement, so it has to be distinguishable from
 -- any other +1/+1 counter arriving.
-training :: TriggeredAbility Card
+training :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 training =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition =
@@ -2334,7 +2335,7 @@ training =
 -- would offer the cost to the wrong player. That slot is NOT a target slot: rule
 -- 702.21a targets nothing, so nothing here is re-checked at CR 608.2b and a
 -- shroud-bearing spell is countered as readily as any other.
-ward :: Cost Keyword -> TriggeredAbility Card
+ward :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 ward cost =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfBecomesTargeted PlayerRelation.Opponent,
@@ -2369,7 +2370,7 @@ ward cost =
 -- Onset.Immediately with no stated duration -- CR 603.7a's floor and CR 603.7b's
 -- default. Rule 702.147a gates neither end of the envelope, so the delayed
 -- ability watches from the moment it is armed and fires once.
-decayed :: TriggeredAbility Card
+decayed :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 decayed =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
@@ -2402,12 +2403,12 @@ decayed =
 -- What no type enforces is a LATER keyword whose arm is written and whose row here
 -- is forgotten -- a dangling name is a silent no-op. Pawl.CardSpec closes the
 -- other direction, so no card's declaration can shadow a row here.
-mintedDelayedAbilities :: Map AbilityName (TriggeredAbility Card)
+mintedDelayedAbilities :: Map AbilityName (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
 mintedDelayedAbilities = Map.singleton decayedSacrificeName decayedSacrifice
 
 -- The lookup Pawl.Engine.Resolve does, which learns only that rule 702 declared
 -- an ability under this name and never which keyword did.
-mintedDelayedAbility :: AbilityName -> Maybe (TriggeredAbility Card)
+mintedDelayedAbility :: AbilityName -> Maybe (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
 mintedDelayedAbility name = Map.lookup name mintedDelayedAbilities
 
 -- The name rule 702.147a's delayed ability is filed under. A card may not declare
@@ -2424,7 +2425,7 @@ decayedSacrificeName = AbilityName.MkAbilityName (Text.pack "decayed")
 -- 603.7c makes that the environment captured as the ability was armed rather than
 -- a fresh read. CR 701.21a keeps it a sacrifice and not a destruction, so an
 -- indestructible attacker still goes.
-decayedSacrifice :: TriggeredAbility Card
+decayedSacrifice :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 decayedSacrifice =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.EndOfCombat) TurnScope.EachTurn),
@@ -2449,7 +2450,7 @@ decayedSacrifice =
 -- prints one "may", and its "if you do" makes the untap conditional on the same
 -- answer (CR 608.2e). The requirement's ATTACKER is Binding.triggerSource and
 -- never a target (CR 115.10a).
-provoke :: TriggeredAbility Card
+provoke :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 provoke =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
@@ -2487,7 +2488,7 @@ provokeTarget = SlotName.MkSlotName (Text.pack "provoked")
 -- clause (CR 608.2e) would check only on resolution.
 --
 -- ONE clause holding BOTH effects, the rule printing one sentence.
-renown :: Natural -> TriggeredAbility Card
+renown :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 renown n =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer,
@@ -2510,7 +2511,7 @@ renown n =
 -- rule 702.105a prints no "if", and CR 608.2a would re-check one on resolution --
 -- so an opponent gaining life in response would wrongly remove the ability from
 -- the stack.
-dethrone :: TriggeredAbility Card
+dethrone :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 dethrone =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfAttacksPlayerWithMostLife,
@@ -2526,11 +2527,11 @@ dethrone =
 
 -- CR 702.79a: persist. Its event is CR 700.4's dies, which is why the condition
 -- below is SelfDies.
-persist :: TriggeredAbility Card
+persist :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 persist = returns CounterKind.MinusOneMinusOne
 
 -- CR 702.93a: undying, persist's mirror in +1/+1 counters.
-undying :: TriggeredAbility Card
+undying :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 undying = returns CounterKind.PlusOnePlusOne
 
 -- The sentence both keywords state, in the counter kind that tells them apart: it
@@ -2552,7 +2553,7 @@ undying = returns CounterKind.PlusOnePlusOne
 -- `underOwner` is rule 702.79a's "under its owner's control", which CR 110.2a
 -- otherwise answers with the ability's controller: a permanent stolen at layer 2
 -- dies under the thief's control and still comes back to its owner.
-returns :: CounterKind.CounterKind Keyword.Keyword -> TriggeredAbility Card
+returns :: CounterKind.CounterKind Keyword.Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 returns kind =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfDies,
@@ -2600,7 +2601,7 @@ returns kind =
 -- CR 612.2a's text change reaches the Spirit written here even though the mint
 -- runs after the CR 613 layer fold: layer 3 records its pairs on the projection
 -- and Projection.mintedTriggeredAbilitiesOf applies them to whatever this returns.
-afterlife :: Natural -> TriggeredAbility Card
+afterlife :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 afterlife n =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfDies,
@@ -2704,7 +2705,7 @@ spiritToken =
 -- Marking the clause optional as well would ask twice and let a player decline
 -- both halves, which rule 702.123a does not allow. THE TOKEN IS MINTED HERE for
 -- afterlife's reason.
-fabricate :: Natural -> TriggeredAbility Card
+fabricate :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 fabricate n =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfEnters,
@@ -2825,7 +2826,7 @@ servoToken =
 -- as CR 115.2's clause (a) -- and the reason the pool carries a GraveyardScope
 -- rather than a Filter is that CR 108.4 gives a card in a graveyard no controller.
 -- The move states no origin zone for that same reason.
-soulshift :: Natural -> TriggeredAbility Card
+soulshift :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 soulshift n =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfDies,
@@ -2878,7 +2879,7 @@ soulshiftTarget = SlotName.MkSlotName (Text.pack "soulshifted")
 -- Effect.ExileHaunting rather than a MoveToZone to Zone.Exile, because the move is
 -- only half of it: CR 702.55b's link from the exiled card to the object targeted
 -- is what the exile-zone half of the card reads, and only that opcode writes it.
-haunt :: TriggeredAbility Card
+haunt :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 haunt =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfDies,
@@ -2910,7 +2911,7 @@ hauntTarget = SlotName.MkSlotName (Text.pack "haunted")
 -- The cost rides the OFFER (CastOffer.payingInstead) rather than the card, CR
 -- 118.9 making it an alternative cost applied "from another effect": Thunderous
 -- Wrath in a hand nobody drew this turn still costs {4}{R}{R}.
-miracle :: Cost Keyword -> TriggeredAbility Card
+miracle :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 miracle cost =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfRevealedForMiracle,
@@ -2960,14 +2961,14 @@ miracleCost keywords =
 -- is what decides that -- Pawl.Engine.Event filters this list by
 -- `functionsIn`, so a drawn Doomed Traveler's dies trigger is offered from no
 -- hand.
-printedTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card]
+printedTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 printedTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
 
 -- CR 702.63a's SECOND and THIRD abilities, the first being mintedReplacementsFor's
 -- -- so vanishing's rule text spans both mints. Ordered as rule 702.63a prints
 -- them, which is also the order they fire in: the upkeep removal takes the last
 -- counter off, and the sacrifice watches that removal.
-vanishing :: [TriggeredAbility Card]
+vanishing :: [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 vanishing = [vanishingUpkeep, vanishingLastCounter]
 
 -- "At the beginning of your upkeep, if this permanent has a time counter on it,
@@ -2982,7 +2983,7 @@ vanishing = [vanishingUpkeep, vanishingLastCounter]
 --
 -- ONE counter per instance, not per counter present: rule 702.63a removes a single
 -- one, and CR 702.63c is what makes a second instance remove a second.
-vanishingUpkeep :: TriggeredAbility Card
+vanishingUpkeep :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 vanishingUpkeep =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn),
@@ -3005,7 +3006,7 @@ vanishingUpkeep =
 --
 -- Effect.Sacrifice, never Destroy: CR 701.21a says a sacrifice is not a
 -- destruction, so an indestructible permanent with vanishing still goes.
-vanishingLastCounter :: TriggeredAbility Card
+vanishingLastCounter :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 vanishingLastCounter =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Time,
@@ -3033,7 +3034,7 @@ vanishingLastCounter =
 -- clause standing after the removal would read a pile the removal had already
 -- emptied. Observably equivalent, since nothing runs between two clauses of one
 -- resolution (CR 117.3b, CR 704.3).
-fading :: TriggeredAbility Card
+fading :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 fading =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn),
@@ -3077,7 +3078,7 @@ fading =
 --
 -- Optionality.Optional is rule 702.43a's "you may". A REAL choice: declining with
 -- a legal target on the board leaves the counters nowhere.
-modular :: TriggeredAbility Card
+modular :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 modular =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfDies,
