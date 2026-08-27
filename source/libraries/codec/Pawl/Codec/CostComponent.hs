@@ -20,7 +20,7 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 -- one entry and nothing else. Note that the list is the ONLY thing that says an
 -- arm exists: every extractor carries its own @_ -> Nothing@, so a constructor
 -- with no entry here compiles, encodes as @{}@ and has no round-trip test
--- (#1715).
+-- (#2262).
 --
 -- The keyword codec is a PARAMETER; see Pawl.Codec.Filter's header.
 codec :: (Typeable.Typeable keyword, Eq keyword) => Codec.Codec keyword -> Codec.Codec (CostComponent.CostComponent keyword)

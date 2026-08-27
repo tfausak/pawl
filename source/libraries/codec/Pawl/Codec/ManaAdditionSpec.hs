@@ -51,7 +51,7 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
   -- The pair the defaulted key needs: an absent @retention@ IS Ordinary (both
   -- cases above), and Shizuko's third sentence is the one printing that writes
   -- it. Nothing forces this case -- the codec's arm list is not exhaustiveness
-  -- checked (#1715) -- so deleting the field from Pawl.Codec.ManaAddition shows
+  -- checked (#2262) -- so deleting the field from Pawl.Codec.ManaAddition shows
   -- up here or nowhere.
   Spec.it s "MkManaAddition, a retention written on the wire" $
     Common.assertCodec
@@ -67,7 +67,7 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
       )
       " {\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}},\"retention\":{\"type\":\"UntilEndOfTurn\"}} "
   -- The same pair for CR 106.6's spending restriction, and it needs its own case
-  -- for the reason the retention one gives: nothing forces the field (#1715).
+  -- for the reason the retention one gives: nothing forces the field (#2262).
   -- Geosurge writes it on a spell and Mishra's Workshop on a mana ability.
   Spec.it s "MkManaAddition, a spending restriction written on the wire" $
     Common.assertCodec

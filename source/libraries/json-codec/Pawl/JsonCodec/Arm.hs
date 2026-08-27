@@ -11,7 +11,8 @@
 --
 -- WHAT THAT GIVES UP is the exhaustiveness check: 'tagged' can no longer tell
 -- that its arm list names every constructor, so one added to the type compiles
--- clean here. Three things soften it. 'tagged' encodes an unmatched value as
+-- clean here. Not implemented: any check that an arm list covers its type
+-- (#2262). Three things soften it. 'tagged' encodes an unmatched value as
 -- @{}@, which is the one shape 'Common.asTagged' cannot read, so the gap fails
 -- loudly at the first round trip instead of writing something plausible. The
 -- arm list was ALREADY the sole source of truth for decoding and for the

@@ -267,7 +267,7 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
   -- is over every kind and the object is still whichever one the quantity is
   -- evaluated against. Round-tripped separately from the arm above because
   -- Pawl.JsonCodec.Arm's tagged list carries its own fallthrough, so a missing arm
-  -- is a decode failure rather than a compile error (#1715).
+  -- is a decode failure rather than a compile error (#2262).
   Spec.it s "ObjectCountersOfAnyKind, a bare tag" $
     Common.assertCodec
       s

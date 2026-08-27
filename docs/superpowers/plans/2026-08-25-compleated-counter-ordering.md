@@ -503,7 +503,7 @@ That condition is also what makes CR 616.2 work: on the first iteration nothing 
 
 - [ ] **Step 6: Codec**
 
-`Pawl.Codec.EntryRewrite` uses `Arm.tagged` with a `_ -> Nothing` fallthrough (CLAUDE.md, #1715), so a missing arm compiles silently. Add the arm by hand and add its case to `Pawl.Codec.EntryRewriteSpec` -- follow `Bloodthirst`'s, which carries the same `Natural` payload.
+`Pawl.Codec.EntryRewrite` uses `Arm.tagged` with a `_ -> Nothing` fallthrough (CLAUDE.md, #2262), so a missing arm compiles silently. Add the arm by hand and add its case to `Pawl.Codec.EntryRewriteSpec` -- follow `Bloodthirst`'s, which carries the same `Natural` payload.
 
 - [ ] **Step 7: Run the test**
 
