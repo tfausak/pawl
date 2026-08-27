@@ -1226,15 +1226,22 @@ effectNestedEffects effect = case effect of
 -- Face field holding effects must be added here too.
 cardCarrierEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 cardCarrierEffects card =
-  Card.allEffects card
-    <> concatMap (Modal.allEffects . ActivatedAbility.modal) (Face.activatedAbilities card)
-    <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Face.triggeredAbilities card)
-    <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
+  printedCarrierEffects card
     -- CR 613.1f's quoted abilities, the seventh and eighth carriers: the text is
     -- printed on THIS card even though the ability ends up on another object, so
     -- every lint below has to read it here or nowhere.
     <> concatMap (Modal.allEffects . ActivatedAbility.modal) (grantedActivatedAbilities card)
     <> concatMap (Modal.allEffects . TriggeredAbility.modal) (grantedTriggeredAbilities card)
+
+-- The limbs of cardCarrierEffects that do NOT go through a grant. Split out so
+-- grantedModifications below can walk them without closing a loop with the two
+-- limbs above, which are defined in terms of it.
+printedCarrierEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
+printedCarrierEffects card =
+  Card.allEffects card
+    <> concatMap (Modal.allEffects . ActivatedAbility.modal) (Face.activatedAbilities card)
+    <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Face.triggeredAbilities card)
+    <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
     -- CR 309.4c: a room ability's effects, which no other limb above reaches --
     -- Pawl.Types.Face.rooms is the fifth carrier.
     <> concatMap (Modal.allEffects . DungeonRoom.ability) (Face.rooms card)
@@ -4280,14 +4287,40 @@ grantedTriggeredAbilities card =
   | Modification.GainAbility (GrantedAbility.Triggered ability) <- grantedModifications card
   ]
 
--- Every modification this face's static abilities carry, the shared walk both
--- grant sweeps above index into.
+-- Every modification this face carries, the shared walk both grant sweeps above
+-- index into. TWO sources, not one: a PRINTED static ability's modifications (CR
+-- 613.1f as card text), and the modifications a RESOLUTION stores through
+-- Effect.ModifyTarget (CR 611.2) -- Retraction Helix's quoted "{T}: Return
+-- target nonland permanent to its owner's hand" is the second kind, and reading
+-- only the first would let it escape every lint below.
+--
+-- Iterated, because a granted ability's own effects may store a grant in turn:
+-- each round feeds the abilities just found back through the ModifyTarget walk,
+-- and it bottoms out because every round descends strictly further into one
+-- card's finite text. Seeded from printedCarrierEffects rather than
+-- cardCarrierEffects, which is what keeps this out of a loop with the two grant
+-- limbs that function ends with.
 grantedModifications :: Face.Face Card.Type.Card -> [Projection.Modification]
 grantedModifications card =
-  [ modification
-  | static <- Face.staticAbilities card,
-    modification <- Foldable.toList (StaticAbility.modifications static)
-  ]
+  let printed =
+        [ modification
+        | static <- Face.staticAbilities card,
+          modification <- Foldable.toList (StaticAbility.modifications static)
+        ]
+      -- The WILDCARD-free read of the one Effect arm carrying a Modification;
+      -- namedRemovals' caveat applies, a second such arm would escape this.
+      storedIn effects =
+        [ ModifyTarget.modification modify
+        | Effect.ModifyTarget modify <- concatMap effectWithNested effects
+        ]
+      effectsOf modifications =
+        concatMap (Modal.allEffects . ActivatedAbility.modal) [a | Modification.GainAbility (GrantedAbility.Activated a) <- modifications]
+          <> concatMap (Modal.allEffects . TriggeredAbility.modal) [t | Modification.GainAbility (GrantedAbility.Triggered t) <- modifications]
+      deeper modifications =
+        if null modifications
+          then []
+          else modifications <> deeper (storedIn (effectsOf modifications))
+   in deeper (printed <> storedIn (printedCarrierEffects card))
 
 triggeredAbilityFilters :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 triggeredAbilityFilters ability =

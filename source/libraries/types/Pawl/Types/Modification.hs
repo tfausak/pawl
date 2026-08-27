@@ -86,6 +86,11 @@ data Modification ability
     -- creature has 'Whenever this creature deals combat damage to a player, you
     -- may draw a card.'").
     --
+    -- A RESOLUTION reaches this arm too, through Pawl.Types.ModifyTarget's own
+    -- ability variable: Retraction Helix's "Until end of turn, target creature
+    -- gains '{T}: Return target nonland permanent to its owner's hand.'" stores
+    -- exactly what an Aura's static ability grants.
+    --
     -- Folded into the ProjectedCharacteristics list CR 113.3 puts its kind in,
     -- which is what decides everything about the granted ability's identity: it
     -- becomes an ability OF THE RECEIVING OBJECT, so CR 113.7 makes that object

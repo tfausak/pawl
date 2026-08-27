@@ -1726,6 +1726,11 @@ rewriteAffected pairs a = case a of
 -- effect it is.
 rewriteEffect :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 rewriteEffect pairs effect = case effect of
+  -- CR 612.1 / 612.3: the words inside a quoted ability a RESOLUTION grants are
+  -- printed on the granting spell, so a text-changer aimed at that spell reaches
+  -- them. Unproved rather than untested: no pooled card grants an ability
+  -- quoting a subtype word, so mutating the descent away leaves the suite green
+  -- (#2420).
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     Effect.ModifyTarget (ModifyTarget.MkModifyTarget (rewriteDuration pairs duration) (rewriteModification pairs modification) (rewriteObjectRef pairs ref))
   Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer excess) -> Effect.DealDamage (DealDamage.MkDealDamage (rewriteObjectRef pairs ref) quantity dealer excess)
