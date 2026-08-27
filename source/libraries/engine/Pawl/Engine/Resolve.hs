@@ -4183,7 +4183,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- Not implemented: a chosen subset of permanents moved somewhere.
             -- Nothing gathers it here, so a card writing the ref under this
             -- opcode names no object; the destination and CR 400.7's funnel
-            -- need a producer first (gap #774x).
+            -- need a producer first (gap #2418).
             ObjectRef.AnyNumberMatching _ -> pure []
           arrivals <- settleArrivals zone placement targets
           -- The batch's own board, read after CR 401.4's arrangement asks (which
