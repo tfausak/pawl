@@ -598,9 +598,11 @@ data Keyword
   | -- | 702.73a: "This object is every creature type." A
     -- CHARACTERISTIC-DEFINING ability (CR 604.3), so it defines a
     -- characteristic rather than minting anything: it lands in CR 613.1d's
-    -- layer 4 through Pawl.Engine.Projection.applySubtypeDefining, and off the
-    -- battlefield through viewOfCard, exactly as CR 702.114a's devoid lands in
-    -- layer 5.
+    -- layer 4 through Pawl.Engine.Projection.applySubtypeDefining, exactly as CR
+    -- 702.114a's devoid lands in layer 5. Rule 702.73a's "works everywhere" needs
+    -- no second route: that seed runs for any live id the projection fold is
+    -- asked about, in whatever zone the object sits, and viewOfCharacteristics
+    -- reads it straight off the projection's subtypes.
     --
     -- Nullary, because rule 702.73a takes no parameter, so no
     -- Pawl.Types.KeywordFamily constructor is owed. Its reader takes
