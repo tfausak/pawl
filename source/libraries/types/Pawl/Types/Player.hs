@@ -120,6 +120,39 @@ data Player = MkPlayer
     -- enters the game: CR 309.5b has the player put a dungeon they own back into the
     -- command zone after finishing one, so this is a supply rather than a stock.
     dungeons :: Set.Set PrintingId.PrintingId,
+    -- | CR 400.11 \/ 400.11a: the cards this player owns that are outside the game,
+    -- counted per printing. Empty for a player who brought no sideboard.
+    --
+    -- PER PLAYER and not on the GameState, because CR 108.3b leaves no card
+    -- outside the game ownerless -- a sideboard card is owned by "the player who
+    -- started the game with it in their sideboard", and every other one by its
+    -- legal owner. Every rule that reaches in asks for the acting player's OWN
+    -- cards (CR 309.2a, CR 701.23j, CR 701.48a, CR 702.139a), so ownership is the
+    -- key rather than a predicate a reader could forget.
+    --
+    -- PrintingIds and not Printings, and no object minted: Player.dungeons' reason
+    -- exactly. Outside the game is not a zone (CR 400.11), so there is nowhere for
+    -- an object to sit until something brings the card in; CR 400.11c is why
+    -- nothing else can reach these in the meantime.
+    --
+    -- COUNTED and not a set, which is where this parts from `dungeons` above: this
+    -- is a STOCK. Pawl.Engine.OutsideTheGame.bringIn spends an entry, because a card
+    -- brought into the game is in the game (CR 400.11b) and the next Burning Wish
+    -- cannot find that same copy again. A dungeon card is never spent (CR 309.5b),
+    -- so its field forgets its counts.
+    --
+    -- NOT merged with `dungeons`, though CR 309.2 puts dungeon cards outside the
+    -- game too: CR 309.2 keeps them out of deck and sideboard both, CR 701.49a
+    -- chooses among them by a rule of its own rather than by a card's filter, and
+    -- CR 309.2d forbids anything else from bringing one in. One map would have
+    -- Pawl.Engine.OutsideTheGame offering dungeon cards to Burning Wish.
+    --
+    -- Where the rest of what is outside the game will land: CR 727.2's restart
+    -- cards (#135), CR 707.13's copy created outside the game (#888) and the
+    -- supergame's cards a subgame reaches for (#152). Sticker sheets (#872) are
+    -- outside the game too but are not cards and have no characteristics (CR
+    -- 123.2), so they need a field of their own rather than this one.
+    outsideTheGame :: Map.Map PrintingId.PrintingId Natural.Natural,
     -- | CR 309.7: how many dungeons this player has completed. "A player
     -- completes a dungeon as that dungeon card is removed from the game", so
     -- Pawl.Engine.Dungeon.remove is the sole writer -- the one function both CR
