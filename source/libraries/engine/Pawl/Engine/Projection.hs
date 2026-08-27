@@ -4294,16 +4294,18 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- The short-circuit reads COPIABLE values while the result reads the PROJECTION,
 -- sound only because every route to an unprinted replacement effect is covered:
 -- `EntryR AsCopy` on a card that is itself a base card with one, CR 122.1c's
--- shield counters, CR 122.1h's finality counters, or a minting keyword printed
--- on, copied by, or granted by a face. Three of the disjuncts are copy-aware --
--- the printed-replacement and keyword ones through copiableReplacementsOf and
--- anyCopiableKeyword, the ability one through staticAbilitiesOf -- so a copy
--- answers off the text it copied rather than the copier's (CR 707.2a).
+-- shield counters, CR 122.1h's finality counters, a minting keyword printed on,
+-- copied by, or granted by a face, or a static ability writing one of the three
+-- TYPES the rules mint an entry replacement from (grantsMintingType). Three of
+-- the disjuncts are copy-aware -- the printed-replacement and keyword ones
+-- through copiableReplacementsOf and anyCopiableKeyword, the ability ones through
+-- staticAbilitiesOf -- so a copy answers off the text it copied rather than the
+-- copier's (CR 707.2a).
 --
--- Not implemented: a minting keyword reaching a permanent through a stored
--- continuous effect or a keyword counter is on no base face (#833). Nor does a
--- copy's CARD TYPE reach the three type-line disjuncts, which still read the
--- copier's printed face (#2397).
+-- Not implemented: a minting keyword or a minting TYPE reaching a permanent
+-- through a stored continuous effect, and a minting keyword arriving on a keyword
+-- counter, are on no base face (#833). Nor does a copy's CARD TYPE reach the three
+-- type-line disjuncts, which still read the copier's printed face (#2397).
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
@@ -4324,6 +4326,14 @@ replacementsAffecting gs =
             || Set.member CardType.Battle (TypeLine.types (Face.typeLine face))
             || anyCopiableKeyword Keyword.mintsReplacement oid gs
             || any (any (grantsKeywordWhere Keyword.mintsReplacement) . StaticAbility.modifications) (staticAbilitiesOf oid gs)
+            -- The three type-line disjuncts above read a PRINTED face, so a
+            -- permanent that is a Saga, a planeswalker or a battle only at layer
+            -- 4 (CR 613.1d) passes none of them. This is that permanent's route
+            -- in, asked of the GRANTOR rather than the grantee for the reason
+            -- the keyword disjunct one line up is: a static ability's affected
+            -- set is not known without the projection this gate exists to skip,
+            -- so any board holding a granting ability is gathered whole.
+            || any (any grantsMintingType . StaticAbility.modifications) (staticAbilitiesOf oid gs)
       forOne oid = fmap (\re -> (oid, re)) (replacementsOf oid gs)
    in if not (any baseHas onBattlefield)
         then []
@@ -4380,6 +4390,65 @@ grantsKeywordWhere p m = case m of
   Modification.AddColor _ -> False
   Modification.AddChosenColor -> False
   Modification.SwitchPowerToughness -> False
+
+-- Does this modification write a card type or subtype that intrinsicReplacementsOf
+-- mints an entry replacement from -- CR 306.5b's planeswalker, CR 310.4b's battle
+-- or CR 714.3a's Saga?
+--
+-- grantsKeywordWhere's twin, and exhaustive for its reason: a modification added
+-- later that also writes the type line would otherwise answer False and take its
+-- grantee's intrinsic row out of the gathered set, a MISSING row rather than a
+-- build failure.
+--
+-- CR 205.3h is why the Saga arm sits under AddSubtype rather than beside the
+-- creature-type and land-type adds: Saga is an ENCHANTMENT type, and each of
+-- those two arms names its own family, rule 205.3i's and rule 205.3m's (see
+-- Pawl.Types.Modification).
+--
+-- The SETS answer beside the adds -- CR 205.1a's replacement leaves the object
+-- holding the new card type exactly as CR 205.1b's addition does.
+--
+-- ONLY the AddSubtype arm is proved by a board (Pawl.SagaSpec's granted-Saga
+-- entry). The SetCardType and ChangeSubtypeWord arms are REGRESSION FENCES: no
+-- card in the pool sets a permanent's card type to planeswalker or battle, and
+-- every text changer in it swaps a colour word, a basic land type or a creature
+-- type -- the Scryfall query Pawl.Types.Modification's AddSubtype records. Both
+-- are kept because this predicate only ever WIDENS what is gathered, so a wrong
+-- True costs a projection and a wrong False loses a rule 614.1c row.
+grantsMintingType :: Modification -> Bool
+grantsMintingType m = case m of
+  Modification.AddSubtype subtype -> subtype == Subtype.Type.Saga
+  Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord _ to) -> to == Subtype.Type.Saga
+  Modification.AddCardType cardType -> mintingCardType cardType
+  Modification.SetCardType cardType -> mintingCardType cardType
+  Modification.GainKeyword _ -> False
+  Modification.GainFlashbackAtManaCost -> False
+  Modification.GainEnchant _ -> False
+  Modification.GainAbility _ -> False
+  Modification.LoseAllAbilities -> False
+  Modification.LoseNamedAbility _ -> False
+  Modification.LoseKeyword _ -> False
+  Modification.SetBasePowerToughness {} -> False
+  Modification.ModifyPowerToughness {} -> False
+  Modification.SetLandSubtype _ -> False
+  Modification.SetLandSubtypeToChosen -> False
+  Modification.AddLandSubtype _ -> False
+  Modification.SetCreatureSubtype _ -> False
+  Modification.AddCreatureSubtype _ -> False
+  Modification.AddEveryCreatureSubtype -> False
+  Modification.AddSupertype _ -> False
+  Modification.RemoveSupertype _ -> False
+  Modification.SetController _ -> False
+  Modification.SetControllerToSource -> False
+  Modification.SetColor _ -> False
+  Modification.AddColor _ -> False
+  Modification.AddChosenColor -> False
+  Modification.SwitchPowerToughness -> False
+
+-- CR 306.5b / 310.4b: the card types intrinsicReplacementsOf mints a CR 614.1c row
+-- from. Rule 714.3a's Saga is a SUBTYPE and so is asked one function up.
+mintingCardType :: CardType.CardType -> Bool
+mintingCardType cardType = cardType == CardType.Planeswalker || cardType == CardType.Battle
 
 -- CR 603 / 613 layer 6: an object's printed-and-granted triggered abilities
 -- after the layer system. A Humility'd creature has none.

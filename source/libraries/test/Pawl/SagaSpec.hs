@@ -80,6 +80,31 @@ entrySpec s registry = Spec.describe s "Entry" $ do
       Nothing -> Spec.assertFailure s "History of Benalia did not reach the battlefield"
       Just oid ->
         Spec.assertEqWith s "one lore counter" (S.counterOf CounterKind.Lore oid after) 1
+  -- CR 714.3a's "each Saga" reaching a permanent that is one only because layer 4
+  -- says so (CR 613.1d / 205.1b). Synthetic Chronicle Weaving grants the subtype
+  -- to the other enchantments its controller has, and High Ground -- printed as a
+  -- plain enchantment, with no replacement effect and no minting keyword on its
+  -- face -- enters under it.
+  --
+  -- The board is deliberately bare otherwise: nothing else on it could carry a
+  -- replacement effect, so Projection.replacementsAffecting's short-circuit is
+  -- what decides, and reading the granted subtype off the printed face answers
+  -- zero here.
+  Spec.it s "CR 714.3a a permanent granted the Saga subtype enters with a lore counter too" $ do
+    plains <- S.printingOf s registry "Plains"
+    weaving <- S.printingOf s registry "Synthetic Chronicle Weaving"
+    highGround <- S.printingOf s registry "High Ground"
+    let (gs, spellId) = S.handOne highGround (S.landsInPlay plains 1)
+        (_, granted) = S.addCreature weaving S.alice gs
+        enter board = S.runPure S.identityAnswer (S.runPure S.identityAnswer board (S.cast S.alice spellId)) Stack.resolveTop
+        after = enter granted
+    case sagaOf after of
+      Nothing -> Spec.assertFailure s "High Ground did not become a Saga on the battlefield"
+      Just oid -> Spec.assertEqWith s "one lore counter on the granted Saga" (S.counterOf CounterKind.Lore oid after) 1
+    -- The same board without the granter, differing in that one permanent: High
+    -- Ground is no Saga and CR 714.3a mints nothing for it.
+    let alone = enter gs
+    Spec.assertEqWith s "and no Saga at all without the granter" (Maybe.isJust (sagaOf alone)) False
   Spec.it s "CR 714.2b that counter fires chapter I, which makes a 2/2 Knight with vigilance" $ do
     plains <- S.printingOf s registry "Plains"
     benalia <- S.printingOf s registry "History of Benalia"

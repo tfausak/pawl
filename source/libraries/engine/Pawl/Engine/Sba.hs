@@ -671,8 +671,12 @@ performStateBasedActions = Event.simultaneously $ do
       --
       -- No board in the pool reaches it, so this is argued rather than tested:
       -- the pool's one prohibition (Garland, Royal Kidnapper) names CREATURES,
-      -- and no printing here is both a Saga and a creature. The guard stands
-      -- because the failure it prevents is a hang rather than a wrong answer.
+      -- and no printing here is both a Saga and a creature. Nor does the layer
+      -- system get there: Synthetic Chronicle Weaving can make an enchantment
+      -- creature a Saga (CR 613.1d), but grants it no chapter ability, so
+      -- Saga.tracksLore stays False and rule 704.5s never names it. The guard
+      -- stands because the failure it prevents is a hang rather than a wrong
+      -- answer.
       told =
         filter
           (\(_, oid) -> not (SacrificeRestriction.prohibited oid gs))
