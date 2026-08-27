@@ -536,9 +536,15 @@ subgameStateFrom starter parent =
       -- their commander from the main-game command zone (if it's there) to the
       -- subgame command zone". Nothing ELSE in the main-game command zone moves --
       -- CR 729.2's "no other cards in a main-game zone are moved" -- and its two
-      -- siblings have no format here: supplementary decks (CR 729.2a) and
-      -- vanguards (CR 729.2b) are not implemented, nor is any other command-zone
-      -- resident (#933, #934, #935, #936, #937).
+      -- siblings have no format here: CR 729.2a's supplementary decks of
+      -- nontraditional cards are the attraction (#871), planar (#934) and scheme
+      -- (#935) decks CR 100.2d names, none of them implemented, and neither are
+      -- CR 729.2b's vanguard cards (#936).
+      --
+      -- The command-zone residents pawl DOES have -- an emblem, and a dungeon a
+      -- player has ventured into -- stay in the parent, which is what CR 729.2
+      -- asks rather than an elision: `movedObjects` below restricts to the
+      -- libraries and CR 729.2c's commanders, so nothing else crosses.
       --
       -- The parent's own copy is deliberately left where it is: the parent is
       -- untouched while the subgame runs (CR 729.1a), and funnelBack drops these

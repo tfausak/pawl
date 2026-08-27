@@ -17,7 +17,9 @@
 -- Farseer -- which has no morph ability at all -- is the WATCHER of rule 708.7's
 -- other written form, and Soul Summons reaches rule 708 without a cast at all.
 -- Manifest is no longer Soul Summons' alone: Cloudform manifests too, and
--- Pawl.AuraSpec's GrantedEnchant group is where that one is proved.
+-- Pawl.AuraSpec's GrantedEnchant group is where that one is proved. Manifest
+-- Dread is the third, and the one that reaches CR 701.62 -- manifest of a card
+-- CHOSEN from a looked-at group rather than off the top of the library.
 --
 -- Ainok Tracker is the SUBSTITUTION's card. {5}{R} Creature -- Dog Scout 3/3,
 -- "First strike / Morph {4}{R}". Every axis CR 708.2a substitutes is observable
@@ -76,10 +78,11 @@
 -- {4}{W}", the pool's plainest disguise creature. It is the only card here whose
 -- face-down listing is not CR 708.2a's default, the ward {2} CR 702.168b names.
 --
--- Soul Summons is MANIFEST's card, and the only one here whose permanent never
--- passes through the stack. {1}{W} Sorcery, "Manifest the top card of your
--- library" (CR 701.40a) -- one clause, transcribed whole, and preferred over
--- Write into Being, whose look-at-two-and-choose prompt is beside CR 708.3.
+-- Soul Summons is MANIFEST's card, one of the two here whose permanent never
+-- passes through the stack (Manifest Dread below is the other). {1}{W} Sorcery,
+-- "Manifest the top card of your library" (CR 701.40a) -- one clause,
+-- transcribed whole, and preferred over Write into Being, whose
+-- look-at-two-and-choose prompt is beside CR 708.3.
 -- Thragtusk is the card underneath it; summonsBoard says why that one, and
 -- Ainok Tracker is the card underneath it again for CR 701.40c, where the
 -- Tracker's {5}{R} against its morph {4}{R} is the only thing that tells the
@@ -87,8 +90,11 @@
 module Pawl.FaceDownSpec where
 
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Cast as Cast
@@ -155,6 +161,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   turnFaceDownSpec s registry
   listedSpec s registry
   manifestSpec s registry
+  manifestDreadSpec s registry
   enteringFaceDownSpec s registry
   faceUpEffectSpec s registry
   disguiseSpec s registry
@@ -1580,6 +1587,99 @@ surpriseBoard s registry top = do
   let (g1, spell) = S.handOne surprise manifested
       (bystander, g2) = S.addCreature galleon S.alice g1
   pure (g2, spell, entered, bystander)
+
+-- CR 701.62 manifest dread: rule 701.40's manifest over a card CHOSEN from a
+-- group an earlier clause looked at, rather than off the top of the library.
+--
+-- Manifest Dread {1}{G} Sorcery, "Manifest dread." (name, cost, type line and
+-- Oracle text checked against api.scryfall.com, 2026-08-26). The whole card is
+-- the keyword action; the printed parenthetical is reminder text. CR 701.62a
+-- spells it out as three instructions, and the card is transcribed as exactly
+-- those three: LookAt the top two binding a group, MoveToZone of
+-- ObjectRef.ChosenCardFromAmong onto the battlefield under
+-- EntryRiders.faceDown, and MoveToZone of ObjectRef.InSlot on the same slot to
+-- the graveyard -- "the cards you looked at that were not manifested this way",
+-- which CR 400.7 leaves the chosen card out of.
+--
+-- What this group proves that Pawl.MassEffectSpec's CommuneWithTheGods group
+-- does not: the faceDown RIDER composes with a ChosenCardFromAmong ref. Commune
+-- moves the chosen card bare; Soul Summons above rides the rider on a
+-- TopOfLibrary ref. Neither pairs the two.
+--
+-- THE BOARD, top of library down: Thragtusk, Ainok Tracker, Goblin Piker.
+--
+--   * The two looked-at cards are DIFFERENT and neither is CR 708.2a's 2/2 --
+--     Thragtusk a 5/3 Beast, Ainok Tracker a 3/3 Dog Scout. A manifested
+--     permanent has no name (CR 708.2a), so which card was manifested is read
+--     off the GRAVEYARD, and two identical cards would make both readings agree.
+--   * The answers are pinned by INDEX into the offer rather than by a search,
+--     since an answerer looking for a legal card would find one under either
+--     reading, and the offer is the group's mint order, top of library first.
+--   * The Goblin Piker sits THIRD, below the looked-at window, so a look of the
+--     wrong depth shows up in the library as well as in the graveyard.
+--   * Thragtusk's "when this creature enters, you gain 5 life" is CR 708.3's
+--     observable, and it is asserted on the leg where Thragtusk is the card that
+--     was MANIFESTED. A rider that failed to apply would put a 5/3 Beast on the
+--     battlefield and pay the 5 life.
+manifestDreadSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+manifestDreadSpec s registry =
+  let named = Just . CardName.MkCardName . Text.pack
+      -- The offer in the order the group was minted, which for a look at the top
+      -- two is the library's (CR 401.2).
+      nth n offered = Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop n (NonEmpty.toList offered)))
+      taking :: Int -> Prompt.Prompt r -> r
+      taking n p = case p of
+        Prompt.ChooseCardFromAmong _ _ _ offered -> nth n offered
+        _ -> S.identityAnswer p
+      -- alice with two Forests for the {1}{G} and Manifest Dread in hand, her
+      -- library stocked bottom first (S.addLibraryCard puts each new card on
+      -- top). Resolved and then run to a stable board, so an enters trigger that
+      -- had been placed would have resolved rather than sitting on a stack.
+      board = do
+        forest <- S.printingOf s registry "Forest"
+        dread <- S.printingOf s registry "Manifest Dread"
+        thragtusk <- S.printingOf s registry "Thragtusk"
+        tracker <- S.printingOf s registry "Ainok Tracker"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let stocked = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) (S.landsInPlay forest 2) [piker, tracker, thragtusk]
+            (withSpell, spellId) = S.handOne dread stocked
+        pure (spellId, withSpell)
+      cast :: (forall r. Prompt.Prompt r -> r) -> (ObjectId.ObjectId, GameState.GameState) -> (GameState.GameState, GameState.GameState)
+      cast answer (spellId, gs) =
+        let announced = S.runPure answer gs (S.cast S.alice spellId)
+            resolved = S.runPure answer announced Stack.resolveTop
+         in (gs, S.runPure answer resolved Engine.priorityLoop)
+      namesIn zone gs = List.sort (fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone S.alice gs))
+   in Spec.describe s "ManifestDread" $ do
+        -- THE HEADLINE, and the leg that pairs the rider with the choice: the
+        -- SECOND looked-at card is the one on the battlefield face down, and the
+        -- first is the one in the graveyard.
+        Spec.it s "CR 701.62a the chosen one of the two is manifested and the other is buried" $ do
+          setup <- board
+          let (before, after) = cast (taking 1) setup
+          case enteredOne before after of
+            Just permanent -> do
+              Spec.assertEqWith s "CR 708.2a a 2/2, neither the Tracker's 3/3 nor Thragtusk's 5/3" (S.powerToughnessOf permanent after) (Just (2, 2))
+              Spec.assertEqWith s "CR 701.40a it is face down, manifested" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Manifested))
+              Spec.assertEqWith s "CR 708.2a no name" (Projection.namesOf permanent after) noNames
+            Nothing -> Spec.assertFailure s "expected exactly one new permanent"
+          Spec.assertEqWith s "CR 701.62a the card NOT manifested is in the graveyard, with the spell" (namesIn Zone.Graveyard after) (List.sort [named "Manifest Dread", named "Thragtusk"])
+          Spec.assertEqWith s "and the third card was never looked at" (namesIn Zone.Library after) [named "Goblin Piker"]
+        -- THE PAIRED CONTROL, everything held fixed but the answer. If the
+        -- engine were picking rather than asking, both legs would manifest the
+        -- same card and bury the same one. This leg also carries CR 708.3: the
+        -- card manifested here is the one with the enters trigger.
+        Spec.it s "CR 608.2d the engine does not pick, and CR 708.3 the manifested card's enters ability does not trigger" $ do
+          setup <- board
+          let (before, after) = cast (taking 0) setup
+          Spec.assertEqWith s "CR 701.62a the OTHER card is buried this time" (namesIn Zone.Graveyard after) (List.sort [named "Ainok Tracker", named "Manifest Dread"])
+          Spec.assertEqWith s "CR 708.3 alice gained no life off the manifested Thragtusk" (S.lifeOf S.alice after) (Just 20)
+          case enteredOne before after of
+            Just permanent -> do
+              Spec.assertEqWith s "CR 708.2a a 2/2, not Thragtusk's printed 5/3" (S.powerToughnessOf permanent after) (Just (2, 2))
+              Spec.assertEqWith s "CR 701.40a it is face down, manifested" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Manifested))
+            Nothing -> Spec.assertFailure s "expected exactly one new permanent"
+          Spec.assertEqWith s "and nothing is waiting on the stack" (length (GameState.stack after)) 0
 
 -- CR 708.2a's "unless otherwise specified by the effect that put it onto the
 -- battlefield face down", and CR 708.6's "what ability or rules caused the

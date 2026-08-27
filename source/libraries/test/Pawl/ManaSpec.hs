@@ -3774,7 +3774,7 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
         -- kept for a spell being cast and for nothing else, which is why
         -- Cost.payMana writes it through PaymentSubject.castOf rather than
         -- through the subject: an activation paid with this same mana records
-        -- nothing (#2007), and widening the subject is exactly the change that
+        -- nothing (#2404), and widening the subject is exactly the change that
         -- would start it recording.
         Spec.assertEqWith s "CR 400.7d the equip records no mana spent" (fmap Object.manaSpent (Game.lookupObject equipId equipped)) (Just (Mana.Type.MkMana []))
 
