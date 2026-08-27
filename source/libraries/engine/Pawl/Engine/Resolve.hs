@@ -2901,7 +2901,8 @@ matchingFromAmong legal resolving controller source gs filter_ members =
 -- zone's contents, which is the whole difference from the zone-keyed choices --
 -- and the reason a batch CR 701.20a's reveal or CR 701.20e's look left in the
 -- LIBRARY is reachable at all (CR 701.20b), a library still having no filtered
--- sweep (#1309).
+-- sweep and being owed none, for the reason Pawl.Types.ObjectRef's EachMatching
+-- gives; see #1309.
 --
 -- ONE function rather than one per opcode, because it is ONE choice: Carth the
 -- Lion's "you may reveal a planeswalker card from among them and put it into

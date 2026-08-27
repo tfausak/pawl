@@ -41,7 +41,10 @@ data ObjectRef
     -- EachCardExiledWithSource -- and a FILTERED sweep of a zone is written on
     -- the arm for that zone: the battlefield's is here, and a graveyard's, a
     -- hand's, the stack's and the linked exile set's are on their own arms. A
-    -- library still has none (#1309) -- TopOfLibraryUntil below is not one, since
+    -- library still has none, and is owed none: every producer is a CR 701.23
+    -- search, and CR 701.23b lets the searcher find fewer than all the matching
+    -- cards, so the shape is a choice under Pawl.Types.Effect's Search rather
+    -- than an arm here; see #1309. TopOfLibraryUntil below is not one, since
     -- it names a PREFIX of a library that a count of matches ends rather than the
     -- cards in it that match, and EachCardFromAmong is not one either, since it
     -- names the matches in a GROUP an earlier clause bound rather than the
@@ -173,8 +176,8 @@ data ObjectRef
     --
     -- The zone is BAKED IN rather than carried as a Pawl.Types.Zone, which is
     -- EachCardInGraveyard's reason: a card wanting a filtered sweep of one more
-    -- zone gets one more arm, and a library's is the one still unwritten
-    -- (gap #1309).
+    -- zone gets one more arm, and a library's is the one still unwritten -- and
+    -- not owed, for the reason EachMatching above gives; see #1309.
     --
     -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
     -- fizzle -- which is the whole difference between this and Cancel's targeted
@@ -321,8 +324,8 @@ data ObjectRef
     -- taken from its head (CR 121.1) and both carry a Quantity, and they differ
     -- only in what that Quantity counts -- cards there, MATCHES here.
     --
-    -- NOT the filtered sweep of a library the arms above still lack (#1309), and
-    -- the difference is the one that issue turns on. A sweep would have to read
+    -- NOT the filtered sweep of a library the arms above still lack, and the
+    -- difference is the one #1309 turned on. A sweep would have to read
     -- every card in a hidden zone (CR 400.2) and report which ones matched; this
     -- walks the pile from the top and stops, so which cards it names is a
     -- POSITION question that a Filter only terminates. Every card the walk names
@@ -454,9 +457,10 @@ data ObjectRef
     -- by CR 701.20a's reveal, CR 701.20e's look, CR 701.17c's mill or a move, and
     -- it sits wherever that effect left it -- which for a look or a reveal is the
     -- LIBRARY, since neither moves anything (CR 701.20b). No zone-keyed arm can
-    -- offer a choice there: a library still has no filtered sweep (#1309), and
-    -- TopOfLibraryUntil's walk is not one either -- it names a prefix, which
-    -- stops at the match that completes its count rather than at the deepest one.
+    -- offer a choice there: a library still has no filtered sweep, and is owed
+    -- none for EachMatching's reason above; see #1309. TopOfLibraryUntil's walk
+    -- is not one either -- it names a prefix, which stops at the match that
+    -- completes its count rather than at the deepest one.
     -- Where the batch DID move to a graveyard, Midnight Tilling writes the same
     -- sentence as ChosenCardInGraveyard narrowed by Filter.IsBound; this arm
     -- reads the slot directly instead, so it needs no such sweep.
@@ -494,7 +498,7 @@ data ObjectRef
     -- The SLOT reaches where no zone-keyed arm does, for the arm above's reason:
     -- the group sits wherever the effect that bound it left the cards, which for
     -- CR 701.20a's reveal and CR 701.20e's look is the LIBRARY, and a library has
-    -- no filtered sweep (#1309).
+    -- no filtered sweep and is owed none; see EachMatching above and #1309.
     --
     -- A READ, not a question, which is the whole difference from the arm above:
     -- "all" states no count and hands out no choice, so CR 608.2d has nobody to
