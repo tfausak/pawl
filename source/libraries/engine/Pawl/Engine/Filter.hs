@@ -132,6 +132,17 @@ data View = MkView
     -- with no combat status to read: a printed card off the battlefield, a
     -- player, an event snapshot -- the vacuous posture power and controller take.
     attacking :: Bool,
+    -- CR 508.1b: WHICH PLAYER is this candidate attacking? Read from
+    -- GameState.combat like `attacking` above and off the same map, but off its
+    -- VALUE rather than its keys: Combat.attackers records what each attacker was
+    -- announced as attacking.
+    --
+    -- Nothing for every candidate `attacking` is False for, and ALSO for an
+    -- attacking creature whose AttackTarget is a planeswalker or a battle. That
+    -- narrowing is the point: CR 509.1a and CR 802.4a both keep "that player"
+    -- apart from "a planeswalker they control", so this field is CR 508.1b's
+    -- player and never CR 508.5's defending player (Pawl.Engine.Defender).
+    attackingPlayer :: Maybe PlayerId.PlayerId,
     -- CR 508.3b: was this candidate DECLARED ATTACKED this COMBAT PHASE? Read
     -- from GameState.combat like `attacking`, off Combat.declaredAttacked -- the
     -- half of the record `declaredAttackerThisCombat` below reads the other half
@@ -476,6 +487,9 @@ playerView pid =
       playerIdentity = Just pid,
       -- CR 506.3: only a creature can attack, and a player is not one.
       attacking = False,
+      -- CR 506.3 again: a player attacks nothing, so there is no player it is
+      -- attacking either.
+      attackingPlayer = Nothing,
       -- CR 508.3b lets a PLAYER be declared attacked, so unlike the field above
       -- this one asks a question a player candidate really can answer -- just not
       -- from here, this view being built from a PlayerId alone and holding no
@@ -948,6 +962,17 @@ matches context view predicate = case predicate of
   -- combat phase ends, so this is a live read of the combat record, never a stamp
   -- on the object.
   Filter.IsAttacking -> attacking view
+  -- CR 508.1b: the same live read one field over, and the relation is answered
+  -- against the perspective here rather than baked, exactly as ControlledBy's is
+  -- -- CR 109.5's "you" is what the match is framed by, not a fact about the
+  -- candidate.
+  --
+  -- Vacuously False where either half is unreadable, ControlledBy's posture: a
+  -- candidate attacking nothing, or attacking a planeswalker or a battle, has no
+  -- player to relate, and a match nothing framed has no "you" to relate it to.
+  Filter.IsAttackingPlayer relation -> case (attackingPlayer view, perspective context) of
+    (Just a, Just p) -> PlayerRelation.holds relation p a
+    _ -> False
   -- CR 509.1g: the same live read IsAttacking is, off the other map. Never the
   -- question Pawl.Engine.Combat.isBlocked asks: CR 509.1h keeps an attacker
   -- blocked after every creature blocking it has gone, so this can be False for
@@ -1152,6 +1177,7 @@ rewrite pairs predicate = case predicate of
   -- rule 612.1 does not reach either.
   Filter.CardsInGraveyardAtLeast _ -> predicate
   Filter.IsAttacking -> predicate
+  Filter.IsAttackingPlayer _ -> predicate
   Filter.IsBlocking -> predicate
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
@@ -1540,6 +1566,7 @@ bakeBound players predicate = case predicate of
   -- substitute into it. Baked one module out, as the atom above is.
   Filter.CardsInGraveyardAtLeast _ -> predicate
   Filter.IsAttacking -> predicate
+  Filter.IsAttackingPlayer _ -> predicate
   Filter.IsBlocking -> predicate
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
@@ -1629,6 +1656,7 @@ manaValueThresholds predicate = case predicate of
   -- value, so CR 601.3a's sample has nothing to learn from it.
   Filter.CardsInGraveyardAtLeast _ -> []
   Filter.IsAttacking -> []
+  Filter.IsAttackingPlayer _ -> []
   Filter.IsBlocking -> []
   Filter.IsBlocked -> []
   Filter.AttackedThisTurn -> []
@@ -1730,6 +1758,7 @@ statesAQuality predicate = case predicate of
   Filter.IsControllerOfBound _ -> True
   Filter.CardsInGraveyardAtLeast _ -> True
   Filter.IsAttacking -> True
+  Filter.IsAttackingPlayer _ -> True
   Filter.IsBlocking -> True
   Filter.IsBlocked -> True
   Filter.AttackedThisTurn -> True

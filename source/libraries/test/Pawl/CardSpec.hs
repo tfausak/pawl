@@ -2662,6 +2662,7 @@ canHostSubjects predicate = case predicate of
   -- a Natural, which holds no Filter for a card author to reach.
   Filter.Type.CardsInGraveyardAtLeast _ -> 0
   Filter.Type.IsAttacking -> 0
+  Filter.Type.IsAttackingPlayer _ -> 0
   Filter.Type.DeclaredAttackedThisCombat -> 0
   Filter.Type.IsBlocking -> 0
   Filter.Type.IsBlocked -> 0
