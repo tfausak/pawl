@@ -181,6 +181,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.Morph as Morph
+import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -912,7 +913,7 @@ effectCounts effect = case effect of
   Effect.BecomesBlocked _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
-  Effect.MoveCounters {} -> []
+  Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ quantity _ _) -> quantityCounts quantity
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> quantityCounts quantity
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
@@ -4007,7 +4008,8 @@ effectFilters effect = case effect of
   -- you control with a +1/+1 counter on it", and a Filter there would otherwise
   -- escape the lint.
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity ref) -> unframed (quantityFilters quantity) <> sourceHosted (objectRefFilters ref)
-  Effect.MoveCounters {} -> []
+  -- The count only: both slots are bare SlotNames, which carry no Filter.
+  Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ quantity _ _) -> unframed (quantityFilters quantity)
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> unframed (quantityFilters quantity)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
