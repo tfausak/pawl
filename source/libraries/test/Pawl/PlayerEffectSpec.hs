@@ -3083,10 +3083,10 @@ hackedSilenceAfter hack hushId hackId before =
           else onStack
    in S.runPure S.identityAnswer hacked Stack.resolveTop
 
--- CR 612.1 reaching the duration a SPELL stores over players, which is the half
--- of Effect.AffectPlayers a word swap can touch: the Filter inside the
--- PlayerEffect is not rewritten on this road yet (#2223), and the players axis is
--- a PlayerScope or a SlotName, neither of which is a word.
+-- CR 612.1 reaching the DURATION a spell stores over players. The restriction's
+-- own Filter is the other half a word swap can touch, and Liliana, Untouched by
+-- Death's group below proves it; the players axis between them is a PlayerScope
+-- or a SlotName, neither of which is a word.
 --
 -- The printed carrier already had this -- Edgewalker under a Magical Hack, above
 -- -- so what is new here is the STORED one: Synthetic Conditional Silence hacked
@@ -3151,6 +3151,219 @@ hackedSilenceSpec s registry =
       Spec.assertEqWith s "and nothing is stored any more" (GameState.playerEffects settled) []
       Spec.assertEqWith s "while a sweep that leaves them with alice changes nothing" (length (GameState.playerEffects kept)) 1
       Spec.assertEqWith s "so bob is still stopped there" (conditionalSilenceCasts S.bob kept) []
+
+-- The one activated ability at index `n` of what the PROJECTION hands out for
+-- `oid` -- not Face.activatedAbilities, which is the printed list a text change
+-- has not reached. Projection.abilitiesOf is the list Activate itself offers
+-- from, so this is the same ability a player would be given.
+projectedAbility :: Int -> ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+projectedAbility n oid gs = case drop n (Projection.abilitiesOf oid gs) of
+  ability : _ -> Just ability
+  [] -> Nothing
+
+-- Filters the offered set down to the recipient naming `oid`, whatever arm the
+-- pool wrapped it in -- a Pool.Creatures slot offers Recipient.ToCreature and a
+-- hand-built ToObject of the same permanent is a different recipient that CR
+-- 608.2b's re-read drops with no error.
+aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtCreature oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
+
+-- alice controls Liliana with four loyalty counters, one untapped Island (the
+-- {U} the changer costs) and two untapped Swamps; she holds an Artificial
+-- Evolution. Her graveyard holds a Whipstitched Zombie ({1}{B} Creature --
+-- Zombie 2/2) and a Cabal Evangel ({1}{B} Creature -- Human Cleric 2/2). The two
+-- graveyard cards cost the SAME, so no assertion below can turn on mana, and
+-- they differ in the subtype word alone -- which is the word the -3 names.
+--
+-- Two Swamps rather than three: the Island pays the {U} on the hacked board and
+-- goes unspent on the control, so both boards can still afford exactly one
+-- {1}{B} cast out of the graveyard.
+--
+-- Returns Liliana, the changer, the Zombie card, the Cleric card and the board.
+lilianaBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+lilianaBoard island swamp liliana evolution zombie evangel =
+  let (_, g1) = S.addCreature island S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addCreature swamp S.alice g1
+      (_, g3) = S.addCreature swamp S.alice g2
+      (lilianaId, g4) = S.addCreature liliana S.alice g3
+      (evolutionId, g5) = S.addHandCard evolution S.alice g4
+      (zombieId, g6) = S.addGraveyardCard zombie S.alice g5
+      (evangelId, g7) = S.addGraveyardCard evangel S.alice g6
+   in ( lilianaId,
+        evolutionId,
+        zombieId,
+        evangelId,
+        (S.addCounter CounterKind.Loyalty 4 lilianaId g7)
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- alice casts the Artificial Evolution at Liliana THE PERMANENT and lets it
+-- resolve. Aimed at the permanent rather than at a spell because Liliana is
+-- already on the battlefield -- Pawl.ActivateSpec's Tidal Warrior chain is the
+-- same road, and the reason the swap is visible to an ability activated
+-- afterwards is that the ability is enumerated off the projected permanent.
+hackLiliana :: ObjectId.ObjectId -> ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> GameState.GameState -> GameState.GameState
+hackLiliana lilianaId evolutionId from to before =
+  S.runPure (swapAt lilianaId from to) before $ do
+    S.cast S.alice evolutionId
+    Stack.resolveTop
+
+-- alice activates the loyalty ability at index `n` of what the projection hands
+-- out and resolves it. A board where Liliana has no such ability is returned
+-- untouched, which every case below catches by asserting on what the resolution
+-- did rather than only on what it did not.
+activateLoyalty :: (forall r. Prompt.Prompt r -> r) -> Int -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+activateLoyalty answer n lilianaId gs = case projectedAbility n lilianaId gs of
+  Nothing -> gs
+  Just ability ->
+    S.runPure answer gs $ do
+      Activate.activateAbility S.alice lilianaId ability
+      Stack.resolveTop
+
+-- alice controls Liliana with four loyalty counters over three untapped Swamps,
+-- and her library holds five copies of `stock` -- five rather than three so the
+-- +1's mill leaves cards behind and CR 104.3c decides nothing.
+lilianaMillBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+lilianaMillBoard swamp liliana stock =
+  let (lilianaId, g1) = S.addCreature liliana S.alice (S.landsInPlay swamp 3)
+      g2 = List.foldl' (\g _ -> snd (S.addLibraryCard stock S.alice g)) g1 [1 :: Int .. 5]
+   in ( lilianaId,
+        (S.addCounter CounterKind.Loyalty 4 lilianaId g2)
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Liliana, Untouched by Death {2}{B}{B} Legendary Planeswalker -- Liliana,
+-- loyalty 4 (Oracle text checked against Scryfall, 2026-08-27):
+--   +1: Mill three cards. If at least one Zombie card is milled this way, each
+--       opponent loses 2 life and you gain 2 life.
+--   -2: Target creature gets -X/-X until end of turn, where X is the number of
+--       Zombies you control.
+--   -3: You may cast Zombie spells from your graveyard this turn.
+--
+-- THE UNIT'S POINT is the -3 under an Artificial Evolution: CR 612.1's word swap
+-- has to reach the Filter inside the restriction a RESOLUTION stores over
+-- players, which is the half of Effect.AffectPlayers the duration case above
+-- leaves. Every printed producer of that shape is a permanent's ability rather
+-- than a spell -- Cherished Hatchling's dies-trigger is the only other one -- so
+-- the board is an activate-chain and reaches Projection.rewriteEffect through
+-- Projection.abilitiesOf rather than through a spell on the stack.
+--
+-- The +1 comes with it because it is the card's other subtype word, and because
+-- it is the only pooled reader of a MillTally: its "if at least one" is a clause
+-- condition comparing Quantity.InSlot against a literal, which nothing else
+-- exercises.
+lilianaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lilianaSpec s registry =
+  let board = do
+        island <- S.printingOf s registry "Island"
+        swamp <- S.printingOf s registry "Swamp"
+        liliana <- S.printingOf s registry "Liliana, Untouched by Death"
+        evolution <- S.printingOf s registry "Artificial Evolution"
+        zombie <- S.printingOf s registry "Whipstitched Zombie"
+        evangel <- S.printingOf s registry "Cabal Evangel"
+        pure (lilianaBoard island swamp liliana evolution zombie evangel)
+      millBoard stockName = do
+        swamp <- S.printingOf s registry "Swamp"
+        liliana <- S.printingOf s registry "Liliana, Untouched by Death"
+        stock <- S.printingOf s registry stockName
+        pure (lilianaMillBoard swamp liliana stock)
+   in Spec.describe s "LilianaUntouchedByDeath" $ do
+        -- The control, differing from the case below in the Artificial Evolution
+        -- alone: unhacked, the printed word stands and the ZOMBIE is the card
+        -- that becomes castable.
+        Spec.it s "CR 601.3 unhacked the -3 reaches the Zombie card and not the Cleric" $ do
+          (lilianaId, _, zombieId, evangelId, before) <- board
+          let after = activateLoyalty S.identityAnswer 2 lilianaId before
+          Spec.assertBool s (S.castable S.alice zombieId after) "the Zombie is castable out of the graveyard"
+          Spec.assertBool s (not (S.castable S.alice evangelId after)) "the Cleric is not"
+          Spec.assertBool s (any (S.isCastOf zombieId) (Action.legalActions S.alice after)) "and the Zombie is offered"
+          Spec.assertBool s (not (any (S.isCastOf evangelId) (Action.legalActions S.alice after))) "while the Cleric is not"
+          Spec.assertEqWith s "the ability really did store something" (length (GameState.playerEffects after)) 1
+
+        -- THE UNIT'S POINT. The same board with Zombie swapped for Cleric on
+        -- Liliana herself. The gameplay assertions lead, and they lead in BOTH
+        -- directions: an arm that dropped the descent would leave the restriction
+        -- naming Zombie, so the Zombie would still be castable and the Cleric
+        -- would not -- which is exactly the case above. Two graveyard cards of
+        -- the same cost are what separates "rewrote the word" from "dropped the
+        -- restriction", since dropping it would make both castable.
+        Spec.it s "CR 612.1/612.2 an Artificial Evolution on Liliana moves the -3 onto the new word" $ do
+          (lilianaId, evolutionId, zombieId, evangelId, before) <- board
+          let after = activateLoyalty S.identityAnswer 2 lilianaId (hackLiliana lilianaId evolutionId Subtype.Zombie Subtype.Cleric before)
+          Spec.assertBool s (S.castable S.alice evangelId after) "the Cleric is castable out of the graveyard"
+          Spec.assertBool s (not (S.castable S.alice zombieId after)) "and the Zombie no longer is"
+          Spec.assertBool s (any (S.isCastOf evangelId) (Action.legalActions S.alice after)) "the Cleric is offered"
+          Spec.assertBool s (not (any (S.isCastOf zombieId) (Action.legalActions S.alice after))) "while the Zombie is not"
+          Spec.assertBool s (PlayerEffect.mayCastFromGraveyard S.alice evangelId after) "the typed question agrees"
+          Spec.assertEqWith s "and exactly one restriction is stored" (length (GameState.playerEffects after)) 1
+
+        -- CR 612.2 again from the other side, and the reason the counts are TWO
+        -- and ONE rather than one apiece: alice controls two Whipstitched Zombies
+        -- and one Cabal Evangel, so the printed word measures -2/-2 and the
+        -- swapped one measures -1/-1. A board with one of each cannot tell them
+        -- apart. Berserkers of Blood Ridge is 4/4, so it survives either reading
+        -- and no state-based action has to run before the assertion.
+        Spec.it s "CR 612.2 the same hack moves the -2's count onto the new word" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          liliana <- S.printingOf s registry "Liliana, Untouched by Death"
+          evolution <- S.printingOf s registry "Artificial Evolution"
+          island <- S.printingOf s registry "Island"
+          zombie <- S.printingOf s registry "Whipstitched Zombie"
+          evangel <- S.printingOf s registry "Cabal Evangel"
+          berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+          let (_, g1) = S.addCreature island S.alice (S.landsInPlay swamp 2)
+              (lilianaId, g2) = S.addCreature liliana S.alice g1
+              (_, g3) = S.addCreature zombie S.alice g2
+              (_, g4) = S.addCreature zombie S.alice g3
+              (_, g5) = S.addCreature evangel S.alice g4
+              (victim, g6) = S.addCreature berserkers S.bob g5
+              (evolutionId, g7) = S.addHandCard evolution S.alice g6
+              ready =
+                (S.addCounter CounterKind.Loyalty 4 lilianaId g7)
+                  { GameState.phase = Phase.PrecombatMain,
+                    GameState.activePlayer = S.alice,
+                    GameState.priority = Just S.alice
+                  }
+              plain = activateLoyalty (aimAtCreature victim) 1 lilianaId ready
+              swapped = activateLoyalty (aimAtCreature victim) 1 lilianaId (hackLiliana lilianaId evolutionId Subtype.Zombie Subtype.Cleric ready)
+          Spec.assertEqWith s "unhacked the two Zombies are counted" (Projection.powerOf victim plain) (Just 2)
+          Spec.assertEqWith s "hacked the one Cleric is counted instead" (Projection.powerOf victim swapped) (Just 3)
+          Spec.assertEqWith s "and the toughness follows the same count" (Projection.toughnessOf victim swapped) (Just 3)
+
+        -- The +1's tally HIT: three Zombie cards milled, so the clause condition
+        -- comparing Quantity.InSlot against one holds and the drain happens.
+        Spec.it s "CR 701.17 the +1 drains when a Zombie card is milled" $ do
+          (lilianaId, before) <- millBoard "Whipstitched Zombie"
+          let after = activateLoyalty S.identityAnswer 0 lilianaId before
+          Spec.assertEqWith s "bob lost two life" (S.lifeOf S.bob after) (Just 18)
+          Spec.assertEqWith s "alice gained two" (S.lifeOf S.alice after) (Just 22)
+          Spec.assertEqWith s "and three cards were milled" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 3
+
+        -- The tally MISS, the same board with the milled cards' subtype the only
+        -- difference: nothing counted, so the gate refuses and neither life total
+        -- moves. Without this the case above would pass on an arm that ignored
+        -- the condition entirely.
+        Spec.it s "CR 701.17 the +1 does not drain when no Zombie card is milled" $ do
+          (lilianaId, before) <- millBoard "Swamp"
+          let after = activateLoyalty S.identityAnswer 0 lilianaId before
+          Spec.assertEqWith s "bob is untouched" (S.lifeOf S.bob after) (Just 20)
+          Spec.assertEqWith s "so is alice" (S.lifeOf S.alice after) (Just 20)
+          Spec.assertEqWith s "and three cards were still milled" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 3
 
 -- Loaded fresh inside each case that needs it -- equivalent because loading
 -- is deterministic and cached (batch-recipe.md).
@@ -4836,6 +5049,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   blossomingCalmSpec s registry
   conditionalSilenceSpec s registry
   hackedSilenceSpec s registry
+  lilianaSpec s registry
   extraLandDropsSpec s registry
   matchesObjectSpec s registry
   vedalkenOrrerySpec s registry

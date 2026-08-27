@@ -19,11 +19,13 @@ import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 -- of the game rather than the characteristics of an object. The player analogue
 -- of Pawl.Types.Modification, and NOT a member of it: CR 613.1's layers compute
 -- an OBJECT's characteristics, while CR 613.10 and 613.11 apply these AFTER that
--- machine has run. There is no Layer constructor here and Pawl.Engine.Projection
--- never sees this type.
+-- machine has run. There is no Layer constructor here.
 --
--- Open-half card data. Pawl.Engine.PlayerEffect is the ONLY module that may case
--- on it.
+-- Open-half card data. Pawl.Engine.PlayerEffect is the only module that may case
+-- on it to ask what an effect MEANS. Pawl.Engine.Projection cases on it in
+-- rewritePlayerEffect alone, and only for CR 612.1's word swap, which walks the
+-- STRUCTURE for a Filter and asks nothing else -- the same standing rewriteEffect
+-- has over Pawl.Types.Effect.
 data PlayerEffect
   = -- | CR 601.3 / Silence: this player can't cast spells at all.
     CantCastSpells
