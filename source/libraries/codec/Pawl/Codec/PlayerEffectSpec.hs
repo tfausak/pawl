@@ -72,7 +72,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost Filter.IsHostOfSource 3))
+      (PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost Filter.IsHostOfSource Nothing 3))
       " {\"type\":\"IncreaseActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"IsHostOfSource\"},\"amount\":3}} "
   -- CR 613.11 / 601.2f / Sapphire Medallion.
   Spec.it s "ReduceSpellCost" $

@@ -3373,7 +3373,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 601.2f at the ACTIVATION moment, Oppressive Rays' third line. Its Filter
   -- names the ability's SOURCE PERMANENT, exactly as ReduceActivationCost's
   -- below does, and it carries no grantedBy for that arm's comment to be about.
-  PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f _) -> [f]
+  PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f _ _) -> [f]
   PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _ _) -> [f]
   -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE
   -- PERMANENT rather than a spell, and is authored the same way. The grantedBy

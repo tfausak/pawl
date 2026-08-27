@@ -2556,6 +2556,10 @@ takesIgnusOnce ignusId p = case p of
 --     Sacrifice this creature: Add {R}{R}{R}"). The Golem is a creature, so the
 --     {3} is a {2}, and the floor at one mana is not reached.
 --
+--   * the INCREASE -- Suppression Field ("Activated abilities cost {2} more to
+--     activate unless they're mana abilities"), whose "unless" is CR 605.1a's
+--     classification and reaches this seam by NOT applying here at all.
+--
 --   * the ADDITIONAL COST -- Drought ("Activated abilities cost an additional
 --     \"Sacrifice a Swamp\" to activate for each black mana symbol in their
 --     activation costs") on Transmogrant Altar's "{B}, {T}, Sacrifice a
@@ -2657,6 +2661,50 @@ activationAdjustmentSpec s registry = Spec.describe s "CR 601.2f a mana ability'
     Spec.assertBool s (not (casts taxed)) "CR 118.3 the Altar is no supply, so the Birds' one mana is the whole board and {3} is out of reach"
     Spec.assertBool s (casts untaxed) "without the Drought the Birds pays the {B} and the Altar's three colorless pay the {3}"
 
+  -- CR 605.1a's rider on the INCREASE half, which the two halves above have no
+  -- producer for: Suppression Field ("Activated abilities cost {2} more to
+  -- activate unless they're mana abilities", checked against Scryfall) is the
+  -- pool's, and its "unless" is a fact about the ABILITY rather than about the
+  -- permanent the increase's Filter is asked of.
+  --
+  -- The MANA half is the proving one, and it is proved at the PAYMENT: the offer
+  -- gate builds `plusComponents adjustments printedCost`, which adds only
+  -- components, and manaPartPayable then short-circuits on a Mountain's empty
+  -- mana part -- so the tap is on the menu whether the {2} reaches it or not, and
+  -- a case enumerating legal actions would read the same either way. What tells
+  -- the two readings apart is whether the tap PAYS: a lone {2} the Mountain has
+  -- no way to produce leaves the pool empty.
+  --
+  -- Three Mountains and not one, so that the taxed reading has a board it could
+  -- plausibly pay {2} on -- except that every Mountain is taxed the same {2}, so
+  -- there is no mana anywhere on it.
+  Spec.it s "CR 605.1a an increase that spares mana abilities does not reach one" $ do
+    field <- S.printingOf s registry "Suppression Field"
+    brothers <- S.printingOf s registry "Brothers of Fire"
+    mountain <- S.printingOf s registry "Mountain"
+    let (mountainId, _, taxed) = suppressionFieldBoard brothers mountain (Just field)
+        (_, _, printed) = suppressionFieldBoard brothers mountain Nothing
+        run gs = snd (State.evalState (Engine.runGame (takesSourceOnce mountainId) gs Engine.priorityLoop) (0 :: Int))
+    Spec.assertEqWith s "CR 605.1a the Field's {2} does not reach the Mountain's mana ability, so its {R} floats" (poolTypes S.alice (run taxed)) [ManaType.Colored Color.Red]
+    Spec.assertEqWith s "the same tap on the same board without the Field" (poolTypes S.alice (run printed)) [ManaType.Colored Color.Red]
+    Spec.assertEqWith s "one Mountain paid for it, and the other two were not asked to" (S.tappedCount S.alice (run taxed)) 1
+
+  -- The other side of the same sentence, and the reason the case above is not
+  -- passing because the card was transcribed as a {0}: Brothers of Fire ("{1}{R}{R},
+  -- {T}: Brothers of Fire deals 1 damage to any target") is no mana ability, so
+  -- the same Field taxes it to {3}{R}{R} and three Mountains stop paying for it.
+  -- Here in ManaSpec rather than in Pawl.PlayerEffectSpec because it is the half
+  -- of ONE card the case above rests on.
+  Spec.it s "CR 601.2f the same increase does reach an ability that is not one" $ do
+    field <- S.printingOf s registry "Suppression Field"
+    brothers <- S.printingOf s registry "Brothers of Fire"
+    mountain <- S.printingOf s registry "Mountain"
+    let (_, brothersId, taxed) = suppressionFieldBoard brothers mountain (Just field)
+        (_, _, printed) = suppressionFieldBoard brothers mountain Nothing
+        offers gs = length (filter (isActivationOf brothersId) (Action.legalActions S.alice gs))
+    Spec.assertEqWith s "CR 601.2f three Mountains cannot pay the taxed {3}{R}{R}" (offers taxed) 0
+    Spec.assertEqWith s "and pay the printed {1}{R}{R} on the same board without the Field" (offers printed) 1
+
 -- alice, active, in her precombat main phase: one Coal Golem, two Mountains, and
 -- the Heartstone or not. Returns the Golem.
 golemBoard :: Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
@@ -2667,6 +2715,19 @@ golemBoard golem mountain heartstone =
         Nothing -> g2
         Just printing -> snd (S.addCreature printing S.alice g2)
    in (golemId, g3 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+
+-- alice, active, in her precombat main phase: three Mountains, one Brothers of
+-- Fire, and the Suppression Field or not. Returns the first Mountain and the
+-- Brothers -- one mana ability and one ability that is not one.
+suppressionFieldBoard :: Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+suppressionFieldBoard brothers mountain field =
+  let (mountainId, g1) = S.addCreature mountain S.alice (Setup.emptyGame S.bothPlayers)
+      g2 = foldr (\_ gs -> snd (S.addCreature mountain S.alice gs)) g1 [1 :: Int, 2]
+      (brothersId, g3) = S.addCreature brothers S.alice g2
+      g4 = case field of
+        Nothing -> g3
+        Just printing -> snd (S.addCreature printing S.alice g3)
+   in (mountainId, brothersId, g4 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
 
 -- alice, active, in her precombat main phase: one Transmogrant Altar, one Goblin
 -- Piker for the printed sacrifice, one `blackSource` for the {B} -- a Swamp
