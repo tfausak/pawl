@@ -1637,10 +1637,11 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
 -- The EXILE assertions below are CR 400.7g's, and this group is where that rule
 -- is proved: "if an effect grants a nonland card an ability that allows it to be
 -- cast, that ability will continue to apply to the new object that card became
--- after it moved to the stack". The grant is anchored to the graveyard object's
--- id, CR 601.2a mints a new one, and only the carry across that move
--- (Pawl.Engine.Cast.keywordsBefore) can still arm rule 702.34a's second static
--- ability on the spell.
+-- after it moved to the stack". Neither grant survives CR 601.2a's move -- one
+-- is derived from the card as it lies in the graveyard and the other is anchored
+-- to that object's id, and the move mints a new one either way -- so only the
+-- carry across it (Pawl.Engine.Cast.keywordsBefore) can still arm rule 702.34a's
+-- second static ability on the spell.
 --
 -- Viral Spawning {2}{G} Sorcery is the producer: "Create a 3/3 green Phyrexian
 -- Beast creature token with toxic 1." plus "Corrupted -- As long as an opponent
