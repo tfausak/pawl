@@ -14,6 +14,7 @@
 -- card JSON to the card in hand.
 module Pawl.OutsideTheGameSpec where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -21,12 +22,15 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.OutsideTheGame as OutsideTheGame
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -178,3 +182,30 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
     -- CR 400.11a / 400.11: the sideboard is outside the game, and outside the game
     -- is not a zone -- so setup mints no object for any of it.
     Spec.assertEqWith s "and no object was minted for any of them" (Map.size (GameState.objects after)) 0
+  -- CR 729.4: a subgame's own view of the main game. Alice's creature sits
+  -- on the PARENT's battlefield; Setup.subgameStateFrom moves it into
+  -- GameState.outsideObjects (CR 729.4, "all objects in the main game ... are
+  -- considered outside the subgame"), and a wish cast IN the subgame can reach
+  -- it just as it reaches the sideboard pool. Called at the unit level --
+  -- `OutsideTheGame.reveal` directly -- rather than through a printed wish,
+  -- since Living Wish's own casting is not this unit's concern.
+  Spec.it s "CR 729.4/729.4a a wish cast in a subgame reaches a main-game creature" $ do
+    bear <- S.printingOf s registry "Prodigal Sorcerer"
+    let (bearId, parent) = S.addCreature bear S.alice (Setup.emptyGame S.bothPlayers)
+        sub = Setup.subgameStateFrom S.alice parent
+        predicate = Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Land]
+        after = snd (Engine.runGamePure S.identityAnswer sub (OutsideTheGame.reveal predicate bearId S.alice))
+    Spec.assertEqWith s "CR 729.4/400.11c: the main-game creature arrives in her subgame hand" (printingsIn Zone.Hand S.alice after) [bear]
+    Spec.assertEqWith s "CR 729.4a: the crossing is recorded for the outer frame to apply" (Foldable.toList (GameState.broughtIn after)) [bearId]
+    Spec.assertEqWith s "and it is no longer offered" (Map.member bearId (GameState.outsideObjects after)) False
+  -- CR 108.3b: the reach outside the game is scoped to the acting player's OWN
+  -- cards. Bob's creature sits in the same outsideObjects map; alice's wish must
+  -- not see it.
+  Spec.it s "CR 108.3b a main-game creature owned by another player is not offered" $ do
+    bear <- S.printingOf s registry "Prodigal Sorcerer"
+    let (bobsBearId, parent) = S.addCreature bear S.bob (Setup.emptyGame S.bothPlayers)
+        sub = Setup.subgameStateFrom S.alice parent
+        predicate = Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Land]
+        after = snd (Engine.runGamePure S.identityAnswer sub (OutsideTheGame.reveal predicate bobsBearId S.alice))
+    Spec.assertEqWith s "alice's hand stays empty: bob's creature is not hers to reach" (printingsIn Zone.Hand S.alice after) []
+    Spec.assertEqWith s "and bob's card is untouched" (Map.member bobsBearId (GameState.outsideObjects after)) True

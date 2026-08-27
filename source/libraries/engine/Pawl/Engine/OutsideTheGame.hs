@@ -21,6 +21,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
@@ -37,6 +38,7 @@ import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.OutsideCard as OutsideCard
+import qualified Pawl.Types.OutsideObject as OutsideObject
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -60,9 +62,13 @@ import qualified Pawl.Types.Zone as Zone
 -- braces -- and cheap enough to keep, since a caller assembling this map by hand
 -- would otherwise offer a card that is no longer out there.
 --
--- Every candidate here is an OutsideCard.InPool: this only reaches CR 103.2a's
--- sideboard pool. CR 729.4's main-game objects (GameState.outsideObjects) are
--- not read yet (gap #152) -- wiring that in is a later unit's job, not this one's.
+-- Two sources feed this, both read the same way: CR 103.2a's sideboard pool
+-- (OutsideCard.InPool) and, when this game is a subgame, CR 729.4's main-game
+-- objects held in GameState.outsideObjects (OutsideCard.InAnotherGame). The
+-- same `admits` reads both through the PRINTED FACE, since CR 729.1b gives a
+-- main-game effect no meaning inside the subgame -- a main-game object is read
+-- as its card, not as its (subgame-invisible) projected characteristics, which
+-- is why OutsideObject carries no characteristics of its own.
 eligible :: Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> PlayerId -> GameState.GameState -> [OutsideCard.OutsideCard]
 eligible predicate source pid gs =
   let pool = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs))
@@ -70,7 +76,17 @@ eligible predicate source pid gs =
       admits printingId = case Game.cardOfPrinting printingId gs of
         Nothing -> False
         Just card -> Filter.matches context (Projection.viewOfCard (Game.resolveFaceFor Nothing card)) predicate
-   in [OutsideCard.InPool printingId | (printingId, n) <- Map.toAscList pool, n > 0, admits printingId]
+      fromPool = [OutsideCard.InPool printingId | (printingId, n) <- Map.toAscList pool, n > 0, admits printingId]
+      -- CR 108.3b scopes the reach to the acting player's OWN cards outside the
+      -- game -- the owner guard below is that scope, not an ownership check on
+      -- the pool (which is already per-player).
+      fromOuter =
+        [ OutsideCard.InAnotherGame oid
+        | (oid, entry) <- Map.toAscList (GameState.outsideObjects gs),
+          OutsideObject.owner entry == pid,
+          admits (OutsideObject.printing entry)
+        ]
+   in fromPool <> fromOuter
 
 -- CR 400.11c \/ 701.20a: reveal a card this player owns from outside the game
 -- matching the Filter and put it into their hand -- Burning Wish's sentence.
@@ -119,18 +135,19 @@ reveal predicate source pid = do
         OutsideCard.InPool printingId -> do
           oid <- State.state (bringIn pid printingId)
           Event.reveal RevealCause.Ordinary pid oid
-        -- `eligible` above offers only OutsideCard.InPool this unit -- CR 729.4's
-        -- main-game half is not wired in yet (gap #152), so this arm is unreached
-        -- until that lands.
-        OutsideCard.InAnotherGame _ -> pure ()
+        OutsideCard.InAnotherGame outerId -> do
+          gs1 <- State.get
+          case bringInFrom pid outerId gs1 of
+            (Nothing, _) -> pure ()
+            (Just oid, gs2) -> do
+              State.put gs2
+              Event.reveal RevealCause.Ordinary pid oid
 
--- CR 400.11b: take one copy of this printing out of the player's pool and mint
--- the card into their hand. Split out from `reveal` above because it is the half
--- every other road into the game will want -- CR 727.2's restart (#135), CR
--- 707.13's copy created outside the game (#888) and a subgame reaching into the
--- supergame (#152) -- and none of those reveals anything.
-bringIn :: PlayerId -> PrintingId.PrintingId -> GameState.GameState -> (ObjectId, GameState.GameState)
-bringIn pid printingId gs =
+-- The object construction and hand-insertion `bringIn` and `bringInFrom` share
+-- -- everything about arriving except what is spent to get there. Split out so
+-- neither road duplicates Object.MkObject's field list.
+mint :: PlayerId -> PrintingId.PrintingId -> GameState.GameState -> (ObjectId, GameState.GameState)
+mint pid printingId gs =
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
@@ -175,16 +192,45 @@ bringIn pid printingId gs =
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }
-      -- One copy, not the entry: CR 100.2a's four-card limit is applied to the
-      -- combined deck and sideboard (CR 100.4a), so copies of a card are COUNTED
-      -- and a player who set aside two can be brought the second one later.
-      spend n = if n <= 1 then Nothing else Just (n - 1)
-      spent p = p {Player.outsideTheGame = Map.update spend printingId (Player.outsideTheGame p)}
-      gs3 =
+   in ( oid,
         Game.insertIntoZone
           Zone.Hand
           LibraryPosition.defaultValue
           pid
           oid
           gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2)}
-   in (oid, gs3 {GameState.players = Map.adjust spent pid (GameState.players gs3)})
+      )
+
+-- CR 400.11b: take one copy of this printing out of the player's pool and mint
+-- the card into their hand. Split out from `reveal` above because it is the half
+-- every other road into the game will want -- CR 727.2's restart (#135) and CR
+-- 707.13's copy created outside the game (#888) -- and none of those reveals
+-- anything.
+bringIn :: PlayerId -> PrintingId.PrintingId -> GameState.GameState -> (ObjectId, GameState.GameState)
+bringIn pid printingId gs =
+  let (oid, gs1) = mint pid printingId gs
+      -- One copy, not the entry: CR 100.2a's four-card limit is applied to the
+      -- combined deck and sideboard (CR 100.4a), so copies of a card are COUNTED
+      -- and a player who set aside two can be brought the second one later.
+      spend n = if n <= 1 then Nothing else Just (n - 1)
+      spent p = p {Player.outsideTheGame = Map.update spend printingId (Player.outsideTheGame p)}
+   in (oid, gs1 {GameState.players = Map.adjust spent pid (GameState.players gs1)})
+
+-- CR 729.4a: bring in a card from a game that is on hold. The entry is dropped
+-- and the OUTER id is appended to GameState.broughtIn, which is the whole record
+-- the outer frame needs: this game cannot reach that game's state, and must
+-- not (CR 729.1a keeps the two apart while the subgame runs). `Nothing` when
+-- the id no longer names an outside entry -- a second wish reaching for a card
+-- something already brought in -- mirrors `bringIn`'s own belt-on-braces guard
+-- for a spent InPool entry.
+bringInFrom :: PlayerId -> ObjectId -> GameState.GameState -> (Maybe ObjectId, GameState.GameState)
+bringInFrom pid outerId gs = case Map.lookup outerId (GameState.outsideObjects gs) of
+  Nothing -> (Nothing, gs)
+  Just entry ->
+    let (oid, gs1) = mint pid (OutsideObject.printing entry) gs
+     in ( Just oid,
+          gs1
+            { GameState.outsideObjects = Map.delete outerId (GameState.outsideObjects gs1),
+              GameState.broughtIn = GameState.broughtIn gs1 Seq.|> outerId
+            }
+        )
