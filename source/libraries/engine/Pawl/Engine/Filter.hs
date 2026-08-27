@@ -324,6 +324,20 @@ data View = MkView
     -- | CR 110.5a's tap status. Not a characteristic, so no projection writes it;
     -- read straight off the object.
     tapped :: Bool,
+    -- | CR 110.5's other status category, and read exactly as `tapped` above is:
+    -- status is not a characteristic (CR 110.5a), so no projection writes it and
+    -- Pawl.Engine.Projection.viewOfCharacteristics reads Object.facing straight
+    -- off the object.
+    --
+    -- Scoped to the BATTLEFIELD there, unlike `tapped` and like `transformed`
+    -- below: CR 110.5d gives status to permanents alone, and Pawl.Types.Facing is
+    -- deliberately not so scoped -- CR 708.4 has a face-down SPELL carrying the
+    -- same value while it waits on the stack. Never Object.exiledFaceDown, which
+    -- CR 110.5d says has no correlation to this.
+    --
+    -- False for every candidate with no permanent behind it: a printed face, a
+    -- player, an event snapshot. Each says so at its own site.
+    faceDown :: Bool,
     -- | CR 701.27g's "transformed permanent": a double-faced permanent on the
     -- battlefield with its back face up. Not a characteristic either (CR
     -- 712.8d/e make which face is up the thing characteristics are read off), so
@@ -551,6 +565,9 @@ playerView pid =
       -- CR 111.1: a token represents a PERMANENT, and a player is not one.
       token = False,
       tapped = False,
+      -- CR 110.5d gives status to PERMANENTS, and CR 109.1 makes a player none of
+      -- those either -- the line below's reason, one status category over.
+      faceDown = False,
       -- CR 701.27g asks about a PERMANENT, and CR 109.1 makes a player none.
       transformed = False,
       -- CR 122.1 puts counters on an object OR a player, and a player's are
@@ -1056,6 +1073,10 @@ matches context view predicate = case predicate of
   -- makes a token's characteristics equivalent to a card's.
   Filter.IsToken -> token view
   Filter.IsTapped -> tapped view
+  -- CR 110.5, the same status one category over, and the battlefield scoping is
+  -- inside the field for Transformed's reason: see the atom's own comment in
+  -- Pawl.Types.Filter.
+  Filter.IsFaceDown -> faceDown view
   -- CR 701.27g, both exclusions inside the field: see the atom's own comment in
   -- Pawl.Types.Filter, and the field below.
   Filter.Transformed -> transformed view
@@ -1200,6 +1221,7 @@ rewrite pairs predicate = case predicate of
   Filter.CanAttachToSubject -> predicate
   Filter.IsToken -> predicate
   Filter.IsTapped -> predicate
+  Filter.IsFaceDown -> predicate
   Filter.Transformed -> predicate
   Filter.IsRingBearer -> predicate
   Filter.HasDesignation _ -> predicate
@@ -1591,6 +1613,7 @@ bakeBound players predicate = case predicate of
   Filter.CanAttachToSubject -> predicate
   Filter.IsToken -> predicate
   Filter.IsTapped -> predicate
+  Filter.IsFaceDown -> predicate
   Filter.Transformed -> predicate
   Filter.IsRingBearer -> predicate
   Filter.HasDesignation _ -> predicate
@@ -1680,6 +1703,7 @@ manaValueThresholds predicate = case predicate of
   Filter.CanAttachToSubject -> []
   Filter.IsToken -> []
   Filter.IsTapped -> []
+  Filter.IsFaceDown -> []
   Filter.Transformed -> []
   Filter.IsRingBearer -> []
   Filter.HasDesignation _ -> []
@@ -1782,6 +1806,7 @@ statesAQuality predicate = case predicate of
   Filter.CanAttachToSubject -> True
   Filter.IsToken -> True
   Filter.IsTapped -> True
+  Filter.IsFaceDown -> True
   Filter.Transformed -> True
   Filter.IsRingBearer -> True
   Filter.HasDesignation _ -> True

@@ -164,6 +164,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   manifestDreadSpec s registry
   enteringFaceDownSpec s registry
   faceUpEffectSpec s registry
+  breakOpenSpec s registry
   disguiseSpec s registry
 
 -- CR 303.4k: an Aura turned face up, choosing what it becomes attached to.
@@ -1894,6 +1895,129 @@ faceUpEffectSpec s registry = Spec.describe s "TurnFaceUp (CR 701.40g)" $ do
         Spec.assertEqWith s "CR 708.7 the counter down the creature road" (S.counterOf CounterKind.PlusOnePlusOne creatureWatcher creatureAfter) 1
         Spec.assertEqWith s "CR 110.5 and that one is face up" (fmap Object.facing (Game.lookupObject creaturePermanent creatureAfter)) (Just Facing.FaceUp)
       _ -> Spec.assertFailure s "the manifest did not reach the battlefield"
+
+-- One card from `pid`'s library onto the battlefield FACE DOWN under their own
+-- control, through the EntryRiders.faceDown door putOntoBattlefield above takes
+-- -- parameterized by the player, which that one is not. Settled rather than run
+-- through the priority loop: CR 708.3 silences an enters trigger on a permanent
+-- that entered face down, so there is nothing on the stack to resolve.
+--
+-- Nothing if the move did not land.
+enterFaceDown :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (GameState.GameState, Maybe ObjectId.ObjectId)
+enterFaceDown printing pid gs =
+  let (oid, g1) = S.addLibraryCard printing pid gs
+      riders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Just (FaceDownState.defaultFor FaceDownReason.Manifested)}
+      (entered, moved) = Engine.runGamePure S.identityAnswer g1 (Event.changeZoneEntering oid Zone.Battlefield LibraryPosition.defaultValue riders (Just pid))
+   in (S.settleSba moved, entered)
+
+-- THE BOARD Break Open's target slot is discriminated on, returned as (the
+-- board, the spell, bob's face-down permanent, bob's FACE-UP creature, alice's
+-- own face-down permanent).
+--
+-- Three permanents, because the slot's filter is a CONJUNCTION and each conjunct
+-- needs an object only it rejects:
+--
+--   * bob's face-down Thragtusk -- the only legal target, and the only permanent
+--     any correct reading admits.
+--   * bob's face-up Hill Giant -- rejected by IsFaceDown alone. Without that
+--     conjunct it is a legal target, and Break Open on a FACE-UP creature is a
+--     no-op (CR 708.8 has nothing to turn), so the wrong choice shows up as the
+--     Thragtusk never turning over rather than as an error.
+--   * alice's face-down Ainok Tracker -- rejected by ControlledBy Opponent
+--     alone. Without that conjunct it is a legal target and turns over instead.
+--
+-- A board missing either bystander cannot tell a correct filter from one missing
+-- the conjunct that rejects it: the two conjuncts would agree on every object.
+--
+-- The three cards are DIFFERENT and none is CR 708.2a's 2/2 -- Thragtusk a 5/3
+-- Beast, Ainok Tracker a 3/3 Dog Scout, Hill Giant a 3/3 Giant -- so which
+-- permanent turned over is read off its printed NAME (CR 708.8), which a
+-- face-down permanent does not have (CR 708.2a).
+--
+-- Two Mountains, which is Break Open's {1}{R} exactly, and a Goblin Piker left
+-- in each library so CR 104.3c has nothing to fire on.
+breakOpenBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, Maybe ObjectId.ObjectId, ObjectId.ObjectId, Maybe ObjectId.ObjectId)
+breakOpenBoard s registry = do
+  breakOpen <- S.printingOf s registry "Break Open"
+  mountain <- S.printingOf s registry "Mountain"
+  thragtusk <- S.printingOf s registry "Thragtusk"
+  tracker <- S.printingOf s registry "Ainok Tracker"
+  giant <- S.printingOf s registry "Hill Giant"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (g1, spell) = S.handOne breakOpen (S.landsInPlay mountain 2)
+      (theirs, g2) = S.addCreature giant S.bob g1
+      (_, g3) = S.addLibraryCard piker S.alice g2
+      (_, g4) = S.addLibraryCard piker S.bob g3
+      (g5, theirFaceDown) = enterFaceDown thragtusk S.bob g4
+      (g6, myFaceDown) = enterFaceDown tracker S.alice g5
+  pure (g6, spell, theirFaceDown, theirs, myFaceDown)
+
+-- CR 110.5 / 110.5d: "target face-down creature an opponent controls", the
+-- filter atom Filter.IsFaceDown is and the conjunct beside it.
+--
+-- Break Open {1}{R} Instant (ONS), "Turn target face-down creature an opponent
+-- controls face up." (name, cost, type line and Oracle text checked against
+-- api.scryfall.com, 2026-08-27 -- the "an opponent controls" clause is errata and
+-- is in the current Oracle text).
+--
+-- CR 708.2a is what makes the base pool admit the target at all: a face-down
+-- permanent IS a creature, so Pool.Creatures gathers it and the filter narrows
+-- from there. The atom reads Object.facing and never Object.exiledFaceDown, which
+-- CR 110.5d says has no correlation to it.
+--
+-- The two negative legs are the SAME board with the SAME answerer predicate
+-- pointed elsewhere: S.preferring falls back to the smallest legal recipient when
+-- its predicate admits none, so aiming at an inadmissible permanent asks the
+-- engine's own candidate set what it holds.
+breakOpenSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+breakOpenSpec s registry = Spec.describe s "IsFaceDown (CR 110.5)" $ do
+  Spec.it s "CR 110.5 Break Open turns the opponent's face-down creature face up" $ do
+    thragtusk <- S.printingOf s registry "Thragtusk"
+    (before, spell, theirFaceDown, theirs, myFaceDown) <- breakOpenBoard s registry
+    case (theirFaceDown, myFaceDown) of
+      (Just victim, Just mine) -> do
+        -- The fixture's positives: all three permanents start as the board's
+        -- comment says, so nothing below can pass because a manifest missed.
+        Spec.assertEqWith s "CR 701.40a bob's is face down" (fmap Object.facing (Game.lookupObject victim before)) (Just (Facing.faceDown FaceDownReason.Manifested))
+        Spec.assertEqWith s "and alice's own is too" (fmap Object.facing (Game.lookupObject mine before)) (Just (Facing.faceDown FaceDownReason.Manifested))
+        Spec.assertEqWith s "and bob's Hill Giant is face up" (fmap Object.facing (Game.lookupObject theirs before)) (Just Facing.FaceUp)
+        let after = S.settleSba (S.runPure (aimedAt victim) before (S.cast S.alice spell >> Stack.resolveTop))
+        -- THE GAMEPLAY ASSERTION.
+        Spec.assertEqWith s "CR 708.8 the opponent's face-down creature turned face up" (fmap Object.facing (Game.lookupObject victim after)) (Just Facing.FaceUp)
+        Spec.assertEqWith s "CR 708.8 and answers to its printed name" (Projection.namesOf victim after) (Set.singleton (S.printingName thragtusk))
+        Spec.assertEqWith s "and alice's own is untouched" (fmap Object.facing (Game.lookupObject mine after)) (Just (Facing.faceDown FaceDownReason.Manifested))
+      _ -> Spec.assertFailure s "the face-down permanents did not reach the battlefield"
+
+  -- WHAT THE ATOM ITSELF BUYS: bob's FACE-UP Hill Giant is a creature bob
+  -- controls, so ControlledBy Opponent admits it and only CR 110.5's status
+  -- keeps it out. The answerer asks for it by name; a correct filter never
+  -- offers it and the Thragtusk turns over instead.
+  Spec.it s "CR 110.5 a face-up creature the opponent controls is not a legal target" $ do
+    (before, spell, theirFaceDown, theirs, myFaceDown) <- breakOpenBoard s registry
+    case (theirFaceDown, myFaceDown) of
+      (Just victim, Just mine) -> do
+        let after = S.settleSba (S.runPure (aimedAt theirs) before (S.cast S.alice spell >> Stack.resolveTop))
+        -- THE GAMEPLAY ASSERTION, and it is the one the Giant's admission would
+        -- change: Break Open aimed at a face-up permanent turns nothing over, so
+        -- the Thragtusk still being face down is what a missing IsFaceDown looks
+        -- like on the board.
+        Spec.assertEqWith s "CR 110.5 the face-down creature is what was turned over" (fmap Object.facing (Game.lookupObject victim after)) (Just Facing.FaceUp)
+        Spec.assertEqWith s "CR 110.5b and the Hill Giant is still face up, having never been one" (fmap Object.facing (Game.lookupObject theirs after)) (Just Facing.FaceUp)
+        Spec.assertEqWith s "and alice's own is still face down" (fmap Object.facing (Game.lookupObject mine after)) (Just (Facing.faceDown FaceDownReason.Manifested))
+      _ -> Spec.assertFailure s "the face-down permanents did not reach the battlefield"
+
+  -- THE OTHER CONJUNCT, and the reason the atom does not ship alone: alice's own
+  -- face-down Ainok Tracker satisfies IsFaceDown and is kept out by ControlledBy
+  -- Opponent. Without it Break Open would read "target face-down creature", which
+  -- is the pre-errata text this card is NOT.
+  Spec.it s "CR 109.5 alice's own face-down creature is not a legal target" $ do
+    (before, spell, theirFaceDown, _, myFaceDown) <- breakOpenBoard s registry
+    case (theirFaceDown, myFaceDown) of
+      (Just victim, Just mine) -> do
+        let after = S.settleSba (S.runPure (aimedAt mine) before (S.cast S.alice spell >> Stack.resolveTop))
+        Spec.assertEqWith s "CR 110.5 alice's own face-down creature stayed face down" (fmap Object.facing (Game.lookupObject mine after)) (Just (Facing.faceDown FaceDownReason.Manifested))
+        Spec.assertEqWith s "CR 708.8 and bob's turned over instead" (fmap Object.facing (Game.lookupObject victim after)) (Just Facing.FaceUp)
+      _ -> Spec.assertFailure s "the face-down permanents did not reach the battlefield"
 
 -- CR 702.168 disguise: rule 702.37's twin, and the one place rule 708.2's "no
 -- characteristics other than those LISTED" has a keyword in the list.

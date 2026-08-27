@@ -324,6 +324,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.CanAttachToSubject -> predicate
   Filter.Type.IsToken -> predicate
   Filter.Type.IsTapped -> predicate
+  Filter.Type.IsFaceDown -> predicate
   Filter.Type.Transformed -> predicate
   Filter.Type.IsRingBearer -> predicate
   Filter.Type.HasDesignation _ -> predicate
@@ -695,6 +696,10 @@ viewOfSnapshot mController isToken snapshot =
       -- not a characteristic, so the arm supplies it above.
       Filter.token = isToken,
       Filter.tapped = False,
+      -- CR 110.5a says status is not a characteristic, and CR 608.2h's record is
+      -- of characteristics -- so a snapshot holds nothing to answer this with,
+      -- `tapped` above's reason one status category over.
+      Filter.faceDown = False,
       -- CR 701.27g asks about a permanent ON THE BATTLEFIELD, and a snapshot is
       -- a record of a past event rather than an object standing on one -- there
       -- is no id here to ask which face is up. No card in the pool counts

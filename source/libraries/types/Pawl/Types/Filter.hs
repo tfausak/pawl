@@ -793,6 +793,31 @@ data Filter keyword
     -- IsToken it is not immutable -- a permanent taps and untaps constantly --
     -- but mutability is not what filterReads asks about.
     IsTapped
+  | -- | CR 110.5: the candidate is a FACE-DOWN permanent -- the other value of
+    -- the same status category IsTapped reads one of. Break Open's "target
+    -- face-down creature an opponent controls" is this atom beside a ControlledBy
+    -- Opponent conjunct, the split Transformed's comment describes. "Face up" is
+    -- spelled `Not IsFaceDown`, the one-relation-one-spelling posture IsToken's
+    -- comment states (#163).
+    --
+    -- The battlefield conjunct is the atom's own, Transformed's posture and for
+    -- the rule's own reason rather than a caller's: CR 110.5d says only permanents
+    -- have status, and CR 708.4 turns an object face down BEFORE it is put onto
+    -- the stack, so a face-down SPELL would otherwise answer True to a Count
+    -- scoped over some other zone.
+    --
+    -- NOT face-down EXILE, which CR 110.5d rules out in as many words -- "although
+    -- an exiled card may be face down, this has no correlation to the face-down
+    -- status of a permanent". Object.exiledFaceDown is that other thing and this
+    -- atom never reads it; Pawl.Types.Facing has the rest of the distinction.
+    --
+    -- Uncharacteristic, like IsToken and IsTapped: CR 110.5a says status is not a
+    -- characteristic in as many words, so nothing in CR 613 writes it and
+    -- Pawl.Engine.Projection.filterReads declares this atom as reading nothing.
+    -- CR 708.2a's 2/2 with no name is the CONSEQUENCE of the status and is
+    -- projected normally, which is what lets a face-down permanent clear a
+    -- creature pool for this atom to narrow.
+    IsFaceDown
   | -- | CR 701.27g: the candidate is a "transformed permanent" -- a double-faced
     -- permanent on the battlefield with its back face up. Mutagen Connoisseur's
     -- "for each transformed permanent you control", whose "you control" is a

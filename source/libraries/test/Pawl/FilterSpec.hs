@@ -69,6 +69,7 @@ blackCreature =
       Filter.canAttachToSubject = False,
       Filter.token = False,
       Filter.tapped = False,
+      Filter.faceDown = False,
       Filter.transformed = False,
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
@@ -116,6 +117,7 @@ devoidBigCreature =
       Filter.canAttachToSubject = False,
       Filter.token = False,
       Filter.tapped = False,
+      Filter.faceDown = False,
       Filter.transformed = False,
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
@@ -1274,6 +1276,25 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- is not one.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsToken)) "player"
+
+  -- CR 110.5. The atom is a bare field read, Transformed's shape below: the
+  -- battlefield scoping CR 110.5d demands lives in the BUILDER that fills the
+  -- field (Pawl.Engine.Projection.viewOfCharacteristics), so the gameplay-level
+  -- proof is Pawl.FaceDownSpec's Break Open group.
+  Spec.describe s "IsFaceDown" $ do
+    Spec.it s "matches a view whose permanent is face down" $ do
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.faceDown = True}) Filter.Type.IsFaceDown) "face down"
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.IsFaceDown)) "face up"
+
+    -- CR 110.5a says status is not a characteristic in as many words, so nothing
+    -- on the characteristic axes implies it -- and in particular CR 708.2a's 2/2
+    -- with no name is the CONSEQUENCE of the status rather than the status.
+    Spec.it s "is independent of every characteristic axis" $ do
+      Spec.assertBool s (not (Filter.matches self devoidBigCreature Filter.Type.IsFaceDown)) "power does not imply face down"
+
+    -- CR 110.5d: only permanents have status, and CR 109.1 makes a player none.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsFaceDown)) "player"
 
   -- CR 701.27g. The atom itself is a bare field read; both of the rule's
   -- exclusions live in the BUILDER that fills the field, so the gameplay-level
