@@ -330,6 +330,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.IsTapped
       " {\"type\":\"IsTapped\"} "
+  Spec.it s "IsFaceDown" $
+    Common.assertCodec
+      s
+      codec
+      Filter.IsFaceDown
+      " {\"type\":\"IsFaceDown\"} "
   Spec.it s "Transformed" $
     Common.assertCodec
       s
@@ -420,6 +426,9 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
         killShot = Filter.IsAttacking
         flashFoliage = Filter.IsAttackingPlayer PlayerRelation.You
         relentlessAssault = Filter.AttackedThisTurn
+        -- Break Open's whole target filter, the composite the new atom actually
+        -- ships in.
+        breakOpen = Filter.And [Filter.IsFaceDown, Filter.ControlledBy PlayerRelation.Opponent]
         crownOfTheAges = Filter.And [Filter.HasSubtype Subtype.Aura, Filter.AttachedTo (Filter.HasCardType CardType.Creature)]
         labyrinthOfSkophos = Filter.Or [Filter.IsAttacking, Filter.IsBlocking]
         -- Hollow Warrior's toll criterion, the deepest nest of the two new
@@ -456,6 +465,7 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
             killShot,
             flashFoliage,
             relentlessAssault,
+            breakOpen,
             crownOfTheAges,
             labyrinthOfSkophos,
             hollowWarrior,

@@ -835,6 +835,10 @@ viewOfCard face =
           -- any zone this builder describes cease to exist.
           Filter.token = False,
           Filter.tapped = False,
+          -- CR 110.5d: only permanents have status, and this is a printed FACE
+          -- with no object behind it -- the rule's own answer rather than an
+          -- unknown, `transformed` below's reason one status category over.
+          Filter.faceDown = False,
           -- CR 701.27g asks about a permanent on the battlefield; this is a
           -- printed FACE with no object behind it, so the rule's own answer is
           -- False rather than an unknown.
@@ -1030,6 +1034,18 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 111.6: fixed for the life of the object (CR 400.7).
       Filter.token = Game.isToken oid gs,
       Filter.tapped = Game.isTapped oid gs,
+      -- CR 110.5's other status, and the only site that fills the field. Read off
+      -- Object.facing, never off the projection: CR 110.5a says status is not a
+      -- characteristic in as many words. Never Object.exiledFaceDown beside it,
+      -- which CR 110.5d says has no correlation to this.
+      --
+      -- The battlefield conjunct is CR 110.5d's own -- only permanents have
+      -- status -- and is a REGRESSION FENCE rather than a proved behaviour, for
+      -- `transformed` below's reason: the object it excludes is a face-down SPELL
+      -- on the stack (CR 708.4), which is reachable, but every pool that reaches
+      -- the atom today is already scoped to the battlefield, so dropping the
+      -- conjunct leaves the suite green.
+      Filter.faceDown = Set.member oid (GameState.battlefield gs) && maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs),
       -- CR 701.27g's two conjuncts, and the only site that fills the field. The
       -- face is read CURRENT -- Game.isFrontFaceUp reads Object.face, never the
       -- Object.turnedOverAt beside it -- which is the rule's first exclusion, a
@@ -3597,6 +3613,9 @@ filterReads f = case f of
   Filter.Type.IsToken -> Set.empty
   -- CR 110.5: tap status is not a characteristic, so no layer writes it.
   Filter.Type.IsTapped -> Set.empty
+  -- CR 110.5a again, one status category over: face-up/face-down is not a
+  -- characteristic either, so no layer writes it.
+  Filter.Type.IsFaceDown -> Set.empty
   -- Reads nothing: CR 712.8d/e make which face is up the thing characteristics
   -- are read OFF rather than one of them, so no Modification writes Object.face.
   Filter.Type.Transformed -> Set.empty
