@@ -1417,12 +1417,12 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
 -- elided, and CR 605.1a is the argument: a keyword-granted ability that adds
 -- mana would have to move no card to or from a library, which cycling does.
 --
--- AbilityKind.ManaAbility is the third criterion, and it is the one Nothing
--- above could never have stood in for: no rule-702 provenance is equally true of
--- every ordinary activated ability arriving through Pawl.Engine.Activate, where
--- everything reaching THIS function is a mana ability by CR 605.1a -- which is
--- what makes Suppression Field's "unless they're mana abilities" inert here
--- (#2293).
+-- AbilityKind.ManaAbility is the THIRD criterion, and the Nothing above could
+-- never have stood in for it: no rule-702 provenance is equally true of every
+-- ordinary activated ability arriving through Pawl.Engine.Activate, while
+-- everything reaching this function is a mana ability by CR 605.1a -- which is
+-- what makes Suppression Field's "unless they're mana abilities" spare every
+-- activation gathered here.
 manaActivationAdjustments :: PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
 manaActivationAdjustments pid oid gs = manaActivationAdjustmentsGiven (PlayerEffect.applying pid gs) oid gs
 

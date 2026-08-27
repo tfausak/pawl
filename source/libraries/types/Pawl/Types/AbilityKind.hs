@@ -17,7 +17,7 @@ module Pawl.Types.AbilityKind where
 data AbilityKind
   = -- | CR 605.1a's four criteria all met.
     ManaAbility
-  | -- | Every other activated ability, which is every one CR 605.3b puts on the
-    -- stack.
+  | -- | Every other activated ability, which is every one CR 602.2a puts on the
+    -- stack -- CR 605.3b being the exception the constructor above names.
     NonManaAbility
   deriving (Bounded, Enum, Eq, Ord, Show)

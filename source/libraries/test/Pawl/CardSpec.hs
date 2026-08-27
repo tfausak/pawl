@@ -3372,7 +3372,9 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f _) -> [f]
   -- CR 601.2f at the ACTIVATION moment, Oppressive Rays' third line. Its Filter
   -- names the ability's SOURCE PERMANENT, exactly as ReduceActivationCost's
-  -- below does, and it carries no grantedBy for that arm's comment to be about.
+  -- below does. The whichKind beside it is not returned, for the reason that
+  -- arm's grantedBy is not: CR 605.1a's classification is no more a Filter than
+  -- a rule-702 family is.
   PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f _ _) -> [f]
   PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _ _) -> [f]
   -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE

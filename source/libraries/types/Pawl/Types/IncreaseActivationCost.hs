@@ -28,8 +28,7 @@ import qualified Pawl.Types.Keyword as Keyword
 -- way, so admitting the other side costs nothing and asserts nothing.
 --
 -- There is no `whichTargets` beside them, because no producer narrows an
--- increase by what the ability targets -- and CR 605.1a's own first criterion is
--- why a mana ability could never be narrowed that way in any case.
+-- increase by what the ability targets.
 data IncreaseActivationCost = MkIncreaseActivationCost
   { whichAbilities :: Filter.Filter Keyword.Keyword,
     whichKind :: Maybe AbilityKind.AbilityKind,
