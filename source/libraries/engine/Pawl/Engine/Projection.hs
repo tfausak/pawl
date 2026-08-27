@@ -746,8 +746,13 @@ powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
 -- fold out of a loop.
 --
 -- CR 208.5's substituted 0 rides along through noValueAt, which is what makes
--- this reader agree with the finished fold's projectFrom about a creature whose
--- only source of a P/T value was stripped.
+-- this reader agree with the finished fold's projectFrom, and with
+-- projectDeciding's running board, about a creature whose only source of a P/T
+-- value was stripped. That call is a REGRESSION FENCE and not a proven
+-- behaviour: mutating it away left the suite green (2026-08-27), no board in
+-- data/cards reaching a no-value creature through this reader rather than
+-- through the running board, where Pawl.PowerToughnessSpec's Synthetic Withering
+-- Comparison case proves it.
 viewUpTo :: Layer -> [Gathered] -> GameState -> Count.ViewOf
 viewUpTo bound cands gs oid =
   if Map.member oid (GameState.objects gs)
@@ -4060,9 +4065,9 @@ projectDeciding admits cands = forObject
                         -- bounded view, and noncreaturePT (CR 208.3) and noValueAt
                         -- (CR 208.5) are applied so the two agree. Another OBJECT
                         -- is read off the running board too (CR 701.3a / CR
-                        -- 613.1). The fallback is now reached only by an id no
-                        -- same-layer effect can apply to, whose running state IS
-                        -- its bounded one -- see reachable above.
+                        -- 613.1). What still falls back is an id outside every
+                        -- same-layer candidate's affected set, which no effect at
+                        -- this layer has been applied to -- see reachable above.
                         --
                         -- The CR 702.178a gate A Tale for the Ages puts in a CR
                         -- 613.8-movable layer is not reached at all (gap #1757).
