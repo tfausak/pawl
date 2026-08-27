@@ -620,10 +620,15 @@ backFace card =
         Layout.ModalDoubleFaced -> successor
         -- CR 712.4b: the back face of a meld card determines nothing off a
         -- melded permanent, so there is none to answer with -- and pawl stores
-        -- none, which is what Pawl.Types.Layout's Meld arm records. Nothing is
-        -- also the answer CR 712.14a wants: a rider asking this card to enter
-        -- transformed finds no face and leaves it alone, which is CR 712.4c's
-        -- "any instructions to do so are ignored".
+        -- none, which is what Pawl.Types.Layout's Meld arm records.
+        --
+        -- CR 712.14a's "transformed" rider reads this same answer, and Nothing is
+        -- what CR 712.4c asks for there too: a meld card IS a double-faced card
+        -- (CR 712.1), so 712.14a's second sentence is not what excludes it --
+        -- "unlike other double-faced cards, meld cards cannot be transformed or
+        -- converted. Any instructions to do so are ignored" is, and a card put
+        -- onto the battlefield with no back face to turn to enters showing its
+        -- front face under CR 712.14's default.
         Layout.Meld -> Nothing
 
 -- CR 701.27a: "To transform a permanent, turn it over so that its other face is
