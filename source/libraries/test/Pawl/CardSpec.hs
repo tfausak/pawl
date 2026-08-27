@@ -3995,8 +3995,10 @@ effectFilters effect = case effect of
   -- arms above give.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ srcRef destRef chosenSource) ->
     unframed (durationFilters duration <> Maybe.maybeToList chosenSource) <> sourceHosted (objectRefFilters srcRef <> objectRefFilters destRef)
-  -- CR 708.2's listed characteristics hold no Filter.
-  Effect.TurnFaceDown _ -> []
+  -- CR 708.2's listed characteristics hold no Filter, but the ref does -- Ixidron's
+  -- "all other nontoken creatures" is an ObjectRef Filter like Destroy's, so the
+  -- lint reaches it.
+  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref _) -> sourceHosted (objectRefFilters ref)
   Effect.TurnFaceUp _ -> []
   Effect.Fight _ -> []
   Effect.RemoveFromCombat ref -> sourceHosted (objectRefFilters ref)
@@ -4221,7 +4223,10 @@ effectObjectRefs effect = case effect of
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _) -> read_ [ref]
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _) -> read_ [ref]
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ srcRef destRef _) -> read_ [srcRef, destRef]
-  Effect.TurnFaceDown {} -> []
+  -- A READ and not an ask: CR 708.2's turning-over takes no choice of its own, and
+  -- this arm never reaches the Game monad, so an AnyNumberMatching ref written
+  -- here would name nothing. inertChoosers is what says so at load time.
+  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref _) -> read_ [ref]
   Effect.TurnFaceUp {} -> []
   Effect.Fight {} -> []
   Effect.RemoveFromCombat ref -> read_ [ref]
