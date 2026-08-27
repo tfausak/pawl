@@ -28,6 +28,7 @@ import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OutsideObject as OutsideObject
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -593,13 +594,34 @@ subgameStateFrom starter parent =
       -- `recovered` pass.
       order = rotateTo starter (Game.stillPlayingInOrder parent)
       firstPlayer = Maybe.fromMaybe (GameState.activePlayer parent) (Maybe.listToMaybe order)
+      -- CR 729.4: "all objects in the main game and all cards outside the main
+      -- game are considered outside the subgame (except those specifically
+      -- brought into the subgame)". The exception is `movedObjects` -- CR
+      -- 729.2's libraries and CR 729.2c's commanders -- which are IN the
+      -- subgame and so are excluded here. Only Source.OfCard objects: CR
+      -- 400.11c's "spells and abilities that allow those cards to be brought
+      -- into the game" is what a road into a subgame is, and a token or an
+      -- emblem is not a card and cannot be brought in.
+      --
+      -- The parent's OWN outsideObjects ride along, which is CR 729.6's
+      -- nesting: "the existing subgame becomes the main game in relation to
+      -- the new subgame", so a card already outside the parent (itself
+      -- possibly a subgame) is outside this one too. funnelBack never touches
+      -- this field, so `parent`'s own copy is untouched for the whole life of
+      -- the game it spawns (CR 729.1a) -- this union is the only place the
+      -- set can grow.
+      outside =
+        Map.union
+          (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.union libIds cmdIds)))
+          (GameState.outsideObjects parent)
+      asOutside obj = case Object.source obj of
+        Source.OfCard printingId -> Just (OutsideObject.MkOutsideObject (Object.owner obj) printingId)
+        _ -> Nothing
    in parent
         { GameState.objects = movedObjects,
           GameState.turnOrder = order,
           GameState.players = resetPlayers (GameState.players parent),
-          -- CR 729.4: the parent's card objects (and CR 729.6's already-outside
-          -- ones) are snapshotted here in a later unit; empty for now.
-          GameState.outsideObjects = Map.empty,
+          GameState.outsideObjects = outside,
           -- CR 729.4a: nothing has crossed into this subgame yet.
           GameState.broughtIn = Seq.empty,
           GameState.library = Map.empty,

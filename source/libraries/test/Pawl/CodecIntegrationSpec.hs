@@ -354,3 +354,13 @@ gameStateRoundTripSpec s registry = do
                 Map.singleton oid (Map.singleton CounterKind.PlusOnePlusOne 2)
             }
     roundTrips "a pending +1/+1 counter" gs
+
+  -- CR 729.4: a non-empty outsideObjects, not only the empty default every
+  -- other case here carries. Setup.subgameStateFrom is the one producer, so
+  -- driving it is more honest than hand-building a Map literal.
+  Spec.it s "a non-empty outsideObjects snapshot round trips" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let (_, gs0) = S.addCreature mountain S.alice (Setup.emptyGame S.bothPlayers)
+        gs = Setup.subgameStateFrom S.alice gs0
+    Spec.assertBool s (not (Map.null (GameState.outsideObjects gs))) "the fixture should hold at least one outside object"
+    roundTrips "a subgame's outsideObjects snapshot" gs
