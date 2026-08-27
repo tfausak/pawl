@@ -55,6 +55,12 @@
 -- is asserted as a LIFE-TOTAL DELTA on the chosen target and never as a board
 -- fact, which is the one reading none of the others can fake.
 --
+-- Break Open is the FILTER's card, and reaches rule 708 from the outside: it
+-- turns nothing over itself that Showstopping Surprise above does not, but its
+-- "target face-down creature an opponent controls" is the only reason CR 110.5's
+-- face-up/face-down status has to be askable of one candidate at a time
+-- (Filter.IsFaceDown).
+--
 -- Aven Farseer is the WATCHER's card, and the only printing rule 708.7's second
 -- written form needs. {1}{W} Creature -- Bird Soldier 1/1, "Flying / Whenever a
 -- permanent is turned face up, put a +1/+1 counter on this creature." It bears
@@ -1920,9 +1926,10 @@ enterFaceDown printing pid gs =
 --   * bob's face-down Thragtusk -- the only legal target, and the only permanent
 --     any correct reading admits.
 --   * bob's face-up Hill Giant -- rejected by IsFaceDown alone. Without that
---     conjunct it is a legal target, and Break Open on a FACE-UP creature is a
---     no-op (CR 708.8 has nothing to turn), so the wrong choice shows up as the
---     Thragtusk never turning over rather than as an error.
+--     conjunct it is a legal target, and Break Open aimed at a face-up creature
+--     turns nothing over -- CR 708.8 is about a face-DOWN permanent -- so the
+--     wrong choice shows up as the Thragtusk never turning over rather than as
+--     an error.
 --   * alice's face-down Ainok Tracker -- rejected by ControlledBy Opponent
 --     alone. Without that conjunct it is a legal target and turns over instead.
 --
@@ -2002,7 +2009,7 @@ breakOpenSpec s registry = Spec.describe s "IsFaceDown (CR 110.5)" $ do
         -- the Thragtusk still being face down is what a missing IsFaceDown looks
         -- like on the board.
         Spec.assertEqWith s "CR 110.5 the face-down creature is what was turned over" (fmap Object.facing (Game.lookupObject victim after)) (Just Facing.FaceUp)
-        Spec.assertEqWith s "CR 110.5b and the Hill Giant is still face up, having never been one" (fmap Object.facing (Game.lookupObject theirs after)) (Just Facing.FaceUp)
+        Spec.assertEqWith s "CR 110.5b and the Hill Giant is still face up, as it entered" (fmap Object.facing (Game.lookupObject theirs after)) (Just Facing.FaceUp)
         Spec.assertEqWith s "and alice's own is still face down" (fmap Object.facing (Game.lookupObject mine after)) (Just (Facing.faceDown FaceDownReason.Manifested))
       _ -> Spec.assertFailure s "the face-down permanents did not reach the battlefield"
 
