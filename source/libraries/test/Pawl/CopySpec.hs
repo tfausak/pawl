@@ -1468,12 +1468,19 @@ copiedAbilitySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     Spec.assertEqWith s "the Shapeshifter is the Lion by name (CR 707.2)" (Projection.namesOf shifterId board) (Set.singleton (cardNamed "Glittering Lion"))
     Spec.assertEqWith s "and the printed Lion has left the battlefield" (length (printedOnBattlefield "Glittering Lion" board)) 0
 
-  -- Site four: the THREE TYPE-LINE disjuncts of that same baseHas -- CR 306.5b's
-  -- planeswalker, CR 714.3a's Saga and CR 310.4b's battle -- which read a card
-  -- type and a subtype, both copiable values under CR 707.2. Copy Enchantment's
-  -- "any enchantment on the battlefield" is the pool's only route to one of the
-  -- three, since a Saga is an enchantment (CR 205.3h) while Clone's and
-  -- Quicksilver Gargantuan's "any creature" and Vesuva's "any land" are not.
+  -- Site four: the TYPE disjunct of that same baseHas (Projection.copiableMintsType),
+  -- which reads a card type and a subtype -- both copiable values, CR 707.2 says
+  -- so outright -- for CR 306.5b's planeswalker, CR 310.4b's battle and CR
+  -- 714.3a's Saga. Two cases below, one per half of that read: Copy Enchantment
+  -- reaches the SUBTYPE half, since a Saga is an enchantment (CR 205.3h), and
+  -- Clever Impersonator's "any nonland permanent" reaches the CARD TYPE half.
+  --
+  -- CR 310.4b's battle is the arm with no case of its own. It is the same
+  -- `mintingCardType` read the planeswalker case below proves off a snapshot, and
+  -- Pawl.BattleSpec's "Invasion of Dominaria enters with five defense counters"
+  -- proves the equality itself off a printed face, so no line here is unproven --
+  -- but no board copies a battle, and one would want a protector designation (CR
+  -- 310.9a) beside the counters.
   --
   -- TWO ENTRIES, so the board that observes the disjunct differs from the one
   -- that does not in exactly the original Saga's presence. The first Copy
@@ -1512,3 +1519,38 @@ copiedAbilitySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         -- out, and that printed Saga really has left the battlefield.
         Spec.assertEqWith s "the first copy entered with one too, while the original was out" (S.counterOf CounterKind.Lore copy1 withOriginal) 1
         Spec.assertEqWith s "and no printed Saga is left on the battlefield for the second entry" (length (printedOnBattlefield "History of Benalia" (gone benaliaId))) 0
+
+  -- The CARD TYPE half of that same read, on Clever Impersonator ({2}{U}{U}
+  -- Creature -- Shapeshifter 0/0, "You may have this creature enter as a copy of
+  -- any nonland permanent on the battlefield") and CR 306.5b's loyalty.
+  --
+  -- The two entries the case above needs, plus a change of controller the legend
+  -- rule forces: every printed planeswalker is legendary, so bob copies alice's
+  -- Jace and alice copies bob's copy, leaving CR 704.5j one of each per player.
+  --
+  -- CR 704.5i is what makes the wrong reading loud rather than quiet: a
+  -- planeswalker that entered with no loyalty counters is put into its owner's
+  -- graveyard the moment state-based actions run. So the id is taken from the
+  -- board BEFORE the settle -- otherwise `newest` would answer with the surviving
+  -- first copy and read ITS three counters.
+  Spec.it s "CR 707.2a a copy of a planeswalker enters with CR 306.5b's loyalty counters" $ do
+    jace <- S.printingOf s registry "Jace Beleren"
+    impersonator <- S.printingOf s registry "Clever Impersonator"
+    let (jaceId, bare) = S.addCreature jace S.alice (Setup.emptyGame S.bothPlayers)
+        board0 = S.addCounter CounterKind.Loyalty 3 jaceId bare
+        (_, staged1) = S.spellOnStack impersonator S.bob board0
+        withOriginal = resolveAndSettle (copyNamed jaceId) staged1
+        gone = S.runPure S.identityAnswer withOriginal (Event.changeZone jaceId Zone.Graveyard)
+    case newest (printedOnBattlefield "Clever Impersonator" withOriginal) of
+      Nothing -> Spec.assertFailure s "the first Clever Impersonator left the battlefield unexpectedly"
+      Just copy1 -> do
+        let entered = S.runPure (copyNamed copy1) (snd (S.spellOnStack impersonator S.alice gone)) Stack.resolveTop
+            final = settle S.identityAnswer entered
+        case newest (printedOnBattlefield "Clever Impersonator" entered) of
+          Nothing -> Spec.assertFailure s "the second Clever Impersonator never reached the battlefield"
+          Just copy2 -> do
+            Spec.assertEqWith s "CR 306.5b three loyalty counters on the copy of a copy" (S.counterOf CounterKind.Loyalty copy2 final) 3
+            Spec.assertBool s (S.onBattlefield copy2 final) "so CR 704.5i does not put it into the graveyard"
+            Spec.assertBool s (Projection.isPlaneswalkerOf copy2 final) "and it really is a planeswalker (CR 707.2)"
+        Spec.assertEqWith s "the first copy entered with three too, while the original was out" (S.counterOf CounterKind.Loyalty copy1 withOriginal) 3
+        Spec.assertEqWith s "and no printed planeswalker is left on the battlefield for the second entry" (length (printedOnBattlefield "Jace Beleren" gone)) 0
