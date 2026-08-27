@@ -792,6 +792,8 @@ viewOfCard face =
           -- CR 506.3 / 509.1a: a card off the battlefield never attacked or
           -- blocked; CR 303.4b: nor is it attached to anything.
           Filter.attacking = False,
+          -- CR 508.1b: a printed face attacks nothing, for the reason above.
+          Filter.attackingPlayer = Nothing,
           Filter.blocking = False,
           Filter.blocked = False,
           Filter.attackedThisTurn = False,
@@ -942,6 +944,14 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.playerIdentity = Nothing,
       -- CR 508.1k: a combat status, not a characteristic (CR 109.3).
       Filter.attacking = Map.member oid (Combat.attackers (GameState.combat gs)),
+      -- CR 508.1b: the same map's VALUE, kept only when it names a player. A
+      -- creature attacking a planeswalker or a battle answers Nothing here and
+      -- True above, which is CR 509.1a's and CR 802.4a's own three-way split --
+      -- deliberately NOT Pawl.Engine.Defender.playerOfAttacker, which answers CR
+      -- 508.5 and would fold all three into one player.
+      Filter.attackingPlayer = case Map.lookup oid (Combat.attackers (GameState.combat gs)) of
+        Just (AttackTarget.OfPlayer pid) -> Just pid
+        _ -> Nothing,
       -- CR 509.1g: likewise. Combat.blockers is keyed by ATTACKER, so blocking is
       -- membership in some attacker's set rather than a key lookup.
       Filter.blocking = any (Set.member oid) (Map.elems (Combat.blockers (GameState.combat gs))),
@@ -3427,6 +3437,9 @@ filterReads f = case f of
   -- Modification writes; every zone change happens between projections.
   Filter.Type.CardsInGraveyardAtLeast _ -> Set.empty
   Filter.Type.IsAttacking -> Set.empty
+  -- Reads nothing, for IsAttacking's reason and off the same map: what a creature
+  -- is attacking is no characteristic of it (CR 109.3).
+  Filter.Type.IsAttackingPlayer _ -> Set.empty
   -- Reads nothing, for IsAttacking's reason and off the same record -- who was
   -- declared attacked is no characteristic of anything.
   Filter.Type.DeclaredAttackedThisCombat -> Set.empty

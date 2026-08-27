@@ -293,6 +293,9 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.HasChosenName -> predicate
   Filter.Type.IsPlayer _ -> predicate
   Filter.Type.IsAttacking -> predicate
+  -- Untouched for ControlledBy's reason: the relation is answered against the
+  -- perspective at Pawl.Engine.Filter.matches, which holds one.
+  Filter.Type.IsAttackingPlayer _ -> predicate
   Filter.Type.DeclaredAttackedThisCombat -> predicate
   Filter.Type.IsBlocking -> predicate
   Filter.Type.IsBlocked -> predicate
@@ -655,6 +658,9 @@ viewOfSnapshot mController isToken snapshot =
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
+      -- CR 508.1b: nothing a snapshot holds says what was attacked, for the
+      -- reason `attacking` above is False.
+      Filter.attackingPlayer = Nothing,
       -- CR 508.3b: whether the candidate was declared attacked is no more a
       -- characteristic than `attacking` above is, so a snapshot has nothing to
       -- answer it with either.
