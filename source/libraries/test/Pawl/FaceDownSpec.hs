@@ -410,10 +410,11 @@ turnFaceDownSpec s registry = Spec.describe s "Turning face down" $ do
   -- A ONE-TARGET BOARD CANNOT DISCRIMINATE. The arm used to read its slot through
   -- Binding.onlyOne, which answers Just for a one-element set and Nothing for a
   -- larger one -- so a single announcement turned its creature over under either
-  -- reading, and a plural one turned over NOTHING rather than one thing. The count
-  -- of face-down creatures is asserted FIRST for that reason: 2 under the fix and
-  -- 0 under the old read, where every per-permanent assertion below would also
-  -- fail but only after the cheap one had already told the story.
+  -- reading, and a plural one turned over NOTHING rather than one thing. The SET
+  -- of face-down permanents is asserted FIRST for that reason: both announced
+  -- creatures under the fix and neither under the old read, where every
+  -- per-permanent assertion below would also fail but only after the one that
+  -- names the whole board had already told the story.
   --
   -- THREE candidates for two announcements, so the choice is real and cannot
   -- short-circuit. The Raptor is the one left alone: it is a morph creature alice

@@ -3937,13 +3937,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- mirror of FaceDown.performTurnFaceUp.
       --
       -- Not implemented: CR 613.7f's new timestamp for a permanent that turns face
-      -- down (#2477).
+      -- down (#2476).
       --
       -- CR 708.2b is the guard below: an effect that LISTS its own values would
-      -- otherwise overwrite the list already there. It reads the FOLD's state
-      -- rather than the enumeration's, so a permanent this same instruction has
-      -- already turned over is guarded too. No event is recorded, so nothing
-      -- triggers on the turning-over (#984).
+      -- otherwise overwrite the list already there. No event is recorded, so
+      -- nothing triggers on the turning-over (#984).
       --
       -- The victims are enumerated ONCE (CR 608.2f), as RemoveFromCombat's fold
       -- below does; an illegal slot (CR 608.2b), a player recipient and an empty
