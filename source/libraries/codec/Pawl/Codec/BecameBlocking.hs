@@ -2,6 +2,7 @@
 
 module Pawl.Codec.BecameBlocking where
 
+import qualified Data.Set as Set
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -23,10 +24,15 @@ codec = Fields.object $ do
   -- is the first thing that blocks any attacker, so every event it records
   -- carries this clear too.
   attackerWasBlocked <- Fields.defaulted "attackerWasBlocked" False Common.boolean BecameBlocking.attackerWasBlocked
+  -- Defaulted to the EMPTY set for the same reason once more: CR 509.1's
+  -- declaration finds every attacker it names unblocked, so the key rides only
+  -- on CR 509.4's entry at an attacker something was already blocking.
+  blockersBefore <- Fields.defaulted "blockersBefore" Set.empty (Common.set ObjectId.codec) BecameBlocking.blockersBefore
   pure
     BecameBlocking.MkBecameBlocking
       { BecameBlocking.blocker = blocker,
         BecameBlocking.attacker = attacker,
         BecameBlocking.putOntoBattlefield = putOntoBattlefield,
-        BecameBlocking.attackerWasBlocked = attackerWasBlocked
+        BecameBlocking.attackerWasBlocked = attackerWasBlocked,
+        BecameBlocking.blockersBefore = blockersBefore
       }

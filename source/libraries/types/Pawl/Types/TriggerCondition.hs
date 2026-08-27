@@ -470,9 +470,12 @@ data TriggerCondition
     -- CreatureBecomesBlockedByAtLeast group is the proof. Removing blockers
     -- cannot reach a floor from above.
     --
-    -- Not implemented: several creatures put onto the battlefield blocking one
-    -- attacker at once (#2298), and an effect that causes a creature already on
-    -- the battlefield to block, which records no event (#1146).
+    -- Several such arrivals at ONE attacker are one crossing rather than one
+    -- each, and each event carrying the tally it found is what says so -- a
+    -- Doubling Season over that same Flash Foliage is the pooled pair there.
+    --
+    -- Not implemented: an effect that causes a creature already on the
+    -- battlefield to block, which records no event (#1146).
     CreatureBecomesBlockedByAtLeast CreatureBecomesBlockedByAtLeast.CreatureBecomesBlockedByAtLeast
   | -- | "Whenever this creature attacks and isn't blocked" -- Eternal of Harsh
     -- Truths', and CR 702.68a's frenzy, which Pawl.Engine.Keyword.frenzy mints.

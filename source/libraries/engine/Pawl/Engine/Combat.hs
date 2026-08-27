@@ -964,7 +964,10 @@ becomeBlocked oid gs =
               -- still says the creature is blocked.
               case Defender.playerOfAttacker oid gs Applicative.<|> Combat.defender c of
                 Nothing -> blocked
-                Just defending -> Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked oid defending)) blocked
+                -- Blocked by ZERO creatures, which is this road's whole point:
+                -- CR 509.3e's count triggers ask how many creatures block it,
+                -- and the answer here is none.
+                Just defending -> Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked oid defending 0)) blocked
 
 -- Every creature currently IN combat: the attackers, plus everything still
 -- blocking one of them. Not the keys of Combat.joinedUnder, which can outlive the
@@ -1487,8 +1490,12 @@ putOntoBattlefieldBlocking oid attacker = do
         -- CR 506.3e / CR 509.4a's second clause
         Defender.playerOfAttacker attacker gs == Just controller -> do
           -- CR 509.3c's "was an unblocked creature at that time", read BEFORE the
-          -- write below.
+          -- write below, and CR 509.3e's comparand read at the same moment: the
+          -- creatures blocking this attacker before this one joined them. The two
+          -- are not the same question, rule 509.1h leaving an attacker blocked by
+          -- an EMPTY set.
           let wasBlocked = Map.member attacker (Combat.blockers c)
+              before = Map.findWithDefault Set.empty attacker (Combat.blockers c)
           State.put
             gs
               { GameState.combat =
@@ -1518,12 +1525,25 @@ putOntoBattlefieldBlocking oid attacker = do
           -- attacker's entry, and CR 509.1h lets that entry be an EMPTY set for
           -- an attacker that is blocked all the same. CR 509.3e's filtered form
           -- is the reader.
-          State.modify' (Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = oid, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = wasBlocked})))
+          --
+          -- `before` rides it for a stronger version of the same reason: several
+          -- creatures can be put onto the battlefield blocking one attacker
+          -- before any trigger is scanned, so the entry read at the scan holds
+          -- the arrivals that came AFTER this one too. Both of rule 509.3e's
+          -- forms read it.
+          State.modify' (Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = oid, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = wasBlocked, BecameBlocking.blockersBefore = before})))
           -- CR 509.3c: the attacker became a blocked creature. The defending
           -- player rides the event as it does off the declaration; the guard
           -- above has already settled that it is this creature's controller.
+          --
+          -- Blocked by ONE creature, and that is not a shortcut: this event is
+          -- withheld unless the attacker was unblocked, so the arrival that
+          -- records it is the only creature blocking the attacker at the moment
+          -- it becomes blocked. A doubled arrival's second token joins AFTER
+          -- this becoming, and CR 509.3e's count reads that off its own
+          -- GameEvent.BecameBlocking instead.
           Monad.unless wasBlocked $
-            State.modify' (Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker controller)))
+            State.modify' (Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker controller 1)))
     _ -> pure ()
 
 -- CR 509.1: the defending player declares blockers -- singular. The loop is over
@@ -1724,7 +1744,16 @@ attemptBlockDeclaration pid attacking rejected = do
               -- today, so no board observes what it holds -- it is recorded
               -- faithfully rather than clamped, since the event is the record.
               let wasBlocked = Map.keysSet (Combat.blockers (GameState.combat gs2))
-              State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = Set.member attacker wasBlocked})) h) g pairs
+              -- CR 509.3e's set is read off `gs2` for the flag's reason and holds
+              -- what was blocking the attacker BEFORE this declaration, which is
+              -- the same set for every pair the declaration names: CR 509.1's
+              -- blockers are all declared at once. Empty on every board today,
+              -- both of CR 509.4's pooled producers reaching an attacker only
+              -- after this declaration -- Flash Foliage prints the restriction
+              -- and Aetherplasm has to be blocking already -- and read rather
+              -- than written as Set.empty because the event is the record. No
+              -- reader looks: both guard on putOntoBattlefield.
+              State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = Set.member attacker wasBlocked, BecameBlocking.blockersBefore = Map.findWithDefault Set.empty attacker (Combat.blockers (GameState.combat gs2))})) h) g pairs
               State.modify' $ \g -> List.foldl' (\h (blocker, attackers) -> Event.recordEvent (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker (Natural.length attackers))) h) g (filter (not . Set.null . snd) (Map.toList declaration))
               -- CR 509.1h: the same declaration makes each attacker it named a BLOCKED
               -- creature. One event per attacker rather than per pair, which is CR
@@ -1744,9 +1773,15 @@ attemptBlockDeclaration pid attacking rejected = do
               --
               -- The defending player rides the event as it rides AttackerDeclared (CR
               -- 702.130a's afflict is the reader), with `pid` as the fallback.
+              --
+              -- CR 509.3e's count rides it too, and here it is the whole
+              -- declaration's -- read off `merged`, which is the state this
+              -- becoming leaves behind. Rule 509.3e's first sentence asks for
+              -- exactly that: "if the creature ... is blocked by that many
+              -- creatures when blockers are declared".
               let becameBlocked = Set.difference (Set.fromList (fmap snd pairs)) wasBlocked
               State.modify'
                 ( \g ->
                     let defendingFor oid = Maybe.fromMaybe pid (Defender.playerOfAttacker oid g)
-                     in List.foldl' (\h attacker -> Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker (defendingFor attacker))) h) g (Set.toList becameBlocked)
+                     in List.foldl' (\h attacker -> Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker (defendingFor attacker) (Natural.length (Map.findWithDefault Set.empty attacker merged)))) h) g (Set.toList becameBlocked)
                 )

@@ -309,7 +309,9 @@ data GameEvent
     -- cannot tell them apart, which is why the flag is on the event rather than
     -- read off the board. Rule 509.3e's two readers -- the blocker COUNT and the
     -- filtered "one or more" -- want the flag set instead: it is the declaration
-    -- that reaches those conditions through AttackerBlocked below.
+    -- that reaches those conditions through AttackerBlocked below. Both of them
+    -- read the payload's blockersBefore too, that being the only record of what
+    -- was blocking the attacker before this arrival joined them.
     --
     -- ONE event per PAIR, which is CR 509.3b's arity ("once for each attacking
     -- creature the creature blocks"). CR 509.3a's once-per-blocker arity is
@@ -334,18 +336,24 @@ data GameEvent
     -- difference, and Pawl.Engine.Event.matchesTrigger sees one event at a time
     -- and so cannot do it.
     --
-    -- The BLOCKERS are not carried. CR 509.3d's "becomes blocked by a creature"
+    -- The BLOCKERS themselves are not carried, only HOW MANY of them there were
+    -- at this becoming (CR 509.3e). CR 509.3d's "becomes blocked by a creature"
     -- is the condition that names one, and it reads BecameBlocking's pair
-    -- instead -- this event exists to be the once-per-combat one. The
-    -- conditions that ask about the blockers as a GROUP -- their quality, or how
-    -- many there were -- read Combat.blockers off this event instead, which is
-    -- exact because CR 509.2a puts these triggers on the stack before any player
-    -- gets priority. Rule 509.3e's "effects that add or remove blockers" is why
-    -- both of them, SelfBecomesBlockedByOneOrMore and
-    -- CreatureBecomesBlockedByAtLeast, read the same record off BecameBlocking
-    -- as well: an arrival that joins an ALREADY blocked attacker records no
-    -- event of this kind at all, CR 509.3c's guard below withholding it -- which
-    -- is what BecameBlocking.attackerWasBlocked says on the other side.
+    -- instead -- this event exists to be the once-per-combat one. The count
+    -- rides the event rather than being read off Combat.blockers when the
+    -- condition is scanned, which would be a stale read: CR 509.2a puts these
+    -- triggers on the stack before any player gets priority, so several
+    -- creatures put onto the battlefield blocking at once (CR 614.16 doubling
+    -- one token-making effect) are all in the record by then, where only the
+    -- first of them was there when the attacker became blocked.
+    -- SelfBecomesBlockedByOneOrMore wants their QUALITY rather than their number
+    -- and reads the record all the same, its arm arguing why that is exact.
+    --
+    -- Rule 509.3e's "effects that add or remove blockers" is why both of those
+    -- conditions read BecameBlocking as well: an arrival that joins an ALREADY
+    -- blocked attacker records no event of this kind at all, CR 509.3c's guard
+    -- below withholding it -- which is what BecameBlocking.attackerWasBlocked
+    -- says on the other side.
     --
     -- CR 509.3c's THIRD producer records it as well: an attacker whose only
     -- blocker is one put onto the battlefield blocking becomes blocked too -- CR

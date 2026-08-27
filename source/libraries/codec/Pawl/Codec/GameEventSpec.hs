@@ -174,7 +174,7 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 6, BecameBlocking.attacker = ObjectId.MkObjectId 7, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = False}))
+      (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 6, BecameBlocking.attacker = ObjectId.MkObjectId 7, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = False, BecameBlocking.blockersBefore = Set.empty}))
       " {\"type\":\"BecameBlocking\",\"value\":{\"blocker\":6,\"attacker\":7}} "
   -- An object and a COUNT: CR 509.3a's event is per blocking creature, and the
   -- number beside it is how many attackers it took (CR 509.3e). Distinct
@@ -185,15 +185,15 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared (ObjectId.MkObjectId 9) 2))
       " {\"type\":\"BlocksDeclared\",\"value\":{\"blocker\":9,\"count\":2}} "
-  -- An object and a player, AttackerDeclared's shape rather than the sibling
-  -- above's two objects: CR 509.3c's event is per blocked ATTACKER, so the
-  -- blockers are not in it, and CR 508.5's defending player is.
+  -- An object, a player and a count: CR 509.3c's event is per blocked ATTACKER,
+  -- so the blockers are not named in it, but CR 508.5's defending player is and
+  -- so is how many creatures blocked it (CR 509.3e). Three distinct numbers.
   Spec.it s "AttackerBlocked" $
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked (ObjectId.MkObjectId 8) (PlayerId.MkPlayerId 2)))
-      " {\"type\":\"AttackerBlocked\",\"value\":{\"attacker\":8,\"defender\":2}} "
+      (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked (ObjectId.MkObjectId 8) (PlayerId.MkPlayerId 2) 3))
+      " {\"type\":\"AttackerBlocked\",\"value\":{\"attacker\":8,\"defender\":2,\"blockers\":3}} "
   -- CR 509.1h's other branch: a bare object, carrying neither the blockers there
   -- were none of nor a defending player no reader in the pool asks for.
   Spec.it s "AttackerUnblocked" $
