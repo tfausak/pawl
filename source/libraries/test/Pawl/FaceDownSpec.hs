@@ -2113,23 +2113,25 @@ whispererBoard s registry faceDowns = do
 primalWhispererSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 primalWhispererSpec s registry = Spec.describe s "Counting face-down creatures (CR 110.5)" $ do
   -- THE CONTROL, and the pair's other half: the same board with the three
-  -- face-down permanents left out. CR 208.2 -- "if the ability needs to use a
-  -- number that can't be determined, use 0" is not what happens here; the count
-  -- is determined and it is zero, so the Whisperer is its printed 2/2.
+  -- face-down permanents left out. The count is zero, so CR 613.4c's modifier is
+  -- +0/+0 and the Whisperer is its printed 2/2 -- and the two face-up creatures
+  -- are still there, which is what makes this the falsifier for a filter that
+  -- counted creatures instead of face-down ones.
   Spec.it s "CR 613.4c with no face-down creature the Whisperer is its printed 2/2" $ do
     (board, mine, _, _) <- whispererBoard s registry False
     Spec.assertEqWith s "CR 613.4c the Whisperer counts none and stays 2/2" (S.powerToughnessOf mine board) (Just (2, 2))
     Spec.assertEqWith s "CR 110.5b and it is itself face up, as it entered" (fmap Object.facing (Game.lookupObject mine board)) (Just Facing.FaceUp)
 
   -- THE POSITIVE. Three face-down creatures across both battlefields, two face-up
-  -- creatures beside them, and 8 is the only power any correct reading produces.
+  -- creatures beside them, and 8 is a power none of the misreadings the board
+  -- comment above enumerates can land on.
   Spec.it s "CR 110.5 the Whisperer counts every face-down creature on the battlefield" $ do
     (board, mine, _, theirs) <- whispererBoard s registry True
     case theirs of
       Just victim -> do
         -- THE GAMEPLAY ASSERTION, first so no precondition can absorb a mutation.
         Spec.assertEqWith s "CR 613.4c the printed 2/2 plus +2/+2 for each of the three" (S.powerToughnessOf mine board) (Just (8, 8))
-        Spec.assertEqWith s "CR 110.5b bob's Ainok Tracker is face down, as it entered" (fmap Object.facing (Game.lookupObject victim board)) (Just (Facing.faceDown FaceDownReason.Manifested))
+        Spec.assertEqWith s "CR 701.40a bob's Ainok Tracker is face down" (fmap Object.facing (Game.lookupObject victim board)) (Just (Facing.faceDown FaceDownReason.Manifested))
         Spec.assertEqWith s "CR 708.2a and it is a creature, which is why it counts" (Projection.cardTypesOf victim board) (Set.singleton CardType.Creature)
       Nothing -> Spec.assertFailure s "the face-down permanents did not reach the battlefield"
 
