@@ -107,11 +107,12 @@ import qualified Pawl.Types.TapState as TapState
 -- A Map by kind, Object.counters' shape: nothing in CR 122.6 limits an effect to
 -- a single kind, and empty is the default every other move carries. WithCounters,
 -- the permanent's-own-text side, is keyed the same way and for the same reason,
--- though there the empty map is unsayable (#2314). Perennation returns a permanent card
--- "with a hexproof counter and an indestructible counter on it", which is the
--- shape the Map is for -- and the board Pawl.ReplacementSpec's Perennation group
--- reads CR 614.5's one opportunity off, since both kinds are pending together
--- before the entry's CR 616.1 loop begins.
+-- though there the empty map is unsayable -- Pawl.Types.WithCounters says why.
+-- Perennation returns a permanent card "with a hexproof counter and an
+-- indestructible counter on it", which is the shape the Map is for -- and the
+-- board Pawl.ReplacementSpec's Perennation group reads CR 614.5's one
+-- opportunity off, since both kinds are pending together before the entry's CR
+-- 616.1 loop begins.
 --
 -- The COUNT is the type parameter, and the two instantiations are the two sides
 -- of CR 608.2h. A card writes EntryRiders Quantity -- Printlifter Ooze's "the

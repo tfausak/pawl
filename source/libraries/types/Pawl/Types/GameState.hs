@@ -404,7 +404,11 @@ data GameState = MkGameState
     -- instead (CR 100.2a's deck limit, CR 201.2's matching).
     --
     -- Append-only, and never collected -- a token that ceases to exist under
-    -- CR 704.5d drops its Object but keeps its entry (gap #1594).
+    -- CR 704.5d drops its Object but keeps its entry. Deliberate rather than a
+    -- gap: the table is bounded by game length and each entry names a Printing
+    -- already shared in memory, so a reachability scan over every Source,
+    -- Player.commander and Player.dungeon would serve a cost nothing has
+    -- measured; see #1594.
     printings :: Map.Map PrintingId.PrintingId Printing.Printing,
     -- | `printings` read backwards, so Pawl.Engine.Game.intern answers with the
     -- id a printing already has instead of minting a second one for it. That

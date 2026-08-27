@@ -1914,13 +1914,6 @@ apply batch candidate event =
       -- runEntry finishes before the Moved event is recorded, so no trigger scan
       -- and no state-based action can see the interim front face.
       --
-      -- WHICH enters-the-battlefield trigger fires does not currently tell this
-      -- apart from the CR 702.145c sweep turning the permanent over a settle later
-      -- (Pawl.Engine.Daytime.turnDue), and that is a defect in the scan rather
-      -- than in this arm: the scan reads the permanent's abilities off the live
-      -- board at settle, by which time the sweep has already run (#1548). What
-      -- this arm fixes regardless is the face itself, which the rule is about.
-      --
       -- Not implemented: CR 712.13a's second sentence, an instant or sorcery back
       -- face sending the spell to its owner's graveyard rather than the
       -- battlefield. The write is unguarded, where Game.turnFaceOver goes through
@@ -4034,7 +4027,7 @@ counterOne source controller oid = do
     -- CR 106.6 through CR 101.2, and ahead of the branch split for CR 613.11's
     -- reason: rule 106.6 says an additional effect "affects the spell or
     -- ability that mana is spent on", so both of CR 701.6a's subjects are in
-    -- reach. An ability records no payment today (#2007), which makes this
+    -- reach. An ability records no payment today (#2404), which makes this
     -- vacuous for one rather than wrong.
     --
     -- The typed question again, so this module never sees a ManaRiderEffect

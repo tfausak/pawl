@@ -753,8 +753,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   --
   -- The trigger can only be read from CR 608.2h last known information: the
   -- Thragtusk is not merely off the battlefield at the CR 117.5 scan, it is not
-  -- in the game, so #1548's live-board ability read has nothing to find. What
-  -- fires is the ability the record says it had.
+  -- in the game, so neither the live board nor the per-group sample the scan
+  -- otherwise reads (GameState.battlefieldWhenTriggered) has anything to find.
+  -- What fires is the ability GameState.lastKnown says it had.
   Spec.it s "CR 603.6c a phased-in permanent leaving the game with its owner triggers its leaves-the-battlefield ability" $ do
     thragtusk <- S.printingOf s registry "Thragtusk"
     let (tusk, g1) = S.addCreature thragtusk S.bob S.threePlayerGame
