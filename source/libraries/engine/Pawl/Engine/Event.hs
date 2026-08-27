@@ -3750,8 +3750,9 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
 -- branches. Not implemented: CR 400.7b's static-ability ability grants (CR
 -- 611.3d), which this carrier cannot reach at all -- a static grant is derived
 -- on every projection rather than stored, so there is no row here to re-key
--- (#2425). CR 400.7g and CR 400.7i are unimplemented as well, on other carriers
--- -- Pawl.Engine.Cast and the land-play path (gap #2398).
+-- (#2425). CR 400.7i is unimplemented too, on a carrier this one never sees --
+-- the land-play path (gap #2398). CR 400.7g is implemented, on
+-- Pawl.Engine.Cast.keywordsBefore rather than here.
 carryOver :: CarryOver.CarryOver -> ObjectId -> ObjectId -> Game ()
 carryOver carrying oldId newId = case carrying of
   CarryOver.NotCarried -> pure ()
