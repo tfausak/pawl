@@ -110,7 +110,11 @@ cheapest close there is.
 seam: two independent passes over every open card-driven issue found no fired
 trigger. That label does not mean wait --- it means the unit is "add the card",
 and the sweep will not find it for you. The open seam is engine-internal:
-issues whose stated gap, blocker or carrier is stale against the tree.
+issues whose stated gap, blocker or carrier is stale against the tree. The
+other direction is open too: an elision outlives the close of the issue it
+cites, and since the checking scripts were removed only a grep for the bare
+number finds it. And a closed issue is not evidence the capability exists ---
+one was closed by hand with no PR behind it, and had to be re-filed.
 
 ## Clusters
 
