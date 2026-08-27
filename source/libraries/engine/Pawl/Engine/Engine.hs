@@ -1635,9 +1635,8 @@ playSubgame = do
   -- funnelBack rebuilds every library from scratch and merges the subgame's
   -- returned cards into GameState.objects. Run applyCrossings after funnelBack
   -- and `filed` would file last known power/toughness for any
-  -- characteristic-defining ability that counts cards in a library, hand or
-  -- graveyard (CR 604.3) against a board that already has the wrong contents
-  -- for those zones.
+  -- characteristic-defining ability that counts cards in a LIBRARY (CR 604.3)
+  -- against a board whose libraries have already been rebuilt.
   State.modify' (Setup.applyCrossings finalSub)
   State.modify' (Setup.funnelBack finalSub)
   -- CR 729.5: each player who was IN the subgame takes the traditional cards they
