@@ -71,6 +71,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
+import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
@@ -2766,23 +2767,111 @@ chooseDamageSource controller resolving context gs filter_ = case filter_ of
           pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
       pure (Just (f, picked))
 
--- CR 609.7a's candidate set: "a permanent; a spell on the stack (including a
--- permanent spell); ... or a face-up object in the command zone", narrowed to the
--- properties the card printed. Read off the PROJECTION, so a permanent that is a
--- red source only by a continuous effect is a candidate.
+-- CR 609.7a's candidate set, its four classes in the rule's own order: "a
+-- permanent; a spell on the stack (including a permanent spell); any object
+-- referred to by an object on the stack, by a replacement or prevention effect
+-- that's waiting to apply, or by a delayed triggered ability that's waiting to
+-- trigger (even if that object is no longer in the zone it used to be in); or a
+-- face-up object in the command zone", narrowed to the properties the card
+-- printed.
 --
--- ASCENDING, so both the single-candidate shortcut and a transcript are
--- deterministic -- Pawl.Engine.Blight's posture.
+-- SPELLS on the stack, not the whole zone: the rule says "a spell", and an
+-- activated or triggered ability sharing that zone falls under none of the four
+-- classes -- it is not a permanent, not a spell, not in the command zone, and
+-- nothing refers to it. Game.isSpell asks the object's zone and its KIND, never which
+-- card it is -- the same reader ObjectRef.EachSpell above narrows with under CR
+-- 109.2b, where the CR 405.1 arm beside it takes the whole zone instead.
 --
--- Not implemented: rule 609.7a's third class, "any object referred to by an
--- object on the stack, by a replacement or prevention effect that's waiting to
--- apply, or by a delayed triggered ability that's waiting to trigger", which
--- narrows the choice a player is offered (#1904).
+-- Read off the PROJECTION, so a permanent that is a red source only by a
+-- continuous effect is a candidate -- with CR 608.2h's fallback onto last known
+-- information, since the third class admits an object "no longer in the zone it
+-- used to be in" and a departed id projects blank. Exactly the pair
+-- Pawl.Engine.Replacement.matchesDamageSource rechecks with under CR 609.7b, so
+-- the choice and the recheck cannot read one source two ways.
+--
+-- That fallback is a REGRESSION FENCE rather than a proven behaviour: every card
+-- in data/cards/ naming a chosen source writes a trivial filter, which admits a
+-- blank view as readily as a filled one, so replacing the pair with the bare
+-- viewOfObject leaves the whole suite green (#2480).
+--
+-- DEDUPED, the classes overlapping wherever a spell's living target is also a
+-- permanent, and ASCENDING out of the same Set, so both the single-candidate
+-- shortcut and a transcript are deterministic -- Pawl.Engine.Blight's posture.
 damageSourceCandidates :: Filter.Context -> GameState -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 damageSourceCandidates context gs filter_ =
   let faceUp oid = fmap Object.facing (Game.lookupObject oid gs) == Just Facing.FaceUp
-      pool = Set.toList (GameState.battlefield gs) <> GameState.stack gs <> filter faceUp (Set.toList (GameState.command gs))
-   in List.sort (filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_) pool)
+      viewOf oid = Maybe.fromMaybe (Projection.viewOfObject oid gs) (Projection.viewWithLastKnownAnywhere gs oid)
+      pool =
+        Set.fromList
+          ( Set.toList (GameState.battlefield gs)
+              <> filter (\oid -> Game.isSpell oid gs) (GameState.stack gs)
+              <> referredToSources gs
+              <> filter faceUp (Set.toList (GameState.command gs))
+          )
+   in filter (\oid -> Filter.matches context (viewOf oid) filter_) (Set.toAscList pool)
+
+-- CR 609.7a's third class, off the three carriers the sentence names: every
+-- object on the stack, every row of GameState.replacements waiting to apply, and
+-- every entry of GameState.delayedTriggers waiting to trigger. What each REFERS
+-- TO is the object it names as its source plus the objects its bindings or slots
+-- hold -- Ghitu Fire-Eater's ability naming the creature its own cost
+-- sacrificed, a shield naming "that creature", a delayed trigger naming "it".
+--
+-- The SOURCE counts as a referent for all three: CR 113.7a says an ability that
+-- causes a source to do something checks that source's information when it
+-- resolves, and a waiting row's own condition and pattern are evaluated in a
+-- Filter.Context built on its source (Pawl.Engine.Replacement.collect), so each
+-- of the three can genuinely name it.
+--
+-- NO ZONE TEST anywhere in here, which is the clause's point: an id that names
+-- nothing is exactly the case the parenthesis admits, and damageSourceCandidates
+-- reads it through CR 608.2h's last known information rather than through the
+-- blank view a live-only projection gives.
+--
+-- Only the STACK half has a card behind it -- Pawl.ReplacementSpec's "a source
+-- only a waiting ability still refers to is offered", Ghitu Fire-Eater under
+-- Auriok Replica. The replacement-row and delayed-trigger halves are REGRESSION
+-- FENCES: neutralizing either leaves the whole suite green, no board in
+-- data/cards/ putting such an object in front of a chooser. They are written
+-- because rule 609.7a's one sentence names all three carriers (#2479).
+referredToSources :: GameState -> [ObjectId]
+referredToSources gs =
+  foldMap (\oid -> foldMap referentsOfObject (Game.lookupObject oid gs)) (GameState.stack gs)
+    <> foldMap (\row -> ActiveReplacement.source row : foldMap Set.toList (ActiveReplacement.slots row)) (GameState.replacements gs)
+    <> foldMap (\entry -> DelayedTrigger.source entry : referentsOfBindings (DelayedTrigger.bindings entry)) (GameState.delayedTriggers gs)
+
+-- What one object on the stack refers to: its CR 113.7 source object, and every
+-- object its bindings name.
+referentsOfObject :: Object.Object -> [ObjectId]
+referentsOfObject obj = sourceObjectOf (Object.source obj) <> referentsOfBindings (Object.bindings obj)
+
+-- The object a Source names, and TOTAL over all seven arms rather than two and a
+-- wildcard: a future arm that names an object owes this list a line, and `_`
+-- would swallow it. Only the two on-stack ability arms name one -- CR 113.7's
+-- "the object whose ability was activated" and "the object whose ability
+-- triggered". The four card-shaped arms ARE the object rather than naming
+-- another, and CR 725.2's inherent trigger has no object source at all, which is
+-- the whole of what distinguishes it from OfTrigger.
+sourceObjectOf :: Source.Source -> [ObjectId]
+sourceObjectOf src = case src of
+  Source.OfCard _ -> []
+  Source.OfToken _ -> []
+  Source.OfAbility a -> [ActivatedAbilitySource.source a]
+  Source.OfTrigger t -> [TriggeredAbilitySource.source t]
+  Source.OfEmblem _ -> []
+  Source.OfSpellCopy _ -> []
+  Source.OfInherentTrigger _ -> []
+
+-- Every object a binding environment names, both shapes: the one object a target
+-- slot holds (CR 601.2c) and every member of a group a clause defines without
+-- targeting it (CR 115.10a). Not Pawl.Engine.Binding.slotObjects, which narrows a
+-- multi-target slot away through `onlyOne` -- a spell that targets two creatures
+-- refers to both of them, and CR 609.7a asks for every object referred to.
+-- Player recipients drop out, the rule's classes all being objects.
+referentsOfBindings :: Map.Map SlotName Binding.Type.Binding -> [ObjectId]
+referentsOfBindings bindings =
+  foldMap (Maybe.mapMaybe Recipient.objectOf . Set.toList) (Binding.targetsOf bindings)
+    <> foldMap Foldable.toList (Binding.groupsOf bindings)
 
 -- The context every effect of a resolution evaluates its quantities and its
 -- ref-borne filters in: CR 109.5's "you" is the resolving controller, the source
