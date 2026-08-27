@@ -2791,6 +2791,9 @@ keywordFilters keyword = case keyword of
   -- Filters are its components'. The "target creature you control" filter its
   -- minted ability carries is the ENGINE's, never a card's.
   Keyword.Equip cost -> costFilters cost
+  -- CR 702.67a's payload is equip's, and so is this: the "target land you
+  -- control" filter its minted ability carries is the ENGINE's, never a card's.
+  Keyword.Fortify cost -> costFilters cost
   Keyword.FirstStrike -> []
   -- CR 702.8a: flash is a static ability with no payload -- it changes WHEN the
   -- card may be cast, and names nothing to filter.

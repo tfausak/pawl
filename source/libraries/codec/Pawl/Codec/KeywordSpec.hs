@@ -363,6 +363,17 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (equip 1)
       " {\"type\":\"Equip\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (equip 1) /= Codec.encode Keyword.codec (equip 3)) "the cost is part of the encoding"
+  -- CR 702.67a's payload is equip's, and the two tags must not collide: a
+  -- Fortification prints fortify and never equip, so a card decoded into the
+  -- wrong one would mint the wrong minted ability.
+  Spec.it s "Fortify carries its cost" $ do
+    let fortify n = Keyword.Fortify (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (fortify 3)
+      " {\"type\":\"Fortify\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (fortify 3) /= Codec.encode Keyword.codec (Keyword.Equip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))) "and is not equip"
   -- CR 702.87a's payload is a Cost, and the tag must not collide with the level
   -- COUNTER's -- CounterKind's "Level" and this keyword's "LevelUp" are two
   -- different wire tags for the two halves of rule 711.

@@ -1335,8 +1335,10 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.BattleCry -> keyword
   Keyword.Type.Evolve -> keyword
   Keyword.Type.Dethrone -> keyword
-  -- CR 702.6a's equip cost, level up's and outlast's shape.
+  -- CR 702.6a's equip cost, level up's and outlast's shape. CR 702.67a's
+  -- fortify cost is the same.
   Keyword.Type.Equip cost -> Keyword.Type.Equip (rewriteCost pairs cost)
+  Keyword.Type.Fortify cost -> Keyword.Type.Fortify (rewriteCost pairs cost)
   Keyword.Type.LevelUp cost -> Keyword.Type.LevelUp (rewriteCost pairs cost)
   Keyword.Type.Outlast cost -> Keyword.Type.Outlast (rewriteCost pairs cost)
   Keyword.Type.Prowess -> keyword
