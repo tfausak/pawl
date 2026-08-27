@@ -450,6 +450,34 @@ data Filter keyword
     -- the closed half already owns (CR 506-511, Pawl.Types.Combat), so reading it
     -- is the same kind of act as reading a card type.
     IsAttacking
+  | -- | CR 508.1b: the candidate is an attacking creature AND the player it is
+    -- attacking stands in this relation to the perspective (CR 109.5's "you").
+    -- Flash Foliage's "target creature attacking you" is @IsAttackingPlayer You@.
+    --
+    -- STRICTLY CR 508.1b's player, never CR 508.5's defending player. Those come
+    -- apart the moment a planeswalker or a battle is attacked, and CR 509.1a and
+    -- CR 802.4a both spell the difference out by writing "attacking that player,
+    -- a planeswalker they control, or a battle they protect" as three separate
+    -- things. So a creature attacking a planeswalker you control does NOT match
+    -- @IsAttackingPlayer You@, and Pawl.Engine.Defender.playerOfAttacker -- which
+    -- answers CR 508.5 and therefore folds all three together -- is the wrong
+    -- function to answer this with.
+    --
+    -- Not implemented: "attacking a planeswalker you control" and "attacking a
+    -- battle you protect", the other two of that list (#2445).
+    --
+    -- Carries a PlayerRelation rather than being a nullary IsAttackingYou,
+    -- because the pool wants the other direction too -- Roar of Resistance's
+    -- "creatures attacking your opponents" -- and the relation is the vocabulary
+    -- every player-relating atom is already written in (ControlledBy, OwnedBy).
+    --
+    -- PRESENT TENSE, like IsAttacking and unlike DeclaredAttackedThisCombat
+    -- below: it reads Combat.attackers, so CR 506.4's removal from combat makes
+    -- it False. CR 506.4c is the case that keeps it from becoming True by
+    -- default -- a creature whose planeswalker or battle leaves stays an
+    -- attacking creature but "is not attacking any player", which is the Nothing
+    -- Pawl.Engine.Projection already answers by keeping only AttackTarget.OfPlayer.
+    IsAttackingPlayer PlayerRelation.PlayerRelation
   | -- | CR 508.3b / 508.1b: the candidate WAS DECLARED ATTACKED this COMBAT
     -- PHASE -- one or more creatures were declared as attackers attacking it.
     -- DeclaredAttackerThisCombat's mirror: that atom asks whether the candidate

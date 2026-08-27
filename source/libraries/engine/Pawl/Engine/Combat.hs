@@ -1467,8 +1467,10 @@ putOntoBattlefieldAttacking oid = do
 --
 -- The last two guards are REGRESSION FENCES rather than proved behaviour:
 -- dropping both leaves the whole suite green. Neither pooled producer can reach
--- them. Flash Foliage's target slot admits only an attacking creature an
--- opponent controls and is re-read at CR 608.2b; Aetherplasm's slot is the
+-- them. Flash Foliage's target slot is Filter.IsAttackingPlayer You, which
+-- is STRICTLY NARROWER than rule 506.3e's three cases -- it admits only a
+-- creature attacking the caster themselves, never one attacking a planeswalker
+-- they control -- and it is re-read at CR 608.2b; Aetherplasm's slot is the
 -- attacker its own blocking trigger bound, which CR 509.1a already had attacking
 -- that same defending player, a planeswalker they control or a battle they
 -- protect -- rule 506.3e's three cases exactly. So no board reaches this function with

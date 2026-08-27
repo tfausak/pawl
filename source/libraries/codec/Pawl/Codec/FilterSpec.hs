@@ -210,6 +210,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.IsAttacking
       " {\"type\":\"IsAttacking\"} "
+  Spec.it s "IsAttackingPlayer" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.IsAttackingPlayer PlayerRelation.You)
+      " {\"type\":\"IsAttackingPlayer\",\"value\":{\"type\":\"You\"}} "
   Spec.it s "IsBlocking" $
     Common.assertCodec
       s
@@ -412,6 +418,7 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
         isSource = Filter.IsSource
         ravenousRats = Filter.IsPlayer PlayerRelation.Opponent
         killShot = Filter.IsAttacking
+        flashFoliage = Filter.IsAttackingPlayer PlayerRelation.You
         relentlessAssault = Filter.AttackedThisTurn
         crownOfTheAges = Filter.And [Filter.HasSubtype Subtype.Aura, Filter.AttachedTo (Filter.HasCardType CardType.Creature)]
         labyrinthOfSkophos = Filter.Or [Filter.IsAttacking, Filter.IsBlocking]
@@ -447,6 +454,7 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
             isSource,
             ravenousRats,
             killShot,
+            flashFoliage,
             relentlessAssault,
             crownOfTheAges,
             labyrinthOfSkophos,

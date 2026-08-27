@@ -93,18 +93,10 @@
             "targetSlots": {
               "target": {
                 "filter": {
-                  "type": "And",
-                  "value": [
-                    {
-                      "type": "IsAttacking"
-                    },
-                    {
-                      "type": "ControlledBy",
-                      "value": {
-                        "type": "Opponent"
-                      }
-                    }
-                  ]
+                  "type": "IsAttackingPlayer",
+                  "value": {
+                    "type": "You"
+                  }
                 },
                 "pool": {
                   "type": "Creatures"

@@ -3989,6 +3989,36 @@ soloFoliageBoard forest attacker foliage =
       stocked = snd (S.addLibraryCard forest S.bob withCard)
    in (stocked, ours)
 
+-- soloFoliageBoard with bob's own JACE BELEREN added and FIVE loyalty counters
+-- on him. Everything else is that fixture's -- one attacker, three Forests for
+-- Flash Foliage's {2}{G}, the spell in hand, one card left in the library so its
+-- draw is not a CR 104.3c loss, and no creature for bob, so nothing can become a
+-- blocker except the token.
+--
+-- ONE attacker is the point: which of CR 508.1b's subjects it is announced at is
+-- then the ONLY legal target the board could offer, so a leg that announces it
+-- at Jace offers Flash Foliage no target at all rather than a different one.
+--
+-- Jace is what makes CR 509.1a's and CR 802.4a's three-way subject list
+-- observable at all: bob is the defending player either way (CR 508.5), and only
+-- a planeswalker on the board separates "attacking you" from it.
+--
+-- Returns the state, the attacker and Jace.
+planeswalkerFoliageBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+planeswalkerFoliageBoard forest jace attacker foliage =
+  let (gs0, mine, theirs) = S.combatBoardOf [attacker] [jace]
+      lands = List.foldl' (\g _ -> snd (S.addCreature forest S.bob g)) gs0 [1 :: Int, 2, 3]
+      (_, withCard) = S.addHandCard foliage S.bob lands
+      stocked = snd (S.addLibraryCard forest S.bob withCard)
+   in case (mine, theirs) of
+        ([attackerId], [jaceId]) -> Just (S.addCounter CounterKind.Loyalty 5 jaceId stocked, attackerId, jaceId)
+        _ -> Nothing
+
 -- Decline every block -- bob has nothing to declare anyway -- cast whatever is
 -- castable, and aim the target at `victim`. The offered set is FILTERED rather
 -- than replaced, so a leg whose target the card's own slot does not admit takes
@@ -4190,6 +4220,58 @@ putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldB
         Spec.assertEqWith s "control: nothing is blocking anything" (Combat.Type.blockers (GameState.combat uncast)) Map.empty
         Spec.assertEqWith s "control: bob's library is untouched" (length (Game.zoneMembers Zone.Library S.bob uncast)) 1
       _ -> Spec.assertFailure s "fixture should have two attackers"
+  -- CR 509.1a / CR 802.4a: "attacking you" is CR 508.1b's PLAYER and not CR
+  -- 508.5's defending player. Both rules write the subject list as three
+  -- separate things -- "attacking that player, a planeswalker they control, or a
+  -- battle they protect" -- so a creature attacking bob's planeswalker is not a
+  -- creature attacking bob, however squarely bob is its defending player.
+  --
+  -- Flash Foliage's target slot is Filter.IsAttackingPlayer You, and this is the
+  -- board that pays for it. Spelled And [IsAttacking, ControlledBy Opponent] --
+  -- what the card carried before -- the Thopter is a legal target on the
+  -- planeswalker leg, the spell resolves, a Saproling enters blocking it and bob
+  -- draws, none of which printed Flash Foliage can do here: with no legal target
+  -- it cannot be cast at all (CR 601.2c). Answering the atom off
+  -- Pawl.Engine.Defender.playerOfAttacker (CR 508.5) reintroduces exactly that,
+  -- that function folding all three of the rule's subjects onto one player.
+  --
+  -- A PAIR of legs off ONE board differing in exactly one thing: which of CR
+  -- 508.1b's subjects the lone attacker was announced at. The control leg is what
+  -- keeps the refusal from being an atom that answers False for everything.
+  Spec.it s "CR 509.1a / 802.4a whole card: Flash Foliage cannot name a creature attacking a planeswalker you control" $ do
+    forest <- S.printingOf s registry "Forest"
+    jace <- S.printingOf s registry "Jace Beleren"
+    thopter <- S.printingOf s registry "Spined Thopter"
+    foliage <- S.printingOf s registry "Flash Foliage"
+    case planeswalkerFoliageBoard forest jace thopter foliage of
+      Just (gs, attacker, jaceId) -> do
+        -- attackThePlaneswalker and S.aggressiveAnswer differ on exactly CR
+        -- 508.1b's announcement and agree on every other prompt.
+        let atJace = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) attackThePlaneswalker gs
+            atBob = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+            refused = runToEndOfCombat (castFoliage attacker) atJace
+            allowed = runToEndOfCombat (castFoliage attacker) atBob
+        Spec.assertEqWith s "the leg really did announce the attack at Jace (CR 508.1b)" (Map.lookup attacker (Combat.Type.attackers (GameState.combat atJace))) (Just (AttackTarget.OfPlaneswalker jaceId))
+        Spec.assertEqWith s "and the control leg at bob himself" (Map.lookup attacker (Combat.Type.attackers (GameState.combat atBob))) (Just (AttackTarget.OfPlayer S.bob))
+        -- GAMEPLAY FIRST, on the quantity the two readings of the slot differ
+        -- on: the Thopter's 2 reached Jace, so nothing blocked it. Under the old
+        -- spelling a Saproling did and this reads 5.
+        Spec.assertEqWith s "CR 306.8 / 509.1a: the attacker is attacking JACE and not bob, so Flash Foliage cannot block it and its 2 comes off loyalty" (S.counterOf CounterKind.Loyalty jaceId refused) 3
+        -- Still gameplay, and the reason: the spell was never cast, so its draw
+        -- never happened either.
+        Spec.assertEqWith s "CR 601.2c: with no legal target it was not cast, so bob never drew" (length (Game.zoneMembers Zone.Library S.bob refused)) 1
+        Spec.assertEqWith s "and no token was created" (S.tokensOf refused) []
+        Spec.assertEqWith s "so nothing is blocking anything" (Combat.Type.blockers (GameState.combat refused)) Map.empty
+        -- Anti-vacuity, and the narrowness of the atom: the creature IS an
+        -- attacking creature on the refused leg. What it is not is one attacking
+        -- bob.
+        Spec.assertBool s (Map.member attacker (Combat.Type.attackers (GameState.combat refused))) "CR 508.1k: it is an attacking creature all the same"
+        -- The other leg: the SAME spell, the SAME board, announced at bob, goes
+        -- through.
+        Spec.assertEqWith s "control: announced at bob, the token blocks it and bob takes nothing" (S.lifeOf S.bob allowed) (Just 20)
+        Spec.assertEqWith s "control: and bob drew the card the spell says to draw" (length (Game.zoneMembers Zone.Library S.bob allowed)) 0
+        Spec.assertEqWith s "control: Jace was never attacked on that leg, so his loyalty is untouched" (S.counterOf CounterKind.Loyalty jaceId allowed) 5
+      Nothing -> Spec.assertFailure s "fixture should have one attacker and one planeswalker"
   -- CR 509.3d's third sentence -- "In addition, it will trigger if a creature is
   -- put onto the battlefield blocking that creature" -- the one form of CR 509.3
   -- that CR 509.4's "never blocked" leaves standing. Rules 509.3a and 509.3b
