@@ -131,7 +131,9 @@ data Face card = MkFace
     -- | CR 614: this face's replacement effects, active while it is on the
     -- battlefield. Read through Pawl.Engine.Projection.replacementsOf (never
     -- directly) so layer 6 LoseAllAbilities strips them uniformly, and so CR
-    -- 604.2's "as long as" clause on each is asked against the live board.
+    -- 604.2's "as long as" clause on each is asked against the board of the
+    -- moment -- the live one, less whatever an entry loop has materialized but
+    -- not entered (Pawl.Engine.Projection.boardAsEntering).
     replacementEffects :: [PrintedReplacement.PrintedReplacement (Effect.Effect card (GrantedAbility.GrantedAbility card))],
     -- | CR 603: this face's triggered abilities, read through
     -- Pawl.Engine.Projection.triggeredAbilitiesOf.

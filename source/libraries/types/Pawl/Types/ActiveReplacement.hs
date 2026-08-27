@@ -81,8 +81,11 @@ data ActiveReplacement = MkActiveReplacement
     -- row stays in GameState.replacements to be asked again.
     --
     -- The SAME posture Pawl.Types.PrintedReplacement.condition takes on a
-    -- permanent's static ability, and asked against the same board
-    -- (Pawl.Engine.Projection.replacementsOf). What differs is CR 109.5's "you":
+    -- permanent's static ability, and asked against the same board -- CR
+    -- 614.12a's, which holds no permanent that is mid-entry. This field's reader
+    -- is Pawl.Engine.Replacement.collect and that one's is
+    -- Pawl.Engine.Projection.replacementsOf; both narrow through
+    -- Pawl.Engine.Projection.boardAsEntering. What differs is CR 109.5's "you":
     -- `controller` above is baked, so a floating clause's "you" survives the
     -- resolution that is about to end.
     --

@@ -282,21 +282,28 @@ inForce gs =
       -- every board a walk that almost no board needs. One shared thunk, so the
       -- battlefield is scanned once per read rather than once per permanent.
       --
-      -- Reading COPIABLE values is enough for the reason given there -- a keyword
-      -- reaches a permanent either from its own copiable rules text or from a
-      -- grant, and a granting object stands on the battlefield or, being neither
-      -- a card nor a permanent (CR 114.5), in the command zone with its abilities
-      -- functioning there (CR 114.4). Both halves of the battlefield read go
-      -- through Pawl.Engine.Projection rather than the face, so a copy's own text
-      -- and its granting text are both seen (CR 707.2a); the command zone is
-      -- Projection.commandGrants, and Pawl.ProjectionSpec's "CR 702.16f an
-      -- emblem's granted protection still bars the red blocker" is its board.
-      -- Two holes remain: a minting keyword arriving through a stored continuous
-      -- effect or a keyword counter is on no base face (#833), and a grant from a
-      -- zone other than those two is not read at all (#2436).
+      -- Reading COPIABLE values is enough for the permanents -- a keyword reaches
+      -- a permanent either from its own copiable rules text or from a grant --
+      -- and both halves of that read go through Pawl.Engine.Projection rather
+      -- than the face, so a copy's own text and its granting text are both seen
+      -- (CR 707.2a). The grants that stand nowhere on the battlefield are the
+      -- other two disjuncts, mirroring Projection.gatherGiven's remaining arms as
+      -- replacementsAffecting's gate does: a stored continuous effect (CR
+      -- 611.2a), and a static ability functioning from the command zone, the
+      -- stack, a graveyard, a hand or a library (CR 114.4, CR 113.6).
+      -- Pawl.ProjectionSpec's three "still bars the ... blocker" boards are one
+      -- each.
+      --
+      -- Not implemented: a minting keyword arriving on a CR 122.1b keyword
+      -- counter is on no base face and in neither disjunct -- decayed is on rule
+      -- 122.1b's list and mints rule 702.147a's "can't block" (#2452). The twin
+      -- gate in Pawl.Engine.Projection needs no such note: rule 122.1b's list and
+      -- Keyword.mintsReplacement's set are disjoint.
       anyMinted =
         any baseCouldMint (Set.toList (GameState.battlefield gs))
-          || Projection.commandGrants (Projection.grantsKeywordWhere Keyword.mintsCombatRestriction) gs
+          || Projection.storedWrites minting gs
+          || Projection.elsewhereGrants minting gs
+      minting = Projection.grantsKeywordWhere Keyword.mintsCombatRestriction
       baseCouldMint oid =
         any (any (Projection.grantsKeywordWhere Keyword.mintsCombatRestriction) . StaticAbility.modifications) (Projection.staticAbilitiesOf oid gs)
           || Projection.anyCopiableKeyword Keyword.mintsCombatRestriction oid gs

@@ -29,15 +29,17 @@ data PrintedReplacement effect = MkPrintedReplacement
     --
     -- Asked when the event would happen, never latched: CR 604.1 makes a static
     -- ability "simply true", so there is no moment at which the clause is checked
-    -- and stored. Pawl.Engine.Projection.replacementsOf asks it against the live
-    -- board, which is why the monarchy changing hands turns Jared's shield off
-    -- with no trigger and no resolution in between.
+    -- and stored. Pawl.Engine.Projection.replacementsOf asks it against
+    -- Pawl.Engine.Projection.boardAsEntering, which is the live board outside an
+    -- entry loop -- so the monarchy changing hands turns Jared's shield off with
+    -- no trigger and no resolution in between -- and the live board minus every
+    -- permanent that is materialized but not entered while one runs (CR 614.12a).
     --
-    -- The twin on Pawl.Types.Replace reads the same way, for CR 614.1's reason
-    -- rather than CR 604.1's: it rides the floating row a resolution installs and
-    -- Pawl.Engine.Replacement.collect asks it as the event would happen. What
-    -- differs is CR 109.5's "you" -- that row bakes its controller, this one
-    -- reads it live off the battlefield.
+    -- The twin on Pawl.Types.Replace reads the same way, and off the same board,
+    -- for CR 614.1's reason rather than CR 604.1's: it rides the floating row a
+    -- resolution installs and Pawl.Engine.Replacement.collect asks it as the
+    -- event would happen. What differs is CR 109.5's "you" -- that row bakes its
+    -- controller, this one reads it live off the battlefield.
     condition :: Maybe Condition.Condition,
     effect :: ReplacementEffect.ReplacementEffect effect,
     -- | The name another clause of the SAME card uses to refer to the static
