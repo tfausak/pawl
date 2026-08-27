@@ -31,6 +31,12 @@
 -- targets, so its case is about CR 601.2c's one announcement over two slots
 -- rather than about the pool alone.
 --
+-- Fall of the Hammer is beside it because it is the other way one slot can
+-- depend on another: not the POOL a slot draws from but the FILTER it is
+-- narrowed by, which is CR 601.2c's "another" between two slots of one
+-- announcement. Its case reads the same union-offer plus joint-check pair
+-- Dwell's does, and turns on an announcement the joint check has to reject.
+--
 -- Cancel and Stifle's case has a third beside it, on the same pool one rule
 -- over: CR 115.5's self-exclusion for an ABILITY, which Adric, Mathematical
 -- Genius is the first card in the pool to make reachable. It is a fence rather
@@ -40,6 +46,11 @@
 -- KEYWORD IS THERE AT ALL. Dawnglade Regent grants it through a CR 604.2 "as
 -- long as you're the monarch" clause, so the same Doom Blade answers both ways
 -- across CR 725.5's no-monarch window.
+--
+-- The last group is the other side of the split again, and the only one about a
+-- slot's own FILTER rather than about a restriction or a pool: Razorfin
+-- Abolisher's "target creature with a counter on it" is CR 122.1 asked
+-- kind-agnostically, and it is here because what it narrows is admission.
 --
 -- Gameplay-level: every target slot under test is read out of a committed card rather
 -- than hand-built, and the cases that turn on an effect cast and resolve through
@@ -68,6 +79,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
@@ -173,6 +185,27 @@ aimingDwellShuffling :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 aimingDwellShuffling oids p = case p of
   Prompt.Shuffle ids -> reverse ids
   _ -> aimingDwell oids p
+
+-- CR 601.2c's whole announcement for Fall of the Hammer: `dealerId` in the
+-- dealer slot and `victimId` in the victim slot. Both counts are fixed at one,
+-- so there is no Prompt.AnnounceTargets to answer.
+--
+-- FILTERED out of the offered set rather than built, which is the posture
+-- Pawl.CopySpec's answerers take: Pool.Creatures offers Recipient.ToCreature,
+-- and a hand-built recipient of another shape would be dropped at CR 608.2b's
+-- re-read with no error. The case that names the same creature in both slots
+-- therefore also depends on that creature being OFFERED for the victim slot,
+-- which the union assertion in the same case pins.
+aimingHammer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimingHammer dealerId victimId p = case p of
+  Prompt.ChooseTargets _ _ _ asked ->
+    Map.mapWithKey
+      ( \slot (_, offered) ->
+          let wanted = if slot == SlotName.MkSlotName (Text.pack "dealer") then dealerId else victimId
+           in Set.filter ((==) (Just wanted) . Recipient.objectOf) offered
+      )
+      asked
+  _ -> S.identityAnswer p
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
@@ -1454,6 +1487,73 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "naming bob and a card in CAROL's graveyard, the cast is reversed (CR 601.2)" (length (GameState.stack castAtCarol)) 0
     Spec.assertBool s (elem dwellId (Game.zoneMembers Zone.Hand S.alice castAtCarol)) "and the spell is back in alice's hand"
 
+  -- CR 601.2c's other sibling-slot reading, and the one the rule states in its
+  -- own words: "The same target can't be chosen multiple times for any one
+  -- instance of the word 'target' on the spell. However, if the spell uses the
+  -- word 'target' in multiple places, the same object or player can be chosen
+  -- once for each instance of the word 'target'." Sharing between two slots is
+  -- the rule's DEFAULT, so a card that forbids it says "another", and the
+  -- restriction lives in that slot's own Filter rather than in the machinery.
+  --
+  -- Fall of the Hammer {1}{R} Instant (data/cards/fall-of-the-hammer.json):
+  -- "Target creature you control deals damage equal to its power to another
+  -- target creature." The victim slot is Filter.Not (Filter.IsBound "dealer"),
+  -- which reads what the dealer slot holds -- the first card in the pool whose
+  -- slots depend on each other through a FILTER rather than through a pool
+  -- (Dwell on the Past above is the pool reading).
+  --
+  -- Rabid Bite is the same card one word apart: same two Pool.Creatures slots,
+  -- same DealDamage off AgainstSlot/Power, and "target creature you don't
+  -- control" where this prints "another target creature". So the Wall is the
+  -- discriminator that matters: it is ALICE's, and naming it is legal here,
+  -- which "another" as a controller test would reject.
+  --
+  -- The three runs differ in exactly one thing apiece -- which creature fills
+  -- the victim slot -- off one board, with the same {1}{R} paid off the same two
+  -- Mountains, and the Piker is the dealer in all three.
+  --
+  -- Damage is read BEFORE state-based actions, so the 2/1 Piker naming itself
+  -- would still be readable had the announcement gone through; a self-damage
+  -- reading is not hidden behind CR 704.5g.
+  Spec.it s "CR 601.2c Fall of the Hammer's victim slot cannot be the creature its dealer slot names" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wall <- S.printingOf s registry "Wall of Stone"
+    rats <- S.printingOf s registry "Typhoid Rats"
+    hammer <- S.printingOf s registry "Fall of the Hammer"
+    let (dealerId, g1) = S.addCreature piker S.alice (S.landsInPlay mountain 2)
+        (wallId, g2) = S.addCreature wall S.alice g1
+        (ratsId, g3) = S.addCreature rats S.bob g2
+        (board, hammerId) = S.handOne hammer g3
+        run victimId =
+          let cast = S.runPure (aimingHammer dealerId victimId) board (S.cast S.alice hammerId)
+           in (cast, S.runPure (aimingHammer dealerId victimId) cast Stack.resolveTop)
+        (castAtSelf, atSelf) = run dealerId
+        (_, atRats) = run ratsId
+        (_, atWall) = run wallId
+        slots = Modal.allTargetSlots (Face.spell (S.combinedFace hammer))
+        offered = Target.legalSets (Just S.alice) Map.empty S.noSource slots board
+        slotNamed name = Map.findWithDefault Set.empty (SlotName.MkSlotName (Text.pack name)) offered
+    -- The behaviour first: naming the Piker in both slots is not an announcement
+    -- the rule allows, so CR 601.2e returns the game to before the proposal.
+    Spec.assertEqWith s "naming the Piker in BOTH slots, the cast is reversed (CR 601.2e)" (length (GameState.stack castAtSelf)) 0
+    Spec.assertEqWith s "so the Piker was never dealt its own two damage" (S.damageOf dealerId atSelf) (Just 0)
+    Spec.assertBool s (elem hammerId (Game.zoneMembers Zone.Hand S.alice castAtSelf)) "and the spell is back in alice's hand"
+    Spec.assertEqWith s "naming bob's Rats instead, the Piker's two damage is marked on them" (S.damageOf ratsId atRats) (Just 2)
+    Spec.assertEqWith s "with the Piker itself unharmed" (S.damageOf dealerId atRats) (Just 0)
+    -- CR 601.2c's "another" is about the OBJECT, not its controller: alice's own
+    -- Wall is a legal victim, which is the whole difference from Rabid Bite.
+    Spec.assertEqWith s "naming alice's own Wall, the same two damage is marked on it" (S.damageOf wallId atWall) (Just 2)
+    -- The union posture, last: the victim slot is still OFFERED the Piker at CR
+    -- 601.2c, which is what makes the first assertion a joint-check rejection
+    -- rather than a slot the fix emptied.
+    Spec.assertEqWith
+      s
+      "the victim slot is offered every creature, the dealer's own candidate included"
+      (slotNamed "victim")
+      (Set.fromList (fmap Recipient.ToCreature [dealerId, wallId, ratsId]))
+    Spec.assertEqWith s "and the dealer slot only alice's two" (slotNamed "dealer") (Set.fromList (fmap Recipient.ToCreature [dealerId, wallId]))
+
   -- CR 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is
   -- a number." Flensing Raptor's enters trigger reads "another target creature
   -- you control with toxic", which names the ABILITY rather than one written
@@ -1654,3 +1754,140 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         -- implementation that asked "is there a monarch at all" would get wrong.
         let bobCrowned = S.withMonarch S.bob crowned
         Spec.assertBool s (Set.member (Recipient.ToCreature regentId) (legalFor S.bob bobCrowned)) "with bob wearing the crown, alice's Regent has no hexproof"
+
+  -- CR 122.1: "A counter is a marker placed on an object or player ...". Razorfin
+  -- Abolisher's slot asks whether the candidate has one AT ALL, with no kind to
+  -- look up -- Filter.HasCountersOfAnyKind, the kind-agnostic sibling of the
+  -- HasCounters atom Renegade Krasis writes.
+  --
+  -- Razorfin Abolisher {2}{U} Creature -- Merfolk Wizard (EVE), "{1}{U}, {T}:
+  -- Return target creature with a counter on it to its owner's hand." (name,
+  -- cost, type line, P/T and Oracle text checked against api.scryfall.com,
+  -- 2026-08-27). Nothing is omitted, so pawl's card is neither stricter nor
+  -- weaker than printed.
+  --
+  -- TWO candidates on bob's side, because one board cannot discriminate the atom
+  -- alone:
+  --
+  --   * a Hill Giant carrying a STUN counter -- the only legal target. The kind is
+  --     deliberately not +1/+1: a HasCounters PlusOnePlusOne written by mistake
+  --     admits nothing here, so the case would fail rather than pass.
+  --   * a Goblin Piker carrying none -- rejected by the atom alone. Without it the
+  --     legal set is a singleton whatever the filter says, and "the Giant was
+  --     returned" would prove nothing about counters.
+  --
+  -- Different names and different P/T, so which creature moved is read off the
+  -- printed name in bob's hand. The Abolisher settles first: CR 302.6 makes its
+  -- {T} illegal otherwise, and it is itself a third counterless creature the
+  -- filter must keep out.
+  razorfinSpec s registry
+
+razorfinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+razorfinSpec s registry = Spec.describe s "HasCountersOfAnyKind (CR 122.1)" $ do
+  Spec.it s "CR 122.1 Razorfin Abolisher returns the creature with a counter on it" $ do
+    built <- razorfinBoard s registry
+    giant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    case built of
+      Nothing -> Spec.assertFailure s "Razorfin Abolisher should print one activated ability"
+      Just (board, ability, giantId, pikerId) -> do
+        -- The fixture's own preconditions: the counter really is there, it is
+        -- really not a +1/+1 one, and the other creature really has none -- so
+        -- nothing below can pass because S.addCounter missed.
+        Spec.assertEqWith s "CR 122.1 the Giant carries one stun counter" (S.counterOf CounterKind.Stun giantId board) 1
+        Spec.assertEqWith s "and no +1/+1 counter, which is not the kind under test" (S.counterOf CounterKind.PlusOnePlusOne giantId board) 0
+        Spec.assertEqWith s "with the Piker carrying none of either" (S.counterOf CounterKind.Stun pikerId board + S.counterOf CounterKind.PlusOnePlusOne pikerId board) 0
+        let after = activateAt giantId board (abolisherOf board) ability
+        -- THE GAMEPLAY ASSERTION.
+        Spec.assertBool s (not (S.onBattlefield giantId after)) "CR 122.1 the creature with a counter on it left the battlefield"
+        Spec.assertBool s (elem (S.printingName giant) (namesInHand S.bob after)) "and CR 400.7's new object is in its OWNER's hand"
+        Spec.assertBool s (S.onBattlefield pikerId after) "with the counterless creature untouched"
+        Spec.assertBool s (notElem (S.printingName piker) (namesInHand S.bob after)) "and nowhere near bob's hand"
+
+  -- WHAT THE ATOM BUYS, asked of the engine's own candidate set: the counterless
+  -- Piker is a creature bob controls and Pool.Creatures gathers it, so only CR
+  -- 122.1 keeps it out. The answerer asks for it and S.preferring falls back to
+  -- the smallest legal recipient when the offer does not hold it -- so a filter
+  -- that had admitted the Piker would have returned the Piker instead.
+  Spec.it s "CR 122.1 a creature with no counters on it is not a legal target" $ do
+    built <- razorfinBoard s registry
+    case built of
+      Nothing -> Spec.assertFailure s "Razorfin Abolisher should print one activated ability"
+      Just (board, ability, giantId, pikerId) -> do
+        let after = activateAt pikerId board (abolisherOf board) ability
+        -- THE GAMEPLAY ASSERTION, and the one the Piker's admission would change.
+        Spec.assertBool s (S.onBattlefield pikerId after) "CR 122.1 the counterless creature was never offered, so it stayed"
+        Spec.assertBool s (not (S.onBattlefield giantId after)) "and the countered one was returned in its place"
+
+  -- The admitted SET by identity, and AFTER the two cases above rather than
+  -- before them: a membership read is a proxy for what the ability does, and the
+  -- board is what this unit exists to move. It is here so that "the Piker stayed"
+  -- cannot be read as an activation that never happened.
+  Spec.it s "CR 601.2c the slot admits exactly the creature with a counter on it" $ do
+    built <- razorfinBoard s registry
+    case built of
+      Nothing -> Spec.assertFailure s "Razorfin Abolisher should print one activated ability"
+      Just (board, ability, giantId, pikerId) -> case soleTargetSlot (ActivatedAbility.modal ability) of
+        Nothing -> Spec.assertFailure s "Razorfin Abolisher's ability should declare one target slot"
+        Just theSlot -> do
+          let legal = Target.legalRecipients (Just S.alice) S.noSource theSlot board
+          Spec.assertEqWith s "CR 122.1 exactly the countered creature" legal (Set.singleton (Recipient.ToCreature giantId))
+          Spec.assertBool s (not (Set.member (Recipient.ToCreature pikerId) legal)) "the counterless one is not in it"
+          Spec.assertBool s (not (Set.member (Recipient.ToCreature (abolisherOf board)) legal)) "nor alice's own counterless Abolisher"
+
+-- Razorfin Abolisher's board: alice's settled Abolisher and two Islands for the
+-- {1}{U}, bob's Hill Giant carrying a stun counter and his counterless Goblin
+-- Piker. Nothing if the printing stopped declaring exactly one ability.
+razorfinBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (Maybe (GameState.GameState, ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card), ObjectId.ObjectId, ObjectId.ObjectId))
+razorfinBoard s registry = do
+  abolisher <- S.printingOf s registry "Razorfin Abolisher"
+  island <- S.printingOf s registry "Island"
+  giant <- S.printingOf s registry "Hill Giant"
+  piker <- S.printingOf s registry "Goblin Piker"
+  pure $ case soleActivatedAbility abolisher of
+    Nothing -> Nothing
+    Just ability ->
+      let (_, g1) = S.addCreature abolisher S.alice (Setup.emptyGame S.bothPlayers)
+          -- CR 302.6: the Abolisher's cost carries {T}, so it must have settled.
+          settled = S.runPure S.identityAnswer g1 (Engine.settleAll S.alice)
+          (_, g2) = S.addCreature island S.alice settled
+          (_, g3) = S.addCreature island S.alice g2
+          (giantId, g4) = S.addCreature giant S.bob g3
+          (pikerId, g5) = S.addCreature piker S.bob g4
+          board = (S.addCounter CounterKind.Stun 1 giantId g5) {GameState.priority = Just S.alice}
+       in Just (board, ability, giantId, pikerId)
+
+-- Activate `ability` off `srcId` aimed at `oid`, and resolve it. One answerer
+-- serves both halves -- CR 602.2b's announcement and the resolution -- which is
+-- the shape the Withered Wretch cases above already have.
+activateAt :: ObjectId.ObjectId -> GameState.GameState -> ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> GameState.GameState
+activateAt oid board srcId ability =
+  S.runPure (aimAtCreature oid) (S.runPure (aimAtCreature oid) board (Activate.activateAbility S.alice srcId ability)) Stack.resolveTop
+
+-- The Abolisher on the battlefield, by printed name. Read off the board rather
+-- than returned by the fixture, which keeps its tuple to the two candidates the
+-- cases discriminate between. S.noSource when it is not there, which no case
+-- reaches -- the fixture put it on the battlefield.
+abolisherOf :: GameState.GameState -> ObjectId.ObjectId
+abolisherOf gs =
+  Maybe.fromMaybe
+    S.noSource
+    ( Maybe.listToMaybe
+        [ oid
+        | oid <- Set.toList (GameState.battlefield gs),
+          fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Razorfin Abolisher"))
+        ]
+    )
+
+-- The printed names of the cards in `pid`'s hand. CR 400.7 makes the returned
+-- permanent a new object, so an assertion about what moved reads the NAME.
+namesInHand :: PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
+namesInHand pid gs = Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers Zone.Hand pid gs)
+
+-- Aim every target slot at one creature, falling back to the smallest legal
+-- recipient when the offer does not hold it -- which is what makes "the engine
+-- never offered it" observable as a different permanent moving.
+aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtCreature oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just oid) . Recipient.objectOf) sets
+  _ -> S.identityAnswer p

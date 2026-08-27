@@ -1,0 +1,88 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "CreateEmblem",
+                        "value": {
+                          "faces": [
+                            {
+                              "name": "Synthetic Emblem Aegis Emblem",
+                              "replacementEffects": [
+                                {
+                                  "effect": {
+                                    "type": "DamageR",
+                                    "value": {
+                                      "matching": {
+                                        "whatRecipient": {
+                                          "type": "And",
+                                          "value": [
+                                            {
+                                              "type": "HasCardType",
+                                              "value": {
+                                                "type": "Creature"
+                                              }
+                                            },
+                                            {
+                                              "type": "ControlledBy",
+                                              "value": {
+                                                "type": "You"
+                                              }
+                                            }
+                                          ]
+                                        },
+                                        "whichKind": {
+                                          "type": "Noncombat"
+                                        }
+                                      },
+                                      "rewrite": {
+                                        "type": "PreventAll"
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Synthetic Emblem Aegis",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

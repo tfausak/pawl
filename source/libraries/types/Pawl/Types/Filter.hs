@@ -793,6 +793,31 @@ data Filter keyword
     -- IsToken it is not immutable -- a permanent taps and untaps constantly --
     -- but mutability is not what filterReads asks about.
     IsTapped
+  | -- | CR 110.5: the candidate is a FACE-DOWN permanent -- the other value of
+    -- the same status category IsTapped reads one of. Break Open's "target
+    -- face-down creature an opponent controls" is this atom beside a ControlledBy
+    -- Opponent conjunct, the split Transformed's comment describes. "Face up" is
+    -- spelled `Not IsFaceDown`, the one-relation-one-spelling posture IsToken's
+    -- comment states (#163).
+    --
+    -- The battlefield conjunct is the atom's own, Transformed's posture and for
+    -- the rule's own reason rather than a caller's: CR 110.5d says only permanents
+    -- have status, and CR 708.4 turns an object face down BEFORE it is put onto
+    -- the stack, so a face-down SPELL would otherwise answer True to a Count
+    -- scoped over some other zone.
+    --
+    -- NOT face-down EXILE, which CR 110.5d rules out in as many words -- "although
+    -- an exiled card may be face down, this has no correlation to the face-down
+    -- status of a permanent". Object.exiledFaceDown is that other thing and this
+    -- atom never reads it; Pawl.Types.Facing has the rest of the distinction.
+    --
+    -- Uncharacteristic, like IsToken and IsTapped: CR 110.5a says status is not a
+    -- characteristic in as many words, so nothing in CR 613 writes it and
+    -- Pawl.Engine.Projection.filterReads declares this atom as reading nothing.
+    -- CR 708.2a's 2/2 with no name is the CONSEQUENCE of the status and is
+    -- projected normally, which is what lets a face-down permanent clear a
+    -- creature pool for this atom to narrow.
+    IsFaceDown
   | -- | CR 701.27g: the candidate is a "transformed permanent" -- a double-faced
     -- permanent on the battlefield with its back face up. Mutagen Connoisseur's
     -- "for each transformed permanent you control", whose "you control" is a
@@ -884,6 +909,27 @@ data Filter keyword
     -- a +1/+1 counter grants is CR 613.4c's, which the projection applies over the
     -- top of what this atom reads.
     HasCounters (CounterKind.CounterKind keyword)
+  | -- | CR 122.1 again, kind-agnostic: does the CANDIDATE have one or more
+    -- counters on it of ANY kind? Razorfin Abolisher's "target creature with a
+    -- counter on it".
+    --
+    -- A SEPARATE nullary atom rather than a Maybe payload on HasCounters above,
+    -- which is the call Quantity.ObjectCountersOfAnyKind made one type over
+    -- (see #994): an absent payload standing for "every kind" makes a field's
+    -- ABSENCE the way a reader tells two questions apart, and the two questions
+    -- are asked by different printings rather than by one printing with a hole
+    -- in it. It also keeps CR 612.1's rewrite simple -- HasCounters is rewritten
+    -- THROUGH its kind, and a kind-less atom has no word to swap.
+    --
+    -- Not spellable as an Or over the kinds: CR 122.1b lets a counter be a
+    -- KEYWORD counter, so CounterKind carries a whole Keyword and is not
+    -- enumerable. There is no finite disjunction a card author could write, which
+    -- is why this atom has to exist rather than being sugar.
+    --
+    -- Uncharacteristic, for HasCounters' reason above, and
+    -- Pawl.Engine.Projection.filterReads declares it as reading nothing on the
+    -- same grounds.
+    HasCountersOfAnyKind
   | -- | CR 602.1 / 605.1a: does the CANDIDATE have one or more activated
     -- abilities that aren't mana abilities? Tsabo's Web's "each land with an
     -- activated ability that isn't a mana ability", and Ravager Wurm's second

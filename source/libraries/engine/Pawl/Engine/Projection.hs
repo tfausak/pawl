@@ -23,6 +23,8 @@ import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.AddActivationCost as AddActivationCost
+import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
@@ -92,6 +94,8 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
+import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
+import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -113,6 +117,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
+import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -120,6 +125,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
+import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.Plus as Plus
@@ -132,6 +138,8 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
+import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
@@ -144,6 +152,7 @@ import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
@@ -828,6 +837,10 @@ viewOfCard face =
           -- any zone this builder describes cease to exist.
           Filter.token = False,
           Filter.tapped = False,
+          -- CR 110.5d: only permanents have status, and this is a printed FACE
+          -- with no object behind it -- the rule's own answer rather than an
+          -- unknown, `transformed` below's reason one status category over.
+          Filter.faceDown = False,
           -- CR 701.27g asks about a permanent on the battlefield; this is a
           -- printed FACE with no object behind it, so the rule's own answer is
           -- False rather than an unknown.
@@ -1023,6 +1036,18 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 111.6: fixed for the life of the object (CR 400.7).
       Filter.token = Game.isToken oid gs,
       Filter.tapped = Game.isTapped oid gs,
+      -- CR 110.5's other status, and the only site that fills the field. Read off
+      -- Object.facing, never off the projection: CR 110.5a says status is not a
+      -- characteristic in as many words. Never Object.exiledFaceDown beside it,
+      -- which CR 110.5d says has no correlation to this.
+      --
+      -- The battlefield conjunct is CR 110.5d's own -- only permanents have
+      -- status -- and is a REGRESSION FENCE rather than a proved behaviour, for
+      -- `transformed` below's reason: the object it excludes is a face-down SPELL
+      -- on the stack (CR 708.4), which is reachable, but every pool that reaches
+      -- the atom today is already scoped to the battlefield, so dropping the
+      -- conjunct leaves the suite green.
+      Filter.faceDown = Set.member oid (GameState.battlefield gs) && maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs),
       -- CR 701.27g's two conjuncts, and the only site that fills the field. The
       -- face is read CURRENT -- Game.isFrontFaceUp reads Object.face, never the
       -- Object.turnedOverAt beside it -- which is the rule's first exclusion, a
@@ -1765,6 +1790,96 @@ rewriteAffected pairs a = case a of
   Affected.TheseObjects _ -> a
   Affected.Attached -> a
 
+-- CR 612.1's subtype word swap over a PlayerEffect, rewriteModification's sibling
+-- for the CR 613.10/613.11 axis. An Artificial Evolution resolved at an
+-- Edgewalker moves "Cleric spells you cast cost {W}{B} less to cast" onto the new
+-- word, because the word naming which spells the ability discounts is text
+-- printed on the permanent like any other.
+--
+-- HERE, beside the other printed-text rewrites, and NOT in
+-- Pawl.Engine.PlayerEffect, which is otherwise the only module that may case on
+-- this type: rewriteEffect's AffectPlayers arm has to reach the same descent for
+-- a restriction a RESOLUTION stores (Liliana, Untouched by Death's -3), and
+-- Pawl.Engine.PlayerEffect imports this module rather than the other way round.
+-- The exception is the same one rewriteEffect itself takes on the Effect type:
+-- this cases on STRUCTURE -- does this arm carry a Filter a swap could reach --
+-- and never on which player effect it is, so no rule in the closed half learns an
+-- effect's identity from it. Every other reader still asks a typed question of
+-- Pawl.Engine.PlayerEffect and never sees a constructor, and this module's own
+-- other handling of the rows stays opaque: they ride
+-- ProjectedCharacteristics.playerAbilities so a copy acquires them (CR 707.2a),
+-- and nothing there looks inside one.
+--
+-- The shape Pawl.Engine.CombatRestriction takes for a restriction -- destructure
+-- the type, hand each inner value to the module that owns it -- with
+-- Pawl.Engine.Filter.rewrite doing the descent.
+--
+-- Exhaustive rather than a catch-all, for rewriteModification's stated reason: a
+-- later arm that can hold a word must break this build instead of silently
+-- keeping the printed one.
+--
+-- CR 612.2's family gate is not restated at the Filter descent, for the reason
+-- Filter.rewrite's own comment gives: a HasSubtype atom may name a word of any
+-- family, so the family the word is used AS is the family it belongs to, and the
+-- exact lookup already asks CR 612.2's question. A Magical Hack's land-type pair
+-- therefore leaves Edgewalker's Cleric alone.
+rewritePlayerEffect :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> PlayerEffect.PlayerEffect -> PlayerEffect.PlayerEffect
+rewritePlayerEffect pairs effect = case effect of
+  -- The arms carrying a Filter, which is the only place in this type a subtype
+  -- word can hide. Thalia's "noncreature spells", Vedalken Orrery's "spells",
+  -- Prowling Serpopard's "creature spells", Heartstone's "activated abilities of
+  -- creatures", Damping Engine's "artifact, creature, or enchantment spells",
+  -- Oppressive Rays' "enchanted creature" and Yawgmoth's Will's "spells" and
+  -- Omniscience's "spells" name none today; Edgewalker's "Cleric spells" does on
+  -- the printed road, and Liliana, Untouched by Death's "Zombie spells" does on
+  -- the stored one.
+  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f n) -> PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.rewrite pairs f) n)
+  PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f n) -> PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost (Filter.rewrite pairs f) n)
+  PlayerEffect.ReduceSpellCost x -> PlayerEffect.ReduceSpellCost x {ReduceSpellCost.whichSpells = Filter.rewrite pairs (ReduceSpellCost.whichSpells x)}
+  -- TWO Filters of its own, and both descend. The second names
+  -- what the ability targets (Dwarven Mauler's "that target this creature",
+  -- spelled Filter.IsSource), so no card in `data/cards/` puts a subtype word
+  -- there today and neutralising that descent leaves the suite green -- it is
+  -- here so that the card which does write one cannot silently keep the printed
+  -- word.
+  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f family targets cost floor_) -> PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.rewrite pairs f) family (fmap (Filter.rewrite pairs) targets) cost floor_)
+  -- The two arms with a word in TWO places: their own criterion ("nontoken
+  -- Rebels"), and the criterion inside each component they add ("sacrifice a
+  -- LAND", "sacrifice a SWAMP"). Both descend, which is Filter.rewriteCost's
+  -- reading of CR 612.2 carried to a component that is added to a cost rather
+  -- than printed in one. The scale beside them names a COLOUR, which CR 612.2's
+  -- subtype pairs cannot reach.
+  PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost f components scale) -> PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.rewrite pairs f) (fmap (Filter.rewriteComponent pairs) components) scale)
+  PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components scale) -> PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost (Filter.rewrite pairs f) (fmap (Filter.rewriteComponent pairs) components) scale)
+  PlayerEffect.CastAsThoughItHadFlash f -> PlayerEffect.CastAsThoughItHadFlash (Filter.rewrite pairs f)
+  PlayerEffect.CantBeCountered f -> PlayerEffect.CantBeCountered (Filter.rewrite pairs f)
+  PlayerEffect.CantCastMatching f -> PlayerEffect.CantCastMatching (Filter.rewrite pairs f)
+  PlayerEffect.CastFromGraveyard f -> PlayerEffect.CastFromGraveyard (Filter.rewrite pairs f)
+  PlayerEffect.CastFromHandWithoutPayingManaCost f -> PlayerEffect.CastFromHandWithoutPayingManaCost (Filter.rewrite pairs f)
+  -- The rest name no word a subtype pair could reach. The two chosen-name arms
+  -- carry nothing at all -- CR 201.4's names are read off the source's
+  -- Object.chosenNames -- and CR 612.2's second sentence says a subtype swap
+  -- could not touch a card name even if they did. A count, a mana filter and a
+  -- player scope are not words either.
+  PlayerEffect.CantCastSpells -> effect
+  PlayerEffect.CantCastMoreThan _ -> effect
+  PlayerEffect.CantCastChosenName -> effect
+  PlayerEffect.CantPlayLandChosenName -> effect
+  PlayerEffect.PlayAdditionalLands _ -> effect
+  PlayerEffect.NoMaximumHandSize -> effect
+  PlayerEffect.SetMaximumHandSize _ -> effect
+  PlayerEffect.DontLoseUnspentMana _ -> effect
+  PlayerEffect.SpendManaAsThough _ -> effect
+  PlayerEffect.CantBeTargetedBy _ -> effect
+  PlayerEffect.DamageCantBePrevented _ -> effect
+  PlayerEffect.CantSearchLibraries -> effect
+  PlayerEffect.CantBecomeMonarch -> effect
+  PlayerEffect.CastOnlyAtSorcerySpeed -> effect
+  PlayerEffect.CantPlayLands -> effect
+  PlayerEffect.PlayLandsFromGraveyard -> effect
+  -- A counter KIND is not a word CR 612.2's subtype pairs could reach either.
+  PlayerEffect.CantGetCounters _ -> effect
+
 -- CR 612's subtype word swap over an effect's AST. Cases on an effect's
 -- STRUCTURE -- does this arm carry a word a swap could reach -- never on which
 -- effect it is.
@@ -1872,10 +1987,13 @@ rewriteEffect pairs effect = case effect of
   Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) ->
     Effect.PutCounters (PutCounters.MkPutCounters kind (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
   Effect.RemoveCounters {} -> effect
-  -- Filter.rewrite renames no slot, so neither bare slot is rewritten.
+  -- Filter.rewrite renames no slot, so none of the three bare slots is rewritten;
+  -- the count is a Quantity and goes through rewriteQuantity, PutCounters' case
+  -- above.
   -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
   -- printed keyword through the swap, PutCounters' case above (#1840).
-  Effect.MoveCounters {} -> effect
+  Effect.MoveCounters (MoveCounters.MkMoveCounters from kind quantity slot to) ->
+    Effect.MoveCounters (MoveCounters.MkMoveCounters from kind (rewriteQuantity pairs quantity) slot to)
   Effect.GainPlayerCounters {} -> effect
   Effect.RemovePlayerCounters {} -> effect
   Effect.PayAnyEnergy _ -> effect
@@ -1892,17 +2010,24 @@ rewriteEffect pairs effect = case effect of
   Effect.EndCombatPhase -> effect
   Effect.GainControl (DurationRef.MkDurationRef duration ref) -> Effect.GainControl (DurationRef.MkDurationRef (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
   Effect.ArmDelayedTrigger {} -> effect
-  -- CR 612.1 through the DURATION, the same descent every neighbouring arm here
-  -- makes: a stored player effect's "for as long as" clause is printed text, so a
-  -- Magical Hack on the spell while it is on the stack changes which word the
-  -- clause counts. The players axis names no word -- an AffectedPlayers is a
-  -- PlayerScope or a SlotName, and neither is a subtype.
+  -- CR 612.1 through BOTH halves that hold printed text, the same descent every
+  -- neighbouring arm here makes. The duration's "for as long as" clause is
+  -- printed text, so a Magical Hack on the spell while it is on the stack changes
+  -- which word the clause counts; the restriction's own Filter is printed text
+  -- too, so an Artificial Evolution on Liliana, Untouched by Death changes which
+  -- graveyard cards her -3 lets its controller cast. The players axis names no
+  -- word -- an AffectedPlayers is a PlayerScope or a SlotName, and neither is a
+  -- subtype.
   --
-  -- Not implemented: the Filter inside the PlayerEffect keeps its printed word
-  -- while the spell is on the stack, where the printed carrier's own copy of that
-  -- Filter is already rewritten by Pawl.Engine.PlayerEffect.rewritePlayerEffect
-  -- (#2223).
-  Effect.AffectPlayers x -> Effect.AffectPlayers x {AffectPlayers.duration = rewriteDuration pairs (AffectPlayers.duration x)}
+  -- rewritePlayerEffect is the SAME function the printed carrier's copy of that
+  -- Filter goes through (Pawl.Engine.PlayerEffect.printedRows), which is why it
+  -- lives beside rewriteModification rather than there.
+  Effect.AffectPlayers x ->
+    Effect.AffectPlayers
+      x
+        { AffectPlayers.duration = rewriteDuration pairs (AffectPlayers.duration x),
+          AffectPlayers.effect = rewritePlayerEffect pairs (AffectPlayers.effect x)
+        }
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) ->
     Effect.RequireBlock (RequireBlock.MkRequireBlock (rewriteDuration pairs duration) (rewriteObjectRef pairs blocker) (rewriteObjectRef pairs attacker))
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration ref) ->
@@ -2980,7 +3105,9 @@ candidatesFor a gs = case a of
 -- layer 6, and such a projection cannot see the layer-7 parts the gate drops.
 --
 -- Well-founded because nothing reachable from here reads a player effect back --
--- the module graph enforces it, since Projection does not import PlayerEffect.
+-- the module graph enforces it, since Projection does not import
+-- Pawl.Engine.PlayerEffect. (It does import Pawl.Types.PlayerEffect, for
+-- rewritePlayerEffect's text swap, which reads nothing back.)
 --
 -- CR 604.2's "as long as" gate IS asked, unlike inside gather: this reader is
 -- outside the fold, so it answers the gate against the seed list the way
@@ -3491,6 +3618,9 @@ filterReads f = case f of
   Filter.Type.IsToken -> Set.empty
   -- CR 110.5: tap status is not a characteristic, so no layer writes it.
   Filter.Type.IsTapped -> Set.empty
+  -- CR 110.5a again, one status category over: face-up/face-down is not a
+  -- characteristic either, so no layer writes it.
+  Filter.Type.IsFaceDown -> Set.empty
   -- Reads nothing: CR 712.8d/e make which face is up the thing characteristics
   -- are read OFF rather than one of them, so no Modification writes Object.face.
   Filter.Type.Transformed -> Set.empty
@@ -3509,6 +3639,9 @@ filterReads f = case f of
   -- Reads nothing: CR 109.3's characteristics do not include counters. The P/T a
   -- +1/+1 counter grants is CR 613.4c's, applied over the top of the set.
   Filter.Type.HasCounters _ -> Set.empty
+  -- CR 122.1 again, and reading nothing for the atom above's reason: CR 109.3's
+  -- list of characteristics has no counters in it, whichever kind is asked about.
+  Filter.Type.HasCountersOfAnyKind -> Set.empty
   -- CR 202.3 reads the printed mana cost, which no Modification writes.
   Filter.Type.ManaValueAtMost _ -> Set.empty
   Filter.Type.ManaValueIsEven -> Set.empty
@@ -4276,10 +4409,11 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 -- ability, so the layer system has nothing to remove.
 --
 -- The rule's FROM-ZONE is not in the pattern -- Pawl.Types.ZoneChangePattern has
--- no such field -- and does not need to be: replacementsAffecting gathers only
--- battlefield permanents, so a row minted here can only ever be a candidate
--- while its source is on the battlefield, which is exactly "from the
--- battlefield". Filter.IsSource is the rule's "this permanent", the self-scope
+-- no such field -- and does not need to be: replacementsAffecting gathers
+-- battlefield permanents and the command zone's emblems, and CR 122.1h mints
+-- this row from counters on a PERMANENT, which CR 114.5 says an emblem is not --
+-- so a row minted here can only ever be a candidate while its source is on the
+-- battlefield, which is exactly "from the battlefield". Filter.IsSource is the rule's "this permanent", the self-scope
 -- CR 614.1c's entry rows use.
 finalityOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 finalityOf oid gs =
@@ -4397,9 +4531,10 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
     -- same projection for CR 306.5b's reason: a subtype is not an ability.
     <> Saga.entryReplacementsOf pc
 
--- CR 614.1: every replacement effect active on the battlefield, PAIRED WITH ITS
--- SOURCE -- a ControllerRelation pattern (CR 109.5's "you") is unanswerable
--- without it. Short-circuits when no permanent has one in its copiable rules text.
+-- CR 614.1: every replacement effect active on the battlefield -- plus the
+-- emblems CR 113.6p keeps working in the command zone, see the walk -- PAIRED
+-- WITH ITS SOURCE, since a ControllerRelation pattern (CR 109.5's "you") is
+-- unanswerable without it. Short-circuits when nothing in either place has one.
 --
 -- The short-circuit reads COPIABLE values while the result reads the PROJECTION,
 -- sound only because every route to an unprinted replacement effect is covered:
@@ -4418,6 +4553,9 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- beside them: storedWrites is its `stored` arm (CR 611.2a) and elsewhereGrants
 -- its emblem, stack, graveyard, hand and library arms (CR 114.4, CR 113.6).
 -- Pawl.ProjectionSpec's three "still prevents the damage" boards are one each.
+-- A third disjunct sits beside them for a question that is not about a grant at
+-- all -- an emblem carrying its OWN printed row -- and the walk widens with it;
+-- both are argued where they are written.
 --
 -- gatherGiven's remaining three arms need no disjunct, and each for a reason
 -- rather than by omission. `designations` emits only menace (CR 701.60c) and
@@ -4464,9 +4602,48 @@ replacementsAffecting gs =
       -- ability does.
       mints m = grantsKeywordWhere Keyword.mintsReplacement m || grantsMintingType m
       elsewhereHas = storedWrites mints gs || elsewhereGrants mints gs
-   in if not (any baseHas onBattlefield || elsewhereHas)
+      -- CR 604.2's second limb: a static ability's replacement effect stays
+      -- active while the object with the ability remains "in the appropriate
+      -- zone, as described in rule 113.6", and CR 113.6p is the arm of that list
+      -- which names emblems -- CR 114.4 again, from the emblem's own rule. So an
+      -- emblem's own printed rows are gathered here, where the two grantor
+      -- disjuncts above find nothing: an emblem that grants nobody anything
+      -- writes no Modification for either of them to read, and CR 114.5 keeps it
+      -- off the battlefield `baseHas` walks.
+      --
+      -- EMBLEMS alone, where the gather takes the whole zone -- the narrowing
+      -- Pawl.Engine.CombatRestriction.inForce and Pawl.Engine.Event's `inCommand`
+      -- make for the same reason: the command zone also holds a commander and a
+      -- dungeon card, whose printed abilities CR 113.6's default leaves
+      -- functioning on the battlefield. Asking Source.OfEmblem is reading the
+      -- rulebook's own list (CR 113.6p), not an effect's identity. Nothing
+      -- OBSERVES that narrowing yet -- no card in data/cards/ puts a commander
+      -- carrying a printed replacement row into the command zone, and dropping
+      -- the filter leaves the suite green -- so it is a regression fence resting
+      -- on CR 113.6's default rather than a proved behaviour.
+      --
+      -- The gate disjunct is deliberately NOT folded into elsewhereGrants beside
+      -- it: that function asks what a Modification WRITES, and it is shared
+      -- verbatim with CombatRestriction.inForce's `anyMinted`, which does not ask
+      -- this question at all. Copiability is not asked either, unlike `baseHas`:
+      -- CR 114.3 makes the emblem's abilities the whole of it, and no copy effect
+      -- has an emblem to copy.
+      --
+      -- Not implemented: a printed replacement row functioning from a graveyard,
+      -- a hand, a library or the stack under CR 113.6b's stated set.
+      -- Pawl.Types.PrintedReplacement carries no functionsFrom field, where
+      -- Pawl.Types.StaticAbility does, so no row can state a zone and a walk past
+      -- this one has nothing to gate on (#2462).
+      isEmblem oid = case fmap Object.source (Game.lookupObject oid gs) of
+        Just (Source.OfEmblem _) -> True
+        _ -> False
+      emblems = filter isEmblem (Set.toList (GameState.command gs))
+      emblemHas oid = case Game.faceOf oid gs of
+        Nothing -> False
+        Just face -> not (null (Face.replacementEffects face))
+   in if not (any baseHas onBattlefield || elsewhereHas || any emblemHas emblems)
         then []
-        else concatMap forOne onBattlefield
+        else concatMap forOne (onBattlefield <> emblems)
 
 -- CR 611.2a: does any STORED continuous effect write a modification satisfying
 -- `p`? gatherGiven's `stored` arm, and a disjunct of each of the two
@@ -4489,8 +4666,9 @@ storedWrites p gs = any (p . ContinuousEffect.modification) (GameState.continuou
 -- write a modification satisfying `p`? storedWrites' sibling disjunct in both
 -- gates, and the other half of what a walk of the permanents cannot reach: an
 -- emblem's abilities function in the command zone and an emblem is neither a
--- card nor a permanent (CR 114.4 / 114.5), and CR 113.6 / 113.6b / 113.6f put a
--- card's abilities to work from the stack, a graveyard, a hand or a library.
+-- card nor a permanent (CR 114.4 / 114.5, the arm CR 113.6p names), and CR
+-- 113.6b / 113.6f put a card's abilities to work from the stack, a graveyard, a
+-- hand or a library.
 --
 -- anyConditional's walk with its predicate swapped, and sound for that
 -- function's reason: each arm reads the SAME list its walk in gatherGiven does.

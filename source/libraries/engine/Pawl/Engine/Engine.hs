@@ -808,6 +808,10 @@ placeBorne srcId pending = do
         Nothing -> fmap Seq.sort (Game.choose (Prompt.ChooseModes decider controller abilId legal selection))
       -- CR 603.3d: targets for the chosen mode(s) only, chosen as the ability is
       -- placed. A mode with no target slots asks nothing.
+      --
+      -- Not implemented: Target.selectionLegal's joint check, which is what
+      -- judges an answer whose slots read each other as CR 601.2c's one act
+      -- (#2472). Every such slot in the pool is on a spell.
       let slots = Modal.modesTargetSlots chosenModes modal
           sets = Target.legalSets (Just controller) bound srcId slots gs
       chosen <- Target.chooseTargets decider controller abilId slots sets

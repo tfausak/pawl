@@ -11,11 +11,21 @@ import qualified Pawl.Types.TargetCount as TargetCount
 -- creature"). This retires the whole hand-carved family of colour- and
 -- type-restricted target constructors (#40): each is now one data value.
 --
--- CR 601.2c's "another" is not a third field: it is Filter.Not Filter.IsSource
--- inside the Filter, which is what makes the exclusion agree with the Pool's own
--- recipient tagging. A separate field was applied by deleting a
--- Recipient.ToObject, which never matched the ToCreature tags a Creatures pool
--- produces, so "another target creature" did not exclude itself.
+-- CR 601.2c's "another" is not a third field: it is a Filter.Not inside the
+-- Filter, which is what makes the exclusion agree with the Pool's own recipient
+-- tagging. A separate field was applied by deleting a Recipient.ToObject, which
+-- never matched the ToCreature tags a Creatures pool produces, so "another
+-- target creature" did not exclude itself.
+--
+-- WHAT it excludes is what the printed word points at, and the two readings are
+-- different atoms: Filter.IsSource for the ability's own source (Flensing
+-- Raptor's "another target creature you control"), and Filter.IsBound for a
+-- SIBLING slot of the same announcement (Fall of the Hammer's second slot,
+-- "another target creature"). Rule 601.2c makes
+-- sharing between two instances of "target" the default, so the second is a
+-- restriction the card writes rather than one the machinery imposes;
+-- Pawl.Engine.Target.jointlyJudged is where an announcement carrying one is
+-- judged whole.
 --
 -- HOW MANY the slot takes is the `count` field (CR 601.2c), which covers CR
 -- 115.6's "up to one", every larger count, and "any number of target ..." with

@@ -69,6 +69,7 @@ blackCreature =
       Filter.canAttachToSubject = False,
       Filter.token = False,
       Filter.tapped = False,
+      Filter.faceDown = False,
       Filter.transformed = False,
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
@@ -116,6 +117,7 @@ devoidBigCreature =
       Filter.canAttachToSubject = False,
       Filter.token = False,
       Filter.tapped = False,
+      Filter.faceDown = False,
       Filter.transformed = False,
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
@@ -1275,6 +1277,25 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsToken)) "player"
 
+  -- CR 110.5. The atom is a bare field read, Transformed's shape below: the
+  -- battlefield scoping CR 110.5d demands lives in the BUILDER that fills the
+  -- field (Pawl.Engine.Projection.viewOfCharacteristics), so the gameplay-level
+  -- proof is Pawl.FaceDownSpec's Break Open group.
+  Spec.describe s "IsFaceDown" $ do
+    Spec.it s "matches a view whose permanent is face down" $ do
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.faceDown = True}) Filter.Type.IsFaceDown) "face down"
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.IsFaceDown)) "face up"
+
+    -- CR 110.5a says status is not a characteristic in as many words, so nothing
+    -- on the characteristic axes implies it -- and in particular CR 708.2a's 2/2
+    -- with no name is the CONSEQUENCE of the status rather than the status.
+    Spec.it s "is independent of every characteristic axis" $ do
+      Spec.assertBool s (not (Filter.matches self devoidBigCreature Filter.Type.IsFaceDown)) "power does not imply face down"
+
+    -- CR 110.5d: only permanents have status, and CR 109.1 makes a player none.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsFaceDown)) "player"
+
   -- CR 701.27g. The atom itself is a bare field read; both of the rule's
   -- exclusions live in the BUILDER that fills the field, so the gameplay-level
   -- proof is Pawl.TransformSpec's TransformedPermanent group.
@@ -1384,6 +1405,33 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
 
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.HasCounters CounterKind.PlusOnePlusOne))) "player"
+
+  -- CR 122.1 again with no kind to look up. The gameplay-level proof is
+  -- Pawl.TargetSpec's Razorfin Abolisher group; these cases are the plumbing
+  -- around it.
+  Spec.describe s "HasCountersOfAnyKind" $ do
+    -- The kind is what the atom above reads and this one does not: the same view
+    -- bears no -1/-1 counter, so a HasCounters MinusOneMinusOne written by
+    -- mistake would answer False here.
+    Spec.it s "matches a permanent bearing counters of any kind at all" $ do
+      Spec.assertBool s (Filter.matches self counteredCreature Filter.Type.HasCountersOfAnyKind) "any kind"
+      Spec.assertBool s (not (Filter.matches self counteredCreature (Filter.Type.HasCounters CounterKind.MinusOneMinusOne))) "not that kind"
+
+    Spec.it s "does not match a permanent with no counters at all" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.HasCountersOfAnyKind)) "none"
+
+    -- The `any (> 0)` half, which `not . Map.null` would get wrong. A REGRESSION
+    -- FENCE and not a proved behaviour: no door in the engine writes a
+    -- zero-valued key today (Pawl.Engine.Event's settleCounters declines a zero
+    -- placement, its removeCounters deletes the key), so no board reaches this
+    -- and the mutation to Map.null reddens here and nowhere else.
+    Spec.it s "does not match a permanent whose counter map is keyed at zero" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.counters = Map.fromList [(CounterKind.Stun, 0)]}) Filter.Type.HasCountersOfAnyKind)) "zero"
+
+    -- CR 122.1 puts counters on a player too, but Player.counters is the other
+    -- half and Quantity.PlayerCounters is what reads it -- see Filter.playerView.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.HasCountersOfAnyKind)) "player"
 
   -- CR 602.1 / 605.1a, read off the one field the builders fill. Whether an
   -- ability is a mana ability is decided there, not here, so these cases are the

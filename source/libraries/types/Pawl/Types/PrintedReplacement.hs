@@ -18,14 +18,19 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 -- through for the reason Pawl.Types.DamageR gives.
 data PrintedReplacement effect = MkPrintedReplacement
   { -- | The ability's "as long as" clause -- Jared Carthalion, True Heir's "while
-    -- you're the monarch" -- or Nothing for one that functions whenever its
-    -- permanent is on the battlefield, which is every other producer in the pool.
+    -- you're the monarch" -- or Nothing for one that functions from wherever CR
+    -- 604.2 leaves it functioning, which is every other producer in the pool.
     --
     -- A SECOND gate, on top of the one CR 604.2 already states, exactly as
     -- Pawl.Types.StaticAbility.condition is: the rule keeps the effect active
-    -- while the permanent is on the battlefield and has the ability, which
-    -- Pawl.Engine.Projection.replacementsAffecting applies by walking the
-    -- battlefield, and this narrows it further.
+    -- while the permanent is on the battlefield and has the ability, OR while the
+    -- object with the ability stays in the zone rule 113.6 names for it, which
+    -- for an emblem is the command zone (CR 113.6p / 114.4). Both limbs are
+    -- Pawl.Engine.Projection.replacementsAffecting's walk, and this narrows what
+    -- that walk gathers further.
+    --
+    -- No zone is stated HERE, unlike Pawl.Types.StaticAbility.functionsFrom, so
+    -- the walk decides the second limb's scope rather than the row (#2462).
     --
     -- Asked when the event would happen, never latched: CR 604.1 makes a static
     -- ability "simply true", so there is no moment at which the clause is checked
