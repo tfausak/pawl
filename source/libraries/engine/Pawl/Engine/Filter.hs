@@ -1152,8 +1152,6 @@ rewrite pairs predicate = case predicate of
   -- rule 612.1 does not reach either.
   Filter.CardsInGraveyardAtLeast _ -> predicate
   Filter.IsAttacking -> predicate
-  -- Untouched: the atom names a player RELATION rather than a slot, so CR 603.2's
-  -- map has nothing to substitute into it -- ControlledBy's posture above.
   Filter.IsBlocking -> predicate
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
@@ -1542,8 +1540,6 @@ bakeBound players predicate = case predicate of
   -- substitute into it. Baked one module out, as the atom above is.
   Filter.CardsInGraveyardAtLeast _ -> predicate
   Filter.IsAttacking -> predicate
-  -- Untouched for IsAttacking's reason: a player relation is no subtype word, and
-  -- neither is a combat status.
   Filter.IsBlocking -> predicate
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
