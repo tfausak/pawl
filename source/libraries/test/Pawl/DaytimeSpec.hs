@@ -22,9 +22,10 @@
 -- Scourge is the whole fixture, and one card supplies every half of the rule: a
 -- daybound front face (so a board with it on it becomes day, CR 702.145d), an
 -- upkeep trigger that says "it becomes night" (CR 731.1), and a nightbound back
--- face for the night to turn it over onto (CR 702.145c). Russet Wolves is the
--- only other card here, and only to reach the trigger's "three or more Wolves
--- and/or Werewolves"; restrictionSpec adds Moonmist, Forest and Humility.
+-- face for the night to turn it over onto (CR 702.145c). Russet Wolves is here
+-- only to reach the trigger's "three or more Wolves and/or Werewolves";
+-- restrictionSpec adds Moonmist, Forest and Humility, and anyNumberSpec adds
+-- Daybreak Ranger // Nightfall Predator.
 --
 -- Tovolar's second sentence -- "Then transform any number of Human Werewolves
 -- you control" -- is modeled and proved here, by anyNumberSpec. It needs a
@@ -76,6 +77,9 @@ faceNameOf oid gs = fmap Face.name (Game.faceOf oid gs)
 frontName :: CardName.CardName
 frontName = CardName.MkCardName (Text.pack "Tovolar, Dire Overlord")
 
+backName :: CardName.CardName
+backName = CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge")
+
 -- Daybreak Ranger's two faces. A Human Werewolf with NO daybound, so CR
 -- 702.145b's third static ability does not withhold the turn -- which is what
 -- makes it the one permanent Tovolar's second sentence can act on.
@@ -84,9 +88,6 @@ rangerFrontName = CardName.MkCardName (Text.pack "Daybreak Ranger")
 
 rangerBackName :: CardName.CardName
 rangerBackName = CardName.MkCardName (Text.pack "Nightfall Predator")
-
-backName :: CardName.CardName
-backName = CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge")
 
 -- CR 117.5's settle, which is where CR 702.145c/d/f/g are checked. Not
 -- S.settleSba: that runs the state-based actions alone, and these rules are

@@ -2081,31 +2081,6 @@ playerRefPlayers legal controller gs ref = case ref of
   where
     everyone = Game.stillPlaying gs
 
--- The objects an ObjectRef names DURING a resolution, and the ONE place a
--- filter-selected set is swept. InSlot takes every recipient CR 608.2b left legal
--- (CR 601.2c); a slot bound to a GROUP is answered before that question, a group
--- being a definition rather than a target (CR 115.10a).
---
--- EachMatching folds the battlefield (CR 109.2) against the projection, so a
--- permanent that is a creature only by a layer-4 effect is in the set. The filter
--- context is this effect's own -- CR 109.5's "you" is the ability's controller --
--- because the filter IS the ability's card text. EachCardInGraveyard is the same
--- fold over CR 400.1's per-player graveyards (CR 109.2a).
---
--- WHEN: at the moment the caller runs (CR 608.2c), and the list is then FIXED --
--- one half of CR 608.2f's simultaneous processing. The other half is the
--- caller's: it hands the whole list to its funnel as one batch rather than
--- calling it per element (Event.destroy's haddock).
---
--- The two callers that store a CONTINUOUS effect -- ModifyTarget and GainControl
--- -- owe CR 611.2c: the set is determined when the effect begins, so those arms
--- freeze this answer as Affected.TheseObjects. Nothing enforces it; a third
--- storing caller must not reach for Affected.Matching, a STATIC ability's set.
---
--- ORDER, for the arms folding over CR 400.1's per-player zones: APNAP (CR
--- 608.2f), then ascending ObjectId. The arms over a SHARED zone keep that zone's
--- own order (CR 101.4). `forEachOrder` is where CR 608.2f's secondary sentence
--- opens, and it asks rather than reading this order.
 -- CR 109.2's battlefield, narrowed by an effect-borne Filter and sorted into CR
 -- 608.2f's APNAP order. ObjectRef.EachMatching's whole answer, and the
 -- CANDIDATES ObjectRef.AnyNumberMatching offers -- shared so a card cannot find
@@ -2137,6 +2112,35 @@ battlefieldMatching legal resolving controller source gs filter_ =
         Just pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)
    in List.sortOn (\oid -> (seat oid, oid)) matching
 
+-- The objects an ObjectRef names DURING a resolution, for every arm whose answer
+-- is a READ. The arms that are a CR 608.2d QUESTION answer [] here and are
+-- carried out by the opcode arms that reach the Game monad. InSlot takes every
+-- recipient CR 608.2b left legal
+-- (CR 601.2c); a slot bound to a GROUP is answered before that question, a group
+-- being a definition rather than a target (CR 115.10a).
+--
+-- EachMatching folds the battlefield (CR 109.2) against the projection, so a
+-- permanent that is a creature only by a layer-4 effect is in the set -- through
+-- battlefieldMatching above, which is that fold and is shared with the
+-- AnyNumberMatching offer. The filter context is this effect's own -- CR 109.5's
+-- "you" is the ability's controller -- because the filter IS the ability's card
+-- text. EachCardInGraveyard is the same
+-- fold over CR 400.1's per-player graveyards (CR 109.2a).
+--
+-- WHEN: at the moment the caller runs (CR 608.2c), and the list is then FIXED --
+-- one half of CR 608.2f's simultaneous processing. The other half is the
+-- caller's: it hands the whole list to its funnel as one batch rather than
+-- calling it per element (Event.destroy's haddock).
+--
+-- The two callers that store a CONTINUOUS effect -- ModifyTarget and GainControl
+-- -- owe CR 611.2c: the set is determined when the effect begins, so those arms
+-- freeze this answer as Affected.TheseObjects. Nothing enforces it; a third
+-- storing caller must not reach for Affected.Matching, a STATIC ability's set.
+--
+-- ORDER, for the arms folding over CR 400.1's per-player zones: APNAP (CR
+-- 608.2f), then ascending ObjectId. The arms over a SHARED zone keep that zone's
+-- own order (CR 101.4). `forEachOrder` is where CR 608.2f's secondary sentence
+-- opens, and it asks rather than reading this order.
 objectRefObjects :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [ObjectId]
 objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.InSlot slot -> case slotGroup slot resolving gs of
@@ -6182,10 +6186,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- is all a turn IS here, every characteristic read already resolving
       -- through Game.faceOf. The victims were enumerated ONCE above (CR 608.2f),
       -- ahead of this write so no member of the batch is judged against a board a
-      -- sibling has already turned over on. WHICH
-      -- face is Pawl.Engine.Card.turnedOver's answer, off the card's layout,
-      -- which withholds a turn from a permanent that is not double-faced (CR
-      -- 701.27c) or whose other face is an instant or sorcery (CR 701.27d).
+      -- sibling has already turned over on. WHICH face is
+      -- Pawl.Engine.Card.turnedOver's answer, off the card's layout, which
+      -- withholds a turn from a permanent that is not double-faced (CR 701.27c)
+      -- or whose other face is an instant or sorcery (CR 701.27d).
       --
       -- CR 701.27b: turning over is its own game action, so it records its own
       -- event -- Event.recordTransformed, over the victims that ACTUALLY turned

@@ -4031,7 +4031,7 @@ effectFilters effect = case effect of
 -- what Pawl.Engine.Resolve implements, not of the card's alphabet.
 data Asks
   = -- | Read through Pawl.Engine.Resolve.objectRefObjects, which is pure and so
-    -- raises no prompt: every ObjectRef position but the two below.
+    -- raises no prompt: every ObjectRef position but the three below.
     AsksNothing
   | -- | Pawl.Engine.Resolve's Effect.MoveToZone gather, which runs in the Game
     -- monad. It asks the graveyard, hand and from-among arms; the random arm
@@ -6197,7 +6197,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "only a library has ends" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 608.2d: a choice an effect offers is announced while the effect is
   -- applied, so an opcode that gathers its objects through the pure
-  -- Pawl.Engine.Resolve.objectRefObjects cannot make one. Two arms of Resolve
+  -- Pawl.Engine.Resolve.objectRefObjects cannot make one. Three arms of Resolve
   -- reach the Game monad and ask instead, over DIFFERENT subsets -- see Asks --
   -- and a chooser-shaped ref written anywhere else names no object, so that share
   -- of the instruction is skipped (CR 101.3, CR 609.3) with nothing on the wire
