@@ -22,7 +22,9 @@ import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -59,6 +61,8 @@ import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry
@@ -510,6 +514,40 @@ elspethEmblemBoard s registry ultimate = do
         (True, ability : _) -> S.runPure S.identityAnswer armed (do Activate.activateAbility S.alice elspethId ability; Stack.resolveTop)
         _ -> armed
   pure (mine, theirs, carols, used {GameState.activePlayer = S.bob})
+
+-- Synthetic Warding Beacon, an artifact whose one ability is
+-- "{T}: You get an emblem with 'Creatures you control have protection from
+-- red.'" (data/cards/synthetic-warding-beacon.json). alice puts it out and taps
+-- it, so CR 114.2's emblem is in the command zone.
+--
+-- Activated rather than cast, elspethEmblemBoard's route: no fixture here has
+-- mana, and the ability states no timing restriction, so it also reaches a board
+-- already sitting in the declare attackers step.
+--
+-- The Beacon STAYS on the battlefield, and trips neither short-circuit while it
+-- is there: an artifact is none of copiableMintsType's three card types, and an
+-- activated ability is not a static one.
+wardedBoard :: Printing.Printing -> GameState.GameState -> GameState.GameState
+wardedBoard beacon gs =
+  let (beaconId, placed) = S.addCreature beacon S.alice gs
+   in case Face.activatedAbilities (S.combinedFace beacon) of
+        ability : _ -> S.runPure S.identityAnswer placed (do Activate.activateAbility S.alice beaconId ability; Stack.resolveTop)
+        [] -> placed
+
+-- Mark `amount` damage on one permanent through the funnel that consults the
+-- replacement effects, then run CR 704's state-based actions.
+dealTo :: ObjectId.ObjectId -> ObjectId.ObjectId -> Natural.Natural -> GameState.GameState -> GameState.GameState
+dealTo src victim amount gs =
+  S.settleSba
+    ( S.runPure
+        S.identityAnswer
+        gs
+        (Damage.applyDamage [DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) amount False False False 0 Nothing DamageKind.Noncombat])
+    )
+
+-- CR 702.16's quality: red, the colour Goblin Piker is and Cabal Evangel is not.
+fromRed :: Keyword.Keyword
+fromRed = Keyword.Protection (Filter.Type.HasColor Color.Red)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
@@ -3130,6 +3168,62 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         (fresh, afterFresh) = S.addCreature piker S.alice wiped
     Spec.assertEqWith s "the emblem is still in the command zone" (Set.size (GameState.command wiped)) 1
     Spec.assertEqWith s "and buffs the new creature" (Projection.powerOf fresh afterFresh, Projection.toughnessOf fresh afterFresh) (Just 4, Just 3)
+
+  -- CR 114.4 against the two BATTLEFIELD-WIDE SHORT-CIRCUITS --
+  -- Projection.replacementsAffecting's `baseHas` and
+  -- CombatRestriction.inForce's `anyMinted`. Both ask their "could anything here
+  -- mint one?" question of the battlefield alone, of each permanent's own
+  -- copiable text and of the GRANTORS standing on it; an emblem is neither a card
+  -- nor a permanent (CR 114.5) and its abilities function in the command zone (CR
+  -- 114.4), so it is the grantor neither gate walks.
+  --
+  -- Protection is what makes one emblem answer for both: rule 702.16e mints a
+  -- damage-prevention replacement and rule 702.16f a CR 509.1b pairwise
+  -- restriction, so a gate that skips the board loses each in turn.
+  --
+  -- Every other object on both boards is chosen to trip neither gate, which is
+  -- the whole trap: Cabal Evangel is a black 2/2 with no abilities and Goblin
+  -- Piker a red 2/1 with none, Setup.emptyGame and S.combatBoardOf put no land
+  -- down, and the Beacon carries an activated ability rather than a static one.
+  -- Elspeth's fixture above cannot show this -- a planeswalker trips `baseHas`
+  -- through copiableMintsType (CR 306.5b) on its own.
+  --
+  -- Synthetic (#2409): Scryfall `o:"emblem with" o:protection`, 2026-08-27, no
+  -- hit -- no printed emblem grants a keyword either short-circuit mints from.
+  -- Nothing in CR 114.3 bounds what abilities an emblem may have, so the card is
+  -- one the rules permit.
+  Spec.it s "CR 702.16e an emblem's granted protection still prevents the damage" $ do
+    beacon <- S.printingOf s registry "Synthetic Warding Beacon"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (mineId, g1) = S.addCreature evangel S.alice (Setup.emptyGame S.bothPlayers)
+        (blackId, g2) = S.addCreature evangel S.bob g1
+        (redId, g3) = S.addCreature piker S.bob g2
+        board = wardedBoard beacon g3
+        red = dealTo redId mineId 2 board
+        black = dealTo blackId mineId 2 board
+    Spec.assertBool s (S.onBattlefield mineId red) "the red source's 2 is prevented"
+    Spec.assertEqWith s "CR 615.6 with nothing marked on it" (S.damageOf mineId red) (Just 0)
+    Spec.assertBool s (not (S.onBattlefield mineId black)) "and the same 2 from the black source kills it, so 2 really is lethal here"
+    -- The fixture's own preconditions, after the behaviour so neither can absorb
+    -- a mutation aimed at it.
+    Spec.assertEqWith s "one emblem, in the command zone" (Set.size (GameState.command board)) 1
+    Spec.assertBool s (Projection.hasKeyword fromRed mineId board) "and the layer fold gave alice's creature the protection"
+    Spec.assertBool s (not (Projection.hasKeyword fromRed redId board)) "which bob's creature does not have"
+  Spec.it s "CR 702.16f an emblem's granted protection still bars the red blocker" $ do
+    beacon <- S.printingOf s registry "Synthetic Warding Beacon"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = S.combatBoardOf [evangel] [evangel, piker]
+        warded = wardedBoard beacon gs
+        board = snd (Engine.runGamePure S.aggressiveAnswer warded (Combat.declareAttackers S.alice))
+    case (mine, theirs) of
+      (attacker : _, [black, red]) -> do
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton red (Set.singleton attacker)) board)) "the red Goblin Piker may not block it"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton black (Set.singleton attacker)) board) "the black Cabal Evangel beside it may, so nothing else refused the declaration"
+        Spec.assertEqWith s "one emblem, in the command zone" (Set.size (GameState.command board)) 1
+        Spec.assertBool s (Projection.hasKeyword fromRed attacker board) "and the attacker really holds the protection"
+      _ -> Spec.assertFailure s "fixture should have one attacker and two blockers"
 
   Spec.it s "CR 613.1 projectUpTo stops before the bound layer" $ do
     -- A layer-7c modification is invisible to a projection bounded at

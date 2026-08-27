@@ -284,12 +284,19 @@ inForce gs =
       --
       -- Reading COPIABLE values is enough for the reason given there -- a keyword
       -- reaches a permanent either from its own copiable rules text or from a
-      -- grant whose granting permanent is on the battlefield -- and both halves
-      -- go through Pawl.Engine.Projection rather than the face, so a copy's own
-      -- text and its granting text are both seen (CR 707.2a). It inherits the
-      -- same hole: a minting keyword arriving through a stored continuous effect
-      -- or a keyword counter is on no base face (#833).
-      anyMinted = any baseCouldMint (Set.toList (GameState.battlefield gs))
+      -- grant, and a granting object stands on the battlefield or, being neither
+      -- a card nor a permanent (CR 114.5), in the command zone with its abilities
+      -- functioning there (CR 114.4). Both halves of the battlefield read go
+      -- through Pawl.Engine.Projection rather than the face, so a copy's own text
+      -- and its granting text are both seen (CR 707.2a); the command zone is
+      -- Projection.commandGrants, and Pawl.ProjectionSpec's "CR 702.16f an
+      -- emblem's granted protection still bars the red blocker" is its board.
+      -- Two holes remain: a minting keyword arriving through a stored continuous
+      -- effect or a keyword counter is on no base face (#833), and a grant from a
+      -- zone other than those two is not read at all (#2440).
+      anyMinted =
+        any baseCouldMint (Set.toList (GameState.battlefield gs))
+          || Projection.commandGrants (Projection.grantsKeywordWhere Keyword.mintsCombatRestriction) gs
       baseCouldMint oid =
         any (any (Projection.grantsKeywordWhere Keyword.mintsCombatRestriction) . StaticAbility.modifications) (Projection.staticAbilitiesOf oid gs)
           || Projection.anyCopiableKeyword Keyword.mintsCombatRestriction oid gs
