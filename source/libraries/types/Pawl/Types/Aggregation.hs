@@ -23,6 +23,8 @@ data Aggregation quantity
     -- one object rather than a narrower stand-in duplicating its arms.
     --
     -- Least and a summing arm are the obvious neighbours and are NOT here: no
-    -- card in the pool asks for them.
+    -- card in data/cards asks for them. Printed cards DO ask for the summing one
+    -- -- Sutured Ghoul and Wretched Bonemass each read "the total power of the
+    -- exiled cards" -- so it arrives with whichever of those lands first (#2482).
     Greatest quantity
   deriving (Eq, Ord, Show)

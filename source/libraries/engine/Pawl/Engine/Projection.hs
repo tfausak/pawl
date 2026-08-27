@@ -744,10 +744,19 @@ powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
 -- HOST is read at this same bound, and so are the permanents attached TO it,
 -- which keeps a Filter.AttachedTo or Filter.HasAttached reached from inside the
 -- fold out of a loop.
+--
+-- CR 208.5's substituted 0 rides along through noValueAt, which is what makes
+-- this reader agree with the finished fold's projectFrom, and with
+-- projectDeciding's running board, about a creature whose only source of a P/T
+-- value was stripped. That call is a REGRESSION FENCE and not a proven
+-- behaviour: mutating it away left the suite green (2026-08-27), no board in
+-- data/cards reaching a no-value creature through this reader rather than
+-- through the running board, where Pawl.PowerToughnessSpec's Synthetic Withering
+-- Comparison case proves it.
 viewUpTo :: Layer -> [Gathered] -> GameState -> Count.ViewOf
 viewUpTo bound cands gs oid =
   if Map.member oid (GameState.objects gs)
-    then Just (viewOfCharacteristics (viewUpTo bound cands gs) oid (projectUpTo bound cands oid gs) (controllerOf oid gs) (countersOf oid gs) gs)
+    then Just (viewOfCharacteristics (viewUpTo bound cands gs) oid (noValueAt bound (projectUpTo bound cands oid gs)) (controllerOf oid gs) (countersOf oid gs) gs)
     else Nothing
 
 -- The characteristics view of a printed card, from the FACE alone. The axes that
@@ -3881,11 +3890,14 @@ project oid gs = projectFrom (gather gs) oid gs
 -- can strip it first, and evaluated against the current state.
 --
 -- Folded in place rather than emitted as a synthetic Gathered: gather runs
--- BEFORE the fold and has no partial to read; CR 604.3 / 208.2a make a CDA
--- function in all zones while gather walks the battlefield only; a CDA has no
--- source and no timestamp to sort on under CR 613.7; and this one is DYNAMIC,
--- CR 707.2 making a copy recompute from the printed text rather than freeze a
--- number into Binding.copy at entry.
+-- BEFORE the fold and has no partial to read, and layer 6 is what decides
+-- whether the object still HAS the ability; CR 604.3 / 208.2a make a CDA
+-- function in all zones while gather walks the battlefield only; Gathered
+-- records a timestamp only for a gathered candidate, so there is none here to
+-- sort on -- an implementation fact and not a rules one, CR 604.3 making a CDA a
+-- static ability and CR 613.7a giving it the timestamp of the object it is on;
+-- and this one is DYNAMIC, CR 707.2 making a copy recompute from the printed
+-- text rather than freeze a number into Binding.copy at entry.
 --
 -- Quantity.determine rather than setPT, because CR 208.2a makes a CDA always
 -- produce a number: a creature whose CDA cannot be determined is a 0/0 that CR
@@ -3896,7 +3908,7 @@ project oid gs = projectFrom (gather gs) oid gs
 --
 -- Not implemented: CR 613.8a's clause (c) lets two CDAs depend on each other, so
 -- a CDA counting a characteristic another CDA defines sees the printed value
--- instead (#1332).
+-- instead (#2482).
 applyCharacteristicPT :: Count.ViewOf -> GameState -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyCharacteristicPT viewOf gs oid pc = case PC.characteristicPT pc of
   Nothing -> pc
@@ -3951,7 +3963,10 @@ projectDeciding admits cands = forObject
     countsItsOwnLayer c = not (Set.disjoint (modificationReads (gModification c)) (Map.findWithDefault Set.empty (gLayer c) writesByLayer))
     forObject oid gs =
       let applyLayer (partial, decided) lyr =
-            let -- What a Count sees when nothing at this layer can move it: the
+            let -- This layer's candidates, shared by the three readers below that
+                -- ask for them.
+                here = filter (\c -> gLayer c == lyr) cands
+                -- What a Count sees when nothing at this layer can move it: the
                 -- layers strictly below (CR 613.1).
                 bounded = viewUpTo lyr cands gs
                 -- CR 613.3: characteristic-defining abilities first, within the
@@ -4005,15 +4020,25 @@ projectDeciding admits cands = forObject
                 --
                 -- Not implemented: a snapshot carries CR 208.3's noncreature P/T
                 -- gate, which the projected object's mid-fold partial does not
-                -- (#1111); nor are objects outside the battlefield scanned, so a
-                -- MatchingAnywhere dependency in another zone is missed (#1112).
+                -- (#1111).
                 snapshot o =
                   let (p, d) = projectDeciding (\l -> admits l && l < lyr) cands o gs
                    in (seedFor o p, d)
                 -- Keyed rather than an association list, because resolve's ViewOf
                 -- looks an object up once per candidate a Count folds over.
                 -- WHNF-strict only, so the snapshots stay lazy.
-                otherBoards = Map.fromSet snapshot (Set.delete oid (GameState.battlefield gs))
+                --
+                -- CR 613.8a asks its question over an effect's whole affected
+                -- SET, and CR 613.1 names no zone, so the range is the battlefield
+                -- plus every object this layer's candidates can reach --
+                -- MatchingAnywhere, MatchingOffBattlefield and TheseObjects all
+                -- reach out of it. Narrowed to THIS layer's candidates, and
+                -- narrowed to their affected sets: an object no same-layer effect
+                -- applies to has the same state on the running board as under the
+                -- bound, so scanning it could not change an answer, and paying for
+                -- every library card on every board would.
+                reachable = Set.unions (GameState.battlefield gs : fmap (\c -> candidatesFor (gAffected c) gs) here)
+                otherBoards = Map.fromSet snapshot (Set.delete oid reachable)
                 -- CR 613.8b: an effect that depends on another waits for it, and
                 -- CR 613.7 timestamp order picks the next among those waiting on
                 -- nothing. Re-deriving `ready` each round IS CR 613.8c, and
@@ -4037,22 +4062,17 @@ projectDeciding admits cands = forObject
                         -- the layers below AND this layer's effects that have
                         -- already applied. No recursion, so nothing here has to
                         -- terminate. An object with no entry falls back to the
-                        -- bounded view, and noncreaturePT is CR 208.3, applied so
-                        -- the two agree. Another OBJECT is read off the running
-                        -- board too (CR 701.3a / CR 613.1).
+                        -- bounded view, and noncreaturePT (CR 208.3) and noValueAt
+                        -- (CR 208.5) are applied so the two agree. Another OBJECT
+                        -- is read off the running board too (CR 701.3a / CR
+                        -- 613.1). What still falls back is an id outside every
+                        -- same-layer candidate's affected set, which no effect at
+                        -- this layer has been applied to -- see reachable above.
                         --
-                        -- Not implemented: an object off the running board is
-                        -- projected but not scanned here, so a count reading a
-                        -- same-layer effect on one still gets the bound (#1332).
-                        -- A Tale for the Ages DOES put CR 303.4b's attachment
-                        -- atom in a CR 613.8-movable layer, its affected set
-                        -- being Matching -- but the reader is still unobserved:
-                        -- mutating it to `fullView` leaves the suite green,
-                        -- because no board in the pool makes a bounded view and
-                        -- a full one disagree here, and none loops. The CR
-                        -- 702.178a gate is not reached at all (gap #1757).
+                        -- The CR 702.178a gate A Tale for the Ages puts in a CR
+                        -- 613.8-movable layer is not reached at all (gap #1757).
                         viewOfBoard board o = case Map.lookup o board of
-                          Just (p, _) -> Just (viewOfCharacteristics (viewOfBoard board) o (noncreaturePT o gs p) (controllerOf o gs) (countersOf o gs) gs)
+                          Just (p, _) -> Just (viewOfCharacteristics (viewOfBoard board) o (noValueAt lyr (noncreaturePT o gs p)) (controllerOf o gs) (countersOf o gs) gs)
                           Nothing -> bounded o
                         view = viewOfBoard running
                         -- Every object CR 613.8a's question ranges over, the
@@ -4140,7 +4160,7 @@ projectDeciding admits cands = forObject
                     | gLayer c /= lyr || Map.member k ds -> ds
                     | otherwise -> Map.insert k (affectsGiven bounded (gSource c) oid (gAffected c) seeded gs) ds
              in if movableHere
-                  then resolve (seeded, decided) otherBoards (zip [0 :: Int ..] (effectUnits (filter (\c -> gLayer c == lyr) cands)))
+                  then resolve (seeded, decided) otherBoards (zip [0 :: Int ..] (effectUnits here))
                   else
                     -- Nothing here can be moved, so no candidate depends on any
                     -- other: CR 613.8 says nothing, CR 613.7 timestamp order
@@ -4160,7 +4180,7 @@ projectDeciding admits cands = forObject
                         applies c = case gEffect c of
                           Nothing -> affectsGiven bounded (gSource c) oid (gAffected c) seeded gs
                           Just k -> Map.findWithDefault False k decided'
-                        ordered = effectUnits (List.sortOn gTimestamp (filter (\c -> gLayer c == lyr && applies c) cands))
+                        ordered = effectUnits (List.sortOn gTimestamp (filter applies here))
                      in (List.foldl' (applyUnit bounded oid) seeded ordered, decided')
           (folded, decisions) = List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers
        in (noncreaturePT oid gs folded, decisions)
@@ -4193,14 +4213,23 @@ noValuePT pc
           PC.toughness = Just (Maybe.fromMaybe 0 (PC.toughness pc))
         }
 
+-- noValuePT at a projection bounded to the layers BELOW `bound`, which is what
+-- a Count reads mid-fold. "Has no value" is answerable exactly once CR 613.4a's
+-- sublayer has run: below layer 7a every star creature is legitimately without
+-- a value and substituting 0 there would report it for all of them, while from
+-- 7b on the question is settled and CR 208.5 answers it -- a creature whose CDA
+-- CR 305.7 stripped is a 0, not a blank, to anything counting it.
+--
+-- Layer's derived Ord is CR 613.1's order, so the comparison is the sublayer
+-- test. The precedent is noncreaturePT, CR 208.3's sibling, which the mid-fold
+-- readers already apply.
+noValueAt :: Layer -> ProjectedCharacteristics -> ProjectedCharacteristics
+noValueAt bound = if bound > Layer.CharacteristicPT then noValuePT else id
+
 -- Project one object against a PRECOMPUTED candidate list. gather is
 -- oid-independent, so a whole-board sweep gathers once and folds each object
--- (projectAll) instead of re-gathering per object. Where CR 208.5 goes, and
--- deliberately NOT inside projectWith: "has no value" cannot be asked of a
--- layer-bounded mid-fold view.
---
--- Not implemented: CR 208.5's substitution is likewise absent from the view a
--- Count reads mid-layer (#1332).
+-- (projectAll) instead of re-gathering per object. Where CR 208.5 goes for the
+-- FINISHED fold; noValueAt above is where it goes for a bounded one.
 projectFrom :: [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
 projectFrom cands oid gs = noValuePT (projectWith (const True) cands oid gs)
 
