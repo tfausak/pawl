@@ -4609,7 +4609,11 @@ replacementsAffecting gs =
       -- make for the same reason: the command zone also holds a commander and a
       -- dungeon card, whose printed abilities CR 113.6's default leaves
       -- functioning on the battlefield. Asking Source.OfEmblem is reading the
-      -- rulebook's own list (CR 113.6p), not an effect's identity.
+      -- rulebook's own list (CR 113.6p), not an effect's identity. Nothing
+      -- OBSERVES that narrowing yet -- no card in data/cards/ puts a commander
+      -- carrying a printed replacement row into the command zone, and dropping
+      -- the filter leaves the suite green -- so it is a regression fence resting
+      -- on CR 113.6's default rather than a proved behaviour.
       --
       -- The gate disjunct is deliberately NOT folded into elsewhereGrants beside
       -- it: that function asks what a Modification WRITES, and it is shared
@@ -4656,8 +4660,8 @@ storedWrites p gs = any (p . ContinuousEffect.modification) (GameState.continuou
 -- gates, and the other half of what a walk of the permanents cannot reach: an
 -- emblem's abilities function in the command zone and an emblem is neither a
 -- card nor a permanent (CR 114.4 / 114.5, the arm CR 113.6p names), and CR
--- 113.6b / 113.6f put a
--- card's abilities to work from the stack, a graveyard, a hand or a library.
+-- 113.6b / 113.6f put a card's abilities to work from the stack, a graveyard, a
+-- hand or a library.
 --
 -- anyConditional's walk with its predicate swapped, and sound for that
 -- function's reason: each arm reads the SAME list its walk in gatherGiven does.

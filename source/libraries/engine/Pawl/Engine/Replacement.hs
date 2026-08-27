@@ -181,8 +181,8 @@ collect sources floating =
             ReplacementCandidate.controller = Projection.controllerOf src sources,
             -- CR 614.3's lifetime, which a static ability does not have: this
             -- segment is re-derived from the board on every iteration, and
-            -- `consume` is a no-op for it. So there is no duration to expire and
-            -- no use to spend, which is what Nothing says -- not an unknown one.
+            -- `consume` is a no-op for it. So there is no duration to expire and no
+            -- use to spend, which is what Nothing says -- not an unknown one.
             ReplacementCandidate.lifetime = Nothing,
             -- CR 614.15: a printed replacement ability is a STATIC ability,
             -- which puts it outside the self-replacement class -- so this
@@ -193,8 +193,8 @@ collect sources floating =
             -- runs in is read off the live board (see `printedRider`).
             ReplacementCandidate.rider = printedRider src (Projection.controllerOf src sources) re,
             -- No resolution installed this segment, so there is nothing it could
-            -- have bound: a printed static ability is re-derived from the
-            -- board, and Filter.IsBound is vacuously False in it.
+            -- have bound: a printed static ability is re-derived from the board,
+            -- and Filter.IsBound is vacuously False in it.
             ReplacementCandidate.slots = Map.empty
           }
       fromFloating active =
@@ -289,8 +289,8 @@ collect sources floating =
 -- The environment is BUILT here rather than snapshotted at installation, which
 -- is the whole difference between this rider and a floating row's (see
 -- Pawl.Types.ActiveReplacement): this ability's source is still an object the
--- board can answer about, so CR 109.5's "you" is whoever controls it now, and a static ability targets
--- nothing (CR 115.10a), so there are no chosen targets to carry -- the slot map
+-- board can answer about, so CR 109.5's "you" is whoever controls it now, and a
+-- static ability targets nothing (CR 115.10a), so there are no chosen targets to carry -- the slot map
 -- is empty. A source the board can no longer answer for has no "you", and gets
 -- no rider rather than one performed by nobody.
 --
