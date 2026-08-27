@@ -9,6 +9,7 @@ import qualified Pawl.Types.InstanceOrdinal as InstanceOrdinal
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PermanentCandidate as PermanentCandidate
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
@@ -36,10 +37,11 @@ spec s = Spec.describe s "Pawl.Codec.PermanentCandidate" $ do
       PermanentCandidate.codec
       PermanentCandidate.MkPermanentCandidate
         { PermanentCandidate.source = ObjectId.MkObjectId 4,
+          PermanentCandidate.provenance = ReplacementProvenance.Printed,
           PermanentCandidate.effect = effect,
           PermanentCandidate.ordinal = InstanceOrdinal.MkInstanceOrdinal 0
         }
-      " {\"source\":4,\"effect\":{\"type\":\"ZoneChangeR\",\"value\":{\"matching\":{\"whenDestination\":{\"type\":\"Graveyard\"}},\"destination\":{\"type\":\"Exile\"}}},\"ordinal\":0} "
+      " {\"source\":4,\"provenance\":{\"type\":\"Printed\"},\"effect\":{\"type\":\"ZoneChangeR\",\"value\":{\"matching\":{\"whenDestination\":{\"type\":\"Graveyard\"}},\"destination\":{\"type\":\"Exile\"}}},\"ordinal\":0} "
   -- CR 702.136b: the SECOND instance of an equal ability on one source is a
   -- different identity, and the ordinal is the only field that says so.
   Spec.it s "the second instance of the same ability" $
@@ -48,9 +50,10 @@ spec s = Spec.describe s "Pawl.Codec.PermanentCandidate" $ do
       PermanentCandidate.codec
       PermanentCandidate.MkPermanentCandidate
         { PermanentCandidate.source = ObjectId.MkObjectId 4,
+          PermanentCandidate.provenance = ReplacementProvenance.Minted,
           PermanentCandidate.effect = effect,
           PermanentCandidate.ordinal = InstanceOrdinal.MkInstanceOrdinal 1
         }
-      " {\"source\":4,\"effect\":{\"type\":\"ZoneChangeR\",\"value\":{\"matching\":{\"whenDestination\":{\"type\":\"Graveyard\"}},\"destination\":{\"type\":\"Exile\"}}},\"ordinal\":1} "
+      " {\"source\":4,\"provenance\":{\"type\":\"Minted\"},\"effect\":{\"type\":\"ZoneChangeR\",\"value\":{\"matching\":{\"whenDestination\":{\"type\":\"Graveyard\"}},\"destination\":{\"type\":\"Exile\"}}},\"ordinal\":1} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s PermanentCandidate.codec

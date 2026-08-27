@@ -9,6 +9,7 @@ import qualified Pawl.Types.FloatingCandidate as FloatingCandidate
 import qualified Pawl.Types.InstanceOrdinal as InstanceOrdinal
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PermanentCandidate as PermanentCandidate
+import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.Types.Timestamp as Timestamp
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -20,11 +21,12 @@ spec s = Spec.describe s "Pawl.Codec.CandidateId" $ do
       ( CandidateId.OfPermanent
           PermanentCandidate.MkPermanentCandidate
             { PermanentCandidate.source = ObjectId.MkObjectId 4,
+              PermanentCandidate.provenance = ReplacementProvenance.Printed,
               PermanentCandidate.effect = PermanentCandidateSpec.effect,
               PermanentCandidate.ordinal = InstanceOrdinal.MkInstanceOrdinal 0
             }
       )
-      " {\"type\":\"OfPermanent\",\"value\":{\"source\":4,\"effect\":{\"type\":\"ZoneChangeR\",\"value\":{\"matching\":{\"whenDestination\":{\"type\":\"Graveyard\"}},\"destination\":{\"type\":\"Exile\"}}},\"ordinal\":0}} "
+      " {\"type\":\"OfPermanent\",\"value\":{\"source\":4,\"provenance\":{\"type\":\"Printed\"},\"effect\":{\"type\":\"ZoneChangeR\",\"value\":{\"matching\":{\"whenDestination\":{\"type\":\"Graveyard\"}},\"destination\":{\"type\":\"Exile\"}}},\"ordinal\":0}} "
   Spec.it s "OfFloating" $
     Common.assertCodec
       s

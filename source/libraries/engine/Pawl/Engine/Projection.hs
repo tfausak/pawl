@@ -133,6 +133,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Reveal as Reveal
@@ -4137,7 +4138,7 @@ abilitiesFromCharacteristics peers pc oid gs =
 -- for CR 109.5's "you".
 -- Nothing is latched, so Jared Carthalion's shield goes away the moment the
 -- monarchy does, with no trigger and no resolution in between.
-replacementsOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
+replacementsOf :: ObjectId -> GameState -> [(ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
 replacementsOf oid gs =
   let pc = project oid gs
       -- CR 614.12: a card-authored condition reads the board an entering
@@ -4153,11 +4154,15 @@ replacementsOf oid gs =
       lives pr = case PrintedReplacement.condition pr of
         Nothing -> True
         Just cond -> Condition.holds (fullView gs) (Filter.contextFor (controllerOf oid gs) (Just oid)) (boardAsEntering gs) oid cond
-   in fmap PrintedReplacement.effect (filter lives (PC.replacementEffects pc))
-        <> intrinsicReplacementsOf (announcedXOf oid gs) (phyrexianLifePaidOf oid gs) pc
-        <> shieldOf oid gs
-        <> finalityOf oid gs
-        <> stunOf oid gs
+   in -- The one place the two provenances are told apart, which is why the mark
+      -- is made HERE rather than inferred downstream: the first segment is the
+      -- card's own rules text and every segment after it is a rule minting a row
+      -- onto the permanent. See Pawl.Types.ReplacementProvenance.
+      fmap ((,) ReplacementProvenance.Printed . PrintedReplacement.effect) (filter lives (PC.replacementEffects pc))
+        <> fmap ((,) ReplacementProvenance.Minted) (intrinsicReplacementsOf (announcedXOf oid gs) (phyrexianLifePaidOf oid gs) pc)
+        <> fmap ((,) ReplacementProvenance.Minted) (shieldOf oid gs)
+        <> fmap ((,) ReplacementProvenance.Minted) (finalityOf oid gs)
+        <> fmap ((,) ReplacementProvenance.Minted) (stunOf oid gs)
 
 -- CR 107.3m: the value of X for this object's enters-the-battlefield replacement
 -- effects, and 0 for every object no such spell stands behind. Read off the
@@ -4379,7 +4384,7 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- Not implemented: a minting keyword or a minting TYPE reaching a permanent
 -- through a stored continuous effect, and a minting keyword arriving on a keyword
 -- counter, are on no base face (#833).
-replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
+replacementsAffecting :: GameState -> [(ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
       -- CR 122.1c's pair, CR 122.1h's row and CR 122.1d's row are minted from
@@ -4403,7 +4408,7 @@ replacementsAffecting gs =
           -- exists to skip, so any board holding a granting ability is gathered
           -- whole.
           || any (any grantsMintingType . StaticAbility.modifications) (staticAbilitiesOf oid gs)
-      forOne oid = fmap (\re -> (oid, re)) (replacementsOf oid gs)
+      forOne oid = fmap (\(provenance, re) -> (oid, provenance, re)) (replacementsOf oid gs)
    in if not (any baseHas onBattlefield)
         then []
         else concatMap forOne onBattlefield

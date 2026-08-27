@@ -8,6 +8,7 @@ import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.InstanceOrdinal as InstanceOrdinal
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Codec.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.PermanentCandidate as PermanentCandidate
@@ -17,11 +18,13 @@ import qualified Pawl.Types.PermanentCandidate as PermanentCandidate
 codec :: Codec.Codec PermanentCandidate.PermanentCandidate
 codec = Fields.object $ do
   source <- Fields.required "source" ObjectId.codec PermanentCandidate.source
+  provenance <- Fields.required "provenance" ReplacementProvenance.codec PermanentCandidate.provenance
   effect <- Fields.required "effect" (ReplacementEffect.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) PermanentCandidate.effect
   ordinal <- Fields.required "ordinal" InstanceOrdinal.codec PermanentCandidate.ordinal
   pure
     PermanentCandidate.MkPermanentCandidate
       { PermanentCandidate.source = source,
+        PermanentCandidate.provenance = provenance,
         PermanentCandidate.effect = effect,
         PermanentCandidate.ordinal = ordinal
       }

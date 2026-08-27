@@ -284,6 +284,7 @@ import qualified Pawl.Codec.RemoveCountersSpec
 import qualified Pawl.Codec.ReplaceSpec
 import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
+import qualified Pawl.Codec.ReplacementProvenanceSpec
 import qualified Pawl.Codec.RequireAttackSpec
 import qualified Pawl.Codec.RequireBlockSpec
 import qualified Pawl.Codec.RestartSignalSpec
@@ -804,6 +805,7 @@ spec s registry = do
   Pawl.Codec.ReplaceSpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s
   Pawl.Codec.ReplacementOriginSpec.spec s
+  Pawl.Codec.ReplacementProvenanceSpec.spec s
   Pawl.Codec.RequireAttackSpec.spec s
   Pawl.Codec.RequireBlockSpec.spec s
   Pawl.Codec.RestartSignalSpec.spec s
