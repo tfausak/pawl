@@ -463,10 +463,12 @@ castableFaces card = case Card.layout card of
   -- any other land (see Cost.costsFor's own note). CR 712.12's other half -- a
   -- player PLAYING such a face as a land -- is landFaces below.
   Layout.ModalDoubleFaced -> NonEmpty.toList (Card.faces card)
-  -- CR 712.4b again: there is one face to offer. A meld card has no back face a
-  -- cast could reach -- CR 712.11a's "transformed" cast and CR 712.4c's refusal
-  -- to transform both land on `backFace` and `turnedOver` below, and both answer
-  -- Nothing for this layout.
+  -- CR 712.8b, which is the stack's own sentence about this layout and needs no
+  -- reading from the two above: "A meld card on the stack has only the
+  -- characteristics of its front face." So there is one face to offer, and no
+  -- back face a cast could reach -- CR 712.11a's "transformed" cast and CR
+  -- 712.4c's refusal to transform both land on `backFace` and `turnedOver`
+  -- below, and both answer Nothing for this layout.
   Layout.Meld -> [NonEmpty.head (Card.faces card)]
 
 -- CR 305.1 / 712.12: the faces of this card a player may PLAY as a land, each
@@ -752,11 +754,18 @@ enteringFace card shown = case Card.layout card of
   -- choice and dropping it would put the OTHER face's permanent onto the
   -- battlefield.
   Layout.ModalDoubleFaced -> shown
-  -- Nothing, which CR 712.8a resolves to the one face this card has: a meld card
-  -- was never cast showing anything else (castableFaces above offers one), so
-  -- there is no chosen face for the move to carry through. CR 701.42a's melded
-  -- permanent does not come through here at all -- it is put onto the battlefield
-  -- as its own object rather than as either component card.
+  -- Nothing, meaning the one face this card has. CR 712.13 is the rule this
+  -- function serves -- "a resolving double-faced spell that becomes a permanent
+  -- is put onto the battlefield with the same face up that was face up on the
+  -- stack" -- and CR 712.8b settles which face that was: "A meld card on the
+  -- stack has only the characteristics of its front face." So there is no chosen
+  -- face for the move to carry through, and dropping `shown` loses nothing. The
+  -- OTHER road into the battlefield agrees: CR 712.14's default is front face up.
+  --
+  -- CR 701.42a's melded permanent does not come through here at all. CR 712.14c
+  -- puts the pair onto the battlefield "as a single permanent with their back
+  -- faces up", which is one object arriving rather than either component card
+  -- entering with a face chosen.
   Layout.Meld -> Nothing
 
 -- CR 202.3b / 712.8e: the face a MANA VALUE is read from, which is not always

@@ -43,11 +43,14 @@ aimedAt oid p = case p of
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Meld" $ do
-  -- CR 712.4b: the back faces of a meld pair matter only on the melded
-  -- permanent, so pawl prints each half's front face alone and the front face
-  -- is what a Battlements on the battlefield is. Its printed "{T}: Add {C}" is
-  -- an ordinary activated mana ability (CR 605.1a).
-  Spec.it s "CR 712.4b a meld card on the battlefield is its front face: Hanweir Battlements taps for {C}" $ do
+  -- CR 712.8's second sentence gives a meld card's front face "its own set of
+  -- characteristics", and CR 712.8d makes those the live ones here: "While a
+  -- double-faced permanent has its front face up, it has only the characteristics
+  -- of its front face." CR 712.4b is why there is nothing else to show -- the
+  -- back face determines nothing off a melded permanent, so pawl prints each half
+  -- of the pair as its front face alone. The printed "{T}: Add {C}" is an
+  -- ordinary activated mana ability (CR 605.1a).
+  Spec.it s "CR 712.8d a meld card on the battlefield has its front face's characteristics: Hanweir Battlements taps for {C}" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
     let (battlementsId, gs) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
         after = S.runPure S.identityAnswer gs (Cost.tapForMana battlementsId)
@@ -57,10 +60,10 @@ spec s registry = Spec.describe s "Meld" $ do
       (Game.poolOf S.alice after)
       (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}])
     Spec.assertEqWith s "and the land is tapped" (S.tappedCount S.alice after) 1
-  -- The same front face's second printed ability, which targets: CR 712.4b
-  -- again, and the case that shows the front face's TEXT is live rather than
-  -- just its type line. The Mountain is what pays the {R}.
-  Spec.it s "CR 712.4b Hanweir Battlements' {R}, {T} grants haste to the creature it targets" $ do
+  -- The same front face's second printed ability, which targets: CR 712.8d again,
+  -- and the case that shows the front face's TEXT is live rather than just its
+  -- type line. The Mountain is what pays the {R}.
+  Spec.it s "CR 712.8d Hanweir Battlements' {R}, {T} grants haste to the creature it targets" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
