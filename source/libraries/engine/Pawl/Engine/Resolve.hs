@@ -2656,7 +2656,11 @@ offerCast resolving caster slot optionality offer = do
 -- written on the card and asking nobody to choose (Scarecrow's "by creatures
 -- with flying"). It reaches the same DamagePattern field as the pair's filter
 -- above, so a caller writing both gets their conjunction; `And []` on either
--- side drops out rather than nesting, since no card in the pool writes both.
+-- side drops out rather than nesting. No card in data/cards/ writes both, and
+-- only Effect.PreventAllDamage passes a non-trivial one at all: no printing
+-- pairs CR 609.7b's properties with CR 615.7's countdown or CR 614.9's
+-- redirection -- Scryfall `o:"prevent the next" o:"sources"`, 2026-08-27, no
+-- hit -- so those two opcodes carry no such field.
 installDamageRow :: Map.Map SlotName PlayerId -> PlayerId -> ObjectId -> Duration.Duration -> Maybe DamageKind.DamageKind -> DamageRewrite.DamageRewrite -> Maybe PreventionRider.PreventionRider -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> (Maybe Recipient, Maybe (Filter.Type.Filter Keyword.Type.Keyword, ObjectId)) -> GameState
 installDamageRow players controller source duration kind rewrite rider printed g (recipient, sourceChoice) = case Expiry.arm players controller source duration g of
   -- CR 611.2b: the duration never started, so no shield is installed.

@@ -14,7 +14,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.DamageDirection as DamageDirection
-import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 
 -- | A bare object keyed by the record's field names, as
@@ -38,7 +38,7 @@ codec effectCodec = Fields.object $ do
   ref <- Fields.required "ref" ObjectRef.codec PreventAllDamage.ref
   direction <- Fields.defaulted "direction" DamageDirection.DealtTo DamageDirection.codec PreventAllDamage.direction
   chosenSource <- Fields.defaulted "chosenSource" Nothing (Common.maybe (Filter.codec Keyword.codec)) PreventAllDamage.chosenSource
-  whatSource <- Fields.defaulted "whatSource" (Filter.Type.And []) (Filter.codec Keyword.codec) PreventAllDamage.whatSource
+  whatSource <- Fields.defaulted "whatSource" (Filter.And []) (Filter.codec Keyword.codec) PreventAllDamage.whatSource
   riders <- Fields.defaulted "riders" Seq.empty (Common.seq effectCodec) PreventAllDamage.riders
   pure
     PreventAllDamage.MkPreventAllDamage
