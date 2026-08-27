@@ -575,7 +575,8 @@ data TriggerCondition
     -- Pawl.Engine.Binding.became is bound only there.
     --
     -- CR 603.6c's second trigger event -- a phased-in permanent leaving the game
-    -- with its owner (CR 800.4a) -- is matched too, off GameEvent.LeftTheGame.
+    -- with its owner (CR 800.4a), or taken out of the main game by a subgame's
+    -- wish (CR 729.4a) -- is matched too, off GameEvent.LeftTheGame.
     -- It is the one form that fires without a zone change, so its bearer can
     -- only be read from CR 608.2h last known information.
     SelfLeavesTheBattlefield

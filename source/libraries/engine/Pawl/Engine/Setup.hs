@@ -612,10 +612,11 @@ subgameStateFrom starter parent =
       -- The parent's OWN outsideObjects ride along, which is CR 729.6's
       -- nesting: "the existing subgame becomes the main game in relation to
       -- the new subgame", so a card already outside the parent (itself
-      -- possibly a subgame) is outside this one too. funnelBack never touches
-      -- this field, so `parent`'s own copy is untouched for the whole life of
-      -- the game it spawns (CR 729.1a) -- this union is the only place the
-      -- set can grow.
+      -- possibly a subgame) is outside this one too. Neither funnelBack nor
+      -- anything else touches `parent`'s own copy for the whole life of the game
+      -- it spawns (CR 729.1a), and this union is the only place the set can
+      -- GROW; applyCrossings shrinks it once that game has ended, dropping the
+      -- entries it hands one level further out.
       outside =
         Map.union
           (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.union libIds cmdIds)))

@@ -114,9 +114,10 @@ data GameState = MkGameState
     -- and spent by Pawl.Engine.OutsideTheGame.
     outsideObjects :: Map.Map ObjectId.ObjectId OutsideObject.OutsideObject,
     -- | CR 729.4a: the outer ids this game has brought in, in the order they
-    -- crossed. Read once, by Pawl.Engine.Engine.playSubgame, which applies each
-    -- departure to the game it holds; an id that is not one of that game's own
-    -- objects came from further out and is passed outward one level (CR 729.6).
+    -- crossed. Read once, by Pawl.Engine.Setup.applyCrossings, which
+    -- Pawl.Engine.Engine.playSubgame runs on the game it holds; an id that is
+    -- not one of that game's own objects came from further out and is passed
+    -- outward one level (CR 729.6).
     broughtIn :: Seq.Seq ObjectId.ObjectId,
     -- | CR 106.4. Absent from the map means an empty pool.
     manaPool :: Map.Map PlayerId.PlayerId Mana.Mana,
