@@ -691,9 +691,12 @@ data TriggerCondition
     -- The SOURCE and not the whole identity, because card data can name no
     -- CandidateId: two prevention effects PRINTED on one object would be
     -- indistinguishable here, and no printing has two (Scryfall
-    -- o:"prevented this way", 2026-08-25). CR 122.1c's shield-counter pair is a
-    -- prevention the RULES mint onto a permanent rather than one its card prints,
-    -- and Pawl.Engine.Replacement.printedBy is what tells the two apart.
+    -- o:"prevented this way", 2026-08-25). CR 122.1c's shield-counter pair and CR
+    -- 702.16e's protection are preventions the RULES mint onto a permanent rather
+    -- than ones its card prints, and Pawl.Engine.Replacement.printedBy is what
+    -- tells those from a printed row -- off the mark
+    -- Pawl.Engine.Projection.replacementsOf makes, since rule 702.16e's row is a
+    -- value a card could print.
     --
     -- The Filter is over CR 120.1's SOURCE of the damage that was prevented --
     -- Samite Ministration's "damage from a black or red source". The trivial

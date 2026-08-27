@@ -1748,10 +1748,12 @@ preventionBy candidate before after = case (ReplacementCandidate.effect candidat
 --
 -- A permanent's is too, unless the row was minted onto it by a rule rather than
 -- printed on its card -- CR 122.1c's shield-counter pair and CR 702.16e's
--- protection are the two preventions that reach here that way. Neither is text
--- the card set up, so a "prevented this way" trigger on that same permanent is
--- not about either: the counter or the keyword prevented the damage and the
--- printed effect never applied.
+-- protection are the preventions that reach here that way. Neither is text the
+-- card set up, so a "prevented this way" trigger on that same permanent is not
+-- about either: the counter or the keyword prevented the damage and the printed
+-- effect never applied. Rule 702.16e holds even where the card PRINTS the
+-- keyword, "this way" pointing at the preceding sentence rather than at the
+-- object.
 --
 -- READ OFF THE CANDIDATE rather than inferred from its effect, because rule
 -- 702.16e's row is a plain PreventAll naming the permanent itself -- the same
