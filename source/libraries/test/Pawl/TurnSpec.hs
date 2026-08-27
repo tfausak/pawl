@@ -1572,7 +1572,7 @@ skippedEndOfCombatSpec s registry = Spec.describe s "SkippedEndOfCombat" $ do
   Spec.it s "CR 614.10a the end of combat step never begins, and the phase ends anyway" $ do
     (gs, _, _, _, spell) <- board
     let after = atPostcombatMain S.aggressiveAnswer (cast spell gs)
-    Spec.assertBool s (S.castable S.alice spell gs) "CR 601.3 the instant is castable in the declare blockers step"
+    Spec.assertBool s (S.castable S.alice spell gs) "CR 117.1a the instant is castable in the declare blockers step"
     Spec.assertEqWith s "the end of combat step never began" (began after) 0
     Spec.assertEqWith s "CR 511.3 the combat phase is over regardless" (GameState.phase after) Phase.PostcombatMain
     Spec.assertEqWith s "having consumed exactly the steps of this turn" (GameState.remaining after) (Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup])
