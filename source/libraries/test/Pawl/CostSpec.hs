@@ -31,6 +31,7 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.FaceDown as FaceDown
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
@@ -2804,6 +2805,25 @@ millikinSpec s registry =
         (Cost.orderObservable [CostComponent.TapThis, CostComponent.MillCards 1])
         "both parts are order-sensitive, so it is the CR 601.2h partition and not orderSensitive that leaves nothing to ask"
       Spec.assertEqWith s "the control: two parts of the ONE pass are ordered by the payer" (length sharedPass) 1
+
+    -- CR 701.17a makes an action a mill wherever it happens, so the payment
+    -- records one exactly as a resolution does. The Master, Transcendent's
+    -- "target creature card in a graveyard that was milled this turn" is what
+    -- reads that record (Filter.MilledThisTurn), and a payment that moved the
+    -- card without recording would leave it invisible to that card while sitting
+    -- in the same graveyard.
+    --
+    -- A PAIR differing in one thing: the cards the mill took answer, the ones it
+    -- left in the library do not.
+    Spec.it s "CR 701.17a a card milled to pay a cost was milled this turn" $ do
+      millikin <- S.printingOf s registry "Millikin"
+      let (millikinId, board) = millikinBoard millikin 3
+          after = S.runPure S.identityAnswer board (Activate.activateAbility S.alice millikinId (theAbility millikin))
+          context = Filter.contextFor (Just S.alice) Nothing
+          milledThisTurn oid = Filter.matches context (Projection.viewOfObject oid after) Filter.Type.MilledThisTurn
+      Spec.assertEqWith s "the mill put one card in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+      Spec.assertBool s (all milledThisTurn (Game.zoneMembers Zone.Graveyard S.alice after)) "which answers CR 701.17a's look-back"
+      Spec.assertBool s (not (any milledThisTurn (Game.zoneMembers Zone.Library S.alice after))) "where the two cards it left in the library do not"
 
 -- Millikin on the battlefield, settled and untapped, with `cards` copies of it
 -- in alice's library, and alice holding priority in her own precombat main
