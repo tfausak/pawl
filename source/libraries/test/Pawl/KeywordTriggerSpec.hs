@@ -1592,11 +1592,12 @@ creatureBecomesBlockedByAtLeastSpec s registry =
                 (firedBy seifer joined)
                 1
             _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob one Giant"
-        -- The same pair of arrivals landing on an UNBLOCKED attacker, where CR
-        -- 509.3c does record GameEvent.AttackerBlocked and rule 509.3e's floor is
-        -- crossed by that becoming rather than by either arrival. Still one
-        -- trigger: the two events describe one creature becoming blocked by two
-        -- creatures, and an arm that answered both would count it twice.
+        -- The same pair of arrivals landing on an UNBLOCKED attacker, which is
+        -- the leg where CR 509.3c does record GameEvent.AttackerBlocked -- one
+        -- creature was blocking the Elves as it became blocked, so that event's
+        -- tally is under the floor and the second Saproling is what crosses it.
+        -- Still ONE trigger between the two events, where a becoming that counted
+        -- the arrivals after it would fire for that as well.
         --
         -- The case above's board with bob declaring nothing, and counted off the
         -- event log rather than at gameplay level for the same reason the
@@ -1616,7 +1617,7 @@ creatureBecomesBlockedByAtLeastSpec s registry =
                 2
               Spec.assertEqWith
                 s
-                "and Seifer triggered once for the becoming, not once per arrival"
+                "and Seifer triggered once for the pair, not once for the becoming and once for the crossing"
                 (firedBy seifer joined)
                 1
             _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob one Giant to leave undeclared"

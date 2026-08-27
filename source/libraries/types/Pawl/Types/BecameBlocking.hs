@@ -44,11 +44,13 @@ data BecameBlocking = MkBecameBlocking
     -- it now" from "was unblocked" either. Pawl.Engine.Game.removeFromCombat is
     -- what spells that emptied key.
     --
-    -- The one reader is rule 509.3e's filtered form
-    -- (TriggerCondition.SelfBecomesBlockedByOneOrMore), which fires off an
+    -- Both of rule 509.3e's forms read it
+    -- (TriggerCondition.SelfBecomesBlockedByOneOrMore and
+    -- TriggerCondition.CreatureBecomesBlockedByAtLeast), each firing off an
     -- arrival only when no GameEvent.AttackerBlocked rode the same arrival --
     -- CR 509.3c withholds that event exactly when this field is True, so the
-    -- field is how the two arms avoid answering one becoming-blocked twice.
+    -- field is how each of them and the arm on that event avoid answering one
+    -- becoming-blocked twice.
     attackerWasBlocked :: Bool,
     -- | CR 509.3e's comparand: the creatures blocking the ATTACKER immediately
     -- before this event, read before the write that added this blocker.

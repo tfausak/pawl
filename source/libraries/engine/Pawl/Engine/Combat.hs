@@ -1748,7 +1748,11 @@ attemptBlockDeclaration pid attacking rejected = do
               -- what was blocking the attacker BEFORE this declaration, which is
               -- the same set for every pair the declaration names: CR 509.1's
               -- blockers are all declared at once. Empty on every board today,
-              -- becomeBlocked's empty key being the only way it is not.
+              -- both of CR 509.4's pooled producers reaching an attacker only
+              -- after this declaration -- Flash Foliage prints the restriction
+              -- and Aetherplasm has to be blocking already -- and read rather
+              -- than written as Set.empty because the event is the record. No
+              -- reader looks: both guard on putOntoBattlefield.
               State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = Set.member attacker wasBlocked, BecameBlocking.blockersBefore = Map.findWithDefault Set.empty attacker (Combat.blockers (GameState.combat gs2))})) h) g pairs
               State.modify' $ \g -> List.foldl' (\h (blocker, attackers) -> Event.recordEvent (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker (Natural.length attackers))) h) g (filter (not . Set.null . snd) (Map.toList declaration))
               -- CR 509.1h: the same declaration makes each attacker it named a BLOCKED

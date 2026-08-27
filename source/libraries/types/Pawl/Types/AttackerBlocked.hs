@@ -11,8 +11,8 @@ data AttackerBlocked = MkAttackerBlocked
   { attacker :: ObjectId.ObjectId,
     defender :: PlayerId.PlayerId,
     -- | CR 509.3e's comparand at the moment of THIS becoming: how many creatures
-    -- were blocking the attacker as it became a blocked creature. The
-    -- declaration's whole set (CR 509.1h) on that road; exactly one on CR
+    -- were blocking the attacker as it became a blocked creature. However many
+    -- the declaration gave it (CR 509.1h) on that road; exactly one on CR
     -- 509.3c's arrival road, that rule recording this event only for an
     -- attacker no creature was blocking yet; and zero for CR 509.1h's escape
     -- clause, where an effect makes a creature blocked by nothing at all.
