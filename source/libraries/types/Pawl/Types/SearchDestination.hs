@@ -7,7 +7,19 @@ module Pawl.Types.SearchDestination where
 -- which Evolving Wilds needs, and most zones a Zone can name have no searching
 -- card behind them. This type names the WHOLE instruction, one arm per sentence.
 data SearchDestination
-  = -- | Evolving Wilds' "put it onto the battlefield tapped".
+  = -- | Nature's Lore's "put that card onto the battlefield", with no rider on
+    -- how it enters.
+    --
+    -- The arm is named for the sentence rather than for the state it lands in:
+    -- the card says only where the found card goes, and CR 110.5b is what makes
+    -- it enter untapped, unflipped, face up and phased in. BattlefieldTapped
+    -- below is the same move with the card's own "unless a spell or ability says
+    -- otherwise" attached, which is why the two are separate arms rather than
+    -- this one carrying a Pawl.Types.TapState -- a state field would invite a
+    -- card to name the three other statuses CR 110.5 lists, none of which a
+    -- search's destination says.
+    Battlefield
+  | -- | Evolving Wilds' "put it onto the battlefield tapped".
     BattlefieldTapped
   | -- | Braidwood Sextant's "reveal that card, put it into your hand", which
     -- CR 702.29e's typecycling also says.

@@ -1190,6 +1190,50 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "every library card is still there"
       (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
       (Set.fromList [vegetationMountain board, vegetationIsland board, vegetationPlains board, vegetationPiker board])
+  -- Nature's Lore -- "Search your library for a Forest card, put that card onto
+  -- the battlefield, then shuffle." The whole-card proof of
+  -- SearchDestination.Battlefield, cast and resolved rather than assembled. Its
+  -- whole printed text is expressible, so nothing about pawl's copy runs weaker
+  -- than the card.
+  --
+  -- The PAIR to Explosive Vegetation above: the two destinations differ in the
+  -- one word "tapped", and the assertions differ in exactly the same place.
+  -- Those cases assert NOTHING is untapped after the fetch; this one asserts
+  -- exactly one thing is, and that it is what the search found. CR 110.5b is the
+  -- rule that makes it so -- this card's sentence names no tap state, so the
+  -- entry defaults stand.
+  --
+  -- Both Forests she started with paid the {1}{G}, so an untapped permanent can
+  -- only be one that entered during the resolution. That is what lets this
+  -- assert about the fetched land even though it shares a name with the two that
+  -- paid.
+  --
+  -- TWO Forest cards in the library against a cap of one, so the searcher faces a
+  -- real choice rather than a candidate set the size of the cap, and the answer
+  -- is PINNED to the basic: Dryad Arbor is a Forest card too and sits ahead of it
+  -- (Support.addLibraryCard prepends), so an engine taking the head of the
+  -- candidate list would fetch the Arbor this answer never names. The Piker gives
+  -- the filter a nonland to reject.
+  Spec.it s "CR 110.5b whole card: Nature's Lore puts the Forest it finds onto the battlefield UNTAPPED" $ do
+    board <- loreBoard s registry
+    let settled = resolveLore (findPinned [loreForest board]) board
+    Spec.assertEqWith
+      s
+      "CR 110.5b the found Forest is the one untapped permanent -- both lands she had paid for the spell"
+      (fmap (`S.soleFaceName` settled) (untappedOf S.alice settled))
+      [CardName.MkCardName (Text.pack "Forest")]
+    Spec.assertEqWith
+      s
+      "three Forests where she had two"
+      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.alice settled)
+      3
+    Spec.assertEqWith s "CR 701.23e the card asks for no reveal, so nothing was revealed" (S.revealsOf settled) []
+    Spec.assertEqWith s "it did NOT go to her hand -- she cast her only card" (S.handSize S.alice settled) 0
+    Spec.assertEqWith
+      s
+      "the other Forest card and the nonland stayed in the library"
+      (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
+      (Set.fromList [loreArbor board, lorePiker board])
   -- Mana Severance -- "Search your library for any number of land cards, exile
   -- them, then shuffle." The whole-card proof that a search can state NO count
   -- (CR 701.23a: the find is bounded by what the zone holds, not by a number the
@@ -2300,6 +2344,35 @@ vegetationBoard s registry = do
 resolveVegetation :: (forall r. Prompt.Prompt r -> r) -> VegetationBoard -> GameState.GameState
 resolveVegetation answer board =
   let cast = snd (Engine.runGamePure answer (vegetationState board) (S.cast S.alice (vegetationSpell board)))
+   in snd (Engine.runGamePure answer cast Engine.priorityLoop)
+
+-- Nature's Lore's board. Two Forests pay the {1}{G} -- both of them, which is
+-- what makes "exactly one untapped" an assertion about the fetch -- and the
+-- library holds two Forest CARDS against a cap of one, plus a nonland for the
+-- filter to reject.
+data LoreBoard = MkLoreBoard
+  { loreState :: GameState.GameState,
+    loreSpell :: ObjectId.ObjectId,
+    loreForest :: ObjectId.ObjectId,
+    loreArbor :: ObjectId.ObjectId,
+    lorePiker :: ObjectId.ObjectId
+  }
+
+loreBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m LoreBoard
+loreBoard s registry = do
+  forest <- S.printingOf s registry "Forest"
+  arbor <- S.printingOf s registry "Dryad Arbor"
+  piker <- S.printingOf s registry "Goblin Piker"
+  lore <- S.printingOf s registry "Nature's Lore"
+  let (forestId, g1) = S.addLibraryCard forest S.alice (S.landsInPlay forest 2)
+      (arborId, g2) = S.addLibraryCard arbor S.alice g1
+      (pikerId, g3) = S.addLibraryCard piker S.alice g2
+      (gs, spellId) = S.handOne lore g3
+  pure (MkLoreBoard gs spellId forestId arborId pikerId)
+
+resolveLore :: (forall r. Prompt.Prompt r -> r) -> LoreBoard -> GameState.GameState
+resolveLore answer board =
+  let cast = snd (Engine.runGamePure answer (loreState board) (S.cast S.alice (loreSpell board)))
    in snd (Engine.runGamePure answer cast Engine.priorityLoop)
 
 -- Mana Severance's board. Two Islands pay the {1}{U}, and the library holds the

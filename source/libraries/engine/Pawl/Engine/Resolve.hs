@@ -6655,6 +6655,11 @@ bindAmountSlot holder slot n gs =
 -- 400.7 funnel either way.
 putFound :: PlayerId -> ObjectId -> SearchDestination.SearchDestination -> ObjectId -> Game ()
 putFound searcher source destination cardId = case destination of
+  -- Nature's Lore's "put that card onto the battlefield": the plain move, with
+  -- no rider naming how it enters, so CR 110.5b's defaults stand and the card
+  -- arrives untapped. That is why this is Event.changeZone rather than putTapped
+  -- below -- the difference between the two arms is the card's own sentence.
+  SearchDestination.Battlefield -> Event.changeZone cardId Zone.Battlefield
   SearchDestination.BattlefieldTapped -> putTapped cardId
   -- The reveal comes FIRST, in the card's own order, and CR 701.20b makes that an
   -- order rather than decoration: revealing does not move the card. The two lines

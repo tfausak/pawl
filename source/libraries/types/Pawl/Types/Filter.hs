@@ -409,10 +409,9 @@ data Filter keyword
     -- STRICT, which is what lets Oreskos ask it of EVERY player: "more lands than
     -- you" excludes you by arithmetic rather than by a relation, so the card's
     -- scope is EachPlayer rather than an opponent relation, and a seat merely LEVEL
-    -- with you is not one that controls more. Surveyor's Scope's "at
-    -- least two more lands than you" wants a margin beside the filter; that card
-    -- needs a search destination pawl does not have either, so neither half is
-    -- built (#1381).
+    -- with you is not one that controls more. Not implemented:
+    -- Surveyor's Scope's "at least two more lands than you" wants a margin beside
+    -- the filter, which this atom does not carry (#2353).
     --
     -- CARRIES A FILTER rather than naming lands: the question is CR 110.2's
     -- control of some described permanent, and the description is a Filter like

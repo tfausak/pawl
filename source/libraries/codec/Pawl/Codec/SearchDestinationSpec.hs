@@ -7,6 +7,12 @@ import qualified Pawl.Types.SearchDestination as SearchDestination
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.SearchDestination" $ do
+  Spec.it s "Battlefield" $
+    Common.assertCodec
+      s
+      SearchDestination.codec
+      SearchDestination.Battlefield
+      " {\"type\":\"Battlefield\"} "
   Spec.it s "BattlefieldTapped" $
     Common.assertCodec
       s
