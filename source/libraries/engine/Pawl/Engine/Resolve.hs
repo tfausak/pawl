@@ -38,6 +38,7 @@ import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.Mulligan as Mulligan
+import qualified Pawl.Engine.OutsideTheGame as OutsideTheGame
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Plot as Plot
@@ -455,6 +456,10 @@ slotsOf effect = case effect of
   -- restriction Filter names none either -- a Filter reads a slot only through
   -- Filter.boundSlots, and no card writes one of those atoms here.
   Effect.ChooseCardName _ -> Map.empty
+  -- No slot: the card comes from outside the game, where CR 400.11c lets nothing
+  -- target and so nothing was announced (CR 601.2c).
+  Effect.RevealFromOutsideTheGame _ -> Map.empty
+  Effect.ExileThisSpell -> Map.empty
   Effect.Bolster quantity -> quantitySlots quantity
   Effect.Amass (Amass.Type.MkAmass quantity _) -> quantitySlots quantity
   Effect.Blight (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
@@ -746,6 +751,8 @@ slotsAreExhaustive effect = case effect of
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
   Effect.ChooseCardName _ -> True
+  Effect.RevealFromOutsideTheGame _ -> True
+  Effect.ExileThisSpell -> True
   Effect.Bolster quantity -> Quantity.slotsAreExhaustive quantity
   Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
@@ -916,6 +923,8 @@ readsX = any effectReadsX
       Effect.Proliferate -> False
       -- No Quantity: rule 201.4 chooses one name and states no count.
       Effect.ChooseCardName _ -> False
+      Effect.RevealFromOutsideTheGame _ -> False
+      Effect.ExileThisSpell -> False
       Effect.Bolster quantity -> Quantity.readsX quantity
       Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.readsX quantity
       Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
@@ -1117,6 +1126,8 @@ boundSlots effect = case effect of
   -- Binds nothing: the name goes on the SOURCE (Object.chosenNames) and is read
   -- back off it by Filter.HasChosenName, so no slot carries it.
   Effect.ChooseCardName _ -> Set.empty
+  Effect.RevealFromOutsideTheGame _ -> Set.empty
+  Effect.ExileThisSpell -> Set.empty
   Effect.Bolster _ -> Set.empty
   Effect.Amass _ -> Set.empty
   Effect.Blight _ -> Set.empty
@@ -5815,6 +5826,29 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     answer <- Game.choose (Prompt.ChooseCardName (Decide.deciderFor controller gs) controller source restriction)
     let stamp o = o {Object.chosenNames = Set.insert answer (Object.chosenNames o)}
     State.modify' $ \g -> g {GameState.objects = Map.adjust stamp source (GameState.objects g)}
+  -- CR 400.11c: the resolving controller reveals a card they own from outside the
+  -- game matching the filter and puts it into their hand -- Burning Wish.
+  --
+  -- The CONTROLLER and not the owner of the source, because CR 109.5 makes the
+  -- card's "you" the player the effect is applied for; the two differ for a spell
+  -- whose control was gained. The SOURCE goes along only for the filter's context
+  -- (CR 113.7), the same pair the search arm's own context is built from.
+  --
+  -- Pawl.Engine.OutsideTheGame is the whole of it, and this arm asks nothing about
+  -- which effect the filter came from.
+  Effect.RevealFromOutsideTheGame predicate -> OutsideTheGame.reveal predicate source controller
+  -- CR 608.2n: "Exile Burning Wish" -- the resolving SPELL goes to exile as this
+  -- instruction runs rather than to its owner's graveyard when the resolution
+  -- ends. finishSpell's move afterwards finds nothing, CR 400.7 having minted a
+  -- fresh incarnation in exile.
+  --
+  -- `resolving` and not `source`: the two coincide for a spell, and this arm is
+  -- about the object ON THE STACK. The faceOf gate is what makes an ability inert
+  -- here -- CR 113.7a's ability object has no card behind it, so exiling it would
+  -- take the ability off the stack in the middle of its own resolution.
+  Effect.ExileThisSpell -> do
+    gs <- State.get
+    Monad.when (Maybe.isJust (Game.faceOf resolving gs)) (Event.changeZone resolving Zone.Exile)
   -- CR 122: PutCounters' mirror, deliberately NOT through a CR 614.16 gate --
   -- nothing in CR 614 replaces a removal.
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity slot) -> do

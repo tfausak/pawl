@@ -828,6 +828,8 @@ effectCounts effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.ChooseCardName _ -> []
+  Effect.RevealFromOutsideTheGame _ -> []
+  Effect.ExileThisSpell -> []
   -- Bolster's N is a Quantity like the Search's above, so its Counts are
   -- reachable from here.
   Effect.Bolster quantity -> quantityCounts quantity
@@ -1140,6 +1142,8 @@ effectNestedEffects effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.ChooseCardName _ -> []
+  Effect.RevealFromOutsideTheGame _ -> []
+  Effect.ExileThisSpell -> []
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
   Effect.Blight {} -> []
@@ -1605,6 +1609,8 @@ effectReplacements effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.ChooseCardName _ -> []
+  Effect.RevealFromOutsideTheGame _ -> []
+  Effect.ExileThisSpell -> []
   Effect.Bolster _ -> []
   Effect.Amass _ -> []
   Effect.Blight _ -> []
@@ -2335,6 +2341,8 @@ effectMintedFaces effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.ChooseCardName _ -> []
+  Effect.RevealFromOutsideTheGame _ -> []
+  Effect.ExileThisSpell -> []
   Effect.Bolster _ -> []
   -- The Army token is Pawl.Engine.Amass.armyToken's, minted from the rulebook
   -- rather than embedded in card data, so this arm mints no face of the card's own.
@@ -3890,6 +3898,11 @@ effectFilters effect = case effect of
   -- an answerer to obey rather than matched against a candidate at all, so none of
   -- the framings' evaluators is the one that reads it.
   Effect.ChooseCardName restriction -> unframed [restriction]
+  -- CR 400.11c's filter, UNFRAMED for ChooseCardName's reason turned around: it
+  -- is matched against a PRINTED FACE (Pawl.Engine.Projection.viewOfCard) rather
+  -- than against an object any of the framings' evaluators project.
+  Effect.RevealFromOutsideTheGame predicate -> unframed [predicate]
+  Effect.ExileThisSpell -> []
   -- Only the count's Filters: rule 701.39a describes the candidate pool, so no
   -- Filter on the card names it.
   Effect.Bolster quantity -> unframed (quantityFilters quantity)
@@ -4153,6 +4166,8 @@ effectObjectRefs effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.ChooseCardName {} -> []
+  Effect.RevealFromOutsideTheGame {} -> []
+  Effect.ExileThisSpell -> []
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
   Effect.Blight {} -> []

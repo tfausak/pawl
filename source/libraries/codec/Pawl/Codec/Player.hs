@@ -35,6 +35,7 @@ codec = Fields.object $ do
   commanderCasts <- Fields.required "commanderCasts" Common.natural Player.commanderCasts
   commanderDamage <- Fields.required "commanderDamage" (Common.naturalMap PlayerId.codec Common.natural) Player.commanderDamage
   dungeons <- Fields.required "dungeons" (Common.set PrintingId.codec) Player.dungeons
+  outsideTheGame <- Fields.required "outsideTheGame" (Common.naturalMap PrintingId.codec Common.natural) Player.outsideTheGame
   completedDungeons <- Fields.required "completedDungeons" Common.natural Player.completedDungeons
   pure
     Player.MkPlayer
@@ -47,5 +48,6 @@ codec = Fields.object $ do
         Player.commanderCasts = commanderCasts,
         Player.commanderDamage = commanderDamage,
         Player.dungeons = dungeons,
+        Player.outsideTheGame = outsideTheGame,
         Player.completedDungeons = completedDungeons
       }

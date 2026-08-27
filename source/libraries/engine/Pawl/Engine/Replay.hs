@@ -79,6 +79,7 @@ encode p answer = case p of
   Prompt.ChooseCardInHand {} -> Response.ChoseCardInHand answer
   Prompt.ChooseCardFromAmong {} -> Response.ChoseCardFromAmong answer
   Prompt.ChooseDungeon {} -> Response.ChoseDungeon answer
+  Prompt.ChooseFromOutsideTheGame {} -> Response.ChoseFromOutsideTheGame answer
   Prompt.ChooseRoom {} -> Response.ChoseRoom answer
   Prompt.ChooseHalf {} -> Response.ChoseHalf answer
   Prompt.ChooseLegend {} -> Response.ChoseLegend answer
@@ -256,6 +257,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseDungeon {} -> case response of
     Response.ChoseDungeon printingId -> Just printingId
+    _ -> Nothing
+  Prompt.ChooseFromOutsideTheGame {} -> case response of
+    Response.ChoseFromOutsideTheGame printingId -> Just printingId
     _ -> Nothing
   Prompt.ChooseRoom {} -> case response of
     Response.ChoseRoom room -> Just room
@@ -578,6 +582,10 @@ defaultAnswer p = case p of
   -- CR 309.2a: the prompt is only raised where the player owns two or more
   -- dungeon cards, and every one of them is a dungeon they may bring in.
   Prompt.ChooseDungeon _ _ candidates -> NonEmpty.head candidates
+  -- CR 400.11c: the prompt is only raised where two or more of the player's cards
+  -- outside the game match the effect's filter, and every one of them is a card
+  -- that effect allows them to bring in.
+  Prompt.ChooseFromOutsideTheGame _ _ candidates -> NonEmpty.head candidates
   -- CR 309.5a: the prompt is only raised where two or more arrows leave the
   -- room, and every one of them is a room the marker may move into.
   Prompt.ChooseRoom _ _ _ candidates -> NonEmpty.head candidates

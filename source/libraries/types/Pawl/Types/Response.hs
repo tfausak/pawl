@@ -225,6 +225,12 @@ data Response
     -- dungeon already in the command zone, this one names the CARD, and a
     -- transcript of one must not satisfy the other.
     ChoseDungeon PrintingId.PrintingId
+  | -- | CR 400.11c: the card a player chose to bring in from outside the game.
+    --
+    -- Its own constructor rather than ChoseDungeon reused, for the reason that one
+    -- is not ChoseRoom: rule 309.2a admits a dungeon card and a wish admits what
+    -- its own filter says, and a transcript of one must not satisfy the other.
+    ChoseFromOutsideTheGame PrintingId.PrintingId
   | -- | CR 309.5a: the room a venturing player chose to move their marker into.
     ChoseRoom RoomIndex.RoomIndex
   | -- | CR 709.5f \/ 709.5g: the half of a permanent a player chose to unlock or
