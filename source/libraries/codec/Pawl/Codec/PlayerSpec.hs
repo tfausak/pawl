@@ -32,9 +32,10 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.commanderCasts = 0,
           Player.commanderDamage = Map.empty,
           Player.dungeons = Set.empty,
+          Player.outsideTheGame = Map.empty,
           Player.completedDungeons = 0
         }
-      " {\"life\":20,\"status\":{\"type\":\"Playing\"},\"counters\":[],\"ringTemptations\":0,\"speed\":null,\"commander\":null,\"commanderCasts\":0,\"commanderDamage\":{},\"dungeons\":[],\"completedDungeons\":0} "
+      " {\"life\":20,\"status\":{\"type\":\"Playing\"},\"counters\":[],\"ringTemptations\":0,\"speed\":null,\"commander\":null,\"commanderCasts\":0,\"commanderDamage\":{},\"dungeons\":[],\"outsideTheGame\":{},\"completedDungeons\":0} "
   -- Every axis away from the case above. `life` is NEGATIVE, which CR 104.3b
   -- reaches through a state-based action rather than clamping at zero, so the
   -- field is an Integer and a Natural encoder would reject this state.
@@ -59,13 +60,14 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.commanderCasts = 6,
           Player.commanderDamage = Map.singleton (PlayerId.MkPlayerId 7) 8,
           Player.dungeons = Set.fromList [PrintingId.MkPrintingId 9, PrintingId.MkPrintingId 11],
+          Player.outsideTheGame = Map.singleton (PrintingId.MkPrintingId 12) 13,
           Player.completedDungeons = 10
         }
       ( " {\"life\":-1,\"status\":{\"type\":\"Departed\",\"value\":{\"type\":\"Conceded\"}}"
           <> ",\"counters\":[{\"key\":{\"type\":\"Energy\"},\"value\":2}"
           <> ",{\"key\":{\"type\":\"Poison\"},\"value\":0}]"
           <> ",\"ringTemptations\":3,\"speed\":4,\"commander\":5,\"commanderCasts\":6"
-          <> ",\"commanderDamage\":{\"7\":8},\"dungeons\":[9,11],\"completedDungeons\":10} "
+          <> ",\"commanderDamage\":{\"7\":8},\"dungeons\":[9,11],\"outsideTheGame\":{\"12\":13},\"completedDungeons\":10} "
       )
   Spec.it s "has a schema" $
     Common.assertHasSchema s Player.codec

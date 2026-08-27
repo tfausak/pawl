@@ -96,6 +96,9 @@ emptyGame order =
               -- CR 309.2: dungeon cards begin outside the game, and which ones a
               -- player brought is their deck's business -- createDeck below.
               Player.dungeons = Set.empty,
+              -- CR 400.11a: a player's sideboard is outside the game, and which
+              -- cards they set aside is their deck's business -- createDeck below.
+              Player.outsideTheGame = Map.empty,
               -- CR 309.7: nobody has completed a dungeon in a game that has not
               -- started, there having been no venture to remove one from it.
               Player.completedDungeons = 0
@@ -240,6 +243,9 @@ createCard pid printingId = do
 createDeck :: PlayerId -> Deck.Deck -> Game ()
 createDeck pid deck = do
   dungeonIds <- Monad.mapM (State.state . Game.intern) (Set.toAscList (Deck.dungeons deck))
+  -- CR 103.2a: the sideboard is set aside before the game, so these are interned
+  -- alongside the deck's own printings but no card is created for them.
+  sideboardIds <- Monad.mapM (\(printing, n) -> fmap (\i -> (i, n)) (State.state (Game.intern printing))) (Map.toAscList (Deck.sideboard deck))
   -- CR 903.7 / CR 103.4: the starting life total, which is the deck's business
   -- and so cannot be settled by emptyGame above.
   State.modify' $ \gs ->
@@ -249,7 +255,10 @@ createDeck pid deck = do
           -- minted for it, because dungeon cards begin OUTSIDE the game and
           -- outside the game is not a zone (CR 400.11). CR 701.49a is what brings
           -- it in; Pawl.Engine.Dungeon.enter is that rule.
-          Map.adjust (\p -> p {Player.life = startingLife (Deck.commander deck), Player.dungeons = Set.fromList dungeonIds}) pid (GameState.players gs)
+          -- CR 400.11a: the sideboard is recorded on the player for the same
+          -- reason and no object is minted for it either. CR 400.11c is what
+          -- keeps anything else from reaching these until a card brings one in.
+          Map.adjust (\p -> p {Player.life = startingLife (Deck.commander deck), Player.dungeons = Set.fromList dungeonIds, Player.outsideTheGame = Map.fromList sideboardIds}) pid (GameState.players gs)
       }
   Monad.forM_ (Map.toList (Deck.cards deck)) $ \(printing, n) -> do
     printingId <- State.state (Game.intern printing)
@@ -413,6 +422,13 @@ resetPlayers players =
               -- completed in it. Player.dungeons is deliberately NOT reset beside
               -- it, for Player.commander's reason -- the supply outside the game
               -- comes from the deck, and the restart reuses the same decks.
+              --
+              -- Player.outsideTheGame is NOT reset either, and for a sharper
+              -- reason than either of those: CR 727.2 involves in the new game
+              -- every card involved in the restarted one, which is the cards a
+              -- wish already brought IN -- and this field no longer holds those,
+              -- having been spent as they were brought in. What is left in it is
+              -- what stayed outside the game, which the restart does not reach.
               Player.completedDungeons = 0
             }
         Status.Departed _ -> player

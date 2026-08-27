@@ -282,6 +282,64 @@ data Effect card ability
     -- Not implemented: rule 701.20a keeps a revealed card revealed "for as long
     -- as necessary", which pawl has nowhere to store (#1408).
     Reveal Reveal.Reveal
+  | -- | CR 400.11c: the resolving controller reveals a card they own from OUTSIDE
+    -- THE GAME matching the Filter and puts it into their hand -- Burning Wish's
+    -- whole sentence. The pool is Pawl.Types.Player's outsideTheGame, and CR
+    -- 400.11c is what makes an opcode necessary rather than an ObjectRef: cards
+    -- outside the game "can\'t be affected by spells or abilities, EXCEPT ...
+    -- spells and abilities that allow those cards to be brought into the game",
+    -- so nothing that names objects can reach them and no ObjectRef could.
+    --
+    -- The Filter is evaluated against the PRINTED FACE
+    -- (Pawl.Engine.Projection.viewOfCard) rather than an object\'s CR 613
+    -- projection, there being no object: CR 400.11 makes outside the game not a
+    -- zone, so there is nowhere for one to sit. CR 604.3 is why that view is still
+    -- the right one -- a characteristic-defining ability is the only thing that
+    -- functions out there, and viewOfCard reads it.
+    --
+    -- A bare Filter and no payload record, ChooseCardName\'s shape: the sentence
+    -- has one variable. What the other axes would be, each with a printed card
+    -- behind it and none in data/cards: a destination other than the hand
+    -- (Spawnsire of Ulamog\'s battlefield), a count other than one (Spawnsire
+    -- again, "any number") and a reveal the card does not print (Ring of Ma\'ruf).
+    -- Not implemented: any of the three (gap #2449).
+    --
+    -- No optionality field: Burning Wish\'s "You may" is the CLAUSE\'s printed may
+    -- (CR 608.2d), which Pawl.Engine.Resolve.exercises already asks ahead of the
+    -- instruction.
+    --
+    -- No chooser ref either, and CR 108.3b is why this is exact rather than an
+    -- approximation: no card outside the game is ownerless, and every rule that
+    -- reaches out there asks for the acting player\'s OWN cards (CR 309.2a, CR
+    -- 701.23j, CR 701.48a, CR 702.139a). A card letting one player reach another\'s
+    -- sideboard is not a card that exists.
+    --
+    -- The reveal is CR 701.20a\'s and rides HERE rather than in a Reveal opcode
+    -- beside it, SearchDestination.RevealThenHand\'s reason: the card prints one
+    -- instruction. Not implemented: the reveal happens as the card ARRIVES IN THE
+    -- HAND rather than before the move as printed, GameEvent.Revealed being keyed
+    -- on an ObjectId and outside the game having none to key it on (#2450).
+    RevealFromOutsideTheGame (Filter.Filter Keyword.Keyword)
+  | -- | CR 608.2n: THIS SPELL goes to exile as this instruction runs, rather than
+    -- to its owner\'s graveyard as the final part of its resolution -- Burning
+    -- Wish\'s "Exile Burning Wish".
+    --
+    -- Not a MoveToZone: that opcode names what it moves with an ObjectRef, and no
+    -- ObjectRef names the resolving spell -- CR 115.10a keeps it from being a
+    -- target, and the reserved CR 113.7 source slot is bound for a triggered
+    -- ability and a hand action but not for a spell.
+    --
+    -- Rule 608.2n needs no help afterwards: Pawl.Engine.Resolve.finishSpell\'s move
+    -- to the graveyard finds the id gone, CR 400.7 having minted a fresh
+    -- incarnation in exile, and Pawl.Engine.Event.changeZoneAttaching answers a
+    -- lookup miss by moving nothing.
+    --
+    -- A SPELL only. An ability\'s resolving object is not a card (CR 113.7a) and
+    -- exiling it would take the ability off the stack mid-resolution, so the arm
+    -- moves nothing for one; a card file stating this on an ability states
+    -- something inert, the shape Pawl.Engine.EffectZone describes for a misplaced
+    -- move origin.
+    ExileThisSpell
   | -- | CR 701.20e: the cards the ObjectRef names are LOOKED AT -- shown to one
     -- player rather than all -- and bound into the slot, so a later clause of the
     -- same resolution can act on what was seen (Into the Wilds).

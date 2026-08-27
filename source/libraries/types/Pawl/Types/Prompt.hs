@@ -354,6 +354,27 @@ data Prompt r where
   -- A PRINTING and not an ObjectId, for the reason Pawl.Types.Player's field is
   -- one: the card is outside the game and no object stands for it.
   ChooseDungeon :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty PrintingId.PrintingId -> Prompt PrintingId.PrintingId
+  -- | CR 400.11c: which card a player brings in from OUTSIDE THE GAME -- Burning
+  -- Wish\'s "a sorcery card you own from outside the game". The NonEmpty is the
+  -- printings they own out there that the effect\'s Filter matches
+  -- (Pawl.Types.Player\'s outsideTheGame), in interning order. Choose, not target
+  -- (CR 115.10a): CR 601.2c announces targets as a spell is cast, and CR 400.11c
+  -- lets nothing target a card out there at all.
+  --
+  -- ChooseDungeon\'s shape and for its reasons -- no source ObjectId and a
+  -- PRINTING rather than an ObjectId, the card being outside the game with no
+  -- object standing for it until the answer is given.
+  --
+  -- Its own constructor rather than ChooseDungeon reused, for the reason
+  -- Response.ChoseDungeon gives against ChoseRoom: that one names a card rule
+  -- 309.2a admits and this one a card the CARD\'s filter admits, and a transcript
+  -- of one must not satisfy the other.
+  --
+  -- Raised only for two or more, one matching card leaving nothing to ask (CR
+  -- 103.2a\'s sideboard is a multiset, so two copies of one printing are one
+  -- offer). Whether to reveal AT ALL is the clause\'s printed may and is asked
+  -- before this.
+  ChooseFromOutsideTheGame :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty PrintingId.PrintingId -> Prompt PrintingId.PrintingId
   -- | CR 309.5a \/ 701.49b: which arrow a venturing player follows. The
   -- ObjectId is the dungeon card their marker is on; the NonEmpty is the rooms
   -- the arrows out of their current room lead to. Choose, not target. Raised

@@ -864,6 +864,7 @@ library engine
     Pawl.Engine.Modal
     Pawl.Engine.Monarch
     Pawl.Engine.Mulligan
+    Pawl.Engine.OutsideTheGame
     Pawl.Engine.Phasing
     Pawl.Engine.PlayerEffect
     Pawl.Engine.Plot
@@ -1179,6 +1180,7 @@ library test
     Pawl.ModalSpec
     Pawl.MoveCounterSpec
     Pawl.MulliganSpec
+    Pawl.OutsideTheGameSpec
     Pawl.PhasingSpec
     Pawl.PlaneswalkerSpec
     Pawl.PlayerEffectSpec
