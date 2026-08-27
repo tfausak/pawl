@@ -1419,9 +1419,10 @@ mintedReplacementsFor keyword count = case keyword of
 
 -- The SHORT-CIRCUIT's voice: Projection.replacementsAffecting skips the whole
 -- board when nothing it walks -- the permanents' COPIABLE rules text, the stored
--- continuous effects, and the static abilities functioning from the other zones
--- -- could hold a replacement effect, and a minted row is not printed in a
--- face's list, so the gate has to be told which keywords mint one. Membership rather than a count, the gate asking whether
+-- continuous effects, the static abilities functioning from the other zones, and
+-- the command zone's emblems' own printed rows -- could hold a replacement
+-- effect, and a minted row is not printed in a face's list, so the gate has to
+-- be told which keywords mint one. Membership rather than a count, the gate asking whether
 -- there is any.
 mintsReplacement :: Keyword -> Bool
 mintsReplacement keyword = not (null (mintedReplacementsFor keyword 1))
