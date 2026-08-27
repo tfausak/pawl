@@ -35,6 +35,26 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 -- why.
 data Modification ability
   = GainKeyword Keyword.Keyword -- layer 6 (Serpent's Gift)
+  | -- | layer 6, CR 613.1f / CR 702.34a: this object gains flashback, priced at
+    -- its OWN mana cost -- "each instant and sorcery card in your graveyard has
+    -- flashback. The flashback cost is equal to that card's mana cost", the
+    -- clause almost every printed granter of flashback carries (Lier, Snapcaster
+    -- Mage, Past in Flames, Recoup, Dralnu, Backdraft Hellkite, Katilda, Iroh).
+    --
+    -- PAYLOAD-FREE, and a second constructor rather than a value GainKeyword
+    -- above could carry, for AddChosenColor's and SetLandSubtypeToChosen's
+    -- reason: the cost is DERIVED at projection time from the RECEIVING object,
+    -- and a static ability's modification is card data, which cannot name the
+    -- mana cost of a card it has not met. Pawl.Engine.Projection.applyModification
+    -- holds that object's id and materialises Keyword.Flashback with it, so
+    -- Keyword.Flashback keeps its literal Cost and no reader downstream changes.
+    --
+    -- FLASHBACK and not a keyword parameter, though rule 702's cost-carrying
+    -- keywords (morph, kicker, bestow, entwine, cycling, equip, foretell) all
+    -- have the same shape: no printing prices any of those at the recipient's
+    -- own mana cost, so a parameter would be a capability no card exercises
+    -- (#1981 is the flashback half alone).
+    GainFlashbackAtManaCost
   | -- | layer 6, CR 613.1f / CR 702.5a: this object gains an enchant ability --
     -- "becomes an Aura enchantment WITH ENCHANT CREATURE", the clause every
     -- printing that turns a permanent into an Aura carries.

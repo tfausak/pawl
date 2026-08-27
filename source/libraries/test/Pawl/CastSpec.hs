@@ -29,6 +29,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replay as Replay
@@ -1802,12 +1803,13 @@ graveRecitalSpec s registry = Spec.describe s "GraveRecital" $ do
 -- alternative costs to a single spell" is what makes two of them a CHOICE rather
 -- than a sum.
 --
--- The Fugitive Doctor {3}{R}{G} is the pool's one producer of a graveyard card
--- holding two, and the only printing whose grant of one is a LITERAL cost and
--- nothing else. Archmage's Newt and Iroh, Grand Lotus each state a literal cost
--- for one class of card and "the flashback cost is equal to that card's mana
--- cost" for another; every remaining granter states only the second, which
--- Modification.GainKeyword's literal Keyword cannot express (#1981).
+-- The Fugitive Doctor {3}{R}{G} is the only printing in the pool whose grant of a
+-- flashback ability is a LITERAL cost and nothing else. Lier, Disciple of the
+-- Drowned is the other producer of a graveyard card holding two -- its grant
+-- states rule 702.34a's cost as "equal to that card's mana cost"
+-- (Modification.GainFlashbackAtManaCost), which lierSpec below proves, and which
+-- Archmage's Newt and Iroh, Grand Lotus each state for one class of card beside
+-- a literal cost for another.
 --
 -- Firebolt's printed {4}{R} and the granted {2}{R}{G} share no reading, and
 -- WHICH of them is the unreachable one is decided by Keyword's derived Ord:
@@ -1959,6 +1961,103 @@ fugitiveDoctorSpec s registry = Spec.describe s "FugitiveDoctor" $ do
     Spec.assertEqWith s "the granted cost's cast dealt its 2 as well" (S.lifeOf S.alice (resolveWith (paying granted))) (Just 18)
     Spec.assertEqWith s "and exiled the card too" (boltsIn Zone.Exile (resolveWith (paying granted))) 1
     Spec.assertEqWith s "not put it into the graveyard either" (boltsIn Zone.Graveyard (resolveWith (paying granted))) 0
+
+-- Lier, Disciple of the Drowned {3}{U}{U} (data/cards/lier-disciple-of-the-drowned.json):
+-- "Spells can't be countered. Each instant and sorcery card in your graveyard
+-- has flashback. The flashback cost is equal to that card's mana cost."
+--
+-- CR 702.34a's [cost] read off the RECEIVING card rather than written on the
+-- granter, which is Modification.GainFlashbackAtManaCost's whole reason: the
+-- grant is card data and cannot name the mana cost of a card it has not met, so
+-- Pawl.Engine.Projection.applyModification materialises the keyword against the
+-- object it is applying to.
+--
+-- Firebolt is the receiver because it already PRINTS Flashback {4}{R}, so the
+-- board holds two flashback abilities whose costs share no reading -- and the
+-- board holds ONE Mountain, which is what makes the two readings differ: the
+-- granted {R} is payable and the printed {4}{R} is not. With ten lands, both
+-- readings end with Firebolt exiled and 2 damage dealt, and every assertion
+-- below would be vacuous.
+--
+-- The second clause is transcribed as well (PlayerEffect.CantBeCountered under
+-- PlayerScope.EachPlayer), so pawl's Lier is not weaker than the printed card;
+-- the last case asks the axis that separates rule 109.5's "you" from every
+-- player, which is whether an OPPONENT's spell is protected too.
+lierBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, ObjectId.ObjectId)
+lierBoard s registry withLier = do
+  mountain <- S.printingOf s registry "Mountain"
+  firebolt <- S.printingOf s registry "Firebolt"
+  lier <- S.printingOf s registry "Lier, Disciple of the Drowned"
+  let -- ONE Mountain: see the header. Everything else about the two boards is
+      -- identical, so nothing below can turn on mana, timing or seats.
+      lands = S.landsInPlay mountain 1
+      seated = if withLier then snd (S.addCreature lier S.alice lands) else lands
+      (inGraveyard, buried) = S.addGraveyardCard firebolt S.alice seated
+  pure (aliceOnTurn buried, inGraveyard)
+
+lierSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lierSpec s registry = Spec.describe s "Lier" $ do
+  Spec.it s "CR 702.34a a granted flashback priced at the card's own mana cost is payable for that cost" $ do
+    firebolt <- S.printingOf s registry "Firebolt"
+    (board, inGraveyard) <- lierBoard s registry True
+    let granted = ManaCost.MkManaCost [theRed]
+        printed = ManaCost.MkManaCost [ManaSymbol.Generic 4, theRed]
+        -- CR 601.2b's announcement, answered by NAMING a cost rather than by
+        -- index: which of the two sorts first is Keyword's derived Ord, not the
+        -- order they were granted in, and an index would pick the unpayable
+        -- {4}{R} on the fixed board and read exactly like the broken one.
+        paying :: ManaCost.ManaCost -> Prompt.Prompt r -> r
+        paying wanted p = case p of
+          Prompt.ChooseCost _ _ _ candidates ->
+            Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just wanted) . Cost.Type.mana) candidates)
+          -- Firebolt's own "any target", FILTERED from the offered set rather
+          -- than built, and aimed at alice so its 2 damage reports which cast
+          -- resolved. Lier is on this battlefield and is a legal target too, so
+          -- an unpinned answer would report a creature's damage instead.
+          Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToPlayer S.alice) . snd) sets
+          _ -> S.identityAnswer p
+        after = S.runPure (paying granted) (S.runPure (paying granted) board (S.cast S.alice inGraveyard)) Stack.resolveTop
+        boltsIn zone gs = length (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName firebolt)) (Game.zoneMembers zone S.alice gs))
+    -- The precondition the whole group rests on, asserted rather than assumed:
+    -- one Mountain cannot pay the printed {4}{R}.
+    Spec.assertEqWith s "alice has one land" (length (Set.toList (GameState.battlefield board)) - 1) 1
+    -- Gameplay level, and FIRST: under the broken reading Firebolt never leaves
+    -- the graveyard at all, Lier granting no cast-from-graveyard permission of
+    -- its own beyond rule 702.34a's.
+    Spec.assertEqWith s "the granted {R} paid for the cast, which dealt its 2" (S.lifeOf S.alice after) (Just 18)
+    Spec.assertEqWith s "and CR 702.34a exiled the card as it resolved" (boltsIn Zone.Exile after) 1
+    Spec.assertEqWith s "so it is not back in the graveyard" (boltsIn Zone.Graveyard after) 0
+    -- Supporting, and AFTER the three above so it cannot absorb a mutation.
+    Spec.assertEqWith
+      s
+      "both flashback costs are on offer, the granted {R} beside the printed {4}{R}"
+      (fmap Cost.Type.mana (Cost.costsFor (S.printingName firebolt) inGraveyard board))
+      [Just printed, Just granted]
+  -- The discriminating twin: same Mountain, same Firebolt, same graveyard, same
+  -- phase and priority. One thing differs, and it is Lier -- so the grant is a
+  -- continuous static ability read live (CR 613.1f / 604.2) rather than a stamp
+  -- the card carried into the graveyard.
+  Spec.it s "CR 613.1f without Lier the printed {4}{R} is the only flashback, and one Mountain cannot pay it" $ do
+    firebolt <- S.printingOf s registry "Firebolt"
+    (board, inGraveyard) <- lierBoard s registry False
+    Spec.assertBool s (not (S.castable S.alice inGraveyard board)) "CR 601.2b: no candidate cost is payable, so the card cannot be cast at all"
+    Spec.assertEqWith
+      s
+      "and the granted cost is gone with the granter"
+      (fmap Cost.Type.mana (Cost.costsFor (S.printingName firebolt) inGraveyard board))
+      [Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, theRed])]
+  -- Lier's other clause. CR 109.5's "you" is what PlayerScope.You means, and
+  -- Prowling Serpopard's is the pool's shape for it; Lier says "spells", not
+  -- "spells you control", so the scope is EachPlayer and an OPPONENT's spell is
+  -- protected too. That is the one axis the two arms differ on.
+  Spec.it s "CR 701.6a/109.5 Lier's first clause protects every player's spells, not only its controller's" $ do
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    (withLier, _) <- lierBoard s registry True
+    (without, _) <- lierBoard s registry False
+    let (bobs, protected) = S.addHandCard bolt S.bob withLier
+        (bobs', unprotected) = S.addHandCard bolt S.bob without
+    Spec.assertBool s (PlayerEffect.cantBeCountered S.bob bobs protected) "an opponent's spell is uncounterable while Lier is out"
+    Spec.assertBool s (not (PlayerEffect.cantBeCountered S.bob bobs' unprotected)) "and counterable without it"
 
 -- Harness the Storm {2}{R} Enchantment (data/cards/harness-the-storm.json):
 -- "Whenever you cast an instant or sorcery spell from your hand, you may cast
@@ -3636,6 +3735,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   grantedFlashbackSpec s registry
   graveRecitalSpec s registry
   fugitiveDoctorSpec s registry
+  lierSpec s registry
   harnessTheStormSpec s registry
   jumpStartSpec s registry
   legendarySpellSpec s registry
