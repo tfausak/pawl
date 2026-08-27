@@ -45,6 +45,7 @@ grantless = Arm.tagged arms
 arms :: (Eq ability) => [Arm.Arm (Modification.Modification ability)]
 arms =
   [ Arm.payload "GainKeyword" Keyword.codec Modification.GainKeyword (\x -> case x of Modification.GainKeyword y -> Just y; _ -> Nothing),
+    Arm.nullary "GainFlashbackAtManaCost" Modification.GainFlashbackAtManaCost,
     Arm.payload "GainEnchant" TargetSlot.codec Modification.GainEnchant (\x -> case x of Modification.GainEnchant y -> Just y; _ -> Nothing),
     Arm.nullary "LoseAllAbilities" Modification.LoseAllAbilities,
     Arm.payload "LoseNamedAbility" AbilityName.codec Modification.LoseNamedAbility (\x -> case x of Modification.LoseNamedAbility y -> Just y; _ -> Nothing),

@@ -46,6 +46,14 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       (Modification.GainKeyword Keyword.Deathtouch)
       " {\"type\":\"GainKeyword\",\"value\":{\"type\":\"Deathtouch\"}} "
+  -- layer 6, CR 702.34a: nullary on the wire, since the cost this grant states
+  -- is the RECEIVING card's mana cost and no card writes it.
+  Spec.it s "GainFlashbackAtManaCost" $
+    Common.assertCodec
+      s
+      codec
+      Modification.GainFlashbackAtManaCost
+      " {\"type\":\"GainFlashbackAtManaCost\"} "
   -- layer 6, CR 702.5a: the granted enchant ability. The payload is a
   -- whole TargetSlot, so this arm's wire form is the one Face.enchant's entries
   -- already take.
