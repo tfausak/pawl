@@ -219,6 +219,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
+  Keyword.Fortify _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -306,6 +307,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
+  Keyword.Fortify _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -506,6 +508,9 @@ battlefieldAbilitiesFor keyword count = case keyword of
   -- abilities may be activated" -- so one ability per instance, crew's reading
   -- above.
   Keyword.Equip cost -> List.genericReplicate count (equip cost)
+  -- CR 702.67c, in CR 702.6d's words: any of a Fortification's fortify
+  -- abilities may be used, so one ability per instance as equip is.
+  Keyword.Fortify cost -> List.genericReplicate count (fortify cost)
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -751,6 +756,47 @@ equip cost =
 equipTarget :: SlotName.SlotName
 equipTarget = SlotName.MkSlotName (Text.pack "equipped")
 
+-- CR 702.67a's whole ability: "[Cost]: Attach this Fortification to target land
+-- you control. Activate only as a sorcery." `equip` above with CR 301.6's land
+-- where CR 301.5 has a creature, and everything that function's haddock says
+-- about the cost, about CR 115.1e putting "target land you control" in the RULE
+-- rather than on the card, and about CR 608.2b re-asking control at resolution
+-- holds here word for word.
+--
+-- Pool.Permanents narrowed by Filter.HasCardType Land, where equip takes
+-- Pool.Creatures whole: CR 115.1a gives the creature pool a constructor and
+-- there is no land pool. The recipient that reaches Object.attachedTo is
+-- therefore Recipient.ToObject rather than ToCreature -- which is what
+-- Pawl.Engine.Attach.attachmentFor's Fortification branch answers with, since
+-- rule 301.6 names a land and not a creature.
+--
+-- CR 301.6's separate restriction -- that a Fortification may only be attached
+-- to a land at all, and that a Fortification that is also a creature and not a
+-- land can't fortify -- is Pawl.Engine.Attach's, and is not restated here.
+fortify :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+fortify cost =
+  ActivatedAbility.MkActivatedAbility
+    { ActivatedAbility.cost = cost,
+      ActivatedAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton fortifyTarget slot)))
+          (ModeSelection.ChooseExactly 1),
+      -- CR 702.67a's "Activate only as a sorcery", which CR 307.5 spells out.
+      ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+      ActivatedAbility.condition = Nothing,
+      ActivatedAbility.name = Nothing
+    }
+  where
+    slot =
+      TargetSlot.required
+        Pool.Permanents
+        (Just (Filter.And [Filter.HasCardType CardType.Land, Filter.ControlledBy PlayerRelation.You]))
+    effect = Effect.Attach fortifyTarget
+
+-- The slot rule 702.67a's one target is chosen into, equipTarget's position.
+fortifyTarget :: SlotName.SlotName
+fortifyTarget = SlotName.MkSlotName (Text.pack "fortified")
+
 -- CR 601.3: the casting permissions rule 702 gives a card for holding a keyword.
 -- A card's own printed permissions are a separate, additive list.
 --
@@ -796,6 +842,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
+  Keyword.Fortify _ -> []
   Keyword.FirstStrike -> []
   -- CR 702.8a grants no permission, and it is the near miss worth stating: its
   -- SECOND sentence widens the TIME a cast may be proposed at (Cast.instantSpeed)
@@ -1217,6 +1264,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
+  Keyword.Fortify _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -1423,6 +1471,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
+  Keyword.Fortify _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -1556,6 +1605,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
   Keyword.Equip _ -> []
+  Keyword.Fortify _ -> []
   Keyword.FirstStrike -> []
   Keyword.Flash -> []
   Keyword.Flying -> []
@@ -1588,10 +1638,11 @@ mintedAttachRestrictionsFor keyword = case keyword of
   -- read, so CR 702.5d's enchant-player Aura is barred by nothing (#2387).
   -- Rule 702.16d has no player half to miss.
   --
-  -- Not implemented: rule 702.16n's and rule 702.16p's exceptions, where an Aura
+  -- Not implemented: rule 702.16n's and rule 702.16p's exceptions, where an AURA
   -- grants protection from a quality and says the effect does not remove Auras,
-  -- or does not remove what is already attached. No card in the pool grants
-  -- protection at all, so nothing here can carry either rider (#2229).
+  -- or does not remove what is already attached. The pool's one grant is an
+  -- activated ability (Tower of the Magistrate) and carries no such rider, so
+  -- nothing here can either (#2229).
   Keyword.Protection quality ->
     [ AttachRestriction.MkAttachRestriction
         { AttachRestriction.affected = Affected.Matching Filter.IsSource,
@@ -1684,7 +1735,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
 -- handAbilitiesFor and battlefieldAbilitiesFor -- so asking both cannot answer
 -- twice for one keyword.
 --
--- Every minting keyword -- cycling, reinforce, crew, level up, outlast, equip --
+-- Every minting keyword -- cycling, reinforce, crew, level up, outlast, equip,
+-- fortify --
 -- carries a payload, so familyOf answers Just for every one of them and its Nothing
 -- is unreachable from here. Its Nothing is still let through rather than made an
 -- error: a nullary keyword that minted an activated ability would have no family
@@ -1724,6 +1776,7 @@ familyOf keyword = case keyword of
   -- is what Bureau Headmaster's reduction names -- Pawl.ActivateSpec's "Equip"
   -- group is what proves it.
   Keyword.Equip _ -> Just KeywordFamily.Equip
+  Keyword.Fortify _ -> Just KeywordFamily.Fortify
   Keyword.Hexproof _ -> Just KeywordFamily.Hexproof
   Keyword.Landwalk _ -> Just KeywordFamily.Landwalk
   Keyword.Cycling {} -> Just KeywordFamily.Cycling

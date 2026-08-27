@@ -77,6 +77,7 @@ codec =
       -- N-carrying form (Waning Wurm's @{"type":"Vanishing","value":2}@) is
       -- untouched by this arm being optional.
       Arm.optionalPayload "Vanishing" Common.natural Keyword.Vanishing (\x -> case x of Keyword.Vanishing y -> Just y; _ -> Nothing),
+      Arm.payload "Fortify" (Cost.codec codec) Keyword.Fortify (\x -> case x of Keyword.Fortify y -> Just y; _ -> Nothing),
       Arm.payload "Frenzy" Common.natural Keyword.Frenzy (\x -> case x of Keyword.Frenzy y -> Just y; _ -> Nothing),
       Arm.payload "Poisonous" Common.natural Keyword.Poisonous (\x -> case x of Keyword.Poisonous y -> Just y; _ -> Nothing),
       Arm.payload "Annihilator" Common.natural Keyword.Annihilator (\x -> case x of Keyword.Annihilator y -> Just y; _ -> Nothing),

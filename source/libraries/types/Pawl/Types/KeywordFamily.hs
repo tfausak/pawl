@@ -86,6 +86,10 @@ data KeywordFamily
     Bloodthirst
   | -- | CR 702.63a: vanishing N.
     Vanishing
+  | -- | CR 702.67a: fortify [cost]. Equip's family one rule over; no card in the
+    -- pool asks yet, and it is owed at the keyword rather than at the first
+    -- asker.
+    Fortify
   | -- | CR 702.68a: frenzy N.
     Frenzy
   | -- | CR 702.70a: poisonous N.

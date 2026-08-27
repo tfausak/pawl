@@ -172,8 +172,7 @@ phasingOut pid gs =
 -- Guarded on the PROJECTED subtypes, because rule 702.26g names Auras,
 -- Equipment and Fortifications rather than "whatever is attached". Anything
 -- else that is somehow attached is illegal by CR 704.5p and stays behind for
--- Pawl.Engine.Sba to detach. Subtype.Fortification has no constructor to name,
--- so that third clause is unreachable rather than elided.
+-- Pawl.Engine.Sba to detach.
 draggedAlong :: Set.Set ObjectId -> GameState -> Set.Set ObjectId
 draggedAlong hosts gs =
   let attachments = Set.filter (isAttachment gs) (GameState.battlefield gs)
@@ -194,7 +193,9 @@ closeOver candidates hosts gs =
 isAttachment :: GameState -> ObjectId -> Bool
 isAttachment gs oid =
   let subtypes = Projection.subtypesOf oid gs
-   in Set.member Subtype.Aura subtypes || Set.member Subtype.Equipment subtypes
+   in Set.member Subtype.Aura subtypes
+        || Set.member Subtype.Equipment subtypes
+        || Set.member Subtype.Fortification subtypes
 
 -- What a permanent is attached to, when that is an object. CR 702.26g reaches
 -- only object hosts: an Aura enchanting a PLAYER (CR 702.5d) has no permanent to

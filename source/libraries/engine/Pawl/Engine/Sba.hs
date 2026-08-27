@@ -164,9 +164,16 @@ destroyedBySba gs pc oid =
 -- Equipment merely DETACHES and stays (CR 301.5c says the same from the card
 -- type's side).
 --
--- "Illegal" is CR 301.5: an Equipment can be attached only to a creature. So a
--- host that is gone, or that is not a creature, is illegal -- and `pcs` answers
--- both at once, since an object no longer on the battlefield has no entry in it.
+-- "Illegal" is CR 301.5 for an Equipment and CR 301.6 for a Fortification: the
+-- one may be attached only to a creature, the other only to a land. So a host
+-- that is gone, or that is not of the card type its attacher's subtype demands,
+-- is illegal -- and `pcs` answers both at once, since an object no longer on the
+-- battlefield has no entry in it.
+--
+-- A permanent carrying BOTH subtypes must satisfy BOTH: rule 301.5 and rule
+-- 301.6 each state their own "can't legally be attached", and CR 101.2 makes
+-- neither yield to the other. Nothing in the pool is both, and the conjunction
+-- is what makes the single-subtype cases fall out unchanged.
 -- Reading the shared pre-pass projection (a per-object project here would
 -- reintroduce the cubic sweep) means an Equipment whose creature dies THIS pass
 -- detaches on the NEXT one, exactly as an Aura falls off on the next one.
@@ -175,35 +182,41 @@ destroyedBySba gs pc oid =
 -- anyway, as the `Nothing` a player host yields from Recipient.objectOf -- there
 -- is no host object to be a creature, so the rule detaches it.
 --
--- Guarded on the PROJECTED subtype, so a permanent that stops being an Equipment
--- while attached stops matching here; cannotBeAttached below is the CR 704.5p
--- branch that detaches it instead.
+-- Guarded on the PROJECTED subtypes, so a permanent that stops being an Equipment
+-- or a Fortification while attached stops matching here; cannotBeAttached below
+-- is the CR 704.5p branch that detaches it instead.
 --
 -- CR 702.16d's second sentence is the other disjunct -- "such Equipment or
 -- Fortifications become unattached from that permanent as a state-based action,
 -- but remain on the battlefield" -- and it is the SAME action, so it is a clause
 -- here rather than a classification of its own. It asks
 -- Pawl.Engine.AttachRestriction, the answer Attach.attachmentFor would have
--- refused the equip by, which is what makes this the Equipment mirror of CR
--- 704.5m's clause in fallsOff below: an Equipment that was attached legally and
--- whose host LATER gained protection from its quality detaches on this pass.
+-- refused the equip or the fortify by, which is what makes this the Equipment and
+-- Fortification mirror of CR 704.5m's clause in fallsOff below: an Equipment or a
+-- Fortification that was attached legally and whose host LATER gained protection
+-- from its quality detaches on this pass.
 -- Rule 704.5n's own "illegal permanent" is the conjunct above it, and the two
--- are kept apart because they read different things -- CR 301.5's card type,
--- and CR 613.11's continuous effect.
+-- are kept apart because they read different things -- CR 301.5's and CR 301.6's
+-- card type, and CR 613.11's continuous effect.
 becomesUnattached :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
   Nothing -> False
   Just obj -> case Object.attachedTo obj of
     Nothing -> False
     Just host ->
-      let isEquipment = case Map.lookup oid pcs of
+      let subtypeOf subtype = case Map.lookup oid pcs of
             Nothing -> False
-            Just pc -> Set.member Subtype.Equipment (PC.subtypes pc)
-          hostIsCreature = case Recipient.objectOf host >>= (\h -> Map.lookup h pcs) of
+            Just pc -> Set.member subtype (PC.subtypes pc)
+          isEquipment = subtypeOf Subtype.Equipment
+          isFortification = subtypeOf Subtype.Fortification
+          hostCardType cardType = case Recipient.objectOf host >>= (\h -> Map.lookup h pcs) of
             Nothing -> False
-            Just pc -> Set.member CardType.Creature (PC.cardTypes pc)
+            Just pc -> Set.member cardType (PC.cardTypes pc)
+          hostIsCreature = hostCardType CardType.Creature
+          hostIsLand = hostCardType CardType.Land
+          hostIsIllegal = (isEquipment && not hostIsCreature) || (isFortification && not hostIsLand)
           hostRefuses = Maybe.maybe False (\h -> AttachRestriction.refusesGiven pcs oid h gs) (Recipient.objectOf host)
-       in isEquipment && (not hostIsCreature || hostRefuses)
+       in (isEquipment || isFortification) && (hostIsIllegal || hostRefuses)
 
 -- CR 704.5p: a battle or creature attached to an object or player becomes
 -- unattached and remains on the battlefield, and so does any nonbattle,
@@ -225,13 +238,10 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 -- "Equipment" are subtypes (CR 205.3h, CR 301.5), so they come from PC.subtypes,
 -- as CR 704.5m's fallsOff below reads PC.enchant for the same reason.
 --
--- Subtype.Fortification is the one clause of the rule with no constructor to case
--- on, and is therefore unreachable rather than elided. The BATTLE clause is
--- written out, though nothing reaches it: the pool has a battle, but CR 310.10
--- forbids attaching one and no effect in the pool tries. That is
--- becomesUnattached's posture toward CR
--- 704.5n's "or to a player" -- express the clause, and let the pool decide when it
--- fires. "Or to a player" needs no clause at all here: this rule asks only whether
+-- The BATTLE clause is written out, though nothing reaches it: the pool has a
+-- battle, but CR 310.10 forbids attaching one and no effect in the pool tries.
+-- That is becomesUnattached's posture toward CR 704.5n's "or to a player" --
+-- express the clause, and let the pool decide when it fires. "Or to a player" needs no clause at all here: this rule asks only whether
 -- the attached permanent may be attached to ANYTHING, so the `Just _` below covers
 -- an object and a player alike.
 --
@@ -252,14 +262,16 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
             isCreature = Set.member CardType.Creature (PC.cardTypes pc)
             isAura = Set.member Subtype.Aura (PC.subtypes pc)
             isEquipment = Set.member Subtype.Equipment (PC.subtypes pc)
+            isFortification = Set.member Subtype.Fortification (PC.subtypes pc)
          in -- Written as the rule's two sentences rather than as the smaller
-            -- equivalent `isBattle || isCreature || not (isAura || isEquipment)`,
+            -- equivalent
+            -- `isBattle || isCreature || not (isAura || isEquipment || isFortification)`,
             -- so each half can be checked against the CR on its own. The
             -- `not isBattle` and `not isCreature` conjuncts are the second
             -- sentence's own "nonbattle, noncreature" qualifiers -- and they are
             -- what makes the two sentences differ at all, since a battle that is
             -- also an Aura detaches by the first and not by the second.
-            isBattle || isCreature || (not isBattle && not isCreature && not isAura && not isEquipment)
+            isBattle || isCreature || (not isBattle && not isCreature && not isAura && not isEquipment && not isFortification)
 
 -- CR 702.103b: is this object bestowed? The designation Pawl.Engine.Cast stamps
 -- and Pawl.Engine.Projection.bestowGathered mints from, read off the object

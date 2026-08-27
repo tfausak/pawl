@@ -578,6 +578,18 @@ data Keyword
     -- Reality Acid (an Aura) and Four Knocks (an enchantment) print it, so
     -- nothing here or in the mint asks whether the bearer is a creature.
     Vanishing (Maybe Natural.Natural)
+  | -- | 702.67a: "Fortify [cost]" means "[Cost]: Attach this Fortification to
+    -- target land you control. Activate only as a sorcery." Equip's ability
+    -- (702.6a) with CR 301.6's land in place of CR 301.5's creature, minted on
+    -- the battlefield by Pawl.Engine.Keyword.battlefieldAbilitiesFor.
+    --
+    -- ONE ability PER INSTANCE, which CR 702.67c settles in the same words CR
+    -- 702.6d uses for equip: "if a Fortification has multiple instances of
+    -- fortify, any of its fortify abilities may be used."
+    --
+    -- A BARE Cost, as Equip's is. Rule 702.67 states no variant for this one to
+    -- miss -- there is no "fortify [quality] land" and no fortify-a-planeswalker.
+    Fortify (Cost.Cost Keyword)
   | -- | 702.68a: frenzy N, "whenever this creature attacks and isn't blocked,
     -- it gets +N/+0 until end of turn". A TRIGGERED ability, which
     -- Pawl.Engine.Keyword.frenzy mints in bushido's position: its condition is

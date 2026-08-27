@@ -32,6 +32,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
@@ -79,11 +80,13 @@ import qualified Pawl.Types.Subtype as Subtype
 -- can't enchant anything", whose state-based half is Sba.cannotBeAttached.
 -- Unreachable in this pool, written because it costs one comparison. The Equipment
 -- branch has no counterpart: CR 301.5c's matching restriction carries a
--- reconfigure exception nothing here can express (#193).
+-- reconfigure exception nothing here can express (#193). The Fortification branch
+-- DOES have one, and rule 301.6 states it outright rather than by reference: "a
+-- Fortification that's also a creature (not a land) can't fortify a land". No
+-- reconfigure exception attaches to it, so it is written here in full.
 --
 -- The first guard -- the destination naming `src` itself -- is CR 301.5c and CR
--- 303.4d at once. Nothing for a source that is neither, per CR 701.3b; there is no
--- Subtype.Fortification to case on.
+-- 303.4d at once. Nothing for a source that is none of the three, per CR 701.3b.
 --
 -- Answers with the RECIPIENT to store rather than a Bool, since CR 303.4
 -- attachment is to an object or player and Object.attachedTo records which -- and
@@ -109,6 +112,24 @@ attachmentFor src destination gs
   | Set.member Subtype.Equipment subtypes = case Recipient.objectOf destination of
       Just oid | Projection.isCreatureOf oid gs -> Just (Recipient.ToCreature oid)
       _ -> Nothing
+  -- CR 301.6, the Equipment branch above with a land where that rule has a
+  -- creature: "a Fortification can be attached to a land. It can't legally be
+  -- attached to an object that isn't a land." A player destination falls to
+  -- Nothing here for the same reason it does above. Recipient.ToObject and not
+  -- ToCreature, because rule 301.6's host is named as a land and CR 115's
+  -- creature tag would be a lie about a land that is not one -- and because
+  -- Sba.becomesUnattached's re-read compares by the object, not by the tag.
+  --
+  -- The second conjunct is rule 301.6's own clarification of CR 301.5c: a
+  -- Fortification that is also a creature can't fortify, UNLESS it is a land
+  -- itself. Read through the projection, so an animated Fortification stops
+  -- being able to fortify while it is a creature.
+  | Set.member Subtype.Fortification subtypes =
+      if Projection.isCreatureOf src gs && not (Set.member CardType.Land (Projection.cardTypesOf src gs))
+        then Nothing
+        else case Recipient.objectOf destination of
+          Just oid | Set.member CardType.Land (Projection.cardTypesOf oid gs) -> Just (Recipient.ToObject oid)
+          _ -> Nothing
   | Set.member Subtype.Aura subtypes =
       if Projection.isCreatureOf src gs
         then Nothing

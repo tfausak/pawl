@@ -250,6 +250,158 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     Spec.assertBool s (Set.member equip (GameState.battlefield after)) "the Equipment survives"
     Spec.assertEqWith s "and is unattached" (fmap Object.attachedTo (Game.lookupObject equip after)) (Just Nothing)
 
+-- alice's board for the fortify cases: Dryad Arbor (a land that is also a
+-- creature), Tower of the Magistrate, Darksteel Garrison, and four Forests to
+-- pay with. Sorcery-speed timing is set here rather than left to
+-- Setup.emptyGame's untap step, because CR 702.67a's "activate only as a
+-- sorcery" is a real gate (CR 307.5).
+--
+-- The Arbor is left UNTAPPED and is never tapped by any case below: Darksteel
+-- Garrison's own "whenever fortified land becomes tapped" trigger would
+-- otherwise fire and put a second object on the stack.
+fortifyBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+fortifyBoard s registry = do
+  forest <- S.printingOf s registry "Forest"
+  dryadArbor <- S.printingOf s registry "Dryad Arbor"
+  tower <- S.printingOf s registry "Tower of the Magistrate"
+  garrison <- S.printingOf s registry "Darksteel Garrison"
+  let base = S.landsInPlay forest 4
+      (arborId, g1) = S.addCreature dryadArbor S.alice base
+      (towerId, g2) = S.addCreature tower S.alice g1
+      (garrisonId, g3) = S.addCreature garrison S.alice g2
+  pure
+    ( arborId,
+      towerId,
+      garrisonId,
+      g3 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+    )
+
+-- CR 702.16a's "protection from artifacts", the quality Tower of the Magistrate
+-- grants and the one Darksteel Garrison has.
+protectionFromArtifacts :: Keyword.Keyword
+protectionFromArtifacts = Keyword.Protection (Filter.Type.HasCardType CardType.Artifact)
+
+-- CR 301.6 / 702.67: Fortifications, the Equipment group above one card type
+-- over -- a Fortification attaches to a LAND, and CR 301.6 says the two are
+-- otherwise the same rule ("rules 301.5a-f apply to Fortifications in relation
+-- to lands just as they apply to Equipment in relation to creatures").
+--
+-- Darksteel Garrison ({2} Artifact -- Fortification, "Fortified land has
+-- indestructible." / "Whenever fortified land becomes tapped, target creature
+-- gets +1/+1 until end of turn." / "Fortify {3}", checked against Scryfall on
+-- 2026-08-27) is the producer, and Dryad Arbor the host: rule 301.6 wants a
+-- land, and CR 702.16d's clause below wants that land to be able to gain
+-- protection, which every grant in the pool offers only to a creature.
+--
+-- Tower of the Magistrate ("{T}: Add {C}." / "{1}, {T}: Target creature gains
+-- protection from artifacts until end of turn.", same fetch) is the grant. The
+-- Garrison is a colorless artifact, so "artifacts" is the one quality of it a
+-- printed card can name.
+fortificationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+fortificationSpec s registry = Spec.describe s "Fortification" $ do
+  -- CR 702.67a: "Fortify is an activated ability of Fortification cards.
+  -- 'Fortify [cost]' means '[Cost]: Attach this Fortification to target land you
+  -- control. Activate only as a sorcery.'" MINTED from the keyword, so the card
+  -- file declares Keyword.Fortify and prints no activated ability -- equip's
+  -- arrangement one rule over, and the single-ability match is the same trap
+  -- assertion.
+  Spec.it s "CR 702.67a the fortify ability is minted from the keyword, not printed" $ do
+    garrison <- S.printingOf s registry "Darksteel Garrison"
+    (_, _, garrisonId, gs) <- fortifyBoard s registry
+    Spec.assertEqWith s "the card itself prints no activated ability" (Face.activatedAbilities (S.combinedFace garrison)) []
+    case Projection.abilitiesOf garrisonId gs of
+      [ability] ->
+        Spec.assertEqWith
+          s
+          "the printed {3}, with nothing appended -- rule 702.67a states no tap symbol"
+          (ActivatedAbility.cost ability)
+          (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) [])
+      abilities -> Spec.assertFailure s ("expected exactly one fortify ability, got " <> show (length abilities))
+  -- CR 702.67a's whole card, and CR 301.6's "a Fortification can be attached to
+  -- a land": pay {3}, aim rule 702.67a's slot at Dryad Arbor, resolve. The
+  -- recipient is Recipient.ToObject and not ToCreature even though the Arbor is
+  -- a creature too, because rule 301.6 names the host as a land.
+  --
+  -- CR 301.5a through CR 301.6: "fortified land" is Affected.Attached, so the
+  -- Garrison's own static ability reaches the Arbor once it lands. The
+  -- state-based pass at the end is CR 704.5p's: a Fortification is one of the
+  -- three permanent kinds that rule does NOT detach.
+  Spec.it s "CR 702.67a whole card: fortifying attaches the Garrison to the land and grants it indestructible" $ do
+    (arborId, _, garrisonId, gs) <- fortifyBoard s registry
+    case Projection.abilitiesOf garrisonId gs of
+      [ability] -> do
+        let activated = S.runPure (aimAtOffered arborId) gs (Activate.activateAbility S.alice garrisonId ability)
+            after = S.runPure (aimAtOffered arborId) activated Stack.resolveTop
+            settled = S.settleSba after
+        Spec.assertEqWith s "the Garrison is attached to the land (CR 701.3a)" (fmap Object.attachedTo (Game.lookupObject garrisonId after)) (Just (Just (Recipient.ToObject arborId)))
+        Spec.assertBool s (Projection.hasKeyword Keyword.Indestructible arborId after) "and the fortified land has indestructible"
+        Spec.assertEqWith s "CR 704.5p leaves it attached" (fmap Object.attachedTo (Game.lookupObject garrisonId settled)) (Just (Just (Recipient.ToObject arborId)))
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Indestructible arborId gs)) "where unfortified the land did not have it"
+        Spec.assertBool s (Set.member garrisonId (GameState.battlefield settled)) "and the Garrison is on the battlefield"
+      abilities -> Spec.assertFailure s ("expected exactly one fortify ability, got " <> show (length abilities))
+  -- CR 702.16d: "A permanent with protection can't be equipped by Equipment that
+  -- have the stated quality or fortified by Fortifications that have the stated
+  -- quality. Such Equipment or Fortifications become unattached from that
+  -- permanent as a state-based action, but remain on the battlefield."
+  --
+  -- Two boards differing in exactly one thing -- whether Tower of the
+  -- Magistrate's ability resolved -- so the detach cannot be about the fortify,
+  -- the Arbor's card types, or the state-based pass itself.
+  Spec.it s "CR 702.16d whole card: a land that gains protection from artifacts sheds its Fortification" $ do
+    (arborId, towerId, garrisonId, gs) <- fortifyBoard s registry
+    case (Projection.abilitiesOf garrisonId gs, Projection.abilitiesOf towerId gs) of
+      ([fortifyAbility], [_, protect]) -> do
+        let fortified =
+              let activated = S.runPure (aimAtOffered arborId) gs (Activate.activateAbility S.alice garrisonId fortifyAbility)
+               in S.runPure (aimAtOffered arborId) activated Stack.resolveTop
+            protected =
+              let activated = S.runPure (aimAtOffered arborId) fortified (Activate.activateAbility S.alice towerId protect)
+               in S.runPure (aimAtOffered arborId) activated Stack.resolveTop
+            after = S.settleSba protected
+            control = S.settleSba fortified
+        Spec.assertEqWith s "CR 702.16d the Garrison becomes unattached from the protected land" (fmap Object.attachedTo (Game.lookupObject garrisonId after)) (Just Nothing)
+        Spec.assertEqWith s "where the same board without the protection keeps it attached" (fmap Object.attachedTo (Game.lookupObject garrisonId control)) (Just (Just (Recipient.ToObject arborId)))
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Indestructible arborId after)) "and the land loses the indestructible the Fortification was granting"
+        Spec.assertBool s (Set.member garrisonId (GameState.battlefield after)) "CR 704.5n it remains on the battlefield"
+        Spec.assertBool s (Projection.hasKeyword protectionFromArtifacts arborId protected) "the land really did gain protection from artifacts"
+        Spec.assertBool s (Projection.hasKeyword Keyword.Indestructible arborId control) "and on the control board it kept the indestructible"
+      abilities -> Spec.assertFailure s ("expected one fortify ability and two Tower abilities, got " <> show (fmap length abilities))
+  -- CR 702.16b, and NOT rule 702.16d's first sentence, which is why the
+  -- state-based case above is the one that proves this unit: a Fortification is
+  -- the source of its own fortify ability, so a land already protected from
+  -- artifacts is out of rule 702.67a's offered set on the TARGETING rule before
+  -- rule 702.16d's "can't be fortified" is reached. The two readings agree here
+  -- and attachRestrictionSpec's header says why nothing in this pool separates
+  -- them. Same board and same two activations as the case above, in the other
+  -- order.
+  Spec.it s "CR 702.16b a land with protection from artifacts is not offered to the fortify ability" $ do
+    (arborId, towerId, garrisonId, gs) <- fortifyBoard s registry
+    case (Projection.abilitiesOf garrisonId gs, Projection.abilitiesOf towerId gs) of
+      ([fortifyAbility], [_, protect]) -> do
+        let protected =
+              let activated = S.runPure (aimAtOffered arborId) gs (Activate.activateAbility S.alice towerId protect)
+               in S.runPure (aimAtOffered arborId) activated Stack.resolveTop
+            after =
+              let activated = S.runPure (aimAtOffered arborId) protected (Activate.activateAbility S.alice garrisonId fortifyAbility)
+               in S.runPure (aimAtOffered arborId) activated Stack.resolveTop
+        Spec.assertEqWith s "the fortify resolved onto nothing" (fmap Object.attachedTo (Game.lookupObject garrisonId after)) (Just Nothing)
+        Spec.assertBool s (Projection.hasKeyword protectionFromArtifacts arborId protected) "the land had the protection when the fortify resolved"
+      abilities -> Spec.assertFailure s ("expected one fortify ability and two Tower abilities, got " <> show (fmap length abilities))
+  -- CR 301.6: "It can't legally be attached to an object that isn't a land."
+  -- CR 704.5n's illegal-host conjunct, the Equipment group's CR 301.5 case with
+  -- the card types swapped. Hand-built, because rule 702.67a's own target slot
+  -- would never offer a creature.
+  Spec.it s "CR 301.6 a Fortification attached to a nonland detaches and stays on the battlefield" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    garrison <- S.printingOf s registry "Darksteel Garrison"
+    let base = Setup.emptyGame S.bothPlayers
+        (creature, withCreature) = S.addCreature piker S.alice base
+        (garrisonId, g2) = S.addCreature garrison S.alice withCreature
+        attached = S.attachTo garrisonId (Recipient.ToObject creature) g2
+        after = S.settleSba attached
+    Spec.assertEqWith s "the Fortification is unattached" (fmap Object.attachedTo (Game.lookupObject garrisonId after)) (Just Nothing)
+    Spec.assertBool s (Set.member garrisonId (GameState.battlefield after)) "and survives"
+
 -- An answerer that aims every target slot at one object, deferring everything
 -- else to S.identityAnswer (ModalSpec.chooseModeAt's shape). The CR 303.4d case
 -- below needs it because both of its target choices are real ones -- alice
@@ -818,6 +970,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   auraSpec s registry
   equipmentSpec s registry
+  fortificationSpec s registry
   unattachableSpec s registry
   reattachSpec s registry
   arbitrationSpec s registry
@@ -1904,20 +2057,24 @@ auraSpec s registry = Spec.describe s "Aura" $ do
 -- Protection is also the pool's one MINTED producer of this restriction (CR
 -- 702.16c, CR 702.16d), so the last two cases below come from a keyword rather
 -- than from a face, and they are where Pawl.Engine.Sba.becomesUnattached's
--- clause is proved as well as fallsOff's.
+-- Equipment clause is proved as well as fallsOff's; its Fortification clause is
+-- fortificationSpec's.
 --
 -- Rule 702.16d's ATTACH GATE has no case of its own, and could not have one on
--- this pool: the only road that puts an Equipment onto a creature is an equip
--- ability, whose source is the Equipment itself, so a black Equipment aimed at a
--- creature with protection from black is refused by CR 702.16b before rule
--- 702.16d is reached and the two readings agree. Separating them needs an effect
--- that attaches an Equipment WITHOUT targeting, which the pool has none of --
+-- this pool: the only roads that put an Equipment onto a creature or a
+-- Fortification onto a land are the equip and fortify abilities, whose source is
+-- the attaching permanent itself, so a black Equipment aimed at a creature with
+-- protection from black -- or Darksteel Garrison aimed at a land with protection
+-- from artifacts, which fortificationSpec above shows -- is refused by CR 702.16b
+-- before rule 702.16d is reached and the two readings agree. Separating them
+-- needs an effect that attaches WITHOUT targeting, which the pool has none of --
 -- every Effect.Attach, Effect.AttachTarget and Effect.AttachTargetToEach in
 -- data/cards/ moves an Aura (Aura Graft, Crown of the Ages, Cloudform, Gliding
 -- Licid, Aura Diffusion), and the printed shape that would do it, "For
 -- Mirrodin!" (CR 702.163a attaches with no target), has no Keyword constructor.
 -- Reconfigure (CR 702.151a) would NOT do it: that ability targets too. The
--- state-based half below is what covers rule 702.16d instead.
+-- state-based half below is what covers rule 702.16d instead, and
+-- fortificationSpec's is the Fortification half of the same sentence.
 attachRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
   -- CR 301.5b's last sentence, at the MOVE: "if an effect attempts to attach an
