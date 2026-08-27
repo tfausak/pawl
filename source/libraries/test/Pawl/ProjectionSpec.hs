@@ -3310,7 +3310,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- which closes it for an emblem, with CR 114.4 saying the same in the emblem's
   -- own rule. This is a PRINTED row, which is what makes CR 604.2 the rule that
   -- decides its zone; the BOARD a row's condition would be read against is the
-  -- separate question CR 614.12a answers (Projection.boardAsEntering), and this
+  -- separate question CR 614.12 answers (Projection.boardAsEntering), and this
   -- row carries no condition.
   --
   -- The board differs in exactly one thing across the pair: whether the Aegis
@@ -3319,14 +3319,16 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- Aegis's own ability activated rather than static.
   --
   -- SYNTHETIC because no printed emblem carries a replacement row pawl can
-  -- author. Scryfall `o:"emblem with"`, 2026-08-27, is every card that makes one;
-  -- exactly three print an emblem with a replacement effect, and each needs a
-  -- capability that does not exist -- Ajani Steadfast and Serra the Benevolent
-  -- both name a PLAYER recipient (#1054), Ajani additionally needs a "prevent all
-  -- but 1" rewrite (#2443), and Jaya Ballard's "cast this way" is a
-  -- back-reference to the permission the same emblem grants. CR 114.2 lets the
-  -- creating effect give an emblem any ability and CR 114.3 bounds only its
-  -- characteristics, so nothing in the CR forbids the card.
+  -- author. Scryfall `o:"emblem with"`, 2026-08-27, is every card that makes one
+  -- (96, has_more false), and the emblems on it that print a replacement effect
+  -- each need a capability that does not exist: Ajani Steadfast and Serra the
+  -- Benevolent both name a PLAYER recipient (#1054), Ajani additionally needs a
+  -- "prevent all but 1" rewrite (#2443), and Jaya Ballard's "cast this way" is a
+  -- back-reference to the permission the same emblem grants. The pool's other
+  -- two Effect.CreateEmblem producers are Ajani, Adversary of Tyrants and
+  -- Elspeth, Sun's Champion, and neither emblem carries a replacementEffects row.
+  -- CR 114.2 lets the creating effect give an emblem any ability and CR 114.3
+  -- bounds only its characteristics, so nothing in the CR forbids the card.
   Spec.it s "CR 113.6p an emblem's own replacement row prevents the damage from the command zone" $ do
     aegis <- S.printingOf s registry "Synthetic Emblem Aegis"
     evangel <- S.printingOf s registry "Cabal Evangel"
@@ -3347,7 +3349,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     -- a mutation aimed at it.
     Spec.assertEqWith s "one emblem, in the command zone" (Set.size (GameState.command board)) 1
     Spec.assertEqWith s "and none without it" (Set.size (GameState.command unarmed)) 0
-    Spec.assertBool s (not (Projection.hasKeyword fromRed mineId board)) "and the emblem grants nothing, so no gate sees a Modification"
+    Spec.assertBool s (not (Projection.hasKeyword fromRed mineId board)) "and this emblem hands out no protection, unlike the Forge's above"
 
   -- The same two short-circuits against the OTHER arms of
   -- Projection.gatherGiven. The emblem pair above covers the command zone; each

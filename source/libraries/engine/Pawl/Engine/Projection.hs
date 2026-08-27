@@ -4406,10 +4406,10 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 --
 -- The rule's FROM-ZONE is not in the pattern -- Pawl.Types.ZoneChangePattern has
 -- no such field -- and does not need to be: replacementsAffecting gathers
--- battlefield permanents and the command zone's emblems, and CR 114.3 leaves an
--- emblem nothing to hold a counter on -- so a row minted here can only ever be a
--- candidate while its source is on the battlefield, which is exactly "from the
--- battlefield". Filter.IsSource is the rule's "this permanent", the self-scope
+-- battlefield permanents and the command zone's emblems, and CR 122.1h mints
+-- this row from counters on a PERMANENT, which CR 114.5 says an emblem is not --
+-- so a row minted here can only ever be a candidate while its source is on the
+-- battlefield, which is exactly "from the battlefield". Filter.IsSource is the rule's "this permanent", the self-scope
 -- CR 614.1c's entry rows use.
 finalityOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 finalityOf oid gs =
