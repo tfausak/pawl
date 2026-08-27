@@ -2718,6 +2718,22 @@ raceShield wantMinted wanted p = case p of
      in maybe 0 Int.toNaturalSaturating (List.findIndex ((== wantMinted) . minted) entries)
   _ -> preferTarget wanted p
 
+-- CR 616.1's choice between the two prevention effects one Phyrexian Vindicator
+-- with protection from artifacts offers: the one its card PRINTS and CR 702.16e's
+-- minted one. Both are a PreventAll on the same source, so the only thing left to
+-- tell them apart by is the SOURCE half of the pattern -- rule 702.16e writes the
+-- protection quality there, and the Vindicator's printed sentence qualifies the
+-- damage in no way.
+raceProtection :: Bool -> [Recipient.Recipient] -> Prompt.Prompt r -> r
+raceProtection wantMinted wanted p = case p of
+  Prompt.ChooseReplacement _ _ entries ->
+    let minted entry = case ReplacementEntry.effect entry of
+          ReplacementEffect.DamageR (DamageR.MkDamageR matching DamageRewrite.PreventAll _) ->
+            DamagePattern.whatSource matching == Filter.Type.HasCardType CardType.Artifact
+          _ -> False
+     in maybe 0 Int.toNaturalSaturating (List.findIndex ((== wantMinted) . minted) entries)
+  _ -> preferTarget wanted p
+
 -- CR 616.1's choice between a permanent's own prevention effect and a FLOATING
 -- one somebody else installed, told apart by whose object the entry names.
 raceIsSelf :: Bool -> ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt.Prompt r -> r
@@ -2797,6 +2813,50 @@ phyrexianVindicatorSpec s registry = Spec.describe s "Phyrexian Vindicator (CR 6
     -- prevention each branch actually applied.
     Spec.assertEqWith s "the counter was spent on the minted branch" (countersOn CounterKind.Shield vindicator mintedAfter) 0
     Spec.assertEqWith s "and left alone on the printed one" (countersOn CounterKind.Shield vindicator printedAfter) 1
+  -- CR 702.16e's prevention, the SAME point one rules-minted prevention over.
+  -- "Any damage that would be dealt by sources that have the stated quality to a
+  -- permanent or player with protection is prevented" is a prevention rule 702.16
+  -- gives the permanent, not a sentence its card prints -- so the damage it stops
+  -- was not stopped "this way" either, and a permanent holding both must stay
+  -- silent for it.
+  --
+  -- Rule 122.1c's pair above is told apart from a printed row by its rewrite;
+  -- this one is a plain PreventAll, structurally what Stormwild Capridor and the
+  -- Vindicator itself print, so nothing about the VALUE separates them. The
+  -- discriminator is the same shape as the shield case: one board, one 4-damage
+  -- event, and the CR 616.1 choice answered both ways.
+  --
+  -- Tower of the Magistrate ("{1}, {T}: Target creature gains protection from
+  -- artifacts until end of turn.") is the grant and Darksteel Garrison ({2}
+  -- Artifact -- Fortification) the artifact source, both checked against Scryfall
+  -- on 2026-08-27. The Garrison is bob's, so the trigger's "any OTHER target" and
+  -- the damage's source are different objects.
+  Spec.it s "CR 702.16e protection's prevention is not 'this way', and the same board's printed one is" $ do
+    plains <- S.printingOf s registry "Plains"
+    vindicatorPrinting <- S.printingOf s registry "Phyrexian Vindicator"
+    towerPrinting <- S.printingOf s registry "Tower of the Magistrate"
+    garrisonPrinting <- S.printingOf s registry "Darksteel Garrison"
+    let base = S.landsInPlay plains 2
+        (vindicator, g1) = S.addCreature vindicatorPrinting S.alice base
+        (tower, g2) = S.addCreature towerPrinting S.alice g1
+        (garrison, g3) = S.addCreature garrisonPrinting S.bob g2
+    case Projection.abilitiesOf tower g3 of
+      [_, protect] -> do
+        let activated = S.runPure (preferTarget [Recipient.ToCreature vindicator]) g3 (Activate.activateAbility S.alice tower protect)
+            protected = S.runPure (preferTarget [Recipient.ToCreature vindicator]) activated Stack.resolveTop
+            batch = [hit garrison (Recipient.ToCreature vindicator) 4]
+            (mintedDealt, mintedAfter) = strikeAndSettleWith (raceProtection True onlyBob) protected batch
+            (printedDealt, printedAfter) = strikeAndSettleWith (raceProtection False onlyBob) protected batch
+        Spec.assertBool s (Projection.hasKeyword (Keyword.Protection (Filter.Type.HasCardType CardType.Artifact)) vindicator protected) "setup: the Tower's ability really did grant protection from artifacts"
+        -- The gameplay assertion, ahead of every proxy: rule 702.16e's prevention
+        -- fires nothing, so bob keeps his life, and the very same board choosing
+        -- the printed prevention instead takes 4 off him.
+        Spec.assertEqWith s "protection's prevention leaves bob untouched" (S.lifeOf S.bob mintedAfter) (Just 20)
+        Spec.assertEqWith s "the printed one deals him the same 4" (S.lifeOf S.bob printedAfter) (Just 16)
+        Spec.assertEqWith s "both prevented the whole 4 off the Vindicator" (fmap (S.damageOf vindicator) [mintedAfter, printedAfter]) [Just 0, Just 0]
+        Spec.assertEqWith s "nothing triggered off protection's prevention" (length (GameState.stack mintedDealt)) 0
+        Spec.assertEqWith s "and the printed one triggered once" (length (GameState.stack printedDealt)) 1
+      abilities -> Spec.assertFailure s ("expected exactly two Tower abilities, got " <> show (length abilities))
   -- The FLOATING rival, and the Squire's ruling read from the other end. Mending
   -- Hands ({W} Instant, "Prevent the next 4 damage that would be dealt to any
   -- target this turn") shields the Vindicator for exactly the amount its own

@@ -108,6 +108,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import Pawl.Types.ReplacementEntry (ReplacementEntry)
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.TokenPattern as TokenPattern
@@ -155,7 +156,7 @@ asZoneChange event = case event of
 -- cannot be got backwards.
 collect :: GameState -> [ActiveReplacement.ActiveReplacement] -> [ReplacementCandidate]
 collect sources floating =
-  let fromPermanent (instance_, (src, re)) =
+  let fromPermanent (instance_, (src, provenance, re)) =
         ReplacementCandidate.MkReplacementCandidate
           { -- CR 614.5 / 702.136b: one identity per INSTANCE, so a permanent
             -- carrying one ability twice gets the rule's two opportunities.
@@ -163,6 +164,10 @@ collect sources floating =
               CandidateId.OfPermanent
                 PermanentCandidate.MkPermanentCandidate
                   { PermanentCandidate.source = src,
+                    -- CR 615.13's "this way", carried from where the row was
+                    -- built rather than inferred from its value here. See
+                    -- Pawl.Types.ReplacementProvenance and `printedBy`.
+                    PermanentCandidate.provenance = provenance,
                     PermanentCandidate.effect = re,
                     PermanentCandidate.ordinal = instance_
                   },
@@ -303,7 +308,7 @@ printedRider src you re = case re of
 -- replacement's position mid-loop. What the ordinal DOES prove is the duplicate
 -- itself -- dropping it to a constant reddens Pawl.ReplacementSpec's two
 -- "CR 702.136b riot twice" cases.
-numberInstances :: [(ObjectId, ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card)))] -> [(InstanceOrdinal.InstanceOrdinal, (ObjectId, ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card))))]
+numberInstances :: [(ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card)))] -> [(InstanceOrdinal.InstanceOrdinal, (ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card))))]
 numberInstances =
   let step seen row =
         let n = Map.findWithDefault 0 row seen
@@ -1741,26 +1746,24 @@ preventionBy candidate before after = case (ReplacementCandidate.effect candidat
 -- gains life from a black source it named", where the shield and the delayed
 -- trigger are both the instant's, so answering Nothing here withholds the life.
 --
--- A permanent's is too, with one exception -- CR 122.1c's shield-counter pair,
--- which Pawl.Engine.Projection.shieldOf mints onto any permanent carrying a
--- shield counter. It is a rule rather than an ability the card prints, so a
--- "prevented this way" trigger on that same permanent is not about it: the
--- counter prevented the damage and the printed effect never applied.
+-- A permanent's is too, unless the row was minted onto it by a rule rather than
+-- printed on its card -- CR 122.1c's shield-counter pair and CR 702.16e's
+-- protection are the two preventions that reach here that way. Neither is text
+-- the card set up, so a "prevented this way" trigger on that same permanent is
+-- not about either: the counter or the keyword prevented the damage and the
+-- printed effect never applied.
 --
--- The wildcard is over the EFFECT of a permanent candidate, where it is the only
--- way to say "not the minted pair" -- the classification is
--- DamageRewrite.PreventRemovingShieldCounter's, which rule 122.1c makes part of
--- the rulebook, and nothing here asks what a card's effect does.
---
--- Not implemented: the OTHER prevention the rules mint onto a permanent, CR
--- 702.16e's protection, which is a plain PreventAll and so has nothing to be
--- told apart by (#2288).
+-- READ OFF THE CANDIDATE rather than inferred from its effect, because rule
+-- 702.16e's row is a plain PreventAll naming the permanent itself -- the same
+-- value Phyrexian Vindicator and Stormwild Capridor print, so no reading of the
+-- effect can separate them. Pawl.Engine.Projection.replacementsOf makes the mark
+-- where the segments are still apart; see Pawl.Types.ReplacementProvenance.
 printedBy :: CandidateId.CandidateId -> Maybe ObjectId
 printedBy candidate = case candidate of
   CandidateId.OfFloating floating -> Just (FloatingCandidate.source floating)
-  CandidateId.OfPermanent permanent -> case PermanentCandidate.effect permanent of
-    ReplacementEffect.DamageR (DamageR.MkDamageR _ DamageRewrite.PreventRemovingShieldCounter _) -> Nothing
-    _ -> Just (PermanentCandidate.source permanent)
+  CandidateId.OfPermanent permanent -> case PermanentCandidate.provenance permanent of
+    ReplacementProvenance.Minted -> Nothing
+    ReplacementProvenance.Printed -> Just (PermanentCandidate.source permanent)
 
 -- CR 615.13: collapse a batch's per-event preventions to one entry per applying
 -- instance per recipient, carrying the total that instance prevented.

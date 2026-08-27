@@ -631,6 +631,8 @@ library codec
     Pawl.Codec.ReplacementEffectSpec
     Pawl.Codec.ReplacementOrigin
     Pawl.Codec.ReplacementOriginSpec
+    Pawl.Codec.ReplacementProvenance
+    Pawl.Codec.ReplacementProvenanceSpec
     Pawl.Codec.ReplaceSpec
     Pawl.Codec.RequireAttack
     Pawl.Codec.RequireAttackSpec
@@ -1539,6 +1541,7 @@ library types
     Pawl.Types.ReplacementEffect
     Pawl.Types.ReplacementEntry
     Pawl.Types.ReplacementOrigin
+    Pawl.Types.ReplacementProvenance
     Pawl.Types.RequireAttack
     Pawl.Types.RequireBlock
     Pawl.Types.Response
