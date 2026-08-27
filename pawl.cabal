@@ -529,6 +529,8 @@ library codec
     Pawl.Codec.OnsetSpec
     Pawl.Codec.Optionality
     Pawl.Codec.OptionalitySpec
+    Pawl.Codec.OutsideCard
+    Pawl.Codec.OutsideCardSpec
     Pawl.Codec.OutsideObject
     Pawl.Codec.OutsideObjectSpec
     Pawl.Codec.PaidExpiry
@@ -1481,6 +1483,7 @@ library types
     Pawl.Types.Onset
     Pawl.Types.OptionalDecision
     Pawl.Types.Optionality
+    Pawl.Types.OutsideCard
     Pawl.Types.OutsideObject
     Pawl.Types.PaidExpiry
     Pawl.Types.PayBranch

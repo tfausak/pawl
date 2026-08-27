@@ -233,6 +233,7 @@ import qualified Pawl.Codec.ObjectSpec
 import qualified Pawl.Codec.OfferCastSpec
 import qualified Pawl.Codec.OnsetSpec
 import qualified Pawl.Codec.OptionalitySpec
+import qualified Pawl.Codec.OutsideCardSpec
 import qualified Pawl.Codec.OutsideObjectSpec
 import qualified Pawl.Codec.PaidExpirySpec
 import qualified Pawl.Codec.PayBranchSpec
@@ -754,6 +755,7 @@ spec s registry = do
   Pawl.Codec.OfferCastSpec.spec s
   Pawl.Codec.OnsetSpec.spec s
   Pawl.Codec.OptionalitySpec.spec s
+  Pawl.Codec.OutsideCardSpec.spec s
   Pawl.Codec.OutsideObjectSpec.spec s
   Pawl.Codec.PaidExpirySpec.spec s
   Pawl.Codec.PayBranchSpec.spec s

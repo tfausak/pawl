@@ -36,6 +36,7 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.OutsideCard as OutsideCard
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -58,14 +59,18 @@ import qualified Pawl.Types.Zone as Zone
 -- such an entry rather than leaving it at zero, so the guard is a belt on top of
 -- braces -- and cheap enough to keep, since a caller assembling this map by hand
 -- would otherwise offer a card that is no longer out there.
-eligible :: Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> PlayerId -> GameState.GameState -> [PrintingId.PrintingId]
+--
+-- Every candidate here is an OutsideCard.InPool: this only reaches CR 103.2a's
+-- sideboard pool. CR 729.4's main-game objects (GameState.outsideObjects) are
+-- not read yet (#152) -- wiring that in is a later unit's job, not this one's.
+eligible :: Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> PlayerId -> GameState.GameState -> [OutsideCard.OutsideCard]
 eligible predicate source pid gs =
   let pool = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs))
       context = Filter.contextFor (Just pid) (Just source)
       admits printingId = case Game.cardOfPrinting printingId gs of
         Nothing -> False
         Just card -> Filter.matches context (Projection.viewOfCard (Game.resolveFaceFor Nothing card)) predicate
-   in [printingId | (printingId, n) <- Map.toAscList pool, n > 0, admits printingId]
+   in [OutsideCard.InPool printingId | (printingId, n) <- Map.toAscList pool, n > 0, admits printingId]
 
 -- CR 400.11c \/ 701.20a: reveal a card this player owns from outside the game
 -- matching the Filter and put it into their hand -- Burning Wish's sentence.
@@ -102,7 +107,7 @@ reveal predicate source pid = do
   case NonEmpty.nonEmpty (eligible predicate source pid gs0) of
     Nothing -> pure ()
     Just offered -> do
-      printingId <- case offered of
+      chosen <- case offered of
         only NonEmpty.:| [] -> pure only
         first NonEmpty.:| _ -> do
           answer <- Game.choose (Prompt.ChooseFromOutsideTheGame (Decide.deciderFor pid gs0) pid offered)
@@ -110,8 +115,14 @@ reveal predicate source pid = do
       -- Against the LIVE state and not gs0, Pawl.Engine.Dungeon.enter's care:
       -- Game.choose above wrote the answer into the transcript, and minting off
       -- the state from before the prompt would drop that.
-      oid <- State.state (bringIn pid printingId)
-      Event.reveal RevealCause.Ordinary pid oid
+      case chosen of
+        OutsideCard.InPool printingId -> do
+          oid <- State.state (bringIn pid printingId)
+          Event.reveal RevealCause.Ordinary pid oid
+        -- `eligible` above offers only OutsideCard.InPool this unit -- CR 729.4's
+        -- main-game half is not wired in yet (#152), so this arm is unreached
+        -- until that lands.
+        OutsideCard.InAnotherGame _ -> pure ()
 
 -- CR 400.11b: take one copy of this printing out of the player's pool and mint
 -- the card into their hand. Split out from `reveal` above because it is the half

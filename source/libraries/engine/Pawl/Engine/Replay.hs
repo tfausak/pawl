@@ -259,7 +259,7 @@ decode p response = case p of
     Response.ChoseDungeon printingId -> Just printingId
     _ -> Nothing
   Prompt.ChooseFromOutsideTheGame {} -> case response of
-    Response.ChoseFromOutsideTheGame printingId -> Just printingId
+    Response.ChoseFromOutsideTheGame outsideCard -> Just outsideCard
     _ -> Nothing
   Prompt.ChooseRoom {} -> case response of
     Response.ChoseRoom room -> Just room
