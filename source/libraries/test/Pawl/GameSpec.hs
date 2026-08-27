@@ -74,6 +74,7 @@ import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.OutsideObject as OutsideObject
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -954,6 +955,16 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     let sub = Setup.subgameStateFrom S.bob (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "bob is the subgame's active player" (GameState.activePlayer sub) S.bob
     Spec.assertEqWith s "the subgame turn order begins with bob" (GameState.turnOrder sub) [S.bob, S.alice]
+
+  Spec.it s "CR 729.4: the subgame sees the main game's cards as outside it, minus the ones it took" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let g0 = poolToLibraryG S.alice (addManyG mountain 3 S.alice (Setup.emptyGame S.bothPlayers))
+        (pikerId, g1) = S.addCreature piker S.alice g0
+        sub = Setup.subgameStateFrom S.alice g1
+    Spec.assertEqWith s "the battlefield card is outside the subgame" (Map.member pikerId (GameState.outsideObjects sub)) True
+    Spec.assertEqWith s "CR 729.2: the library cards moved INTO the subgame, so they are not outside it" (length (GameState.outsideObjects sub)) 1
+    Spec.assertEqWith s "and it is hers" (fmap OutsideObject.owner (Map.lookup pikerId (GameState.outsideObjects sub))) (Just S.alice)
 
   Spec.it s "CR 729.2/729.4 #147: a departed player is not offered as the subgame's first player, and has no library for the subgame to churn" $ do
     -- Three seats; bob has left. CR 800.4a's first clause took his cards with

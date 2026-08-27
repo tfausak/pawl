@@ -40,6 +40,7 @@ import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.OutsideCard as OutsideCard
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -354,27 +355,36 @@ data Prompt r where
   -- A PRINTING and not an ObjectId, for the reason Pawl.Types.Player's field is
   -- one: the card is outside the game and no object stands for it.
   ChooseDungeon :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty PrintingId.PrintingId -> Prompt PrintingId.PrintingId
-  -- | CR 400.11c: which card a player brings in from OUTSIDE THE GAME -- Burning
-  -- Wish\'s "a sorcery card you own from outside the game". The NonEmpty is the
-  -- printings they own out there that the effect\'s Filter matches
-  -- (Pawl.Types.Player\'s outsideTheGame), in interning order. Choose, not target
-  -- (CR 115.10a): CR 601.2c announces targets as a spell is cast, and CR 400.11c
-  -- lets nothing target a card out there at all.
+  -- | CR 400.11c \/ 729.4: which card a player brings in from OUTSIDE THE GAME --
+  -- Burning Wish\'s "a sorcery card you own from outside the game". The NonEmpty
+  -- is every OutsideCard.OutsideCard the effect\'s Filter matches, in interning
+  -- order: CR 103.2a\'s sideboard pool (Pawl.Types.Player\'s outsideTheGame)
+  -- inside a main game, and additionally CR 729.4\'s main-game objects
+  -- (GameState.outsideObjects) when this prompt is raised from inside a subgame.
+  -- Choose, not target (CR 115.10a): CR 601.2c announces targets as a spell is
+  -- cast, and CR 400.11c lets nothing target a card out there at all.
   --
   -- ChooseDungeon\'s shape and for its reasons -- no source ObjectId and a
-  -- PRINTING rather than an ObjectId, the card being outside the game with no
-  -- object standing for it until the answer is given.
+  -- payload naming the card by id rather than an ObjectId already minted, the
+  -- card being outside the game with no object standing for it until the answer
+  -- is given.
   --
   -- Its own constructor rather than ChooseDungeon reused, for the reason
   -- Response.ChoseDungeon gives against ChoseRoom: that one names a card rule
   -- 309.2a admits and this one a card the CARD\'s filter admits, and a transcript
   -- of one must not satisfy the other.
   --
+  -- OutsideCard rather than a bare PrintingId, and OutsideCard\'s own header
+  -- comment gives the full reason: which zone the card leaves decides which
+  -- main-game abilities trigger (CR 729.4a), so the pool and the main game are
+  -- not interchangeable sources and the engine may not pick between them for the
+  -- player.
+  --
   -- Raised only for two or more, one matching card leaving nothing to ask (CR
   -- 103.2a\'s sideboard is a multiset, so two copies of one printing are one
   -- offer). Whether to reveal AT ALL is the clause\'s printed may and is asked
   -- before this.
-  ChooseFromOutsideTheGame :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty PrintingId.PrintingId -> Prompt PrintingId.PrintingId
+  ChooseFromOutsideTheGame :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty OutsideCard.OutsideCard -> Prompt OutsideCard.OutsideCard
   -- | CR 309.5a \/ 701.49b: which arrow a venturing player follows. The
   -- ObjectId is the dungeon card their marker is on; the NonEmpty is the rooms
   -- the arrows out of their current room lead to. Choose, not target. Raised

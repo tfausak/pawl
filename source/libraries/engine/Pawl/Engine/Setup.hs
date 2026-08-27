@@ -3,6 +3,7 @@ module Pawl.Engine.Setup where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -11,23 +12,29 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Commander as Commander
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.HandActionPerformer (HandActionPerformer)
+import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OutsideObject as OutsideObject
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -115,6 +122,9 @@ emptyGame order =
           GameState.command = mempty,
           GameState.stack = [],
           GameState.players = Map.fromList (fmap newPlayer order_),
+          -- CR 729.4: nobody is nested inside another game here.
+          GameState.outsideObjects = Map.empty,
+          GameState.broughtIn = Seq.empty,
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
           GameState.events = Seq.empty,
@@ -453,7 +463,10 @@ restartGame perform exempt starter = do
     -- game, in their seats, rotated to begin with `starter` (CR 727.1a).
     let order = rotateTo starter (Game.stillPlayingInOrder gs)
      in gs
-          { GameState.players = resetPlayers (GameState.players gs),
+          { -- GameState.outsideObjects and GameState.broughtIn are deliberately
+            -- absent from this update: CR 727.1 restarts the game, and a card
+            -- outside it is still outside it, so both are carried over unchanged.
+            GameState.players = resetPlayers (GameState.players gs),
             GameState.manaPool = Map.empty,
             GameState.combat = Combat.emptyCombat,
             GameState.events = Seq.empty,
@@ -587,10 +600,46 @@ subgameStateFrom starter parent =
       -- `recovered` pass.
       order = rotateTo starter (Game.stillPlayingInOrder parent)
       firstPlayer = Maybe.fromMaybe (GameState.activePlayer parent) (Maybe.listToMaybe order)
+      -- CR 729.4: "all objects in the main game and all cards outside the main
+      -- game are considered outside the subgame (except those specifically
+      -- brought into the subgame)". The exception is `movedObjects` -- CR
+      -- 729.2's libraries and CR 729.2c's commanders -- which are IN the
+      -- subgame and so are excluded here. Only Source.OfCard objects: CR
+      -- 400.11c's "spells and abilities that allow those cards to be brought
+      -- into the game" is what a road into a subgame is, and a token or an
+      -- emblem is not a card and cannot be brought in.
+      --
+      -- The parent's OWN outsideObjects ride along, which is CR 729.6's
+      -- nesting: "the existing subgame becomes the main game in relation to
+      -- the new subgame", so a card already outside the parent (itself
+      -- possibly a subgame) is outside this one too. Neither funnelBack nor
+      -- anything else touches `parent`'s own copy for the whole life of the game
+      -- it spawns (CR 729.1a), and this union is the only place the set can
+      -- GROW; applyCrossings shrinks it once that game has ended, dropping the
+      -- entries it hands one level further out.
+      --
+      -- Not implemented: an object's face-down status is not carried, so a
+      -- face-down main-game permanent is offered by its PRINTED face rather than
+      -- by CR 708.2's characteristics (#2467).
+      --
+      -- Not implemented: this reach is not scoped away from the parent's STACK,
+      -- so a wish can name the very spell that is resolving it (correct per CR
+      -- 729.4/729.5), but what Pawl.Engine.Resolve.resolveSpellWith does
+      -- afterwards, once that spell's own object is gone, is untested (#2473).
+      outside =
+        Map.union
+          (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.union libIds cmdIds)))
+          (GameState.outsideObjects parent)
+      asOutside obj = case Object.source obj of
+        Source.OfCard printingId -> Just (OutsideObject.MkOutsideObject (Object.owner obj) printingId)
+        _ -> Nothing
    in parent
         { GameState.objects = movedObjects,
           GameState.turnOrder = order,
           GameState.players = resetPlayers (GameState.players parent),
+          GameState.outsideObjects = outside,
+          -- CR 729.4a: nothing has crossed into this subgame yet.
+          GameState.broughtIn = Seq.empty,
           GameState.library = Map.empty,
           GameState.hand = Map.empty,
           GameState.graveyard = Map.empty,
@@ -661,6 +710,148 @@ subgameStateFrom starter parent =
           -- ends.
           GameState.extraTurns = [],
           GameState.turnAnchor = Nothing
+        }
+
+-- CR 729.4a: the cards the subgame brought in have left the main game, so the
+-- main game loses them. Applied HERE, once the subgame has ended, and that is
+-- exact rather than late: the main game was discontinued for the whole subgame
+-- (CR 729.1a), so no state-based action, no priority and no continuous-effect
+-- recomputation could have read the board in between, so replaying
+-- GameState.broughtIn in crossing order NOW -- as the running fold below, not as
+-- one batch -- produces the same events, the same CR 608.2h last known
+-- information and the same trigger order as applying each at the instant it
+-- crossed. Rule 729.5's last sentence says the abilities that
+-- triggered wait for the main game to resume anyway, so nothing is owed earlier.
+--
+-- Borrowed from Pawl.Engine.Departure.objectsLeaveWith, CR 800.4a's departure and
+-- the tree's other road out of the game that reaches no zone: file CR 608.2h last
+-- known information, remove from the zones, delete the object, record a
+-- GameEvent.LeftTheGame. What is NOT borrowed is that function's shape. Rule
+-- 800.4a's objects leave at ONE INSTANT, which is why it may read one board for
+-- the whole batch and wrap the events in Event.simultaneouslyPure; these crossed
+-- at different moments of the subgame, so this is a RUNNING fold instead -- one
+-- iteration per crossing, in order, each reading the state the crossings before
+-- it left behind.
+--
+-- That running board is load-bearing twice over, and both readings are
+-- gameplay-visible:
+--
+--   * the last known information of the SECOND crossing must be projected on a
+--     board the FIRST has already left. Alice's Glorious Anthem crosses, then her
+--     Arbor Elf: at the instant the elf left, the anthem was already gone from the
+--     main game, so its last known power is 1 and not 2. Projection.controllerOf
+--     and Event.copiedSnapshot are read at the same moment for the same reason.
+--
+--   * each event is recorded AFTER its own crossing's deletion and BEFORE the
+--     next one's, so Event.recordEvent's CR 603.10 sample of the battlefield
+--     (GameState.battlefieldWhenTriggered) stamps that group with the board as it
+--     stood then -- with every later crossing still on it. Sampling after the
+--     whole batch would hide a main-game permanent that was there when the first
+--     card left, and CR 729.5's last sentence is precisely where the ability it
+--     owes would have gone on the stack.
+--
+-- So no Event.simultaneouslyPure: each crossing takes its own event group and CR
+-- 603.10a's look-back triggers read them as a sequence rather than as one event.
+--
+-- Not implemented: the event is recorded for a permanent on the battlefield and
+-- for nothing else, so a card that crossed out of a hand, a graveyard, a library
+-- or exile files its last known information and records nothing -- narrower than
+-- CR 729.4a's "abilities in the main game that trigger on objects leaving a
+-- main-game zone" (#2463).
+--
+-- Not implemented: CR 604.2's handover of an ability that goes on applying after
+-- the permanent leaves the battlefield (Titania's Song), which
+-- Departure.objectsLeaveWith hands to GameState.continuousEffects through
+-- Event.lingeringHandover (#2459).
+--
+-- An id that is not one of this game's own objects came from further out: CR
+-- 729.6 makes a subgame's own parent the main game of a subgame below it, so
+-- subgameStateFrom hands a subgame its parent's outsideObjects along with the
+-- parent's objects, and a wish two levels down can reach a card two games out.
+-- Such an id is dropped from THIS game's outsideObjects and appended to THIS
+-- game's broughtIn, so the frame one level out applies it. One level per frame,
+-- never a reach past a parent -- rule 729.1a keeps a game from touching the state
+-- of the game holding it, and this frame is the only one that holds both.
+applyCrossings :: GameState -> GameState -> GameState
+applyCrossings finalSub parent =
+  let crossed = Foldable.toList (GameState.broughtIn finalSub)
+      isOurs oid = Map.member oid (GameState.objects parent)
+      (mine, further) = List.partition isOurs crossed
+      -- The same deletion Departure.objectsLeaveWith performs, dropping the same
+      -- carriers keyed on the departing id: its combat entries (CR 506.4 removes
+      -- a permanent from combat as it leaves the battlefield), its
+      -- exile-until-monarch entry, CR 702.55b's haunt link and CR 607.2a's
+      -- exiled-with link. See there for why each is keyed on the KEY and not the
+      -- value.
+      leave g oid = case Map.lookup oid (GameState.objects g) of
+        -- Unreachable: `mine` holds only ids GameState.objects answered for, and
+        -- no id crosses twice -- OutsideTheGame.bringInFrom drops the entry it
+        -- spent, so a second wish cannot reach the same card.
+        Nothing -> g
+        Just obj ->
+          let g1 = Game.removeFromZones (Object.owner obj) oid g
+              combat = GameState.combat g1
+           in g1
+                { GameState.objects = Map.delete oid (GameState.objects g1),
+                  GameState.combat =
+                    combat
+                      { Combat.Type.attackers = Map.delete oid (Combat.Type.attackers combat),
+                        Combat.Type.struckFirst = fmap (Set.delete oid) (Combat.Type.struckFirst combat)
+                      },
+                  GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g1),
+                  GameState.haunting = Map.delete oid (GameState.haunting g1),
+                  GameState.exiledWith = Map.delete oid (GameState.exiledWith g1)
+                }
+      -- CR 608.2h, taken against `g` -- the running state, which is this game as
+      -- it stands at the moment THIS card crosses. The object itself is still in
+      -- it, exactly as Departure.objectsLeaveWith's own `filed` reads a board its
+      -- subject has not left yet; what is different is that the cards which
+      -- crossed EARLIER have already gone.
+      filed g oid = case Map.lookup oid (GameState.objects g) of
+        -- Unreachable, for `leave`'s reason.
+        Nothing -> Nothing
+        Just obj ->
+          Just
+            ( oid,
+              LastKnown.MkLastKnown
+                (Projection.project oid g)
+                -- CR 613.1b: the projected controller as it left, who need not be
+                -- its owner. The fallback is unreachable for the reason
+                -- Departure.objectsLeaveWith gives.
+                (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid g))
+                (Object.source obj)
+                (Object.counters obj)
+                (Event.copiedSnapshot oid g)
+                (Object.attachedTo obj)
+            )
+      -- One crossing: file, delete, then record. The event LAST, so that
+      -- Event.recordEvent's CR 603.10 sample is of the board immediately after
+      -- this card left and before the next one does.
+      --
+      -- The event only for a permanent on the battlefield, which is the set
+      -- Pawl.Types.GameEvent.LeftTheGame documents at its own constructor.
+      -- Battlefield MEMBERSHIP rather than Object.zone, the way
+      -- Departure.objectsLeaveWith reads the same question, since
+      -- Pawl.Engine.Phasing takes a phased-out permanent out of that set and
+      -- leaves its Object.zone alone -- and rule 702.26k, which is about a
+      -- departing owner rather than about this road, is the reason that
+      -- distinction is worth drawing at all.
+      --
+      -- Not implemented: so a PHASED-OUT permanent crosses without an event,
+      -- though CR 702.26d leaves it on the battlefield and CR 729.4a carries no
+      -- carve-out of its own (#2468).
+      cross g oid =
+        let noted = case filed g oid of
+              Nothing -> g
+              Just (key, value) -> g {GameState.lastKnown = Map.insert key value (GameState.lastKnown g)}
+            gone = leave noted oid
+         in if Set.member oid (GameState.battlefield g)
+              then Event.recordEvent (GameEvent.LeftTheGame oid) gone
+              else gone
+      applied = List.foldl' cross parent mine
+   in applied
+        { GameState.outsideObjects = Map.withoutKeys (GameState.outsideObjects applied) (Set.fromList further),
+          GameState.broughtIn = GameState.broughtIn applied <> Seq.fromList further
         }
 
 -- CR 729.5: at the end of a subgame, each player takes all traditional cards
@@ -760,8 +951,56 @@ funnelBack finalSub parent =
       toCommand = Map.union backFromSub recoveredCmd
       libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) allReturned))
       keptParentObjects = Map.withoutKeys (GameState.objects parent) movedIds
+      -- CR 400.11b / 729.5: a card a wish inside the subgame took out of a
+      -- player's sideboard pool "remains in the game until the game ends", and
+      -- rule 729.5 puts it into their main-game library above. So the pool that
+      -- comes back is the SUBGAME's, which OutsideTheGame.bringIn already spent
+      -- it from; keeping the parent's would leave that card in the library and
+      -- still outside the game at once.
+      --
+      -- Only that field. Every other one stays the parent's, which is CR 729.1b:
+      -- nothing that happened in the subgame -- life lost, counters, a commander
+      -- tax -- has any meaning in the main game. Nothing but bringIn writes the
+      -- pool once a game is under way (createDeck is the only other writer, and
+      -- neither startGameFromCards nor restartGame calls it), so what the subgame
+      -- hands back differs from the parent's by exactly the cards it spent.
+      --
+      -- A player who DEPARTED inside the subgame keeps the parent's pool instead.
+      -- CR 400.11b's second clause is the rule half: a card brought in remains in
+      -- the game "until the game ends, their owner leaves the game, or a rule or
+      -- effect removes them", so CR 800.4a's departure took every card they had
+      -- wished in back OUT of the game. Where it goes then is pawl's model choice
+      -- and not the rule's words -- the CR says only that it is no longer in the
+      -- game -- and putting it back in the pool it came from is the choice made
+      -- here, because that pool is exactly pawl's "outside the game" for a card
+      -- with an owner (CR 400.11a) and the alternative loses the card: the
+      -- objects are gone (Departure.objectsLeaveWith deleted them), so `returned`
+      -- has nothing to put in their library either.
+      --
+      -- This arm restores only what the sideboard road spent (CR 400.11a and
+      -- CR 400.11c). A card the same player took from the MAIN GAME instead
+      -- (OutsideTheGame.bringInFrom)
+      -- comes back nowhere: applyCrossings deleted the main game's copy, and
+      -- objectsLeaveWith deleted the subgame's, so nothing represents it in
+      -- either game. That is the two rules read together rather than an oversight
+      -- -- CR 729.4a took it out of the main game and CR 800.4a took it out of
+      -- the subgame -- and Pawl.SetupSpec pins it. The two arms of the same road
+      -- do end differently, though, and CR 729.5's Example gives both sources one
+      -- destination, so which arm is wrong is open (#2469).
+      --
+      -- A player absent from the subgame's roster keeps the parent's pool too.
+      -- The lookup cannot miss today -- subgameStateFrom rebuilds the players map
+      -- from the parent's, departed seats included -- so that arm is the total
+      -- reading of a partial map rather than a case with a rule behind it.
+      carriedPools = Map.mapWithKey carryPool (GameState.players parent)
+      carryPool pid player = case Map.lookup pid (GameState.players finalSub) of
+        Nothing -> player
+        Just inSub -> case Player.status inSub of
+          Status.Departed _ -> player
+          Status.Playing -> player {Player.outsideTheGame = Player.outsideTheGame inSub}
    in parent
         { GameState.objects = Map.unions [allReturned, toCommand, keptParentObjects],
+          GameState.players = carriedPools,
           GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) (GameState.turnOrder parent)),
           -- CR 729.5c. The parent's other command-zone residents are untouched:
           -- CR 729.2c moved only the commanders, so only they can come back.
