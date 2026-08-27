@@ -1095,6 +1095,28 @@ anyCopiableKeyword p oid gs = case copiableSnapshotOf oid gs of
   Just snapshot -> any p (Map.keys (PC.keywords snapshot))
   Nothing -> any (any p . Face.keywords) (Game.faceOf oid gs)
 
+-- CR 707.2: does this object's copiable rules text give it a card type or subtype
+-- that intrinsicReplacementsOf mints a CR 614.1c entry row from -- CR 306.5b's
+-- planeswalker, CR 310.4b's battle or CR 714.3a's Saga? The fourth of
+-- staticAbilitiesOf's shape, and a PREDICATE for anyCopiableKeyword's reason: the
+-- two arms hold different containers, a projection's two type sets against a
+-- face's one type line.
+--
+-- CARD TYPE and SUBTYPE are copiable, which rule 707.2 says outright, so a
+-- permanent that entered as or became a copy of one of the three answers off what
+-- it copied. What is NOT read here is the layer-4 result: a subtype a static
+-- ability writes reaches the same rows through grantsMintingType, asked of the
+-- GRANTOR, because an affected set is unknown without the projection this gate
+-- exists to skip.
+copiableMintsType :: ObjectId -> GameState -> Bool
+copiableMintsType oid gs = case copiableSnapshotOf oid gs of
+  Just snapshot -> Set.member Subtype.Type.Saga (PC.subtypes snapshot) || any mintingCardType (PC.cardTypes snapshot)
+  Nothing -> any fromFace (Game.faceOf oid gs)
+  where
+    fromFace face =
+      Set.member Subtype.Type.Saga (TypeLine.subtypes (Face.typeLine face))
+        || any mintingCardType (TypeLine.types (Face.typeLine face))
+
 -- CR 208.2 / 604.3: the card's characteristic-defining P/T, with the printed star
 -- resolved to what the CDA counts. Nothing unless the card declares a CDA *and*
 -- has a printed power and toughness box (CR 208.1) for the star to sit in.
@@ -4342,45 +4364,45 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- sound only because every route to an unprinted replacement effect is covered:
 -- `EntryR AsCopy` on a card that is itself a base card with one, CR 122.1c's
 -- shield counters, CR 122.1h's finality counters, a minting keyword printed on,
--- copied by, or granted by a face, or a static ability writing one of the three
--- TYPES the rules mint an entry replacement from (grantsMintingType). Three of
--- the disjuncts are copy-aware -- the printed-replacement and keyword ones
--- through copiableReplacementsOf and anyCopiableKeyword, the ability ones through
--- staticAbilitiesOf -- so a copy answers off the text it copied rather than the
--- copier's (CR 707.2a).
+-- copied by, or granted by a face, one of the three TYPES the rules mint an entry
+-- replacement from printed on or copied by a face (copiableMintsType), or a
+-- static ability writing one of those three (grantsMintingType). Every disjunct
+-- but the last is copy-aware -- through copiableReplacementsOf,
+-- copiableMintsType, anyCopiableKeyword and staticAbilitiesOf -- so a copy
+-- answers off the text it copied rather than the copier's (CR 707.2), which is
+-- what Pawl.CopySpec's copiedAbilitySpec proves a disjunct at a time.
+--
+-- No face is looked up here any more: each of those four readers falls back to
+-- the printed face on its own, and an object that has none answers False from
+-- inside them rather than from a guard around the lot.
 --
 -- Not implemented: a minting keyword or a minting TYPE reaching a permanent
 -- through a stored continuous effect, and a minting keyword arriving on a keyword
--- counter, are on no base face (#833). Nor does a copy's CARD TYPE reach the three
--- type-line disjuncts, which still read the copier's printed face (#2397).
+-- counter, are on no base face (#833).
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
       -- CR 122.1c's pair, CR 122.1h's row and CR 122.1d's row are minted from
       -- COUNTERS, so none of them is on any base face -- which is why all three
-      -- are asked before the face is looked up at all.
+      -- are asked before any copiable value is.
       baseHas oid | shieldCounters oid gs > 0 || finalityCounters oid gs > 0 || stunCounters oid gs > 0 = True
-      baseHas oid = case Game.faceOf oid gs of
-        Nothing -> False
-        -- The planeswalker disjunct keeps CR 306.5b's intrinsic replacement
-        -- inside the short-circuit: it appears in no base face's list.
-        Just face ->
-          not (null (copiableReplacementsOf oid gs))
-            || Set.member CardType.Planeswalker (TypeLine.types (Face.typeLine face))
-            -- The Saga disjunct is the planeswalker one's twin, for CR 714.3a.
-            || Set.member Subtype.Type.Saga (TypeLine.subtypes (Face.typeLine face))
-            -- And the battle disjunct is the third, for CR 310.4b.
-            || Set.member CardType.Battle (TypeLine.types (Face.typeLine face))
-            || anyCopiableKeyword Keyword.mintsReplacement oid gs
-            || any (any (grantsKeywordWhere Keyword.mintsReplacement) . StaticAbility.modifications) (staticAbilitiesOf oid gs)
-            -- The three type-line disjuncts above read a PRINTED face, so a
-            -- permanent that is a Saga, a planeswalker or a battle only at layer
-            -- 4 (CR 613.1d) passes none of them. This is that permanent's route
-            -- in, asked of the GRANTOR rather than the grantee for the reason
-            -- the keyword disjunct one line up is: a static ability's affected
-            -- set is not known without the projection this gate exists to skip,
-            -- so any board holding a granting ability is gathered whole.
-            || any (any grantsMintingType . StaticAbility.modifications) (staticAbilitiesOf oid gs)
+      baseHas oid =
+        not (null (copiableReplacementsOf oid gs))
+          -- The TYPE disjunct keeps CR 306.5b's, CR 310.4b's and CR 714.3a's
+          -- intrinsic replacements inside the short-circuit: none of the three
+          -- appears in any base face's list.
+          || copiableMintsType oid gs
+          || anyCopiableKeyword Keyword.mintsReplacement oid gs
+          || any (any (grantsKeywordWhere Keyword.mintsReplacement) . StaticAbility.modifications) (staticAbilitiesOf oid gs)
+          -- The type disjunct above reads a COPIABLE value, so a permanent that
+          -- is a Saga, a planeswalker or a battle only at layer 4 (CR 613.1d)
+          -- passes it no more than the printed read it replaced did. This is
+          -- that permanent's route in, asked of the GRANTOR rather than the
+          -- grantee for the reason the keyword disjunct one line up is: a static
+          -- ability's affected set is not known without the projection this gate
+          -- exists to skip, so any board holding a granting ability is gathered
+          -- whole.
+          || any (any grantsMintingType . StaticAbility.modifications) (staticAbilitiesOf oid gs)
       forOne oid = fmap (\re -> (oid, re)) (replacementsOf oid gs)
    in if not (any baseHas onBattlefield)
         then []

@@ -5,7 +5,8 @@
 -- from inside Pawl.Engine.Event's changeZone) and its CR 707.9 exceptions
 -- (Replacement.applyCopyExceptions, Quicksilver Gargantuan), its CR 707.5 eligible set
 -- (Replacement.legalCopyTargets, Copy Enchantment's "any enchantment" against Clone's
--- "any creature"), the P2 copy gate (Clone), and
+-- "any creature", and Clever Impersonator's negated "any nonland permanent"), the
+-- P2 copy gate (Clone), and
 -- Pawl.Engine.Resolve's CreateCopy arm (CR 707.2's token copy, Cackling
 -- Counterpart and Watchful Radstag; its count, and the simultaneous entry that
 -- count buys, kicked Rite of Replication; and CR 122.6's entry rider on it,
@@ -21,12 +22,13 @@
 -- (Pawl.Engine.Projection.setLandSubtypeTo) -- plus the other order, where CR
 -- 614.12 leaves Vesuva no copy ability to apply at all.
 --
--- And CR 707.2a's abilities half at the two BATTLEFIELD-WIDE SHORT-CIRCUITS that
+-- And CR 707.2's copiable values at the two BATTLEFIELD-WIDE SHORT-CIRCUITS that
 -- decide whether a walk is needed at all -- Pawl.Engine.Projection's
--- copiableReplacementsOf and anyCopiableKeyword, in replacementsAffecting's
--- baseHas, and Pawl.Engine.CombatRestriction's baseCouldMint -- on a board an
--- Unstable Shapeshifter has left holding the only copy of the departed original's
--- text (copiedAbilitySpec).
+-- copiableReplacementsOf, anyCopiableKeyword and copiableMintsType, in
+-- replacementsAffecting's baseHas, and Pawl.Engine.CombatRestriction's
+-- baseCouldMint -- on a board that has been left holding the only copy of the
+-- departed original's text, whether an Unstable Shapeshifter or a Copy
+-- Enchantment / Clever Impersonator put it there (copiedAbilitySpec).
 --
 -- And Pawl.Engine.Resolve's CopySpell arm (CR 707.10's copy of a spell on the
 -- stack, Twincast) with the CR 707.10c re-target prompt it raises, the CR 704.5e
@@ -1387,10 +1389,11 @@ cardNamed :: String -> CardName.CardName
 cardNamed = CardName.MkCardName . Text.pack
 
 -- CR 707.2 / 707.2a: "the copiable values are the values derived from the text
--- printed on the object ... A copy acquires the abilities of the object it's
--- copying because those values are derived from its rules text." Three readers
--- asked that question off the COPIER's printed face rather than the copied one,
--- each behind a whole-board short-circuit that a copy could take out entirely.
+-- printed on the object (that text being name, mana cost, color indicator, card
+-- type, subtype, supertype, rules text, power, toughness, and/or loyalty)."
+-- Readers that asked that question off the COPIER's printed face rather than the
+-- copied one, each behind a whole-board short-circuit that a copy could take out
+-- entirely.
 copiedAbilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 copiedAbilitySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- Site one: the KEYWORD disjunct of Projection.replacementsAffecting's
@@ -1467,3 +1470,117 @@ copiedAbilitySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     Spec.assertEqWith s "while the Evangel beside it marks its 1" (S.damageOf evangelId bystander) (Just 1)
     Spec.assertEqWith s "the Shapeshifter is the Lion by name (CR 707.2)" (Projection.namesOf shifterId board) (Set.singleton (cardNamed "Glittering Lion"))
     Spec.assertEqWith s "and the printed Lion has left the battlefield" (length (printedOnBattlefield "Glittering Lion" board)) 0
+
+  -- Site four: the TYPE disjunct of that same baseHas (Projection.copiableMintsType),
+  -- which reads a card type and a subtype -- both copiable values, CR 707.2 says
+  -- so outright -- for CR 306.5b's planeswalker, CR 310.4b's battle and CR
+  -- 714.3a's Saga -- one case each. Copy Enchantment reaches the SUBTYPE half,
+  -- since a Saga is an enchantment (CR 205.3h); Clever Impersonator's "any
+  -- nonland permanent" reaches both equalities of the CARD TYPE half.
+  --
+  -- TWO ENTRIES, so the board that observes the disjunct differs from the one
+  -- that does not in exactly the original Saga's presence. The first Copy
+  -- Enchantment enters while History of Benalia is still out, so the PRINTED
+  -- Saga answers the whole-board short-circuit and the lore counter goes on
+  -- either way. Then the original leaves, and the second copies the first: now
+  -- no printed face on the battlefield carries a Saga subtype, and reading the
+  -- disjunct off the copier's face gathers nothing at all.
+  --
+  -- CR 707.2's last sentence keeps the second entry honest -- counters are not
+  -- copied -- so the counter it ends with is CR 714.3a's own, minted for it.
+  --
+  -- `newest` names the SECOND copy on the settled board rather than a pre-settle
+  -- one (the planeswalker case below needs that): a Saga with no lore counters is
+  -- below its final chapter number, so CR 704.5s does not sacrifice it and the
+  -- wrong reading leaves it on the battlefield reporting zero.
+  Spec.it s "CR 707.2 a copy of a Saga enters with CR 714.3a's lore counter" $ do
+    benalia <- S.printingOf s registry "History of Benalia"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    let (benaliaId, board0) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+        (_, staged1) = S.spellOnStack copyEnchantment S.alice board0
+        withOriginal = resolveAndSettle (copyNamed benaliaId) staged1
+        firstId = newest (printedOnBattlefield "Copy Enchantment" withOriginal)
+        gone oid = S.runPure S.identityAnswer withOriginal (Event.changeZone oid Zone.Graveyard)
+        second oid = resolveAndSettle (copyNamed oid) (snd (S.spellOnStack copyEnchantment S.alice (gone benaliaId)))
+    case firstId of
+      Nothing -> Spec.assertFailure s "the first Copy Enchantment left the battlefield unexpectedly"
+      Just copy1 -> do
+        let final = second copy1
+        case newest (printedOnBattlefield "Copy Enchantment" final) of
+          Nothing -> Spec.assertFailure s "the second Copy Enchantment left the battlefield unexpectedly"
+          Just copy2 -> do
+            -- The gameplay-level assertion this case exists for, ahead of every
+            -- proxy: the copy of a copy of a Saga is a Saga, so CR 714.3a mints
+            -- its entry row even with no printed Saga left on the battlefield.
+            Spec.assertEqWith s "CR 714.3a one lore counter on the copy of a copy" (S.counterOf CounterKind.Lore copy2 final) 1
+            Spec.assertBool s (elem Subtype.Saga (Set.toList (Projection.subtypesOf copy2 final))) "and it really is a Saga (CR 707.2)"
+            Spec.assertEqWith s "CR 707.3 by the copied card's name, not the copier's" (Projection.namesOf copy2 final) (Set.singleton (cardNamed "History of Benalia"))
+        -- The preconditions, after the behaviour so neither can absorb a mutation
+        -- aimed at it: the first copy got its counter with the printed Saga still
+        -- out, and that printed Saga really has left the battlefield.
+        Spec.assertEqWith s "the first copy entered with one too, while the original was out" (S.counterOf CounterKind.Lore copy1 withOriginal) 1
+        Spec.assertEqWith s "and no printed Saga is left on the battlefield for the second entry" (length (printedOnBattlefield "History of Benalia" (gone benaliaId))) 0
+
+  -- The CARD TYPE half of that same read, on Clever Impersonator ({2}{U}{U}
+  -- Creature -- Shapeshifter 0/0, "You may have this creature enter as a copy of
+  -- any nonland permanent on the battlefield") and CR 306.5b's loyalty.
+  --
+  -- The two entries the case above needs, plus a change of controller the legend
+  -- rule forces: every printed planeswalker is legendary, so bob copies alice's
+  -- Jace and alice copies bob's copy, leaving CR 704.5j one of each per player.
+  --
+  -- CR 704.5i is what makes the wrong reading loud rather than quiet: a
+  -- planeswalker that entered with no loyalty counters is put into its owner's
+  -- graveyard the moment state-based actions run. So the id is taken from the
+  -- board BEFORE the settle -- otherwise `newest` would answer with the surviving
+  -- first copy and read ITS three counters.
+  Spec.it s "CR 707.2 a copy of a planeswalker enters with CR 306.5b's loyalty counters" $ do
+    jace <- S.printingOf s registry "Jace Beleren"
+    impersonator <- S.printingOf s registry "Clever Impersonator"
+    let (jaceId, bare) = S.addCreature jace S.alice (Setup.emptyGame S.bothPlayers)
+        board0 = S.addCounter CounterKind.Loyalty 3 jaceId bare
+        (_, staged1) = S.spellOnStack impersonator S.bob board0
+        withOriginal = resolveAndSettle (copyNamed jaceId) staged1
+        gone = S.runPure S.identityAnswer withOriginal (Event.changeZone jaceId Zone.Graveyard)
+    case newest (printedOnBattlefield "Clever Impersonator" withOriginal) of
+      Nothing -> Spec.assertFailure s "the first Clever Impersonator left the battlefield unexpectedly"
+      Just copy1 -> do
+        let entered = S.runPure (copyNamed copy1) (snd (S.spellOnStack impersonator S.alice gone)) Stack.resolveTop
+            final = settle S.identityAnswer entered
+        case newest (printedOnBattlefield "Clever Impersonator" entered) of
+          Nothing -> Spec.assertFailure s "the second Clever Impersonator never reached the battlefield"
+          Just copy2 -> do
+            Spec.assertEqWith s "CR 306.5b three loyalty counters on the copy of a copy" (S.counterOf CounterKind.Loyalty copy2 final) 3
+            Spec.assertBool s (S.onBattlefield copy2 final) "so CR 704.5i does not put it into the graveyard"
+            Spec.assertBool s (Projection.isPlaneswalkerOf copy2 final) "and it really is a planeswalker (CR 707.2)"
+        Spec.assertEqWith s "the first copy entered with three too, while the original was out" (S.counterOf CounterKind.Loyalty copy1 withOriginal) 3
+        Spec.assertEqWith s "and no printed planeswalker is left on the battlefield for the second entry" (length (printedOnBattlefield "Jace Beleren" gone)) 0
+
+  -- CR 310.4b's arm of the same read, and the third of Clever Impersonator's
+  -- three eligible card types. Invasion of Dominaria is not legendary, so the
+  -- controller swap the planeswalker case needs is not forced here -- it is kept
+  -- anyway, because a Siege's protector must be an opponent of its controller
+  -- (CR 310.12a) and two seats then leave the two copies distinguishable.
+  --
+  -- CR 704.5v is this case's CR 704.5i: a Siege with defense 0 is put into its
+  -- owner's graveyard, so the id is again taken before the settle.
+  Spec.it s "CR 707.2 a copy of a battle enters with CR 310.4b's defense counters" $ do
+    invasion <- S.printingOf s registry "Invasion of Dominaria"
+    impersonator <- S.printingOf s registry "Clever Impersonator"
+    let (invasionId, bare) = S.addCreature invasion S.alice (Setup.emptyGame S.bothPlayers)
+        board0 = S.addCounter CounterKind.Defense 5 invasionId bare
+        (_, staged1) = S.spellOnStack impersonator S.bob board0
+        withOriginal = resolveAndSettle (copyNamed invasionId) staged1
+        gone = S.runPure S.identityAnswer withOriginal (Event.changeZone invasionId Zone.Graveyard)
+    case newest (printedOnBattlefield "Clever Impersonator" withOriginal) of
+      Nothing -> Spec.assertFailure s "the first Clever Impersonator left the battlefield unexpectedly"
+      Just copy1 -> do
+        let entered = S.runPure (copyNamed copy1) (snd (S.spellOnStack impersonator S.alice gone)) Stack.resolveTop
+            final = settle S.identityAnswer entered
+        case newest (printedOnBattlefield "Clever Impersonator" entered) of
+          Nothing -> Spec.assertFailure s "the second Clever Impersonator never reached the battlefield"
+          Just copy2 -> do
+            Spec.assertEqWith s "CR 310.4b five defense counters on the copy of a copy" (S.counterOf CounterKind.Defense copy2 final) 5
+            Spec.assertBool s (S.onBattlefield copy2 final) "so CR 704.5v does not put it into the graveyard"
+        Spec.assertEqWith s "the first copy entered with five too, while the original was out" (S.counterOf CounterKind.Defense copy1 withOriginal) 5
+        Spec.assertEqWith s "and no printed battle is left on the battlefield for the second entry" (length (printedOnBattlefield "Invasion of Dominaria" gone)) 0
