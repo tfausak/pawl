@@ -427,6 +427,7 @@ import qualified Pawl.KeywordTriggerSpec
 import qualified Pawl.LibraryOrderSpec
 import qualified Pawl.ManaSpec
 import qualified Pawl.MassEffectSpec
+import qualified Pawl.MeldSpec
 import qualified Pawl.ModalDoubleFacedSpec
 import qualified Pawl.ModalSpec
 import qualified Pawl.MoveCounterSpec
@@ -949,6 +950,7 @@ spec s registry = do
   Pawl.LibraryOrderSpec.spec s registry
   Pawl.ManaSpec.spec s registry
   Pawl.MassEffectSpec.spec s registry
+  Pawl.MeldSpec.spec s registry
   Pawl.ModalDoubleFacedSpec.spec s registry
   Pawl.ModalSpec.spec s registry
   Pawl.MulliganSpec.spec s registry

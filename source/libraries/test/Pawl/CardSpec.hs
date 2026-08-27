@@ -4734,6 +4734,25 @@ sharedTypeLineOffends card =
   let lines_ = fmap Face.typeLine (Card.Type.faces card)
    in Card.hasSharedTypeLine card && any (/= NonEmpty.head lines_) lines_
 
+-- CR 712.4b: the back face of a meld card "fails to determine its
+-- characteristics" anywhere but on a melded permanent on the battlefield, so
+-- pawl stores each half of a meld pair as its front face alone
+-- (Pawl.Types.Layout's Meld arm). A file that gave one a second face would be
+-- storing characteristics no rule can read: every Pawl.Engine.Card arm for this
+-- layout answers off NonEmpty.head, so the extra face would be silently dropped
+-- rather than rejected. This is where that is made loud.
+--
+-- A `== Layout.Meld` rather than an engine classifier, unlike
+-- sharedTypeLineOffends above: nothing in Pawl.Engine.Card asks "is this a meld
+-- card?" -- CR 701.42b's and CR 712.4c's readers case on the layout directly --
+-- so there is no shared answer for the lint to range over.
+--
+-- Over the whole card rather than through anyFace, for distinctFaceNamesOffends'
+-- reason: this is a claim about the faces as a set.
+meldFaceCountOffends :: Card.Type.Card -> Bool
+meldFaceCountOffends card =
+  Card.Type.layout card == Layout.Meld && length (Card.Type.faces card) /= 1
+
 -- Two things a TriggerCondition.AnyOf may not contain, checked at every depth so
 -- that a nested one cannot smuggle either in.
 --
@@ -6868,6 +6887,30 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- authoring rather than a defect.
     victory <- S.printingOf s registry "Onward"
     Spec.assertBool s (not (sharedTypeLineOffends (Printing.card victory))) "a Split card's halves may differ"
+  -- CR 712.4b, swept over the pool. See meldFaceCountOffends for what the rule
+  -- asks and why the check is a face count.
+  Spec.it s "CR 712.4b a meld card carries its front face alone" $ do
+    ps <- S.allPrintings s
+    let melds = filter ((== Layout.Meld) . Card.Type.layout . Printing.card) ps
+        offenders = filter (meldFaceCountOffends . Printing.card) ps
+    -- The guard the sibling lints carry: over a pool with no meld card this
+    -- sweep counts nothing.
+    Spec.assertBool s (not (null melds)) "the pool has a meld card to lint"
+    Spec.assertEqWith s "no meld card prints a second face" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The REJECTING direction, against the real pair restated rather than a card
+  -- file, as the Room lint above does it: the two halves of a meld pair stitched
+  -- into one card must not be loadable.
+  Spec.it s "the lint itself catches a meld card carrying a second face" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    ranger <- S.printingOf s registry "Daybreak Ranger"
+    let card = Printing.card battlements
+        stitched = card {Card.Type.faces = NonEmpty.head (Card.Type.faces card) NonEmpty.:| [NonEmpty.head (Card.Type.faces (Printing.card garrison))]}
+    Spec.assertBool s (not (meldFaceCountOffends card)) "the real Hanweir Battlements is accepted"
+    Spec.assertBool s (meldFaceCountOffends stitched) "a meld card carrying a second face is rejected"
+    -- NOT an offence on the layouts CR 712.1 lists alongside this one: a
+    -- nonmodal double-faced card prints two Magic card faces and stores both.
+    Spec.assertBool s (not (meldFaceCountOffends (Printing.card ranger))) "a Transforming card may print two faces"
   -- CR 603.2's event triggers and CR 603.8's state triggers are gathered by two
   -- different scans, so one ability may not be both. See anyOfOffends for the two
   -- shapes this rejects and why each would be incoherent rather than merely odd.

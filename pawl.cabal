@@ -1178,6 +1178,7 @@ library test
     Pawl.LibraryOrderSpec
     Pawl.ManaSpec
     Pawl.MassEffectSpec
+    Pawl.MeldSpec
     Pawl.ModalDoubleFacedSpec
     Pawl.ModalSpec
     Pawl.MoveCounterSpec
