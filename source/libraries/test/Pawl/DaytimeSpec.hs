@@ -223,23 +223,33 @@ entrySpec s registry = Spec.describe s "EntersTransformed" $ do
   -- The first two are separated by asserting on `entered`, the board the spell's
   -- resolution leaves, which is BEFORE the settle the sweep runs in.
   --
-  -- THE TOKEN COUNT DISCRIMINATES TOO, and it did not always: the trigger scan
-  -- reads each event group's battlefield as it was sampled
-  -- (GameState.battlefieldWhenTriggered), not the board it finds at settle, so
-  -- the entry's group carries the abilities the permanent entered with and the CR
-  -- 702.145c sweep a settle later is a different group. Neutralizing
-  -- Pawl.Engine.Event's EntersTransformed face write reddens "and its back
-  -- face's trigger made two Insects" at 1 == 2, because the swept engine places
-  -- the FRONT face's trigger.
   Spec.it s "CR 712.13a/702.145b a daybound spell cast at night enters transformed" $ do
     tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
     forest <- S.printingOf s registry "Forest"
     expert <- S.printingOf s registry "Infestation Expert"
     let (spellId, board) = expertBoard tovolar forest expert 0
-        (entered, triggered) = castExpert spellId board
+        (entered, _) = castExpert spellId board
     Spec.assertEqWith s "it is night when the spell resolves" (GameState.daytime board) (Just Daytime.Night)
     Spec.assertEqWith s "the permanent is showing its back face already" (expertFaces entered) [expertBack]
-    Spec.assertEqWith s "and its back face's trigger made two Insects" (S.countOnBattlefieldByName insectToken S.alice triggered) 2
+  -- THE TOKEN COUNT IS A SECOND DISCRIMINATOR, and it sits in its OWN case so
+  -- that it can be reached: Pawl.Spec.assertFailure aborts, so a token assertion
+  -- placed after the face assertion above would never run under a mutation the
+  -- face assertion already catches, and the count would prove nothing.
+  --
+  -- What it adds is WHICH ABILITY the permanent entered with, rather than which
+  -- face it shows. The trigger scan reads each event group's battlefield as it
+  -- was sampled (GameState.battlefieldWhenTriggered) rather than the board it
+  -- finds at settle, so the entry's group carries the abilities the permanent
+  -- entered with and the CR 702.145c sweep a settle later is a different group:
+  -- the back face's "create two 1/1 green Insect creature tokens" against the
+  -- front face's one.
+  Spec.it s "CR 712.13a/702.145b and the transformed permanent's own trigger is the one that resolves" $ do
+    tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
+    forest <- S.printingOf s registry "Forest"
+    expert <- S.printingOf s registry "Infestation Expert"
+    let (spellId, board) = expertBoard tovolar forest expert 0
+        (_, triggered) = castExpert spellId board
+    Spec.assertEqWith s "its back face's trigger made two Insects" (S.countOnBattlefieldByName insectToken S.alice triggered) 2
   -- The negative, the same board with ONE spell cast during the previous turn
   -- instead of none: CR 502.2 leaves it day, CR 702.145b's condition fails, and
   -- the permanent enters front face up and stays there. The falsifier for a

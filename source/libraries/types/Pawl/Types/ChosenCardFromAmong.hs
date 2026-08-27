@@ -13,8 +13,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- Commune with the Gods' revealed five (CR 701.20a), Carth the Lion's looked-at
 -- seven (CR 701.20e) -- and where those cards are is whatever the effect that
 -- bound them left them. A library batch is the case no zone-keyed arm can reach,
--- a library still having no filtered sweep and being owed none, which
--- Pawl.Types.ObjectRef's EachMatching derives from CR 701.23b; see #1309 -- and
+-- a library still having no filtered sweep (gap #2416) -- and
 -- Pawl.Types.ObjectRef.TopOfLibraryUntil's walk is not one, since it stops at the
 -- match that completes its count rather than collecting every one of them.
 --
