@@ -1085,6 +1085,15 @@ chooseDamageSourceOf src p = case p of
     Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== src) (NonEmpty.toList candidates))
   _ -> S.identityAnswer p
 
+-- chooseDamageSourceOf with every target slot aimed at one PLAYER: aimAndChoose's
+-- player-side twin, for the group's third-class case, whose Fire-Eater ability
+-- has to be aimed at the player Auriok Replica's "to you" shields.
+choosePlayerAndSource :: PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+choosePlayerAndSource pid src p = case p of
+  Prompt.ChooseDamageSource _ _ _ candidates ->
+    Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== src) (NonEmpty.toList candidates))
+  _ -> aimPlayer pid p
+
 -- CR 609.7a's chosen source on the UNBOUNDED shield, whose producer is Auriok
 -- Replica ({3} Artifact Creature -- Cleric, 2/2: "{W}, Sacrifice this creature:
 -- Prevent all damage a source of your choice would deal to you this turn").
@@ -1094,11 +1103,14 @@ chooseDamageSourceOf src p = case p of
 -- the duration expires however many times the chosen source strikes.
 --
 -- The chosen source is deliberately NOT the first candidate the prompt offers:
--- CR 609.7a's pool here is alice's Plains, the two Pikers and the ability itself
--- on the stack, sorted ascending, so an engine that ignored the answer and took
--- the head would shield against the Plains and both damage assertions would read
--- the other way round. The Replica is not in the pool at all -- its own cost
--- sacrificed it -- so nothing about the choice can come from the source object.
+-- CR 609.7a's pool here is alice's Plains, the two Pikers and the sacrificed
+-- Replica, sorted ascending, so an engine that ignored the answer and took the
+-- head would shield against the Plains and both damage assertions would read the
+-- other way round. The Replica is in the pool through the rule's THIRD class and
+-- not because it is a permanent -- its own cost sacrificed it, and the ability
+-- resolving on the stack still names it as its CR 113.7 source. The ability
+-- OBJECT is not in the pool: CR 609.7a admits "a spell on the stack", and an
+-- activated ability sharing that zone is none of the four classes.
 auriokReplicaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
   let hit src recipient n =
@@ -1203,6 +1215,110 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
     Spec.assertEqWith s "setup: CR 400.7 gave that permanent an id the spell did not have" (became shielded == spellId) False
     Spec.assertEqWith s "setup: the shield is a floating replacement" (length (GameState.replacements shielded)) 1
     Spec.assertEqWith s "alice was asked which source, and answered the spell" (chosenSourcesIn (answersFor (chooseDamageSourceOf spellId) afterCast (Activate.activateAbility S.alice replicaId (theAbility replica) Monad.>> Stack.resolveTop Monad.>> Stack.resolveTop))) [spellId]
+  -- CR 609.7a's THIRD class, which none of the three cases above reaches: "any
+  -- object referred to by an object on the stack, by a replacement or prevention
+  -- effect that's waiting to apply, or by a delayed triggered ability that's
+  -- waiting to trigger (even if that object is no longer in the zone it used to
+  -- be in)". Ghitu Fire-Eater ({2}{R} Creature -- Human Nomad 2/2, "{T},
+  -- Sacrifice this creature: It deals damage equal to its power to any target")
+  -- pays its own departure as a COST, so while its ability waits on the stack the
+  -- id that ability names as its CR 113.7 source is in no zone at all and is a
+  -- permanent, a spell and a command-zone object under none of the other three
+  -- classes.
+  --
+  -- WHY IT IS THE ONLY PLAY: Pawl.Engine.Resolve's DealDamage arm files that same
+  -- departed id as the damage event's source (CR 113.7a), and
+  -- Pawl.Engine.Replacement.matchesDamagePattern compares whichSource by id. So
+  -- until the third class was offered, no answer alice could give installed a
+  -- shield that ever matched this damage -- the choice was not merely narrowed,
+  -- the correct play was unreachable.
+  --
+  -- ORDER is the whole of the setup: the Fire-Eater's ability goes on the stack
+  -- FIRST and the Replica's on top of it, so the reference is still standing when
+  -- the choice is made, and the stack is resolved top-by-top rather than to empty.
+  --
+  -- TWO boards differing in the ANSWER alone, because one cannot separate the
+  -- readings: alice on 20 says the shield matched, and a board where nothing else
+  -- deals damage would read 20 under an engine that shielded everything. The
+  -- Piker is the other answer and it is bob's, so the two answers name objects
+  -- with different controllers as well as different ids.
+  Spec.it s "CR 609.7a a source only a waiting ability still refers to is offered, and shields the damage it deals" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    replica <- S.printingOf s registry "Auriok Replica"
+    ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
+    let base = S.landsInPlay plains 1
+        (fireEater, g1) = S.addCreature ghitu S.alice base
+        (replicaId, g2) = S.addCreature replica S.alice g1
+        (decoy, g3) = S.addCreature pikerPrinting S.bob g2
+        act =
+          Activate.activateAbility S.alice fireEater (theAbility ghitu)
+            Monad.>> Activate.activateAbility S.alice replicaId (theAbility replica)
+            Monad.>> Stack.resolveTop
+            Monad.>> Stack.resolveTop
+        -- Rank-2, so the answerer is applied at each use rather than let-bound.
+        after src = S.runPure (choosePlayerAndSource S.alice src) g3 act
+    -- THE gameplay assertion: alice named the departed Fire-Eater and its 2 is
+    -- prevented. Before the third class that id was not in the offered set, the
+    -- answerer fell back to the head of the pool, and this read 18.
+    Spec.assertEqWith s "the departed source alice chose deals nothing" (S.lifeOf S.alice (after fireEater)) (Just 20)
+    -- Its twin on the same board, differing in the ANSWER alone: aim the shield
+    -- at bob's Piker and the same 2 lands, so the case cannot pass on an engine
+    -- that shielded whatever turned up.
+    Spec.assertEqWith s "and aiming the same shield at the Piker leaves that 2 landing in full" (S.lifeOf S.alice (after decoy)) (Just 18)
+    -- The proxies, after the behaviour.
+    Spec.assertBool s (Maybe.isNothing (Game.lookupObject fireEater (after fireEater))) "setup: the cost really did remove the source, so the id names nothing"
+    Spec.assertEqWith s "setup: the shield is a floating replacement" (length (GameState.replacements (after fireEater))) 1
+    Spec.assertEqWith s "alice was OFFERED the departed source and answered it" (chosenSourcesIn (answersFor (choosePlayerAndSource S.alice fireEater) g3 act)) [fireEater]
+  -- CR 609.7a in the other direction, on the same two cards: the rule's second
+  -- class is "a spell on the stack (including a permanent spell)", and an
+  -- ACTIVATED ABILITY sharing that zone is neither a spell nor a permanent nor a
+  -- face-up command-zone object, nor is it referred to by anything. It is not a
+  -- legal choice, and pawl used to offer every object on the stack.
+  --
+  -- OBSERVED AT GAMEPLAY LEVEL rather than by counting the offered set, which the
+  -- lands ordering below is what buys. The answerer names the Fire-Eater's
+  -- ability OBJECT and, per this group's FILTERED-not-trusted posture, falls back
+  -- to the head of the pool when that id is not offered. The Fire-Eater and the
+  -- Replica are placed BEFORE the Plains, so the ascending pool's head is the
+  -- departed Fire-Eater -- the one source whose damage this shield can prevent.
+  -- So an engine that offers the ability installs a shield naming an object no
+  -- damage event ever carries and alice takes the 2; the engine that declines it
+  -- falls back and prevents the 2.
+  Spec.it s "CR 609.7a an activated ability on the stack is not a spell, so it is not offered as a source" $ do
+    plains <- S.printingOf s registry "Plains"
+    replica <- S.printingOf s registry "Auriok Replica"
+    ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
+    let (fireEater, g1) = S.addCreature ghitu S.alice (Setup.emptyGame S.bothPlayers)
+        (replicaId, g2) = S.addCreature replica S.alice g1
+        g3 = S.landsFor plains S.alice 1 g2
+        -- The Fire-Eater's ability alone, so its object's id can be read off the
+        -- stack rather than guessed.
+        armed = S.runPure (aimPlayer S.alice) g3 (Activate.activateAbility S.alice fireEater (theAbility ghitu))
+        abilityId = case GameState.stack armed of
+          oid : _ -> oid
+          [] -> fireEater
+        rest =
+          Activate.activateAbility S.alice replicaId (theAbility replica)
+            Monad.>> Stack.resolveTop
+            Monad.>> Stack.resolveTop
+        after src = S.runPure (choosePlayerAndSource S.alice src) armed rest
+        -- The Plains: the battlefield holds it and the Replica, and the lands
+        -- were placed last, so the Plains carries the higher id.
+        plainsId = Set.findMax (GameState.battlefield armed)
+    -- THE gameplay assertion: naming the ability gets alice the FALLBACK, and the
+    -- fallback prevents the 2. An engine offering the ability would shield an
+    -- object that deals no damage and leave alice on 18.
+    Spec.assertEqWith s "the ability was not offered, so the fallback shielded the Fire-Eater it names" (S.lifeOf S.alice (after abilityId)) (Just 20)
+    -- Its twin, differing in the ANSWER alone and naming something the rule DOES
+    -- admit: the Plains is a permanent, is offered, and shields nothing that
+    -- happens here -- so the 20 above is not "everything was prevented".
+    Spec.assertEqWith s "naming the Plains instead, which IS a legal choice, leaves the same 2 landing" (S.lifeOf S.alice (after plainsId)) (Just 18)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "setup: exactly one object is on the stack, and it is not the Fire-Eater's own id" (GameState.stack armed) [abilityId]
+    Spec.assertBool s (abilityId /= fireEater) "setup: CR 602.2a's ability object is not the permanent whose ability it is"
+    Spec.assertBool s (plainsId /= replicaId) "setup: the id the twin names is the Plains and not the Replica"
+    Spec.assertEqWith s "the answer recorded is the fallback, not the ability alice named" (chosenSourcesIn (answersFor (choosePlayerAndSource S.alice abilityId) armed rest)) [fireEater]
 
 -- CR 609.7b's PROPERTY-named source on a shield covering a PLAYER, whose
 -- producer is Scarecrow ({5} Artifact Creature -- Scarecrow, 2/2: "{6}, {T}:
