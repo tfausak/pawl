@@ -52,6 +52,7 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -94,7 +95,7 @@ statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
 -- printing, so a card that grew a second ability fails the case that names it
 -- rather than silently picking whichever came first (Pawl.TargetSpec's
 -- soleTargetSlot is the same shape for the same reason).
-soleActivatedAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+soleActivatedAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 soleActivatedAbility p = case Face.activatedAbilities (S.combinedFace p) of
   [only] -> Just only
   _ -> Nothing

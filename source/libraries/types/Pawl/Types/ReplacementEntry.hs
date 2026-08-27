@@ -2,6 +2,7 @@ module Pawl.Types.ReplacementEntry where
 
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 
@@ -52,6 +53,6 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 -- the prompt is raised at all only when some other pair in the list differs.
 data ReplacementEntry = MkReplacementEntry
   { source :: ObjectId.ObjectId,
-    effect :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card)
+    effect :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card))
   }
   deriving (Eq, Ord, Show)

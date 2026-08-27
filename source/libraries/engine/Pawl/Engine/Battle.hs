@@ -64,6 +64,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -272,7 +273,7 @@ designateProtector pc controller oid = do
 -- that name -- the reserved slot for the incarnation a card became -- and
 -- Pawl.Engine.Resolve reads it live, since a resolving ability's target map is
 -- fixed before its effect fold begins.
-siegeDefeat :: TriggeredAbility Card
+siegeDefeat :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 siegeDefeat =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
@@ -323,7 +324,7 @@ siegeDefeat =
 -- Projection mints after the layer fold and so puts out of LoseAllAbilities' reach:
 -- rule 310.4b hangs off the CARD TYPE, where 310.12b hangs off an ability the rules
 -- grant, and layer 6 removes abilities.
-triggeredAbilitiesOf :: PC.ProjectedCharacteristics -> [TriggeredAbility Card]
+triggeredAbilitiesOf :: PC.ProjectedCharacteristics -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 triggeredAbilitiesOf pc = [siegeDefeat | Set.member Subtype.Siege (battleTypes pc)]
 
 -- CR 122.1g / 310.4c: the defense counters on a permanent. Zero for an object the

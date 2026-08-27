@@ -43,6 +43,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -306,7 +307,7 @@ activated masterId master gs =
   S.runPure S.identityAnswer gs (Activate.activateAbility S.alice masterId (theReanimation master) >> Engine.priorityLoop)
 
 -- The Master's sole activated ability, off its printed face.
-theReanimation :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card
+theReanimation :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 theReanimation printing = case Face.activatedAbilities (S.combinedFace printing) of
   ability : _ -> ability
   [] -> error "Pawl.RadSpec: The Master, Transcendent has no activated ability"

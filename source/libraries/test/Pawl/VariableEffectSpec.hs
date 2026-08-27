@@ -39,6 +39,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -1426,7 +1427,7 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
     let (baubleId, placed) = S.addCreature bauble S.alice (S.landsInPlay plains 1)
         (_, buried) = S.addGraveyardCard piker S.alice placed
         board = (stockLibrary piker S.alice 5 buried) {GameState.priority = Just S.alice}
-        activate :: (forall r. Prompt.Prompt r -> r) -> ActivatedAbility.ActivatedAbility Card.Type.Card -> GameState.GameState
+        activate :: (forall r. Prompt.Prompt r -> r) -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> GameState.GameState
         activate answer ability = S.runPure answer board $ do
           Activate.activateAbility S.alice baubleId ability
           Stack.resolveTop

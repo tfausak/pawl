@@ -5,6 +5,7 @@ module Pawl.Codec.HandAction where
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Effect as Effect
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -16,7 +17,7 @@ import qualified Pawl.Types.HandAction as HandAction
 codec :: (Typeable.Typeable card, Eq card) => Codec.Codec card -> Codec.Codec (HandAction.HandAction card)
 codec cardCodec = Fields.object $ do
   condition <- Fields.defaulted "condition" Nothing (Common.maybe Condition.codec) HandAction.condition
-  effects <- Fields.defaulted "effects" [] (Common.list (Effect.codec cardCodec)) HandAction.effects
+  effects <- Fields.defaulted "effects" [] (Common.list (Effect.codec cardCodec (GrantedAbility.codec cardCodec))) HandAction.effects
   pure
     HandAction.MkHandAction
       { HandAction.condition = condition,

@@ -13,6 +13,7 @@ import qualified Pawl.Codec.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Defense as Defense
 import qualified Pawl.Codec.Effect as Effect
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
 import qualified Pawl.Codec.PlayerStaticAbility as PlayerStaticAbility
@@ -45,9 +46,9 @@ codec = Fields.object $ do
   subtypes <- Fields.defaulted "subtypes" Set.empty (Common.set Subtype.codec) PC.subtypes
   staticAbilities <- Fields.defaulted "staticAbilities" [] (Common.list (StaticAbility.codec Card.codec)) PC.staticAbilities
   playerAbilities <- Fields.defaulted "playerAbilities" [] (Common.list PlayerStaticAbility.codec) PC.playerAbilities
-  activatedAbilities <- Fields.defaulted "activatedAbilities" [] (Common.list (ActivatedAbility.codec Card.codec)) PC.activatedAbilities
-  replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (PrintedReplacement.codec (Effect.codec Card.codec))) PC.replacementEffects
-  triggeredAbilities <- Fields.defaulted "triggeredAbilities" [] (Common.list (TriggeredAbility.codec Card.codec)) PC.triggeredAbilities
+  activatedAbilities <- Fields.defaulted "activatedAbilities" [] (Common.list (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec))) PC.activatedAbilities
+  replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (PrintedReplacement.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))) PC.replacementEffects
+  triggeredAbilities <- Fields.defaulted "triggeredAbilities" [] (Common.list (TriggeredAbility.codec Card.codec (GrantedAbility.codec Card.codec))) PC.triggeredAbilities
   enchant <- Fields.defaulted "enchant" [] (Common.list TargetSlot.codec) PC.enchant
   subtypeWordChanges <- Fields.defaulted "subtypeWordChanges" [] (Common.list ChangeSubtypeWord.codec) PC.subtypeWordChanges
   pure

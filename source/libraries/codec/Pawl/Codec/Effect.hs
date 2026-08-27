@@ -77,11 +77,11 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Effect as Effect
 
-codec :: (Typeable.Typeable card, Eq card) => Codec.Codec card -> Codec.Codec (Effect.Effect card)
-codec cardCodec =
+codec :: (Typeable.Typeable card, Eq card, Typeable.Typeable ability, Eq ability) => Codec.Codec card -> Codec.Codec ability -> Codec.Codec (Effect.Effect card ability)
+codec cardCodec abilityCodec =
   Arm.tagged
     [ Arm.payload "DealDamage" DealDamage.codec Effect.DealDamage (\x -> case x of Effect.DealDamage y -> Just y; _ -> Nothing),
-      Arm.payload "ModifyTarget" ModifyTarget.codec Effect.ModifyTarget (\x -> case x of Effect.ModifyTarget y -> Just y; _ -> Nothing),
+      Arm.payload "ModifyTarget" (ModifyTarget.codec abilityCodec) Effect.ModifyTarget (\x -> case x of Effect.ModifyTarget y -> Just y; _ -> Nothing),
       Arm.payload "ChangeText" ChangeText.codec Effect.ChangeText (\x -> case x of Effect.ChangeText y -> Just y; _ -> Nothing),
       Arm.payload "AddMana" ManaAddition.codec Effect.AddMana (\x -> case x of Effect.AddMana y -> Just y; _ -> Nothing),
       Arm.payload "Search" Search.codec Effect.Search (\x -> case x of Effect.Search y -> Just y; _ -> Nothing),
@@ -182,7 +182,7 @@ codec cardCodec =
     ]
   where
     createCodec = Create.codec cardCodec
-    replaceCodec = Replace.codec (codec cardCodec)
-    preventCodec = PreventNextDamage.codec (codec cardCodec)
-    preventAllCodec = PreventAllDamage.codec (codec cardCodec)
-    forEachCodec = ForEach.codec (codec cardCodec)
+    replaceCodec = Replace.codec (codec cardCodec abilityCodec)
+    preventCodec = PreventNextDamage.codec (codec cardCodec abilityCodec)
+    preventAllCodec = PreventAllDamage.codec (codec cardCodec abilityCodec)
+    forEachCodec = ForEach.codec (codec cardCodec abilityCodec)

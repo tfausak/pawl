@@ -43,6 +43,7 @@ import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
@@ -95,7 +96,7 @@ decodeFace = Codec.decode faceCodec
 
 -- | CR 700.2's non-modal shape, which is what a land or vanilla creature's
 -- spell payload is: one mode, no effects, forced.
-minimalModal :: Modal.Modal Card.Card
+minimalModal :: Modal.Modal Card.Card (GrantedAbility.GrantedAbility Card.Card)
 minimalModal =
   Modal.MkModal
     (Seq.singleton (Mode.MkMode Seq.empty Map.empty))
@@ -103,7 +104,7 @@ minimalModal =
 
 -- | CR 603.6a's simplest trigger. The shape does not matter here, only that it
 -- is a well-typed TriggeredAbility Card.
-minimalTriggeredAbility :: TriggeredAbility.TriggeredAbility Card.Card
+minimalTriggeredAbility :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 minimalTriggeredAbility =
   TriggeredAbility.MkTriggeredAbility TriggerCondition.SelfEnters minimalModal Nothing TriggerLimit.Unlimited
 

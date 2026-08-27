@@ -121,6 +121,7 @@ import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -11981,7 +11982,7 @@ eventTriggers events gs =
 -- effect specifies that the object is put into that zone", and the
 -- delayed-triggered-ability sentence (#819). Neither needs a trigger condition,
 -- so both belong to the fold below rather than here.
-zoneFunctionedFrom :: TriggeredAbility.TriggeredAbility Card -> Maybe Zone
+zoneFunctionedFrom :: TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Maybe Zone
 zoneFunctionedFrom ability =
   if enchantedObjectLeaves (TriggeredAbility.condition ability)
     then Nothing
@@ -12038,7 +12039,7 @@ enchantedObjectLeaves condition = case condition of
 -- an ability whose condition already answers CR 113.6k, and if one did they
 -- would both say graveyard. The order is written down so a future card meets a
 -- decision rather than an accident.
-functionsIn :: Zone -> TriggeredAbility.TriggeredAbility Card -> Bool
+functionsIn :: Zone -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Bool
 functionsIn zone ability = case zoneFunctionedFrom ability of
   Just named -> zone == named
   Nothing -> Set.member zone (zonesTriggeredFrom (TriggeredAbility.condition ability))

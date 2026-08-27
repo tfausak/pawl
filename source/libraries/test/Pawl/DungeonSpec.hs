@@ -39,6 +39,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
@@ -54,7 +55,7 @@ import qualified Pawl.Types.Zone as Zone
 -- Secret Door's one activated ability, "{4}{U}: Venture into the dungeon.
 -- Activate only as a sorcery." Taken off the printing rather than rebuilt, so the
 -- case exercises the card file.
-ventureAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card
+ventureAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 ventureAbility printing = case concatMap Face.activatedAbilities (Card.faces (Printing.card printing)) of
   ab : _ -> ab
   [] -> error "Secret Door has no activated ability"
@@ -130,13 +131,13 @@ resolveAll answer = go (20 :: Int)
 
 -- One venture: activate Secret Door's ability, then resolve everything it puts on
 -- the stack.
-ventureOnce :: (forall r. Prompt.Prompt r -> r) -> ActivatedAbility.ActivatedAbility Card.Card -> ObjectId -> GameState.GameState -> GameState.GameState
+ventureOnce :: (forall r. Prompt.Prompt r -> r) -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> ObjectId -> GameState.GameState -> GameState.GameState
 ventureOnce answer ability doorId gs =
   let activated = S.runPure answer gs (Activate.activateAbility S.alice doorId ability)
    in resolveAll answer (S.runPure answer activated Engine.settleForPriority)
 
 -- `n` ventures in a row, all answered the same way.
-ventureTimes :: Int -> (forall r. Prompt.Prompt r -> r) -> ActivatedAbility.ActivatedAbility Card.Card -> ObjectId -> GameState.GameState -> GameState.GameState
+ventureTimes :: Int -> (forall r. Prompt.Prompt r -> r) -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> ObjectId -> GameState.GameState -> GameState.GameState
 ventureTimes n answer ability doorId gs = List.foldl' (\acc _ -> ventureOnce answer ability doorId acc) gs [1 .. n]
 
 -- alice controls a Secret Door and `lands` untapped Islands, owns `dungeons`

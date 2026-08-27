@@ -66,6 +66,7 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaType as ManaType
@@ -256,7 +257,7 @@ playsAndDeclines p = case p of
 -- loop offers it, and passes otherwise -- so an ability that reaches the stack
 -- did so because the engine offered it, not because this answerer reached past a
 -- gate.
-activates :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Prompt.Prompt r -> r
+activates :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Prompt.Prompt r -> r
 activates srcId ability p = case p of
   Prompt.ChooseAction _ _ actions ->
     let wanted a = case a of
@@ -275,7 +276,7 @@ activates srcId ability p = case p of
 -- Named rather than "whatever is legal" for `activates`' reason, even where one
 -- board offers a single candidate: an answerer that searched would quietly repair
 -- a mutation on a board that later grows a second creature.
-activatesTargeting :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> ObjectId -> Prompt.Prompt r -> r
+activatesTargeting :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> ObjectId -> Prompt.Prompt r -> r
 activatesTargeting srcId ability victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (\r -> Recipient.objectOf r == Just victim) candidates) sets
   _ -> activates srcId ability p
@@ -291,7 +292,7 @@ plusOnesOn oid gs = maybe 0 (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . 
 -- Activate only as a sorcery." (data/cards/littjara-mirrorlake.json; Oracle text
 -- checked against api.scryfall.com, 2026-08-25.) Its SECOND printed ability is
 -- the copy one -- the first is the mana ability CR 605.3b keeps off the stack.
-sacrificeAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+sacrificeAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 sacrificeAbility = Maybe.listToMaybe . drop 1 . Face.activatedAbilities . S.combinedFace
 
 -- alice controls the Mirrorlake untapped, a Goblin Piker carrying TWO +1/+1
@@ -319,7 +320,7 @@ mirrorlakeBoard forest island piker mirrorlake =
 -- Mutavault's SECOND printed ability -- "{1}: This land becomes a 2/2 creature
 -- with all creature types until end of turn. It's still a land". The first is the
 -- mana ability CR 605.3b keeps off the stack, which no priority window offers.
-animationAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+animationAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 animationAbility = Maybe.listToMaybe . drop 1 . Face.activatedAbilities . S.combinedFace
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

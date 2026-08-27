@@ -54,6 +54,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -101,14 +102,14 @@ chooseNoModes p = case p of
 -- The single ability of a printing (all M3e gates have exactly one). Total: the
 -- empty-ability fallback is unreachable in these fixtures, and honors the
 -- no-partial-functions rule (no `error`).
-theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Nothing Nothing
 
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) -- the fixture
 -- shape every pre-M4h single-mode ActivatedAbility now takes.
-singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSlot.TargetSlot -> Modal.Modal card
+singleModeAbility :: [Effect.Effect card ability] -> Map.Map SlotName.SlotName TargetSlot.TargetSlot -> Modal.Modal card ability
 singleModeAbility effects slots =
   Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots)) (ModeSelection.ChooseExactly 1)
 
@@ -1942,7 +1943,7 @@ tovolarBackName = CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge"
 --
 -- Total for theAbility's reason, and the fallback is inert: it costs nothing and
 -- does nothing, so a fixture that reached it would fail its own assertions.
-shownAbility :: ObjectId.ObjectId -> GameState.GameState -> ActivatedAbility.ActivatedAbility Card.Type.Card
+shownAbility :: ObjectId.ObjectId -> GameState.GameState -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 shownAbility oid gs = case Game.faceOf oid gs >>= Maybe.listToMaybe . Face.activatedAbilities of
   Just ab -> ab
   Nothing -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Nothing Nothing
@@ -2319,7 +2320,7 @@ soleCreatureOf pid gs = case filter (`Projection.isCreatureOf` gs) (Game.zoneMem
 -- Face.activatedAbilities, which is the printed list a text change has not
 -- reached. Projection.abilitiesGiven is the list Activate itself offers from, so
 -- this is the same ability a player would be given.
-soleProjectedAbility :: ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+soleProjectedAbility :: ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 soleProjectedAbility oid gs = case Projection.abilitiesOf oid gs of
   [only] -> Just only
   _ -> Nothing
@@ -2934,7 +2935,7 @@ activationCostReductionSpec s registry = Spec.describe s "ActivationCostReductio
 -- Mishra's Foundry's {2}. `theAbility` takes the first, which on both is the mana
 -- ability CR 605.3b keeps off the stack -- and one with no mana in its cost, so
 -- nothing could be measured on it.
-animationAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+animationAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 animationAbility p = case drop 1 (Face.activatedAbilities (S.combinedFace p)) of
   ab : _ -> ab
   [] -> theAbility p
@@ -3482,7 +3483,7 @@ evolveAt oid from to p = case p of
   _ -> S.identityAnswer p
 
 -- The one ability on the object that the printing did not print: the grant.
-grantedAbility :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+grantedAbility :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 grantedAbility printed oid gs = case filter (/= theAbility printed) (Projection.abilitiesOf oid gs) of
   ability : _ -> Just ability
   [] -> Nothing
@@ -3539,7 +3540,7 @@ goldenEggSpec s registry = Spec.describe s "Golden Egg" $ do
 -- Golden Egg's SECOND activated ability -- the life gain, not the mana ability
 -- theAbility above would pick. Total: the fallback is unreachable for a printing
 -- with two.
-lifeGainAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+lifeGainAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 lifeGainAbility p = case Face.activatedAbilities (S.combinedFace p) of
   _ : ab : _ -> ab
   _ -> theAbility p
@@ -3716,7 +3717,7 @@ hoistMixedBoard printings n =
 -- Activate.activatableGiven fed everything Action.legalActions hoists for it.
 -- One expression, so the spec below reads as a differential rather than as a
 -- pile of arguments.
-threadedGate :: PlayerId.PlayerId -> ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> GameState.GameState -> Bool
+threadedGate :: PlayerId.PlayerId -> ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> GameState.GameState -> Bool
 threadedGate pid oid ability gs =
   let grants = Projection.controlGrants gs
       pcs = Projection.projectAll gs

@@ -4,6 +4,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Effect as Effect
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -230,4 +231,4 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
   where
     -- CR 615.5: the DamageR arm carries riders, so the codec takes the effect
     -- codec the card boundary would pass it.
-    codec = ReplacementEffect.codec (Effect.codec Card.codec)
+    codec = ReplacementEffect.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))

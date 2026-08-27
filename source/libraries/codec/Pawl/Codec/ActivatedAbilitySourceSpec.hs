@@ -9,6 +9,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Modal as Modal
@@ -19,7 +20,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 -- | What the ability itself encodes to is Pawl.Codec.ActivatedAbility's own
 -- case; one mana cost and no modes is enough to show the two keys this record
 -- adds around it.
-ability :: ActivatedAbility.ActivatedAbility Card.Card
+ability :: ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 ability =
   ActivatedAbility.MkActivatedAbility
     (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [])

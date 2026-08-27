@@ -50,6 +50,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Object as Object
@@ -1099,7 +1100,7 @@ controlChangeRemovalSpec s registry = Spec.describe s "ControlChangeRemoval" $ d
 -- parse of the committed card data (S.spellTargetSlot's posture, for an
 -- activated ability rather than a spell). The first is the land's "{T}: Add
 -- {C}".
-removalAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+removalAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 removalAbility printing = case Face.activatedAbilities (S.combinedFace printing) of
   [_, ability] -> Just ability
   _ -> Nothing
@@ -1107,7 +1108,7 @@ removalAbility printing = case Face.activatedAbilities (S.combinedFace printing)
 -- That ability's "target" slot: CR 601.2c's narrowing, reached for an
 -- activated ability through CR 602.2b, which for this card is Pool.Creatures
 -- under `Or [IsAttacking, IsBlocking]`.
-removalTargetSlot :: ActivatedAbility.ActivatedAbility Card.Type.Card -> Maybe TargetSlot.TargetSlot
+removalTargetSlot :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe TargetSlot.TargetSlot
 removalTargetSlot ability =
   Map.lookup
     (SlotName.MkSlotName (Text.pack "target"))
@@ -1150,7 +1151,7 @@ skophosBoard labyrinth land who mine theirs =
 -- hung the suite instead of failing it, which is not a test.
 mazeAnswer ::
   ObjectId.ObjectId ->
-  ActivatedAbility.ActivatedAbility Card.Type.Card ->
+  ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) ->
   ObjectId.ObjectId ->
   Prompt.Prompt r ->
   State.State Bool r
@@ -1280,7 +1281,7 @@ effectRemovalSpec s registry = Spec.describe s "EffectRemoval" $ do
 
 -- Save Point's only activated ability, read off the JSON-loaded printing for
 -- removalAbility's reason.
-savePointAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+savePointAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 savePointAbility printing = case Face.activatedAbilities (S.combinedFace printing) of
   [ability] -> Just ability
   _ -> Nothing
@@ -1291,7 +1292,7 @@ savePointAbility printing = case Face.activatedAbilities (S.combinedFace printin
 -- explain a leg where it did not.
 savePointAnswer ::
   ObjectId.ObjectId ->
-  ActivatedAbility.ActivatedAbility Card.Type.Card ->
+  ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) ->
   Prompt.Prompt r ->
   State.State Bool r
 savePointAnswer pointId ability p = case p of

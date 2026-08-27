@@ -27,13 +27,18 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 cardCodec :: Codec.Codec Text.Text
 cardCodec = Common.text
 
-codec :: Codec.Codec (Modal.Modal Text.Text)
-codec = Modal.codec cardCodec
+-- | And the `ability` parameter likewise: it too is reached only through the
+-- codec supplied here, so any type proves the shape.
+abilityCodec :: Codec.Codec Text.Text
+abilityCodec = Common.text
 
-toJson :: Modal.Modal Text.Text -> Value.Value
+codec :: Codec.Codec (Modal.Modal Text.Text Text.Text)
+codec = Modal.codec cardCodec abilityCodec
+
+toJson :: Modal.Modal Text.Text Text.Text -> Value.Value
 toJson = Codec.encode codec
 
-fromJson :: Value.Value -> Either Text.Text (Modal.Modal Text.Text)
+fromJson :: Value.Value -> Either Text.Text (Modal.Modal Text.Text Text.Text)
 fromJson = Codec.decode codec
 
 -- One constructor, so three cases: a populated payload in CR 700.2's non-modal

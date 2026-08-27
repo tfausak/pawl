@@ -5,6 +5,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
@@ -43,7 +44,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- channel rather than a binding on an object, because a shielded player has no
 -- object to bind it to.
 data PreventionRider = MkPreventionRider
-  { effects :: Seq.Seq (Effect.Effect Card.Card),
+  { effects :: Seq.Seq (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)),
     targets :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient),
     controller :: PlayerId.PlayerId,
     source :: ObjectId.ObjectId

@@ -35,6 +35,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
@@ -64,10 +65,10 @@ import qualified Pawl.Types.Zone as Zone
 -- needs the same one and cannot come through here -- CR 605.3b is why
 -- activatableGiven refuses a mana ability outright. All that is left on this
 -- side is handing over the ability's cost.
-sicknessOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
+sicknessOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState -> Bool
 sicknessOk = sicknessOkGiven Map.empty
 
-sicknessOkGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
+sicknessOkGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState -> Bool
 sicknessOkGiven pcs pid srcId ability =
   Cost.sicknessOkGiven pcs pid srcId (ActivatedAbility.cost ability)
 
@@ -104,7 +105,7 @@ sicknessOkGiven pcs pid srcId ability =
 -- reaches Projection.project for itself, as do sicknessOk above and
 -- activatable's membership check when called the same way. The ENUMERATION path
 -- goes through abilitiesForGiven instead.
-abilitiesFor :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
+abilitiesFor :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)]
 abilitiesFor = abilitiesForGiven Map.empty
 
 -- The ...Given half of the pair, and the one the enumeration calls:
@@ -112,7 +113,7 @@ abilitiesFor = abilitiesForGiven Map.empty
 -- re-derives a projection per object. Only the battlefield arm reads that board
 -- at all -- a hand or graveyard object's absence from it is not a miss (#1859; see
 -- Projection.projectGiven).
-abilitiesForGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
+abilitiesForGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)]
 abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) of
   -- Filtered by CR 113.6m's "functions ONLY in that zone", exactly as the
   -- graveyard arm below is. For an ability whose COST names another zone the
@@ -148,7 +149,7 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
 --
 -- Nothing for every other zone, matching abilitiesForGiven's silence there: no
 -- rule-702 keyword mints an activated ability outside a hand or the battlefield.
-familyGrantingGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> ActivatedAbility.ActivatedAbility Card.Card -> Maybe KeywordFamily.KeywordFamily
+familyGrantingGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Maybe KeywordFamily.KeywordFamily
 familyGrantingGiven pcs oid gs ability = case fmap Object.zone (Game.lookupObject oid gs) of
   Just Zone.Battlefield -> Keyword.familyGranting (Projection.keywordsGiven pcs oid gs) ability
   Just Zone.Hand -> case Game.faceOf oid gs of
@@ -158,7 +159,7 @@ familyGrantingGiven pcs oid gs ability = case fmap Object.zone (Game.lookupObjec
 
 -- familyGrantingGiven off this object's own board -- `activatable`'s pairing, and
 -- activateAbility's, neither of which is inside an enumeration.
-familyGranting :: ObjectId -> GameState -> ActivatedAbility.ActivatedAbility Card.Card -> Maybe KeywordFamily.KeywordFamily
+familyGranting :: ObjectId -> GameState -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Maybe KeywordFamily.KeywordFamily
 familyGranting = familyGrantingGiven Map.empty
 
 -- CR 113.6j + CR 113.6m + CR 702.178b: the AUTHORED abilities a card outside the
@@ -201,7 +202,7 @@ familyGranting = familyGrantingGiven Map.empty
 --
 -- The VIEW is Projection.fullView, matching Projection.abilitiesGiven: nothing
 -- here is inside the layer fold, so there is no circularity to bound against.
-zoneAbilitiesOf :: Zone.Zone -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
+zoneAbilitiesOf :: Zone.Zone -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)]
 zoneAbilitiesOf zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs) of
   (Just face, Just obj) ->
     let functionsHere = functionsIn zone
@@ -243,7 +244,7 @@ zoneAbilitiesOf zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs
 -- be ORDER-sensitive across the cost and the effects, and its
 -- delayed-triggered-ability sentence (#819). The clause's Aura half needs a
 -- trigger condition and so belongs to the triggered reading alone.
-zoneFunctionedFrom :: ActivatedAbility.ActivatedAbility Card.Card -> Maybe Zone.Zone
+zoneFunctionedFrom :: ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Maybe Zone.Zone
 zoneFunctionedFrom ability =
   case Cost.zoneFunctionedFrom (ActivatedAbility.cost ability) of
     Just zone -> Just zone
@@ -256,7 +257,7 @@ zoneFunctionedFrom ability =
 -- which CR 113.6's default puts on the battlefield -- so this is only ever asked
 -- of a zone abilitiesForGiven has already decided is a zone abilities are read
 -- from, and never of a library or a stack.
-functionsIn :: Zone.Zone -> ActivatedAbility.ActivatedAbility Card.Card -> Bool
+functionsIn :: Zone.Zone -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Bool
 functionsIn zone ability = case zoneFunctionedFrom ability of
   Nothing -> zone == Zone.Battlefield
   Just named -> zone == named
@@ -302,7 +303,7 @@ activatorOfGiven grants oid gs = case Game.lookupObject oid gs of
 -- The once-per-turn clause is a fold over the CR 608.2i log rather than a stamp,
 -- and it is keyed on the PERMANENT and not on the player: an opponent who
 -- somehow activated it first has used the permanent's one activation.
-loyaltyOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
+loyaltyOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState -> Bool
 loyaltyOk pid srcId ability gs =
   not (Cost.isLoyaltyCost (ActivatedAbility.cost ability))
     || (Turn.sorcerySpeedWindow pid gs && not (loyaltyActivatedThisTurn srcId gs))
@@ -410,7 +411,7 @@ recipientObjects = Set.fromList . concatMap (Maybe.mapMaybe Recipient.objectOf .
 -- Only the FILLABLE modes (CR 700.2a), which is the set activatableGiven's mode
 -- conjunct measures: a slot belonging to a mode this board cannot choose is not
 -- a target this activation could name.
-candidateTargetsGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Target.Pools -> PlayerId -> ObjectId -> Modal.Type.Modal Card.Card -> Set.Set ModeIndex.ModeIndex -> GameState -> Set.Set ObjectId
+candidateTargetsGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Target.Pools -> PlayerId -> ObjectId -> Modal.Type.Modal Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Set.Set ModeIndex.ModeIndex -> GameState -> Set.Set ObjectId
 candidateTargetsGiven pcs grants pools pid srcId modal fillable gs =
   let slotsOf mi = Modal.modesTargetSlots (Seq.singleton mi) modal
       setsOf slots = Target.legalSetsGiven pcs grants pools (Just pid) Map.empty srcId slots gs
@@ -476,12 +477,12 @@ affordableX candidates family pid srcId gs cost = Cost.greatestPayableX Nothing 
 -- nothing, and it makes the plain path a genuinely independent computation a
 -- differential test could hold the threaded one against -- its `sources` is
 -- built off that same Map.empty for the same reason.
-activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
+activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState -> Bool
 activatable pid srcId ability gs =
   let grants = Projection.controlGrants gs
    in activatableGiven grants Map.empty (Target.poolsGiven Map.empty gs) (Cost.supplyManaSourcesGiven grants Map.empty pid gs) pid srcId ability gs
 
-activatableGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Target.Pools -> [ObjectId] -> PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
+activatableGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Target.Pools -> [ObjectId] -> PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState -> Bool
 activatableGiven grants pcs pools sources pid srcId ability gs =
   let modal = ActivatedAbility.modal ability
       fillable = Target.fillableModesGiven pcs grants pools (Just pid) Map.empty srcId Map.empty modal gs
@@ -558,7 +559,7 @@ revealIfHidden pid srcId = do
 -- an activation the engine refused revealed nothing, and must leave no reveal
 -- in the log claiming otherwise. Everything else reads `gs`, the state as of the
 -- announcement.
-activateAbility :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> Game ()
+activateAbility :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Game ()
 activateAbility pid srcId ability = do
   before <- State.get
   -- CR 602.2a's own order: the reveal is part of announcing, and so precedes

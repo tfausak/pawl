@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.SlotName as SlotName
@@ -42,7 +43,7 @@ import qualified Pawl.Types.TurnWindow as TurnWindow
 -- card data says "this turn", and the game remembers whose turn and when. It is
 -- armed by Pawl.Engine.Expiry.arm exactly as a continuous effect's is.
 data DelayedTrigger = MkDelayedTrigger
-  { ability :: TriggeredAbility.TriggeredAbility Card.Card,
+  { ability :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card),
     source :: ObjectId.ObjectId,
     controller :: PlayerId.PlayerId,
     bindings :: Map.Map SlotName.SlotName Binding.Binding,

@@ -17,7 +17,7 @@ spec s = Spec.describe s "Pawl.Codec.ModifyTarget" $ do
   Spec.it s "MkModifyTarget, all three keys" $
     Common.assertCodec
       s
-      ModifyTarget.codec
+      (ModifyTarget.codec Common.text)
       ( ModifyTarget.MkModifyTarget
           { ModifyTarget.duration = Duration.UntilEndOfTurn,
             ModifyTarget.modification = Modification.GainKeyword Keyword.Flying,
@@ -25,4 +25,4 @@ spec s = Spec.describe s "Pawl.Codec.ModifyTarget" $ do
           }
       )
       " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"modification\":{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
-  Spec.it s "has a schema" $ Common.assertHasSchema s ModifyTarget.codec
+  Spec.it s "has a schema" $ Common.assertHasSchema s (ModifyTarget.codec Common.text)

@@ -3,6 +3,7 @@ module Pawl.Codec.PrintedReplacementSpec where
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Effect as Effect
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.PrintedReplacement as PrintedReplacement
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -71,4 +72,4 @@ spec s = Spec.describe s "Pawl.Codec.PrintedReplacement" $ do
   where
     -- The effect codec the card boundary would pass in (CR 615.5's riders ride
     -- the DamageR arm underneath).
-    codec = PrintedReplacement.codec (Effect.codec Card.codec)
+    codec = PrintedReplacement.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))

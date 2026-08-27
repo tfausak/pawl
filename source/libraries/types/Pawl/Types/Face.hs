@@ -36,6 +36,7 @@ import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRestriction as EntryRestriction
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
@@ -122,19 +123,19 @@ data Face card = MkFace
     -- resolves, as one or more modes (CR 700.2). A non-modal card is a single mode
     -- with ChooseExactly 1 (forced, unprompted); a land or vanilla creature is a
     -- single EMPTY mode. Pawl.Types.Card ties Modal's `card` knot at `Modal Card`.
-    spell :: Modal.Modal card,
+    spell :: Modal.Modal card (GrantedAbility.GrantedAbility card),
     -- | CR 602: this face's printed activated abilities. The closed half reads
     -- these through Pawl.Engine.Projection.abilitiesOf, never directly: layer 6
     -- (Humility) removes abilities.
-    activatedAbilities :: [ActivatedAbility.ActivatedAbility card],
+    activatedAbilities :: [ActivatedAbility.ActivatedAbility card (GrantedAbility.GrantedAbility card)],
     -- | CR 614: this face's replacement effects, active while it is on the
     -- battlefield. Read through Pawl.Engine.Projection.replacementsOf (never
     -- directly) so layer 6 LoseAllAbilities strips them uniformly, and so CR
     -- 604.2's "as long as" clause on each is asked against the live board.
-    replacementEffects :: [PrintedReplacement.PrintedReplacement (Effect.Effect card)],
+    replacementEffects :: [PrintedReplacement.PrintedReplacement (Effect.Effect card (GrantedAbility.GrantedAbility card))],
     -- | CR 603: this face's triggered abilities, read through
     -- Pawl.Engine.Projection.triggeredAbilitiesOf.
-    triggeredAbilities :: [TriggeredAbility.TriggeredAbility card],
+    triggeredAbilities :: [TriggeredAbility.TriggeredAbility card (GrantedAbility.GrantedAbility card)],
     -- | CR 603.7: this face's DELAYED triggered abilities, keyed by name -- the
     -- payloads an Effect.ArmDelayedTrigger in this face's own text arms. Card
     -- DATA, not an opcode payload: Effect is first-order and non-recursive
@@ -144,7 +145,7 @@ data Face card = MkFace
     -- Read straight from the card, never through the projection: a delayed
     -- ability is not ON the source object -- CR 603.7d gives it no source
     -- permanent to lose, so layer 6 cannot strip it.
-    delayedAbilities :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card),
+    delayedAbilities :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card (GrantedAbility.GrantedAbility card)),
     -- | CR 309.4: this face's rooms, topmost first -- the room graph of a dungeon
     -- card, and empty for every card that is not a dungeon. The CardSpec lint
     -- family holds that biconditional in both directions, as it does for loyalty
@@ -471,7 +472,7 @@ data Face card = MkFace
 --
 -- Its selection must agree with Pawl.Codec.Modal.defaultSelection, or the
 -- "selection" key would be written out for every vanilla card in the corpus.
-defaultSpell :: Modal.Modal card
+defaultSpell :: Modal.Modal card (GrantedAbility.GrantedAbility card)
 defaultSpell =
   Modal.MkModal
     (Seq.singleton (Mode.MkMode Seq.empty Map.empty))

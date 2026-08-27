@@ -23,7 +23,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 codec :: Codec.Codec (GrantedAbility.GrantedAbility Text.Text)
 codec = GrantedAbility.codec Common.text
 
-emptyModal :: Modal.Modal Text.Text
+emptyModal :: Modal.Modal Text.Text (GrantedAbility.GrantedAbility Text.Text)
 emptyModal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)
 
 -- Both arms, since the whole point of the type is that CR 613.1f's grant reaches

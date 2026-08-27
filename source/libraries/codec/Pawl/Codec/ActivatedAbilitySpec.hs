@@ -37,13 +37,18 @@ import qualified Pawl.Types.TurnScope as TurnScope
 cardCodec :: Codec.Codec Text.Text
 cardCodec = Common.text
 
-codec :: Codec.Codec (ActivatedAbility.ActivatedAbility Text.Text)
-codec = ActivatedAbility.codec cardCodec
+-- | And the `ability` parameter likewise: it too is reached only through the
+-- codec supplied here, so any type proves the shape.
+abilityCodec :: Codec.Codec Text.Text
+abilityCodec = Common.text
 
-toJson :: ActivatedAbility.ActivatedAbility Text.Text -> Value.Value
+codec :: Codec.Codec (ActivatedAbility.ActivatedAbility Text.Text Text.Text)
+codec = ActivatedAbility.codec cardCodec abilityCodec
+
+toJson :: ActivatedAbility.ActivatedAbility Text.Text Text.Text -> Value.Value
 toJson = Codec.encode codec
 
-fromJson :: Value.Value -> Either Text.Text (ActivatedAbility.ActivatedAbility Text.Text)
+fromJson :: Value.Value -> Either Text.Text (ActivatedAbility.ActivatedAbility Text.Text Text.Text)
 fromJson = Codec.decode codec
 
 -- One constructor, so three cases: rule 702.6a's equip ability as

@@ -3,6 +3,7 @@
 module Pawl.Codec.InherentTriggerSource where
 
 import qualified Pawl.Codec.Card as Card
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -15,7 +16,7 @@ import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 codec :: Codec.Codec InherentTriggerSource.InherentTriggerSource
 codec = Fields.object $ do
   controller <- Fields.required "controller" PlayerId.codec InherentTriggerSource.controller
-  ability <- Fields.required "ability" (TriggeredAbility.codec Card.codec) InherentTriggerSource.ability
+  ability <- Fields.required "ability" (TriggeredAbility.codec Card.codec (GrantedAbility.codec Card.codec)) InherentTriggerSource.ability
   pure
     InherentTriggerSource.MkInherentTriggerSource
       { InherentTriggerSource.controller = controller,

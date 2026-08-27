@@ -46,6 +46,7 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -94,7 +95,7 @@ modeTargetSlot printing idx = case fmap Map.elems (Card.modeTargetSlots idx (S.c
 -- Same shape as ActivateSpec.theAbility -- duplicated per this test suite's
 -- existing convention of group-local helpers (ActivateSpec, ReplacementSpec)
 -- rather than centralizing a helper this small in Support.
-theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing Nothing
@@ -114,7 +115,7 @@ permanentAbility = 1
 -- single one", which Ersatz Gnomes' two do not fit. Nothing when the index is
 -- out of range; the callers assert on that rather than falling back to an
 -- ability that would make their assertions vacuous.
-abilityAt :: Int -> Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+abilityAt :: Int -> Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 abilityAt i p = case drop i (Face.activatedAbilities (S.combinedFace p)) of
   ab : _ -> Just ab
   [] -> Nothing

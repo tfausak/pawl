@@ -72,6 +72,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Modification as Modification
@@ -88,7 +89,7 @@ import qualified Pawl.Types.Zone as Zone
 -- The one target slot a single-slot card or ability declares, read out of the
 -- committed printing (S.spellTargetSlot's rationale) but keyed by COUNT rather
 -- than by slot name: Cancel calls its slot "spell", not "target".
-soleTargetSlot :: Modal.Modal Card.Type.Card -> Maybe TargetSlot.TargetSlot
+soleTargetSlot :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe TargetSlot.TargetSlot
 soleTargetSlot modal = case Map.elems (Modal.allTargetSlots modal) of
   [only] -> Just only
   _ -> Nothing
@@ -105,7 +106,7 @@ triggerTargetSlot printing = case Face.triggeredAbilities (S.combinedFace printi
 -- any other printing, so a card that grew a second ability fails the case that
 -- names it rather than silently picking whichever came first -- soleTargetSlot
 -- above is the same shape for the same reason.
-soleActivatedAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+soleActivatedAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 soleActivatedAbility p = case Face.activatedAbilities (S.combinedFace p) of
   [only] -> Just only
   _ -> Nothing

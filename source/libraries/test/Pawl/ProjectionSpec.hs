@@ -65,6 +65,7 @@ import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Layer as Layer
@@ -3896,7 +3897,7 @@ isActivateOfOgre oid action = case action of
 -- The single activated ability of a printing. Total: every caller below names a
 -- printing with exactly one, and a fallback that answered some other ability
 -- would make the case pass for the wrong reason.
-soleActivatedAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card
+soleActivatedAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 soleActivatedAbility printing = case Face.activatedAbilities (S.combinedFace printing) of
   [ability] -> ability
   _ -> error "Pawl.ProjectionSpec: expected exactly one activated ability"

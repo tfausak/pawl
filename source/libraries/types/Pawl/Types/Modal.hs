@@ -9,8 +9,8 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 -- at least one mode; the codec rejects an empty modes array, the UnsafeX/textToX
 -- posture -- there is no NonEmpty Seq in base). A non-modal payload is one Mode with
 -- ChooseExactly 1.
-data Modal card = MkModal
-  { modes :: Seq.Seq (Mode.Mode card),
+data Modal card ability = MkModal
+  { modes :: Seq.Seq (Mode.Mode card ability),
     selection :: ModeSelection.ModeSelection
   }
   deriving (Eq, Ord, Show)

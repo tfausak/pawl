@@ -31,12 +31,12 @@ import Pawl.Types.TargetSlot (TargetSlot)
 -- the unit of choice but resolution is not in play, where flattening would fuse
 -- two alternatives into one. selectionEffects just below is what CR 700.2's
 -- selection makes of it, and is what Pawl.Engine.Mana reads.
-modeEffects :: Modal.Modal card -> [[Effect card]]
+modeEffects :: Modal.Modal card ability -> [[Effect card ability]]
 modeEffects m = fmap (Foldable.toList . Mode.allEffects) (Foldable.toList (Modal.modes m))
 
 -- Every effect across all modes, printed (mode, then written) order (CR
 -- 608.2c).
-allEffects :: Modal.Modal card -> [Effect card]
+allEffects :: Modal.Modal card ability -> [Effect card ability]
 allEffects m = concat (modeEffects m)
 
 -- CR 700.2/700.2a: every way this payload's SELECTION could be satisfied -- one
@@ -55,7 +55,7 @@ allEffects m = concat (modeEffects m)
 -- Every size the instruction allows, so a RANGE ("Choose one or both")
 -- contributes the selections of each size -- one mode alone adds less mana than
 -- both together, and both are ways the one activation could go.
-selectionEffects :: Modal.Modal card -> [[Effect card]]
+selectionEffects :: Modal.Modal card ability -> [[Effect card ability]]
 selectionEffects m = fmap concat (concatMap (\n -> enumerate n (modeEffects m)) (selectionSizes (Modal.selection m)))
   where
     enumerate = if allowsRepeats m then combinationsWithRepeats else combinations
@@ -94,7 +94,7 @@ combinationsWithRepeats n xs
 -- modes, and that is CHECKED rather than merely intended: a CardSpec lint
 -- rejects the card whose two modes declare one name, which this union would
 -- otherwise collapse into a single entry.
-allTargetSlots :: Modal.Modal card -> Map SlotName TargetSlot
+allTargetSlots :: Modal.Modal card ability -> Map SlotName TargetSlot
 allTargetSlots m = Map.unions (fmap Mode.targetSlots (Foldable.toList (Modal.modes m)))
 
 -- CR 700.2d: the slot a given INSTANCE of a chosen mode fills. "If that mode
@@ -129,7 +129,7 @@ instanceSlot mi slot = case ModeInstance.occurrence mi of
 -- neither question where it belongs. The instance rides along so the prompt can
 -- name which mode is asking and so the resolver can find that instance's own
 -- slots.
-chosenModes :: Seq.Seq ModeIndex.ModeIndex -> Modal.Modal card -> [(ModeInstance.ModeInstance, Mode.Mode card)]
+chosenModes :: Seq.Seq ModeIndex.ModeIndex -> Modal.Modal card ability -> [(ModeInstance.ModeInstance, Mode.Mode card ability)]
 chosenModes chosen m =
   let modeAt mi = fmap ((,) mi) (modeAtIndex (ModeInstance.index mi) m)
    in Maybe.mapMaybe modeAt (instancesOf chosen)
@@ -146,7 +146,7 @@ instancesOf chosen =
    in number Map.empty (List.sort (Foldable.toList chosen))
 
 -- One mode by index, or Nothing when the index is out of range (total).
-modeAtIndex :: ModeIndex.ModeIndex -> Modal.Modal card -> Maybe (Mode.Mode card)
+modeAtIndex :: ModeIndex.ModeIndex -> Modal.Modal card ability -> Maybe (Mode.Mode card ability)
 modeAtIndex (ModeIndex.MkModeIndex n) m = Seq.lookup (Natural.toIntSaturating n) (Modal.modes m)
 
 -- CR 608.2c/700.2: only the CHOSEN modes' effects, flattened in ModeIndex then
@@ -154,7 +154,7 @@ modeAtIndex (ModeIndex.MkModeIndex n) m = Seq.lookup (Natural.toIntSaturating n)
 -- 700.2d). A CLASSIFICATION read -- what effects these modes hold, of the kind
 -- Pawl.Engine.ManaAbility asks -- where optionality is not part of the question;
 -- resolution goes through chosenModes instead.
-modesEffects :: Seq.Seq ModeIndex.ModeIndex -> Modal.Modal card -> [Effect card]
+modesEffects :: Seq.Seq ModeIndex.ModeIndex -> Modal.Modal card ability -> [Effect card ability]
 modesEffects chosen m = concatMap (Foldable.toList . Mode.allEffects . snd) (chosenModes chosen m)
 
 -- CR 601.2c/700.2c: only the CHOSEN modes' target slots (union), each instance's
@@ -163,13 +163,13 @@ modesEffects chosen m = concatMap (Foldable.toList . Mode.allEffects . snd) (cho
 -- rather than a latent one -- so the CardSpec lint keeps a card whose modes share
 -- a slot name out of the pool, and instanceSlot keeps one mode's repeats from
 -- colliding with themselves.
-modesTargetSlots :: Seq.Seq ModeIndex.ModeIndex -> Modal.Modal card -> Map SlotName TargetSlot
+modesTargetSlots :: Seq.Seq ModeIndex.ModeIndex -> Modal.Modal card ability -> Map SlotName TargetSlot
 modesTargetSlots chosen m = Map.unions (fmap (\mi -> instanceTargetSlots mi m) (instancesOf chosen))
 
 -- One chosen instance's target slots, renamed under that instance's slot names.
 -- The inverse of the projection instanceView applies before running the
 -- instance's effects, which still read the printed names.
-instanceTargetSlots :: ModeInstance.ModeInstance -> Modal.Modal card -> Map SlotName TargetSlot
+instanceTargetSlots :: ModeInstance.ModeInstance -> Modal.Modal card ability -> Map SlotName TargetSlot
 instanceTargetSlots mi m =
   Map.mapKeys (instanceSlot mi) (maybe Map.empty Mode.targetSlots (modeAtIndex (ModeInstance.index mi) m))
 
@@ -210,7 +210,7 @@ instanceView allSlots mi printed env =
 
 -- The target slots of one mode by index (CR 700.2c: only the chosen mode's
 -- slots). Nothing if the index is out of range (total).
-modeTargetSlots :: ModeIndex.ModeIndex -> Modal.Modal card -> Maybe (Map SlotName TargetSlot)
+modeTargetSlots :: ModeIndex.ModeIndex -> Modal.Modal card ability -> Maybe (Map SlotName TargetSlot)
 modeTargetSlots (ModeIndex.MkModeIndex n) m =
   fmap Mode.targetSlots (Seq.lookup (Natural.toIntSaturating n) (Modal.modes m))
 
@@ -251,7 +251,7 @@ selectionSizes :: ModeSelection.ModeSelection -> [Natural]
 selectionSizes selection = [leastOf selection .. mostOf selection]
 
 -- allowsRepeatsIn over the payload's own printed selection.
-allowsRepeats :: Modal.Modal card -> Bool
+allowsRepeats :: Modal.Modal card ability -> Bool
 allowsRepeats = allowsRepeatsIn . Modal.selection
 
 -- CR 700.2a/700.2b: the selection a player has NO choice about, if there is one
@@ -320,5 +320,5 @@ selectionSatisfiedBy legal selection chosen =
 -- selection demands. CR 702.42a's entwine is what asks it: this is the count
 -- Pawl.Engine.Cast substitutes for selectionCount when the entwine cost is
 -- paid.
-modeCount :: Modal.Modal card -> Natural
+modeCount :: Modal.Modal card ability -> Natural
 modeCount = Natural.length . Modal.modes

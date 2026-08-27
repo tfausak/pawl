@@ -36,6 +36,7 @@ import qualified Pawl.Codec.Defense as Defense
 import qualified Pawl.Codec.DungeonRoom as DungeonRoom
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.EntryRestriction as EntryRestriction
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.HandAction as HandAction
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
@@ -85,12 +86,12 @@ codec cardCodec = Fields.object $ do
   enchant <- Fields.defaulted "enchant" [] (Common.list TargetSlot.codec) Face.enchant
   keywords <- Fields.defaulted "keywords" Set.empty (Common.set Keyword.codec) Face.keywords
   colorIndicator <- Fields.defaulted "colorIndicator" Set.empty (Common.set Color.codec) Face.colorIndicator
-  spell <- Fields.defaulted "spell" Face.defaultSpell (Modal.codec cardCodec) Face.spell
+  spell <- Fields.defaulted "spell" Face.defaultSpell (Modal.codec cardCodec (GrantedAbility.codec cardCodec)) Face.spell
   staticAbilities <- Fields.defaulted "staticAbilities" [] (Common.list (StaticAbility.codec cardCodec)) Face.staticAbilities
-  activatedAbilities <- Fields.defaulted "activatedAbilities" [] (Common.list (ActivatedAbility.codec cardCodec)) Face.activatedAbilities
-  replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (PrintedReplacement.codec (Effect.codec cardCodec))) Face.replacementEffects
-  triggeredAbilities <- Fields.defaulted "triggeredAbilities" [] (Common.list (TriggeredAbility.codec cardCodec)) Face.triggeredAbilities
-  delayedAbilities <- Fields.defaulted "delayedAbilities" Map.empty (TriggeredAbility.codecDelayed cardCodec) Face.delayedAbilities
+  activatedAbilities <- Fields.defaulted "activatedAbilities" [] (Common.list (ActivatedAbility.codec cardCodec (GrantedAbility.codec cardCodec))) Face.activatedAbilities
+  replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (PrintedReplacement.codec (Effect.codec cardCodec (GrantedAbility.codec cardCodec)))) Face.replacementEffects
+  triggeredAbilities <- Fields.defaulted "triggeredAbilities" [] (Common.list (TriggeredAbility.codec cardCodec (GrantedAbility.codec cardCodec))) Face.triggeredAbilities
+  delayedAbilities <- Fields.defaulted "delayedAbilities" Map.empty (TriggeredAbility.codecDelayed cardCodec (GrantedAbility.codec cardCodec)) Face.delayedAbilities
   -- CR 309.4: the rooms of a dungeon card, topmost first.
   rooms <- Fields.defaulted "rooms" Seq.empty (Common.seq (DungeonRoom.codec cardCodec)) Face.rooms
   castingPermissions <- Fields.defaulted "castingPermissions" [] (Common.list CastingPermission.codec) Face.castingPermissions

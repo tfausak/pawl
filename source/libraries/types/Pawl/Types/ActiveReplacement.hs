@@ -6,6 +6,7 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PreventionRider as PreventionRider
@@ -53,7 +54,7 @@ import qualified Pawl.Types.Uses as Uses
 -- self-replacement effect to a resolving spell or ability, ruling static
 -- replacement abilities out.
 data ActiveReplacement = MkActiveReplacement
-  { effect :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card),
+  { effect :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)),
     source :: ObjectId.ObjectId,
     -- | CR 109.5's "you", BAKED as the row is installed rather than re-derived
     -- from `source`, the same posture Pawl.Types.ContinuousEffect and

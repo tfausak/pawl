@@ -27,6 +27,7 @@ import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Modal as Modal
@@ -66,7 +67,7 @@ import qualified Pawl.Types.Zone as Zone
 -- clause. Stack.resolveTop's OfInherentTrigger arm applies CR 608.2a's
 -- resolution recheck to any inherent ability that HAS one (CR 702.179d's does),
 -- so this is a fact about rule 725.2 rather than a licence the arm relies on.
-oneEffect :: TriggerCondition -> Effect.Effect Card -> TriggeredAbility Card
+oneEffect :: TriggerCondition -> Effect.Effect Card (GrantedAbility.GrantedAbility Card) -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 oneEffect cond eff =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = cond,
@@ -81,7 +82,7 @@ oneEffect cond eff =
 -- CR 725.2's end step draw. Controller-scoped to the monarch, so
 -- ControllersTurn plus the monarch as "you" is exactly the monarch's own end
 -- step.
-endStepDraw :: TriggeredAbility Card
+endStepDraw :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 endStepDraw =
   oneEffect
     (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) TurnScope.ControllersTurn))
@@ -89,14 +90,14 @@ endStepDraw =
 
 -- CR 725.2's crown steal. Controlled by the current monarch; makes a DIFFERENT
 -- player (the damager's controller) the monarch.
-crownSteal :: TriggeredAbility Card
+crownSteal :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 crownSteal =
   oneEffect
     TriggerCondition.CreatureDealtCombatDamageToMonarch
     (Effect.BecomeMonarch MonarchTarget.ControllerOfSource)
 
 -- The monarch's inherent abilities, present only while there is a monarch.
-monarchAbilities :: [TriggeredAbility Card]
+monarchAbilities :: [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 monarchAbilities = [endStepDraw, crownSteal]
 
 -- CR 725.2: match one inherent ability against one event for the given monarch

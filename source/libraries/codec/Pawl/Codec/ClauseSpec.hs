@@ -34,13 +34,18 @@ import qualified Pawl.Types.SlotName as SlotName
 cardCodec :: Codec.Codec Text.Text
 cardCodec = Common.text
 
-codec :: Codec.Codec (Clause.Clause Text.Text)
-codec = Clause.codec cardCodec
+-- | And the `ability` parameter likewise: it too is reached only through the
+-- codec supplied here, so any type proves the shape.
+abilityCodec :: Codec.Codec Text.Text
+abilityCodec = Common.text
 
-toJson :: Clause.Clause Text.Text -> Value.Value
+codec :: Codec.Codec (Clause.Clause Text.Text Text.Text)
+codec = Clause.codec cardCodec abilityCodec
+
+toJson :: Clause.Clause Text.Text Text.Text -> Value.Value
 toJson = Codec.encode codec
 
-fromJson :: Value.Value -> Either Text.Text (Clause.Clause Text.Text)
+fromJson :: Value.Value -> Either Text.Text (Clause.Clause Text.Text Text.Text)
 fromJson = Codec.decode codec
 
 -- One constructor, so seven cases: a populated clause, CR 603.5's `optionality`

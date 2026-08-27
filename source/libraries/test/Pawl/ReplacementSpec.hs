@@ -84,6 +84,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.LifeChange as LifeChange
@@ -135,7 +136,7 @@ answersFor answer gs game = snd (Replay.record answer gs game)
 -- existing convention of group-local helpers (ActivateSpec and ManaSpec
 -- already duplicate singleModeAbility the same way) rather than centralizing
 -- a helper this small in Support.
-theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card
+theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing Nothing
@@ -6418,7 +6419,7 @@ castColdsteel mountain coldsteel pick =
 
 -- Take the candidate carrying `rewrite`. Total, falling back on the canonical
 -- first the way the engine's own out-of-range handling does.
-pickRewrite :: EntryRewrite.EntryRewrite (Effect.Effect Card.Card) -> [ReplacementEntry.ReplacementEntry] -> Natural.Natural
+pickRewrite :: EntryRewrite.EntryRewrite (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)) -> [ReplacementEntry.ReplacementEntry] -> Natural.Natural
 pickRewrite rewrite entries =
   let wanted e = ReplacementEntry.effect e == ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource rewrite)
    in maybe 0 Int.toNaturalSaturating (List.findIndex wanted entries)

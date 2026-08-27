@@ -5,6 +5,7 @@ module Pawl.Codec.DungeonRoom where
 import qualified Data.Set as Set
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.AbilityName as AbilityName
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.Modal as Modal
 import qualified Pawl.Codec.RoomIndex as RoomIndex
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -21,7 +22,7 @@ codec cardCodec = Fields.object $ do
   -- CR 309.4c: a room whose printed effect pawl cannot express writes no
   -- ability, and the default is Face.defaultSpell -- one empty mode, the same
   -- value a vanilla creature's spell takes.
-  ability <- Fields.defaulted "ability" Face.defaultSpell (Modal.codec cardCodec) DungeonRoom.ability
+  ability <- Fields.defaulted "ability" Face.defaultSpell (Modal.codec cardCodec (GrantedAbility.codec cardCodec)) DungeonRoom.ability
   -- CR 309.4: the bottommost room has no arrows out of it, so an empty set is
   -- the common case and writes no key.
   exits <- Fields.defaulted "exits" Set.empty (Common.set RoomIndex.codec) DungeonRoom.exits

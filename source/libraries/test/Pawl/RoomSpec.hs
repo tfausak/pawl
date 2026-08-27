@@ -77,6 +77,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -185,7 +186,7 @@ unlocksOffered gs = [(o, n) | A.Unlock o n <- Action.legalActions S.alice gs]
 -- Keys to the House's SECOND ability, "{3}, {T}, Sacrifice this artifact: Lock
 -- or unlock a door of target Room you control. Activate only as a sorcery." The
 -- first is an ordinary basic-land tutor and shares nothing with rule 709.5.
-lockAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+lockAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 lockAbility keys = case drop 1 (Face.activatedAbilities (S.combinedFace keys)) of
   ability : _ -> ability
   -- Unreachable: the printing has two. A no-mode ability with an unpayable cost

@@ -1,6 +1,7 @@
 module Pawl.Types.TriggerEntry where
 
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
@@ -45,6 +46,6 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 -- increase identical; as values the three abilities differ.
 data TriggerEntry = MkTriggerEntry
   { source :: TriggerSource.TriggerSource,
-    ability :: TriggeredAbility.TriggeredAbility Card.Card
+    ability :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
   }
   deriving (Eq, Ord, Show)

@@ -2,6 +2,7 @@ module Pawl.Types.PermanentCandidate where
 
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InstanceOrdinal as InstanceOrdinal
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -15,7 +16,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 -- payload a codec needs.
 data PermanentCandidate = MkPermanentCandidate
   { source :: ObjectId.ObjectId,
-    effect :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card),
+    effect :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)),
     ordinal :: InstanceOrdinal.InstanceOrdinal
   }
   deriving (Eq, Ord, Show)

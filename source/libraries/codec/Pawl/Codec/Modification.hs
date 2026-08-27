@@ -1,7 +1,6 @@
 module Pawl.Codec.Modification where
 
 import qualified Data.Typeable as Typeable
-import qualified Data.Void as Void
 import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.ChangeSubtypeWord as ChangeSubtypeWord
@@ -24,22 +23,13 @@ import qualified Pawl.Types.Modification as Modification
 -- Takes the codec for the GRANTED ABILITY rather than for a card, since that is
 -- what Pawl.Types.Modification is parametric in -- and because naming
 -- Pawl.Codec.GrantedAbility here would close the same module cycle the type's
--- own parameter opens. 'grantless' below is this codec at the one position that
--- cannot hold a grant.
+-- own parameter opens.
 codec :: (Typeable.Typeable ability, Eq ability) => Codec.Codec ability -> Codec.Codec (Modification.Modification ability)
 codec abilityCodec =
   Arm.tagged
     ( Arm.payload "GainAbility" abilityCodec Modification.GainAbility (\x -> case x of Modification.GainAbility y -> Just y; _ -> Nothing)
         : arms
     )
-
--- | The codec for a Modification in a position whose ability variable is Void
--- (Pawl.Types.ModifyTarget). Shares one arm list with 'codec' above, so the two
--- differ in exactly the arm the type says they differ in -- and the schema for a
--- ModifyTarget honestly omits the grant rather than describing an unsatisfiable
--- payload.
-grantless :: Codec.Codec (Modification.Modification Void.Void)
-grantless = Arm.tagged arms
 
 -- | Every arm that carries no ability, hence polymorphic in the variable.
 arms :: (Eq ability) => [Arm.Arm (Modification.Modification ability)]

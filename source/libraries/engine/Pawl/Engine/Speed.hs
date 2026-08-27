@@ -42,6 +42,7 @@ import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Modal as Modal
@@ -131,7 +132,7 @@ startEngines pid gs =
 -- Single mode, no targets, forced (CR 603.3's "you" is the ability's controller
 -- and nothing is chosen), which is what lets Monarch.placeInherent put it on the
 -- stack unprompted.
-increaseAbility :: TriggeredAbility Card
+increaseAbility :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 increaseAbility =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.OpponentLostLifeDuringYourTurn,

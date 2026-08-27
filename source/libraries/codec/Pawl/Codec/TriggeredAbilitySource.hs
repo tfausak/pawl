@@ -3,6 +3,7 @@
 module Pawl.Codec.TriggeredAbilitySource where
 
 import qualified Pawl.Codec.Card as Card
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.Timestamp as Timestamp
 import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
@@ -16,7 +17,7 @@ import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 codec :: Codec.Codec TriggeredAbilitySource.TriggeredAbilitySource
 codec = Fields.object $ do
   source <- Fields.required "source" ObjectId.codec TriggeredAbilitySource.source
-  ability <- Fields.required "ability" (TriggeredAbility.codec Card.codec) TriggeredAbilitySource.ability
+  ability <- Fields.required "ability" (TriggeredAbility.codec Card.codec (GrantedAbility.codec Card.codec)) TriggeredAbilitySource.ability
   -- CR 603.7a: absent for an ability the source itself has, which is every
   -- trigger but a delayed one.
   createdAt <- Fields.defaulted "createdAt" Nothing (Common.maybe Timestamp.codec) TriggeredAbilitySource.createdAt

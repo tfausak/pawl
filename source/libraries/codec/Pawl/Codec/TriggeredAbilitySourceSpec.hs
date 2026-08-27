@@ -6,6 +6,7 @@ import qualified Pawl.Codec.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -19,7 +20,7 @@ import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 -- | What the ability itself encodes to is Pawl.Codec.TriggeredAbility's own
 -- case; a bare enters trigger is enough to show the two keys this record adds
 -- around it.
-ability :: TriggeredAbility.TriggeredAbility Card.Card
+ability :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 ability =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfEnters,

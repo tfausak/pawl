@@ -77,6 +77,7 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -94,7 +95,7 @@ import qualified Pawl.Types.Zone as Zone
 -- taken with a `head` the way every other spec's `theAbility` is, because this is
 -- the first card in the pool with more than one activated ability and CR 606.6 is
 -- a claim about WHICH of them is offered.
-abilityAt :: Int -> Printing.Printing -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
+abilityAt :: Int -> Printing.Printing -> [ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 abilityAt i p = take 1 (drop i (Face.activatedAbilities (S.combinedFace p)))
 
 -- The Activate action for one of Jace's abilities, as a one-or-zero-element list

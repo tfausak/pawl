@@ -23,8 +23,8 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 -- applying the effect". Both resolution-time riders -- CR 603.5's printed "may"
 -- and CR 118.12a's "unless [a player] pays" -- therefore live on the clause.
 -- They rode the mode until a card needed a "may" narrower than one (#335).
-data Mode card = MkMode
-  { clauses :: Seq.Seq (Clause.Clause card),
+data Mode card ability = MkMode
+  { clauses :: Seq.Seq (Clause.Clause card ability),
     targetSlots :: Map.Map SlotName.SlotName TargetSlot.TargetSlot
   }
   deriving (Eq, Ord, Show)
@@ -33,5 +33,5 @@ data Mode card = MkMode
 -- boundaries dropped. For the readers that legitimately want the flat list: the
 -- static analyses (the slot lints, CR 612's text rewriting) ask what the mode
 -- SAYS, and a clause boundary is a resolution-time question they never pose.
-allEffects :: Mode card -> Seq.Seq (Effect.Effect card)
+allEffects :: Mode card ability -> Seq.Seq (Effect.Effect card ability)
 allEffects = foldMap Clause.effects . clauses

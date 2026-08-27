@@ -24,13 +24,18 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 cardCodec :: Codec.Codec Text.Text
 cardCodec = Common.text
 
-codec :: Codec.Codec (Mode.Mode Text.Text)
-codec = Mode.codec cardCodec
+-- | And the `ability` parameter likewise: it too is reached only through the
+-- codec supplied here, so any type proves the shape.
+abilityCodec :: Codec.Codec Text.Text
+abilityCodec = Common.text
 
-toJson :: Mode.Mode Text.Text -> Value.Value
+codec :: Codec.Codec (Mode.Mode Text.Text Text.Text)
+codec = Mode.codec cardCodec abilityCodec
+
+toJson :: Mode.Mode Text.Text Text.Text -> Value.Value
 toJson = Codec.encode codec
 
-fromJson :: Value.Value -> Either Text.Text (Mode.Mode Text.Text)
+fromJson :: Value.Value -> Either Text.Text (Mode.Mode Text.Text Text.Text)
 fromJson = Codec.decode codec
 
 -- One constructor and two fields, so two cases: a populated mode, and the empty

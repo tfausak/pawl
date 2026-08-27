@@ -31,6 +31,7 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -74,7 +75,7 @@ import qualified Pawl.Types.Zone as Zone
 -- a guard. Every clause here reads an ActivatedAbility's PRINTED effects out of
 -- the card, so no replacement effect is in scope to take into account, and the
 -- self-replacement ones the rule does admit are written into those effects.
-isManaAbility :: ActivatedAbility.ActivatedAbility Card.Type.Card -> Bool
+isManaAbility :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 isManaAbility ab =
   not (null (Maybe.mapMaybe manaProduced effects))
     && Map.null (Modal.allTargetSlots (ActivatedAbility.modal ab))
@@ -101,7 +102,7 @@ isManaAbility ab =
 -- criteria say nothing about whose pool the mana goes to ("a player's", not its
 -- controller's), how long it lasts, or what it may pay for, so an addition
 -- naming any of them is a mana ability just the same.
-manaProduced :: Effect Card.Type.Card -> Maybe ManaAddition.ManaAddition
+manaProduced :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe ManaAddition.ManaAddition
 manaProduced effect = case effect of
   Effect.AddMana addition -> Just addition
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> Nothing
@@ -220,7 +221,7 @@ manaProduced effect = case effect of
 -- branch that takes the card OUT (CR 701.25a, CR 701.44a), and CR 605.1a's test is
 -- what the effect may do rather than what it did on one resolution -- the same
 -- reading `manaProduced` gives "could add mana".
-movesLibraryCard :: Effect Card.Type.Card -> Bool
+movesLibraryCard :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 movesLibraryCard effect = case effect of
   -- CR 121.1: a draw takes the top card of a library into a hand.
   Effect.Draw {} -> True

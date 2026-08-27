@@ -6,6 +6,7 @@ import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.Expiry as Expiry
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.PreventionRider as PreventionRider
@@ -29,7 +30,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- can name several.
 codec :: Codec.Codec ActiveReplacement.ActiveReplacement
 codec = Fields.object $ do
-  effect <- Fields.required "effect" (ReplacementEffect.codec (Effect.codec Card.codec)) ActiveReplacement.effect
+  effect <- Fields.required "effect" (ReplacementEffect.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) ActiveReplacement.effect
   source <- Fields.required "source" ObjectId.codec ActiveReplacement.source
   controller <- Fields.required "controller" PlayerId.codec ActiveReplacement.controller
   timestamp <- Fields.required "timestamp" Timestamp.codec ActiveReplacement.timestamp

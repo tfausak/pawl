@@ -12,6 +12,7 @@ import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
@@ -151,17 +152,17 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- layer 4 (Blood Moon), as are the two fields below. A NAMED removal reaches
     -- it too (Modification.LoseNamedAbility, Gliding Licid), as it does the
     -- replacementEffects below; those two are the ability kinds carrying a name.
-    activatedAbilities :: [ActivatedAbility.ActivatedAbility Card.Card],
+    activatedAbilities :: [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)],
     -- | CR 614 layer 6: the object's replacement effects after the layer system,
     -- the same projection posture as activatedAbilities, emptied by the same two
     -- and singled out by the same named removal (Glittering Lion).
-    replacementEffects :: [PrintedReplacement.PrintedReplacement (Effect.Effect Card.Card)],
+    replacementEffects :: [PrintedReplacement.PrintedReplacement (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card))],
     -- | CR 603 layer 6: the object's triggered abilities after the layer system,
     -- the same projection posture as activatedAbilities: seeded from the card,
     -- added to by CR 613.1f's grant (Sixth Sense), emptied by the same two. CR
     -- 603.2's scan reads this field, so a granted trigger fires without
     -- Pawl.Engine.Event learning that it was granted.
-    triggeredAbilities :: [TriggeredAbility.TriggeredAbility Card.Card],
+    triggeredAbilities :: [TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)],
     -- | CR 702.5a / 613 layer 6: this object's enchant abilities after the layer
     -- system -- what restricts an Aura spell's target and what the Aura can
     -- enchant. Seeded from Face.enchant and added to by CR 613.1f's grant

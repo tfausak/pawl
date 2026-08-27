@@ -17,10 +17,10 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
 -- | The wire format is unchanged by the conversion to a bundle; what it adds is
 -- the schema.
-codec :: (Typeable.Typeable card, Eq card) => Codec.Codec card -> Codec.Codec (TriggeredAbility.TriggeredAbility card)
-codec cardCodec = Fields.object $ do
+codec :: (Typeable.Typeable card, Eq card, Typeable.Typeable ability, Eq ability) => Codec.Codec card -> Codec.Codec ability -> Codec.Codec (TriggeredAbility.TriggeredAbility card ability)
+codec cardCodec abilityCodec = Fields.object $ do
   condition <- Fields.required "condition" TriggerCondition.codec TriggeredAbility.condition
-  modal <- Fields.required "modal" (Modal.codec cardCodec) TriggeredAbility.modal
+  modal <- Fields.required "modal" (Modal.codec cardCodec abilityCodec) TriggeredAbility.modal
   intervening <- Fields.defaulted "intervening" Nothing (Common.maybe Condition.codec) TriggeredAbility.intervening
   limit <- Fields.defaulted "limit" TriggerLimit.Unlimited TriggerLimit.codec TriggeredAbility.limit
   pure
@@ -33,7 +33,8 @@ codec cardCodec = Fields.object $ do
 
 -- | A name-keyed map as a JSON OBJECT keyed by the ability name.
 codecDelayed ::
-  (Typeable.Typeable card, Eq card) =>
+  (Typeable.Typeable card, Eq card, Typeable.Typeable ability, Eq ability) =>
   Codec.Codec card ->
-  Codec.Codec (Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card))
-codecDelayed cardCodec = Common.textMap AbilityName.unwrap (Right . AbilityName.MkAbilityName) (codec cardCodec)
+  Codec.Codec ability ->
+  Codec.Codec (Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card ability))
+codecDelayed cardCodec abilityCodec = Common.textMap AbilityName.unwrap (Right . AbilityName.MkAbilityName) (codec cardCodec abilityCodec)

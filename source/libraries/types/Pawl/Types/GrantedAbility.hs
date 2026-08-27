@@ -15,14 +15,19 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 -- nothing downstream learns the ability came from a grant.
 --
 -- Parametric in `card` for the reason ActivatedAbility and TriggeredAbility are,
--- and it is what Pawl.Types.Modification's own variable is instantiated at:
--- naming either ability type there would close the module cycle that variable
--- exists to open.
+-- and it is what Pawl.Types.Modification's own variable is instantiated at.
+--
+-- THIS is where the ability knot is tied, the way Pawl.Types.Card ties the card
+-- one: both arms instantiate their ability variable at this very type, so an
+-- ability granted by a continuous effect may itself grant an ability. Every
+-- module on the path -- Effect, ModifyTarget, Clause, Mode, Modal,
+-- ActivatedAbility, TriggeredAbility -- stays parametric so that none of them
+-- has to import this one, which is the cycle the variable exists to open.
 --
 -- CR 113.3d's static abilities have no arm, nor do the replacement effects CR
 -- 614.1 makes some of them. Not implemented: a granted STATIC or REPLACEMENT
 -- ability (#1942).
 data GrantedAbility card
-  = Activated (ActivatedAbility.ActivatedAbility card)
-  | Triggered (TriggeredAbility.TriggeredAbility card)
+  = Activated (ActivatedAbility.ActivatedAbility card (GrantedAbility card))
+  | Triggered (TriggeredAbility.TriggeredAbility card (GrantedAbility card))
   deriving (Eq, Ord, Show)

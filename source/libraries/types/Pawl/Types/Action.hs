@@ -4,6 +4,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 
@@ -57,7 +58,7 @@ data Action
   | -- | CR 602: activate the source permanent's ability. Carries the ability
     -- VALUE (validated by membership in Projection.abilitiesOf), never an
     -- index.
-    Activate ObjectId.ObjectId (ActivatedAbility.ActivatedAbility Card.Card)
+    Activate ObjectId.ObjectId (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))
   | -- | CR 605.3a's FIRST window: activate one of this permanent's mana
     -- abilities while holding priority, with no payment in flight. Separate from
     -- Activate above because CR 605.3b keeps a mana ability off the stack, so

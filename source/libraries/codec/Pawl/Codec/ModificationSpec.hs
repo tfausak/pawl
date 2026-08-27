@@ -253,6 +253,3 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       )
       " {\"type\":\"GainAbility\",\"value\":{\"type\":\"Activated\",\"value\":{\"cost\":{\"mana\":null,\"components\":[{\"type\":\"TapThis\"}]},\"modal\":{\"modes\":[{}]}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
-  -- The Void instantiation Pawl.Types.ModifyTarget takes: one arm short, and the
-  -- schema says so.
-  Spec.it s "the grantless codec has a schema" $ Common.assertHasSchema s Modification.grantless

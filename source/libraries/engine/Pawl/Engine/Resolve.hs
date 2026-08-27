@@ -145,6 +145,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.Keyword as Keyword.Type
@@ -429,7 +430,7 @@ exchangeSidesSlots sides = case sides of
 -- The one legitimate home of `case effect of`: this module is the VM's opcode
 -- semantics (design.md section 1). slotsOf is the read half of the dataflow lint;
 -- X is not one of its reads, readsX below being X's own half.
-slotsOf :: Effect Card.Type.Card -> Map.Map SlotName SlotArity
+slotsOf :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Map.Map SlotName SlotArity
 slotsOf effect = case effect of
   -- The dealer is a read like any other (CR 120.2b), and one object (CR 120.1).
   Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer _) ->
@@ -636,7 +637,7 @@ durationSlots duration = case duration of
 -- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless
 -- [a player] pays" names, and every slot a target slot's own pool or filter
 -- names. A payer or pool slot no effect also reads would otherwise dangle.
-modeSlots :: Mode.Mode Card.Type.Card -> Map.Map SlotName SlotArity
+modeSlots :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Map.Map SlotName SlotArity
 modeSlots mode =
   joinSlots
     [ joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))),
@@ -698,7 +699,7 @@ conditionSlots condition = case condition of
 -- the three that carry no Filter say so rather than falling through. The nested
 -- EFFECTS an EntryR rewrite or a DamageR rider carries are not walked -- see
 -- slotsAreExhaustive's Replace arm.
-replacementPatternSlots :: ReplacementEffect.ReplacementEffect (Effect Card.Type.Card) -> Map.Map SlotName SlotArity
+replacementPatternSlots :: ReplacementEffect.ReplacementEffect (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Map.Map SlotName SlotArity
 replacementPatternSlots re = case re of
   ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _) -> filterSlotsOf (ZoneChangePattern.whatObject pat)
   ReplacementEffect.EntryR (EntryR.MkEntryR pat _) -> filterSlotsOf pat
@@ -730,7 +731,7 @@ filterSlotsOf = Map.fromSet (const SlotArity.One) . Filter.boundSlots
 -- No wildcard: a new opcode must answer here as well as in slotsOf. The `{}` arms
 -- answer a constant, so a new FIELD on one is not forced -- hence the four
 -- ObjectRef-taking opcodes routed through objectRefQuantities.
-slotsAreExhaustive :: Effect Card.Type.Card -> Bool
+slotsAreExhaustive :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 slotsAreExhaustive effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.Fight {} -> True
@@ -900,7 +901,7 @@ conditionSlotsAreExhaustive condition = case condition of
 -- OPCODE the compiler forces, this case being exhaustive; widening an existing
 -- one it does not, since an arm written `{} -> False` keeps compiling. The four
 -- ObjectRef-taking opcodes route through objectRefQuantities for that reason.
-readsX :: [Effect Card.Type.Card] -> Bool
+readsX :: [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Bool
 readsX = any effectReadsX
   where
     effectReadsX effect = case effect of
@@ -1018,7 +1019,7 @@ readsX = any effectReadsX
       Effect.ForEach (ForEach.MkForEach ref _ body) -> any Quantity.readsX (objectRefQuantities ref) || readsX (Foldable.toList body)
 
 -- CR 603.7: the delayed abilities an effect list ARMS, by name.
-armedAbilities :: [Effect Card.Type.Card] -> Set AbilityName
+armedAbilities :: [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Set AbilityName
 armedAbilities effects =
   let named effect = case effect of
         Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name _ _) -> Just name
@@ -1027,7 +1028,7 @@ armedAbilities effects =
 
 -- CR 603.7: armedAbilities narrowed to the arms whose firing is gated past the
 -- turn that armed them, i.e. not Onset.Immediately.
-onsetGatedAbilities :: [Effect Card.Type.Card] -> Set AbilityName
+onsetGatedAbilities :: [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Set AbilityName
 onsetGatedAbilities effects =
   let named effect = case effect of
         Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger _ Onset.Immediately _) -> Nothing
@@ -1036,14 +1037,14 @@ onsetGatedAbilities effects =
    in Set.fromList (Maybe.mapMaybe named effects)
 
 -- boundSlots over a whole effect list: the write half of the dataflow lint.
-definedSlots :: [Effect Card.Type.Card] -> Set SlotName
+definedSlots :: [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Set SlotName
 definedSlots = foldMap boundSlots
 
 -- definedSlots' other half, one MODE at a time: the slot a CR 118.12 gate binds
 -- as it is answered (Binding.gatePlayers, stamped by payGateAdmits). A mode
 -- stating no gate binds nothing, so a card reading that name without offering a
 -- resolution cost is still caught by the dataflow lint.
-gateDefinedSlots :: Mode.Mode card -> Set SlotName
+gateDefinedSlots :: Mode.Mode card ability -> Set SlotName
 gateDefinedSlots mode
   | any (Maybe.isJust . Clause.payGate) (Mode.clauses mode) = Set.singleton Binding.gatePlayers
   | otherwise = Set.empty
@@ -1052,7 +1053,7 @@ gateDefinedSlots mode
 -- (Binding.mayPlayers, stamped by exercises). A mode printing no "may" binds
 -- nothing, so a card reading that name without an optional clause is still
 -- caught by the dataflow lint.
-mayDefinedSlots :: Mode.Mode card -> Set SlotName
+mayDefinedSlots :: Mode.Mode card ability -> Set SlotName
 mayDefinedSlots mode
   | any (isOptional . Clause.optionality) (Mode.clauses mode) = Set.singleton Binding.mayPlayers
   | otherwise = Set.empty
@@ -1065,7 +1066,7 @@ mayDefinedSlots mode
 -- is also the set Pawl.CardSpec's reserved-name sweep ranges over. Exhaustive
 -- deliberately: a wildcard would file a new bind position under "binds nothing"
 -- in both the dataflow lint and that sweep, with no diagnostic.
-boundSlots :: Effect Card.Type.Card -> Set SlotName
+boundSlots :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Set SlotName
 boundSlots effect = case effect of
   -- CR 400.7: the incarnation minted at the destination.
   Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ mSlot _ _) -> foldMap Set.singleton mSlot
@@ -1255,7 +1256,7 @@ bakeTokenCharacteristics eval card = card {Card.Type.faces = fmap bakeFace (Card
 --
 -- The mode's TARGET SLOTS are rewritten by targetSlotsOf instead: CR 608.2b
 -- re-reads them off the printed face, which unions in CR 303.4a's enchant slot.
-modesOf :: ObjectId -> GameState -> [(ModeInstance, Mode.Mode Card.Type.Card)]
+modesOf :: ObjectId -> GameState -> [(ModeInstance, Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 modesOf oid gs = case Game.lookupObject oid gs of
   Nothing -> []
   Just obj -> case Game.faceOf oid gs of
@@ -1478,7 +1479,7 @@ resolveSpell = resolveSpellWith noSubgame
 -- `runSubgame` is the injected nested-game runner, the same one resolveSpellWith
 -- takes: CR 729.1a says "the spell or ability that created the subgame", so an
 -- ability's PlaySubgame plays one exactly as a spell's does (see #137).
-resolveModesWith :: Game Result -> ObjectId -> ObjectId -> [(ModeInstance, Mode.Mode Card.Type.Card)] -> Game ()
+resolveModesWith :: Game Result -> ObjectId -> ObjectId -> [(ModeInstance, Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))] -> Game ()
 resolveModesWith runSubgame stackId srcId modes = do
   gs <- State.get
   case Game.lookupObject stackId gs of
@@ -1579,7 +1580,7 @@ resolveModesWith runSubgame stackId srcId modes = do
 -- is False. Asked BEFORE the other three, so a skipped clause raises no prompt.
 --
 -- A pure function rather than a Game action: it reads nothing but the fold.
-ifTakenHolds :: Set ClauseIndex -> Clause.Clause Card.Type.Card -> Bool
+ifTakenHolds :: Set ClauseIndex -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 ifTakenHolds ran clause = maybe True (`Set.member` ran) (Clause.ifTaken clause)
 
 -- The other end of the same fold: a clause's ordinal is recorded exactly when
@@ -1608,7 +1609,7 @@ recordTaken admitted cIdx ran = if admitted then Set.insert cIdx ran else ran
 -- named (CR 115.10a). Under the printed slot names, which is how every other
 -- group read is written (slotGroups) and unlike the chosen map, which the caller
 -- has projected into CR 700.2d's mode instance.
-gateHolds :: PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Seq.Seq ObjectId) -> Clause.Clause Card.Type.Card -> Game Bool
+gateHolds :: PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Seq.Seq ObjectId) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game Bool
 gateHolds controller source chosen groups clause = case Clause.condition clause of
   Nothing -> pure True
   Just condition -> do
@@ -1637,7 +1638,7 @@ gateHolds controller source chosen groups clause = case Clause.condition clause 
 -- anyway, as is one whose instruction has nothing legal to act on (Keys to the
 -- House offers its lock over a Room with every door already shut), and choosing
 -- either leaves the pair doing nothing (#2167).
-chosenBranch :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map ClauseIndex ClauseIndex -> Clause.Clause Card.Type.Card -> Game (Bool, Map.Map ClauseIndex ClauseIndex)
+chosenBranch :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map ClauseIndex ClauseIndex -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game (Bool, Map.Map ClauseIndex ClauseIndex)
 chosenBranch resolving controller idx cIdx picked clause = case Clause.orElse clause of
   Nothing -> pure (True, picked)
   Just sibling ->
@@ -1685,7 +1686,7 @@ chosenBranch resolving controller idx cIdx picked clause = case Clause.orElse cl
 -- Not implemented: CR 608.2d's other half, that the player cannot choose an
 -- option that is illegal or impossible -- an inert clause is a slot question,
 -- and "you may discard a card" on an empty hand is not (#2167).
-exercises :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Set SlotName -> Map.Map SlotName (Set Recipient) -> Clause.Clause Card.Type.Card -> Game Bool
+exercises :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Set SlotName -> Map.Map SlotName (Set Recipient) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game Bool
 exercises resolving controller idx cIdx bound legal clause = case Clause.optionality clause of
   Optionality.Mandatory -> pure True
   Optionality.Optional asker
@@ -1731,7 +1732,7 @@ exercises resolving controller idx cIdx bound legal clause = case Clause.optiona
 -- hold vacuously. Nothing in data/cards/ prints one, and reaching this ahead of
 -- CR 608.2b's fizzle needs a modal payload mixing a live mode with a dead one
 -- (Deadly Complication).
-clauseIsInert :: Set SlotName -> Map.Map SlotName (Set Recipient) -> Clause.Clause Card.Type.Card -> Bool
+clauseIsInert :: Set SlotName -> Map.Map SlotName (Set Recipient) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 clauseIsInert bound legal clause =
   let effects = Foldable.toList (Clause.effects clause)
       dead name = case Map.lookup name legal of
@@ -1784,7 +1785,7 @@ clauseIsInert bound legal clause =
 -- being keyed on the offering clause's ordinal. A clause naming an offer never
 -- made falls through and makes it, the named clause having failed its own CR
 -- 701.46a "if" or CR 603.5 "may".
-payGateAdmits :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Map.Map ClauseIndex (Map.Map PlayerId Bool) -> Clause.Clause Card.Type.Card -> Game (Bool, Map.Map ClauseIndex (Map.Map PlayerId Bool))
+payGateAdmits :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Map.Map ClauseIndex (Map.Map PlayerId Bool) -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game (Bool, Map.Map ClauseIndex (Map.Map PlayerId Bool))
 payGateAdmits resolving source controller idx cIdx legal answers clause = case Clause.payGate clause of
   Nothing -> pure (True, answers)
   Just gate -> do
@@ -1913,7 +1914,7 @@ apnapPlayersOf ref legal controller gs =
 
 -- The no-subgame mode executor: every direct caller, and any path that cannot
 -- reach a PlaySubgame.
-resolveModes :: ObjectId -> ObjectId -> [(ModeInstance, Mode.Mode Card.Type.Card)] -> Game ()
+resolveModes :: ObjectId -> ObjectId -> [(ModeInstance, Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))] -> Game ()
 resolveModes = resolveModesWith noSubgame
 
 -- CR 608: resolve an activated ability. The effect SOURCE is the source permanent
@@ -1922,7 +1923,7 @@ resolveModes = resolveModesWith noSubgame
 --
 -- `runSubgame` rides through to the effects for the reason resolveModesWith
 -- gives (CR 729.1a).
-resolveAbilityWith :: Game Result -> ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Game ()
+resolveAbilityWith :: Game Result -> ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
 resolveAbilityWith runSubgame abilId srcId ability = do
   gs <- State.get
   case Game.lookupObject abilId gs of
@@ -1932,7 +1933,7 @@ resolveAbilityWith runSubgame abilId srcId ability = do
        in resolveModesWith runSubgame abilId srcId (Modal.chosenModes chosen (ActivatedAbility.modal ability))
 
 -- The no-subgame activated-ability resolver.
-resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card -> Game ()
+resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
 resolveAbility = resolveAbilityWith noSubgame
 
 -- CR 701.27a over ONE object: turn it over, or leave the map as it was. The turn
@@ -2967,7 +2968,7 @@ chooseCardFromAmong resolving source controller legal chosen (ChosenCardFromAmon
 
 -- One effect, applied, wrapped in the window CR 607.2a's link is filed from:
 -- what was in exile before, and what is in it after.
-applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card -> Game ()
+applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
 applyEffectWith runSubgame resolving source controller legal chosen effect = do
   before <- State.gets GameState.exile
   applyOneEffect runSubgame resolving source controller legal chosen effect
@@ -3123,7 +3124,7 @@ chooseNewTargetsFor controller copyId = do
 -- environment is read back, and where CR 601.2b's announced X lives. Not
 -- `source`: for an ability the two differ (CR 113.7a), and that permanent can be
 -- gone before a later effect of the same list runs.
-applyOneEffect :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card -> Game ()
+applyOneEffect :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
 applyOneEffect runSubgame resolving source controller legal chosen effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer excess) -> do
     gs <- State.get
@@ -3260,9 +3261,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         { ContinuousEffect.source = source,
                           ContinuousEffect.timestamp = ts,
                           ContinuousEffect.expiry = expiry,
-                          -- CR 611.2: the stored modification is the narrow
-                          -- (grantless) one, widened for the projection.
-                          ContinuousEffect.modification = Projection.widenModification frozen,
+                          ContinuousEffect.modification = frozen,
                           ContinuousEffect.affected = Affected.TheseObjects (Set.fromList targets)
                         }
                  in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
@@ -6470,7 +6469,7 @@ changeLife pid delta =
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).
-applyEffect :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card -> Game ()
+applyEffect :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
 applyEffect = applyEffectWith noSubgame
 
 -- CR 615.5: run the additional effect of every prevention that has just been

@@ -49,6 +49,7 @@ import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -484,7 +485,7 @@ assaultBoard mountain assault mine piker =
    in (gs, enchantment, ours, theirs)
 
 -- The card's one printed activated ability.
-assaultAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+assaultAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 assaultAbility assault = case Face.activatedAbilities (S.combinedFace assault) of
   [] -> Nothing
   ability : _ -> Just ability
@@ -495,7 +496,7 @@ assaultAbility assault = case Face.activatedAbilities (S.combinedFace assault) o
 -- here: ActivationRestriction.restrictionsOk gates Action.legalActions, and a direct
 -- activateAbility call goes around it, so the test that cares asks
 -- Activate.activatable itself.
-activateAssault :: ActivatedAbility.ActivatedAbility Card.Type.Card -> ObjectId -> GameState.GameState -> GameState.GameState
+activateAssault :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> ObjectId -> GameState.GameState -> GameState.GameState
 activateAssault ability enchantment gs =
   let activated = snd (Engine.runGamePure S.identityAnswer gs (Activate.activateAbility S.alice enchantment ability))
    in snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)

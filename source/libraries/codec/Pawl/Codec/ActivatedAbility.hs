@@ -16,10 +16,10 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 
 -- | The wire format is unchanged by the conversion to a bundle; what it adds is
 -- the schema.
-codec :: (Typeable.Typeable card, Eq card) => Codec.Codec card -> Codec.Codec (ActivatedAbility.ActivatedAbility card)
-codec cardCodec = Fields.object $ do
+codec :: (Typeable.Typeable card, Eq card, Typeable.Typeable ability, Eq ability) => Codec.Codec card -> Codec.Codec ability -> Codec.Codec (ActivatedAbility.ActivatedAbility card ability)
+codec cardCodec abilityCodec = Fields.object $ do
   cost <- Fields.required "cost" (Cost.codec Keyword.codec) ActivatedAbility.cost
-  modal <- Fields.required "modal" (Modal.codec cardCodec) ActivatedAbility.modal
+  modal <- Fields.required "modal" (Modal.codec cardCodec abilityCodec) ActivatedAbility.modal
   -- CR 602.5: emitted only for a restricted ability, so the absence of the key
   -- is CR 602.2's default -- no "activate only ..." rider at all.
   restrictions <- Fields.defaulted "restrictions" [] (Common.list ActivationRestriction.codec) ActivatedAbility.restrictions
