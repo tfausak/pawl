@@ -1474,12 +1474,9 @@ copiedAbilitySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- Site four: the TYPE disjunct of that same baseHas (Projection.copiableMintsType),
   -- which reads a card type and a subtype -- both copiable values, CR 707.2 says
   -- so outright -- for CR 306.5b's planeswalker, CR 310.4b's battle and CR
-  -- 714.3a's Saga. Two cases below, one per half of that read: Copy Enchantment
-  -- reaches the SUBTYPE half, since a Saga is an enchantment (CR 205.3h), and
-  -- Clever Impersonator's "any nonland permanent" reaches the CARD TYPE half.
-  --
-  -- Clever Impersonator reaches CR 310.4b's battle as well, which the third case
-  -- takes: same `mintingCardType` read, the other equality.
+  -- 714.3a's Saga -- one case each. Copy Enchantment reaches the SUBTYPE half,
+  -- since a Saga is an enchantment (CR 205.3h); Clever Impersonator's "any
+  -- nonland permanent" reaches both equalities of the CARD TYPE half.
   --
   -- TWO ENTRIES, so the board that observes the disjunct differs from the one
   -- that does not in exactly the original Saga's presence. The first Copy
