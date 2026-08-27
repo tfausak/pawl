@@ -17,6 +17,10 @@
 -- sorcery, "You may reveal a sorcery card you own from outside the game and put
 -- it into your hand. Exile Burning Wish.") for the pool, and Living Wish inside a
 -- Shahrazad subgame for CR 729.4's main game, in the last case of all.
+--
+-- Not implemented: the cycle's instant, Cunning Wish, and Ring of Ma'ruf are not
+-- in data/cards/, so nothing here casts a wish at instant speed and nothing
+-- reaches outside the game through a draw replacement (#2470).
 module Pawl.OutsideTheGameSpec where
 
 import qualified Data.Foldable as Foldable

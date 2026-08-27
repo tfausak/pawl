@@ -617,6 +617,10 @@ subgameStateFrom starter parent =
       -- it spawns (CR 729.1a), and this union is the only place the set can
       -- GROW; applyCrossings shrinks it once that game has ended, dropping the
       -- entries it hands one level further out.
+      --
+      -- Not implemented: an object's face-down status is not carried, so a
+      -- face-down main-game permanent is offered by its PRINTED face rather than
+      -- by CR 708.2's characteristics (#2467).
       outside =
         Map.union
           (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.union libIds cmdIds)))
@@ -827,6 +831,10 @@ applyCrossings finalSub parent =
       -- leaves its Object.zone alone -- and rule 702.26k, which is about a
       -- departing owner rather than about this road, is the reason that
       -- distinction is worth drawing at all.
+      --
+      -- Not implemented: so a PHASED-OUT permanent crosses without an event,
+      -- though CR 702.26d leaves it on the battlefield and CR 729.4a carries no
+      -- carve-out of its own (#2468).
       cross g oid =
         let noted = case filed g oid of
               Nothing -> g
@@ -971,7 +979,9 @@ funnelBack finalSub parent =
       -- objectsLeaveWith deleted the subgame's, so nothing represents it in
       -- either game. That is the two rules read together rather than an oversight
       -- -- CR 729.4a took it out of the main game and CR 800.4a took it out of
-      -- the subgame -- and Pawl.SetupSpec pins it.
+      -- the subgame -- and Pawl.SetupSpec pins it. The two arms of the same road
+      -- do end differently, though, and CR 729.5's Example gives both sources one
+      -- destination, so which arm is wrong is open (#2469).
       --
       -- A player absent from the subgame's roster keeps the parent's pool too.
       -- The lookup cannot miss today -- subgameStateFrom rebuilds the players map

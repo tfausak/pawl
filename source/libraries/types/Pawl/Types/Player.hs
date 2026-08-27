@@ -148,8 +148,12 @@ data Player = MkPlayer
     -- Pawl.Engine.OutsideTheGame offering dungeon cards to Burning Wish.
     --
     -- Where the rest of what is outside the game will land: CR 727.2's restart
-    -- cards (#135), CR 707.13's copy created outside the game (#888) and the
-    -- supergame's cards a subgame reaches for (#152). Sticker sheets (#872) are
+    -- cards (#135) and CR 707.13's copy created outside the game (#888). CR
+    -- 729.4's other half -- the main game's cards, which a subgame sees as
+    -- outside it -- deliberately did NOT land here: those are objects in a game
+    -- that is on hold rather than a count of printings a player set aside, so
+    -- they ride Pawl.Types.GameState's outsideObjects and only for as long as
+    -- the subgame runs. Sticker sheets (#872) are
     -- outside the game too but are not cards and have no characteristics (CR
     -- 123.2), so they need a field of their own rather than this one.
     outsideTheGame :: Map.Map PrintingId.PrintingId Natural.Natural,

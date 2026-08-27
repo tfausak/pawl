@@ -1578,12 +1578,18 @@ playGame =
 -- 729.5c). Nesting terminates: each level's library comes from the parent's at
 -- cast time, so depth is bounded by |library| / 7.
 --
--- Not implemented: cards brought into a subgame from the main game, and the
--- main-game triggers their removal queues (#152). Of CR 729.2a-c and CR
--- 729.5a-c's command-zone residents, commanders are the kind Setup carries both
--- ways, and dungeons ride Player.dungeons rather than the command zone; planes
--- and phenomena (#934), schemes (#935), vanguards (#936) and conspiracies (#937)
--- do not exist.
+-- CR 729.4 runs the other way too: a subgame's wish reaches the main game's
+-- cards, and CR 729.4a takes each one it finds out of the main game.
+-- Setup.subgameStateFrom hands the subgame a SNAPSHOT of those cards rather than
+-- the parent itself, OutsideTheGame.bringInFrom records which of them crossed,
+-- and their departures are applied to the parent below, once the subgame has
+-- ended -- exact rather than late, since CR 729.1a discontinued the main game
+-- throughout. Setup.applyCrossings carries that argument in full.
+--
+-- Of CR 729.2a-c and CR 729.5a-c's command-zone residents, commanders are the
+-- kind Setup carries both ways, and dungeons ride Player.dungeons rather than
+-- the command zone; planes and phenomena (#934), schemes (#935), vanguards
+-- (#936) and conspiracies (#937) do not exist.
 playSubgame :: Game Result
 playSubgame = do
   parent <- State.get
