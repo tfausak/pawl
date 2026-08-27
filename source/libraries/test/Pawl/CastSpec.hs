@@ -1998,6 +1998,7 @@ lierSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 lierSpec s registry = Spec.describe s "Lier" $ do
   Spec.it s "CR 702.34a a granted flashback priced at the card's own mana cost is payable for that cost" $ do
     firebolt <- S.printingOf s registry "Firebolt"
+    mountain <- S.printingOf s registry "Mountain"
     (board, inGraveyard) <- lierBoard s registry True
     let granted = ManaCost.MkManaCost [theRed]
         printed = ManaCost.MkManaCost [ManaSymbol.Generic 4, theRed]
@@ -2019,7 +2020,7 @@ lierSpec s registry = Spec.describe s "Lier" $ do
         boltsIn zone gs = length (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName firebolt)) (Game.zoneMembers zone S.alice gs))
     -- The precondition the whole group rests on, asserted rather than assumed:
     -- one Mountain cannot pay the printed {4}{R}.
-    Spec.assertEqWith s "alice has one land" (length (Set.toList (GameState.battlefield board)) - 1) 1
+    Spec.assertEqWith s "alice has exactly one Mountain, which cannot pay the printed {4}{R}" (S.countOnBattlefieldByName (S.printingName mountain) S.alice board) 1
     -- Gameplay level, and FIRST: under the broken reading Firebolt never leaves
     -- the graveyard at all, Lier granting no cast-from-graveyard permission of
     -- its own beyond rule 702.34a's.
