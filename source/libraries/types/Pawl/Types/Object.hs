@@ -701,8 +701,11 @@ data Object = MkObject
     -- newIncarnation forgets it everywhere else -- which is what Berg Strider
     -- needs, its clause being an ability of the PERMANENT.
     --
-    -- Not implemented: an ACTIVATION cost's mana is not recorded, since
-    -- Pawl.Engine.Activate pays with no object to record against (#2007).
+    -- Not implemented: an ACTIVATION cost's mana is not recorded --
+    -- Pawl.Engine.Cost's recordSpent writes this through
+    -- Pawl.Types.PaymentSubject.castOf, which answers only for a spell being
+    -- cast (#2404). The narrowing is at castOf, not for want of somewhere to
+    -- write it: PaymentSubject.Activating carries the source's id.
     --
     -- Empty for every object nothing was spent on: a token, a permanent an
     -- effect put onto the battlefield, and every spell whose cost was free.

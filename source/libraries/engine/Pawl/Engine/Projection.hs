@@ -1583,9 +1583,6 @@ liveAfterLayers setEffs oid gs =
 -- ability gate wired open, so the projection behind this gate never re-enters it.
 -- The seed can only over-project (gather says why), and here that can only widen
 -- the set a setter reaches.
---
--- Not implemented: CR 613.8a's dependency is decided at `oid` alone rather than
--- over the setter's whole affected set (#236).
 setSubtypeStripped :: [Gathered] -> [(ObjectId, Affected.Affected)] -> GameState -> ObjectId -> Bool
 setSubtypeStripped cands setEffs gs = case appliedSetEffects setEffs gs of
   -- Almost every board sets no land's subtype, and then no projection is spent on
@@ -1614,6 +1611,12 @@ setSubtypeStripped cands setEffs gs = case appliedSetEffects setEffs gs of
 -- one that strips its OWN source still applies. Timestamps are the SOURCE
 -- PERMANENT's (CR 613.7d), and a source that has left has none, sorting last.
 -- Indices carry the identity, since two permanents can generate equal pairs.
+--
+-- Not implemented: CR 613.8a clause (b)'s "what it applies to" limb for these
+-- effects (#2405). `dependsOn` asks only whether the other effect strips THIS
+-- one's source -- the existence limb, over one object -- and never whether it
+-- moves this setter's affected set, so a pair whose dependency shows up only in
+-- the set falls back to CR 613.8b's timestamp order.
 appliedSetEffects :: [(ObjectId, Affected.Affected)] -> GameState -> [(ObjectId, Affected.Affected)]
 appliedSetEffects setEffs gs =
   let indexed = zip [0 :: Int ..] setEffs

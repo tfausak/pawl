@@ -1313,7 +1313,7 @@ manaActivations measure pcs pid oid cost restrictions gs = manaActivationsGiven 
 -- player abilities it prints, and it does not depend on which route is being
 -- measured -- so a caller that asks per ROUTE of per PERMANENT took an identical
 -- one every time, which is one more per-permanent O(N) walk inside
--- Action.legalActions' own loop (#1073, which an allocation guard caught).
+-- Action.legalActions' own loop; see #1073, which an allocation guard caught.
 -- Not implemented: nothing asserts it stays hoisted (gap #578).
 --
 -- PARTIALLY APPLIED, which is the whole of the hoist: one closure carrying one
@@ -2200,7 +2200,7 @@ payManaExcept inFlight subject spending pid cost = do
     -- `PaymentSubject.castOf` is the object it goes on, and it answers Just only
     -- where the payment is for a spell being cast (see `pay`), which is the whole
     -- of what any printed card asks about ("if {S} was spent to CAST this
-    -- spell"). An activation's mana is not recorded (#2007) -- the narrowing is
+    -- spell"). An activation's mana is not recorded (#2404) -- the narrowing is
     -- deliberate and is why this reads `castOf` rather than the subject.
     --
     -- Written HERE rather than by the caller because this is the one place that

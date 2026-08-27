@@ -223,12 +223,14 @@ entrySpec s registry = Spec.describe s "EntersTransformed" $ do
   -- The first two are separated by asserting on `entered`, the board the spell's
   -- resolution leaves, which is BEFORE the settle the sweep runs in.
   --
-  -- THE TOKEN COUNT IS A FENCE, NOT A PROOF, and the reason is worth stating: the
-  -- trigger scan reads the permanent's abilities off the live board at settle,
-  -- and Daytime.settle runs earlier in that same settle, so the swept engine
-  -- places the back face's trigger too (#1548). Two Insects here says the back
-  -- face's ability is the live one; it does not say the permanent entered that
-  -- way.
+  -- THE TOKEN COUNT DISCRIMINATES TOO, and it did not always: the trigger scan
+  -- reads each event group's battlefield as it was sampled
+  -- (GameState.battlefieldWhenTriggered), not the board it finds at settle, so
+  -- the entry's group carries the abilities the permanent entered with and the CR
+  -- 702.145c sweep a settle later is a different group. Neutralizing
+  -- Pawl.Engine.Event's EntersTransformed face write reddens "and its back
+  -- face's trigger made two Insects" at 1 == 2, because the swept engine places
+  -- the FRONT face's trigger.
   Spec.it s "CR 712.13a/702.145b a daybound spell cast at night enters transformed" $ do
     tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
     forest <- S.printingOf s registry "Forest"
