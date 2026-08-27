@@ -250,13 +250,15 @@ collect sources floating =
       -- Proven by Pawl.ReplacementSpec's Synthetic Magnetic Lockdown pair, the
       -- floating twin of its Frontier Mastodon pairs.
       --
-      -- Only the CLAUSE narrows. `applies` below keeps the live board because a
-      -- row's PATTERN is answered against one object's view (matchesFiltered) and
-      -- against controllerOf and zone ownership, none of which folds the
-      -- battlefield -- and the object it asks about is the entering permanent
-      -- itself, which the narrowed board still names (boardAsEntering leaves
-      -- GameState.objects alone but would take the subject out of the index the
-      -- pattern never reads).
+      -- Only the CLAUSE narrows, and `applies` below keeps the live board
+      -- deliberately: a row's PATTERN is answered against ONE object's view
+      -- (matchesFiltered), against controllerOf, and against zone ownership, none
+      -- of which folds the battlefield index boardAsEntering subtracts from, and
+      -- the object each of them asks about is the entering permanent itself.
+      -- `admitsEntry`'s Bloodthirst arm is the one measurement on that path, and
+      -- it reads the event log rather than the board. So the two boards cannot
+      -- differ there, and passing the narrowed one would say the same thing more
+      -- obscurely.
       --
       -- CR 109.5's "you" is the row's BAKED controller, and the reading object is
       -- its source: the clause outlives the resolution that installed it, so

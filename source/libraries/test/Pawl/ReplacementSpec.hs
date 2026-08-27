@@ -7661,9 +7661,11 @@ frontierMastodonSpec s registry = Spec.describe s "Frontier Mastodon (CR 614.12)
 -- instead settled inside its own resolution (Galvanic Blast, Crater's Claws,
 -- Mirran Mettle, ...); `o:"until end of turn" o:instead o:"if you control"`
 -- answers nineteen modal or pump-vs-pump spells; `o:enters o:"this turn"
--- (t:instant or t:sorcery)` answers seventeen, of which only Gather Specimens and
--- Theoretical Duplication install an entry replacement and neither carries a
--- clause. A printing of any of those families with a stated duration AND a
+-- (t:instant or t:sorcery)` answers seventeen, of which Gather Specimens alone
+-- installs an entry REPLACEMENT -- the near miss, Theoretical Duplication, prints
+-- "whenever a nontoken creature an opponent controls enters this turn, create a
+-- token that's a copy of that creature", which is a delayed trigger and replaces
+-- nothing. A printing of any of those families with a stated duration AND a
 -- printed "if" would refute this and replace the synthetic. The same enumeration
 -- inside data/cards: only Galvanic Blast and Synthetic Voltaic Surge write a
 -- condition on an Effect.Replace at all, and both gate a DamageR.
@@ -7707,7 +7709,7 @@ magneticLockdownSpec s registry = Spec.describe s "Synthetic Magnetic Lockdown (
     case newestNamed baubleName after of
       Just oid -> do
         Spec.assertEqWith s "the Bauble entered untapped" (fmap Object.tapped (Game.lookupObject oid after)) (Just TapState.Untapped)
-        Spec.assertEqWith s "setup: alice controlled two artifacts as it entered" (S.countOnBattlefieldByName splitterName S.alice after) 2
+        Spec.assertEqWith s "setup: alice controlled two artifacts as it entered" (controlledNamed splitterName S.alice after) 2
         Spec.assertEqWith s "setup: the row was installed and is still installed" (length (GameState.replacements armed), length (GameState.replacements after)) (1, 1)
       _ -> Spec.assertFailure s "the Bauble did not reach the battlefield"
   Spec.it s "CR 614.12a a third artifact already on the battlefield does count, so the same row taps it" $ do
@@ -7715,7 +7717,7 @@ magneticLockdownSpec s registry = Spec.describe s "Synthetic Magnetic Lockdown (
     case newestNamed baubleName after of
       Just oid -> do
         Spec.assertEqWith s "the Bauble entered tapped" (fmap Object.tapped (Game.lookupObject oid after)) (Just TapState.Tapped)
-        Spec.assertEqWith s "setup: alice controlled three artifacts as it entered" (S.countOnBattlefieldByName splitterName S.alice after) 3
+        Spec.assertEqWith s "setup: alice controlled three artifacts as it entered" (controlledNamed splitterName S.alice after) 3
       _ -> Spec.assertFailure s "the Bauble did not reach the battlefield"
 
 -- CR 122.6 with CR 107.3c: an entry rider whose COUNT is not a number. Printlifter
