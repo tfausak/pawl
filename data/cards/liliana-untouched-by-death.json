@@ -1,0 +1,322 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "AddLoyaltyToThis",
+                "value": 1
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Mill",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 3
+                          },
+                          "tally": {
+                            "filter": {
+                              "type": "HasSubtype",
+                              "value": {
+                                "type": "Zombie"
+                              }
+                            },
+                            "slot": "milled"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "condition": {
+                      "type": "Compares",
+                      "value": {
+                        "comparison": {
+                          "type": "AtLeast"
+                        },
+                        "measured": {
+                          "type": "InSlot",
+                          "value": "milled"
+                        },
+                        "threshold": {
+                          "type": "Literal",
+                          "value": 1
+                        }
+                      }
+                    },
+                    "effects": [
+                      {
+                        "type": "LoseLife",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "Opponent"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 2
+                          }
+                        }
+                      },
+                      {
+                        "type": "GainLife",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 2
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "RemoveLoyaltyFromThis",
+                "value": 2
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ModifyTarget",
+                        "value": {
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "modification": {
+                            "type": "ModifyPowerToughness",
+                            "value": {
+                              "power": {
+                                "type": "Negate",
+                                "value": {
+                                  "type": "Count",
+                                  "value": {
+                                    "aggregation": {
+                                      "type": "Members"
+                                    },
+                                    "filter": {
+                                      "type": "And",
+                                      "value": [
+                                        {
+                                          "type": "HasSubtype",
+                                          "value": {
+                                            "type": "Zombie"
+                                          }
+                                        },
+                                        {
+                                          "type": "ControlledBy",
+                                          "value": {
+                                            "type": "You"
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    "scope": {
+                                      "type": "InZone",
+                                      "value": {
+                                        "player": {
+                                          "type": "EachPlayer"
+                                        },
+                                        "zone": {
+                                          "type": "Battlefield"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "toughness": {
+                                "type": "Negate",
+                                "value": {
+                                  "type": "Count",
+                                  "value": {
+                                    "aggregation": {
+                                      "type": "Members"
+                                    },
+                                    "filter": {
+                                      "type": "And",
+                                      "value": [
+                                        {
+                                          "type": "HasSubtype",
+                                          "value": {
+                                            "type": "Zombie"
+                                          }
+                                        },
+                                        {
+                                          "type": "ControlledBy",
+                                          "value": {
+                                            "type": "You"
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    "scope": {
+                                      "type": "InZone",
+                                      "value": {
+                                        "player": {
+                                          "type": "EachPlayer"
+                                        },
+                                        "zone": {
+                                          "type": "Battlefield"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "target": {
+                    "pool": {
+                      "type": "Creatures"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "RemoveLoyaltyFromThis",
+                "value": 3
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "AffectPlayers",
+                        "value": {
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "effect": {
+                            "type": "CastFromGraveyard",
+                            "value": {
+                              "type": "HasSubtype",
+                              "value": {
+                                "type": "Zombie"
+                              }
+                            }
+                          },
+                          "players": {
+                            "type": "Scoped",
+                            "value": {
+                              "type": "You"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "loyalty": {
+        "type": "Literal",
+        "value": 4
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Liliana, Untouched by Death",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Liliana"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Planeswalker"
+          }
+        ]
+      }
+    }
+  ]
+}

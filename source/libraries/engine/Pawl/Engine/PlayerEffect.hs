@@ -6,10 +6,11 @@
 --
 -- The dependency is therefore ONE-WAY, and that is what keeps it well founded:
 -- this module reads the layer machine's finished answers, while
--- Pawl.Engine.Projection is untouched by this module and never sees these types.
+-- Pawl.Engine.Projection is untouched by this module.
 --
--- This module is the ONLY module that may case on Pawl.Types.PlayerEffect and
--- Pawl.Types.PlayerScope -- the standing Pawl.Engine.Resolve has over Effect,
+-- This module is the only module that may case on Pawl.Types.PlayerEffect and
+-- Pawl.Types.PlayerScope for what an effect MEANS -- the standing
+-- Pawl.Engine.Resolve has over Effect,
 -- Pawl.Engine.Projection over Modification, Pawl.Engine.Event over
 -- TriggerCondition and Pawl.Engine.Expiry over Expiry. Every consumer asks a
 -- TYPED QUESTION and never sees a constructor.
@@ -17,6 +18,12 @@
 -- Pawl.Types.AffectedPlayers is the one type here that Resolve also cases on,
 -- and by that same standing: it is an Effect payload, and only a resolution can
 -- answer the slot its Named arm holds. This module reads the BAKED value.
+--
+-- The one other module that cases on PlayerEffect is Pawl.Engine.Projection,
+-- through rewritePlayerEffect, and it asks nothing about meaning: CR 612.1's word
+-- swap walks the type's STRUCTURE for a Filter that could hold a subtype word,
+-- and hands the answer straight back. Living there is what lets rewriteEffect
+-- reach a restriction a resolution stores.
 module Pawl.Engine.PlayerEffect where
 
 import qualified Data.Foldable as Foldable
@@ -67,7 +74,6 @@ import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
-import Pawl.Types.Subtype (Subtype)
 import Pawl.Types.Timestamp (Timestamp)
 
 -- CR 109.5: "you" on an object is its controller, and for a static ability the
@@ -248,7 +254,7 @@ printedRows gs =
                 -- once per ability-bearing permanent instead of once per
                 -- permanent on the battlefield.
                 let changes = Projection.textChangesAffecting oid gs
-                    readAs = if null changes then id else rewritePlayerEffect changes
+                    readAs = if null changes then id else Projection.rewritePlayerEffect changes
                     -- CR 604.2's "as long as" clause, the same gate
                     -- Projection.gatherStatic applies to the object-facing
                     -- carrier, and asked here for the player-facing one.
@@ -388,86 +394,6 @@ applying pid gs =
       effectOf (_, source, _, _, effect) = (source, effect)
       stampOf (timestamp, _, _, _, _) = timestamp
    in fmap effectOf (List.sortOn stampOf (filter keep (printed <> stored)))
-
--- CR 612.1's subtype word swap over a PlayerEffect, the CR 613.10/613.11 axis's
--- answer to Pawl.Engine.Projection.rewriteModification. An Artificial Evolution
--- resolved at an Edgewalker moves "Cleric spells you cast cost {W}{B} less to
--- cast" onto the new word, because the word naming which spells the ability
--- discounts is text printed on the permanent like any other.
---
--- HERE and not beside rewriteModification, which is where the printed-text
--- rewrites for objects live: this module is the only one that may case on
--- PlayerEffect: Pawl.Engine.Projection carries the rows opaquely through
--- ProjectedCharacteristics.playerAbilities so a copy acquires them (CR 707.2a),
--- and never looks inside one. The
--- shape Pawl.Engine.CombatRestriction takes for a restriction -- destructure the
--- module's own type, hand each inner value to the module that owns it -- is the
--- one taken here, with Pawl.Engine.Filter.rewrite doing the descent.
---
--- Exhaustive rather than a catch-all, for rewriteModification's stated reason: a
--- later arm that can hold a word must break this build instead of silently
--- keeping the printed one.
---
--- CR 612.2's family gate is not restated at the Filter descent, for the reason
--- Filter.rewrite's own comment gives: a HasSubtype atom may name a word of any
--- family, so the family the word is used AS is the family it belongs to, and the
--- exact lookup already asks CR 612.2's question. A Magical Hack's land-type pair
--- therefore leaves Edgewalker's Cleric alone.
-rewritePlayerEffect :: [(Subtype, Subtype)] -> PlayerEffect -> PlayerEffect
-rewritePlayerEffect pairs effect = case effect of
-  -- The arms carrying a Filter, which is the only place in this type a subtype
-  -- word can hide. Thalia's "noncreature spells", Vedalken Orrery's "spells",
-  -- Prowling Serpopard's "creature spells", Heartstone's "activated abilities of
-  -- creatures", Damping Engine's "artifact, creature, or enchantment spells",
-  -- Oppressive Rays' "enchanted creature" and Yawgmoth's Will's "spells" and
-  -- Omniscience's "spells" name none today;
-  -- Edgewalker's "Cleric spells" does, and Haakon's "Knight spells" would.
-  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f n) -> PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.rewrite pairs f) n)
-  PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f n) -> PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost (Filter.rewrite pairs f) n)
-  PlayerEffect.ReduceSpellCost x -> PlayerEffect.ReduceSpellCost x {ReduceSpellCost.whichSpells = Filter.rewrite pairs (ReduceSpellCost.whichSpells x)}
-  -- TWO Filters of its own, and both descend. The second names
-  -- what the ability targets (Dwarven Mauler's "that target this creature",
-  -- spelled Filter.IsSource), so no card in `data/cards/` puts a subtype word
-  -- there today and neutralising that descent leaves the suite green -- it is
-  -- here so that the card which does write one cannot silently keep the printed
-  -- word.
-  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f family targets cost floor_) -> PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.rewrite pairs f) family (fmap (Filter.rewrite pairs) targets) cost floor_)
-  -- The two arms with a word in TWO places: their own criterion ("nontoken
-  -- Rebels"), and the criterion inside each component they add ("sacrifice a
-  -- LAND", "sacrifice a SWAMP"). Both descend, which is Filter.rewriteCost's
-  -- reading of CR 612.2 carried to a component that is added to a cost rather
-  -- than printed in one. The scale beside them names a COLOUR, which CR 612.2's
-  -- subtype pairs cannot reach.
-  PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost f components scale) -> PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.rewrite pairs f) (fmap (Filter.rewriteComponent pairs) components) scale)
-  PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components scale) -> PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost (Filter.rewrite pairs f) (fmap (Filter.rewriteComponent pairs) components) scale)
-  PlayerEffect.CastAsThoughItHadFlash f -> PlayerEffect.CastAsThoughItHadFlash (Filter.rewrite pairs f)
-  PlayerEffect.CantBeCountered f -> PlayerEffect.CantBeCountered (Filter.rewrite pairs f)
-  PlayerEffect.CantCastMatching f -> PlayerEffect.CantCastMatching (Filter.rewrite pairs f)
-  PlayerEffect.CastFromGraveyard f -> PlayerEffect.CastFromGraveyard (Filter.rewrite pairs f)
-  PlayerEffect.CastFromHandWithoutPayingManaCost f -> PlayerEffect.CastFromHandWithoutPayingManaCost (Filter.rewrite pairs f)
-  -- The rest name no word a subtype pair could reach. The two chosen-name arms
-  -- carry nothing at all -- CR 201.4's names are read off the source's
-  -- Object.chosenNames -- and CR 612.2's second sentence says a subtype swap
-  -- could not touch a card name even if they did. A count, a mana filter and a
-  -- player scope are not words either.
-  PlayerEffect.CantCastSpells -> effect
-  PlayerEffect.CantCastMoreThan _ -> effect
-  PlayerEffect.CantCastChosenName -> effect
-  PlayerEffect.CantPlayLandChosenName -> effect
-  PlayerEffect.PlayAdditionalLands _ -> effect
-  PlayerEffect.NoMaximumHandSize -> effect
-  PlayerEffect.SetMaximumHandSize _ -> effect
-  PlayerEffect.DontLoseUnspentMana _ -> effect
-  PlayerEffect.SpendManaAsThough _ -> effect
-  PlayerEffect.CantBeTargetedBy _ -> effect
-  PlayerEffect.DamageCantBePrevented _ -> effect
-  PlayerEffect.CantSearchLibraries -> effect
-  PlayerEffect.CantBecomeMonarch -> effect
-  PlayerEffect.CastOnlyAtSorcerySpeed -> effect
-  PlayerEffect.CantPlayLands -> effect
-  PlayerEffect.PlayLandsFromGraveyard -> effect
-  -- A counter KIND is not a word CR 612.2's subtype pairs could reach either.
-  PlayerEffect.CantGetCounters _ -> effect
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over the
 -- whole event log, which is exactly "this turn" because Engine.handoffTurn clears
