@@ -2635,9 +2635,11 @@ abilitySources gs = Set.toList (Set.difference (GameState.battlefield gs) (GameS
 --   * A NESTED entry's outer subject: an entry rewrite that runs another entry
 --     (EntryRewrite.SacrificeAnyNumber, RunEffects) leaves the outer permanent
 --     uncountable too, because runEntry inserts into this set rather than writing
---     it. No board observes that leg -- neither card-authored board-counting
---     entry condition in data/cards, Dust Animus's nor Frontier Mastodon's, sits
---     under either rewrite -- so it is a regression fence rather than a proven
+--     it. No board observes that leg -- no card-authored board-counting entry
+--     condition in data/cards sits under either rewrite, neither of the two on a
+--     permanent's static ability (Dust Animus, Frontier Mastodon) nor the one on
+--     a floating row (Synthetic Magnetic Lockdown) -- so it is a regression
+--     fence rather than a proven
 --     behaviour. The outer BATCH is not covered: runEntry writes enteringBeside,
 --     as abilitySources has always read it.
 --
