@@ -1582,12 +1582,18 @@ playGame =
 -- 729.5c). Nesting terminates: each level's library comes from the parent's at
 -- cast time, so depth is bounded by |library| / 7.
 --
--- Not implemented: cards brought into a subgame from the main game, and the
--- main-game triggers their removal queues (#152). Of CR 729.2a-c and CR
--- 729.5a-c's command-zone residents, commanders are the kind Setup carries both
--- ways, and dungeons ride Player.dungeons rather than the command zone; planes
--- and phenomena (#934), schemes (#935), vanguards (#936) and conspiracies (#937)
--- do not exist.
+-- CR 729.4 runs the other way too: a subgame's wish reaches the main game's
+-- cards, and CR 729.4a takes each one it finds out of the main game.
+-- Setup.subgameStateFrom hands the subgame a SNAPSHOT of those cards rather than
+-- the parent itself, OutsideTheGame.bringInFrom records which of them crossed,
+-- and their departures are applied to the parent below, once the subgame has
+-- ended -- exact rather than late, since CR 729.1a discontinued the main game
+-- throughout. Setup.applyCrossings carries that argument in full.
+--
+-- Of CR 729.2a-c and CR 729.5a-c's command-zone residents, commanders are the
+-- kind Setup carries both ways, and dungeons ride Player.dungeons rather than
+-- the command zone; planes and phenomena (#934), schemes (#935), vanguards
+-- (#936) and conspiracies (#937) do not exist.
 playSubgame :: Game Result
 playSubgame = do
   parent <- State.get
@@ -1614,6 +1620,28 @@ playSubgame = do
           (Asked.under parent)
           (State.runStateT (Setup.startGameFromCards Resolve.performHandAction Set.empty >> playGame) sub0)
       )
+  -- CR 729.4a. This frame is the only one holding both games, which is why the
+  -- departures are applied from here and not from inside either of them
+  -- (CR 729.1a).
+  --
+  -- BEFORE the funnel, so funnelBack's keptParentObjects reads a parent the card
+  -- has already left rather than one it has to be kept out of. The order is
+  -- load-bearing on two counts, not one. First, the deletion itself: swapping
+  -- the two lines still leaves the whole suite green, since funnelBack keeps
+  -- the crossed object rather than reviving it, so applying the crossings
+  -- afterwards deletes exactly the same id from exactly the same zones -- what
+  -- would end THAT coincidence is funnelBack ever MINTING for a parent id, the
+  -- way the recovery path already does for a player who departed inside the
+  -- subgame (`recovered`), which would resurrect a crossed card the moment one
+  -- of those ids could also cross. Second, and observable today: applyCrossings'
+  -- `filed` takes CR 608.2h last known information by projecting the crossed
+  -- object against the running board (Pawl.Engine.Setup.applyCrossings), and
+  -- funnelBack rebuilds every library from scratch and merges the subgame's
+  -- returned cards into GameState.objects. Run applyCrossings after funnelBack
+  -- and `filed` would file last known power/toughness for any
+  -- characteristic-defining ability that counts cards in a LIBRARY (CR 604.3)
+  -- against a board whose libraries have already been rebuilt.
+  State.modify' (Setup.applyCrossings finalSub)
   State.modify' (Setup.funnelBack finalSub)
   -- CR 729.5: each player who was IN the subgame takes the traditional cards they
   -- own back to their main-game library and shuffles.
