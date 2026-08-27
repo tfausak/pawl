@@ -909,6 +909,27 @@ data Filter keyword
     -- a +1/+1 counter grants is CR 613.4c's, which the projection applies over the
     -- top of what this atom reads.
     HasCounters (CounterKind.CounterKind keyword)
+  | -- | CR 122.1 again, kind-agnostic: does the CANDIDATE have one or more
+    -- counters on it of ANY kind? Razorfin Abolisher's "target creature with a
+    -- counter on it".
+    --
+    -- A SEPARATE nullary atom rather than a Maybe payload on HasCounters above,
+    -- which is the call Quantity.ObjectCountersOfAnyKind made one type over
+    -- (#994): an absent payload standing for "every kind" makes a field's
+    -- ABSENCE the way a reader tells two questions apart, and the two questions
+    -- are asked by different printings rather than by one printing with a hole
+    -- in it. It also keeps CR 612.1's rewrite simple -- HasCounters is rewritten
+    -- THROUGH its kind, and a kind-less atom has no word to swap.
+    --
+    -- Not spellable as an Or over the kinds: CR 122.1b lets a counter be a
+    -- KEYWORD counter, so CounterKind carries a whole Keyword and is not
+    -- enumerable. There is no finite disjunction a card author could write, which
+    -- is why this atom has to exist rather than being sugar.
+    --
+    -- Uncharacteristic, for HasCounters' reason above, and
+    -- Pawl.Engine.Projection.filterReads declares it as reading nothing on the
+    -- same grounds.
+    HasCountersOfAnyKind
   | -- | CR 602.1 / 605.1a: does the CANDIDATE have one or more activated
     -- abilities that aren't mana abilities? Tsabo's Web's "each land with an
     -- activated ability that isn't a mana ability", and Ravager Wurm's second
