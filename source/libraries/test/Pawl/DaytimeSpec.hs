@@ -374,10 +374,14 @@ transformSpec s registry = Spec.describe s "Transform" $ do
 anyNumberSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 anyNumberSpec s registry = Spec.describe s "AnyNumber" $ do
   -- CR 608.2d, through Tovolar's whole upkeep trigger: "it becomes night. Then
-  -- transform any number of Human Werewolves you control." The board is three
-  -- seats' worth of nothing spare -- Tovolar is the source, Russet Wolves is the
-  -- third Wolf the trigger's intervening "if" counts, and Daybreak Ranger is the
-  -- only permanent the second sentence can reach.
+  -- transform any number of Human Werewolves you control." The board is four
+  -- permanents' worth of nothing spare -- Tovolar is the source, Russet Wolves is
+  -- the third Wolf the trigger's intervening "if" counts, and Daybreak Ranger is
+  -- the only permanent alice's half of the second sentence can reach. BOB's
+  -- Daybreak Ranger is the fourth seat's worth, and the negative half: an equally
+  -- transformable Human Werewolf that "you control" excludes, so it separates the
+  -- Filter's controller conjunct from a bare battlefield sweep and separates an
+  -- answer FILTERED against the offer from one taken on trust.
   --
   -- Why the Ranger and not Tovolar: he is daybound, so CR 702.145c has already
   -- turned him over by the time the second sentence runs and CR 702.145b's third
@@ -393,10 +397,14 @@ anyNumberSpec s registry = Spec.describe s "AnyNumber" $ do
     tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
     ranger <- S.printingOf s registry "Daybreak Ranger"
     wolf <- S.printingOf s registry "Russet Wolves"
-    let (tovolarId, rangerId, started) = anyNumberBoard tovolar ranger wolf
+    let (tovolarId, rangerId, bobRangerId, started) = anyNumberBoard tovolar ranger wolf
         after = S.runPure namingAll (upkeep started) Engine.runStep
     Spec.assertEqWith s "the Ranger shows its back face" (faceNameOf rangerId after) (Just rangerBackName)
     Spec.assertEqWith s "and it is a 4/4 Nightfall Predator" (S.powerToughnessOf rangerId after) (Just (4, 4))
+    -- CR 109.5's "you", read through the sweep's own Filter.Context: bob's copy
+    -- is the same printing on the same battlefield and was never offered, so
+    -- naming EVERY candidate still leaves it alone.
+    Spec.assertEqWith s "bob's copy was never offered, so it is untouched" (faceNameOf bobRangerId after) (Just rangerFrontName)
     Spec.assertEqWith s "the trigger ran, so it is night" (GameState.daytime after) (Just Daytime.Night)
     Spec.assertEqWith s "and CR 702.145c turned Tovolar over" (faceNameOf tovolarId after) (Just backName)
   -- "ANY NUMBER" includes zero, and CR 608.2d bars only an illegal or impossible
@@ -408,25 +416,25 @@ anyNumberSpec s registry = Spec.describe s "AnyNumber" $ do
     tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
     ranger <- S.printingOf s registry "Daybreak Ranger"
     wolf <- S.printingOf s registry "Russet Wolves"
-    let (tovolarId, rangerId, started) = anyNumberBoard tovolar ranger wolf
+    let (tovolarId, rangerId, _, started) = anyNumberBoard tovolar ranger wolf
         after = S.runPure namingNone (upkeep started) Engine.runStep
     Spec.assertEqWith s "the Ranger is still front face up" (faceNameOf rangerId after) (Just rangerFrontName)
     Spec.assertEqWith s "and is still a 2/2 Daybreak Ranger" (S.powerToughnessOf rangerId after) (Just (2, 2))
     Spec.assertEqWith s "the trigger ran all the same, so it is night" (GameState.daytime after) (Just Daytime.Night)
     Spec.assertEqWith s "and CR 702.145c turned Tovolar over" (faceNameOf tovolarId after) (Just backName)
-  -- The offer is FILTERED, not trusted (#222): Russet Wolves is a Wolf and never
-  -- a Human Werewolf, so it was never among the candidates and naming it turns
-  -- nothing over -- neither it nor the Ranger the answer did not name.
+  -- The offer is FILTERED, not trusted (#222). bob's Daybreak Ranger is the
+  -- discriminating victim rather than the Russet Wolves beside it: the Wolf is a
+  -- single-faced card, so CR 701.27c withholds its turn whatever the engine did
+  -- with the answer, where bob's Ranger would turn over the moment an answer was
+  -- taken on trust.
   Spec.it s "CR 608.2d an answer naming what was never offered turns nothing over" $ do
     tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
     ranger <- S.printingOf s registry "Daybreak Ranger"
     wolf <- S.printingOf s registry "Russet Wolves"
-    let (tovolarId, rangerId, started) = anyNumberBoard tovolar ranger wolf
-        wolfIds = filter (\oid -> oid /= tovolarId && oid /= rangerId) (Set.toList (GameState.battlefield started))
-        after = S.runPure (namingExactly (Set.fromList wolfIds)) (upkeep started) Engine.runStep
-    Spec.assertEqWith s "one Russet Wolves was there to name" (length wolfIds) 1
-    Spec.assertEqWith s "the Ranger is still front face up" (faceNameOf rangerId after) (Just rangerFrontName)
-    Spec.assertEqWith s "and the Wolf, which has no other face, is unchanged" (fmap (fmap Face.name . (`Game.faceOf` after)) wolfIds) [Just (CardName.MkCardName (Text.pack "Russet Wolves"))]
+    let (_, rangerId, bobRangerId, started) = anyNumberBoard tovolar ranger wolf
+        after = S.runPure (namingExactly (Set.singleton bobRangerId)) (upkeep started) Engine.runStep
+    Spec.assertEqWith s "bob's Ranger, which was never offered, is still front face up" (faceNameOf bobRangerId after) (Just rangerFrontName)
+    Spec.assertEqWith s "and so is alice's, which the answer did not name" (faceNameOf rangerId after) (Just rangerFrontName)
     Spec.assertEqWith s "the trigger ran all the same, so it is night" (GameState.daytime after) (Just Daytime.Night)
 
 -- Alice controls Tovolar, a Daybreak Ranger and a Russet Wolves, settled, with
@@ -437,12 +445,13 @@ anyNumberBoard ::
   Printing.Printing ->
   Printing.Printing ->
   Printing.Printing ->
-  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 anyNumberBoard tovolar ranger wolf =
   let (tovolarId, g1) = S.addCreature tovolar S.alice (Setup.emptyGame S.bothPlayers)
       (rangerId, g2) = S.addCreature ranger S.alice g1
       (_, g3) = S.addCreature wolf S.alice g2
-   in (tovolarId, rangerId, settle (afterOneCast g3))
+      (bobRangerId, g4) = S.addCreature ranger S.bob g3
+   in (tovolarId, rangerId, bobRangerId, settle (afterOneCast g4))
 
 -- One spell cast by alice during the previous turn, written into the per-seat
 -- snapshot the Ranger's trigger reads. Set directly, as afterCasting above is,
