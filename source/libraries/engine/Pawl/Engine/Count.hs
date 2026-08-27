@@ -20,6 +20,8 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Filter as Filter.Type
@@ -206,7 +208,12 @@ mapQuantity f count =
 playerView :: GameState -> PlayerId -> Filter.View
 playerView gs pid =
   (Filter.playerView pid)
-    { Filter.dealtDamageThisTurn = Game.wasDealtDamageThisTurn gs pid
+    { Filter.dealtDamageThisTurn = Game.wasDealtDamageThisTurn gs pid,
+      -- CR 508.3b: the same division, one record over -- a player IS one of that
+      -- rule's three subjects, and Pawl.Engine.Filter.playerView holds no combat
+      -- record to read the answer from.
+      Filter.declaredAttackedThisCombat =
+        Set.member (AttackTarget.OfPlayer pid) (Combat.declaredAttacked (GameState.combat gs))
     }
 
 -- CR 110.2 / 109.5: answer every perspective-reframing atom in a predicate
@@ -286,6 +293,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.HasChosenName -> predicate
   Filter.Type.IsPlayer _ -> predicate
   Filter.Type.IsAttacking -> predicate
+  Filter.Type.DeclaredAttackedThisCombat -> predicate
   Filter.Type.IsBlocking -> predicate
   Filter.Type.IsBlocked -> predicate
   Filter.Type.AttackedThisTurn -> predicate
@@ -647,6 +655,10 @@ viewOfSnapshot mController isToken snapshot =
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
+      -- CR 508.3b: whether the candidate was declared attacked is no more a
+      -- characteristic than `attacking` above is, so a snapshot has nothing to
+      -- answer it with either.
+      Filter.declaredAttackedThisCombat = False,
       Filter.blocking = False,
       Filter.blocked = False,
       Filter.attackedThisTurn = False,

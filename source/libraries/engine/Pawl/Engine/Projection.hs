@@ -30,6 +30,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
@@ -797,6 +798,9 @@ viewOfCard face =
           -- CR 508.1a / 509.1a: a printed face is in no combat, for the reason
           -- `attacking` above is False.
           Filter.declaredAttackerThisCombat = False,
+          -- CR 508.3b's other half, False for the same reason: a printed face is
+          -- in no combat, so nothing was declared attacking it.
+          Filter.declaredAttackedThisCombat = False,
           Filter.declaredBlockerThisCombat = False,
           -- CR 701.17a mills an OBJECT; this builder describes a printed FACE.
           -- viewOfCharacteristics is the view that holds an id and answers.
@@ -952,6 +956,13 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- payment these two are read during, so a fold over them would be False
       -- for exactly the creatures being declared.
       Filter.declaredAttackerThisCombat = Set.member oid (Combat.declaredAttackers (GameState.combat gs)),
+      -- CR 508.3b: the same record's other half, indexed by TARGET rather than by
+      -- attacker. A permanent is named as AttackTarget.OfPlaneswalker or
+      -- AttackTarget.OfBattle; Pawl.Engine.Count.playerView answers CR 508.3b's
+      -- third subject off the same set.
+      Filter.declaredAttackedThisCombat =
+        Set.member (AttackTarget.OfPlaneswalker oid) (Combat.declaredAttacked (GameState.combat gs))
+          || Set.member (AttackTarget.OfBattle oid) (Combat.declaredAttacked (GameState.combat gs)),
       Filter.declaredBlockerThisCombat = Set.member oid (Combat.declaredBlockers (GameState.combat gs)),
       -- CR 701.17a / 608.2i: the same log, read for the mills.
       Filter.milledThisTurn = any (milledIt oid . LoggedEvent.event) (GameState.events gs),
@@ -3416,6 +3427,9 @@ filterReads f = case f of
   -- Modification writes; every zone change happens between projections.
   Filter.Type.CardsInGraveyardAtLeast _ -> Set.empty
   Filter.Type.IsAttacking -> Set.empty
+  -- Reads nothing, for IsAttacking's reason and off the same record -- who was
+  -- declared attacked is no characteristic of anything.
+  Filter.Type.DeclaredAttackedThisCombat -> Set.empty
   -- Reads nothing, for IsAttacking's reason and off the same record.
   Filter.Type.IsBlocking -> Set.empty
   Filter.Type.IsBlocked -> Set.empty

@@ -72,6 +72,7 @@ codec keywordCodec =
       Arm.payload "SameNameAsBound" SlotName.codec Filter.SameNameAsBound (\x -> case x of Filter.SameNameAsBound y -> Just y; _ -> Nothing),
       Arm.nullary "HasChosenName" Filter.HasChosenName,
       Arm.nullary "IsAttacking" Filter.IsAttacking,
+      Arm.nullary "DeclaredAttackedThisCombat" Filter.DeclaredAttackedThisCombat,
       Arm.nullary "IsBlocking" Filter.IsBlocking,
       Arm.nullary "IsBlocked" Filter.IsBlocked,
       Arm.nullary "AttackedThisTurn" Filter.AttackedThisTurn,
