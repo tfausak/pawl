@@ -889,7 +889,7 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 -- loop would otherwise find its siblings already sitting on the battlefield.
 --
 -- A simultaneously-entering sibling can reach a later member's entry loop through
--- three channels; only the first needs this explicit exclusion:
+-- four channels; only the first needs this explicit exclusion:
 --   1. Copy targets -- excluded by `batch`. Two boards observe it, one per
 --      producer: kicked Rite of Replication on a Clone, where five token Clones
 --      enter at once (Pawl.CopySpec's "none may copy a sibling"), and Rise of the
@@ -921,6 +921,16 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --      sacrifices nothing" is the proof: without it Ashaya, Soul of the Wild makes
 --      a bystanding Goblin Piker a Forest land, and the Wood Elemental arriving
 --      beside it eats the Piker.
+--   4. Board membership -- a CARD-AUTHORED count, either in the CR 604.2 clause
+--      that gates a row (Pawl.Types.PrintedReplacement) or in the amount a rewrite
+--      places (the EntryRewrite.WithCounters arm below). Both fold over the
+--      battlefield, which holds the sibling whether or not its abilities function,
+--      so channel 3 does not reach them; and this is the one channel the loop's
+--      own SUBJECT is on the wrong side of as well. Excluded by
+--      Pawl.Engine.Projection.boardAsEntering, which subtracts
+--      GameState.enteringSubjects too. Pawl.ReplacementSpec's Frontier Mastodon
+--      pairs are the proof, one per direction; the amount half has no board that
+--      observes it (#2431).
 applyReplacementsIn :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
 applyReplacementsIn asOf batch event = do
   (outcome, _, _) <- applyReplacementsFully asOf batch event
@@ -1459,6 +1469,18 @@ apply batch candidate event =
       -- announcement rides across the move on Object.announcedX, which
       -- Quantity.substituteAnnouncedX puts back where the rule says it belongs and
       -- nowhere else.
+      --
+      -- The AMOUNT is CR 614.12's "how they apply", so it counts over
+      -- Projection.boardAsEntering rather than the live battlefield -- Tidewalker's
+      -- "a time counter for each Island you control" must not count an Island
+      -- arriving in the same batch. The VIEW stays the live one, as
+      -- Projection.replacementsOf's does and for its reason. No board in
+      -- data/cards observes this: reaching it wants a batch that carries both a
+      -- card whose entry rewrite counts the board and something it would count,
+      -- and the pool's two such rewrites count Islands (Tidewalker) and graveyard
+      -- creature cards (Undergrowth Scavenger). A regression fence, then, kept
+      -- because CR 614.12 states it -- mutating it away leaves the suite green
+      -- (#2431).
       EntryRewrite.WithCounters (WithCounters.MkWithCounters counters) -> do
         gs <- State.get
         let viewOf = Projection.viewWithLastKnown oid gs
@@ -1466,7 +1488,7 @@ apply batch candidate event =
             announcedX = Projection.announcedXOf oid gs
         Replacement.consume (ReplacementCandidate.identity candidate)
         Foldable.for_ (Map.toList counters) $ \(kind, quantity) ->
-          case Quantity.evaluate viewOf context gs oid (Quantity.substituteAnnouncedX announcedX quantity) of
+          case Quantity.evaluate viewOf context (Projection.boardAsEntering gs) oid (Quantity.substituteAnnouncedX announcedX quantity) of
             Nothing -> pure () -- unevaluable quantity: no counters (Resolve's PutCounters posture)
             Just n -> addEnteringCounters oid kind (Integer.toNaturalSaturating n)
         pure (Just event)

@@ -307,9 +307,9 @@ data GameState = MkGameState
     -- Empty at every priority window the engine reaches, exactly as the two
     -- queues above are: it is non-empty only for the span of one entry loop.
     enteringBeside :: Set.Set ObjectId.ObjectId,
-    -- | CR 614.12: the SUBJECT of every entry loop currently running -- the
-    -- permanents `enteringBeside` above is the complement of. Materialized on the
-    -- battlefield, so that CR 614.12's "characteristics of the permanent as it
+    -- | CR 614.12: the SUBJECT of every entry loop currently running -- the one
+    -- permanent `enteringBeside` above deliberately leaves out. Materialized on
+    -- the battlefield, so that CR 614.12's "characteristics of the permanent as it
     -- would exist on the battlefield" is a plain projection, but not on it as far
     -- as the rules are concerned: Frontier Mastodon's ferocious row "checks if you
     -- control a creature with power 4 or greater as Frontier Mastodon enters the
@@ -319,8 +319,8 @@ data GameState = MkGameState
     -- Together with `enteringBeside` this is every permanent that is
     -- materialized but not entered, which is what
     -- Pawl.Engine.Projection.boardAsEntering subtracts from the battlefield before
-    -- a CR 614.12 determination reads it. The two are disjoint and neither
-    -- subsumes the other: a subject's own static abilities DO apply to it (which
+    -- a CR 614.12 determination reads it. Neither field subsumes the other: a
+    -- subject's own static abilities DO apply to it (which
     -- is why abilitySources subtracts only the siblings), and a sibling is no more
     -- countable than the subject (which is why the board subtracts both).
     --

@@ -2588,13 +2588,19 @@ abilitySources gs = Set.toList (Set.difference (GameState.battlefield gs) (GameS
 --     (Blackcleave Cliffs, Gatherer 2023-02-04) -- the batch.
 --   * "Because Frontier Mastodon isn't on the battlefield at this time, it
 --     won't count itself" (Gatherer 2014-11-24) -- the subject.
---   * A NESTED entry's outer subject, which no card reaches: an entry rewrite
---     that runs another entry (SacrificeAnyNumber, RunEffects) leaves the outer
---     permanent uncountable too, because runEntry inserts rather than writes.
---     Nothing in data/cards puts a board-counting entry condition under one, so
---     that leg is a regression fence rather than a proven behaviour. Its
---     sibling's outer BATCH is not covered: runEntry writes enteringBeside, as
---     abilitySources has always read it.
+--   * A NESTED entry's outer subject: an entry rewrite that runs another entry
+--     (EntryRewrite.SacrificeAnyNumber, RunEffects) leaves the outer permanent
+--     uncountable too, because runEntry inserts into this set rather than writing
+--     it. No board observes that leg -- neither card-authored board-counting
+--     entry condition in data/cards, Dust Animus's nor Frontier Mastodon's, sits
+--     under either rewrite -- so it is a regression fence rather than a proven
+--     behaviour. The outer BATCH is not covered: runEntry writes enteringBeside,
+--     as abilitySources has always read it.
+--
+-- Every determination made WHILE an entry loop runs reads this board, not only
+-- the one about the entering permanent: a rewrite that runs a sacrifice or
+-- resolves a card's effects can reach another replacement, and the permanent is
+-- no more on the battlefield for that one than for its own.
 --
 -- Answers `gs` unchanged outside an entry loop, where both sets are empty, so
 -- the ordinary board is untouched.

@@ -7498,15 +7498,15 @@ dustAnimusSpec s registry = Spec.describe s "Dust Animus (CR 614.1c)" $ do
 --
 -- Frontier Mastodon {2}{G} Creature -- Elephant 3/2, whole text: "Ferocious --
 -- This creature enters with a +1/+1 counter on it if you control a creature with
--- power 4 or greater." (oracle checked on Scryfall 2026-08-26; "Ferocious" is an
--- ability word and means nothing). The card carries the rulings for BOTH
--- directions: "Frontier Mastodon's ferocious ability checks if you control a
--- creature with power 4 or greater as Frontier Mastodon enters the battlefield.
--- Because Frontier Mastodon isn't on the battlefield at this time, it won't count
--- itself" (Gatherer 2014-11-24), and the batch half is the fast lands' "if one of
--- these lands enters the battlefield at the same time as one or more other lands
--- ... it doesn't take those lands into consideration" (Blackcleave Cliffs,
--- Gatherer 2023-02-04).
+-- power 4 or greater." (oracle checked on Scryfall 2026-08-27; "Ferocious" is an
+-- ability word and means nothing). The card carries the ruling for one direction
+-- and the fast lands carry the other: "Frontier Mastodon's ferocious ability
+-- checks if you control a creature with power 4 or greater as Frontier Mastodon
+-- enters the battlefield. Because Frontier Mastodon isn't on the battlefield at
+-- this time, it won't count itself" (Gatherer 2014-11-24), and "if one of these
+-- lands enters the battlefield at the same time as one or more other lands ... it
+-- doesn't take those lands into consideration" (Blackcleave Cliffs, Gatherer
+-- 2023-02-04).
 --
 -- TWO PAIRS, one per direction, because either exclusion alone would leave the
 -- other's pair green:
