@@ -28,6 +28,7 @@ import qualified Pawl.Codec.Mana as Mana
 import qualified Pawl.Codec.MonarchWatch as MonarchWatch
 import qualified Pawl.Codec.Object as Object
 import qualified Pawl.Codec.ObjectId as ObjectId
+import qualified Pawl.Codec.OutsideObject as OutsideObject
 import qualified Pawl.Codec.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Codec.Phase as Phase
 import qualified Pawl.Codec.PhasedOut as PhasedOut
@@ -71,6 +72,8 @@ codec = Fields.object $ do
   command <- Fields.required "command" (Common.set ObjectId.codec) GameState.command
   stack <- Fields.required "stack" (Common.list ObjectId.codec) GameState.stack
   players <- Fields.required "players" (Common.naturalMap PlayerId.codec Player.codec) GameState.players
+  outsideObjects <- Fields.required "outsideObjects" (Common.naturalMap ObjectId.codec OutsideObject.codec) GameState.outsideObjects
+  broughtIn <- Fields.required "broughtIn" (Common.seq ObjectId.codec) GameState.broughtIn
   manaPool <- Fields.required "manaPool" (Common.naturalMap PlayerId.codec Mana.codec) GameState.manaPool
   combat <- Fields.required "combat" Combat.codec GameState.combat
   events <- Fields.required "events" (Common.seq LoggedEvent.codec) GameState.events
@@ -137,6 +140,8 @@ codec = Fields.object $ do
         GameState.command = command,
         GameState.stack = stack,
         GameState.players = players,
+        GameState.outsideObjects = outsideObjects,
+        GameState.broughtIn = broughtIn,
         GameState.manaPool = manaPool,
         GameState.combat = combat,
         GameState.events = events,

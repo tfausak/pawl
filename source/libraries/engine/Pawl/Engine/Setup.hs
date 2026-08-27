@@ -115,6 +115,9 @@ emptyGame order =
           GameState.command = mempty,
           GameState.stack = [],
           GameState.players = Map.fromList (fmap newPlayer order_),
+          -- CR 729.4: nobody is nested inside another game here.
+          GameState.outsideObjects = Map.empty,
+          GameState.broughtIn = Seq.empty,
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
           GameState.events = Seq.empty,
@@ -453,7 +456,10 @@ restartGame perform exempt starter = do
     -- game, in their seats, rotated to begin with `starter` (CR 727.1a).
     let order = rotateTo starter (Game.stillPlayingInOrder gs)
      in gs
-          { GameState.players = resetPlayers (GameState.players gs),
+          { -- GameState.outsideObjects and GameState.broughtIn are deliberately
+            -- absent from this update: CR 727.1 restarts the game, and a card
+            -- outside it is still outside it, so both are carried over unchanged.
+            GameState.players = resetPlayers (GameState.players gs),
             GameState.manaPool = Map.empty,
             GameState.combat = Combat.emptyCombat,
             GameState.events = Seq.empty,
@@ -591,6 +597,11 @@ subgameStateFrom starter parent =
         { GameState.objects = movedObjects,
           GameState.turnOrder = order,
           GameState.players = resetPlayers (GameState.players parent),
+          -- CR 729.4: the parent's card objects (and CR 729.6's already-outside
+          -- ones) are snapshotted here in a later unit; empty for now.
+          GameState.outsideObjects = Map.empty,
+          -- CR 729.4a: nothing has crossed into this subgame yet.
+          GameState.broughtIn = Seq.empty,
           GameState.library = Map.empty,
           GameState.hand = Map.empty,
           GameState.graveyard = Map.empty,
