@@ -108,6 +108,12 @@ Standing assignments, in order of yield:
 - turn the NEXT issue (or cluster) into a dispatch-ready brief carrying what
   the implementer would otherwise re-derive --- see "Writing a brief" in the
   role file, which now says which fields to carry and which to stop writing
+- audit the last few MERGED units against each other. Two units each correct
+  alone can compose wrong, and no single unit's mutations see it: a delayed
+  trigger that never consulted the batch scoping landed that way (#2384). Read
+  the merged diffs, not the tests. A comment-only unit is the same shape from
+  the other side --- nothing red catches a false CR classification or a haddock
+  naming a function with no callers --- so read its diff before it merges
 - the **staleness sweep** the role file describes, against the TREE. Sweeping
   card names for fired `expires:card-driven` triggers is a closed seam: two
   independent passes over every open card-driven issue found none
@@ -146,9 +152,12 @@ agents to run `cabal` in the foreground with a generous timeout, and never to
 **Merging.** Arm auto-merge (squash) on each PR. The ruleset requires branches
 be up to date, so an armed auto-merge silently stalls at `BEHIND` --- poll
 `mergeStateStatus` and run `gh pr update-branch`. That adds a merge commit to
-the agent's branch, which is why agents must not force-push. On a conflict,
-send the agent back to merge `origin/main`, resolve by taking both sides, and
-**re-run its mutations**.
+the agent's branch, which is why agents must not force-push. Arming does not
+stick: a push to the branch can drop it, and a PR reported ready is not an
+armed one --- re-check `autoMergeRequest` after arming and after every push,
+including the one that resolves a conflict. On a conflict, send the agent back
+to merge `origin/main`, resolve by taking both sides, and **re-run its
+mutations**.
 
 **Scheduling, by subsystem rather than by a predicted file list.** Never have
 two units in flight that edit the same file, unless they are deliberately
