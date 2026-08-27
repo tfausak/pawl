@@ -3110,6 +3110,10 @@ targetsOnStack oid gs =
 -- it was not offered, the wrong number of targets, or a recipient outside the
 -- offered set leaves the copied targets standing rather than being patched into
 -- something the player did not choose.
+--
+-- Not implemented: Target.selectionLegal's joint check, so `wellFormed` measures
+-- each slot against the UNION and two slots that exclude each other are not
+-- judged together (#2472). Every such slot in the pool is on a spell.
 chooseNewTargetsFor :: PlayerId -> ObjectId -> Game ()
 chooseNewTargetsFor controller copyId = do
   gs <- State.get
