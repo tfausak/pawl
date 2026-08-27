@@ -1,5 +1,6 @@
 module Pawl.Types.BecameBlocking where
 
+import qualified Data.Set as Set
 import qualified Pawl.Types.ObjectId as ObjectId
 
 -- | CR 509.1g: a creature became a blocking creature, and which attacking
@@ -48,6 +49,31 @@ data BecameBlocking = MkBecameBlocking
     -- arrival only when no GameEvent.AttackerBlocked rode the same arrival --
     -- CR 509.3c withholds that event exactly when this field is True, so the
     -- field is how the two arms avoid answering one becoming-blocked twice.
-    attackerWasBlocked :: Bool
+    attackerWasBlocked :: Bool,
+    -- | CR 509.3e's comparand: the creatures blocking the ATTACKER immediately
+    -- before this event, read before the write that added this blocker.
+    --
+    -- On CR 509.4's road, the one both readers guard on, exactly one creature
+    -- joins per event -- so the attacker is blocked by one more than this many
+    -- the moment after, a count trigger's floor is crossed here when this many
+    -- plus one equals it, and a filtered one's when nothing here matched the
+    -- Filter. CR 509.1's declaration is simultaneous instead, so every pair it
+    -- records carries the same pre-declaration set; no reader looks.
+    --
+    -- Not derivable from Combat.blockers when the condition is scanned, and for
+    -- a sharper reason than the flag above: several creatures can be put onto
+    -- the battlefield blocking one attacker BEFORE any of them is scanned (CR
+    -- 509.2a, and CR 614.16 doubling one token-making effect is the pooled
+    -- producer), so the entry read at the scan holds the whole batch and every
+    -- arrival in it reads the same set. Subtracting this arrival from that set
+    -- leaves the others in, which is what made a doubled arrival invisible to
+    -- both readers.
+    --
+    -- The SET rather than a count, because the two readers want different
+    -- things off it: TriggerCondition.CreatureBecomesBlockedByAtLeast counts,
+    -- and TriggerCondition.SelfBecomesBlockedByOneOrMore asks its Filter about
+    -- each id (through CR 608.2h last known information, a blocker that has
+    -- since left keeping its id here).
+    blockersBefore :: Set.Set ObjectId.ObjectId
   }
   deriving (Eq, Ord, Show)

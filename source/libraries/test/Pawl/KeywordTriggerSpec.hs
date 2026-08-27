@@ -1292,6 +1292,15 @@ creatureBecomesBlockedByAtLeastSpec s registry =
         let lands = List.foldl' (\g _ -> snd (S.addCreature forest S.bob g)) gs0 (replicate (3 * copies) ())
             stocked = List.foldl' (\g _ -> snd (S.addLibraryCard forest S.bob (snd (S.addHandCard foliage S.bob g)))) lands (replicate copies ())
         pure (stocked, ours, yours)
+      -- foliageBoard with a Doubling Season on the DEFENDING seat, which is the
+      -- whole difference: CR 614.16 makes one Flash Foliage mint two Saprolings,
+      -- and Combat.putOntoBattlefieldBlocking puts BOTH onto the battlefield
+      -- blocking the same attacker before any player gets priority (CR 509.2a).
+      -- One copy of the spell, so nothing here is a second casting.
+      doublingFoliageBoard mine theirs = do
+        (gs0, ours, yours) <- foliageBoard 1 mine theirs
+        season <- S.printingOf s registry "Doubling Season"
+        pure (snd (S.addCreature season S.bob gs0), ours, yours)
       -- The attack declared and the game handed over AT the declare blockers
       -- step. S.runToStep stops when the phase first matches, which is BEFORE CR
       -- 509.1's turn-based action, so the declaration is still ahead of the
@@ -1543,6 +1552,74 @@ creatureBecomesBlockedByAtLeastSpec s registry =
                 (firedBy seifer joined)
                 1
             _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob one Giant"
+        -- Rule 509.3e's floor crossed by TWO arrivals at once, which is the case
+        -- no per-arrival reading of the live blocker count can state: CR 614.16
+        -- doubles Flash Foliage's Saproling, so the block goes from one declared
+        -- Hill Giant straight to three and the count never lands on two. The
+        -- attacker plainly did become blocked by two or more creatures, and once.
+        --
+        -- The case above's board with a Doubling Season added on the defending
+        -- seat and one Flash Foliage instead of two, so the difference from it is
+        -- the SIMULTANEITY rather than the number of arrivals: there the count
+        -- steps 1, 2, 3 and here it jumps 1, 3.
+        Spec.it s "CR 509.3e whole card: two Saprolings arriving at once cross the floor together" $ do
+          (gs, mine, theirs) <- doublingFoliageBoard ["Llanowar Elves", "Seifer, Balamb Rival"] ["Hill Giant"]
+          case (mine, theirs) of
+            ([elves, seifer], [giant]) -> do
+              let declared = atBlockers elves [giant] gs
+                  joined = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (casting elves [giant] elves giant) declared
+                  -- The control: the same board and the same declaration with the
+                  -- spell left in bob's hand, so the Giant faces the Elves alone.
+                  alone = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (declaring elves [giant]) declared
+              Spec.assertEqWith
+                s
+                "the Giant dies to the 1/1 once the two Saprolings join the block, and lives when they do not"
+                (giants joined, giants alone)
+                (0, 1)
+              -- Anti-vacuity: the doubling really happened and both tokens really
+              -- are blocking THIS attacker, so the death above is the crossing
+              -- rather than a spell that fizzled or a Season that did nothing.
+              Spec.assertEqWith
+                s
+                "CR 614.16: three creatures are blocking the Elves on the firing leg"
+                (Set.size (Combat.blockersOf elves (S.runToStep (Phase.Combat CombatStep.CombatDamage) (casting elves [giant] elves giant) declared)))
+                3
+              -- Rule 509.3e's arity, after the gameplay quantity: the pair of
+              -- arrivals is ONE crossing, not one apiece.
+              Spec.assertEqWith
+                s
+                "and Seifer triggered exactly once across the whole combat"
+                (firedBy seifer joined)
+                1
+            _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob one Giant"
+        -- The same pair of arrivals landing on an UNBLOCKED attacker, where CR
+        -- 509.3c does record GameEvent.AttackerBlocked and rule 509.3e's floor is
+        -- crossed by that becoming rather than by either arrival. Still one
+        -- trigger: the two events describe one creature becoming blocked by two
+        -- creatures, and an arm that answered both would count it twice.
+        --
+        -- The case above's board with bob declaring nothing, and counted off the
+        -- event log rather than at gameplay level for the same reason the
+        -- uncrossed case above is: deathtouch or not, the Elves' one point kills
+        -- a 1/1 Saproling, so no board moves.
+        Spec.it s "CR 509.3e two Saprolings arriving at once at an unblocked attacker fire it once, not twice" $ do
+          (gs, mine, theirs) <- doublingFoliageBoard ["Llanowar Elves", "Seifer, Balamb Rival"] ["Hill Giant"]
+          case (mine, theirs) of
+            ([elves, seifer], [giant]) -> do
+              let joined = S.runToStep (Phase.Combat CombatStep.CombatDamage) (casting elves [] elves giant) (atBlockers elves [] gs)
+              -- Anti-vacuity FIRST: the assertion under test is a count, which a
+              -- board where the spell never resolved would also satisfy.
+              Spec.assertEqWith
+                s
+                "both Saprolings arrived, so the Elves is blocked by two creatures"
+                (Set.size (Combat.blockersOf elves joined))
+                2
+              Spec.assertEqWith
+                s
+                "and Seifer triggered once for the becoming, not once per arrival"
+                (firedBy seifer joined)
+                1
+            _ -> Spec.assertFailure s "fixture should give alice an Elves and a Seifer, and bob one Giant to leave undeclared"
 
 -- CR 509.3c: "Whenever [a creature] becomes blocked, . . ." -- the ATTACKING
 -- side of the same declaration selfBlocksSpec reads, matched against
@@ -4516,7 +4593,7 @@ afflictSpec s registry =
         -- 702.130a's "defending player" reads. The falsifier is an arm that binds
         -- the attacking side, or none at all.
         Spec.it s "CR 603.2 the defending player rides the becomes-blocked event in the reserved slot" $ do
-          let bindings = Event.eventBindings Nothing TriggerCondition.SelfBecomesBlocked (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked (ObjectId.MkObjectId 9) S.carol))
+          let bindings = Event.eventBindings Nothing TriggerCondition.SelfBecomesBlocked (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked (ObjectId.MkObjectId 9) S.carol 1))
           Spec.assertEqWith s "carol is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.carol)))
         -- CR 702.130b: "If a creature has multiple instances of afflict, each
         -- triggers separately." Asked of the mint rather than of a board, as
