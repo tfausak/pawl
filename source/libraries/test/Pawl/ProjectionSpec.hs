@@ -436,6 +436,48 @@ chorusBadMoon chorus badMoon bogWraith childOfNight chorusFirst =
       (childId, gs) = S.addCreature childOfNight S.alice g2
    in (wraithId, childId, gs)
 
+-- The printings the graveyard-dependency group below shares: Synthetic Charnel
+-- Measure, Grist, the Hunger Tide and a Hill Giant.
+charnelPrintings ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (Printing.Printing, Printing.Printing, Printing.Printing)
+charnelPrintings s registry = do
+  charnel <- S.printingOf s registry "Synthetic Charnel Measure"
+  grist <- S.printingOf s registry "Grist, the Hunger Tide"
+  giant <- S.printingOf s registry "Hill Giant"
+  pure (charnel, grist, giant)
+
+-- Synthetic Charnel Measure on alice's battlefield, Grist in her graveyard and a
+-- Hill Giant (3/3, vanilla) beside the Measure. `measureFirst` controls the
+-- timestamp order the way chorusBadMoon's flag does -- fresh timestamps ascend
+-- with placement, and Grist's effect takes Grist's own (CR 613.7a).
+--
+-- The Giant is the only creature alice controls, so the Measure's affected set
+-- and its counted set are disjoint: the count folds over the GRAVEYARD, and a
+-- board where it could reach the Giant would not tell the two readings apart.
+-- Its printed 3/3 is also distinct from every value either reading writes (1, or
+-- the 0 a bounded view yields under CR 208.5).
+--
+-- Returns Grist, the Giant and the board.
+gristCharnel ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Bool ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+gristCharnel charnel grist giant measureFirst =
+  let empty = Setup.emptyGame S.bothPlayers
+      (gristId, placed) =
+        if measureFirst
+          then S.addGraveyardCard grist S.alice (snd (S.addCreature charnel S.alice empty))
+          else
+            let (g, afterGrist) = S.addGraveyardCard grist S.alice empty
+             in (g, snd (S.addCreature charnel S.alice afterGrist))
+      (giantId, gs) = S.addCreature giant S.alice placed
+   in (gristId, giantId, gs)
+
 limbBloodMoon :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 limbBloodMoon bayou shroofus limb bloodMoon limbFirst =
   let base = Setup.emptyGame S.bothPlayers
@@ -1915,6 +1957,86 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "the Wraith is its printed 3/3" (Projection.toughnessOf wraithId gs) (Just 3)
     Spec.assertEqWith s "the Child is its printed 2/1" (Projection.powerOf childId gs) (Just 2)
     Spec.assertEqWith s "the Child is its printed 2/1" (Projection.toughnessOf childId gs) (Just 1)
+
+  -- The same limb of CR 613.8a clause (b), asked about an object OFF the
+  -- battlefield. CR 613.1 names no zone, so the scan CR 613.8a describes ranges
+  -- over an effect's whole affected set wherever it lies; projectDeciding's
+  -- running board held the battlefield and the projected object alone, so a
+  -- same-layer effect on a graveyard card was invisible both to the dependency
+  -- test and to the count that reads it.
+  --
+  -- Grist, the Hunger Tide -- {1}{B}{G} Legendary Planeswalker -- Grist, loyalty
+  -- 3 -- whole static text: "As long as Grist isn't on the battlefield, it's a
+  -- 1/1 Insect creature in addition to its other types." Oracle text verified
+  -- against Scryfall. It is PRINTED, and it is a CR 613.4b layer-7b effect that
+  -- lands on an object in a graveyard -- which is what makes this pair's other
+  -- half the only synthetic one.
+  --
+  -- Synthetic Charnel Measure, {2}{G} Enchantment, whole text: "Creatures you
+  -- control have base power and toughness X/X, where X is the greatest power
+  -- among creature cards in your graveyard." Also layer 7b (CR 613.4b), so the
+  -- two are same-sublayer, and its magnitude reads the power Grist's own effect
+  -- writes -- CR 613.8a clause (b)'s "what it does to" limb again. Synthetic
+  -- because no printed card puts a P/T read inside the fold; nothing in the CR
+  -- forbids one, layer 7b taking a magnitude exactly as layer 7c does.
+  --
+  -- What each half of the fix pays for. Grist in the graveyard is what the
+  -- running board had to grow to hold: without it the Measure's count falls back
+  -- to a view bounded BELOW layer 7b, where Grist has no power of its own yet and
+  -- CR 208.5 reads it as 0, and the Measure writes a 0/0. With it, the count sees
+  -- the 1 Grist's own effect wrote. The Measure-older board additionally needs the
+  -- dependency edge, which is derived from that same board.
+  Spec.it s "CR 613.8a a count depends on a same-layer effect on a GRAVEYARD card (Measure older)" $ do
+    (charnel, grist, giant) <- charnelPrintings s registry
+    let (gristId, giantId, gs) = gristCharnel charnel grist giant True
+    Spec.assertEqWith s "CR 613.8b: Grist first (1/1 in the graveyard), then the Measure counting it" (Projection.powerOf giantId gs) (Just 1)
+    Spec.assertEqWith s "and its toughness with it" (Projection.toughnessOf giantId gs) (Just 1)
+    Spec.assertEqWith s "CR 604.2/613.4b Grist itself is the 1/1 it made itself" (Projection.powerOf gristId gs) (Just 1)
+
+  -- The dependency overrides CR 613.7, so the answer is the same with the
+  -- timestamps swapped. This board is the one that passes on the running-board
+  -- half alone.
+  Spec.it s "CR 613.8b the graveyard dependency overrides timestamp order (Grist older)" $ do
+    (charnel, grist, giant) <- charnelPrintings s registry
+    let (_, giantId, gs) = gristCharnel charnel grist giant False
+    Spec.assertEqWith s "order-independent: still 1/1" (Projection.powerOf giantId gs) (Just 1)
+    Spec.assertEqWith s "order-independent: still 1/1" (Projection.toughnessOf giantId gs) (Just 1)
+
+  -- The card-level proof, at gameplay level: alice casts the Measure off three
+  -- Forests and it resolves, rather than being placed. Grist is already lying in
+  -- her graveyard, so this is the Grist-older order.
+  Spec.it s "CR 613.4b casting the Measure sets the base P/T from the graveyard card's own layer-7b value" $ do
+    (charnel, grist, giant) <- charnelPrintings s registry
+    forest <- S.printingOf s registry "Forest"
+    let (_, g1) = S.addGraveyardCard grist S.alice (S.landsInPlay forest 3)
+        (giantId, g2) = S.addCreature giant S.alice g1
+        (gs, charnelId) = S.handOne charnel g2
+        resolved = S.runPure S.identityAnswer gs (S.cast S.alice charnelId >> Stack.resolveTop)
+    Spec.assertEqWith s "the enchantment resolved" (GameState.stack resolved) []
+    Spec.assertEqWith s "the Giant's base is the greatest power in the graveyard, Grist's 1" (Projection.powerOf giantId resolved) (Just 1)
+    Spec.assertEqWith s "and its toughness with it" (Projection.toughnessOf giantId resolved) (Just 1)
+
+  -- Two controls, each the same board with one thing changed. A plain 2/1 Goblin
+  -- Piker in the graveyard instead of Grist is the LIVE half: no layer-7b effect
+  -- touches it, its power is the printed 2 under either reading, and the Measure
+  -- writes 2/2 -- so the count, the zone it folds over and the 7b setter all work
+  -- and the case above is not passing on a dead fixture. An EMPTY graveyard is the
+  -- other: Count.evaluate answers Nothing over no members, setPT keeps the base,
+  -- and the Giant is its printed 3/3 -- which rules out reading the 1/1 above as
+  -- "the Measure writes something whatever it counts".
+  Spec.it s "CR 613.4b control: an ordinary graveyard creature card is read at its printed power" $ do
+    (charnel, _, giant) <- charnelPrintings s registry
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g1) = S.addGraveyardCard piker S.alice (snd (S.addCreature charnel S.alice (Setup.emptyGame S.bothPlayers)))
+        (giantId, gs) = S.addCreature giant S.alice g1
+    Spec.assertEqWith s "the Piker's printed 2" (Projection.powerOf giantId gs) (Just 2)
+    Spec.assertEqWith s "the Piker's printed 2" (Projection.toughnessOf giantId gs) (Just 2)
+
+  Spec.it s "CR 613.4b control: an empty graveyard leaves the count unevaluable and the base alone" $ do
+    (charnel, _, giant) <- charnelPrintings s registry
+    let (giantId, gs) = S.addCreature giant S.alice (snd (S.addCreature charnel S.alice (Setup.emptyGame S.bothPlayers)))
+    Spec.assertEqWith s "the Giant is its printed 3/3" (Projection.powerOf giantId gs) (Just 3)
+    Spec.assertEqWith s "the Giant is its printed 3/3" (Projection.toughnessOf giantId gs) (Just 3)
 
   -- The card-level proof of the layer-4 AddCreatureSubtype arm: Life and Limb
   -- makes a basic Forest a 1/1 green Saproling creature land, and the Saproling
