@@ -183,12 +183,12 @@ inWindow selector phase = selector == PhaseSelector.Step phase || wholePhaseOf p
 -- grains: "until end of combat" expires at the end of the combat phase, not at
 -- the start of the end of combat step.
 --
--- Answers from the step alone, so a phase whose last step never runs never
--- reports its end here. Two of the three ways that happens are covered
--- elsewhere: Pawl.Engine.Resolve's CR 724.1 and CR 724.2 arms sweep the phase
--- they end themselves, and a phase skipped whole never ends at all (CR 500.11,
--- at Engine.skipWholePhase). Not implemented: the third, a CR 614.1b skip of
--- the last step ALONE (#2126).
+-- Answers from the step alone, which is why every road out of a phase has to
+-- ask: Pawl.Engine.Resolve's CR 724.1 and CR 724.2 arms sweep the phase they end
+-- themselves, having no last step to ask; Engine.skipStep asks this of a step a
+-- CR 614.1b skip removed, since CR 724.2e ends the phase even though its last
+-- step did not happen; and a phase skipped whole never ends at all (CR 500.11,
+-- at Engine.skipWholePhase), so it never asks.
 phaseEndingAt :: Phase -> Maybe PhaseSelector
 phaseEndingAt phase = if lastStepOf phase == Just phase then wholePhaseOf phase else Nothing
 
@@ -310,10 +310,10 @@ attackedThisStep pid gs =
 -- Asked of the game and not of a player, CR 506.7 describing a point in the turn.
 --
 -- No conjunct about the current phase, which is CR 511.3 rather than an omission:
--- Pawl.Engine.Combat.declareBlockers is the only writer and its clearCombat the
--- only clearer. Not implemented: a combat phase whose end of combat step alone is
--- skipped never reaches clearCombat, so this answers True into the next turn
--- (#2010).
+-- Pawl.Engine.Combat.declareBlockers is the only writer and Combat.clearCombat
+-- the only clearer, and every road out of a combat phase runs that clearer --
+-- Engine.endPhase for a phase the game leaves with or without its last step, and
+-- Pawl.Engine.Resolve's CR 724.2d arm for one an effect ends part-way through.
 afterBlockersDeclared :: GameState -> Bool
 afterBlockersDeclared = Combat.blockersDeclared . GameState.combat
 

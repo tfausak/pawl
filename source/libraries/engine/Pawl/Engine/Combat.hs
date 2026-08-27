@@ -85,7 +85,7 @@ clearCombat gs = gs {GameState.combat = emptyCombat}
 -- about one step, so the record answering it ends with the step. Engine.runStep
 -- calls this as EVERY step ends, clearCombat's sibling in placement and its
 -- opposite in reach -- CR 500.11 lets any step be skipped, so a reset that ran
--- only in the combat steps (or only in the end of combat step, where CR 511.3
+-- only in the combat steps (or only as the combat phase ends, where CR 511.3
 -- puts clearCombat) would strand the record into a later turn whenever the step
 -- carrying it never happened.
 clearAttackedThisStep :: GameState -> GameState
