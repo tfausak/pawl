@@ -5,7 +5,8 @@
 -- from inside Pawl.Engine.Event's changeZone) and its CR 707.9 exceptions
 -- (Replacement.applyCopyExceptions, Quicksilver Gargantuan), its CR 707.5 eligible set
 -- (Replacement.legalCopyTargets, Copy Enchantment's "any enchantment" against Clone's
--- "any creature"), the P2 copy gate (Clone), and
+-- "any creature", and Clever Impersonator's negated "any nonland permanent"), the
+-- P2 copy gate (Clone), and
 -- Pawl.Engine.Resolve's CreateCopy arm (CR 707.2's token copy, Cackling
 -- Counterpart and Watchful Radstag; its count, and the simultaneous entry that
 -- count buys, kicked Rite of Replication; and CR 122.6's entry rider on it,
@@ -21,12 +22,13 @@
 -- (Pawl.Engine.Projection.setLandSubtypeTo) -- plus the other order, where CR
 -- 614.12 leaves Vesuva no copy ability to apply at all.
 --
--- And CR 707.2a's abilities half at the two BATTLEFIELD-WIDE SHORT-CIRCUITS that
+-- And CR 707.2's copiable values at the two BATTLEFIELD-WIDE SHORT-CIRCUITS that
 -- decide whether a walk is needed at all -- Pawl.Engine.Projection's
--- copiableReplacementsOf and anyCopiableKeyword, in replacementsAffecting's
--- baseHas, and Pawl.Engine.CombatRestriction's baseCouldMint -- on a board an
--- Unstable Shapeshifter has left holding the only copy of the departed original's
--- text (copiedAbilitySpec).
+-- copiableReplacementsOf, anyCopiableKeyword and copiableMintsType, in
+-- replacementsAffecting's baseHas, and Pawl.Engine.CombatRestriction's
+-- baseCouldMint -- on a board that has been left holding the only copy of the
+-- departed original's text, whether an Unstable Shapeshifter or a Copy
+-- Enchantment / Clever Impersonator put it there (copiedAbilitySpec).
 --
 -- And Pawl.Engine.Resolve's CopySpell arm (CR 707.10's copy of a spell on the
 -- stack, Twincast) with the CR 707.10c re-target prompt it raises, the CR 704.5e
