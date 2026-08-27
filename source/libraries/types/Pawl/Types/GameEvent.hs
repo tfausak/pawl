@@ -880,14 +880,15 @@ data GameEvent
     -- "dies" asks -- and the answer would be a fiction.
     --
     -- Emitted for a PHASED-IN BATTLEFIELD permanent and for nothing else, by
-    -- both roads, which is exactly the set CR 603.6c's second trigger event
-    -- ranges over: rule 702.26k says a phased-out permanent leaving this way
-    -- causes no zone-change ability to trigger, and no rule pawl can express
-    -- reads the departure of a card that was in a hand, a library, a graveyard,
-    -- exile or on the stack. Those still file last known information; what they
-    -- do not do is enter this log. CR 729.4a's "abilities that trigger on
-    -- objects leaving a main-game zone" is wider than that, and the same width
-    -- CR 800.4a's road already does not have.
+    -- both roads. For CR 800.4a's that is exactly right: it is the set CR 603.6c's
+    -- second trigger event ranges over, and rule 702.26k says a phased-out
+    -- permanent leaving that way causes no zone-change ability to trigger.
+    --
+    -- Not implemented: CR 729.4a asks for more -- "abilities in the main game
+    -- that trigger on objects leaving a main-game ZONE" -- so a card a subgame
+    -- took out of a hand, a graveyard, a library or exile should be readable and
+    -- is not. Such a card still files its CR 608.2h last known information; what
+    -- it does not do is enter this log (#2463).
     LeftTheGame ObjectId.ObjectId
   | -- | CR 701.22d: a player completed CR 701.22a's scry. Recorded AFTER the
     -- reorder, and recorded even where nothing could move -- that rule's "even

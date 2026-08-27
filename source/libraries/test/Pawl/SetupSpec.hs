@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.OutsideTheGame as OutsideTheGame
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
@@ -31,6 +32,7 @@ import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
@@ -41,6 +43,7 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Sickness as Sickness
@@ -639,7 +642,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     Spec.assertEqWith s "CR 729.4a: the crossed creature is off the main game's battlefield" (Set.member elfId (GameState.battlefield after)) False
     Spec.assertEqWith s "CR 729.4a: and out of the main game's objects entirely" (Map.member elfId (GameState.objects after)) False
     Spec.assertEqWith s "bob's creature, which nothing took, is untouched" (Set.member bystanderId (GameState.battlefield after)) True
-    Spec.assertEqWith s "CR 603.6c: a GameEvent.LeftTheGame names it in the main game's log" leftEvents [elfId]
+    Spec.assertEqWith s "CR 729.4a: a GameEvent.LeftTheGame names it in the main game's log" leftEvents [elfId]
     Spec.assertEqWith s "CR 608.2h: its last known information is filed under the id it had" (Map.member elfId (GameState.lastKnown after)) True
 
   -- Why applyCrossings does NOT wrap its batch in Event.simultaneouslyPure, the
@@ -647,20 +650,52 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
   -- objects leave at one instant and share a group, but two wishes cast at two
   -- different moments of the subgame are two events, and CR 603.10a's look-back
   -- triggers have to be able to tell them apart.
-  Spec.it s "CR 608.2f: two crossings are two events, in the order they crossed" $ do
+  Spec.it s "CR 603.10a: two crossings are two events, read against a running board" $ do
     elf <- S.printingOf s registry "Arbor Elf"
     let g0 = Setup.emptyGame S.bothPlayers
-        (firstId, g1) = S.addCreature elf S.alice g0
-        (secondId, parent) = S.addCreature elf S.alice g1
+        -- Minted in the opposite order to the one they cross in, so every
+        -- assertion below reads the CROSSING order and not the id order.
+        (lateCrosser, g1) = S.addCreature elf S.alice g0
+        (earlyCrosser, parent) = S.addCreature elf S.alice g1
         sub0 = Setup.subgameStateFrom S.alice parent
-        -- Second one first, so the assertion below reads the CROSSING order and
-        -- not the id order.
-        (_, crossed1) = OutsideTheGame.bringInFrom S.alice secondId sub0
-        (_, crossedSub) = OutsideTheGame.bringInFrom S.alice firstId crossed1
+        (_, crossed1) = OutsideTheGame.bringInFrom S.alice earlyCrosser sub0
+        (_, crossedSub) = OutsideTheGame.bringInFrom S.alice lateCrosser crossed1
         after = Setup.applyCrossings crossedSub parent
         left = Maybe.mapMaybe (\logged -> case LoggedEvent.event logged of GameEvent.LeftTheGame oid -> Just (LoggedEvent.group logged, oid); _ -> Nothing) (Foldable.toList (GameState.events after))
-    Spec.assertEqWith s "both left, in crossing order rather than id order" (fmap snd left) [secondId, firstId]
+        -- CR 603.10's "objects that exist immediately after an event", as
+        -- Event.recordEvent sampled it for each of the two groups.
+        sampledAt eventGroup = Map.keysSet (Map.findWithDefault Map.empty eventGroup (GameState.battlefieldWhenTriggered after))
+        groupOf oid = fmap fst (List.find (\entry -> snd entry == oid) left)
+    Spec.assertEqWith s "both left, in crossing order rather than id order" (fmap snd left) [earlyCrosser, lateCrosser]
     Spec.assertEqWith s "CR 603.10a: they are two event groups, not one simultaneous batch" (length (List.nub (fmap fst left))) 2
+    -- The running board, read out of the sample CR 603.10 takes at each event. A
+    -- batch that deleted both and only then recorded answers False to the first
+    -- of these, and a main-game ability watching the LATE crosser leave the
+    -- battlefield would never see the early one go.
+    Spec.assertEqWith s "CR 603.10: the early crossing's event was sampled while the late one still stood" (fmap (Set.member lateCrosser . sampledAt) (groupOf earlyCrosser)) (Just True)
+    Spec.assertEqWith s "CR 603.10: the late crossing's event was sampled after the early one had gone" (fmap (Set.member earlyCrosser . sampledAt) (groupOf lateCrosser)) (Just False)
+
+  -- CR 608.2h against a RUNNING board, which is the whole reason applyCrossings
+  -- is a fold and not a batch: the anthem crosses first, so by the instant the
+  -- elf crosses there is nothing pumping it any more and its last known power is
+  -- its printed one. A batch reading the pristine parent for every crossing
+  -- answers 2, which is the power of a permanent that had already left.
+  Spec.it s "CR 608.2h: the second crossing's last known information is read after the first has gone" $ do
+    elf <- S.printingOf s registry "Arbor Elf"
+    anthem <- S.printingOf s registry "Glorious Anthem"
+    let g0 = Setup.emptyGame S.bothPlayers
+        (anthemId, g1) = S.addCreature anthem S.alice g0
+        (elfId, parent) = S.addCreature elf S.alice g1
+        sub0 = Setup.subgameStateFrom S.alice parent
+        (_, crossed1) = OutsideTheGame.bringInFrom S.alice anthemId sub0
+        (_, crossedSub) = OutsideTheGame.bringInFrom S.alice elfId crossed1
+        after = Setup.applyCrossings crossedSub parent
+        lastPower oid = fmap (PC.power . LastKnown.characteristics) (Map.lookup oid (GameState.lastKnown after))
+    -- The discriminator: the anthem genuinely was pumping the elf in the main
+    -- game, so 1 and 2 are two different readings of the same board.
+    Spec.assertEqWith s "the anthem really was pumping the elf before either crossed" (Projection.powerOf elfId parent) (Just 2)
+    Spec.assertEqWith s "CR 608.2h: the elf left a board the anthem had already left, so its last known power is 1" (lastPower elfId) (Just (Just 1))
+    Spec.assertEqWith s "the anthem, which crossed first, left the untouched board" (fmap (const True) (lastPower anthemId)) (Just True)
 
   -- CR 729.6's nesting, the case a middle frame cannot settle: a wish two levels
   -- down reached a card belonging to the game ABOVE this one, which
@@ -734,6 +769,27 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     Spec.assertEqWith s "CR 400.11b: bob left, so the card he wished in is outside the game again" (poolOf S.bob after) (Just (Map.singleton printingId 2))
     Spec.assertEqWith s "alice, who is still playing, keeps her spend" (poolOf S.alice after) (Just (Map.singleton printingId 1))
     Spec.assertEqWith s "carol, who wished for nothing, is unchanged" (poolOf S.carol after) (Just (Map.singleton printingId 2))
+
+  -- The road the pool arm above does NOT restore, pinned so that nobody reads its
+  -- silence as an oversight: bob wished a MAIN-GAME card of his own into the
+  -- subgame and then departed there. CR 729.4a took the card out of the main game
+  -- and CR 800.4a took the subgame's copy out with him, so nothing in either game
+  -- represents it afterwards. Nothing was spent from his pool, so the pool arm has
+  -- nothing to give back.
+  Spec.it s "CR 729.4a/800.4a a main-game card a departed player wished in is in neither game after" $ do
+    elf <- S.printingOf s registry "Arbor Elf"
+    let g0 = Setup.emptyGame S.threePlayers
+        (bobsId, parent) = S.addCreature elf S.bob g0
+        sub0 = Setup.subgameStateFrom S.alice parent
+        (minted, crossedSub) = OutsideTheGame.bringInFrom S.bob bobsId sub0
+        departedSub = S.departs Departure.Type.Lost S.bob crossedSub
+        after = Setup.funnelBack departedSub (Setup.applyCrossings departedSub parent)
+    Spec.assertEqWith s "the subgame really did mint him a copy" (Maybe.isJust minted) True
+    Spec.assertEqWith s "the subgame really was multiplayer, so CR 800.4a's removal fired" (Departure.continuesAfterDeparture departedSub) True
+    Spec.assertEqWith s "CR 800.4a: the subgame's copy left with him" (fmap (`Map.member` GameState.objects departedSub) minted) (Just False)
+    Spec.assertEqWith s "CR 729.4a: the main game's copy left when the subgame took it" (Map.member bobsId (GameState.objects after)) False
+    Spec.assertEqWith s "so bob owns nothing in the main game afterwards" (Map.keys (Map.filter (\o -> Object.owner o == S.bob) (GameState.objects after))) []
+    Spec.assertEqWith s "and his pool, which no wish reached, is still empty" (fmap Player.outsideTheGame (Map.lookup S.bob (GameState.players after))) (Just Map.empty)
 
   Spec.it s "CR 729.2/729.4 #147: a subgame seats only the players still in the main game" $ do
     -- CR 729.2: "Each player takes all the cards in their main-game library,

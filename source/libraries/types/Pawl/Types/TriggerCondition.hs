@@ -574,9 +574,11 @@ data TriggerCondition
     -- arriving object holds only for a public destination, so
     -- Pawl.Engine.Binding.became is bound only there.
     --
-    -- CR 603.6c's second trigger event -- a phased-in permanent leaving the game
-    -- with its owner (CR 800.4a), or taken out of the main game by a subgame's
-    -- wish (CR 729.4a) -- is matched too, off GameEvent.LeftTheGame.
+    -- Leaving the GAME is matched too, off GameEvent.LeftTheGame, on the two
+    -- roads that reach it: CR 603.6c's second trigger event, a phased-in
+    -- permanent leaving the game with its owner (CR 800.4a), and CR 729.4a's own
+    -- grant, a card a subgame took out of the main game -- that rule, not rule
+    -- 603.6c, is what makes the main game's ability trigger there.
     -- It is the one form that fires without a zone change, so its bearer can
     -- only be read from CR 608.2h last known information.
     SelfLeavesTheBattlefield

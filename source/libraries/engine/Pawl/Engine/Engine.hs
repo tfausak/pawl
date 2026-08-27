@@ -1610,10 +1610,19 @@ playSubgame = do
           (Asked.under parent)
           (State.runStateT (Setup.startGameFromCards Resolve.performHandAction Set.empty >> playGame) sub0)
       )
-  -- CR 729.4a: BEFORE the funnel, so that funnelBack's keptParentObjects cannot
-  -- resurrect a card the subgame took out of this game. This frame is the only
-  -- one holding both games, which is why the departures are applied from here
-  -- and not from inside either of them (CR 729.1a).
+  -- CR 729.4a. This frame is the only one holding both games, which is why the
+  -- departures are applied from here and not from inside either of them
+  -- (CR 729.1a).
+  --
+  -- BEFORE the funnel, so funnelBack's keptParentObjects reads a parent the card
+  -- has already left rather than one it has to be kept out of. The order is
+  -- deliberate but is NOT observable today, and swapping the two lines leaves the
+  -- whole suite green: funnelBack keeps the crossed object rather than reviving
+  -- it, so applying the crossings afterwards deletes exactly the same id from
+  -- exactly the same zones. What would end the coincidence is funnelBack ever
+  -- MINTING for a parent id -- the recovery path already does that for a player
+  -- who departed inside the subgame (`recovered`), and it would resurrect a
+  -- crossed card the moment one of those ids could also cross.
   State.modify' (Setup.applyCrossings finalSub)
   State.modify' (Setup.funnelBack finalSub)
   -- CR 729.5: each player who was IN the subgame takes the traditional cards they

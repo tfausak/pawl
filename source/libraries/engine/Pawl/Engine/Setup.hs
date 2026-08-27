@@ -707,27 +707,48 @@ subgameStateFrom starter parent =
 -- main game loses them. Applied HERE, once the subgame has ended, and that is
 -- exact rather than late: the main game was discontinued for the whole subgame
 -- (CR 729.1a), so no state-based action, no priority and no continuous-effect
--- recomputation could have read the board in between, and walking
--- GameState.broughtIn in crossing order now produces the same events, the same
--- CR 608.2h last known information and the same trigger order as applying each
--- at the instant it crossed. Rule 729.5's last sentence says the abilities that
+-- recomputation could have read the board in between, so replaying
+-- GameState.broughtIn in crossing order NOW -- as the running fold below, not as
+-- one batch -- produces the same events, the same CR 608.2h last known
+-- information and the same trigger order as applying each at the instant it
+-- crossed. Rule 729.5's last sentence says the abilities that
 -- triggered wait for the main game to resume anyway, so nothing is owed earlier.
 --
--- Mirrors Pawl.Engine.Departure.objectsLeaveWith, CR 800.4a's departure and the
--- tree's other road out of the game that reaches no zone: file last known
--- information from the board BEFORE any of them left, remove from the zones,
--- delete the object, record a GameEvent.LeftTheGame. One thing is deliberately
--- NOT mirrored -- the batch is not wrapped in Event.simultaneouslyPure. Rule
--- 800.4a's objects all leave at one instant; these crossed at different moments
--- of the subgame, so each takes its own event group and CR 603.10a's look-back
--- triggers read them as a sequence rather than as one event.
+-- Borrowed from Pawl.Engine.Departure.objectsLeaveWith, CR 800.4a's departure and
+-- the tree's other road out of the game that reaches no zone: file CR 608.2h last
+-- known information, remove from the zones, delete the object, record a
+-- GameEvent.LeftTheGame. What is NOT borrowed is that function's shape. Rule
+-- 800.4a's objects leave at ONE INSTANT, which is why it may read one board for
+-- the whole batch and wrap the events in Event.simultaneouslyPure; these crossed
+-- at different moments of the subgame, so this is a RUNNING fold instead -- one
+-- iteration per crossing, in order, each reading the state the crossings before
+-- it left behind.
 --
--- The event is recorded for a permanent on the battlefield and for nothing else,
--- which is the set Pawl.Types.GameEvent.LeftTheGame documents at its own
--- constructor: a card that crossed out of a hand, a graveyard, a library or exile
--- files its last known information and records nothing, there being no reader for
--- it. That is narrower than CR 729.4a's "abilities that trigger on objects
--- leaving a main-game zone", which is the same gap CR 800.4a's road has.
+-- That running board is load-bearing twice over, and both readings are
+-- gameplay-visible:
+--
+--   * the last known information of the SECOND crossing must be projected on a
+--     board the FIRST has already left. Alice's Glorious Anthem crosses, then her
+--     Arbor Elf: at the instant the elf left, the anthem was already gone from the
+--     main game, so its last known power is 1 and not 2. Projection.controllerOf
+--     and Event.copiedSnapshot are read at the same moment for the same reason.
+--
+--   * each event is recorded AFTER its own crossing's deletion and BEFORE the
+--     next one's, so Event.recordEvent's CR 603.10 sample of the battlefield
+--     (GameState.battlefieldWhenTriggered) stamps that group with the board as it
+--     stood then -- with every later crossing still on it. Sampling after the
+--     whole batch would hide a main-game permanent that was there when the first
+--     card left, and CR 729.5's last sentence is precisely where the ability it
+--     owes would have gone on the stack.
+--
+-- So no Event.simultaneouslyPure: each crossing takes its own event group and CR
+-- 603.10a's look-back triggers read them as a sequence rather than as one event.
+--
+-- Not implemented: the event is recorded for a permanent on the battlefield and
+-- for nothing else, so a card that crossed out of a hand, a graveyard, a library
+-- or exile files its last known information and records nothing -- narrower than
+-- CR 729.4a's "abilities in the main game that trigger on objects leaving a
+-- main-game zone" (#2463).
 --
 -- Not implemented: CR 604.2's handover of an ability that goes on applying after
 -- the permanent leaves the battlefield (Titania's Song), which
@@ -772,41 +793,53 @@ applyCrossings finalSub parent =
                   GameState.haunting = Map.delete oid (GameState.haunting g1),
                   GameState.exiledWith = Map.delete oid (GameState.exiledWith g1)
                 }
-      -- CR 608.2h, taken against `parent` -- the board before any of them left --
-      -- for the reason Departure.objectsLeaveWith gives at its own `filed`, minus
-      -- the simultaneity: these are read from the same board not because they are
-      -- one event but because the board never moved, the main game having been
-      -- discontinued throughout (CR 729.1a).
-      filed oid = case Map.lookup oid (GameState.objects parent) of
+      -- CR 608.2h, taken against `g` -- the running state, which is this game as
+      -- it stands at the moment THIS card crosses. The object itself is still in
+      -- it, exactly as Departure.objectsLeaveWith's own `filed` reads a board its
+      -- subject has not left yet; what is different is that the cards which
+      -- crossed EARLIER have already gone.
+      filed g oid = case Map.lookup oid (GameState.objects g) of
         -- Unreachable, for `leave`'s reason.
         Nothing -> Nothing
         Just obj ->
           Just
             ( oid,
               LastKnown.MkLastKnown
-                (Projection.project oid parent)
+                (Projection.project oid g)
                 -- CR 613.1b: the projected controller as it left, who need not be
                 -- its owner. The fallback is unreachable for the reason
                 -- Departure.objectsLeaveWith gives.
-                (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid parent))
+                (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid g))
                 (Object.source obj)
                 (Object.counters obj)
-                (Event.copiedSnapshot oid parent)
+                (Event.copiedSnapshot oid g)
                 (Object.attachedTo obj)
             )
-      -- CR 702.26k's distinction, read the way Departure.objectsLeaveWith reads
-      -- it: membership of GameState.battlefield is what tells a phased-in
-      -- permanent from a phased-out one, since Pawl.Engine.Phasing takes the
-      -- phased-out one out of that set and leaves its Object.zone alone.
-      permanents = filter (\oid -> Set.member oid (GameState.battlefield parent)) mine
-      removed = List.foldl' leave parent mine
-      recorded =
-        removed
-          { GameState.lastKnown = Map.fromList (Maybe.mapMaybe filed mine) <> GameState.lastKnown removed,
-            GameState.outsideObjects = Map.withoutKeys (GameState.outsideObjects removed) (Set.fromList further),
-            GameState.broughtIn = GameState.broughtIn removed <> Seq.fromList further
-          }
-   in List.foldl' (\g oid -> Event.recordEvent (GameEvent.LeftTheGame oid) g) recorded permanents
+      -- One crossing: file, delete, then record. The event LAST, so that
+      -- Event.recordEvent's CR 603.10 sample is of the board immediately after
+      -- this card left and before the next one does.
+      --
+      -- The event only for a permanent on the battlefield, which is the set
+      -- Pawl.Types.GameEvent.LeftTheGame documents at its own constructor.
+      -- Battlefield MEMBERSHIP rather than Object.zone, the way
+      -- Departure.objectsLeaveWith reads the same question, since
+      -- Pawl.Engine.Phasing takes a phased-out permanent out of that set and
+      -- leaves its Object.zone alone -- and rule 702.26k, which is about a
+      -- departing owner rather than about this road, is the reason that
+      -- distinction is worth drawing at all.
+      cross g oid =
+        let noted = case filed g oid of
+              Nothing -> g
+              Just (key, value) -> g {GameState.lastKnown = Map.insert key value (GameState.lastKnown g)}
+            gone = leave noted oid
+         in if Set.member oid (GameState.battlefield g)
+              then Event.recordEvent (GameEvent.LeftTheGame oid) gone
+              else gone
+      applied = List.foldl' cross parent mine
+   in applied
+        { GameState.outsideObjects = Map.withoutKeys (GameState.outsideObjects applied) (Set.fromList further),
+          GameState.broughtIn = GameState.broughtIn applied <> Seq.fromList further
+        }
 
 -- CR 729.5: at the end of a subgame, each player takes all traditional cards
 -- (Source.OfCard) they own in the subgame other than those in the subgame
@@ -919,14 +952,26 @@ funnelBack finalSub parent =
       -- neither startGameFromCards nor restartGame calls it), so what the subgame
       -- hands back differs from the parent's by exactly the cards it spent.
       --
-      -- A player who DEPARTED inside the subgame keeps the parent's pool instead,
-      -- which is rule 400.11b's own second clause: a card brought in remains in
+      -- A player who DEPARTED inside the subgame keeps the parent's pool instead.
+      -- CR 400.11b's second clause is the rule half: a card brought in remains in
       -- the game "until the game ends, their owner leaves the game, or a rule or
-      -- effect removes them", so CR 800.4a's departure put every card they had
-      -- wished in back outside the game. Their spend is undone rather than
-      -- carried, and it has to be: Departure.objectsLeaveWith deleted those
-      -- objects, so `returned` has nothing to put in their library and a spent
-      -- pool would lose the card altogether.
+      -- effect removes them", so CR 800.4a's departure took every card they had
+      -- wished in back OUT of the game. Where it goes then is pawl's model choice
+      -- and not the rule's words -- the CR says only that it is no longer in the
+      -- game -- and putting it back in the pool it came from is the choice made
+      -- here, because that pool is exactly pawl's "outside the game" for a card
+      -- with an owner (CR 400.11a) and the alternative loses the card: the
+      -- objects are gone (Departure.objectsLeaveWith deleted them), so `returned`
+      -- has nothing to put in their library either.
+      --
+      -- This arm restores only what the sideboard road spent (CR 400.11a and
+      -- CR 400.11c). A card the same player took from the MAIN GAME instead
+      -- (OutsideTheGame.bringInFrom)
+      -- comes back nowhere: applyCrossings deleted the main game's copy, and
+      -- objectsLeaveWith deleted the subgame's, so nothing represents it in
+      -- either game. That is the two rules read together rather than an oversight
+      -- -- CR 729.4a took it out of the main game and CR 800.4a took it out of
+      -- the subgame -- and Pawl.SetupSpec pins it.
       --
       -- A player absent from the subgame's roster keeps the parent's pool too.
       -- The lookup cannot miss today -- subgameStateFrom rebuilds the players map
