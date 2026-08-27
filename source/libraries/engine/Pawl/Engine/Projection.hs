@@ -4409,12 +4409,13 @@ grantsKeywordWhere p m = case m of
 -- holding the new card type exactly as CR 205.1b's addition does.
 --
 -- ONLY the AddSubtype arm is proved by a board (Pawl.SagaSpec's granted-Saga
--- entry). The SetCardType and ChangeSubtypeWord arms are REGRESSION FENCES: no
--- card in the pool sets a permanent's card type to planeswalker or battle, and
--- every text changer in it swaps a colour word, a basic land type or a creature
--- type -- the Scryfall query Pawl.Types.Modification's AddSubtype records. Both
--- are kept because this predicate only ever WIDENS what is gathered, so a wrong
--- True costs a projection and a wrong False loses a rule 614.1c row.
+-- entry). The two card-type arms and the ChangeSubtypeWord one are REGRESSION
+-- FENCES: every AddCardType and SetCardType in `data/cards` writes artifact,
+-- creature, enchantment or land, and every text changer in the pool swaps a
+-- colour word, a basic land type or a creature type -- the Scryfall query
+-- Pawl.Types.Modification's AddSubtype records. All three are kept because this
+-- predicate only ever WIDENS what is gathered, so a wrong True costs a projection
+-- and a wrong False loses a rule 614.1c row.
 grantsMintingType :: Modification -> Bool
 grantsMintingType m = case m of
   Modification.AddSubtype subtype -> subtype == Subtype.Type.Saga
