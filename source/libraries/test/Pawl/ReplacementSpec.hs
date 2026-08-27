@@ -4572,6 +4572,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   wardingBeaconSpec s registry
   dustAnimusSpec s registry
   frontierMastodonSpec s registry
+  magneticLockdownSpec s registry
   printlifterSpec s registry
   shieldCounterSpec s registry
   warLeechSpec s registry
@@ -7644,6 +7645,80 @@ frontierMastodonSpec s registry = Spec.describe s "Frontier Mastodon (CR 614.12)
         Spec.assertEqWith s "one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 1
         Spec.assertEqWith s "so the Anthem and the counter make it a 5/4" (S.powerToughnessOf oid after) (Just (5, 4))
       _ -> Spec.assertFailure s "the Elephant did not reach the battlefield"
+
+-- Synthetic Magnetic Lockdown {2}{W} Instant: "Until end of turn, if you control
+-- three or more artifacts, artifacts enter the battlefield tapped." The FLOATING
+-- twin of frontierMastodonSpec above: the same CR 614.12a board question, asked
+-- of a row CR 614.3 installed rather than of a permanent's static ability.
+--
+-- SYNTHETIC because the shape has no printing. Both halves are printed, and by
+-- different cards -- Kismet writes the EntryR/Tapped rewrite, Galvanic Blast's
+-- metalcraft writes the "if you control three or more artifacts" clause -- and
+-- what nothing prints is a DURATION-bounded row carrying such a clause. Scryfall
+-- with a User-Agent, 2026-08-27: `(t:instant or t:sorcery) o:"would enter the
+-- battlefield" o:instead` answers one card, Gather Specimens, which prints no
+-- "if"; `o:"instead if you control"` answers fourteen, every one a one-shot
+-- instead settled inside its own resolution (Galvanic Blast, Crater's Claws,
+-- Mirran Mettle, ...); `o:"until end of turn" o:instead o:"if you control"`
+-- answers nineteen modal or pump-vs-pump spells; `o:enters o:"this turn"
+-- (t:instant or t:sorcery)` answers seventeen, of which Gather Specimens alone
+-- installs an entry REPLACEMENT -- the near miss, Theoretical Duplication, prints
+-- "whenever a nontoken creature an opponent controls enters this turn, create a
+-- token that's a copy of that creature", which is a delayed trigger and replaces
+-- nothing. A printing of any of those families with a stated duration AND a
+-- printed "if" would refute this and replace the synthetic. The same enumeration
+-- inside data/cards: only Galvanic Blast and Synthetic Voltaic Surge write a
+-- condition on an Effect.Replace at all, and both gate a DamageR.
+--
+-- THE PAIR differs in exactly one permanent, and the entering artifact is what
+-- either reading disagrees about. alice controls two Bonesplitters, casts the
+-- Lockdown, then casts a Conjurer's Bauble: as the Bauble's entry loop runs she
+-- controls TWO artifacts under CR 614.12a and THREE under a reading that counts
+-- the permanent mid-entry, so the clause is false one way and true the other and
+-- the Bauble enters untapped or tapped accordingly. The positive board is the
+-- same board with a third Bonesplitter, where the clause is true either way --
+-- so the negative is not the row being off, missing, or expired.
+--
+-- Conjurer's Bauble rather than a third Bonesplitter: distinct names make
+-- `newestNamed` name the entering permanent rather than trust an id order, and
+-- {1} keeps the mana apart from the Lockdown's {2}{W} out of four Plains.
+magneticLockdownSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+magneticLockdownSpec s registry = Spec.describe s "Synthetic Magnetic Lockdown (CR 614.12a)" $ do
+  let baubleName = CardName.MkCardName (Text.pack "Conjurer's Bauble")
+      splitterName = CardName.MkCardName (Text.pack "Bonesplitter")
+      board owned = do
+        plains <- S.printingOf s registry "Plains"
+        splitter <- S.printingOf s registry "Bonesplitter"
+        lockdown <- S.printingOf s registry "Synthetic Magnetic Lockdown"
+        bauble <- S.printingOf s registry "Conjurer's Bauble"
+        let lands = S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers)
+            stocked = List.foldl' (\g _ -> snd (S.addCreature splitter S.alice g)) lands [1 .. owned]
+            (lockdownId, g1) = S.addHandCard lockdown S.alice stocked
+            (baubleId, g2) = S.addHandCard bauble S.alice g1
+            ready =
+              g2
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            armed = castAndResolve S.identityAnswer ready lockdownId
+        pure (armed, castAndResolve S.identityAnswer armed baubleId)
+  -- THE PROVING CASE.
+  Spec.it s "CR 614.12a the artifact mid-entry is not one of the three its own row counts, so it enters untapped" $ do
+    (armed, after) <- board (2 :: Int)
+    case newestNamed baubleName after of
+      Just oid -> do
+        Spec.assertEqWith s "the Bauble entered untapped" (fmap Object.tapped (Game.lookupObject oid after)) (Just TapState.Untapped)
+        Spec.assertEqWith s "setup: alice controlled two artifacts as it entered" (controlledNamed splitterName S.alice after) 2
+        Spec.assertEqWith s "setup: the row was installed and is still installed" (length (GameState.replacements armed), length (GameState.replacements after)) (1, 1)
+      _ -> Spec.assertFailure s "the Bauble did not reach the battlefield"
+  Spec.it s "CR 614.12a a third artifact already on the battlefield does count, so the same row taps it" $ do
+    (_, after) <- board (3 :: Int)
+    case newestNamed baubleName after of
+      Just oid -> do
+        Spec.assertEqWith s "the Bauble entered tapped" (fmap Object.tapped (Game.lookupObject oid after)) (Just TapState.Tapped)
+        Spec.assertEqWith s "setup: alice controlled three artifacts as it entered" (controlledNamed splitterName S.alice after) 3
+      _ -> Spec.assertFailure s "the Bauble did not reach the battlefield"
 
 -- CR 122.6 with CR 107.3c: an entry rider whose COUNT is not a number. Printlifter
 -- Ooze -- {1}{G} 2/2 Creature -- Ooze with deathtouch and disguise {3}{G} --

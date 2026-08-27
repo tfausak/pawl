@@ -231,8 +231,34 @@ collect sources floating =
       -- printed "if" the installing clause carried is asked HERE rather than at
       -- installation -- the row stays in GameState.replacements and is asked
       -- again next time. The permanent segment's twin is
-      -- Projection.replacementsOf, which drops a CR 604.2 clause the same way and
-      -- against the same board.
+      -- Projection.replacementsOf, which drops its own clause the same way --
+      -- CR 604.2's there, since a permanent's is a static ability's, and CR
+      -- 614.3's here, since a resolution installed this row.
+      --
+      -- The BOARD is Projection.boardAsEntering's, as replacementsOf's is, and
+      -- for a reason neither of those two rules states: CR 614.12a puts the
+      -- choice an entry replacement requires "before the permanent enters the
+      -- battlefield", so a permanent the CR 616.1 loop is mid-way through has
+      -- not entered and is on nobody's battlefield for ANY count made in that
+      -- window. That is a claim about zone membership rather than about which
+      -- segment asks, which is why the two segments cannot differ on it -- the
+      -- same reason Event.apply's EntryRewrite.WithCounters arm reads that board
+      -- for a floating row and a printed one alike. The VIEW stays live, as
+      -- replacementsOf's does: what the rule takes off the board is membership,
+      -- not characteristics.
+      --
+      -- Proven by Pawl.ReplacementSpec's Synthetic Magnetic Lockdown pair, the
+      -- floating twin of its Frontier Mastodon pairs.
+      --
+      -- Only the CLAUSE narrows, and `applies` below keeps the live board
+      -- deliberately: a row's PATTERN is answered against ONE object's view
+      -- (matchesFiltered), against controllerOf, and against zone ownership, none
+      -- of which folds the battlefield index boardAsEntering subtracts from, and
+      -- the object each of them asks about is the entering permanent itself.
+      -- `admitsEntry`'s Bloodthirst arm is the one measurement on that path, and
+      -- it reads the event log rather than the board. So the two boards cannot
+      -- differ there, and passing the narrowed one would say the same thing more
+      -- obscurely.
       --
       -- CR 109.5's "you" is the row's BAKED controller, and the reading object is
       -- its source: the clause outlives the resolution that installed it, so
@@ -245,7 +271,7 @@ collect sources floating =
           Condition.holds
             (Projection.fullView sources)
             (Filter.contextWithSlots (Just (ActiveReplacement.controller active)) (Just (ActiveReplacement.source active)) (ActiveReplacement.slots active))
-            sources
+            (Projection.boardAsEntering sources)
             (ActiveReplacement.source active)
             condition
    in fmap fromPermanent (numberInstances (Projection.replacementsAffecting sources))

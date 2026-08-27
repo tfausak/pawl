@@ -28,7 +28,9 @@ data Replace effect = MkReplace
     -- (Synthetic Voltaic Surge).
     --
     -- The same posture Pawl.Types.PrintedReplacement.condition takes on a
-    -- permanent's static ability, which is CR 604.1's "simply true".
+    -- permanent's static ability, which is CR 604.1's "simply true", and asked
+    -- against the same board -- see that field for which one, and why CR 614.12a
+    -- leaves the two segments no room to differ on it.
     condition :: Maybe Condition.Condition,
     effect :: ReplacementEffect.ReplacementEffect effect
   }
