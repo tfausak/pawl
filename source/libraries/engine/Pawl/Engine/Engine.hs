@@ -1106,6 +1106,13 @@ priorityLoop = do
                                 -- it up. NOT changeZoneEntering, where CR 712.14b
                                 -- turns a put-onto-the-battlefield instruction
                                 -- away: playing a land is a special action.
+                                --
+                                -- Not implemented: CR 400.7i, the land half of the
+                                -- sentence Pawl.Engine.Cast.followIntoSpell keeps
+                                -- for spells (CR 400.7h) -- the rest of the effect
+                                -- that allowed this play cannot find the permanent
+                                -- the land card became, so a rider on the
+                                -- permission has nothing to attach to (gap #2398).
                                 Monad.void (Event.changeZoneShowing oid Zone.Battlefield mName)
                                 -- CR 305.2a counts the lands played this turn, so
                                 -- this TALLIES rather than flagging. CR 305.4:

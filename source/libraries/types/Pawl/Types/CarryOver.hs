@@ -16,8 +16,9 @@ module Pawl.Types.CarryOver where
 -- Not implemented: CR 400.7b (static-ability ability grants, CR 611.3d), the one
 -- exception this carrier still owes beside the two it makes; a static grant is
 -- derived on every projection rather than stored, so no constructor here could
--- carry it (#2425). CR 400.7g and CR 400.7i are unimplemented as well, on other
--- carriers (gap #2398).
+-- carry it (#2425). CR 400.7i is unimplemented too, on another carrier
+-- altogether -- the land-play path (gap #2398). CR 400.7g's carrier is
+-- Pawl.Engine.Cast.keywordsBefore, and it is implemented.
 data CarryOver
   = Carried
   | NotCarried

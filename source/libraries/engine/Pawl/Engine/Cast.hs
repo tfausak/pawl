@@ -1231,12 +1231,17 @@ castSpellWith applied pid oid name facing = do
             fmap
               (\candidate -> candidate {CandidateCost.cost = taxed (CandidateCost.cost candidate)})
               (maybe (Cost.candidateCostsFor name oid proposed) (pure . Cost.untagged) applied)
-          -- CR 400.7 / 613.1: the keywords the card has WHERE IT LIES, read one
+          -- CR 400.7g / 613.1: the keywords the card has WHERE IT LIES, read one
           -- step ahead of the move below for the reason `castFrom` is. The move
           -- mints a fresh incarnation on the stack, and an ability granting this
           -- card flashback while it sat in the graveyard (Viral Spawning's own)
           -- stops applying the moment it leaves -- so armCastFromGraveyard, which
           -- runs after the move, could not ask the question there.
+          --
+          -- Reading it here is HOW pawl keeps rule 400.7g's "that ability will
+          -- continue to apply to the new object that card became": the value
+          -- crosses the move that the grant cannot. armCastFromGraveyard is where
+          -- the carried answer is spent.
           keywordsBefore = graveyardKeywords oid proposed
           -- CR 118.14, read one step ahead of the move for `keywordsBefore`'s
           -- reason and a stronger one: the permission carrying the clause lives
@@ -1716,6 +1721,15 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
 -- The keywords are the ones the card held IN THE GRAVEYARD, read before CR
 -- 601.2a's move (castSpellWith's `keywordsBefore`) -- a granted flashback stops
 -- applying as the card leaves, so the stack incarnation cannot be asked.
+--
+-- That carry IS CR 400.7g -- "if an effect grants a nonland card an ability that
+-- allows it to be cast, that ability will continue to apply to the new object
+-- that card became after it moved to the stack as a result of being cast this
+-- way" -- and it is the rule's whole observable consequence here: what the
+-- granted ability still has to do on the stack is state rule 702.34a's second
+-- static ability, which this arms. Not implemented: the granted keyword itself
+-- is not carried onto the stack incarnation, so a projection of the spell
+-- reports only what the card printed (#2427).
 --
 -- ARMED HERE rather than re-derived from the card while the spell sits on the
 -- stack because CR 702.34a conditions the ability on "if the flashback cost was
