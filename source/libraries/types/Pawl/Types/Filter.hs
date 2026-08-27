@@ -473,8 +473,10 @@ data Filter keyword
     --
     -- PRESENT TENSE, like IsAttacking and unlike DeclaredAttackedThisCombat
     -- below: it reads Combat.attackers, so CR 506.4's removal from combat makes
-    -- it False, and CR 506.4c's planeswalker leaving the battlefield can turn it
-    -- from False to True while the creature stays in combat.
+    -- it False. CR 506.4c is the case that keeps it from becoming True by
+    -- default -- a creature whose planeswalker or battle leaves stays an
+    -- attacking creature but "is not attacking any player", which is the Nothing
+    -- Pawl.Engine.Projection already answers by keeping only AttackTarget.OfPlayer.
     IsAttackingPlayer PlayerRelation.PlayerRelation
   | -- | CR 508.3b / 508.1b: the candidate WAS DECLARED ATTACKED this COMBAT
     -- PHASE -- one or more creatures were declared as attackers attacking it.
