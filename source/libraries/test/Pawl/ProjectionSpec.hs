@@ -599,9 +599,9 @@ toweredBoard s registry victim gs = do
 -- returns eleven cards and every grant among them is a battlefield static or a
 -- trigger. Glory is the near miss and belongs to the case above it: its
 -- graveyard ability is ACTIVATED, so what it leaves behind is a stored
--- continuous effect. Nothing in the CR forbids the card: rule 113.6b lets an
--- ability name the zones it functions in, and rule 702.16 puts no restriction
--- on who may grant protection.
+-- continuous effect. Nothing in the CR forbids the card: rule 113.6b is the
+-- rule that lets an ability name the zones it functions in, and Anger is the
+-- printed card of exactly this shape with haste in protection's place.
 bulwarkBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> GameState.GameState -> m GameState.GameState
 bulwarkBoard s registry gs = do
   bulwark <- S.printingOf s registry "Synthetic Grave Bulwark"
@@ -3228,12 +3228,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "and buffs the new creature" (Projection.powerOf fresh afterFresh, Projection.toughnessOf fresh afterFresh) (Just 4, Just 3)
 
   -- CR 114.4 against the two BATTLEFIELD-WIDE SHORT-CIRCUITS --
-  -- Projection.replacementsAffecting's `baseHas` and
-  -- CombatRestriction.inForce's `anyMinted`. Both ask their "could anything here
-  -- mint one?" question of the battlefield alone, of each permanent's own
-  -- copiable text and of the GRANTORS standing on it; an emblem is neither a card
-  -- nor a permanent (CR 114.5) and its abilities function in the command zone (CR
-  -- 114.4), so it is the grantor neither gate walks.
+  -- Projection.replacementsAffecting's gate and CombatRestriction.inForce's
+  -- `anyMinted`. Both ask their "could anything here mint one?" question of each
+  -- permanent's own copiable text and of the GRANTORS standing on the
+  -- battlefield; an emblem is neither a card nor a permanent (CR 114.5) and its
+  -- abilities function in the command zone (CR 114.4), so it is the grantor
+  -- neither of those two reads reaches -- Projection.elsewhereGrants is the
+  -- disjunct that does.
   --
   -- Protection is what makes one emblem answer for both: rule 702.16e mints a
   -- damage-prevention replacement and rule 702.16f a CR 509.1b pairwise
@@ -3298,7 +3299,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   --     ACTIVATED ability's resolution, which is on no object's rules text at
   --     all, so no walk of anybody's static abilities can find it.
   --   * CR 113.6b's stated zone -- a static ability functioning from a
-  --     graveyard, which the two gates walked neither.
+  --     graveyard, a zone neither gate walked.
   --
   -- Protection carries all four cases for the emblem pair's reason: rule 702.16e
   -- mints a prevention and rule 702.16f a CR 509.1b pairwise restriction, so one

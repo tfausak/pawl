@@ -4412,7 +4412,7 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 --
 -- gatherGiven's remaining three arms need no disjunct, and each for a reason
 -- rather than by omission. `designations` emits only menace (CR 701.60c) and
--- `bestows` only rule 702.103a's type line and enchant, none of which either
+-- `bestows` only rule 702.103b's type line and enchant, none of which either
 -- mint predicate is True of. `counters` emits CR 122.1b's keyword counters,
 -- whose enumeration -- flying, first strike, double strike, deathtouch, decayed,
 -- exalted, haste, hexproof, indestructible, lifelink, menace, reach, shadow,
@@ -4460,12 +4460,12 @@ replacementsAffecting gs =
         else concatMap forOne onBattlefield
 
 -- CR 611.2a: does any STORED continuous effect write a modification satisfying
--- `p`? gatherGiven's `stored` arm, read by the two battlefield-wide
--- short-circuits -- replacementsAffecting's `baseHas` and
--- Pawl.Engine.CombatRestriction.inForce's `anyMinted` -- each of which asks its
--- grantor question of objects, where this arm is on no object's rules text at
--- all: a resolved spell or ability has left the stack and its effect outlives it
--- (CR 611.2a), so no walk of anybody's static abilities can find it.
+-- `p`? gatherGiven's `stored` arm, and a disjunct of each of the two
+-- battlefield-wide short-circuits -- replacementsAffecting's gate and
+-- Pawl.Engine.CombatRestriction.inForce's `anyMinted` -- whose other disjuncts
+-- ask their grantor question of OBJECTS, where this arm is on no object's rules
+-- text at all: a resolved spell or ability has left the stack and its effect
+-- outlives it, so no walk of anybody's static abilities can find it.
 --
 -- Reads the SAME list gatherGiven's `stored` arm does, entire, which is what
 -- makes it sound. CR 611.2c's locked affected set is deliberately NOT consulted:
@@ -4477,11 +4477,11 @@ storedWrites :: (Modification -> Bool) -> GameState -> Bool
 storedWrites p gs = any (p . ContinuousEffect.modification) (GameState.continuousEffects gs)
 
 -- Does any static ability functioning from a zone OTHER than the battlefield
--- write a modification satisfying `p`? The other half of what the two gates
--- above miss, since neither is a permanent's ability: an emblem's abilities
--- function in the command zone and an emblem is neither a card nor a permanent
--- (CR 114.4 / 114.5), and CR 113.6 / 113.6b / 113.6f put a card's abilities to
--- work from the stack, a graveyard, a hand or a library.
+-- write a modification satisfying `p`? storedWrites' sibling disjunct in both
+-- gates, and the other half of what a walk of the permanents cannot reach: an
+-- emblem's abilities function in the command zone and an emblem is neither a
+-- card nor a permanent (CR 114.4 / 114.5), and CR 113.6 / 113.6b / 113.6f put a
+-- card's abilities to work from the stack, a graveyard, a hand or a library.
 --
 -- anyConditional's walk with its predicate swapped, and sound for that
 -- function's reason: each arm reads the SAME list its walk in gatherGiven does.
@@ -4490,15 +4490,15 @@ storedWrites p gs = any (p . ContinuousEffect.modification) (GameState.continuou
 -- states no zone this admits it against gatherGiven's narrower default (rule
 -- 113.6's card types on the stack, rule 113.6f's classification in a graveyard).
 -- A superset costs the board one walk it did not need; a subset would drop a
--- rule 614.1c row. The two HIDDEN zones narrow instead and cost nothing for it,
+-- rule 614.1 row. The two HIDDEN zones narrow instead and cost nothing for it,
 -- for the reason anyConditional states: rule 113.6b's stated set is a printed
 -- field, and an ability that states no zone is one gatherGiven's hidden walks
 -- cannot keep however `p` answers.
 --
 -- Walked on every replacement gather and every combat declaration, where the
 -- command zone alone was nearly free. What that costs per card is mayStateZone's
--- printed-field read, the same bound gatherGiven's own hidden walks carry
--- (see #1935).
+-- printed-field read, the same bound gatherGiven's own hidden walks carry; see
+-- #1935, which measured those walks.
 elsewhereGrants :: (Modification -> Bool) -> GameState -> Bool
 elsewhereGrants p gs =
   let writes sa = any p (StaticAbility.modifications sa)
