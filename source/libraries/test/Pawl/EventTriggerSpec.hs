@@ -3510,10 +3510,11 @@ boggartPranksterSpec s registry =
 -- how Boggart Prankster's "target attacking Goblin you control" hides the same
 -- distinction on every board.
 --
--- The Opponent arm is exercised by no card. Its producer, Ever-Watching
--- Threshold, carries a CR 603.4 intervening "if" reading what was attacked
--- (#2280); the boards below prove only that the implementation does not BEHAVE
--- as Opponent.
+-- The Opponent arm is borne by Ever-Watching Threshold, whose group is below,
+-- and no board tells it from AnyPlayer: CR 506.2 and CR 508.1 let only the
+-- active player declare and no player attacks themselves, so every card printing
+-- either phrase sees the same declarations. What the boards below prove is that
+-- this implementation does not behave as Opponent.
 avatarRokuSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 avatarRokuSpec s registry =
   let isActivate a = case a of
@@ -3755,6 +3756,136 @@ anafenzaAttackSpec s registry =
             Spec.assertEqWith s "an untapped creature is not a legal target" (countersOn wallId settled) (Just 0)
             Spec.assertEqWith s "and neither is a creature bob controls" (countersOn theirs settled) (Just 0)
           _ -> Spec.assertFailure s "fixture should give alice Anafenza, a Piker and a Wall, and bob a Piker"
+
+-- CR 603.4: an attack trigger with an intervening "if" that reads WHAT the
+-- declaration was aimed at.
+--
+-- Ever-Watching Threshold {2}{U} Enchantment is the card, and nothing is omitted
+-- from it: "Whenever an opponent attacks, if they attacked you and/or a
+-- planeswalker you control, draw a card."
+--
+-- The trigger is CR 508.3d's PlayerAttacks, once per declaration; the "if" is a
+-- Pawl.Types.Condition whose two disjuncts read Filter.DeclaredAttackedThisCombat
+-- off the two subjects the printed sentence names -- alice herself, through
+-- Scope.OverPlayers, and a planeswalker she controls, through the battlefield.
+--
+-- "THEY" is not read, and cannot be: CR 506.2 makes the attacking player the
+-- active player, so every creature in a combat phase's declaration is that one
+-- player's, and CR 506.4 removes a creature from combat the moment its
+-- controller changes (Pawl.Engine.Combat's controlChanged). So "they attacked
+-- you" and "a creature attacked you" are the same question, by rule rather than
+-- by the pool's current shape.
+--
+-- Three boards, all three-seat, all with bob active and declaring:
+--
+--   * bob attacks CAROL. Rule 508.3d's own condition holds -- alice's opponent
+--     declared attackers -- and the clause is the only thing that can stop it.
+--   * bob attacks ALICE. The first disjunct.
+--   * bob attacks alice's JACE. The second disjunct, and the leg that parts this
+--     card's clause from CR 508.5's defending player -- which is alice on the
+--     Jace board and on the alice board alike, so an implementation reading that
+--     field could not tell the two disjuncts apart.
+--
+-- PlayerRelation.Opponent is BORNE by this card and still not discriminated from
+-- AnyPlayer: CR 506.2/508.1 let only the active player declare, and no player
+-- attacks themselves, so alice declaring leaves the "if" false whichever relation
+-- is read. What the boards do falsify is You -- bob declares on all three, and a
+-- You reading fires nothing at all.
+everWatchingThresholdSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+everWatchingThresholdSpec s registry =
+  let -- Declares `attacker` alone and announces it at `target`, FILTERED out of
+      -- what the engine offered rather than built, for seiferSpec's reason.
+      answering :: ObjectId.ObjectId -> AttackTarget.AttackTarget -> Prompt.Prompt r -> r
+      answering attacker target p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
+        Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== target) (NonEmpty.toList options))
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      sentAt gs = Combat.Type.attackers (GameState.combat gs)
+      -- How many of rule 508.3d's triggers CR 603.2 wrote down. Rule 603.4's
+      -- first sentence is why this is 0 on the silent board rather than 1: the
+      -- clause is checked at the GATHER, so an ability it rejects "does nothing"
+      -- and never becomes a trigger to record. Asserted beside the hand because
+      -- the hand alone cannot tell a clause that held from a draw that failed.
+      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacks (AbilityTriggered.condition record)]
+      -- bob active and declaring, with `defending` settled as CR 506.2a's one
+      -- defending player. combatBoardOf's tail of steps, so S.runToStep can walk
+      -- from the declare attackers step to the next one.
+      bobAttacking defending gs =
+        gs
+          { GameState.activePlayer = S.bob,
+            GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just defending},
+            GameState.remaining =
+              Seq.fromList
+                [ Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.PostcombatMain,
+                  Phase.Ending EndingStep.EndStep,
+                  Phase.Ending EndingStep.Cleanup
+                ]
+          }
+      -- alice holds the Threshold and a Jace stocked with loyalty (CR 704.5i
+      -- would otherwise take a loyalty-0 planeswalker away before attackers are
+      -- declared); bob holds one Piker; carol holds nothing, so bob's only
+      -- creature is the whole declaration whichever seat he is pointed at. Three
+      -- cards under alice's library, so CR 104.3c never decks her.
+      fixture = do
+        threshold <- S.printingOf s registry "Ever-Watching Threshold"
+        piker <- S.printingOf s registry "Goblin Piker"
+        jace <- S.printingOf s registry "Jace Beleren"
+        island <- S.printingOf s registry "Island"
+        case S.threePlayerCombat [threshold, jace] [piker] [] of
+          (gs0, [_, jaceId], [pikerId], []) ->
+            let stock g = snd (S.addLibraryCard island S.alice g)
+             in pure (Just (jaceId, pikerId, stock (stock (stock (S.addCounter CounterKind.Loyalty 3 jaceId gs0)))))
+          _ -> pure Nothing
+   in Spec.describe s "Ever-Watching Threshold" $ do
+        -- The proving test: the declaration reached alice, so the clause is true
+        -- and the ability draws.
+        Spec.it s "CR 603.4 the clause holds when the declaring opponent attacked you" $ do
+          built <- fixture
+          case built of
+            Just (_, pikerId, gs) -> do
+              let after = atBlockers (answering pikerId (AttackTarget.OfPlayer S.alice)) (bobAttacking S.alice gs)
+              Spec.assertEqWith s "CR 121.1 alice drew the card" (S.handSize S.alice after) 1
+              Spec.assertEqWith s "CR 508.3d and one trigger fired for the one declaration" (fired after) 1
+              Spec.assertEqWith s "CR 508.1 and it was bob's Piker, declared at alice" (sentAt after) (Map.fromList [(pikerId, AttackTarget.OfPlayer S.alice)])
+            Nothing -> Spec.assertFailure s "fixture should give alice a Threshold and a Jace, and bob a Piker"
+        -- The second disjunct. CR 508.5 makes alice the defending player here
+        -- too, so only a clause reading the ANNOUNCED target can tell this board
+        -- from the one above -- and only one reading the planeswalker rather than
+        -- the player can tell it from the one below.
+        Spec.it s "CR 603.4 the clause holds when a planeswalker you control was attacked" $ do
+          built <- fixture
+          case built of
+            Just (jaceId, pikerId, gs) -> do
+              let after = atBlockers (answering pikerId (AttackTarget.OfPlaneswalker jaceId)) (bobAttacking S.alice gs)
+              Spec.assertEqWith s "CR 121.1 alice drew the card" (S.handSize S.alice after) 1
+              Spec.assertEqWith s "CR 508.3d and one trigger fired for the one declaration" (fired after) 1
+              Spec.assertEqWith s "CR 508.1b and the Piker really was declared at Jace" (sentAt after) (Map.fromList [(pikerId, AttackTarget.OfPlaneswalker jaceId)])
+            Nothing -> Spec.assertFailure s "fixture should give alice a Threshold and a Jace, and bob a Piker"
+        -- The negative, and the same fixture: bob attacks the third seat, so
+        -- neither disjunct holds. Rule 603.4's first sentence -- the ability
+        -- "triggers only if" the clause is true -- is what makes `fired` 0 here
+        -- and 1 on both boards above, and rule 508.3d's condition is satisfied on
+        -- all three alike.
+        Spec.it s "CR 603.4 the clause fails when the declaration went at a third player" $ do
+          built <- fixture
+          case built of
+            Just (_, pikerId, gs) -> do
+              let after = atBlockers (answering pikerId (AttackTarget.OfPlayer S.carol)) (bobAttacking S.carol gs)
+              Spec.assertEqWith s "CR 121.1 alice drew nothing" (S.handSize S.alice after) 0
+              Spec.assertEqWith s "CR 603.4 and the ability did not trigger at all" (fired after) 0
+              Spec.assertEqWith s "CR 508.1 and the Piker was declared at carol" (sentAt after) (Map.fromList [(pikerId, AttackTarget.OfPlayer S.carol)])
+            Nothing -> Spec.assertFailure s "fixture should give alice a Threshold and a Jace, and bob a Piker"
+
+-- Rule 508.3d's condition, read off the log entry CR 603.2 writes for a trigger.
+isPlayerAttacks :: TriggerCondition.TriggerCondition -> Bool
+isPlayerAttacks condition = case condition of
+  TriggerCondition.PlayerAttacks _ -> True
+  _ -> False
 
 -- CR 508.3e: "whenever [a player] attacks [another player]" -- the last of rule
 -- 508.3's arities, and the only one whose subject is a PAIR of players.
@@ -5588,6 +5719,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   curseOfVitalitySpec s registry
   boggartPranksterSpec s registry
   avatarRokuSpec s registry
+  everWatchingThresholdSpec s registry
   hermesSpec s registry
   seiferSpec s registry
   ezuriExperienceSpec s registry
