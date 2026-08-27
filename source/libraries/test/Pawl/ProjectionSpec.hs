@@ -3188,10 +3188,16 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- Elspeth's fixture above cannot show this -- a planeswalker trips `baseHas`
   -- through copiableMintsType (CR 306.5b) on its own.
   --
-  -- Synthetic (#2409): Scryfall `o:"emblem with" o:protection`, 2026-08-27, no
-  -- hit -- no printed emblem grants a keyword either short-circuit mints from.
-  -- Nothing in CR 114.3 bounds what abilities an emblem may have, so the card is
-  -- one the rules permit.
+  -- SYNTHETIC because no printed emblem grants a keyword either short-circuit
+  -- mints from. Scryfall `o:"emblem with"`, 2026-08-27, is every card that makes
+  -- one, and reading each emblem's text finds none granting protection, riot,
+  -- unleash, modular, vanishing, fading, bloodthirst, megamorph or daybound --
+  -- the whole of Pawl.Engine.Keyword.mintsReplacement's and
+  -- mintsCombatRestriction's sets. Domri, Chaos Bringer names riot and is the
+  -- near miss: the riot rides mana its loyalty ability adds, and its emblem makes
+  -- tokens. Nothing in the CR forbids the card either: CR 114.3 bounds an
+  -- emblem's characteristics but not its abilities, and CR 114.2 lets the effect
+  -- that creates one give it any ability.
   Spec.it s "CR 702.16e an emblem's granted protection still prevents the damage" $ do
     forge <- S.printingOf s registry "Synthetic Emblem Forge"
     evangel <- S.printingOf s registry "Cabal Evangel"

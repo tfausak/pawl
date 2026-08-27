@@ -293,7 +293,7 @@ inForce gs =
       -- emblem's granted protection still bars the red blocker" is its board.
       -- Two holes remain: a minting keyword arriving through a stored continuous
       -- effect or a keyword counter is on no base face (#833), and a grant from a
-      -- zone other than those two is not read at all (#2440).
+      -- zone other than those two is not read at all (#2436).
       anyMinted =
         any baseCouldMint (Set.toList (GameState.battlefield gs))
           || Projection.commandGrants (Projection.grantsKeywordWhere Keyword.mintsCombatRestriction) gs

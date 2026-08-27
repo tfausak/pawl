@@ -4390,7 +4390,7 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- Not implemented: a minting keyword or a minting TYPE reaching a permanent
 -- through a stored continuous effect, and a minting keyword arriving on a keyword
 -- counter, are on no base face (#833). Nor is a grant from a zone other than the
--- battlefield and the command zone (#2440).
+-- battlefield and the command zone (#2436).
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
@@ -4419,8 +4419,8 @@ replacementsAffecting gs =
       -- CR 114.4's grantor, standing where `baseHas` cannot see it. Both of
       -- baseHas's grantor disjuncts again, since an emblem writes the same two
       -- modifications a permanent's static ability does.
-      emblemHas = commandGrants (\m -> grantsKeywordWhere Keyword.mintsReplacement m || grantsMintingType m) gs
-   in if not (any baseHas onBattlefield || emblemHas)
+      commandHas = commandGrants (\m -> grantsKeywordWhere Keyword.mintsReplacement m || grantsMintingType m) gs
+   in if not (any baseHas onBattlefield || commandHas)
         then []
         else concatMap forOne onBattlefield
 
@@ -4438,7 +4438,7 @@ replacementsAffecting gs =
 --
 -- Not implemented: the other zones gatherGiven gathers static abilities from --
 -- the stack, graveyards, hands and libraries (CR 113.6) -- are not walked here,
--- so a minting keyword granted from one of them is still missed (#2440). The
+-- so a minting keyword granted from one of them is still missed (#2436). The
 -- command zone is normally empty, where a graveyard walk on every gather is not.
 commandGrants :: (Modification -> Bool) -> GameState -> Bool
 commandGrants p gs =
