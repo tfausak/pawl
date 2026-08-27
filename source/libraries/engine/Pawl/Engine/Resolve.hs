@@ -2778,7 +2778,8 @@ chooseDamageSource controller resolving context gs filter_ = case filter_ of
 -- SPELLS on the stack, not the whole zone: an activated or triggered ability
 -- sharing that zone is a permanent under none of the four classes, and the rule
 -- says "a spell". Game.isSpell asks the object's zone and its KIND, never which
--- card it is -- the same reader the CR 405.1 arm above uses.
+-- card it is -- the same reader ObjectRef.EachSpell above narrows with under CR
+-- 109.2b, where the CR 405.1 arm beside it takes the whole zone instead.
 --
 -- Read off the PROJECTION, so a permanent that is a red source only by a
 -- continuous effect is a candidate -- with CR 608.2h's fallback onto last known
@@ -2786,6 +2787,11 @@ chooseDamageSource controller resolving context gs filter_ = case filter_ of
 -- used to be in" and a departed id projects blank. Exactly the pair
 -- Pawl.Engine.Replacement.matchesDamageSource rechecks with under CR 609.7b, so
 -- the choice and the recheck cannot read one source two ways.
+--
+-- That fallback is a REGRESSION FENCE rather than a proven behaviour: every card
+-- in data/cards/ naming a chosen source writes a trivial filter, which admits a
+-- blank view as readily as a filled one, so replacing the pair with the bare
+-- viewOfObject leaves the whole suite green (#2480).
 --
 -- DEDUPED, the classes overlapping wherever a spell's living target is also a
 -- permanent, and ASCENDING out of the same Set, so both the single-candidate
@@ -2820,6 +2826,13 @@ damageSourceCandidates context gs filter_ =
 -- nothing is exactly the case the parenthesis admits, and damageSourceCandidates
 -- reads it through CR 608.2h's last known information rather than through the
 -- blank view a live-only projection gives.
+--
+-- Only the STACK half has a card behind it -- Pawl.ReplacementSpec's "a source
+-- only a waiting ability still refers to is offered", Ghitu Fire-Eater under
+-- Auriok Replica. The replacement-row and delayed-trigger halves are REGRESSION
+-- FENCES: neutralizing either leaves the whole suite green, no board in
+-- data/cards/ putting such an object in front of a chooser. They are written
+-- because rule 609.7a's one sentence names all three carriers (#2479).
 referredToSources :: GameState -> [ObjectId]
 referredToSources gs =
   foldMap (\oid -> foldMap referentsOfObject (Game.lookupObject oid gs)) (GameState.stack gs)

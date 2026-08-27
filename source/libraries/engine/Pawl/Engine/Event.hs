@@ -3776,7 +3776,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
 -- damage dealt by that spell and any damage dealt by the permanent that spell
 -- becomes when it resolves" -- and that is the rule the pool's producer plays
 -- to: Auriok Replica's chosen source, since Resolve.damageSourceCandidates
--- offers the stack.
+-- offers the spells on the stack.
 --
 -- Called INSIDE changeZoneAttaching, before the CR 614.1c entry loop, and
 -- Pawl.Types.CarryOver is how the move says whether CR 400.7's exception is
