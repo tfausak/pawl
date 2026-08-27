@@ -3539,23 +3539,25 @@ retractionHelixSpec s registry = Spec.describe s "Retraction Helix" $ do
   Spec.it s "CR 400.7 whole card: the granted {T} bounces a nonland permanent to its OWNER's hand" $ do
     board <- helixBoard s registry
     let granted = helixCast board
-    case grantedAbility (helixSorcererPrinting board) (helixSorcerer board) granted of
-      Nothing -> Spec.assertFailure s "the resolved spell should have granted an ability"
-      Just ability -> do
-        let resolved =
-              S.runPure (aimAtObject (helixPiker board)) granted $ do
-                Activate.activateAbility S.bob (helixSorcerer board) ability
-                Stack.resolveTop
-        -- CR 400.1: the move makes a NEW object, so the Piker is named rather
-        -- than tracked by id -- which is also what makes the OWNER claim below
-        -- readable off the board.
-        Spec.assertEqWith s "the Piker is in carol's hand" (fmap (`S.soleFaceName` resolved) (Game.zoneMembers Zone.Hand S.carol resolved)) [S.printingName (helixPikerPrinting board)]
-        Spec.assertEqWith s "and the activating player's hand is empty" (length (Game.zoneMembers Zone.Hand S.bob resolved)) 0
-        Spec.assertEqWith s "it left the battlefield" (S.countOnBattlefieldByName (S.printingName (helixPikerPrinting board)) S.carol resolved) 0
-        Spec.assertEqWith s "carol's Island stayed on the battlefield" (fmap Object.zone (Game.lookupObject (helixCarolIsland board) resolved)) (Just Zone.Battlefield)
-        Spec.assertEqWith s "the receiving creature paid the {T}" (fmap Object.tapped (Game.lookupObject (helixSorcerer board) resolved)) (Just TapState.Tapped)
-        Spec.assertBool s (any (\a -> case a of A.Activate _ ab -> ab == ability; _ -> False) (activationsOf (helixSorcerer board) (Action.legalActions S.bob granted))) "the granted ability is offered to its controller"
-        Spec.assertEqWith s "and not to the spell's controller" (activationsOf (helixSorcerer board) (Action.legalActions S.alice granted)) []
+    -- Falls back to the PRINTED ability rather than failing when the grant is
+    -- missing, so a board that never granted anything is answered by the bounce
+    -- assertion below rather than by a structural one ahead of it.
+    let ability = Maybe.fromMaybe (theAbility (helixSorcererPrinting board)) (grantedAbility (helixSorcererPrinting board) (helixSorcerer board) granted)
+        resolved =
+          S.runPure (aimAtObject (helixPiker board)) granted $ do
+            Activate.activateAbility S.bob (helixSorcerer board) ability
+            Stack.resolveTop
+    -- CR 400.1: the move makes a NEW object, so the Piker is named rather
+    -- than tracked by id -- which is also what makes the OWNER claim below
+    -- readable off the board.
+    Spec.assertEqWith s "the Piker is in carol's hand" (fmap (`S.soleFaceName` resolved) (Game.zoneMembers Zone.Hand S.carol resolved)) [S.printingName (helixPikerPrinting board)]
+    Spec.assertEqWith s "and the activating player's hand is empty" (length (Game.zoneMembers Zone.Hand S.bob resolved)) 0
+    Spec.assertEqWith s "it left the battlefield" (S.countOnBattlefieldByName (S.printingName (helixPikerPrinting board)) S.carol resolved) 0
+    Spec.assertEqWith s "carol's Island stayed on the battlefield" (fmap Object.zone (Game.lookupObject (helixCarolIsland board) resolved)) (Just Zone.Battlefield)
+    Spec.assertEqWith s "the receiving creature paid the {T}" (fmap Object.tapped (Game.lookupObject (helixSorcerer board) resolved)) (Just TapState.Tapped)
+    Spec.assertBool s (any (\a -> case a of A.Activate _ ab -> ab == ability; _ -> False) (activationsOf (helixSorcerer board) (Action.legalActions S.bob granted))) "the granted ability is offered to its controller"
+    Spec.assertEqWith s "and not to the spell's controller" (activationsOf (helixSorcerer board) (Action.legalActions S.alice granted)) []
+    Spec.assertBool s (ability /= theAbility (helixSorcererPrinting board)) "and what was activated is the granted ability, not the printed one"
 
 -- Aims every announced target slot at one object, filtering the OFFERED set so a
 -- recipient the engine did not offer can never stand in for one it did.
