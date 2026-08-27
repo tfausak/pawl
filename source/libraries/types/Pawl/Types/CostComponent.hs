@@ -17,7 +17,7 @@ import qualified Pawl.Types.TapPermanents as TapPermanents
 -- library" is Pawl.Engine.ManaAbility.costMovesLibraryCard, which cannot route
 -- through Pawl.Engine.Cost without a module cycle (see that function).
 -- Pawl.Engine.Filter.rewriteComponent cases on it too and reads nothing -- CR
--- 613.1d's subtype rewrite is a traversal that reconstructs every arm.
+-- 612.1's word swap is a traversal that reconstructs every arm.
 --
 -- Either way what the rules core takes from it is a CLASSIFICATION (can this be
 -- paid? does it require the tap symbol? does it touch a library?) and never the

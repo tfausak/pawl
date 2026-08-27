@@ -1,8 +1,9 @@
 -- CR 605.1a's classification, at both the scales the rule needs it:
--- `manaProduced` asks one EFFECT whether it could add mana and
--- `movesLibraryCard` asks one EFFECT whether it moves a card to or from a
--- library, and `isManaAbility` folds both over a whole ABILITY and adds the
--- no-target and not-a-loyalty-ability clauses.
+-- `manaProduced` asks one EFFECT whether it could add mana, `movesLibraryCard`
+-- asks one EFFECT whether it moves a card to or from a library and
+-- `costMovesLibraryCard` asks the same of one COST COMPONENT, and
+-- `isManaAbility` folds all three over a whole ABILITY and adds the no-target
+-- and not-a-loyalty-ability clauses.
 --
 -- The ability-level half lives here rather than in Pawl.Engine.Mana because
 -- Pawl.Engine.Projection needs it -- CR 605.1a's exclusion is half of

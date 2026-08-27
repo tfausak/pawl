@@ -1187,8 +1187,8 @@ claimOf pid oid component gs = case component of
   -- CR 701.17a spends cards out of the paying player's own library, so the pool
   -- is that library and the count is how many the mill takes -- the ZONE keying a
   -- Removal soundly for the header's reason. What it buys is two mills of one
-  -- cost needing two cards rather than one, which Hall's condition then asks;
-  -- a FENCE on this pool, no printing milling twice in one cost.
+  -- cost needing two cards rather than one, which Hall's condition then asks; a
+  -- FENCE, no card in `data/cards/` milling twice in one cost.
   CostComponent.MillCards n ->
     claim (ClaimAxis.Removal Zone.Library) (Set.fromList (Game.zoneMembers Zone.Library pid gs)) n
   -- CR 107.5: {T} spends exactly the untapped-ness the TapPermanents arm below
@@ -2065,8 +2065,8 @@ payPass moment pid oid components =
 --
 -- The RANDOM half has no arm because it has no constructor: nothing in
 -- Pawl.Types.CostComponent flips a coin or rolls a die, so every False below is
--- decided by the library half alone. The two halves are one predicate because CR
--- 601.2h states one pass, not two.
+-- decided by the library half alone. One predicate for both, because rule
+-- 601.2h's two criteria select one pass between them.
 --
 -- EXHAUSTIVE with no wildcard, `orderSensitive`'s posture and for its reason.
 paidInSecondPass :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool

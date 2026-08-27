@@ -2764,9 +2764,10 @@ barkhideTrollSpec s registry =
 -- MILLS, and so of CR 601.2h's second pass. Pawl.ManaSpec's Millikin group
 -- carries CR 605.1a, which is the other rule its cost reaches.
 --
--- Two things are proved here and nowhere else: CR 701.17b's refusal of a mill
--- bigger than the library, and the two-pass split -- the payment asks the payer
--- to order NOTHING, where one undivided list would have asked.
+-- Three things are proved here and nowhere else: CR 701.17b's refusal of a mill
+-- bigger than the library, the two-pass split -- the payment asks the payer to
+-- order NOTHING, where one undivided list would have asked -- and CR 701.17a's
+-- record, which is what makes a cost-side mill a mill to anything watching.
 millikinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 millikinSpec s registry =
   Spec.describe s "Millikin" $ do
@@ -2774,6 +2775,10 @@ millikinSpec s registry =
     -- instruction. The two boards differ in the library and in nothing else, so
     -- the refusal is the library's doing: Millikin is untapped and settled on
     -- both, which is the whole of the other component's payability.
+    --
+    -- The OFFER is guarded twice over -- Cost.canPayComponent's arm and the
+    -- Zone.Library claim Cost.claimOf states, either of which alone withholds it
+    -- -- so the two component assertions below are what pin the arm itself.
     Spec.it s "CR 701.17b a mill cost is unpayable out of an empty library, so the ability is not offered" $ do
       millikin <- S.printingOf s registry "Millikin"
       let (stockedId, stocked) = millikinBoard millikin 1

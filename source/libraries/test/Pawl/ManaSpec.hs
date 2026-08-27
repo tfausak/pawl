@@ -3149,8 +3149,9 @@ isActivateOf oid action = case action of
 -- ability, so every other criterion in rule 605.1a is met and its COST is the
 -- whole of why it is not a mana ability. The parenthesis is reminder text --
 -- "activate only as an instant" is the CONSEQUENCE of the clause and not a
--- printed rider, so the card authors no ActivationRestriction and these cases
--- would not pass if it did.
+-- printed rider, so the card authors no ActivationRestriction -- which the
+-- characteristics case below asserts, since no board here would tell an
+-- instant-speed rider from its absence.
 --
 -- Sol Ring ({1} Artifact, "{T}: Add {C}{C}") is the control on every board here:
 -- the same {T}, the same colourless production, and no mill. It is what says a
