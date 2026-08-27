@@ -6,7 +6,8 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Printing as Printing
 
 -- | A deck: the multiset of printings a player's library is built from, plus CR
--- 903.3's commander designation.
+-- 903.3's commander designation and the two things the player brings alongside
+-- it -- CR 309.2's dungeon cards and CR 100.4's sideboard.
 --
 -- The cards are a multiset because a shuffle erases any order among them, so
 -- counts are the honest model. `Printing` and everything beneath it derive `Ord`,
@@ -50,11 +51,30 @@ data Deck = MkDeck
     -- A Set and not `cards`' multiset: two copies of one dungeon printing offer the
     -- same choice and enter the same card, so a count would be a distinction CR
     -- 309.2a's choice cannot see.
-    dungeons :: Set.Set Printing.Printing
+    dungeons :: Set.Set Printing.Printing,
+    -- | CR 100.4 \/ 103.2a: the cards this player sets aside before the game, which
+    -- CR 400.11a puts outside the game. What is left after they are set aside is
+    -- the starting deck, so these are not among `cards`.
+    --
+    -- Here for the commander's and the dungeons' reason: it is what the player
+    -- BROUGHT, settled before the game begins, and every caller that builds a game
+    -- already threads a Deck per player.
+    --
+    -- A MULTISET and not `dungeons`' set, which is the one place this field parts
+    -- from the one above it. CR 100.4a bounds a sideboard by COUNT, so two copies
+    -- of a card are two cards; and Pawl.Engine.OutsideTheGame spends them, so the
+    -- second Burning Wish of a game can find the second copy and only the second
+    -- copy. A dungeon is a supply nothing spends (CR 309.5b), which is what lets
+    -- that field forget its counts.
+    --
+    -- Pawl.Engine.Setup.createDeck interns these into Player.outsideTheGame, which
+    -- is the pool the rules read; this field is the deck-building half and nothing
+    -- in the engine reads it after setup.
+    sideboard :: Map.Map Printing.Printing Natural.Natural
   }
   deriving (Eq, Ord, Show)
 
--- | A deck with no commander and no dungeons -- every format but Commander, and
--- every game nobody ventures in.
+-- | A deck with no commander, no dungeons and no sideboard -- every format but
+-- Commander, every game nobody ventures in, and every game nobody wishes in.
 fromCards :: Map.Map Printing.Printing Natural.Natural -> Deck
-fromCards m = MkDeck {cards = m, commander = Nothing, dungeons = Set.empty}
+fromCards m = MkDeck {cards = m, commander = Nothing, dungeons = Set.empty, sideboard = Map.empty}

@@ -1780,6 +1780,13 @@ rewriteEffect pairs effect = case effect of
   -- CR 612.1: rule 201.4a's restriction is printed card text, so a text-changer
   -- rewrites it exactly as it rewrites a search's filter above.
   Effect.ChooseCardName restriction -> Effect.ChooseCardName (Filter.rewrite pairs restriction)
+  -- CR 612.1 again: "a sorcery card you own from outside the game" is printed
+  -- card text like the search's filter above, so a text-changer reaches it the
+  -- same way. A REGRESSION FENCE rather than a proven behaviour -- no card in
+  -- data/cards changes a word this filter names, so both readings leave the same
+  -- board and mutating this line reddens nothing.
+  Effect.RevealFromOutsideTheGame predicate -> Effect.RevealFromOutsideTheGame (Filter.rewrite pairs predicate)
+  Effect.ExileThisSpell -> effect
   Effect.Bolster _ -> effect
   -- CR 612.1 / 612.2a: amass's subtype is a printed word of CR 205.3m's family,
   -- and the token's own name follows it.

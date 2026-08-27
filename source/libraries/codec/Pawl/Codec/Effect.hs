@@ -88,6 +88,8 @@ codec cardCodec abilityCodec =
       Arm.nullary "ExileAllGraveyards" Effect.ExileAllGraveyards,
       Arm.nullary "Proliferate" Effect.Proliferate,
       Arm.payload "ChooseCardName" (Filter.codec Keyword.codec) Effect.ChooseCardName (\x -> case x of Effect.ChooseCardName y -> Just y; _ -> Nothing),
+      Arm.payload "RevealFromOutsideTheGame" (Filter.codec Keyword.codec) Effect.RevealFromOutsideTheGame (\x -> case x of Effect.RevealFromOutsideTheGame y -> Just y; _ -> Nothing),
+      Arm.nullary "ExileThisSpell" Effect.ExileThisSpell,
       Arm.payload "Bolster" Quantity.codec Effect.Bolster (\x -> case x of Effect.Bolster y -> Just y; _ -> Nothing),
       Arm.payload "Amass" Amass.codec Effect.Amass (\x -> case x of Effect.Amass y -> Just y; _ -> Nothing),
       Arm.payload "Blight" PlayerQuantity.codec Effect.Blight (\x -> case x of Effect.Blight y -> Just y; _ -> Nothing),
