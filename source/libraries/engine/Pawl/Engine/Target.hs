@@ -260,10 +260,20 @@ slotContext pcs perspective bindings source gs =
       -- lives in an effect's QUANTITY, which is evaluated later and
       -- elsewhere.
       Filter.recipient = Nothing,
-      -- Empty: a slot's own filter is matched while the slots are still
-      -- being CHOSEN (CR 601.2c), so there is no resolution's slot map to
-      -- hand over yet, and IsBound is vacuously False here.
-      Filter.slotObjects = Map.empty,
+      -- Off `bindings`, exactly as slotNames below is and for CR 601.2c's
+      -- other sibling-slot reading: "another target creature" is a slot
+      -- forbidding what a SIBLING slot holds (Fall of the Hammer's
+      -- Not (IsBound "dealer")), and rule 601.2c makes sharing the default,
+      -- so the restriction has to be a Filter the card writes rather than
+      -- machinery. What a caller supplies no bindings for stays vacuously
+      -- False, which is the same posture every other context-relative field
+      -- here takes.
+      --
+      -- WIDENING at CR 601.2c is still the offer: legalSetsGiven's first
+      -- pass hands every slot the seed alone, so the union is what a
+      -- dependent slot is offered, and selectionLegal is where an
+      -- announcement naming one creature twice is rejected.
+      Filter.slotObjects = fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) bindings,
       -- THE one site that fills it, alongside sourcePower and
       -- defendingPlayer above and for the same reason: SameNameAsBound
       -- lives in a target slot's Filter, and this is where one is matched.
@@ -941,6 +951,38 @@ legalSetsGiven pcs grants pools perspective seed source slots gs =
    in -- Map.union is left-biased, so the second pass wins wherever it answered.
       Map.union dependent independent
 
+-- Must this slot's answer be judged against what its SIBLING slots were answered
+-- with (CR 601.2c)? Two ways one slot depends on another, and they are the pool's
+-- and the filter's:
+--
+--   * the POOL names a slot (dependsOnSlot below), which is Dwell on the Past's
+--     "their graveyard";
+--   * the FILTER reads one, which is CR 601.2c's "another" between two slots of
+--     one announcement -- Fall of the Hammer's Not (IsBound "dealer").
+--
+-- Filter.boundSlots is the read half, the same set Pawl.Engine.Resolve's dataflow
+-- lint folds over a mode's slots, so an atom that function does not report is one
+-- this gate does not fire for -- which is the pairing that comment insists on.
+--
+-- `declared` is the ANNOUNCEMENT's own slot names, and a filter naming anything
+-- else is deliberately not a sibling read: CR 603.2's trigger bindings reach
+-- legalSetsGiven as `seed` and reach selectionLegal not at all, so re-deriving
+-- such a slot against `chosen` alone would answer it off an empty binding rather
+-- than off the trigger's, and reject an announcement the rule allows. Harness the
+-- Storm's twin slot is the shape (its filter names `thatSpell`), and that half is
+-- a REGRESSION FENCE rather than a proven behaviour: every card in the pool whose
+-- slot filter names a seed is on a triggered ability, and no trigger reaches
+-- selectionLegal at all (#2472), so dropping `declared` reddens nothing.
+--
+-- Only the JOINT CHECK reads this, never legalSetsGiven's second pass. That pass
+-- is a WIDENING -- it offers the union over what a named slot could still take --
+-- and "another" is a NARROWING, so handing it every sibling candidate at once
+-- would exclude every candidate and leave the slot unfillable.
+jointlyJudged :: Set SlotName -> TargetSlot -> Bool
+jointlyJudged declared slot =
+  dependsOnSlot (TargetSlot.pool slot)
+    || not (Set.disjoint declared (foldMap Filter.boundSlots (TargetSlot.filter slot)))
+
 -- Does this pool's candidate set depend on what another target slot is answered
 -- with (CR 601.2c)? A GraveyardScope's InSlot is the one axis that does, wherever
 -- it appears; every other pool draws from a zone no slot names.
@@ -1017,14 +1059,16 @@ chooseTargets decider pid oid slots sets = do
 -- caster who could not find three legal targets has not announced an illegal
 -- number, they were never offered it.
 --
--- THE JOINT CHECK is the second conjunct, and it is what makes CR 601.2c's "all
--- at once" a whole answer rather than an order: a slot whose pool names another
--- slot was OFFERED the union over that slot's candidates (legalSetsGiven), so
+-- THE JOINT CHECK is the third conjunct, and it is what makes CR 601.2c's "all
+-- at once" a whole answer rather than an order: a slot that names another slot
+-- was OFFERED the union over that slot's candidates (legalSetsGiven), so
 -- membership in `sets` alone would let a caster take a card from one player's
--- graveyard while targeting another. Re-deriving the dependent slots against
--- `chosen` -- exactly the derivation CR 608.2b will make at resolution -- judges
--- the announcement as the single act the rule makes it, with neither slot
--- resolved before the other.
+-- graveyard while targeting another -- or name one creature in both of Fall of
+-- the Hammer's slots, which rule 601.2c's "another" forbids. Re-deriving the
+-- dependent slots against `chosen` -- exactly the derivation CR 608.2b will make
+-- at resolution -- judges the announcement as the single act the rule makes it,
+-- with neither slot resolved before the other. jointlyJudged is which slots those
+-- are, in both readings.
 --
 -- An announced COUNT is still measured against the union: a caster who announces
 -- four targets and then cannot name four coherent ones fails here and CR 601.2
@@ -1035,7 +1079,7 @@ selectionLegal :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSlot -> Map S
 selectionLegal perspective source slots sets chosen gs =
   Set.isSubsetOf (Map.keysSet chosen) (Map.keysSet sets)
     && and (Map.elems (Map.mapWithKey slotLegal slots))
-    && and (Map.elems (Map.mapWithKey coherent (Map.filter (dependsOnSlot . TargetSlot.pool) slots)))
+    && and (Map.elems (Map.mapWithKey coherent (Map.filter (jointlyJudged (Map.keysSet slots)) slots)))
   where
     pcs = Projection.projectAll gs
     slotLegal slot targetSlot =
@@ -1051,9 +1095,16 @@ selectionLegal perspective source slots sets chosen gs =
 
 -- CR 700.2a: the mode indices every one of whose target slots can be filled --
 -- that is, has at least as many legal recipients as its count demands (a mode
--- with no slots is trivially fillable). Self-exclusion ("another") is
--- honored because it lives in the slot's own Filter. Shared by spells (Cast) and
--- abilities (Activate/Engine).
+-- with no slots is trivially fillable). Self-exclusion against the SOURCE
+-- ("another target creature" on a creature's own ability) is honored because it
+-- lives in the slot's own Filter. Shared by spells (Cast) and abilities
+-- (Activate/Engine).
+--
+-- Each slot is asked INDEPENDENTLY. Not implemented: narrowing a mode's
+-- fillability to what a COHERENT announcement could reach, so a mode whose slots
+-- exclude each other (Fall of the Hammer's, through selectionLegal's joint
+-- check) is judged fillable off a board holding one creature and the cast is
+-- then reversed at CR 601.2e (#1296).
 --
 -- `extra` is the slots EVERY mode carries in addition to its own -- CR 303.4a's
 -- enchant slot, declared by the card rather than by a mode, which castability
