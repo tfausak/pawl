@@ -4369,12 +4369,12 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- static ability writing one of those three (grantsMintingType). Every disjunct
 -- but the last is copy-aware -- through copiableReplacementsOf,
 -- copiableMintsType, anyCopiableKeyword and staticAbilitiesOf -- so a copy
--- answers off the text it copied rather than the copier's (CR 707.2a), which is
--- what Pawl.CopySpec's copiedAbilitySpec proves one case per disjunct.
+-- answers off the text it copied rather than the copier's (CR 707.2), which is
+-- what Pawl.CopySpec's copiedAbilitySpec proves a disjunct at a time.
 --
--- No face is looked up at all: every disjunct reads a copiable value, and each of
--- the four readers answers for a faceless object on its own. So a token copy,
--- which has copiable values and no printed card, is gated by what it copied.
+-- No face is looked up here any more: each of those four readers falls back to
+-- the printed face on its own, and an object that has none answers False from
+-- inside them rather than from a guard around the lot.
 --
 -- Not implemented: a minting keyword or a minting TYPE reaching a permanent
 -- through a stored continuous effect, and a minting keyword arriving on a keyword

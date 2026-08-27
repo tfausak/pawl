@@ -10,8 +10,7 @@ import qualified Pawl.Types.Keyword as Keyword
 --
 -- The Filter is the printed noun phrase after "a copy of", read as a quality of
 -- the candidate: Clone's "any creature", Copy Enchantment's "any enchantment",
--- Clever Impersonator's "any nonland permanent" (the pool's one NEGATED eligible
--- set).
+-- Clever Impersonator's negated "any nonland permanent".
 -- It is NOT the rewrite's @matching@ field, which says which ENTERING permanent
 -- the replacement modifies (CR 614.12's subject); these are two different
 -- objects and Clone writes @IsSource@ for the one and @HasCardType Creature@ for
