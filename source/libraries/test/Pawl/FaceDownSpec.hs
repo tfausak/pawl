@@ -61,6 +61,13 @@
 -- face-up/face-down status has to be askable of one candidate at a time
 -- (Filter.IsFaceDown).
 --
+-- Primal Whisperer is the COUNT's card, and the same atom's other half: {4}{G}
+-- Creature -- Elf Soldier 2/2, "This creature gets +2/+2 for each face-down
+-- creature on the battlefield. / Morph {3}{G}". Break Open asks the status of one
+-- candidate at a time; the Whisperer asks it of every permanent on the
+-- battlefield and turns the tally into a number, which is the read
+-- Pawl.Engine.Count answers and no target slot reaches.
+--
 -- Aven Farseer is the WATCHER's card, and the only printing rule 708.7's second
 -- written form needs. {1}{W} Creature -- Bird Soldier 1/1, "Flying / Whenever a
 -- permanent is turned face up, put a +1/+1 counter on this creature." It bears
@@ -171,6 +178,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   enteringFaceDownSpec s registry
   faceUpEffectSpec s registry
   breakOpenSpec s registry
+  primalWhispererSpec s registry
   disguiseSpec s registry
 
 -- CR 303.4k: an Aura turned face up, choosing what it becomes attached to.
@@ -2025,6 +2033,118 @@ breakOpenSpec s registry = Spec.describe s "IsFaceDown (CR 110.5)" $ do
         Spec.assertEqWith s "CR 110.5 alice's own face-down creature stayed face down" (fmap Object.facing (Game.lookupObject mine after)) (Just (Facing.faceDown FaceDownReason.Manifested))
         Spec.assertEqWith s "CR 708.8 and bob's turned over instead" (fmap Object.facing (Game.lookupObject victim after)) (Just Facing.FaceUp)
       _ -> Spec.assertFailure s "the face-down permanents did not reach the battlefield"
+
+-- THE BOARD Primal Whisperer's count is read on, returned as (the board, the
+-- Whisperer, Break Open in alice's hand, bob's face-down Ainok Tracker).
+--
+-- `faceDowns` says whether the three face-down permanents are placed. The two
+-- boards it builds differ in that and in nothing else, which is what makes the
+-- printed 2/2 case below a control rather than a second fixture.
+--
+-- Three face-down creatures, ONE under alice and TWO under bob, because the
+-- card's scope is the whole battlefield: with them all on one side "on the
+-- battlefield" and "you control" would agree, and Mutagen Connoisseur's
+-- neighbouring JSON -- the payload this card's static ability is spelled after --
+-- writes the ControlledBy You conjunct this one must not have.
+--
+-- Two face-up creatures beside them, the Whisperer itself and bob's Hill Giant,
+-- because a filter that dropped the IsFaceDown conjunct would count every
+-- creature instead. A board of only face-down creatures is this group's vacuity
+-- trap: the two readings answer the same number.
+--
+-- Every misreading lands on a different power, and none coincides with 8: 3
+-- face-down creatures doubled onto the printed 2 is 8, ControlledBy You answers
+-- 4, ControlledBy Opponent 6, a dropped IsFaceDown conjunct 12 (five creatures),
+-- and a single Count where the card prints Plus 5.
+--
+-- Thragtusk, Ainok Tracker and Goblin Piker go face down and none of them is on
+-- the board face up. Which card is underneath cannot be read off the board at all
+-- -- CR 708.2a leaves a face-down permanent a 2/2 with no name -- so the distinct
+-- printings are only there to keep the Break Open case's turn-over legible.
+--
+-- Two Mountains, which is Break Open's {1}{R} exactly, and a Goblin Piker left in
+-- each library so CR 104.3c has nothing to fire on.
+whispererBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, Maybe ObjectId.ObjectId)
+whispererBoard s registry faceDowns = do
+  whisperer <- S.printingOf s registry "Primal Whisperer"
+  breakOpen <- S.printingOf s registry "Break Open"
+  mountain <- S.printingOf s registry "Mountain"
+  giant <- S.printingOf s registry "Hill Giant"
+  thragtusk <- S.printingOf s registry "Thragtusk"
+  tracker <- S.printingOf s registry "Ainok Tracker"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (g1, spell) = S.handOne breakOpen (S.landsInPlay mountain 2)
+      (mine, g2) = S.addCreature whisperer S.alice g1
+      (_, g3) = S.addCreature giant S.bob g2
+      (_, g4) = S.addLibraryCard piker S.alice g3
+      (_, g5) = S.addLibraryCard piker S.bob g4
+  if faceDowns
+    then
+      let (g6, _) = enterFaceDown thragtusk S.alice g5
+          (g7, theirs) = enterFaceDown tracker S.bob g6
+          (g8, _) = enterFaceDown piker S.bob g7
+       in pure (g8, mine, spell, theirs)
+    else pure (g5, mine, spell, Nothing)
+
+-- CR 110.5 under a Quantity.Count: the same atom Break Open puts in a target
+-- slot, asked of every permanent on the battlefield at once.
+--
+-- Primal Whisperer {4}{G} Creature -- Elf Soldier 2/2 (LGN), "This creature gets
+-- +2/+2 for each face-down creature on the battlefield. / Morph {3}{G}" (name,
+-- cost, type line, P/T and Oracle text checked against api.scryfall.com,
+-- 2026-08-27). Transcribed whole: the morph is Pine Walker's shape and is not
+-- what this group reads, but leaving it off would make pawl's card stricter than
+-- printed.
+--
+-- The pump is CR 613.4c layer 7c -- an ordinary ModifyPowerToughness on a printed
+-- 2/2, NOT a characteristic-defining ability, so no Star box and no layer 7a.
+--
+-- The +2/+2 is Plus of two identical Counts: Pawl.Types.Quantity has no
+-- multiplicative arm by design, and Abomination of Llanowar already writes a Plus
+-- of two Counts.
+--
+-- The HasCardType Creature conjunct beside IsFaceDown is transcription, not
+-- discrimination: CR 708.2a makes every face-down permanent a creature, so no
+-- board can separate the two readings. It is written because the card prints
+-- "face-down creature".
+--
+-- Every case reads the Whisperer's PROJECTED power and toughness, which is what
+-- CR 613.4c produces and what combat and CR 704.5f/704.5g go on to use.
+primalWhispererSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+primalWhispererSpec s registry = Spec.describe s "Counting face-down creatures (CR 110.5)" $ do
+  -- THE CONTROL, and the pair's other half: the same board with the three
+  -- face-down permanents left out. CR 208.2 -- "if the ability needs to use a
+  -- number that can't be determined, use 0" is not what happens here; the count
+  -- is determined and it is zero, so the Whisperer is its printed 2/2.
+  Spec.it s "CR 613.4c with no face-down creature the Whisperer is its printed 2/2" $ do
+    (board, mine, _, _) <- whispererBoard s registry False
+    Spec.assertEqWith s "CR 613.4c the Whisperer counts none and stays 2/2" (S.powerToughnessOf mine board) (Just (2, 2))
+    Spec.assertEqWith s "CR 110.5b and it is itself face up, as it entered" (fmap Object.facing (Game.lookupObject mine board)) (Just Facing.FaceUp)
+
+  -- THE POSITIVE. Three face-down creatures across both battlefields, two face-up
+  -- creatures beside them, and 8 is the only power any correct reading produces.
+  Spec.it s "CR 110.5 the Whisperer counts every face-down creature on the battlefield" $ do
+    (board, mine, _, theirs) <- whispererBoard s registry True
+    case theirs of
+      Just victim -> do
+        -- THE GAMEPLAY ASSERTION, first so no precondition can absorb a mutation.
+        Spec.assertEqWith s "CR 613.4c the printed 2/2 plus +2/+2 for each of the three" (S.powerToughnessOf mine board) (Just (8, 8))
+        Spec.assertEqWith s "CR 110.5b bob's Ainok Tracker is face down, as it entered" (fmap Object.facing (Game.lookupObject victim board)) (Just (Facing.faceDown FaceDownReason.Manifested))
+        Spec.assertEqWith s "CR 708.2a and it is a creature, which is why it counts" (Projection.cardTypesOf victim board) (Set.singleton CardType.Creature)
+      Nothing -> Spec.assertFailure s "the face-down permanents did not reach the battlefield"
+
+  -- THE COUNT IS LIVE, not a value read once when the Whisperer entered: Break
+  -- Open turns one of bob's two face-down creatures face up and the pump shrinks
+  -- with the board it counts. A stored tally answers 8 here.
+  Spec.it s "CR 613.4c turning one face up drops the Whisperer by two" $ do
+    (before, mine, spell, theirs) <- whispererBoard s registry True
+    case theirs of
+      Just victim -> do
+        let after = S.settleSba (S.runPure (aimedAt victim) before (S.cast S.alice spell >> Stack.resolveTop))
+        -- THE GAMEPLAY ASSERTION: two face-down creatures left, so 2 + 2*2.
+        Spec.assertEqWith s "CR 613.4c two face-down creatures left, so 6/6" (S.powerToughnessOf mine after) (Just (6, 6))
+        Spec.assertEqWith s "CR 708.8 and the Tracker is what turned over" (fmap Object.facing (Game.lookupObject victim after)) (Just Facing.FaceUp)
+      Nothing -> Spec.assertFailure s "the face-down permanents did not reach the battlefield"
 
 -- CR 702.168 disguise: rule 702.37's twin, and the one place rule 708.2's "no
 -- characteristics other than those LISTED" has a keyword in the list.

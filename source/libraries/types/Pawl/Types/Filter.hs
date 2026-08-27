@@ -800,6 +800,10 @@ data Filter keyword
     -- spelled `Not IsFaceDown`, the one-relation-one-spelling posture IsToken's
     -- comment states (#163).
     --
+    -- Primal Whisperer's "+2/+2 for each face-down creature on the battlefield"
+    -- is the same atom under a Quantity.Count instead of a target slot, and the
+    -- other half of what Pawl.Engine.Count answers for it.
+    --
     -- The battlefield conjunct is the atom's own, Transformed's posture and for
     -- the rule's own reason rather than a caller's: CR 110.5d says only permanents
     -- have status, and CR 708.4 turns an object face down BEFORE it is put onto
