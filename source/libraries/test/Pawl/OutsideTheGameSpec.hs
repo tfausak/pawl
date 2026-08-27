@@ -110,8 +110,10 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
         -- still in hand to be counted.
         (secondWish, again) = S.addHandCard wish S.alice once
         twice = resolveWish exercising secondWish again
-    Spec.assertEqWith s "the first wish emptied the pool" (Map.size (poolOf S.alice once)) 0
-    Spec.assertEqWith s "so the second brings in nothing: the one card in hand is the first wish's" (printingsIn Zone.Hand S.alice twice) [signInBlood]
+    -- THE BEHAVIOUR first, and the pool's own state after it: an assertion about
+    -- the pool ordered ahead would absorb a mutation the hand is what observes.
+    Spec.assertEqWith s "the second wish brings in nothing: the one card in hand is the first wish's" (printingsIn Zone.Hand S.alice twice) [signInBlood]
+    Spec.assertEqWith s "and the first wish had emptied the pool" (Map.size (poolOf S.alice once)) 0
     -- The second wish still resolved and still exiled itself, which is what tells
     -- "found nothing" apart from "did not resolve".
     Spec.assertEqWith s "and exiled itself all the same" (length (printingsIn Zone.Exile S.alice twice)) 2
@@ -125,8 +127,8 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
         once = resolveWish exercising firstWish gs
         (secondWish, again) = S.addHandCard wish S.alice once
         twice = resolveWish exercising secondWish again
-    Spec.assertEqWith s "one copy is left after the first wish" (Map.elems (poolOf S.alice once)) [1]
-    Spec.assertEqWith s "and the second wish brings in the second copy" (List.sort (printingsIn Zone.Hand S.alice twice)) (List.sort [signInBlood, signInBlood])
+    Spec.assertEqWith s "the second wish brings in the second copy" (List.sort (printingsIn Zone.Hand S.alice twice)) (List.sort [signInBlood, signInBlood])
+    Spec.assertEqWith s "and one copy was left after the first wish" (Map.elems (poolOf S.alice once)) [1]
   -- CR 400.11c: what the effect ALLOWS is the card's own filter, so a pool that
   -- holds nothing the filter admits yields nothing.
   Spec.it s "CR 400.11c a pool holding no sorcery yields nothing" $ do
