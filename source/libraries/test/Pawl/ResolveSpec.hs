@@ -1196,12 +1196,12 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- whole printed text is expressible, so nothing about pawl's copy runs weaker
   -- than the card.
   --
-  -- The PAIR to Explosive Vegetation above, deliberately on the same board
-  -- shape: the two cards differ in the one word "tapped", and the assertions
-  -- differ in exactly the same place. Those cases assert NOTHING is untapped
-  -- after the fetch; this one asserts exactly one thing is, and that it is what
-  -- the search found. CR 110.5b is the rule that makes it so -- this card's
-  -- sentence names no tap state, so the entry defaults stand.
+  -- The PAIR to Explosive Vegetation above: the two destinations differ in the
+  -- one word "tapped", and the assertions differ in exactly the same place.
+  -- Those cases assert NOTHING is untapped after the fetch; this one asserts
+  -- exactly one thing is, and that it is what the search found. CR 110.5b is the
+  -- rule that makes it so -- this card's sentence names no tap state, so the
+  -- entry defaults stand.
   --
   -- Both Forests she started with paid the {1}{G}, so an untapped permanent can
   -- only be one that entered during the resolution. That is what lets this
