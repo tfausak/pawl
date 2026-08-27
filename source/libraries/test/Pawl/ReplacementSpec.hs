@@ -1270,6 +1270,55 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
     Spec.assertBool s (Maybe.isNothing (Game.lookupObject fireEater (after fireEater))) "setup: the cost really did remove the source, so the id names nothing"
     Spec.assertEqWith s "setup: the shield is a floating replacement" (length (GameState.replacements (after fireEater))) 1
     Spec.assertEqWith s "alice was OFFERED the departed source and answered it" (chosenSourcesIn (answersFor (choosePlayerAndSource S.alice fireEater) g3 act)) [fireEater]
+  -- CR 609.7a in the other direction, on the same two cards: the rule's second
+  -- class is "a spell on the stack (including a permanent spell)", and an
+  -- ACTIVATED ABILITY sharing that zone is neither a spell nor a permanent nor a
+  -- face-up command-zone object, nor is it referred to by anything. It is not a
+  -- legal choice, and pawl used to offer every object on the stack.
+  --
+  -- OBSERVED AT GAMEPLAY LEVEL rather than by counting the offered set, which the
+  -- lands ordering below is what buys. The answerer names the Fire-Eater's
+  -- ability OBJECT and, per this group's FILTERED-not-trusted posture, falls back
+  -- to the head of the pool when that id is not offered. The Fire-Eater and the
+  -- Replica are placed BEFORE the Plains, so the ascending pool's head is the
+  -- departed Fire-Eater -- the one source whose damage this shield can prevent.
+  -- So an engine that offers the ability installs a shield naming an object no
+  -- damage event ever carries and alice takes the 2; the engine that declines it
+  -- falls back and prevents the 2.
+  Spec.it s "CR 609.7a an activated ability on the stack is not a spell, so it is not offered as a source" $ do
+    plains <- S.printingOf s registry "Plains"
+    replica <- S.printingOf s registry "Auriok Replica"
+    ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
+    let (fireEater, g1) = S.addCreature ghitu S.alice (Setup.emptyGame S.bothPlayers)
+        (replicaId, g2) = S.addCreature replica S.alice g1
+        g3 = S.landsFor plains S.alice 1 g2
+        -- The Fire-Eater's ability alone, so its object's id can be read off the
+        -- stack rather than guessed.
+        armed = S.runPure (aimPlayer S.alice) g3 (Activate.activateAbility S.alice fireEater (theAbility ghitu))
+        abilityId = case GameState.stack armed of
+          oid : _ -> oid
+          [] -> fireEater
+        rest =
+          Activate.activateAbility S.alice replicaId (theAbility replica)
+            Monad.>> Stack.resolveTop
+            Monad.>> Stack.resolveTop
+        after src = S.runPure (choosePlayerAndSource S.alice src) armed rest
+        -- The Plains: the battlefield holds it and the Replica, and the lands
+        -- were placed last, so the Plains carries the higher id.
+        plainsId = Set.findMax (GameState.battlefield armed)
+    -- THE gameplay assertion: naming the ability gets alice the FALLBACK, and the
+    -- fallback prevents the 2. An engine offering the ability would shield an
+    -- object that deals no damage and leave alice on 18.
+    Spec.assertEqWith s "the ability was not offered, so the fallback shielded the Fire-Eater it names" (S.lifeOf S.alice (after abilityId)) (Just 20)
+    -- Its twin, differing in the ANSWER alone and naming something the rule DOES
+    -- admit: the Plains is a permanent, is offered, and shields nothing that
+    -- happens here -- so the 20 above is not "everything was prevented".
+    Spec.assertEqWith s "naming the Plains instead, which IS a legal choice, leaves the same 2 landing" (S.lifeOf S.alice (after plainsId)) (Just 18)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "setup: exactly one object is on the stack, and it is not the Fire-Eater's own id" (GameState.stack armed) [abilityId]
+    Spec.assertBool s (abilityId /= fireEater) "setup: CR 602.2a's ability object is not the permanent whose ability it is"
+    Spec.assertBool s (plainsId /= replicaId) "setup: the id the twin names is the Plains and not the Replica"
+    Spec.assertEqWith s "the answer recorded is the fallback, not the ability alice named" (chosenSourcesIn (answersFor (choosePlayerAndSource S.alice abilityId) armed rest)) [fireEater]
 
 -- CR 609.7b's PROPERTY-named source on a shield covering a PLAYER, whose
 -- producer is Scarecrow ({5} Artifact Creature -- Scarecrow, 2/2: "{6}, {T}:
