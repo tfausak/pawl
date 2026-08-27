@@ -1467,3 +1467,48 @@ copiedAbilitySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     Spec.assertEqWith s "while the Evangel beside it marks its 1" (S.damageOf evangelId bystander) (Just 1)
     Spec.assertEqWith s "the Shapeshifter is the Lion by name (CR 707.2)" (Projection.namesOf shifterId board) (Set.singleton (cardNamed "Glittering Lion"))
     Spec.assertEqWith s "and the printed Lion has left the battlefield" (length (printedOnBattlefield "Glittering Lion" board)) 0
+
+  -- Site four: the THREE TYPE-LINE disjuncts of that same baseHas -- CR 306.5b's
+  -- planeswalker, CR 714.3a's Saga and CR 310.4b's battle -- which read a card
+  -- type and a subtype, both copiable values under CR 707.2. Copy Enchantment's
+  -- "any enchantment on the battlefield" is the pool's only route to one of the
+  -- three, since a Saga is an enchantment (CR 205.3h) while Clone's and
+  -- Quicksilver Gargantuan's "any creature" and Vesuva's "any land" are not.
+  --
+  -- TWO ENTRIES, so the board that observes the disjunct differs from the one
+  -- that does not in exactly the original Saga's presence. The first Copy
+  -- Enchantment enters while History of Benalia is still out, so the PRINTED
+  -- Saga answers the whole-board short-circuit and the lore counter goes on
+  -- either way. Then the original leaves, and the second copies the first: now
+  -- no printed face on the battlefield carries a Saga subtype, and reading the
+  -- disjunct off the copier's face gathers nothing at all.
+  --
+  -- CR 707.2's last sentence keeps the second entry honest -- counters are not
+  -- copied -- so the counter it ends with is CR 714.3a's own, minted for it.
+  Spec.it s "CR 707.2a a copy of a Saga enters with CR 714.3a's lore counter" $ do
+    benalia <- S.printingOf s registry "History of Benalia"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    let (benaliaId, board0) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+        (_, staged1) = S.spellOnStack copyEnchantment S.alice board0
+        withOriginal = resolveAndSettle (copyNamed benaliaId) staged1
+        firstId = newest (printedOnBattlefield "Copy Enchantment" withOriginal)
+        gone oid = S.runPure S.identityAnswer withOriginal (Event.changeZone oid Zone.Graveyard)
+        second oid = resolveAndSettle (copyNamed oid) (snd (S.spellOnStack copyEnchantment S.alice (gone benaliaId)))
+    case firstId of
+      Nothing -> Spec.assertFailure s "the first Copy Enchantment left the battlefield unexpectedly"
+      Just copy1 -> do
+        let final = second copy1
+        case newest (printedOnBattlefield "Copy Enchantment" final) of
+          Nothing -> Spec.assertFailure s "the second Copy Enchantment left the battlefield unexpectedly"
+          Just copy2 -> do
+            -- The gameplay-level assertion this case exists for, ahead of every
+            -- proxy: the copy of a copy of a Saga is a Saga, so CR 714.3a mints
+            -- its entry row even with no printed Saga left on the battlefield.
+            Spec.assertEqWith s "CR 714.3a one lore counter on the copy of a copy" (S.counterOf CounterKind.Lore copy2 final) 1
+            Spec.assertBool s (elem Subtype.Saga (Set.toList (Projection.subtypesOf copy2 final))) "and it really is a Saga (CR 707.2)"
+            Spec.assertEqWith s "CR 707.10 by the copied card's name, not the copier's" (Projection.namesOf copy2 final) (Set.singleton (cardNamed "History of Benalia"))
+        -- The preconditions, after the behaviour so neither can absorb a mutation
+        -- aimed at it: the first copy got its counter with the printed Saga still
+        -- out, and that printed Saga really has left the battlefield.
+        Spec.assertEqWith s "the first copy entered with one too, while the original was out" (S.counterOf CounterKind.Lore copy1 withOriginal) 1
+        Spec.assertEqWith s "and no printed Saga is left on the battlefield for the second entry" (length (printedOnBattlefield "History of Benalia" (gone benaliaId))) 0
