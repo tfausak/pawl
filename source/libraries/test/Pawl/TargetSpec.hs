@@ -31,6 +31,12 @@
 -- targets, so its case is about CR 601.2c's one announcement over two slots
 -- rather than about the pool alone.
 --
+-- Fall of the Hammer is beside it because it is the other way one slot can
+-- depend on another: not the POOL a slot draws from but the FILTER it is
+-- narrowed by, which is CR 601.2c's "another" between two slots of one
+-- announcement. Its case reads the same union-offer plus joint-check pair
+-- Dwell's does, and turns on an announcement the joint check has to reject.
+--
 -- Cancel and Stifle's case has a third beside it, on the same pool one rule
 -- over: CR 115.5's self-exclusion for an ABILITY, which Adric, Mathematical
 -- Genius is the first card in the pool to make reachable. It is a fence rather
@@ -179,6 +185,27 @@ aimingDwellShuffling :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 aimingDwellShuffling oids p = case p of
   Prompt.Shuffle ids -> reverse ids
   _ -> aimingDwell oids p
+
+-- CR 601.2c's whole announcement for Fall of the Hammer: `dealerId` in the
+-- dealer slot and `victimId` in the victim slot. Both counts are fixed at one,
+-- so there is no Prompt.AnnounceTargets to answer.
+--
+-- FILTERED out of the offered set rather than built, which is the posture
+-- Pawl.CopySpec's answerers take: Pool.Creatures offers Recipient.ToCreature,
+-- and a hand-built recipient of another shape would be dropped at CR 608.2b's
+-- re-read with no error. The case that names the same creature in both slots
+-- therefore also depends on that creature being OFFERED for the victim slot,
+-- which the union assertion in the same case pins.
+aimingHammer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimingHammer dealerId victimId p = case p of
+  Prompt.ChooseTargets _ _ _ asked ->
+    Map.mapWithKey
+      ( \slot (_, offered) ->
+          let wanted = if slot == SlotName.MkSlotName (Text.pack "dealer") then dealerId else victimId
+           in Set.filter ((==) (Just wanted) . Recipient.objectOf) offered
+      )
+      asked
+  _ -> S.identityAnswer p
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
@@ -1459,6 +1486,73 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "and both arrive in his library" (length (Game.zoneMembers Zone.Library S.bob atBoth)) 2
     Spec.assertEqWith s "naming bob and a card in CAROL's graveyard, the cast is reversed (CR 601.2)" (length (GameState.stack castAtCarol)) 0
     Spec.assertBool s (elem dwellId (Game.zoneMembers Zone.Hand S.alice castAtCarol)) "and the spell is back in alice's hand"
+
+  -- CR 601.2c's other sibling-slot reading, and the one the rule states in its
+  -- own words: "The same target can't be chosen multiple times for any one
+  -- instance of the word 'target' on the spell. However, if the spell uses the
+  -- word 'target' in multiple places, the same object or player can be chosen
+  -- once for each instance of the word 'target'." Sharing between two slots is
+  -- the rule's DEFAULT, so a card that forbids it says "another", and the
+  -- restriction lives in that slot's own Filter rather than in the machinery.
+  --
+  -- Fall of the Hammer {1}{R} Instant (data/cards/fall-of-the-hammer.json):
+  -- "Target creature you control deals damage equal to its power to another
+  -- target creature." The victim slot is Filter.Not (Filter.IsBound "dealer"),
+  -- which reads what the dealer slot holds -- the first card in the pool whose
+  -- slots depend on each other through a FILTER rather than through a pool
+  -- (Dwell on the Past above is the pool reading).
+  --
+  -- Rabid Bite is the same card one word apart: same two Pool.Creatures slots,
+  -- same DealDamage off AgainstSlot/Power, and "target creature you don't
+  -- control" where this prints "another target creature". So the Wall is the
+  -- discriminator that matters: it is ALICE's, and naming it is legal here,
+  -- which "another" as a controller test would reject.
+  --
+  -- The three runs differ in exactly one thing apiece -- which creature fills
+  -- the victim slot -- off one board, with the same {1}{R} paid off the same two
+  -- Mountains, and the Piker is the dealer in all three.
+  --
+  -- Damage is read BEFORE state-based actions, so the 2/1 Piker naming itself
+  -- would still be readable had the announcement gone through; a self-damage
+  -- reading is not hidden behind CR 704.5g.
+  Spec.it s "CR 601.2c Fall of the Hammer's victim slot cannot be the creature its dealer slot names" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wall <- S.printingOf s registry "Wall of Stone"
+    rats <- S.printingOf s registry "Typhoid Rats"
+    hammer <- S.printingOf s registry "Fall of the Hammer"
+    let (dealerId, g1) = S.addCreature piker S.alice (S.landsInPlay mountain 2)
+        (wallId, g2) = S.addCreature wall S.alice g1
+        (ratsId, g3) = S.addCreature rats S.bob g2
+        (board, hammerId) = S.handOne hammer g3
+        run victimId =
+          let cast = S.runPure (aimingHammer dealerId victimId) board (S.cast S.alice hammerId)
+           in (cast, S.runPure (aimingHammer dealerId victimId) cast Stack.resolveTop)
+        (castAtSelf, atSelf) = run dealerId
+        (_, atRats) = run ratsId
+        (_, atWall) = run wallId
+        slots = Modal.allTargetSlots (Face.spell (S.combinedFace hammer))
+        offered = Target.legalSets (Just S.alice) Map.empty S.noSource slots board
+        slotNamed name = Map.findWithDefault Set.empty (SlotName.MkSlotName (Text.pack name)) offered
+    -- The behaviour first: naming the Piker in both slots is not an announcement
+    -- the rule allows, so CR 601.2e returns the game to before the proposal.
+    Spec.assertEqWith s "naming the Piker in BOTH slots, the cast is reversed (CR 601.2e)" (length (GameState.stack castAtSelf)) 0
+    Spec.assertEqWith s "so the Piker was never dealt its own two damage" (S.damageOf dealerId atSelf) (Just 0)
+    Spec.assertBool s (elem hammerId (Game.zoneMembers Zone.Hand S.alice castAtSelf)) "and the spell is back in alice's hand"
+    Spec.assertEqWith s "naming bob's Rats instead, the Piker's two damage is marked on them" (S.damageOf ratsId atRats) (Just 2)
+    Spec.assertEqWith s "with the Piker itself unharmed" (S.damageOf dealerId atRats) (Just 0)
+    -- CR 601.2c's "another" is about the OBJECT, not its controller: alice's own
+    -- Wall is a legal victim, which is the whole difference from Rabid Bite.
+    Spec.assertEqWith s "naming alice's own Wall, the same two damage is marked on it" (S.damageOf wallId atWall) (Just 2)
+    -- The union posture, last: the victim slot is still OFFERED the Piker at CR
+    -- 601.2c, which is what makes the first assertion a joint-check rejection
+    -- rather than a slot the fix emptied.
+    Spec.assertEqWith
+      s
+      "the victim slot is offered every creature, the dealer's own candidate included"
+      (slotNamed "victim")
+      (Set.fromList (fmap Recipient.ToCreature [dealerId, wallId, ratsId]))
+    Spec.assertEqWith s "and the dealer slot only alice's two" (slotNamed "dealer") (Set.fromList (fmap Recipient.ToCreature [dealerId, wallId]))
 
   -- CR 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is
   -- a number." Flensing Raptor's enters trigger reads "another target creature

@@ -75,9 +75,11 @@ data Modification ability
     -- takes.
     --
     -- Its Filter is matched by Pawl.Engine.Target.admittedGiven, which fills
-    -- `perspective` and `source` and leaves `slotObjects` empty -- so a granted
-    -- enchant naming IsBound or SameNameAsBound would be vacuously False, exactly
-    -- as a PRINTED one is (#2057). A "ControlledBy You" conjunct, the shape
+    -- `perspective` and `source`, and fills `slotObjects` and `slotNames` from
+    -- whatever the announcement has already bound -- so a granted enchant naming
+    -- IsBound or SameNameAsBound is judged against exactly the context a PRINTED
+    -- one is, and answers False only where the announcement bound
+    -- nothing. A "ControlledBy You" conjunct, the shape
     -- Old-Growth Troll prints, is answered honestly.
     GainEnchant TargetSlot.TargetSlot
   | -- | layer 6, CR 613.1f: this object gains a whole quoted ability, authored on
