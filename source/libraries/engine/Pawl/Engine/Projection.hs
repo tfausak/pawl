@@ -117,6 +117,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
+import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -1986,10 +1987,13 @@ rewriteEffect pairs effect = case effect of
   Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) ->
     Effect.PutCounters (PutCounters.MkPutCounters kind (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
   Effect.RemoveCounters {} -> effect
-  -- Filter.rewrite renames no slot, so neither bare slot is rewritten.
+  -- Filter.rewrite renames no slot, so none of the three bare slots is rewritten;
+  -- the count is a Quantity and goes through rewriteQuantity, PutCounters' case
+  -- above.
   -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
   -- printed keyword through the swap, PutCounters' case above (#1840).
-  Effect.MoveCounters {} -> effect
+  Effect.MoveCounters (MoveCounters.MkMoveCounters from kind quantity slot to) ->
+    Effect.MoveCounters (MoveCounters.MkMoveCounters from kind (rewriteQuantity pairs quantity) slot to)
   Effect.GainPlayerCounters {} -> effect
   Effect.RemovePlayerCounters {} -> effect
   Effect.PayAnyEnergy _ -> effect
