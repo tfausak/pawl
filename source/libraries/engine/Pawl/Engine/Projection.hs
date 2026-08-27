@@ -1787,7 +1787,10 @@ rewriteAffected pairs a = case a of
 -- this cases on STRUCTURE -- does this arm carry a Filter a swap could reach --
 -- and never on which player effect it is, so no rule in the closed half learns an
 -- effect's identity from it. Every other reader still asks a typed question of
--- Pawl.Engine.PlayerEffect and never sees a constructor.
+-- Pawl.Engine.PlayerEffect and never sees a constructor, and this module's own
+-- other handling of the rows stays opaque: they ride
+-- ProjectedCharacteristics.playerAbilities so a copy acquires them (CR 707.2a),
+-- and nothing there looks inside one.
 --
 -- The shape Pawl.Engine.CombatRestriction takes for a restriction -- destructure
 -- the type, hand each inner value to the module that owns it -- with

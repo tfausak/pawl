@@ -543,13 +543,16 @@ data PlayerEffect
     --
     -- The Filter is the axis that separates the producers, as it is for
     -- CastAsThoughItHadFlash: Yawgmoth's Will says "spells" and so matches
-    -- everything (`And []`), while Haakon, Stromgald Scourge's "Knight spells"
-    -- and Liliana, Untouched by Death's "Zombie spells" would narrow it. Read
+    -- everything (`And []`), while Liliana, Untouched by Death's "Zombie spells"
+    -- narrows it and Haakon, Stromgald Scourge's "Knight spells" would. Read
     -- through Pawl.Engine.PlayerEffect.matchesObject, the same read
-    -- CantCastMatching makes of a card in a hand. What a NARROWING filter sees
-    -- of a card in a graveyard is unobserved, since the one producer writes the
-    -- predicate that is true of everything, and this reader takes the printed
-    -- card there (#1859).
+    -- CantCastMatching makes of a card in a hand.
+    --
+    -- That read takes the PRINTED card in the graveyard rather than the projected
+    -- one, so a continuous effect changing a graveyard CARD's own characteristics
+    -- is invisible to the narrowing (#1859). CR 612.1's word swap on the ABILITY
+    -- is the other axis and does reach it, through
+    -- Pawl.Engine.Projection.rewritePlayerEffect.
     --
     -- A PERMISSION, folded as a disjunction for CastAsThoughItHadFlash's reason:
     -- there is nothing for a second permission to outvote.

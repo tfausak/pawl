@@ -3258,15 +3258,18 @@ lilianaMillBoard swamp liliana stock =
 -- THE UNIT'S POINT is the -3 under an Artificial Evolution: CR 612.1's word swap
 -- has to reach the Filter inside the restriction a RESOLUTION stores over
 -- players, which is the half of Effect.AffectPlayers the duration case above
--- leaves. Every printed producer of that shape is a permanent's ability rather
--- than a spell -- Cherished Hatchling's dies-trigger is the only other one -- so
--- the board is an activate-chain and reaches Projection.rewriteEffect through
--- Projection.abilitiesOf rather than through a spell on the stack.
+-- leaves. The board is an ACTIVATE-chain rather than a cast-chain: Scryfall
+-- `oracle:/cast [A-Z][a-z]+ spells/ -t:instant -t:sorcery` and
+-- `oracle:/(cast|costs?|counter)[^.]*this turn/ -t:instant -t:sorcery`, read
+-- 2026-08-27, turned up no instant or sorcery naming a subtype in a player
+-- restriction -- Cherished Hatchling's dies-trigger is the nearest other
+-- producer, and it is a permanent's too. Both reach Projection.rewriteEffect by
+-- the same road, through Projection.abilitiesOf.
 --
 -- The +1 comes with it because it is the card's other subtype word, and because
--- it is the only pooled reader of a MillTally: its "if at least one" is a clause
--- condition comparing Quantity.InSlot against a literal, which nothing else
--- exercises.
+-- it is the first card in `data/cards/` to write a MillTally at all: its "if at
+-- least one" is a clause condition comparing Quantity.InSlot against a literal,
+-- and the whole tally-then-gate road had no producer before it.
 lilianaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 lilianaSpec s registry =
   let board = do
