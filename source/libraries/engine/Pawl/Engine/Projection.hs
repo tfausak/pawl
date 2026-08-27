@@ -811,10 +811,8 @@ viewOfCard face =
           Filter.controller = Nothing,
           -- CR 108.3 gives an owner to a card IN THE GAME; this builder describes
           -- a printed FACE, so there is nothing to read Object.owner off.
-          --
-          -- Not implemented: the owner of a card matched OFF the battlefield,
-          -- where viewUpTo falls back here with an object id in hand and CR 400.3
-          -- would answer from Object.owner (#1068).
+          -- viewOfCharacteristics is the view that holds an id and answers, in
+          -- whatever zone the object sits.
           Filter.owner = Nothing,
           -- CR 400.1 / 109.1: a printed card being matched by a search is not an
           -- object, so there is no zone for IsInZone to read either.
