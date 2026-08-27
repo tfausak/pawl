@@ -522,6 +522,33 @@ indirectSpec s registry = Spec.describe s "Indirect" $ do
     Spec.assertEqWith s "the phased-out Aura is still phased out" (Phasing.isPhasedOut auraId settled) True
     Spec.assertEqWith s "still exists" (Maybe.isJust (Game.lookupObject auraId settled)) True
     Spec.assertEqWith s "and is still attached to its host" (attachedHostOf auraId settled) (attachedHostOf auraId board)
+  -- Rule 702.26g's FORTIFICATION, which the Aura case above cannot stand in for:
+  -- Pawl.Engine.Phasing.isAttachment reads the projected subtypes, so each of the
+  -- three the rule names is a separate membership test and a missing one leaves
+  -- the attachment behind on a battlefield whose host no longer exists -- where
+  -- CR 704.5n then detaches it.
+  --
+  -- Teferi's Isle (Legendary Land, "Phasing" / "Teferi's Isle enters tapped." /
+  -- "{T}: Add {U}{U}", checked against Scryfall on 2026-08-27) is the only land
+  -- with phasing (Scryfall `t:land keyword:phasing`, 2026-08-27, one hit), and
+  -- Darksteel Garrison the Fortification CR 301.6 lets ride on it. The
+  -- attachment is hand-built, equippedBoard's posture above and for its reason.
+  Spec.it s "CR 702.26g a Fortification attached to a land that phases out phases out with it" $ do
+    isle <- S.printingOf s registry "Teferi's Isle"
+    garrison <- S.printingOf s registry "Darksteel Garrison"
+    let base = Setup.emptyGame S.bothPlayers
+        (isleId, withIsle) = S.addCreature isle S.alice base
+        (garrisonId, withGarrison) = S.addCreature garrison S.alice withIsle
+        board = S.attachTo garrisonId (Recipient.ToObject isleId) withGarrison
+        after = S.settleSba (untapStep S.alice board)
+    Spec.assertEqWith s "both were on the battlefield before the step" (fmap (`onBattlefield` board) [isleId, garrisonId]) [True, True]
+    Spec.assertEqWith s "and neither is afterwards" (fmap (`onBattlefield` after) [isleId, garrisonId]) [False, False]
+    Spec.assertEqWith s "the land phased out directly" (Phasing.phasedOutStatus isleId after) (Just (PhasedOut.Directly S.alice))
+    Spec.assertEqWith s "and the Fortification indirectly" (Phasing.phasedOutStatus garrisonId after) (Just (PhasedOut.Indirectly S.alice))
+    -- CR 704.5n did not reach it, which is the whole point of rule 702.26g's
+    -- first sentence: a Fortification left behind would be attached to a
+    -- permanent the game no longer treats as existing.
+    Spec.assertEqWith s "and is still attached to its host" (attachedHostOf garrisonId after) (Just (Recipient.ToObject isleId))
   -- CR 702.26g's last sentence: "an Aura, Equipment, or Fortification that phased
   -- out indirectly won't phase in by itself, but instead phases in along with the
   -- permanent it's attached to."

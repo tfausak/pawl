@@ -291,7 +291,7 @@ protectionFromArtifacts = Keyword.Protection (Filter.Type.HasCardType CardType.A
 -- gets +1/+1 until end of turn." / "Fortify {3}", checked against Scryfall on
 -- 2026-08-27) is the producer, and Dryad Arbor the host: rule 301.6 wants a
 -- land, and CR 702.16d's clause below wants that land to be able to gain
--- protection, which every grant in the pool offers only to a creature.
+-- protection, which the pool's one grant offers only to a creature.
 --
 -- Tower of the Magistrate ("{T}: Add {C}." / "{1}, {T}: Target creature gains
 -- protection from artifacts until end of turn.", same fetch) is the grant. The

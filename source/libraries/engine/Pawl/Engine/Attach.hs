@@ -124,6 +124,11 @@ attachmentFor src destination gs
   -- Fortification that is also a creature can't fortify, UNLESS it is a land
   -- itself. Read through the projection, so an animated Fortification stops
   -- being able to fortify while it is a creature.
+  --
+  -- Below the Equipment branch, so a permanent carrying both subtypes is
+  -- attached as an Equipment. That is the guard order and not a reading of the
+  -- rules; Sba.becomesUnattached takes CR 101.2's conjunctive one and would
+  -- detach it on the next pass. Nothing in the pool is both.
   | Set.member Subtype.Fortification subtypes =
       if Projection.isCreatureOf src gs && not (Set.member CardType.Land (Projection.cardTypesOf src gs))
         then Nothing

@@ -1736,9 +1736,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
 -- twice for one keyword.
 --
 -- Every minting keyword -- cycling, reinforce, crew, level up, outlast, equip,
--- fortify --
--- carries a payload, so familyOf answers Just for every one of them and its Nothing
--- is unreachable from here. Its Nothing is still let through rather than made an
+-- fortify -- carries a payload, so familyOf answers Just for every one of them
+-- and its Nothing is unreachable from here. Its Nothing is still let through rather than made an
 -- error: a nullary keyword that minted an activated ability would have no family
 -- to name, and CR 702 would have to grow one first.
 --

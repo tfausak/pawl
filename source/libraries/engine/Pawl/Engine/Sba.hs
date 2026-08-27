@@ -241,9 +241,10 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 -- The BATTLE clause is written out, though nothing reaches it: the pool has a
 -- battle, but CR 310.10 forbids attaching one and no effect in the pool tries.
 -- That is becomesUnattached's posture toward CR 704.5n's "or to a player" --
--- express the clause, and let the pool decide when it fires. "Or to a player" needs no clause at all here: this rule asks only whether
--- the attached permanent may be attached to ANYTHING, so the `Just _` below covers
--- an object and a player alike.
+-- express the clause, and let the pool decide when it fires. "Or to a player"
+-- needs no clause at all here: this rule asks only whether the attached permanent
+-- may be attached to ANYTHING, so the `Just _` below covers an object and a
+-- player alike.
 --
 -- This is also where CR 303.4d's second clause is enforced without being named:
 -- an Aura that is also a creature is attached, so it detaches HERE and CR 704.5m's
