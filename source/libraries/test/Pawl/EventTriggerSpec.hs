@@ -2281,13 +2281,13 @@ singularCureSpec s registry =
 -- CR 101.4: two delayed entries with DIFFERENT controllers matched by one batch
 -- are choices made at the same time, so the active player makes theirs first and
 -- the nonactive players follow in turn order. CR 101.4b is what makes the order
--- load-bearing rather than cosmetic -- "a player knows the choices made by the
--- previous players when making their choice" -- and CR 603.7d fixes each entry's
--- chooser as the player who controlled the spell that created it.
+-- load-bearing rather than cosmetic, the later chooser knowing what the earlier
+-- one named, and CR 603.7d fixes each entry's chooser as the player who
+-- controlled the spell that created it.
 --
 -- The two entries are two copies of Synthetic Singular Cure, one cast by each of
 -- two seats; no second card is needed. GameState.delayedTriggers appends in
--- RESOLUTION order and the stack is last-in-first-out (CR 608.1), so the seat who
+-- RESOLUTION order and the stack is last-in-first-out (CR 405.2 / 608.1), so the seat who
 -- casts LAST arms FIRST -- which is how arming order and APNAP order come apart
 -- on a two-seat board at all. The first case below asserts that gap on the board
 -- rather than assuming it.
@@ -2313,7 +2313,7 @@ apnapDelayedSpec s registry =
               _ -> False
          in maybe 0 Int.toNaturalSaturating (List.findIndex gained (NonEmpty.toList candidates))
       -- The state is the sequence of controllers asked, which is both what the
-      -- later answer depends on and what the last assertion reads.
+      -- later answer depends on and what `asked` below reads.
       laterKnows :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
       laterKnows p = case p of
         Prompt.ChooseDelayedTriggerEvent _ controller _ candidates -> do
@@ -2353,6 +2353,10 @@ apnapDelayedSpec s registry =
       played gs = State.runState (Engine.runGame laterKnows gs (Engine.settleForPriority >> Engine.priorityLoop)) []
       asked gs = snd (played gs)
       after gs = snd (fst (played gs))
+      -- The store's own order, which the reordering must NOT disturb: it is the
+      -- arming order every later gather reads. Read on the pre-batch board, where
+      -- it is both this group's precondition -- arming order is not APNAP order,
+      -- or nothing here is observable -- and the fence on that half of the change.
       armingOrder gs = fmap DelayedTrigger.controller (Foldable.toList (GameState.delayedTriggers gs))
    in Spec.describe s "CR 101.4 simultaneous delayed triggers" $ do
         -- The proving case. alice casts first, so BOB's entry is armed first, and
@@ -2366,15 +2370,16 @@ apnapDelayedSpec s registry =
           Spec.assertEqWith s "bob was asked second, so he kept his 4 and drained carol instead" (S.lifeOf S.bob (after gs)) (Just 24)
           Spec.assertEqWith s "carol paid for the second answer" (S.lifeOf S.carol (after gs)) (Just 16)
           Spec.assertEqWith s "and the two questions were raised in APNAP order" (asked gs) [S.alice, S.bob]
-          Spec.assertEqWith s "setup: bob's entry was armed first, so arming order is not APNAP order" (armingOrder gs) [S.bob, S.alice]
+          Spec.assertEqWith s "bob's entry was armed first, so arming order is not APNAP order, and the store still holds it" (armingOrder gs) [S.bob, S.alice]
           Spec.assertEqWith s "setup: every seat started at 20" (fmap (\pid -> S.lifeOf pid gs) [S.alice, S.bob, S.carol]) [Just 20, Just 20, Just 20]
           Spec.assertEqWith s "three gains, in one event group" (length (gainsIn (after gs)), length (List.nub (gainsIn (after gs)))) (3, 1)
           Spec.assertEqWith s "and both entries are spent, neither having a stated duration" (Seq.length (GameState.delayedTriggers (after gs))) 0
         -- The other half of the pair, differing in exactly one thing -- which seat
         -- cast first, and so which entry was armed first. bob casts first, alice
         -- second, and the arming order is now APNAP order already: the same seats
-        -- drain the same amounts. An engine that sorted the store the wrong way
-        -- round passes the case above and fails this one.
+        -- drain the same amounts. An engine that merely REVERSED the store passes
+        -- the case above and fails this one; one that sorted the wrong way round
+        -- fails both.
         Spec.it s "CR 101.4 arming the other way round changes nothing" $ do
           gs <- armed S.bob S.alice
           Spec.assertEqWith s "alice is still asked first and still drains herself" (S.lifeOf S.alice (after gs)) (Just 16)

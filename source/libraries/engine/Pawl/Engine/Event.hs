@@ -13105,7 +13105,8 @@ delayedPending grouped gs =
         -- order, because CR 101.4 governs neither of the two things it feeds: the
         -- pending list is CR 603.3b's to order, which Engine.orderPending does,
         -- and the surviving store's order is the arming order every later pass
-        -- reads.
+        -- reads. Pawl.EventTriggerSpec's "the store still holds it" is what pins
+        -- that second half.
         let asking = List.sortOn (Replacement.seatOf gs . DelayedTrigger.controller . snd) (zip [0 :: Int ..] (Foldable.toList store))
         answered <- traverse (\(index, entry) -> fmap (\fired -> (index, (entry, fired))) (triggered entry)) asking
         let outcomes = Seq.fromList (fmap snd (List.sortOn fst answered))
