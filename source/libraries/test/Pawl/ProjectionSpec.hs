@@ -13,6 +13,7 @@ module Pawl.ProjectionSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -548,6 +549,63 @@ dealTo src victim amount gs =
 -- CR 702.16's quality: red, the colour Goblin Piker is and Cabal Evangel is not.
 fromRed :: Keyword.Keyword
 fromRed = Keyword.Protection (Filter.Type.HasColor Color.Red)
+
+-- CR 702.16a's other quality, the one Tower of the Magistrate grants and
+-- Synthetic Grave Bulwark writes: Icehide Golem is an artifact and Cabal
+-- Evangel is not.
+fromArtifacts :: Keyword.Keyword
+fromArtifacts = Keyword.Protection (Filter.Type.HasCardType CardType.Artifact)
+
+-- Aim every target slot at the first of `wanted` the offered set actually
+-- holds. The offered set is FILTERED rather than a recipient built by hand: CR
+-- 608.2b re-reads targets at resolution and drops one the pool never offered,
+-- with no error. Pawl.ReplacementSpec's preferTarget is the same helper beside
+-- its own group.
+preferTarget :: [Recipient.Recipient] -> Prompt.Prompt r -> r
+preferTarget wanted p = case p of
+  Prompt.ChooseTargets _ _ _ sets ->
+    fmap (\(_, legal) -> maybe Set.empty Set.singleton (List.find (`Set.member` legal) wanted)) sets
+  _ -> S.identityAnswer p
+
+-- Tower of the Magistrate's second ability, activated at `victim` and resolved
+-- -- "{1}, {T}: Target creature gains protection from artifacts until end of
+-- turn.", checked against Scryfall on 2026-08-27. A grant from an ACTIVATED
+-- ABILITY'S RESOLUTION, so CR 611.2a stores it in GameState.continuousEffects
+-- rather than deriving it from anybody's static ability.
+--
+-- The Tower and the two Plains that pay for it stay on the battlefield and trip
+-- neither short-circuit: a land is none of copiableMintsType's three card types
+-- and an activated ability is not a static one.
+toweredBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> ObjectId.ObjectId -> GameState.GameState -> m GameState.GameState
+toweredBoard s registry victim gs = do
+  plains <- S.printingOf s registry "Plains"
+  tower <- S.printingOf s registry "Tower of the Magistrate"
+  let (towerId, placed) = S.addCreature tower S.alice (S.landsFor plains S.alice 2 gs)
+  case Projection.abilitiesOf towerId placed of
+    [_, protect] -> pure (S.runPure (preferTarget [Recipient.ToCreature victim]) placed (do Activate.activateAbility S.alice towerId protect; Stack.resolveTop))
+    abilities -> Spec.assertFailure s ("expected exactly two Tower abilities, got " <> show (length abilities))
+
+-- Synthetic Grave Bulwark ({2}{W} Creature -- Spirit, "Creatures you control
+-- have protection from artifacts." with the ability functioning from the
+-- graveyard, data/cards/synthetic-grave-bulwark.json) in alice's graveyard:
+-- CR 113.6b's stated set, so the ability functions from there and nowhere else.
+--
+-- SYNTHETIC because no printing grants a keyword either short-circuit mints
+-- from out of a zone other than the battlefield and the command zone. Scryfall
+-- `o:/have protection/ (o:"in your graveyard" or o:"in your hand" or o:"in your
+-- library")`, 2026-08-27, returns only Masked Gorgon, whose threshold clause is
+-- a BATTLEFIELD static that counts the graveyard; `o:/(have|has|gain|gains)
+-- (riot|unleash|modular|bloodthirst|daybound|megamorph|decayed)/`, same date,
+-- returns eleven cards and every grant among them is a battlefield static or a
+-- trigger. Glory is the near miss and belongs to the case above it: its
+-- graveyard ability is ACTIVATED, so what it leaves behind is a stored
+-- continuous effect. Nothing in the CR forbids the card: rule 113.6b lets an
+-- ability name the zones it functions in, and rule 702.16 puts no restriction
+-- on who may grant protection.
+bulwarkBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> GameState.GameState -> m GameState.GameState
+bulwarkBoard s registry gs = do
+  bulwark <- S.printingOf s registry "Synthetic Grave Bulwark"
+  pure (snd (S.addGraveyardCard bulwark S.alice gs))
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
@@ -3229,6 +3287,86 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton black (Set.singleton attacker)) board) "the black Cabal Evangel beside it may, so nothing else refused the declaration"
         Spec.assertEqWith s "one emblem, in the command zone" (Set.size (GameState.command board)) 1
         Spec.assertBool s (Projection.hasKeyword fromRed attacker board) "and the attacker really holds the protection"
+      _ -> Spec.assertFailure s "fixture should have one attacker and two blockers"
+
+  -- The same two short-circuits against the OTHER arms of
+  -- Projection.gatherGiven. The emblem pair above covers the command zone; each
+  -- pair below covers one more of the arms a gate that enumerated base faces
+  -- could not see:
+  --
+  --   * CR 611.2a's stored continuous effect -- a grant left behind by an
+  --     ACTIVATED ability's resolution, which is on no object's rules text at
+  --     all, so no walk of anybody's static abilities can find it.
+  --   * CR 113.6b's stated zone -- a static ability functioning from a
+  --     graveyard, which the two gates walked neither.
+  --
+  -- Protection carries all four cases for the emblem pair's reason: rule 702.16e
+  -- mints a prevention and rule 702.16f a CR 509.1b pairwise restriction, so one
+  -- grant answers for both gates.
+  --
+  -- Every other object on all four boards is chosen to trip neither gate: Cabal
+  -- Evangel is a black 2/2 with no abilities, Goblin Piker a red 2/1 with none,
+  -- Icehide Golem a snow artifact 2/2 with none, and Plains and Tower of the
+  -- Magistrate carry activated abilities rather than static ones.
+  Spec.it s "CR 611.2a a stored grant's protection still prevents the artifact's damage" $ do
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    golem <- S.printingOf s registry "Icehide Golem"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (mineId, g1) = S.addCreature evangel S.alice (Setup.emptyGame S.bothPlayers)
+        (artifactId, g2) = S.addCreature golem S.bob g1
+        (redId, g3) = S.addCreature piker S.bob g2
+    board <- toweredBoard s registry mineId g3
+    let byArtifact = dealTo artifactId mineId 2 board
+        byCreature = dealTo redId mineId 2 board
+    Spec.assertBool s (S.onBattlefield mineId byArtifact) "the artifact source's 2 is prevented"
+    Spec.assertEqWith s "CR 615.6 with nothing marked on it" (S.damageOf mineId byArtifact) (Just 0)
+    Spec.assertBool s (not (S.onBattlefield mineId byCreature)) "and the same 2 from the nonartifact source kills it, so 2 really is lethal here"
+    -- The fixture's own preconditions, after the behaviour so neither can absorb
+    -- a mutation aimed at it.
+    Spec.assertEqWith s "CR 611.2a one stored continuous effect, and nothing in the command zone" (length (GameState.continuousEffects board), Set.size (GameState.command board)) (1, 0)
+    Spec.assertBool s (Projection.hasKeyword fromArtifacts mineId board) "and the layer fold gave alice's creature the protection"
+    Spec.assertBool s (not (Projection.hasKeyword fromArtifacts artifactId board)) "which bob's Golem does not have"
+  Spec.it s "CR 611.2a a stored grant's protection still bars the artifact blocker" $ do
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    golem <- S.printingOf s registry "Icehide Golem"
+    let (gs, mine, theirs) = S.combatBoardOf [evangel] [golem, evangel]
+    case (mine, theirs) of
+      ([attacker], [artifact, black]) -> do
+        warded <- toweredBoard s registry attacker gs
+        let board = snd (Engine.runGamePure S.aggressiveAnswer warded (Combat.declareAttackers S.alice))
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton artifact (Set.singleton attacker)) board)) "the Icehide Golem may not block it"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton black (Set.singleton attacker)) board) "the Cabal Evangel beside it may, so nothing else refused the declaration"
+        Spec.assertEqWith s "CR 611.2a one stored continuous effect, and nothing in the command zone" (length (GameState.continuousEffects board), Set.size (GameState.command board)) (1, 0)
+        Spec.assertBool s (Projection.hasKeyword fromArtifacts attacker board) "and the attacker really holds the protection"
+      _ -> Spec.assertFailure s "fixture should have one attacker and two blockers"
+  Spec.it s "CR 113.6b a graveyard grant's protection still prevents the artifact's damage" $ do
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    golem <- S.printingOf s registry "Icehide Golem"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (mineId, g1) = S.addCreature evangel S.alice (Setup.emptyGame S.bothPlayers)
+        (artifactId, g2) = S.addCreature golem S.bob g1
+        (redId, g3) = S.addCreature piker S.bob g2
+    board <- bulwarkBoard s registry g3
+    let byArtifact = dealTo artifactId mineId 2 board
+        byCreature = dealTo redId mineId 2 board
+    Spec.assertBool s (S.onBattlefield mineId byArtifact) "the artifact source's 2 is prevented"
+    Spec.assertEqWith s "CR 615.6 with nothing marked on it" (S.damageOf mineId byArtifact) (Just 0)
+    Spec.assertBool s (not (S.onBattlefield mineId byCreature)) "and the same 2 from the nonartifact source kills it, so 2 really is lethal here"
+    Spec.assertEqWith s "CR 113.6b no stored effect and nothing in the command zone: the graveyard is the only grantor" (length (GameState.continuousEffects board), Set.size (GameState.command board)) (0, 0)
+    Spec.assertBool s (Projection.hasKeyword fromArtifacts mineId board) "and the layer fold gave alice's creature the protection"
+    Spec.assertBool s (not (Projection.hasKeyword fromArtifacts artifactId board)) "which bob's Golem does not have"
+  Spec.it s "CR 113.6b a graveyard grant's protection still bars the artifact blocker" $ do
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    golem <- S.printingOf s registry "Icehide Golem"
+    let (gs, mine, theirs) = S.combatBoardOf [evangel] [golem, evangel]
+    case (mine, theirs) of
+      ([attacker], [artifact, black]) -> do
+        warded <- bulwarkBoard s registry gs
+        let board = snd (Engine.runGamePure S.aggressiveAnswer warded (Combat.declareAttackers S.alice))
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton artifact (Set.singleton attacker)) board)) "the Icehide Golem may not block it"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton black (Set.singleton attacker)) board) "the Cabal Evangel beside it may, so nothing else refused the declaration"
+        Spec.assertEqWith s "CR 113.6b no stored effect and nothing in the command zone: the graveyard is the only grantor" (length (GameState.continuousEffects board), Set.size (GameState.command board)) (0, 0)
+        Spec.assertBool s (Projection.hasKeyword fromArtifacts attacker board) "and the attacker really holds the protection"
       _ -> Spec.assertFailure s "fixture should have one attacker and two blockers"
 
   Spec.it s "CR 613.1 projectUpTo stops before the bound layer" $ do
