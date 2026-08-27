@@ -3616,6 +3616,44 @@ avatarRokuSpec s registry =
               Spec.assertEqWith s "the pool says the same thing" (poolOf S.alice after) []
             Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
 
+        -- CR 500.5 / CR 614.1b: the same phase end reached by a SKIP of the
+        -- phase's last step rather than by an effect ending the phase. CR 724.2e
+        -- is the CR contemplating exactly that pairing -- the combat phase ends
+        -- while its end of combat step does not happen -- and Engine.skipStep is
+        -- where the phase-grain sweep this retention needs now lives.
+        --
+        -- Synthetic Truncate the Fray ({1}{U} Instant, "Target player skips their
+        -- next end of combat step"), synthetic because nothing printed names that
+        -- step: Scryfall o:/skips?.*end of combat/ and o:"end of combat step"
+        -- o:skip, 2026-08-27, no hit. Pawl.TurnSpec's SkippedEndOfCombat group is
+        -- the stored-effect and combat-record twin of this case.
+        --
+        -- The skip must be aimed at the ACTIVE player, whose combat phase it is
+        -- (Event.beginsPhase asks of GameState.activePlayer), so bob casts it at
+        -- alice. BOB casts it for the case above's reason as well: he holds the
+        -- only lands, so no part of {1}{U} can come out of the retained {R}.
+        --
+        -- "The end of combat step never began" is what keeps this from passing
+        -- vacuously: a cast that silently did nothing would leave the step to run
+        -- normally, and the pool would be empty at the same moment under both
+        -- readings.
+        Spec.it s "CR 500.5 a skipped end of combat step still takes the retained mana" $ do
+          built <- fixture
+          case built of
+            Just (rokuId, _, gs) -> do
+              island <- S.printingOf s registry "Island"
+              fray <- S.printingOf s registry "Synthetic Truncate the Fray"
+              let (spell, staged) = S.addHandCard fray S.bob (S.landsFor island S.bob 2 gs)
+                  blockers = withPriority (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing staged)
+                  after = S.runToStep Phase.PostcombatMain (castingOnly spell) blockers
+                  began = filter (== GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Combat CombatStep.EndOfCombat) S.alice)) (S.eventsOf after)
+              Spec.assertEqWith s "the six retained {R} are there when the step begins" (poolOf S.alice blockers) (replicate 6 retainedRed)
+              Spec.assertEqWith s "CR 614.6 the end of combat step never began" began []
+              Spec.assertEqWith s "CR 511.3 the combat phase is over regardless" (GameState.phase after) Phase.PostcombatMain
+              Spec.assertEqWith s "and the retained mana went with the phase" (poolOf S.alice after) []
+              Spec.assertBool s (not (any (isActivationOf rokuId) (Action.legalActions S.alice (withPriority after)))) "so alice may no longer activate Roku off it"
+            Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
+
 -- Casts that one object the first time it is offered and passes otherwise,
 -- leaving every combat decision to S.aggressiveAnswer. Pinned to the OBJECT
 -- rather than to "the first cast on offer", so a mutation cannot be repaired by
