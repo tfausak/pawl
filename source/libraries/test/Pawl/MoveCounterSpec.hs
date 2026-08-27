@@ -53,6 +53,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   moveCounterSpec s registry
   namedKindSpec s registry
+  batchSpec s registry
 
 -- Which counter the answerer takes, and whether it takes the printed "may" at
 -- all. Pinned by POSITION in the offered list rather than by naming a kind, so
@@ -465,3 +466,103 @@ namedKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of a named
             Spec.assertEqWith s "the piker bearing none died and did not" (pairOn cache (bolted bare), Set.member bare (GameState.battlefield (bolted bare))) ((2, 1), False)
           _ -> Spec.assertFailure s "expected exactly two Goblin Pikers on the battlefield"
       Nothing -> Spec.assertFailure s "the artifact did not reach the battlefield"
+
+-- Black Panther, Wakandan King {G}{W} 2/2 Legendary Creature - Human Noble Hero
+-- (Marvel's Spider-Man; name, cost, type line and oracle text checked against
+-- Scryfall 2026-08-27), data/cards/black-panther-wakandan-king.json:
+--
+--   First strike
+--   Survey the Realm - Whenever Black Panther or another creature you control
+--   enters, put a +1/+1 counter on target land you control.
+--   Mine Vibranium - {3}: Move all +1/+1 counters from target land you control
+--   onto target creature. If one or more +1/+1 counters are moved this way, you
+--   gain that much life and draw a card.
+--
+-- The third line is this group's subject, and the card is why the count exists:
+-- "all +1/+1 counters" is a whole tally crossing in one batch, where both cards
+-- above move exactly one. Its two target slots have DISJOINT pools -- a land you
+-- control and a creature -- so it needs no distinctness between them, which no
+-- target slot can express (#2460).
+pantherName :: CardName.CardName
+pantherName = CardName.MkCardName (Text.pack "Black Panther, Wakandan King")
+
+mountainName :: CardName.CardName
+mountainName = CardName.MkCardName (Text.pack "Mountain")
+
+-- Aims both target slots at once. The two pools are disjoint, so one predicate
+-- over both is exact rather than a search that could repair a mutation: the land
+-- slot offers only lands and the creature slot only creatures, and the Mountain
+-- and the Piker are one of each. FILTERS the offered set rather than building a
+-- recipient, so CR 608.2b's re-read at resolution still finds what was named.
+pantherAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+pantherAnswer land creature p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (maybe False (`elem` [land, creature]) . Recipient.objectOf) sets
+  _ -> S.identityAnswer p
+
+batchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+batchSpec s registry = Spec.describe s "CR 122.5 moving a whole tally of counters" $ do
+  let -- alice: four Forests (the {3} has to come from somewhere), one Mountain,
+      -- Black Panther and a Goblin Piker settled on the battlefield, and two
+      -- Plains in her library so the card the rider draws is there and nothing
+      -- decks her (CR 104.3c). `counters` is what a case puts on the Mountain,
+      -- and is the ONLY difference between the two boards below.
+      board counters = do
+        forest <- S.printingOf s registry "Forest"
+        mountain <- S.printingOf s registry "Mountain"
+        plains <- S.printingOf s registry "Plains"
+        panther <- S.printingOf s registry "Black Panther, Wakandan King"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let lands = S.landsFor mountain S.alice 1 (S.landsInPlay forest 4)
+            (pantherId, g1) = S.addCreature panther S.alice lands
+            (pikerId, g2) = S.addCreature piker S.alice g1
+            (_, g3) = S.addLibraryCard plains S.alice (snd (S.addLibraryCard plains S.alice g2))
+            ready = g3 {GameState.priority = Just S.alice}
+        pure $ do
+          landId <- newestNamed mountainName ready
+          -- The SHIELD counter is why the land bears two kinds: the card names
+          -- +1/+1, so a batch that took everything on the object would be
+          -- indistinguishable from one that took the named kind on a land bearing
+          -- only that kind.
+          let staged = S.addCounter CounterKind.Shield 1 landId (counters landId ready)
+          pure (pantherId, pikerId, landId, staged)
+      -- Mine Vibranium, activated once and resolved. Exactly one printed
+      -- activated ability, not the first of however many.
+      mine (pantherId, pikerId, landId, staged) = case Activate.abilitiesFor pantherId staged of
+        [only] -> Just (S.runPure (pantherAnswer landId pikerId) staged (Activate.activateAbility S.alice pantherId only >> Stack.resolveTop))
+        _ -> Nothing
+  -- THE CASE THIS UNIT EXISTS FOR. THREE +1/+1 counters, so a move of one and a
+  -- move of the tally are three different boards apart, and both ends are read:
+  -- a fix that put three without taking three leaves the land at three.
+  Spec.it s "all three +1/+1 counters cross in one batch, and the rider counts them" $ do
+    built <- board (S.addCounter CounterKind.PlusOnePlusOne 3)
+    case built of
+      Just staged@(_, pikerId, landId, before) -> do
+        Spec.assertEqWith s "the land bears three +1/+1 counters and a shield counter" (pairOn landId before) (3, 1)
+        Spec.assertEqWith s "and the creature bears none of either" (pairOn pikerId before) (0, 0)
+        case mine staged of
+          Just after -> do
+            -- THE GAMEPLAY-LEVEL ASSERTIONS, ahead of the rider's: the whole
+            -- tally of the named kind crossed, and only that kind.
+            Spec.assertEqWith s "all three +1/+1 counters are on the creature and the shield counter is not" (pairOn pikerId after) (3, 0)
+            Spec.assertEqWith s "and the land is down all three, its shield counter untouched" (pairOn landId after) (0, 1)
+            Spec.assertEqWith s "alice gained one life for each counter moved this way" (S.lifeOf S.alice after) (fmap (+ 3) (S.lifeOf S.alice before))
+            Spec.assertEqWith s "and drew the one card the rider names" (S.handSize S.alice after) (S.handSize S.alice before + 1)
+          Nothing -> Spec.assertFailure s "expected Black Panther to offer exactly its one printed activated ability"
+      Nothing -> Spec.assertFailure s "the Mountain did not reach the battlefield"
+  -- The same board differing in exactly one thing: the land bears no +1/+1
+  -- counter, only the shield counter. CR 122.5's second impossibility, and the
+  -- rider's "if one or more" read against the zero the move binds -- an
+  -- unbound slot would leave the gate unevaluable rather than false.
+  Spec.it s "a land bearing no counter of the named kind moves nothing and pays no rider" $ do
+    built <- board (const id)
+    case built of
+      Just staged@(_, pikerId, landId, before) -> do
+        Spec.assertEqWith s "the land bears the shield counter and no +1/+1 counter" (pairOn landId before) (0, 1)
+        case mine staged of
+          Just after -> do
+            Spec.assertEqWith s "the creature received nothing" (pairOn pikerId after) (0, 0)
+            Spec.assertEqWith s "and the land kept its shield counter" (pairOn landId after) (0, 1)
+            Spec.assertEqWith s "alice gained no life" (S.lifeOf S.alice after) (S.lifeOf S.alice before)
+            Spec.assertEqWith s "and drew nothing" (S.handSize S.alice after) (S.handSize S.alice before)
+          Nothing -> Spec.assertFailure s "expected Black Panther to offer exactly its one printed activated ability"
+      Nothing -> Spec.assertFailure s "the Mountain did not reach the battlefield"
