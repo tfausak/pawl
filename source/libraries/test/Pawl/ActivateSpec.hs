@@ -3503,8 +3503,8 @@ grantedAbility printed oid gs = case filter (/= theAbility printed) (Projection.
 -- Sorcerer receives the ability, and CAROL owns what the granted ability
 -- bounces. CR 113.7 makes the Sorcerer the granted ability's source, CR 602.2
 -- and CR 113.8 make bob -- not alice -- the only player who may activate it and
--- the controller of the ability on the stack, and CR 400.7's move is to the
--- bounced permanent's OWNER's hand, which is carol's rather than bob's.
+-- the controller of the ability on the stack, and CR 400.3 sends the bounced
+-- permanent to its OWNER's hand, which is carol's rather than bob's.
 --
 -- The Sorcerer is the receiver because it PRINTS an activated ability of its own
 -- ("{T}: This creature deals 1 damage to any target"), so the granted one has to
@@ -3533,10 +3533,10 @@ retractionHelixSpec s registry = Spec.describe s "Retraction Helix" $ do
 
   -- The gameplay-level proof. bob activates the ability his creature was GIVEN
   -- and aims it at carol's Goblin Piker: the Piker ends up in CAROL's hand (CR
-  -- 400.7's owner, not the activating player's), bob's Sorcerer paid the {T},
+  -- 400.3's owner, not the activating player's), bob's Sorcerer paid the {T},
   -- and carol's Island -- which the quoted "nonland permanent" excludes -- is
   -- untouched.
-  Spec.it s "CR 400.7 whole card: the granted {T} bounces a nonland permanent to its OWNER's hand" $ do
+  Spec.it s "CR 400.3 whole card: the granted {T} bounces a nonland permanent to its OWNER's hand" $ do
     board <- helixBoard s registry
     let granted = helixCast board
     -- Falls back to the PRINTED ability rather than failing when the grant is
@@ -3547,7 +3547,7 @@ retractionHelixSpec s registry = Spec.describe s "Retraction Helix" $ do
           S.runPure (aimAtObject (helixPiker board)) granted $ do
             Activate.activateAbility S.bob (helixSorcerer board) ability
             Stack.resolveTop
-    -- CR 400.1: the move makes a NEW object, so the Piker is named rather
+    -- CR 400.7: the move makes a NEW object, so the Piker is named rather
     -- than tracked by id -- which is also what makes the OWNER claim below
     -- readable off the board.
     Spec.assertEqWith s "the Piker is in carol's hand" (fmap (`S.soleFaceName` resolved) (Game.zoneMembers Zone.Hand S.carol resolved)) [S.printingName (helixPikerPrinting board)]
