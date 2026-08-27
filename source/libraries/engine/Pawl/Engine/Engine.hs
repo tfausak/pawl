@@ -1454,31 +1454,37 @@ skipWholePhase phase = do
 -- of combat" animation never wore off, an UntilEndOfCombat mana retention stood
 -- until CR 514.2's cleanup backstop, and GameState.combat was never emptied.
 --
--- CR 500.5's "Then any unspent mana ... empties" attaches to a step OR PHASE
--- ending, and a phase is what ends here, so the pool empties as well -- after
--- `endPhase`'s retention sweep, which is CR 500.5's own order. Ending the
--- retention without taking the mana would leave it spendable in the phase after,
--- which is the whole of what the retention was keeping it for.
+-- The pool goes with it, `endPhase` carrying CR 500.5's "Then any unspent mana
+-- ... empties": that clause attaches to a step OR PHASE ending, and a phase is
+-- what ends here. Ending an "until end of combat" retention without taking the
+-- mana would leave it spendable in the phase after, which is the whole of what
+-- the retention was keeping it for.
 --
 -- No CR 704.3 check: that rule keys the sweep to a player receiving priority,
 -- and a skipped step grants none. The next step's own check, which runs ahead of
 -- its priority round, catches whatever the sweeps here raised.
 skipStep :: Phase.Phase -> Game ()
 skipStep phase = do
-  let ending = Turn.phaseEndingAt phase
-  Foldable.traverse_ endPhase ending
-  Monad.when (Maybe.isJust ending) (State.modify' Mana.emptyManaPools)
+  Foldable.traverse_ endPhase (Turn.phaseEndingAt phase)
   advance
 
--- CR 500.5 read on the PHASE grain, plus CR 511.3's removal from combat: exactly
--- what the game owes as it LEAVES a phase, wherever it leaves from. Shared by
--- runStepThatBegan and by skipStep, because the two roads out of a phase are
--- required to agree and used not to.
+-- CR 500.5 whole, read on the PHASE grain, plus CR 511.3's removal from combat:
+-- exactly what the game owes as it LEAVES a phase, wherever it leaves from.
+-- Shared by runStepThatBegan and by skipStep, because the two roads out of a
+-- phase are required to agree and used not to.
 --
--- Takes the window that is ENDING and not the step, so both sweeps below test
+-- Takes the window that is ENDING and not the step, so the two sweeps below test
 -- equality against the phase Turn.phaseEndingAt named and against nothing else
 -- (CR 500.5a: an "until end of combat" effect does not expire when the end of
 -- combat step ends AS A STEP).
+--
+-- The pool empty is INSIDE this rather than after it, and that is what keeps the
+-- order the CR fixes: CR 500.5's "Then any unspent mana ... empties" is ONE
+-- action for a step-and-phase that end together, so on the ordinary road this
+-- runs it and runStepThatBegan runs it only for a step whose phase does not end.
+-- Emptying twice around Combat.clearCombat would not be idempotent --
+-- Mana.emptyManaPools reads Pawl.Engine.PlayerEffect.keepsUnspentMana, whose CR
+-- 604.2 "as long as" gate is a live read of the board.
 --
 -- Phase-generic rather than combat-shaped, deliberately: Turn.phaseEndingAt is
 -- CR 500.5's own grain and answers on every stepped phase -- Turn.lastStepOf
@@ -1494,6 +1500,14 @@ endPhase ending = do
   -- empty, which is CR 500.5's own order -- ending it AFTER emptyManaPools would
   -- carry the mana one boundary too far.
   State.modify' (Mana.endRetentionAtEndOf ending)
+  -- CR 703.4q: emptying the pool is a turn-based action that does not use the
+  -- stack, and CR 500.5's "Then" puts it AFTER the expiries above. This line says
+  -- only WHEN; WHICH mana empties is Mana.emptyManaPools', off both retention
+  -- carriers -- per player (Upwelling) and per unit (Shizuko, Caller of Autumn).
+  -- The ordering against a retention that ENDS at this same boundary is
+  -- observable, and both carriers are read live: one swept afterwards would keep
+  -- the pool across a boundary it no longer covers.
+  State.modify' Mana.emptyManaPools
   -- CR 511.3: as soon as the end of combat step ends, creatures, battles and
   -- planeswalkers are removed from combat -- so this belongs at the END of that
   -- step and not in runTurnBasedActions, CR 511.1 giving the step no turn-based
@@ -1547,20 +1561,15 @@ runStepThatBegan phase = do
         -- live for the whole of that step. The step is swept before the phase, CR
         -- 500.1 nesting the one inside the other; nothing observes the order.
         State.modify' (Expiry.dropAtEndOf (PhaseSelector.Step phase))
-        -- Everything the ending PHASE owes, shared with skipStep so that the two
-        -- roads out of a phase cannot drift apart. CR 511.3's removal from combat
-        -- moved in there with the rest, which puts it ahead of the pool empty
-        -- below rather than after it; the two touch disjoint state (the combat
-        -- record, the mana pools), so no board can tell the orders apart.
-        Foldable.traverse_ endPhase (Turn.phaseEndingAt phase)
-        -- CR 703.4q: emptying the pool is a turn-based action that does not use
-        -- the stack, and CR 500.5's "Then" puts it AFTER the expiries above. This
-        -- line says only WHEN; WHICH mana empties is Mana.emptyManaPools', off
-        -- both retention carriers -- per player (Upwelling) and per unit (Shizuko,
-        -- Caller of Autumn). The ordering against a retention that ENDS at this
-        -- same boundary is observable, and both carriers are read live: one swept
-        -- afterwards would keep the pool across a boundary it no longer covers.
-        State.modify' Mana.emptyManaPools
+        -- Everything the ending PHASE owes -- CR 500.5's phase-grain expiries, CR
+        -- 703.4q's pool and CR 511.3's removal from combat -- shared with
+        -- skipStep so that the two roads out of a phase cannot drift apart. It
+        -- carries CR 500.5's pool empty, which is why the ELSE arm is the one
+        -- that runs it here: a step whose phase ends with it empties the pool
+        -- once, in the rule's own "Then" position.
+        case Turn.phaseEndingAt phase of
+          Just ending -> endPhase ending
+          Nothing -> State.modify' Mana.emptyManaPools
         -- CR 508.6 read on CR 500.1's span: the step-scoped half of the attack
         -- record ends with the step, so this runs at EVERY step's end and not
         -- just at combat's. See Pawl.Engine.Combat.clearAttackedThisStep for why

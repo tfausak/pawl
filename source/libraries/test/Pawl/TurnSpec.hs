@@ -1576,7 +1576,7 @@ skippedEndOfCombatSpec s registry = Spec.describe s "SkippedEndOfCombat" $ do
     Spec.assertEqWith s "the end of combat step never began" (began after) 0
     Spec.assertEqWith s "CR 511.3 the combat phase is over regardless" (GameState.phase after) Phase.PostcombatMain
     Spec.assertEqWith s "having consumed exactly the steps of this turn" (GameState.remaining after) (Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup])
-  -- CR 511.3's removal from combat, in its own case (#2010). The identity of the
+  -- CR 511.3's removal from combat, in its own case; see #2010. The identity of the
   -- attacker and of the blocker, not merely the emptiness of the two maps: a
   -- partial sweep that dropped one of them passes an emptiness test on the other.
   Spec.it s "CR 511.3 combat is emptied though the end of combat step never ran" $ do
@@ -1590,7 +1590,7 @@ skippedEndOfCombatSpec s registry = Spec.describe s "SkippedEndOfCombat" $ do
     Spec.assertEqWith s "and none is blocking" (Map.keys (Combat.Type.blockers (GameState.combat after))) []
     Spec.assertBool s (not (Turn.afterBlockersDeclared after)) "CR 506.7b so a card castable only after blockers are declared is out of its window again"
     Spec.assertBool s (S.onBattlefield attacker after && S.onBattlefield blocker after) "and both creatures are still on the battlefield, so nothing was emptied by CR 506.4"
-  -- CR 500.5 / CR 500.5a's expiry, in its own case (#2126). The animation is
+  -- CR 500.5 / CR 500.5a's expiry, in its own case; see #2126. The animation is
   -- STILL live in the combat damage step, which is what keeps this from passing
   -- against an engine that ended it at the wrong boundary altogether.
   Spec.it s "CR 500.5a an until-end-of-combat effect expires though the end of combat step never ran" $ do
