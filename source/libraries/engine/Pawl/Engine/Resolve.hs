@@ -5921,9 +5921,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- permanent on each side (Agent's Toolkit binds the artifact itself and
           -- the creature that entered; Explorer's Cache binds the artifact and a
           -- targeted creature; Black Panther, Wakandan King binds a targeted land
-          -- and a targeted creature). A slot bound as the ability triggered may name an
-          -- object CR 400.7 has since moved, and a targeted one may have become
-          -- illegal, which is CR 608.2b's re-read in legalOne above.
+          -- and a targeted creature). A slot bound as the ability triggered may
+          -- name an object CR 400.7 has since moved, and a targeted one may have
+          -- become illegal, which is CR 608.2b's re-read in legalOne above.
           --
           -- The `from` half answers CR 702.26b as much as CR 400.7, and both are
           -- proven boards. Pawl.Engine.Phasing spells "treated as though it does
