@@ -529,8 +529,6 @@ library codec
     Pawl.Codec.OnsetSpec
     Pawl.Codec.Optionality
     Pawl.Codec.OptionalitySpec
-    Pawl.Codec.OutsideCard
-    Pawl.Codec.OutsideCardSpec
     Pawl.Codec.OutsideObject
     Pawl.Codec.OutsideObjectSpec
     Pawl.Codec.PaidExpiry

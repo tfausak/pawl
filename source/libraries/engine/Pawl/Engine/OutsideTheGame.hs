@@ -62,7 +62,7 @@ import qualified Pawl.Types.Zone as Zone
 --
 -- Every candidate here is an OutsideCard.InPool: this only reaches CR 103.2a's
 -- sideboard pool. CR 729.4's main-game objects (GameState.outsideObjects) are
--- not read yet (#152) -- wiring that in is a later unit's job, not this one's.
+-- not read yet (gap #152) -- wiring that in is a later unit's job, not this one's.
 eligible :: Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> PlayerId -> GameState.GameState -> [OutsideCard.OutsideCard]
 eligible predicate source pid gs =
   let pool = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs))
@@ -120,7 +120,7 @@ reveal predicate source pid = do
           oid <- State.state (bringIn pid printingId)
           Event.reveal RevealCause.Ordinary pid oid
         -- `eligible` above offers only OutsideCard.InPool this unit -- CR 729.4's
-        -- main-game half is not wired in yet (#152), so this arm is unreached
+        -- main-game half is not wired in yet (gap #152), so this arm is unreached
         -- until that lands.
         OutsideCard.InAnotherGame _ -> pure ()
 
