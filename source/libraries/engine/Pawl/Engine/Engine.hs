@@ -1610,6 +1610,11 @@ playSubgame = do
           (Asked.under parent)
           (State.runStateT (Setup.startGameFromCards Resolve.performHandAction Set.empty >> playGame) sub0)
       )
+  -- CR 729.4a: BEFORE the funnel, so that funnelBack's keptParentObjects cannot
+  -- resurrect a card the subgame took out of this game. This frame is the only
+  -- one holding both games, which is why the departures are applied from here
+  -- and not from inside either of them (CR 729.1a).
+  State.modify' (Setup.applyCrossings finalSub)
   State.modify' (Setup.funnelBack finalSub)
   -- CR 729.5: each player who was IN the subgame takes the traditional cards they
   -- own back to their main-game library and shuffles.
