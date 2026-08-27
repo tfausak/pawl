@@ -29,6 +29,7 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.OutsideCard as OutsideCard
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -225,12 +226,15 @@ data Response
     -- dungeon already in the command zone, this one names the CARD, and a
     -- transcript of one must not satisfy the other.
     ChoseDungeon PrintingId.PrintingId
-  | -- | CR 400.11c: the card a player chose to bring in from outside the game.
+  | -- | CR 400.11c \/ 729.4: the card a player chose to bring in from outside the
+    -- game -- either CR 103.2a's sideboard pool or, from inside a subgame, CR
+    -- 729.4's main game. Pawl.Types.OutsideCard's header comment gives the full
+    -- reason it names one or the other rather than carrying a bare PrintingId.
     --
     -- Its own constructor rather than ChoseDungeon reused, for the reason that one
     -- is not ChoseRoom: rule 309.2a admits a dungeon card and a wish admits what
     -- its own filter says, and a transcript of one must not satisfy the other.
-    ChoseFromOutsideTheGame PrintingId.PrintingId
+    ChoseFromOutsideTheGame OutsideCard.OutsideCard
   | -- | CR 309.5a: the room a venturing player chose to move their marker into.
     ChoseRoom RoomIndex.RoomIndex
   | -- | CR 709.5f \/ 709.5g: the half of a permanent a player chose to unlock or

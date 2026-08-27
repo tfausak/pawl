@@ -865,24 +865,30 @@ data GameEvent
     -- zone change at all, and an Aura that entered attached says nothing in its
     -- ZoneChange about what it landed on.
     BecameAttached BecameAttached.BecameAttached
-  | -- | CR 800.4a: a permanent left the GAME, rather than the battlefield,
-    -- because its owner left the game. The ObjectId is the id it had while it
-    -- existed -- the key Pawl.Engine.Departure files its CR 608.2h last known
-    -- information under, and the only route back to what it was, since leaving
-    -- the game mints no new incarnation for it to become.
+  | -- | A permanent left the GAME, rather than the battlefield. Two roads reach
+    -- it: CR 800.4a, its owner having left the game (Pawl.Engine.Departure), and
+    -- CR 729.4a, a subgame having brought the card in out of the main game
+    -- (Pawl.Engine.Setup.applyCrossings). The ObjectId is the id it had while it
+    -- existed -- the key each of them files its CR 608.2h last known information
+    -- under, and the only route back to what it was, since leaving the game
+    -- mints no new incarnation for it to become.
     --
-    -- Not a GameEvent.Moved, and the difference is the rules': CR 800.4a takes
+    -- Not a GameEvent.Moved, and the difference is the rules': either road takes
     -- the object out of the game entirely, so there is no destination zone to
     -- name and CR 400.7 never runs. A Moved carrying an invented destination
     -- would answer "did it go to a graveyard" -- which is what CR 700.4's
     -- "dies" asks -- and the answer would be a fiction.
     --
-    -- Emitted for a PHASED-IN BATTLEFIELD permanent and for nothing else, which
-    -- is exactly the set CR 603.6c's second trigger event ranges over: rule
-    -- 702.26k says a phased-out permanent leaving this way causes no zone-change
-    -- ability to trigger, and no rule reads the departure of a card that was in
-    -- a hand, a library, a graveyard, exile or on the stack. Those still file
-    -- last known information; what they do not do is enter this log.
+    -- Emitted for a PHASED-IN BATTLEFIELD permanent and for nothing else, by
+    -- both roads. For CR 800.4a's that is exactly right: it is the set CR 603.6c's
+    -- second trigger event ranges over, and rule 702.26k says a phased-out
+    -- permanent leaving that way causes no zone-change ability to trigger.
+    --
+    -- Not implemented: CR 729.4a asks for more -- "abilities in the main game
+    -- that trigger on objects leaving a main-game ZONE" -- so a card a subgame
+    -- took out of a hand, a graveyard, a library or exile should be readable and
+    -- is not. Such a card still files its CR 608.2h last known information; what
+    -- it does not do is enter this log (#2463).
     LeftTheGame ObjectId.ObjectId
   | -- | CR 701.22d: a player completed CR 701.22a's scry. Recorded AFTER the
     -- reorder, and recorded even where nothing could move -- that rule's "even

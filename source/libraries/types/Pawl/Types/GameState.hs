@@ -28,6 +28,7 @@ import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OutsideObject as OutsideObject
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasedOut as PhasedOut
@@ -106,6 +107,18 @@ data GameState = MkGameState
     command :: Set.Set ObjectId.ObjectId,
     stack :: [ObjectId.ObjectId],
     players :: Map.Map PlayerId.PlayerId Player.Player,
+    -- | CR 729.4: the cards outside THIS game that sit in a game on hold --
+    -- empty for a game nobody is nested inside. Filled by
+    -- Pawl.Engine.Setup.subgameStateFrom from its parent's card objects (and
+    -- from the parent's own copy of this field, which is CR 729.6's nesting),
+    -- and spent by Pawl.Engine.OutsideTheGame.
+    outsideObjects :: Map.Map ObjectId.ObjectId OutsideObject.OutsideObject,
+    -- | CR 729.4a: the outer ids this game has brought in, in the order they
+    -- crossed. Read once, by Pawl.Engine.Setup.applyCrossings, which
+    -- Pawl.Engine.Engine.playSubgame runs on the game it holds; an id that is
+    -- not one of that game's own objects came from further out and is passed
+    -- outward one level (CR 729.6).
+    broughtIn :: Seq.Seq ObjectId.ObjectId,
     -- | CR 106.4. Absent from the map means an empty pool.
     manaPool :: Map.Map PlayerId.PlayerId Mana.Mana,
     -- | CR 508/509. Lives for one combat phase; cleared at CR 511.

@@ -59,6 +59,7 @@ import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.OutsideCard as OutsideCard
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
@@ -909,17 +910,17 @@ combatReplaySpec s =
         -- CR 400.11c: which card a wish brought in from outside the game is a
         -- decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseFromOutsideTheGame round-trips through the transcript" $ do
-          let a = PrintingId.MkPrintingId 7
-              b = PrintingId.MkPrintingId 9
+          let a = OutsideCard.InPool (PrintingId.MkPrintingId 7)
+              b = OutsideCard.InAnotherGame (ObjectId.MkObjectId 9)
               p = Prompt.ChooseFromOutsideTheGame decider S.alice (a NonEmpty.:| [b])
           Spec.assertEqWith s "choosing the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
           Spec.assertEqWith s "choosing the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
           -- Discriminating: fails if the prompt reuses Response.ChoseDungeon
-          -- rather than getting its own constructor. The two are the same SHAPE --
-          -- a Prompt over one PrintingId, answered from a NonEmpty of them -- so
-          -- nothing but a distinct constructor keeps a transcript of one from
-          -- replaying as the other.
-          Spec.assertEqWith s "a dungeon choice does not decode as this one" (Replay.decode p (Response.ChoseDungeon a)) Nothing
+          -- rather than getting its own constructor. The two are no longer even
+          -- the same SHAPE now that this one answers with an OutsideCard rather
+          -- than a bare PrintingId, but nothing but a distinct constructor keeps a
+          -- transcript of one from replaying as the other.
+          Spec.assertEqWith s "a dungeon choice does not decode as this one" (Replay.decode p (Response.ChoseDungeon (PrintingId.MkPrintingId 7))) Nothing
           Spec.assertEqWith s "a short transcript brings in the first offered" (Replay.defaultAnswer p) a
         -- CR 709.3 / 712.11b / 715.3: which half of a multi-faced object a player
         -- chose to cast off an offer is a decision, so it has to survive a
