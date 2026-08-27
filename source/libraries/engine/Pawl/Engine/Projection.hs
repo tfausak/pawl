@@ -4372,6 +4372,12 @@ grantsKeywordWhere p m = case m of
   -- Keyword.mintsCombatRestriction all match `Keyword.Flashback _`. False here
   -- would be a MISSING row -- fromGraveyardCard's CR 113.6f gate would stop
   -- offering the granted cast at all.
+  --
+  -- A REGRESSION FENCE rather than a proved answer: the two mint predicates are
+  -- False of flashback whatever cost it carries, and fromGraveyardCard asks this
+  -- of an ability on the GRAVEYARD CARD itself, where no card in the pool grants
+  -- a computed flashback -- Lier grants one from the battlefield. So flipping
+  -- this arm to False leaves the suite green.
   Modification.GainFlashbackAtManaCost -> p (Keyword.Type.Flashback (Cost.MkCost Nothing []))
   -- Hands out CR 702.5a's enchant, which is not a Pawl.Types.Keyword at all, so
   -- there is nothing here for `p` to be asked about.

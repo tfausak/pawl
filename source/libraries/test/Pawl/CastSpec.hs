@@ -1980,9 +1980,8 @@ fugitiveDoctorSpec s registry = Spec.describe s "FugitiveDoctor" $ do
 -- below would be vacuous.
 --
 -- The second clause is transcribed as well (PlayerEffect.CantBeCountered under
--- PlayerScope.EachPlayer), so pawl's Lier is not weaker than the printed card;
--- the last case asks the axis that separates rule 109.5's "you" from every
--- player, which is whether an OPPONENT's spell is protected too.
+-- PlayerScope.EachPlayer, Spider-Punk's shape), so pawl's Lier is not weaker
+-- than the printed card; the last case holds it to that scope.
 lierBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, ObjectId.ObjectId)
 lierBoard s registry withLier = do
   mountain <- S.printingOf s registry "Mountain"
@@ -2046,10 +2045,37 @@ lierSpec s registry = Spec.describe s "Lier" $ do
       "and the granted cost is gone with the granter"
       (fmap Cost.Type.mana (Cost.costsFor (S.printingName firebolt) inGraveyard board))
       [Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, theRed])]
-  -- Lier's other clause. CR 109.5's "you" is what PlayerScope.You means, and
-  -- Prowling Serpopard's is the pool's shape for it; Lier says "spells", not
-  -- "spells you control", so the scope is EachPlayer and an OPPONENT's spell is
-  -- protected too. That is the one axis the two arms differ on.
+  -- The other half of rule 702.34a: its FIRST static ability is a casting
+  -- permission (Keyword.permissionsFor), so a card printing no flashback of its
+  -- own cannot be cast from a graveyard at all until the grant arrives. Lightning
+  -- Bolt is that card, and its mana cost is the same {R} the Mountain pays -- so
+  -- the whole offer here, permission and price alike, comes from Lier.
+  Spec.it s "CR 702.34a/113.6f the grant creates the cast-from-graveyard permission, not just a price" $ do
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    lier <- S.printingOf s registry "Lier, Disciple of the Drowned"
+    let lands = S.landsInPlay mountain 1
+        (_, seated) = S.addCreature lier S.alice lands
+        (inGraveyard, buried) = S.addGraveyardCard bolt S.alice seated
+        board = aliceOnTurn buried
+        (withoutLier, unhelped) = S.addGraveyardCard bolt S.alice lands
+        bare = aliceOnTurn unhelped
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToPlayer S.alice) . snd) sets
+          _ -> S.identityAnswer p
+        after = S.runPure answer (S.runPure answer board (S.cast S.alice inGraveyard)) Stack.resolveTop
+        boltsIn zone gs = length (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName bolt)) (Game.zoneMembers zone S.alice gs))
+    Spec.assertEqWith s "Lightning Bolt prints no flashback, so without Lier the graveyard offers no cost at all" (Cost.costsFor (S.printingName bolt) withoutLier bare) []
+    Spec.assertEqWith s "the granted flashback paid {R} and the spell dealt its 3" (S.lifeOf S.alice after) (Just 17)
+    Spec.assertEqWith s "and CR 702.34a exiled the card" (boltsIn Zone.Exile after) 1
+    Spec.assertEqWith s "rather than returning it to the graveyard" (boltsIn Zone.Graveyard after) 0
+  -- Lier's other clause, which is Spider-Punk's sentence and takes its scope:
+  -- "spells can't be countered" has no possessive, so PlayerScope.EachPlayer
+  -- rather than CR 109.5's You. Here to hold LIER's transcription to that
+  -- reading -- the machinery is already proved by CR 701.6a's group below --
+  -- since a You arm would leave an opponent's spells counterable and pawl's
+  -- Lier weaker than the printed card.
   Spec.it s "CR 701.6a/109.5 Lier's first clause protects every player's spells, not only its controller's" $ do
     bolt <- S.printingOf s registry "Lightning Bolt"
     (withLier, _) <- lierBoard s registry True
