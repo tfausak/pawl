@@ -16,7 +16,10 @@
 -- Casing on Effect here is not a breach of design.md section 1: the closed half
 -- may depend on a CLASSIFICATION of effects, and this function is one. What
 -- stays forbidden is a case that acts on WHICH effect it is, and every arm
--- below answers the one question in the type.
+-- below answers the one question in the type. `costMovesLibraryCard` cases on
+-- Pawl.Types.CostComponent for exactly the same reason, and lives HERE rather
+-- than beside its siblings in Pawl.Engine.Cost because that module cannot be
+-- reached from this one: Cost imports Mana imports Projection imports this.
 module Pawl.Engine.ManaAbility where
 
 import qualified Data.Foldable as Foldable
@@ -25,6 +28,8 @@ import qualified Data.Maybe as Maybe
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.DurationRef as DurationRef
@@ -32,6 +37,7 @@ import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -59,10 +65,11 @@ import qualified Pawl.Types.Zone as Zone
 -- "(see rule 115.6)" is why: an ability whose slot may be left empty is "still
 -- said to require targets", so a CR 115.6 slot keeps it off this list too.
 --
--- The library clause reads the EFFECT half of "its cost and effect don't move
--- any card to or from a library" only. The COST half is not checked: no
--- Pawl.Types.CostComponent moves a card to or from a library, so there is
--- nothing to ask (#1517).
+-- The library clause reads BOTH halves of "its cost and effect don't move any
+-- card to or from a library" -- `movesLibraryCard` over the effects and
+-- `costMovesLibraryCard` over the activation cost's components. Millikin's
+-- "{T}, Mill a card: Add {C}" is disqualified by its cost alone, which is what
+-- its own reminder text ("Activate only as an instant") records.
 --
 -- ACTIVATED abilities only, which is CR 605.1a's own scope. Not implemented: CR
 -- 605.1b's triggered mana ability. No Pawl.Types.TriggerCondition watches mana
@@ -80,8 +87,52 @@ isManaAbility ab =
   not (null (Maybe.mapMaybe manaProduced effects))
     && Map.null (Modal.allTargetSlots (ActivatedAbility.modal ab))
     && not (any movesLibraryCard effects)
+    && not (any costMovesLibraryCard (Cost.components (ActivatedAbility.cost ab)))
   where
     effects = Modal.allEffects (ActivatedAbility.modal ab)
+
+-- CR 605.1a's library clause read of ONE cost component: does paying it move a
+-- card to or from a library? `movesLibraryCard`'s cost-side twin, and the two
+-- must not drift -- that one already answers True of Effect.Mill.
+--
+-- NOT CR 601.2h's question, which Pawl.Engine.Cost.paidInSecondPass asks: that
+-- rule is about a card moving from a library to a PUBLIC zone, where this one is
+-- about a library at either end and says nothing about where the card goes.
+--
+-- The MANA part is not asked, and needs no arm: CR 202.1's symbols spend a mana
+-- pool, and no card moves.
+--
+-- EXHAUSTIVE with no wildcard, the posture every case over this type takes: a
+-- new component owes an answer here, and -Werror is what makes it.
+costMovesLibraryCard :: CostComponent.CostComponent Keyword.Keyword -> Bool
+costMovesLibraryCard component = case component of
+  -- CR 701.17a moves the cards out of the paying player's library. The one True
+  -- arm in the vocabulary, and the whole reason this function exists.
+  CostComponent.MillCards _ -> True
+  -- A hand, a graveyard, the battlefield and the stack -- CR 605.1a names a
+  -- LIBRARY and none of these is one.
+  CostComponent.DiscardCards {} -> False
+  CostComponent.DiscardThis _ -> False
+  CostComponent.SacrificeThis -> False
+  CostComponent.Sacrifice {} -> False
+  CostComponent.ReturnThis -> False
+  CostComponent.ExileThisFromGraveyard -> False
+  CostComponent.ExileCardsFromGraveyard {} -> False
+  CostComponent.ExileTopFromGraveyard _ -> False
+  -- These move no card at all.
+  CostComponent.TapThis -> False
+  CostComponent.UntapThis -> False
+  CostComponent.TapForTotalPower {} -> False
+  CostComponent.TapPermanents {} -> False
+  CostComponent.PayLife _ -> False
+  CostComponent.PayLifeX -> False
+  CostComponent.PayEnergy _ -> False
+  CostComponent.AddLoyaltyToThis _ -> False
+  CostComponent.RemoveLoyaltyFromThis _ -> False
+  CostComponent.RemovePlusOneCountersFromThis _ -> False
+  CostComponent.PutPlusOneCountersOnThis _ -> False
+  CostComponent.Blight _ -> False
+  CostComponent.BlightX -> False
 
 -- CR 605: does this effect add mana, and on what instruction? Read by
 -- Mana.isManaAbility to keep mana abilities off the stack, and by

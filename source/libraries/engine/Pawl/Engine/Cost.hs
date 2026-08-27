@@ -7,10 +7,13 @@
 -- ability activated, and CR 118.12's payment when one RESOLVES. `total`'s CR
 -- 601.2f adjustments reach only the first.
 --
--- The SOLE casing home for Pawl.Types.CostComponent; every other module reads
--- the classifications derived here instead -- requiresSicknessCheck (CR 302.6),
+-- The casing home for Pawl.Types.CostComponent; every other module reads the
+-- classifications derived here instead -- requiresSicknessCheck (CR 302.6),
 -- isLoyaltyCost (CR 606.2/606.3), zoneFunctionedFrom (CR 113.6m),
--- statesHiddenQuality (CR 118.8c).
+-- statesHiddenQuality (CR 118.8c). The one classification that is NOT here is
+-- CR 605.1a's library clause: Pawl.Engine.ManaAbility.costMovesLibraryCard
+-- answers it, this module being unreachable from there (Cost -> Mana ->
+-- Projection -> ManaAbility).
 module Pawl.Engine.Cost where
 
 import qualified Control.Monad as Monad
@@ -19,6 +22,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.ActivationRestriction as ActivationRestriction
@@ -67,6 +71,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
@@ -78,6 +83,7 @@ import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
@@ -533,6 +539,7 @@ substituteXInComponent x component = case component of
   CostComponent.ExileThisFromGraveyard -> component
   CostComponent.ExileCardsFromGraveyard {} -> component
   CostComponent.ExileTopFromGraveyard _ -> component
+  CostComponent.MillCards _ -> component
 
 -- Does this cost contain an X (CR 107.3)? What decides whether the caster is
 -- asked for a value at CR 601.2b. BOTH HALVES: CR 601.2b names the mana cost as
@@ -574,6 +581,7 @@ componentHasVariable component = case component of
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
+  CostComponent.MillCards _ -> False
 
 -- CR 601.2b: the greatest value of X this player could legally announce -- what
 -- Prompt.ChooseX carries -- found by ASCENDING SEARCH from 0 over the caller's
@@ -647,6 +655,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
+  CostComponent.MillCards _ -> False
 
 -- CR 101.1: the ceiling this face's own words put on CR 601.2b's announced X --
 -- Soul Immolation's "X can't be greater than the greatest toughness among
@@ -891,6 +900,7 @@ loyaltyAmountOf component = case component of
   CostComponent.ExileThisFromGraveyard -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
+  CostComponent.MillCards _ -> Nothing
 
 -- CR 606.5: multiple costs to add or remove loyalty counters are combined into a
 -- single one. Carth the Lion's added [+1] on Jace Beleren's printed [-10] is one
@@ -956,6 +966,11 @@ zoneOfComponent component = case component of
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.DiscardCards {} -> Nothing
+  -- Nothing, and NOT Just Zone.Library, for the arms above's reason: CR 701.17a
+  -- mills the cards on top of the paying player's library, which are OTHER cards
+  -- than the object the cost is on -- a Millikin on the battlefield is not in the
+  -- library it mills.
+  CostComponent.MillCards _ -> Nothing
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.AddLoyaltyToThis _ -> Nothing
   CostComponent.RemoveLoyaltyFromThis _ -> Nothing
@@ -1018,6 +1033,12 @@ componentStatesHiddenQuality component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> False
+  -- The other hidden zone (CR 400.2), and the FIRST conjunct is satisfied where
+  -- no other arm's is -- but the second is not: CR 701.17a takes the cards off
+  -- the top, so "mill a card" describes no quality for a player to fail to find.
+  -- The whole of CR 118.8c's phrase is "cards with a stated quality in a hidden
+  -- zone", and this component can never state one, having no Filter at all.
+  CostComponent.MillCards _ -> False
 
 -- CR 306.5c: a planeswalker's loyalty is the number of loyalty counters on it.
 -- Zero for an object with none, which CR 704.5i reads as loyalty 0 -- so this is
@@ -1163,6 +1184,13 @@ claimOf pid oid component gs = case component of
   CostComponent.ExileTopFromGraveyard criterion ->
     claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (Maybe.maybeToList (topExileCandidate pid criterion gs))) 1
   CostComponent.ExileThisFromGraveyard -> claim (ClaimAxis.Removal Zone.Graveyard) (itself (isOwnedIn Zone.Graveyard)) 1
+  -- CR 701.17a spends cards out of the paying player's own library, so the pool
+  -- is that library and the count is how many the mill takes -- the ZONE keying a
+  -- Removal soundly for the header's reason. What it buys is two mills of one
+  -- cost needing two cards rather than one, which Hall's condition then asks;
+  -- a FENCE on this pool, no printing milling twice in one cost.
+  CostComponent.MillCards n ->
+    claim (ClaimAxis.Removal Zone.Library) (Set.fromList (Game.zoneMembers Zone.Library pid gs)) n
   -- CR 107.5: {T} spends exactly the untapped-ness the TapPermanents arm below
   -- claims, so it is the same axis, on a pool of one.
   CostComponent.TapThis ->
@@ -1496,6 +1524,8 @@ uncountedCeiling component = case component of
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.ExileThisFromGraveyard -> Nothing
+  -- Counted by `objectCeiling` too, the library being this claim's pool.
+  CostComponent.MillCards _ -> Nothing
   -- Counted by `lifeCeiling`, CR 119.4.
   CostComponent.PayLife _ -> Nothing
   -- Zero, not the 1 the uncounted components take: an unannounced X cannot be
@@ -1679,6 +1709,7 @@ lifeOwedByComponent component = case component of
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
+  CostComponent.MillCards _ -> 0
 
 -- The +1\/+1 counters a cost takes OFF the object it is on, added up --
 -- `lifeOwedBy`'s counter sibling, and `repeatsOf`'s counterCeiling is what
@@ -1715,6 +1746,7 @@ plusOneCountersOwedByComponent component = case component of
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
+  CostComponent.MillCards _ -> 0
 
 canPayComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Bool
 canPayComponent pid oid component gs = case component of
@@ -1857,6 +1889,14 @@ canPayComponent pid oid component gs = case component of
   -- 701.68a's candidate is qualified by CONTROL alone, the whole difference from
   -- PutPlusOneCountersOnThis above.
   CostComponent.Blight _ -> Blight.canBlight pid gs
+  -- CR 701.17b's last sentence, stated of costs in as many words: "the player
+  -- can't pay a cost that includes milling a number of cards greater than the
+  -- number of cards in their library". Not the general "as many as possible" of
+  -- rule 701.17b's second sentence, which is about an INSTRUCTION to mill.
+  --
+  -- This component ALONE, Sacrifice's caveat: two mills in one cost can each see
+  -- the same cards here, and `jointlyPayable` asks them together.
+  CostComponent.MillCards n -> Natural.length (Game.zoneMembers Zone.Library pid gs) >= n
   -- CR 601.2b: the component BEFORE X is announced, so there is no number of
   -- counters to measure rule 701.68b against -- PayLifeX's arm above, verbatim.
   -- Unreachable from either cast path, both of which substitute before they
@@ -1989,21 +2029,76 @@ payTagged pid charges = case charges of
 -- one Bayou and one plain Swamp is payable, and a payer who spends the Bayou on
 -- the Swamp half loses the cost.
 --
--- Asked ONCE for the whole cost; each component's own prompts are still issued
--- as it is paid. ONE pass, where CR 601.2h states two: the second takes parts
--- involving a random element or moving an object from a library to a public
--- zone, and this vocabulary has none (`orderSensitive` below).
+-- TWO PASSES, which is CR 601.2h's own structure: everything that moves no card
+-- out of a library into a public zone first, in any order, then everything left
+-- (`paidInSecondPass` below). Each pass is ordered on its own, so a cost holding
+-- one part of each kind asks NOTHING -- Millikin's "{T}, Mill a card" is that
+-- cost -- where one list of both would have offered orders the rules forbid.
+--
+-- Asked ONCE PER PASS; each component's own prompts are still issued as it is
+-- paid.
 --
 -- FILTERED, NOT TRUSTED: Game.permute keeps the printed order for an answer that
 -- is not a permutation of the offered indices.
 payComponents :: PaymentMoment.PaymentMoment -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
-payComponents moment pid oid components =
+payComponents moment pid oid components = do
+  let (second, first) = List.partition paidInSecondPass components
+  outcome <- payPass moment pid oid first
+  case outcome of
+    Payment.Unpaid -> pure Payment.Unpaid
+    Payment.Paid bound -> fmap (mergeBound bound) (payPass moment pid oid second)
+
+-- ONE of CR 601.2h's two passes: the payer orders it where the order is
+-- observable, then it is paid in that order.
+payPass :: PaymentMoment.PaymentMoment -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
+payPass moment pid oid components =
   if orderObservable components
     then do
       gs <- State.get
       answer <- Game.choose (Prompt.OrderCostComponents (Decide.deciderFor pid gs) pid oid components)
       payInOrder moment pid oid (Game.permute components answer)
     else payInOrder moment pid oid components
+
+-- CR 601.2h: is this part paid in the SECOND pass -- "all costs that don't
+-- involve random elements or moving objects from the library to a public zone"
+-- being the first, and this the rest?
+--
+-- The RANDOM half has no arm because it has no constructor: nothing in
+-- Pawl.Types.CostComponent flips a coin or rolls a die, so every False below is
+-- decided by the library half alone. The two halves are one predicate because CR
+-- 601.2h states one pass, not two.
+--
+-- EXHAUSTIVE with no wildcard, `orderSensitive`'s posture and for its reason.
+paidInSecondPass :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
+paidInSecondPass component = case component of
+  -- CR 701.17a moves cards from a library to a graveyard, and CR 400.2 makes the
+  -- one hidden and the other public. The one True arm in the vocabulary.
+  CostComponent.MillCards _ -> True
+  -- A HAND is not a library (CR 400.2 makes both hidden, which is not what rule
+  -- 601.2h asks), and a graveyard, a battlefield and a stack are not either, so
+  -- every other component that moves an object stays in the first pass.
+  CostComponent.DiscardCards {} -> False
+  CostComponent.DiscardThis _ -> False
+  CostComponent.SacrificeThis -> False
+  CostComponent.Sacrifice {} -> False
+  CostComponent.ReturnThis -> False
+  CostComponent.ExileThisFromGraveyard -> False
+  CostComponent.ExileCardsFromGraveyard {} -> False
+  CostComponent.ExileTopFromGraveyard _ -> False
+  -- These move no object at all.
+  CostComponent.TapThis -> False
+  CostComponent.UntapThis -> False
+  CostComponent.TapForTotalPower {} -> False
+  CostComponent.TapPermanents {} -> False
+  CostComponent.PayLife _ -> False
+  CostComponent.PayLifeX -> False
+  CostComponent.PayEnergy _ -> False
+  CostComponent.AddLoyaltyToThis _ -> False
+  CostComponent.RemoveLoyaltyFromThis _ -> False
+  CostComponent.RemovePlusOneCountersFromThis _ -> False
+  CostComponent.PutPlusOneCountersOnThis _ -> False
+  CostComponent.Blight _ -> False
+  CostComponent.BlightX -> False
 
 payInOrder :: PaymentMoment.PaymentMoment -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
 payInOrder moment pid oid components = case components of
@@ -2051,9 +2146,10 @@ orderObservable components = case filter orderSensitive components of
 -- True for every part that moves an object out of a zone, taps or untaps one, or
 -- changes the counters on one; False for the per-player scalars.
 --
--- EXHAUSTIVE with no wildcard, `claimOf`'s posture. A component that involved a
--- random element, or moved an object from a library to a public zone, would want
--- CR 601.2h's second pass as well as an answer here.
+-- EXHAUSTIVE with no wildcard, `claimOf`'s posture. Asked WITHIN one of CR
+-- 601.2h's passes rather than across the whole cost -- `paidInSecondPass` above
+-- is what splits them -- so a True here only ever competes with the other parts
+-- of its own pass.
 orderSensitive :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
 orderSensitive component = case component of
   CostComponent.Sacrifice {} -> True
@@ -2083,6 +2179,12 @@ orderSensitive component = case component of
   -- The arm above's classification, which is what CR 601.2b turns this into.
   -- Unreachable unsubstituted: `pay` runs on the announced cost.
   CostComponent.BlightX -> True
+  -- CR 701.17a puts a card into a graveyard, which a graveyard-reading part of
+  -- the same cost could then spend (Circling Vultures' "the top creature card of
+  -- your graveyard"). Alone in CR 601.2h's second pass on this pool, so nothing
+  -- it could compete with is ever in the same pass -- a FENCE, not proven
+  -- behaviour.
+  CostComponent.MillCards _ -> True
   CostComponent.PayLife _ -> False
   CostComponent.PayLifeX -> False
   CostComponent.PayEnergy _ -> False
@@ -2420,6 +2522,25 @@ payComponent moment pid oid component = case component of
   -- Unpayable, `canPayComponent`'s answer and for its reason. Unpaid rather than
   -- a guessed 0, which CR 601.2h turns into the reversal of the whole casting.
   CostComponent.PayLifeX -> pure Payment.Unpaid
+  -- CR 701.17a: the top `n` cards of the PAYING player's own library (CR 400.3),
+  -- moved to their graveyard. `canPayComponent` above has already refused a cost
+  -- milling more than the library holds (CR 701.17b), so the take is exact rather
+  -- than an "as many as possible".
+  --
+  -- Through Event.changeZoneReturning, the CR 400.7 funnel, and then recorded as
+  -- the mill it was -- Resolve's Effect.Mill arm's two steps, since CR 701.17a
+  -- makes this a mill wherever it happens and a watcher of one cannot tell a cost
+  -- from a resolution. ONE entry for the batch, that arm's reading of rule
+  -- 701.17a, and none at all where every move was cancelled.
+  --
+  -- Binds NO slot: CR 701.17c's look-back is for a later clause of the same
+  -- resolution, and a cost has none -- see Pawl.Types.CostComponent's arm.
+  CostComponent.MillCards n -> do
+    gs <- State.get
+    let cards = List.genericTake n (Game.zoneMembers Zone.Library pid gs)
+    arrived <- fmap Maybe.catMaybes (Monad.mapM (\card -> Event.changeZoneReturning card Zone.Graveyard) cards)
+    Monad.unless (null arrived) (State.modify' (Event.recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList arrived)))))
+    pure bindsNothing
   -- CR 701.21a: the player chooses which of their permanents dies, so this is a
   -- prompt. Elided only when forced -- exactly as many candidates as the count.
   -- Three payable Mountains and a count of two IS asked: they differ in tap

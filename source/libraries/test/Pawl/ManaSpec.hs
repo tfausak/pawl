@@ -52,6 +52,7 @@ import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.DealDamage as DealDamage
@@ -3140,6 +3141,97 @@ isActivateOf oid action = case action of
   Action.Type.EndEffect _ -> False
   Action.Type.Pass -> False
 
+-- CR 605.1a's library clause read of the COST half, which chromaticSpec above
+-- reads of the effect half. Millikin ({2} Artifact Creature -- Construct 0/1,
+-- Oracle text checked against Scryfall: "{T}, Mill a card: Add {C}. (Activate
+-- only as an instant. To mill a card, put the top card of your library into your
+-- graveyard.)") is the printing: it adds mana, targets nothing and is no loyalty
+-- ability, so every other criterion in rule 605.1a is met and its COST is the
+-- whole of why it is not a mana ability. The parenthesis is reminder text --
+-- "activate only as an instant" is the CONSEQUENCE of the clause and not a
+-- printed rider, so the card authors no ActivationRestriction and these cases
+-- would not pass if it did.
+--
+-- Sol Ring ({1} Artifact, "{T}: Add {C}{C}") is the control on every board here:
+-- the same {T}, the same colourless production, and no mill. It is what says a
+-- Millikin assertion below fails on the mill rather than on the board.
+millikinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+millikinSpec s registry = Spec.describe s "Millikin" $ do
+  Spec.it s "Millikin is a {2} 0/1 Artifact Creature whose one ability mills as a cost" $ do
+    millikin <- S.printingOf s registry "Millikin"
+    Spec.assertEqWith s "name" (Face.name (S.combinedFace millikin)) (CardName.MkCardName $ Text.pack "Millikin")
+    Spec.assertEqWith s "one activated ability" (length (Face.activatedAbilities (S.combinedFace millikin))) 1
+    Spec.assertEqWith
+      s
+      "CR 601.2f its cost is the tap symbol and a one-card mill"
+      (Cost.Type.components (ActivatedAbility.cost (theAbility millikin)))
+      [CostComponent.TapThis, CostComponent.MillCards 1]
+    Spec.assertEqWith s "CR 602.5 and it prints no rider, the reminder text being CR 605.1a's consequence" (length (ActivatedAbility.restrictions (theAbility millikin))) 0
+
+  Spec.it s "CR 605.1a the mill in the cost keeps Millikin off the mana sources" $ do
+    millikin <- S.printingOf s registry "Millikin"
+    solRing <- S.printingOf s registry "Sol Ring"
+    let (millikinId, solRingId, board) = millikinBoard millikin solRing
+        sources = Mana.manaSources Cost.manaActivations S.alice board
+    Spec.assertBool s (elem solRingId sources) "the Sol Ring is a mana source"
+    Spec.assertBool s (notElem millikinId sources) "and Millikin, whose cost mills, is not"
+
+  -- The same split at the menu, which is what the priority loop actually reads.
+  -- Both directions on one board, so neither half can pass because Millikin was
+  -- simply unaffordable: it IS offered, under the other constructor.
+  Spec.it s "CR 605.3b Millikin is offered as an ordinary activation instead" $ do
+    millikin <- S.printingOf s registry "Millikin"
+    solRing <- S.printingOf s registry "Sol Ring"
+    let (millikinId, solRingId, board) = millikinBoard millikin solRing
+        actions = Action.legalActions S.alice board
+    Spec.assertBool s (elem (Action.Type.ActivateManaAbility solRingId) actions) "the Sol Ring is menued as a mana ability"
+    Spec.assertBool s (notElem (Action.Type.ActivateManaAbility millikinId) actions) "Millikin is not"
+    Spec.assertBool s (any (isActivateOf millikinId) actions) "Millikin is menued as an ordinary activation"
+    Spec.assertBool s (not (any (isActivateOf solRingId) actions)) "which a mana ability never is"
+
+  -- End to end, and the gameplay-level proof (design.md section 4).
+  -- tapEverything takes ONLY mana activations, so what it reaches is exactly CR
+  -- 605.3a's window: the Sol Ring is tapped for {C}{C} and Millikin is never
+  -- touched, so no card is milled and it stays untapped. Under the other reading
+  -- of rule 605.1a the window takes Millikin too, and the graveyard says so.
+  Spec.it s "CR 605.3a the mana window reaches the Sol Ring and never Millikin" $ do
+    millikin <- S.printingOf s registry "Millikin"
+    solRing <- S.printingOf s registry "Sol Ring"
+    let (millikinId, solRingId, board) = millikinBoard millikin solRing
+        after = S.runPure tapEverything board Engine.priorityLoop
+    Spec.assertEqWith s "CR 701.17a nothing was milled" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+    Spec.assertEqWith s "and Millikin's library is whole" (length (Game.zoneMembers Zone.Library S.alice after)) 3
+    Spec.assertEqWith s "Millikin is untapped, never having paid its cost" (fmap Object.tapped (Game.lookupObject millikinId after)) (Just TapState.Untapped)
+    Spec.assertEqWith s "the Sol Ring did pay its own" (fmap Object.tapped (Game.lookupObject solRingId after)) (Just TapState.Tapped)
+    Spec.assertEqWith s "so the window ran and floated {C}{C}" (poolTypes S.alice after) [ManaType.Colorless, ManaType.Colorless]
+
+  -- The card in its own right: CR 605.3b puts it on the stack, CR 602.2b pays
+  -- its cost as it is activated, and the mana arrives only on resolution.
+  Spec.it s "CR 602.2b activating Millikin pays the mill up front and adds {C} on resolution" $ do
+    millikin <- S.printingOf s registry "Millikin"
+    solRing <- S.printingOf s registry "Sol Ring"
+    let (millikinId, _, board) = millikinBoard millikin solRing
+        activated = S.runPure S.identityAnswer board (Activate.activateAbility S.alice millikinId (theAbility millikin))
+        resolved = S.runPure S.identityAnswer activated Stack.resolveTop
+    Spec.assertEqWith s "CR 605.3b the ability is on the stack" (length (GameState.stack activated)) 1
+    Spec.assertEqWith s "CR 601.2h nothing is in the pool yet" (poolTypes S.alice activated) []
+    Spec.assertEqWith s "CR 701.17a the top card of the library is in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice activated)) 1
+    Spec.assertEqWith s "which is one card off the library" (length (Game.zoneMembers Zone.Library S.alice activated)) 2
+    Spec.assertEqWith s "CR 107.5 and Millikin is tapped" (fmap Object.tapped (Game.lookupObject millikinId activated)) (Just TapState.Tapped)
+    Spec.assertEqWith s "the resolution adds {C}" (poolTypes S.alice resolved) [ManaType.Colorless]
+
+-- alice, active, in her precombat main phase, with Millikin and a Sol Ring on
+-- the battlefield -- both settled and untapped -- and three cards in her library
+-- for a mill to take. Nothing else makes mana, so every mana on this board comes
+-- through one of the two.
+millikinBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+millikinBoard millikin solRing =
+  let base = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
+      (millikinId, g1) = S.addCreature millikin S.alice base
+      (solRingId, g2) = S.addCreature solRing S.alice g1
+      stocked = foldr (\p gs -> snd (S.addLibraryCard p S.alice gs)) g2 (replicate 3 solRing)
+   in (millikinId, solRingId, stocked)
+
 -- Whether alice is offered the cast of one card of this printing from her hand.
 offersCast :: Printing.Printing -> GameState.GameState -> Bool
 offersCast printing board =
@@ -4360,6 +4452,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   crewedBatterySpec s registry
   villageRitesSpec s registry
   chromaticSpec s registry
+  millikinSpec s registry
   burningTreeSpec s registry
   shizukoSpec s registry
   avatarRokuSpec s registry

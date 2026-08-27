@@ -2975,6 +2975,9 @@ costComponentFilters component = case component of
   CostComponent.Blight _ -> []
   CostComponent.BlightX -> []
   CostComponent.ExileThisFromGraveyard -> []
+  -- CR 701.17a takes the cards off the top, so this component carries no Filter
+  -- to narrow -- ExileThisFromGraveyard's answer above and for its reason.
+  CostComponent.MillCards _ -> []
 
 -- The Filter narrowing a target slot's CR 115 pool -- "target creature with
 -- flying" -- and CR 303.4a's enchant slot, which is a TargetSlot too.

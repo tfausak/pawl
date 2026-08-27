@@ -165,5 +165,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.ExileTopFromGraveyard (Filter.HasCardType CardType.Creature))
       " {\"type\":\"ExileTopFromGraveyard\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+  -- CR 701.17a as a cost: a bare count, the cards coming off the top with
+  -- nothing to choose.
+  Spec.it s "MillCards" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.MillCards 1)
+      " {\"type\":\"MillCards\",\"value\":1} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s codec
