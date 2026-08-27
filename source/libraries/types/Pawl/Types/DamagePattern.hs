@@ -73,6 +73,10 @@ import qualified Pawl.Types.Recipient as Recipient
 -- card data cannot name an ObjectId. Resolve's installDamageRow is the one
 -- producer, and Pawl.CardSpec's engineOnlyOffends keeps the corpus off it.
 --
+-- Not fixed for the row's life: CR 400.7c and CR 609.7a's last sentence follow a
+-- chosen PERMANENT SPELL onto the battlefield, so Pawl.Engine.Event.carryOver
+-- re-keys this field to the permanent the spell became.
+--
 -- Not implemented: a printed recipient condition naming a PLAYER, which is what
 -- a static redirection ability needs -- "all damage that would be dealt to you
 -- is dealt to this creature instead" (Palisade Giant, Pariah) (#1054).

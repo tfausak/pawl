@@ -56,6 +56,7 @@ import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
+import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AsCopy as AsCopy
@@ -95,6 +96,7 @@ import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBl
 import Pawl.Types.DamageEvent (DamageEvent)
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
@@ -3607,6 +3609,12 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- Tidewalker case is the proof: hacked Island -> Swamp on the
               -- stack, its own "enters with a time counter for each Island"
               -- counts Swamps.
+              --
+              -- Not implemented: a gate on `dest`, so a CR 614.6 redirect that
+              -- sent this permanent spell somewhere other than the battlefield
+              -- carries anyway -- both exceptions carryOver makes are for "the
+              -- permanent that spell becomes", and a spell that became no
+              -- permanent makes neither (#2399).
               carryOver carrying oid newId
               -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
               -- nowhere else. CR 616.1g's nesting of one event inside another is
@@ -3727,20 +3735,64 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
 -- resolution effect ever stores (CR 611.2c locks the set); the dynamic arms
 -- belong to static abilities and are re-derived each projection.
 --
+-- CR 400.7c is the SECOND half, and rides the same re-keying: a prevention
+-- effect that applies to damage from a permanent spell keeps applying to damage
+-- from the permanent it becomes. CR 609.7a says the same thing from the choice's
+-- side -- "if the player chooses a permanent spell, the effect will apply to any
+-- damage dealt by that spell and any damage dealt by the permanent that spell
+-- becomes when it resolves" -- and that is the rule the pool's producer plays
+-- to: Auriok Replica's chosen source, since Resolve.damageSourceCandidates
+-- offers the stack.
+--
 -- Called INSIDE changeZoneAttaching, before the CR 614.1c entry loop, and
--- Pawl.Types.CarryOver is how the move says whether CR 400.7a's exception is
+-- Pawl.Types.CarryOver is how the move says whether CR 400.7's exception is
 -- the one it is making. Scoped to Pawl.Engine.Stack's two permanent-spell
 -- branches. Not implemented: CR 400.7b's static-ability ability grants (CR
--- 611.3d) and CR 400.7c's prevention effects, the two exceptions this carrier
--- owes beside CR 400.7a and which no move can ask for (#2394). CR 400.7g and CR
--- 400.7i are unimplemented as well, on other carriers -- Pawl.Engine.Cast and
--- the land-play path (gap #2398).
+-- 611.3d), which this carrier cannot reach at all -- a static grant is derived
+-- on every projection rather than stored, so there is no row here to re-key
+-- (#2425). CR 400.7g and CR 400.7i are unimplemented as well, on other carriers
+-- -- Pawl.Engine.Cast and the land-play path (gap #2398).
 carryOver :: CarryOver.CarryOver -> ObjectId -> ObjectId -> Game ()
 carryOver carrying oldId newId = case carrying of
   CarryOver.NotCarried -> pure ()
   CarryOver.Carried ->
     State.modify' $ \gs ->
-      gs {GameState.continuousEffects = fmap (reanchor oldId newId) (GameState.continuousEffects gs)}
+      gs
+        { GameState.continuousEffects = fmap (reanchor oldId newId) (GameState.continuousEffects gs),
+          GameState.replacements = fmap (rewatch oldId newId) (GameState.replacements gs)
+        }
+
+-- carryOver's per-ROW half, and CR 400.7c's whole of it: a floating damage row
+-- watching the spell watches the permanent instead. DamagePattern.whichSource is
+-- the one field that can name a permanent spell -- CR 609.7a's chosen source is
+-- baked into it, and the rule's own last sentence is what follows the choice
+-- across the zone change. Its `whichRecipient` neighbour cannot hold one: CR
+-- 120.3's recipient is a player or a permanent, and a spell is neither.
+--
+-- DamageR is the only arm of Pawl.Types.ReplacementEffect carrying a
+-- DamagePattern, which is what makes the fallthrough below exhaustive rather
+-- than lazy -- a new arm would have to grow a baked id before it wanted one.
+--
+-- THE INVARIANT: no case on any effect's identity. DamageR is CR 614.1a's
+-- CLASSIFICATION of a replacement -- which damage events it intercepts -- and
+-- the arms below ask nothing else.
+--
+-- The row's TARGETED sibling in the same field (Dovin, Hand of Control's "dealt
+-- by target permanent") is unreachable here rather than a second reading: a
+-- target is declared on the stack against a permanent (CR 601.2c), so no id it
+-- holds is ever a permanent spell's.
+--
+-- PlayerEffect.DamageCantBePrevented carries the same pattern type and is left
+-- alone: CR 615.12's sentence is not a prevention effect, so CR 400.7c does not
+-- speak to it, and Pawl.CardSpec's engineOnlyOffends keeps card data off that
+-- field anyway, so no row of it can name an object at all.
+rewatch :: ObjectId -> ObjectId -> ActiveReplacement.ActiveReplacement -> ActiveReplacement.ActiveReplacement
+rewatch oldId newId row = case ActiveReplacement.effect row of
+  ReplacementEffect.DamageR damage
+    | DamagePattern.whichSource (DamageR.matching damage) == Just oldId ->
+        let pattern_ = DamageR.matching damage
+         in row {ActiveReplacement.effect = ReplacementEffect.DamageR damage {DamageR.matching = pattern_ {DamagePattern.whichSource = Just newId}}}
+  _ -> row
 
 -- carryOver's per-effect half: swap oldId for newId in a locked affected set
 -- that names it, and leave every other effect alone.
