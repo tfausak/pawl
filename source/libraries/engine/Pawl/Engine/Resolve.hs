@@ -2775,9 +2775,10 @@ chooseDamageSource controller resolving context gs filter_ = case filter_ of
 -- face-up object in the command zone", narrowed to the properties the card
 -- printed.
 --
--- SPELLS on the stack, not the whole zone: an activated or triggered ability
--- sharing that zone is a permanent under none of the four classes, and the rule
--- says "a spell". Game.isSpell asks the object's zone and its KIND, never which
+-- SPELLS on the stack, not the whole zone: the rule says "a spell", and an
+-- activated or triggered ability sharing that zone falls under none of the four
+-- classes -- it is not a permanent, not a spell, not in the command zone, and
+-- nothing refers to it. Game.isSpell asks the object's zone and its KIND, never which
 -- card it is -- the same reader ObjectRef.EachSpell above narrows with under CR
 -- 109.2b, where the CR 405.1 arm beside it takes the whole zone instead.
 --
@@ -2813,7 +2814,7 @@ damageSourceCandidates context gs filter_ =
 -- object on the stack, every row of GameState.replacements waiting to apply, and
 -- every entry of GameState.delayedTriggers waiting to trigger. What each REFERS
 -- TO is the object it names as its source plus the objects its bindings or slots
--- hold -- Mogg Fanatic's ability naming the Fire-Eater that its own cost
+-- hold -- Ghitu Fire-Eater's ability naming the creature its own cost
 -- sacrificed, a shield naming "that creature", a delayed trigger naming "it".
 --
 -- The SOURCE counts as a referent for all three: CR 113.7a says an ability that
@@ -2861,8 +2862,9 @@ sourceObjectOf src = case src of
   Source.OfSpellCopy _ -> []
   Source.OfInherentTrigger _ -> []
 
--- Every object a binding environment names, both shapes: CR 601.2c's targets and
--- CR 115.10a's groups. Not Pawl.Engine.Binding.slotObjects, which narrows a
+-- Every object a binding environment names, both shapes: the one object a target
+-- slot holds (CR 601.2c) and every member of a group a clause defines without
+-- targeting it (CR 115.10a). Not Pawl.Engine.Binding.slotObjects, which narrows a
 -- multi-target slot away through `onlyOne` -- a spell that targets two creatures
 -- refers to both of them, and CR 609.7a asks for every object referred to.
 -- Player recipients drop out, the rule's classes all being objects.
