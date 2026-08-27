@@ -785,6 +785,24 @@ data Prompt r where
   -- Answers as Response.ChoseSacrifices: the payload is the same set of
   -- permanents.
   ChooseAnyNumberToSacrifice :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt (Set.Set ObjectId.ObjectId)
+  -- | CR 608.2d: which of the permanents an effect offers to act on the player
+  -- picks, where the effect states no count -- Tovolar, Dire Overlord's
+  -- "transform any number of Human Werewolves you control",
+  -- Pawl.Types.ObjectRef's AnyNumberMatching. The ObjectId is the effect's
+  -- source; the [ObjectId] is the matching permanents, engine-pre-filtered
+  -- against that ref's Filter.
+  --
+  -- ChooseAnyNumberToSacrifice's shape and posture -- no count field, every
+  -- subset admissible including the empty one, asked even at ONE candidate
+  -- because a free choice of subset still leaves two answers, skipped at none.
+  -- A separate arm because that one is CR 614.1c's as-enters replacement and
+  -- this one is a resolving effect's own choice, and because Pawl.Types.Response
+  -- gives every prompt its own constructor.
+  --
+  -- NOT ChooseTargets: CR 115.1 makes a target only what the word "target"
+  -- names, and conflating them would let shroud, hexproof and "becomes the
+  -- target" triggers observe this choice (CR 115.10a).
+  ChooseAnyNumberOfPermanents :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 702.122a: which permanents to TAP to pay a cost measured by their
   -- TOTAL POWER. The ObjectId is the Vehicle; the [ObjectId] is the payer's
   -- matching untapped permanents, engine-pre-filtered; the Natural is a

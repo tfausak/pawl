@@ -22,21 +22,26 @@
 -- Scourge is the whole fixture, and one card supplies every half of the rule: a
 -- daybound front face (so a board with it on it becomes day, CR 702.145d), an
 -- upkeep trigger that says "it becomes night" (CR 731.1), and a nightbound back
--- face for the night to turn it over onto (CR 702.145c). Russet Wolves is the
--- only other card here, and only to reach the trigger's "three or more Wolves
--- and/or Werewolves"; restrictionSpec adds Moonmist, Forest and Humility.
+-- face for the night to turn it over onto (CR 702.145c). Russet Wolves is here
+-- only to reach the trigger's "three or more Wolves and/or Werewolves";
+-- restrictionSpec adds Moonmist, Forest and Humility, and anyNumberSpec adds
+-- Daybreak Ranger // Nightfall Predator.
 --
--- One clause of Tovolar's printed text is NOT modeled by the card file, and no
--- case here asserts on it: "Then transform any number of Human Werewolves you
--- control" needs a player-chosen subset of permanents, which pawl's ObjectRef
--- cannot express (#774). His combat-damage trigger IS modeled, and is read by
--- Pawl.TriggerSpec's `tovolarSpec` rather than here.
+-- Tovolar's second sentence -- "Then transform any number of Human Werewolves
+-- you control" -- is modeled and proved here, by anyNumberSpec. It needs a
+-- SECOND card for a rules reason rather than a fixture one: CR 702.145b's third
+-- static ability makes the clause inert on every daybound Human Werewolf,
+-- Tovolar himself included, so Daybreak Ranger // Nightfall Predator -- a Human
+-- Werewolf with no daybound -- is the only permanent the clause can reach. His
+-- combat-damage trigger IS modeled, and is read by Pawl.TriggerSpec's
+-- `tovolarSpec` rather than here.
 --
 -- Moonmist's second sentence is modeled by its card file and proved by
 -- Pawl.ReplacementSpec's Moonmist group, not here: it is a CR 615.1 prevention
 -- effect and has nothing to do with day or night.
 module Pawl.DaytimeSpec where
 
+import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -59,6 +64,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
@@ -73,6 +79,15 @@ frontName = CardName.MkCardName (Text.pack "Tovolar, Dire Overlord")
 
 backName :: CardName.CardName
 backName = CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge")
+
+-- Daybreak Ranger's two faces. A Human Werewolf with NO daybound, so CR
+-- 702.145b's third static ability does not withhold the turn -- which is what
+-- makes it the one permanent Tovolar's second sentence can act on.
+rangerFrontName :: CardName.CardName
+rangerFrontName = CardName.MkCardName (Text.pack "Daybreak Ranger")
+
+rangerBackName :: CardName.CardName
+rangerBackName = CardName.MkCardName (Text.pack "Nightfall Predator")
 
 -- CR 117.5's settle, which is where CR 702.145c/d/f/g are checked. Not
 -- S.settleSba: that runs the state-based actions alone, and these rules are
@@ -145,6 +160,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Daytime" $ do
   designationSpec s registry
   transformSpec s registry
+  anyNumberSpec s registry
   restrictionSpec s registry
   untapCheckSpec s registry
   entrySpec s registry
@@ -365,6 +381,115 @@ transformSpec s registry = Spec.describe s "Transform" $ do
         after = S.runPure S.identityAnswer (upkeep (settle board)) Engine.runStep
     Spec.assertEqWith s "still day" (GameState.daytime after) (Just Daytime.Day)
     Spec.assertEqWith s "and still front face up" (faceNameOf tovolarId after) (Just frontName)
+
+anyNumberSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+anyNumberSpec s registry = Spec.describe s "AnyNumber" $ do
+  -- CR 608.2d, through Tovolar's whole upkeep trigger: "it becomes night. Then
+  -- transform any number of Human Werewolves you control." The board is four
+  -- permanents' worth of nothing spare -- Tovolar is the source, Russet Wolves is
+  -- the third Wolf the trigger's intervening "if" counts, and Daybreak Ranger is
+  -- the only permanent alice's half of the second sentence can reach. BOB's
+  -- Daybreak Ranger is the fourth seat's worth, and the negative half: an equally
+  -- transformable Human Werewolf that "you control" excludes, so it separates the
+  -- Filter's controller conjunct from a bare battlefield sweep and separates an
+  -- answer FILTERED against the offer from one taken on trust.
+  --
+  -- Why the Ranger and not Tovolar: he is daybound, so CR 702.145c has already
+  -- turned him over by the time the second sentence runs and CR 702.145b's third
+  -- static ability forbids turning him again. His face reads the same under both
+  -- readings of the clause, so a board asserting on him alone proves nothing.
+  --
+  -- Why one spell last turn: the Ranger's OWN upkeep trigger transforms it when
+  -- no spells were cast last turn, which would turn it over whatever the chooser
+  -- said. One spell fails that intervening "if" (and CR 502.2's night check is
+  -- not reached at all here, this being the upkeep rather than the untap step),
+  -- so every turn the Ranger takes is the chosen one.
+  Spec.it s "CR 608.2d the chooser names the Human Werewolf and it turns over" $ do
+    tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
+    ranger <- S.printingOf s registry "Daybreak Ranger"
+    wolf <- S.printingOf s registry "Russet Wolves"
+    let (tovolarId, rangerId, bobRangerId, started) = anyNumberBoard tovolar ranger wolf
+        after = S.runPure namingAll (upkeep started) Engine.runStep
+    Spec.assertEqWith s "the Ranger shows its back face" (faceNameOf rangerId after) (Just rangerBackName)
+    Spec.assertEqWith s "and it is a 4/4 Nightfall Predator" (S.powerToughnessOf rangerId after) (Just (4, 4))
+    -- CR 109.5's "you", read through the sweep's own Filter.Context: bob's copy
+    -- is the same printing on the same battlefield and was never offered, so
+    -- naming EVERY candidate still leaves it alone.
+    Spec.assertEqWith s "bob's copy was never offered, so it is untouched" (faceNameOf bobRangerId after) (Just rangerFrontName)
+    Spec.assertEqWith s "the trigger ran, so it is night" (GameState.daytime after) (Just Daytime.Night)
+    Spec.assertEqWith s "and CR 702.145c turned Tovolar over" (faceNameOf tovolarId after) (Just backName)
+  -- "ANY NUMBER" includes zero, and CR 608.2d bars only an illegal or impossible
+  -- option -- naming nothing is neither. The same board as the case above,
+  -- differing in exactly one thing: what the chooser answered. This is what
+  -- separates the clause from a sweep of every match, which no assertion on the
+  -- case above can do.
+  Spec.it s "CR 608.2d naming nothing is a legal answer and turns nothing over" $ do
+    tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
+    ranger <- S.printingOf s registry "Daybreak Ranger"
+    wolf <- S.printingOf s registry "Russet Wolves"
+    let (tovolarId, rangerId, _, started) = anyNumberBoard tovolar ranger wolf
+        after = S.runPure namingNone (upkeep started) Engine.runStep
+    Spec.assertEqWith s "the Ranger is still front face up" (faceNameOf rangerId after) (Just rangerFrontName)
+    Spec.assertEqWith s "and is still a 2/2 Daybreak Ranger" (S.powerToughnessOf rangerId after) (Just (2, 2))
+    Spec.assertEqWith s "the trigger ran all the same, so it is night" (GameState.daytime after) (Just Daytime.Night)
+    Spec.assertEqWith s "and CR 702.145c turned Tovolar over" (faceNameOf tovolarId after) (Just backName)
+  -- The offer is FILTERED, not trusted (#222). bob's Daybreak Ranger is the
+  -- discriminating victim rather than the Russet Wolves beside it: the Wolf is a
+  -- single-faced card, so CR 701.27c withholds its turn whatever the engine did
+  -- with the answer, where bob's Ranger would turn over the moment an answer was
+  -- taken on trust.
+  Spec.it s "CR 608.2d an answer naming what was never offered turns nothing over" $ do
+    tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
+    ranger <- S.printingOf s registry "Daybreak Ranger"
+    wolf <- S.printingOf s registry "Russet Wolves"
+    let (_, rangerId, bobRangerId, started) = anyNumberBoard tovolar ranger wolf
+        after = S.runPure (namingExactly (Set.singleton bobRangerId)) (upkeep started) Engine.runStep
+    Spec.assertEqWith s "bob's Ranger, which was never offered, is still front face up" (faceNameOf bobRangerId after) (Just rangerFrontName)
+    Spec.assertEqWith s "and so is alice's, which the answer did not name" (faceNameOf rangerId after) (Just rangerFrontName)
+    Spec.assertEqWith s "the trigger ran all the same, so it is night" (GameState.daytime after) (Just Daytime.Night)
+
+-- Alice controls Tovolar, a Daybreak Ranger and a Russet Wolves, settled, with
+-- one spell cast last turn. Three Wolves and/or Werewolves, which is the
+-- trigger's intervening "if" (CR 603.4), and the one spell is what keeps the
+-- Ranger's own upkeep trigger from firing.
+anyNumberBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+anyNumberBoard tovolar ranger wolf =
+  let (tovolarId, g1) = S.addCreature tovolar S.alice (Setup.emptyGame S.bothPlayers)
+      (rangerId, g2) = S.addCreature ranger S.alice g1
+      (_, g3) = S.addCreature wolf S.alice g2
+      (bobRangerId, g4) = S.addCreature ranger S.bob g3
+   in (tovolarId, rangerId, bobRangerId, settle (afterOneCast g4))
+
+-- One spell cast by alice during the previous turn, written into the per-seat
+-- snapshot the Ranger's trigger reads. Set directly, as afterCasting above is,
+-- and what it stands in for is proved through the rules by Pawl.TransformSpec's
+-- SpellsCastLastTurn group.
+afterOneCast :: GameState.GameState -> GameState.GameState
+afterOneCast gs = gs {GameState.castsLastTurn = Map.singleton S.alice 1}
+
+-- Names every permanent offered. Pinned rather than left to S.identityAnswer,
+-- whose fallback happens to answer the same way: the assertion is about what the
+-- CHOOSER said, so the fixture has to say it.
+namingAll :: Prompt.Prompt r -> r
+namingAll p = case p of
+  Prompt.ChooseAnyNumberOfPermanents _ _ _ candidates -> Set.fromList candidates
+  _ -> S.identityAnswer p
+
+-- Names nothing, the empty answer CR 608.2d admits.
+namingNone :: Prompt.Prompt r -> r
+namingNone p = case p of
+  Prompt.ChooseAnyNumberOfPermanents {} -> Set.empty
+  _ -> S.identityAnswer p
+
+-- Names exactly this set, whether or not it was offered.
+namingExactly :: Set.Set ObjectId.ObjectId -> Prompt.Prompt r -> r
+namingExactly wanted p = case p of
+  Prompt.ChooseAnyNumberOfPermanents {} -> wanted
+  _ -> S.identityAnswer p
 
 untapCheckSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 untapCheckSpec s registry = Spec.describe s "UntapCheck" $ do

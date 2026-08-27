@@ -288,6 +288,9 @@ movesLibraryCard effect = case effect of
       -- library it was shown from (CR 701.20b).
       ObjectRef.EachCardFromAmong {} -> True
       ObjectRef.RandomCardInHand _ -> False
+      -- The battlefield, the arm this one offers a subset of: EachMatching's
+      -- answer, unchanged by a chooser standing between the sweep and the set.
+      ObjectRef.AnyNumberMatching _ -> False
   Effect.AddMana _ -> False
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> False
   Effect.Fight {} -> False

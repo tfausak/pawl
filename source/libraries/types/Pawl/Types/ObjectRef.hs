@@ -553,4 +553,39 @@ data ObjectRef
     -- ChosenCardInGraveyard's note above describes, and the lint that note names
     -- rejects it.
     RandomCardInHand PlayerRef.PlayerRef
+  | -- | ANY NUMBER of the permanents on the battlefield matching the Filter, the
+    -- set chosen as the effect runs -- Tovolar, Dire Overlord's "transform any
+    -- number of Human Werewolves you control".
+    --
+    -- EachMatching's zone, sweep and Filter position exactly, with the sweep
+    -- turned into an OFFER: that arm takes every match, this one offers every
+    -- match and takes the subset the chooser names. So "you control" is a
+    -- conjunct of the Filter here as it is there (CR 109.5 answers "you" against
+    -- the resolving controller), and the two share one candidate function so a
+    -- card cannot find the sweep and the offer disagreeing about what matches.
+    --
+    -- NOT A TARGET (CR 115.10a): the printed sentence does not say "target", so
+    -- nothing narrows the offered set for the player and CR 608.2b has nothing to
+    -- re-validate. The choice is made while the effect is applied (CR 608.2d),
+    -- which is why this is a QUESTION rather than a read.
+    --
+    -- ANY NUMBER, so no count field and the EMPTY answer is legal: CR 608.2d bars
+    -- only an illegal or impossible option, and naming nothing is neither. That
+    -- is the whole of what parts this arm from EachMatching, and the only reason
+    -- it is asked even at ONE candidate -- a free choice of subset still leaves
+    -- two distinguishable answers, the posture
+    -- Pawl.Types.Prompt.ChooseAnyNumberToSacrifice already takes.
+    --
+    -- THE RESOLVING CONTROLLER chooses, by CR 608.2c, so there is no
+    -- Pawl.Types.Chooser beside the Filter the way ChosenCardInGraveyard carries
+    -- one. Scryfall `o:"any number of" o:"you control" -o:target`, 2026-08-26:
+    -- every hit leaves the choice to the spell or ability's own controller;
+    -- Tovolar is the card that would refute this if it named another seat.
+    --
+    -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
+    -- read, so objectRefObjects answers nothing for it -- ChosenCardInGraveyard's
+    -- note above says why, and the same lint rejects it under an opcode that
+    -- cannot ask. Today Pawl.Engine.Resolve's Effect.Transform arm is the one
+    -- that asks.
+    AnyNumberMatching (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

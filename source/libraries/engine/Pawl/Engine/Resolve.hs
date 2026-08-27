@@ -381,6 +381,9 @@ objectRefSlots ref = case ref of
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong slot _) -> Map.singleton slot SlotArity.Many
   -- The seats whose hands randomness reads: the arm above's read.
   ObjectRef.RandomCardInHand player -> playerRefSlots player
+  -- EachMatching's answer: the candidates come off the battlefield, so no slot
+  -- names them and the chooser is CR 608.2c's resolving controller.
+  ObjectRef.AnyNumberMatching _ -> Map.empty
 
 -- The Quantities an ObjectRef carries: the two library walks' counts.
 -- Exhaustive, no wildcard: slotsAreExhaustive, readsX and Pawl.CardSpec's Count traversal all
@@ -407,6 +410,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.ChosenCardFromAmong {} -> []
   ObjectRef.EachCardFromAmong {} -> []
   ObjectRef.RandomCardInHand _ -> []
+  ObjectRef.AnyNumberMatching _ -> []
 
 -- The slots a MonarchTarget reads: only the targeted arm names one.
 monarchTargetSlots :: MonarchTarget.MonarchTarget -> Map.Map SlotName SlotArity
@@ -2077,15 +2081,50 @@ playerRefPlayers legal controller gs ref = case ref of
   where
     everyone = Game.stillPlaying gs
 
--- The objects an ObjectRef names DURING a resolution, and the ONE place a
--- filter-selected set is swept. InSlot takes every recipient CR 608.2b left legal
+-- CR 109.2's battlefield, narrowed by an effect-borne Filter and sorted into CR
+-- 608.2f's APNAP order. ObjectRef.EachMatching's whole answer, and the
+-- CANDIDATES ObjectRef.AnyNumberMatching offers -- shared so a card cannot find
+-- the sweep and the offer disagreeing about what matches.
+--
+-- CR 303.4b's host is supplied here and nowhere else in this module: this sweep
+-- is the one effect-borne Filter position naming what the SOURCE enchants. Read
+-- live, so an Aura moved between the trigger and its resolution acts on the host
+-- it has now.
+--
+-- Through effectContext, so the resolution's own slot bindings ride along and a
+-- sweep can exclude what another slot already named: Showstopping Surprise's
+-- "each OTHER creature" is `Not (IsBound "target")`. Filter.IsBound answers False
+-- for every candidate against an empty slot map, so a bare contextFor here would
+-- leave such a card silently sweeping in its own target. It is also what answers
+-- a CONTROLLER-relative conjunct -- Tovolar's "Human Werewolves you control" is
+-- `ControlledBy You`, read against CR 109.5's perspective.
+battlefieldMatching :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
+battlefieldMatching legal resolving controller source gs filter_ =
+  let context = (effectContext controller source legal (slotGroups resolving gs)) {Filter.sourceAttachedTo = Projection.hostOf source gs}
+      matching =
+        filter
+          (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
+          (Set.toList (GameState.battlefield gs))
+      order = Game.apnapOrder gs
+      last_ = length order
+      seat oid = case Projection.controllerOf oid gs of
+        Nothing -> last_
+        Just pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)
+   in List.sortOn (\oid -> (seat oid, oid)) matching
+
+-- The objects an ObjectRef names DURING a resolution, for every arm whose answer
+-- is a READ. The arms that are a CR 608.2d QUESTION answer [] here and are
+-- carried out by the opcode arms that reach the Game monad. InSlot takes every
+-- recipient CR 608.2b left legal
 -- (CR 601.2c); a slot bound to a GROUP is answered before that question, a group
 -- being a definition rather than a target (CR 115.10a).
 --
 -- EachMatching folds the battlefield (CR 109.2) against the projection, so a
--- permanent that is a creature only by a layer-4 effect is in the set. The filter
--- context is this effect's own -- CR 109.5's "you" is the ability's controller --
--- because the filter IS the ability's card text. EachCardInGraveyard is the same
+-- permanent that is a creature only by a layer-4 effect is in the set -- through
+-- battlefieldMatching above, which is that fold and is shared with the
+-- AnyNumberMatching offer. The filter context is this effect's own -- CR 109.5's
+-- "you" is the ability's controller -- because the filter IS the ability's card
+-- text. EachCardInGraveyard is the same
 -- fold over CR 400.1's per-player graveyards (CR 109.2a).
 --
 -- WHEN: at the moment the caller runs (CR 608.2c), and the list is then FIXED --
@@ -2110,28 +2149,14 @@ objectRefObjects legal resolving controller source gs ref = case ref of
     -- never a target (CR 115.10a). slotGroup says why being ahead is safe.
     Just group -> Foldable.toList group
     Nothing -> Maybe.mapMaybe Recipient.objectOf (legalMany slot legal)
-  ObjectRef.EachMatching filter_ ->
-    -- CR 303.4b's host is supplied here and nowhere else in this module: this
-    -- sweep is the one effect-borne Filter position naming what the SOURCE
-    -- enchants. Read live, so an Aura moved between the trigger and its
-    -- resolution acts on the host it has now.
-    --
-    -- Through effectContext, so the resolution's own slot bindings ride along and
-    -- a sweep can exclude what another slot already named: Showstopping Surprise's
-    -- "each OTHER creature" is `Not (IsBound "target")`. Filter.IsBound answers
-    -- False for every candidate against an empty slot map, so a bare contextFor
-    -- here would leave such a card silently sweeping in its own target.
-    let context = (effectContext controller source legal (slotGroups resolving gs)) {Filter.sourceAttachedTo = Projection.hostOf source gs}
-        matching =
-          filter
-            (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
-            (Set.toList (GameState.battlefield gs))
-        order = Game.apnapOrder gs
-        last_ = length order
-        seat oid = case Projection.controllerOf oid gs of
-          Nothing -> last_
-          Just pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)
-     in List.sortOn (\oid -> (seat oid, oid)) matching
+  ObjectRef.EachMatching filter_ -> battlefieldMatching legal resolving controller source gs filter_
+  -- A CR 608.2d question, so this pure sweep answers nothing for it: the
+  -- candidates are battlefieldMatching's, but WHICH of them the instruction names
+  -- is the chooser's, and only the Effect.Transform arm reaches the Game monad to
+  -- ask. Under any other opcode this empty answer is an inert card-data error,
+  -- which Pawl.CardSpec's inertChoosers rejects at load time --
+  -- ChosenCardInGraveyard's note below is the shape.
+  ObjectRef.AnyNumberMatching _ -> []
   -- EachMatching's sweep with CR 109.2's battlefield default switched off by the
   -- card's own words (CR 109.2a), over CR 400.1's per-player zone. Whose
   -- graveyards is graveyardScopePlayers below -- either the perspective's own
@@ -2441,6 +2466,8 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardFromAmong {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- No recipients: only the Reveal arm can ask the interpreter.
   ObjectRef.RandomCardInHand _ -> []
+  -- No recipients: only the Effect.Transform gather can ask the chooser.
+  ObjectRef.AnyNumberMatching _ -> []
 
 -- CR 608.2f's order for the per-object loop: APNAP first, reading a player
 -- recipient as that seat and an object as its controller's. Imposed here rather
@@ -4156,6 +4183,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- under this opcode names no object; the count and that rule's other
             -- exception need a design call (#1733).
             ObjectRef.RandomCardInHand _ -> pure []
+            -- Not implemented: a chosen subset of permanents moved somewhere.
+            -- Nothing gathers it here, so a card writing the ref under this
+            -- opcode names no object; the destination and CR 400.7's funnel
+            -- need a producer first (gap #2418).
+            ObjectRef.AnyNumberMatching _ -> pure []
           arrivals <- settleArrivals zone placement targets
           -- The batch's own board, read after CR 401.4's arrangement asks (which
           -- move nothing) and before any member does.
@@ -6117,14 +6149,46 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             { GameState.objects =
                 foldr (Map.adjust mark) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)
             }
-  Effect.Transform ref ->
+  Effect.Transform ref -> do
+    -- WHICH permanents turn over, gathered BEFORE the turn: the one ref here that
+    -- is a CR 608.2d question rather than a read has to be answered in the Game
+    -- monad, and every other is objectRefObjects' pure sweep.
+    victims <- case ref of
+      -- CR 608.2d: "any number of Human Werewolves you control" is a choice made
+      -- while the effect is applied, so it is asked HERE. The candidates are
+      -- EachMatching's sweep of the same Filter, read live off the pre-turn board
+      -- (CR 608.2c) -- which for Tovolar is a board CR 702.145c has already turned
+      -- him over on, so his own back face is no longer a Human Werewolf to offer.
+      --
+      -- ONE ask, of the resolving controller (CR 608.2c). Skipped at no candidate,
+      -- where the empty set is the only answer (CR 101.3, CR 609.3), and asked at
+      -- ONE, unlike the counted choices: "any number" leaves two distinguishable
+      -- answers there.
+      --
+      -- FILTERED, not trusted (#222): an answer naming a permanent that was never
+      -- offered would otherwise turn it over. Filtering rather than taking the
+      -- answer also keeps CR 608.2f's APNAP order, which the candidate list
+      -- already carries and a Set does not.
+      ObjectRef.AnyNumberMatching filter_ -> do
+        gs <- State.get
+        let candidates = battlefieldMatching legal resolving controller source gs filter_
+        if null candidates
+          then pure []
+          else do
+            answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates)
+            pure (filter (`Set.member` answer) candidates)
+      _ -> do
+        gs <- State.get
+        pure (objectRefObjects legal resolving controller source gs ref)
     State.modify' $ \gs ->
       -- CR 701.27a: turn each victim over -- one assignment to Object.face, which
       -- is all a turn IS here, every characteristic read already resolving
-      -- through Game.faceOf. The victims are enumerated ONCE (CR 608.2f). WHICH
-      -- face is Pawl.Engine.Card.turnedOver's answer, off the card's layout,
-      -- which withholds a turn from a permanent that is not double-faced (CR
-      -- 701.27c) or whose other face is an instant or sorcery (CR 701.27d).
+      -- through Game.faceOf. The victims were enumerated ONCE above (CR 608.2f),
+      -- ahead of this write so no member of the batch is judged against a board a
+      -- sibling has already turned over on. WHICH face is
+      -- Pawl.Engine.Card.turnedOver's answer, off the card's layout, which
+      -- withholds a turn from a permanent that is not double-faced (CR 701.27c)
+      -- or whose other face is an instant or sorcery (CR 701.27d).
       --
       -- CR 701.27b: turning over is its own game action, so it records its own
       -- event -- Event.recordTransformed, over the victims that ACTUALLY turned
@@ -6142,7 +6206,6 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- restriction being read off the layer fold.
       let (now, g1) = Game.freshTimestamp gs
           pcs = Projection.projectAll g1
-          victims = objectRefObjects legal resolving controller source g1 ref
           turned = foldr (turnOver pcs resolving now g1) (GameState.objects g1) victims
        in Event.recordTransformed
             (Game.facesTurned (GameState.objects g1) turned victims)
