@@ -13085,12 +13085,30 @@ delayedPending grouped gs =
       -- Triggering spends the one shot only for an entry with no stated duration.
       spent (entry, fired) = not (null fired) && Maybe.isNothing (DelayedTrigger.expiry entry)
    in do
-        -- One pass, in store order, because `triggered` can now ASK: the prompt
-        -- must be raised once per entry, and `spent` reads the answer rather than
-        -- recomputing it. Not implemented: CR 101.4's APNAP order over two
-        -- entries with different controllers, which are asked in arming order
-        -- instead (#2380).
-        outcomes <- traverse (\entry -> fmap ((,) entry) (triggered entry)) store
+        -- One pass, because `triggered` can ASK: the prompt must be raised once
+        -- per entry, and `spent` reads the answer rather than recomputing it.
+        --
+        -- CR 101.4: two entries with different controllers matched by one batch
+        -- are choices made at the same time, so the active player is asked first
+        -- and the nonactive players follow in turn order. CR 101.4b is what makes
+        -- that order load-bearing rather than cosmetic -- the later chooser knows
+        -- what the earlier one named. The seat is the ENTRY's controller (CR
+        -- 603.7d-f), which travels with the entry, and not Decide.deciderFor's
+        -- decider, whom a control-changing effect can make someone else.
+        --
+        -- Replacement.seatOf is the shared answer to "how far down APNAP order",
+        -- including its fallback: a controller off the seating roster sorts last.
+        -- A STABLE sort, so entries sharing a controller keep arming order,
+        -- which is not the order CR 101.4c has that player choose (gap #2455).
+        --
+        -- The ASKING is all that is reordered. `outcomes` is reassembled in store
+        -- order, because CR 101.4 governs neither of the two things it feeds: the
+        -- pending list is CR 603.3b's to order, which Engine.orderPending does,
+        -- and the surviving store's order is the arming order every later pass
+        -- reads.
+        let asking = List.sortOn (Replacement.seatOf gs . DelayedTrigger.controller . snd) (zip [0 :: Int ..] (Foldable.toList store))
+        answered <- traverse (\(index, entry) -> fmap (\fired -> (index, (entry, fired))) (triggered entry)) asking
+        let outcomes = Seq.fromList (fmap snd (List.sortOn fst answered))
         pure (concatMap snd outcomes, fmap fst (Seq.filter (not . spent) outcomes))
 
 -- CR 603.7a: the printed Onset as the game first stores it. The delayed-trigger
