@@ -1914,13 +1914,6 @@ apply batch candidate event =
       -- runEntry finishes before the Moved event is recorded, so no trigger scan
       -- and no state-based action can see the interim front face.
       --
-      -- WHICH enters-the-battlefield trigger fires does not currently tell this
-      -- apart from the CR 702.145c sweep turning the permanent over a settle later
-      -- (Pawl.Engine.Daytime.turnDue), and that is a defect in the scan rather
-      -- than in this arm: the scan reads the permanent's abilities off the live
-      -- board at settle, by which time the sweep has already run (#1548). What
-      -- this arm fixes regardless is the face itself, which the rule is about.
-      --
       -- Not implemented: CR 712.13a's second sentence, an instant or sorcery back
       -- face sending the spell to its owner's graveyard rather than the
       -- battlefield. The write is unguarded, where Game.turnFaceOver goes through
@@ -3736,9 +3729,11 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
 -- Called INSIDE changeZoneAttaching, before the CR 614.1c entry loop, and
 -- Pawl.Types.CarryOver is how the move says whether CR 400.7a's exception is
 -- the one it is making. Scoped to Pawl.Engine.Stack's two permanent-spell
--- branches: CR 400.7b (static-ability ability grants) and CR 400.7c (prevention
--- effects) are separate exceptions with separate carriers and are not claimed
--- here (#634).
+-- branches. Not implemented: CR 400.7b's static-ability ability grants (CR
+-- 611.3d) and CR 400.7c's prevention effects, the two exceptions this carrier
+-- owes beside CR 400.7a and which no move can ask for (#2394). CR 400.7g and CR
+-- 400.7i are unimplemented as well, on other carriers -- Pawl.Engine.Cast and
+-- the land-play path (gap #2398).
 carryOver :: CarryOver.CarryOver -> ObjectId -> ObjectId -> Game ()
 carryOver carrying oldId newId = case carrying of
   CarryOver.NotCarried -> pure ()
@@ -4032,7 +4027,7 @@ counterOne source controller oid = do
     -- CR 106.6 through CR 101.2, and ahead of the branch split for CR 613.11's
     -- reason: rule 106.6 says an additional effect "affects the spell or
     -- ability that mana is spent on", so both of CR 701.6a's subjects are in
-    -- reach. An ability records no payment today (#2007), which makes this
+    -- reach. An ability records no payment today (#2404), which makes this
     -- vacuous for one rather than wrong.
     --
     -- The typed question again, so this module never sees a ManaRiderEffect

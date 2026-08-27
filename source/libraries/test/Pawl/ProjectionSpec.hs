@@ -1975,14 +1975,26 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Set.member Subtype.Type.Merfolk (Projection.subtypesOf oid board)) "before: a Merfolk among the rest"
     Spec.assertEqWith s "after: Creature -- Frog alone" (Projection.subtypesOf oid after) (Set.singleton Subtype.Type.Frog)
 
-  -- CR 702.73a says the ability "works everywhere", and viewOfCard is built from
-  -- a face rather than folded through CR 613, so it applies the ability itself --
-  -- devoid's posture at CR 702.114a.
+  -- CR 702.73a says the ability "works everywhere". OFF the battlefield that is
+  -- the SAME route as on it -- the projection fold, whose layer 4 seeds
+  -- applySubtypeDefining for any live id in any zone -- so the graveyard leg
+  -- below is the one that answers the rule. viewOfCard is built from a face
+  -- rather than folded through CR 613 and so applies the ability itself, devoid's
+  -- posture at CR 702.114a; it has no engine caller, so its leg here is about
+  -- that builder rather than about a route a card can reach.
   Spec.it s "CR 702.73a a changeling is every creature type OFF the battlefield too" $ do
     changeling <- S.printingOf s registry "Woodland Changeling"
     let view = Projection.viewOfCard (S.combinedFace changeling)
-    Spec.assertBool s (Set.member Subtype.Type.Merfolk (Filter.subtypes view)) "a Merfolk in a library"
-    Spec.assertBool s (not (Set.member Subtype.Type.Island (Filter.subtypes view))) "and still not a land type"
+    -- The GAMEPLAY leg: a card sitting in a graveyard, read the way every
+    -- engine reader reads one. Proves applySubtypeDefining is the route, and
+    -- reddens if it stops being (see the CR 613.3 case above for the other half
+    -- of that function's proof).
+    let (gid, gs) = S.addGraveyardCard changeling S.alice (Setup.emptyGame S.bothPlayers)
+    Spec.assertBool s (Set.member Subtype.Type.Merfolk (Projection.subtypesOf gid gs)) "a Merfolk in a graveyard"
+    Spec.assertBool s (not (Set.member Subtype.Type.Island (Projection.subtypesOf gid gs))) "and still not a land type"
+    -- The printed-face builder, which answers the same way for its own reason.
+    Spec.assertBool s (Set.member Subtype.Type.Merfolk (Filter.subtypes view)) "a Merfolk off viewOfCard too"
+    Spec.assertBool s (not (Set.member Subtype.Type.Island (Filter.subtypes view))) "and no land type there either"
 
   -- CR 205.1b's add over the whole of CR 205.3m, the layer-4 arm changeling's two
   -- routes both come down to. Wings of Velis Vel is the card: "target creature has
