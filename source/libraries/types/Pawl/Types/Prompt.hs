@@ -795,9 +795,9 @@ data Prompt r where
   -- ChooseAnyNumberToSacrifice's shape and posture -- no count field, every
   -- subset admissible including the empty one, asked even at ONE candidate
   -- because a free choice of subset still leaves two answers, skipped at none.
-  -- A separate arm because that one is a COST (CR 601.2h) and this one is an
-  -- effect's own choice, and because Pawl.Types.Response gives every prompt its
-  -- own constructor.
+  -- A separate arm because that one is CR 614.1c's as-enters replacement and
+  -- this one is a resolving effect's own choice, and because Pawl.Types.Response
+  -- gives every prompt its own constructor.
   --
   -- NOT ChooseTargets: CR 115.1 makes a target only what the word "target"
   -- names, and conflating them would let shroud, hexproof and "becomes the
