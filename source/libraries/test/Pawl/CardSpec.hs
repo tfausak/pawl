@@ -608,6 +608,9 @@ durationCounts duration = case duration of
 modificationCounts :: Projection.Modification -> [Count.Type.Count Quantity.Type.Quantity]
 modificationCounts modification = case modification of
   Modification.GainKeyword _ -> []
+  -- CR 702.34a's computed flashback carries no payload at all, so it reaches
+  -- neither a Count nor, below, a Filter.
+  Modification.GainFlashbackAtManaCost -> []
   -- CR 702.5a's granted enchant carries a TargetSlot, whose Filter can nest a
   -- Count -- but a Filter's Counts are reached through modificationFilters below
   -- and countFilters, never through this sweep, which is the answer GainKeyword
@@ -3104,6 +3107,8 @@ durationFilters duration =
 modificationFilters :: Projection.Modification -> [Filter.Type.Filter Keyword.Keyword]
 modificationFilters modification = case modification of
   Modification.GainKeyword keyword -> keywordFilters keyword
+  -- Payload-free, so there is no Filter to sweep -- see modificationCounts.
+  Modification.GainFlashbackAtManaCost -> []
   -- CR 702.5a again: the granted slot's own Filter, which is card text like any
   -- other and has to be swept. NOT [] -- this, GainKeyword above and LoseKeyword
   -- below are the arms that answer with something, and every other one carries no
