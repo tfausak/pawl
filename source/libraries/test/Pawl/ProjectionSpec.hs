@@ -516,18 +516,23 @@ elspethEmblemBoard s registry ultimate = do
         _ -> armed
   pure (mine, theirs, carols, used {GameState.activePlayer = S.bob})
 
--- Synthetic Emblem Forge, an artifact whose one ability is
--- "{T}: You get an emblem with 'Creatures you control have protection from
--- red.'" (data/cards/synthetic-emblem-forge.json). alice puts it out and taps
--- it, so CR 114.2's emblem is in the command zone.
+-- alice puts an emblem-minting artifact out and taps it, so CR 114.2's emblem is
+-- in the command zone. Two cards take this route, and they are unlike in the one
+-- way the gates below care about: Synthetic Emblem Forge's emblem GRANTS
+-- ("{T}: You get an emblem with 'Creatures you control have protection from
+-- red.'", data/cards/synthetic-emblem-forge.json), where Synthetic Emblem
+-- Aegis's emblem carries a replacement row of its own and grants nothing
+-- ("{T}: You get an emblem with 'If a source would deal noncombat damage to a
+-- creature you control, prevent that damage.'",
+-- data/cards/synthetic-emblem-aegis.json).
 --
 -- Activated rather than cast, elspethEmblemBoard's route: no fixture here has
 -- mana, and the ability states no timing restriction, so it also reaches a board
 -- already sitting in the declare attackers step.
 --
--- The Forge STAYS on the battlefield, and trips neither short-circuit while it
--- is there: an artifact is none of copiableMintsType's three card types, and an
--- activated ability is not a static one.
+-- The artifact STAYS on the battlefield, and trips neither short-circuit while
+-- it is there: an artifact is none of copiableMintsType's three card types, and
+-- an activated ability is not a static one.
 forgedBoard :: Printing.Printing -> GameState.GameState -> GameState.GameState
 forgedBoard forge gs =
   let (forgeId, placed) = S.addCreature forge S.alice gs
@@ -3289,6 +3294,60 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         Spec.assertEqWith s "one emblem, in the command zone" (Set.size (GameState.command board)) 1
         Spec.assertBool s (Projection.hasKeyword fromRed attacker board) "and the attacker really holds the protection"
       _ -> Spec.assertFailure s "fixture should have one attacker and two blockers"
+
+  -- The emblem pair above GRANTS a keyword, so Projection.elsewhereGrants finds
+  -- a Modification to read and the gate opens. This emblem grants nobody
+  -- anything and carries a replacement row of its OWN, so it writes no
+  -- Modification at all: neither grantor disjunct is True of it, and `baseHas`
+  -- cannot see it because CR 114.5 keeps it off the battlefield. Widening
+  -- replacementsAffecting's WALK without widening its gate leaves this board
+  -- short-circuiting to [], which is why the case is here rather than folded
+  -- into the pair above.
+  --
+  -- CR 604.2's second limb is the authority -- a static ability's replacement
+  -- effect is active while the object with the ability stays "in the appropriate
+  -- zone, as described in rule 113.6" -- and CR 113.6p is the arm of that list
+  -- which closes it for an emblem, with CR 114.4 saying the same in the emblem's
+  -- own rule. This is a PRINTED row, which is what makes CR 604.2 the rule that
+  -- decides its zone; the BOARD a row's condition would be read against is the
+  -- separate question CR 614.12a answers (Projection.boardAsEntering), and this
+  -- row carries no condition.
+  --
+  -- The board differs in exactly one thing across the pair: whether the Aegis
+  -- was tapped for its emblem. Everything else trips neither gate, the reason the
+  -- pair above gives -- two Cabal Evangels, a Goblin Piker, no land, and the
+  -- Aegis's own ability activated rather than static.
+  --
+  -- SYNTHETIC because no printed emblem carries a replacement row pawl can
+  -- author. Scryfall `o:"emblem with"`, 2026-08-27, is every card that makes one;
+  -- exactly three print an emblem with a replacement effect, and each needs a
+  -- capability that does not exist -- Ajani Steadfast and Serra the Benevolent
+  -- both name a PLAYER recipient (#1054), Ajani additionally needs a "prevent all
+  -- but 1" rewrite (#2443), and Jaya Ballard's "cast this way" is a
+  -- back-reference to the permission the same emblem grants. CR 114.2 lets the
+  -- creating effect give an emblem any ability and CR 114.3 bounds only its
+  -- characteristics, so nothing in the CR forbids the card.
+  Spec.it s "CR 113.6p an emblem's own replacement row prevents the damage from the command zone" $ do
+    aegis <- S.printingOf s registry "Synthetic Emblem Aegis"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (mineId, g1) = S.addCreature evangel S.alice (Setup.emptyGame S.bothPlayers)
+        (theirsId, g2) = S.addCreature evangel S.bob g1
+        (srcId, g3) = S.addCreature piker S.bob g2
+        board = forgedBoard aegis g3
+        unarmed = snd (S.addCreature aegis S.alice g3)
+        mine = dealTo srcId mineId 2 board
+        theirs = dealTo srcId theirsId 2 board
+        without = dealTo srcId mineId 2 unarmed
+    Spec.assertBool s (S.onBattlefield mineId mine) "the emblem's own row prevents the 2"
+    Spec.assertEqWith s "CR 615.6 with nothing marked on it" (S.damageOf mineId mine) (Just 0)
+    Spec.assertBool s (not (S.onBattlefield mineId without)) "and the same 2 kills it with the Aegis never tapped, so 2 really is lethal here"
+    Spec.assertBool s (not (S.onBattlefield theirsId theirs)) "CR 109.5 bob's identical creature is outside the emblem's \"you\""
+    -- The fixture's own preconditions, after the behaviour so neither can absorb
+    -- a mutation aimed at it.
+    Spec.assertEqWith s "one emblem, in the command zone" (Set.size (GameState.command board)) 1
+    Spec.assertEqWith s "and none without it" (Set.size (GameState.command unarmed)) 0
+    Spec.assertBool s (not (Projection.hasKeyword fromRed mineId board)) "and the emblem grants nothing, so no gate sees a Modification"
 
   -- The same two short-circuits against the OTHER arms of
   -- Projection.gatherGiven. The emblem pair above covers the command zone; each
