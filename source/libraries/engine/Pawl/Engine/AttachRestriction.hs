@@ -136,7 +136,7 @@ refusesGiven pcs subject host gs =
       -- NO short-circuit of the kind Pawl.Engine.CombatRestriction.inForce takes
       -- before its own minted rows, and the difference is that one host is not a
       -- board: that gate exists to avoid projecting EVERY permanent, and asks a
-      -- battlefield walk to decide it, which here would cost more than the one
+      -- whole-board walk to decide it, which here would cost more than the one
       -- projection it saves. The `pcs` argument is the affordance instead.
       --
       -- Read off the PROJECTION rather than the printed face, so a granted or

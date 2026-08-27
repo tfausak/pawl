@@ -1418,9 +1418,10 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Undying -> []
 
 -- The SHORT-CIRCUIT's voice: Projection.replacementsAffecting skips the whole
--- board when no permanent's COPIABLE rules text could hold a replacement effect,
--- and a minted row is not printed in a face's list, so the gate has to be told
--- which keywords mint one. Membership rather than a count, the gate asking whether
+-- board when nothing it walks -- the permanents' COPIABLE rules text, the stored
+-- continuous effects, and the static abilities functioning from the other zones
+-- -- could hold a replacement effect, and a minted row is not printed in a
+-- face's list, so the gate has to be told which keywords mint one. Membership rather than a count, the gate asking whether
 -- there is any.
 mintsReplacement :: Keyword -> Bool
 mintsReplacement keyword = not (null (mintedReplacementsFor keyword 1))
@@ -1570,8 +1571,10 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Reinforce {} -> []
 
 -- `mintsReplacement`'s twin, and read by the same kind of short-circuit:
--- Pawl.Engine.CombatRestriction.inForce projects a permanent only when some base
--- face on the battlefield could put a restriction-minting keyword on one.
+-- Pawl.Engine.CombatRestriction.inForce projects a permanent only when something
+-- it walks -- the battlefield, the stored continuous effects, or a static
+-- ability functioning from one of the other zones -- could put a
+-- restriction-minting keyword on one.
 mintsCombatRestriction :: Keyword -> Bool
 mintsCombatRestriction = not . null . mintedCombatRestrictionsFor
 

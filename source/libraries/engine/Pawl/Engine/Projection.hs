@@ -4406,20 +4406,26 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- answers off the text it copied rather than the copier's (CR 707.2), which is
 -- what Pawl.CopySpec's copiedAbilitySpec proves a disjunct at a time.
 --
--- The two grantor disjuncts are asked of the BATTLEFIELD, which is not where every
--- granting object stands: an emblem's abilities function in the command zone (CR
--- 114.4) and an emblem is no permanent (CR 114.5), so commandGrants asks them
--- there as well. Pawl.ProjectionSpec's "CR 702.16e an emblem's granted protection
--- still prevents the damage" is the board.
+-- The two grantor disjuncts are asked of the BATTLEFIELD, which is not where
+-- every grant comes from, so the gate mirrors the REST of gatherGiven's arms
+-- beside them: storedWrites is its `stored` arm (CR 611.2a) and elsewhereGrants
+-- its emblem, stack, graveyard, hand and library arms (CR 114.4, CR 113.6).
+-- Pawl.ProjectionSpec's three "still prevents the damage" boards are one each.
+--
+-- gatherGiven's remaining three arms need no disjunct, and each for a reason
+-- rather than by omission. `designations` emits only menace (CR 701.60c) and
+-- `bestows` only rule 702.103b's type line and enchant, none of which either
+-- mint predicate is True of. `counters` emits CR 122.1b's keyword counters,
+-- whose enumeration -- flying, first strike, double strike, deathtouch, decayed,
+-- exalted, haste, hexproof, indestructible, lifelink, menace, reach, shadow,
+-- trample, vigilance and their variants -- does not meet
+-- Keyword.mintsReplacement's set anywhere, so no keyword counter can put a
+-- replacement effect on a permanent. (CombatRestriction's copy of this gate does
+-- NOT get that argument: decayed is on both lists.)
 --
 -- No face is looked up here any more: each of those four readers falls back to
 -- the printed face on its own, and an object that has none answers False from
 -- inside them rather than from a guard around the lot.
---
--- Not implemented: a minting keyword or a minting TYPE reaching a permanent
--- through a stored continuous effect, and a minting keyword arriving on a keyword
--- counter, are on no base face (#833). Nor is a grant from a zone other than the
--- battlefield and the command zone (#2436).
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
@@ -4445,36 +4451,73 @@ replacementsAffecting gs =
           -- whole.
           || any (any grantsMintingType . StaticAbility.modifications) (staticAbilitiesOf oid gs)
       forOne oid = fmap (\(provenance, re) -> (oid, provenance, re)) (replacementsOf oid gs)
-      -- CR 114.4's grantor, standing where `baseHas` cannot see it. Both of
-      -- baseHas's grantor disjuncts again, since an emblem writes the same two
-      -- modifications a permanent's static ability does.
-      commandHas = commandGrants (\m -> grantsKeywordWhere Keyword.mintsReplacement m || grantsMintingType m) gs
-   in if not (any baseHas onBattlefield || commandHas)
+      -- The grantors standing where `baseHas` cannot see them, asked BOTH of
+      -- baseHas's grantor disjuncts again: a stored effect and an off-battlefield
+      -- static ability write the same two modifications a permanent's static
+      -- ability does.
+      mints m = grantsKeywordWhere Keyword.mintsReplacement m || grantsMintingType m
+      elsewhereHas = storedWrites mints gs || elsewhereGrants mints gs
+   in if not (any baseHas onBattlefield || elsewhereHas)
         then []
         else concatMap forOne onBattlefield
 
--- CR 114.4 / 114.5: an emblem is neither a card nor a permanent, and its
--- abilities function in the COMMAND ZONE, so it is a granting object that a walk
--- of the battlefield cannot reach. The command-zone half of the two
--- battlefield-wide short-circuits -- replacementsAffecting's `baseHas` and
--- Pawl.Engine.CombatRestriction.inForce's `anyMinted` -- each of which asks its
--- grantor question of the permanents alone.
+-- CR 611.2a: does any STORED continuous effect write a modification satisfying
+-- `p`? gatherGiven's `stored` arm, and a disjunct of each of the two
+-- battlefield-wide short-circuits -- replacementsAffecting's gate and
+-- Pawl.Engine.CombatRestriction.inForce's `anyMinted` -- whose other disjuncts
+-- ask their grantor question of OBJECTS, where this arm is on no object's rules
+-- text at all: a resolved spell or ability has left the stack and its effect
+-- outlives it, so no walk of anybody's static abilities can find it.
 --
--- Reads the SAME list gatherGiven's emblem branch does, which is what makes it
--- sound: the whole command zone rather than the emblems in it, through the same
--- functionsFromZone default. A commander card sitting there over-trips the gate,
--- which costs the board one walk it did not need and can never drop a row.
+-- Reads the SAME list gatherGiven's `stored` arm does, entire, which is what
+-- makes it sound. CR 611.2c's locked affected set is deliberately NOT consulted:
+-- deciding which permanents an effect reaches means building the projection this
+-- gate exists to skip, so a stored effect writing a minting modification gathers
+-- the whole board however narrow its set. That over-trips and can never drop a
+-- row.
+storedWrites :: (Modification -> Bool) -> GameState -> Bool
+storedWrites p gs = any (p . ContinuousEffect.modification) (GameState.continuousEffects gs)
+
+-- Does any static ability functioning from a zone OTHER than the battlefield
+-- write a modification satisfying `p`? storedWrites' sibling disjunct in both
+-- gates, and the other half of what a walk of the permanents cannot reach: an
+-- emblem's abilities function in the command zone and an emblem is neither a
+-- card nor a permanent (CR 114.4 / 114.5), and CR 113.6 / 113.6b / 113.6f put a
+-- card's abilities to work from the stack, a graveyard, a hand or a library.
 --
--- Not implemented: the other zones gatherGiven gathers static abilities from --
--- the stack, graveyards, hands and libraries (CR 113.6) -- are not walked here,
--- so a minting keyword granted from one of them is still missed (#2436). The
--- command zone is normally empty, where a graveyard walk on every gather is not.
-commandGrants :: (Modification -> Bool) -> GameState -> Bool
-commandGrants p gs =
-  let grants oid = case Game.faceOf oid gs of
+-- anyConditional's walk with its predicate swapped, and sound for that
+-- function's reason: each arm reads the SAME list its walk in gatherGiven does.
+-- The first three take functionsFromZone, a SUPERSET of what gatherGiven keeps
+-- -- rule 113.6b's stated set answers the same either way, and where an ability
+-- states no zone this admits it against gatherGiven's narrower default (rule
+-- 113.6's card types on the stack, rule 113.6f's classification in a graveyard).
+-- A superset costs the board one walk it did not need; a subset would drop a
+-- rule 614.1 row. The two HIDDEN zones narrow instead and cost nothing for it,
+-- for the reason anyConditional states: rule 113.6b's stated set is a printed
+-- field, and an ability that states no zone is one gatherGiven's hidden walks
+-- cannot keep however `p` answers.
+--
+-- Walked on every replacement gather and every combat declaration, where the
+-- command zone alone was nearly free. What that costs per card is mayStateZone's
+-- printed-field read, the same bound gatherGiven's own hidden walks carry; see
+-- #1935, which measured those walks.
+elsewhereGrants :: (Modification -> Bool) -> GameState -> Bool
+elsewhereGrants p gs =
+  let writes sa = any p (StaticAbility.modifications sa)
+      grants zone oid = case Game.faceOf oid gs of
         Nothing -> False
-        Just face -> any (\sa -> functionsFromZone Zone.Command sa && any p (StaticAbility.modifications sa)) (Face.staticAbilities face)
-   in any grants (Set.toList (GameState.command gs))
+        Just face -> any (\sa -> functionsFromZone zone sa && writes sa) (Face.staticAbilities face)
+      grantsStating zone oid = case Game.lookupObject oid gs of
+        Nothing -> False
+        Just obj | not (mayStateZone gs zone obj) -> False
+        Just obj -> case Game.faceOfObject gs obj of
+          Nothing -> False
+          Just face -> any (\sa -> statesZone zone sa && writes sa) (Face.staticAbilities face)
+   in any (grants Zone.Command) (Set.toList (GameState.command gs))
+        || any (grants Zone.Stack) (GameState.stack gs)
+        || any (grants Zone.Graveyard) (graveyardCards gs)
+        || anyZoneCard GameState.hand (grantsStating Zone.Hand) gs
+        || anyZoneCard GameState.library (grantsStating Zone.Library) gs
 
 -- Does this modification hand its affected objects a keyword satisfying `p`?
 -- Exhaustive rather than a catch-all: a modification added later that also hands
