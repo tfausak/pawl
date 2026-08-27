@@ -2057,10 +2057,10 @@ breakOpenSpec s registry = Spec.describe s "IsFaceDown (CR 110.5)" $ do
 -- 4, ControlledBy Opponent 6, a dropped IsFaceDown conjunct 12 (five creatures),
 -- and a single Count where the card prints Plus 5.
 --
--- Thragtusk, Ainok Tracker and Goblin Piker go face down and none of them is on
--- the board face up. Which card is underneath cannot be read off the board at all
--- -- CR 708.2a leaves a face-down permanent a 2/2 with no name -- so the distinct
--- printings are only there to keep the Break Open case's turn-over legible.
+-- Thragtusk, Ainok Tracker and Goblin Piker go face down, and none of the three
+-- is also on the board face up. CR 708.2a leaves a face-down permanent a 2/2 with
+-- no name, so which card is underneath changes no count here and every case names
+-- its permanent by id rather than by name.
 --
 -- Two Mountains, which is Break Open's {1}{R} exactly, and a Goblin Piker left in
 -- each library so CR 104.3c has nothing to fire on.
