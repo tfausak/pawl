@@ -117,12 +117,14 @@ resolveTopWith runSubgame = do
                     -- permanent it becomes, and an Aura back face would carry its
                     -- face for the same reason a creature one does.
                     --
-                    -- CarryOver.Carried is on both for CR 400.7a, and these two
-                    -- branches are the only places in the engine that pass it: an
-                    -- effect that changed the permanent SPELL keeps applying to the
-                    -- permanent it becomes. The move itself performs the re-key,
-                    -- before the CR 614.1c entry loop reads the entering
-                    -- permanent's own rows (Event.carryOver, CR 614.12).
+                    -- CarryOver.Carried is on both for CR 400.7a and CR 400.7c,
+                    -- and these two branches are the only places in the engine
+                    -- that pass it: an effect that changed the permanent SPELL,
+                    -- and a prevention shield that watched it as a source of
+                    -- damage, keep applying to the permanent it becomes. The move
+                    -- itself performs the re-key, before the CR 614.1c entry loop
+                    -- reads the entering permanent's own rows (Event.carryOver,
+                    -- CR 614.12).
                     if not (Set.member Subtype.Aura (Projection.subtypesOf oid gs))
                       then -- CR 708.4's last sentence: "the permanent the spell becomes
                       -- will be a face-down permanent". A STATUS carried across a

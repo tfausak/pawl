@@ -1147,6 +1147,62 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
     Spec.assertEqWith s "alpha's 2 is prevented now that alpha is the chosen source" (S.lifeOf S.alice (strike alpha 2 shielded)) (Just 20)
     Spec.assertEqWith s "and omega's 3 lands in full" (S.lifeOf S.alice (strike omega 3 shielded)) (Just 17)
     Spec.assertEqWith s "alice was asked which source, and answered alpha" (chosenSourcesIn (answersFor (chooseDamageSourceOf alpha) g3 activate)) [alpha]
+  -- CR 400.7c, and CR 609.7a's last sentence for the same board: a source chosen
+  -- while it was a permanent SPELL keeps the shield when that spell resolves --
+  -- "the effect will apply to any damage dealt by that spell and any damage dealt
+  -- by the permanent that spell becomes when it resolves". CR 400.7 mints a NEW
+  -- id for that permanent, so a shield still naming the spell's id would watch an
+  -- object that no longer exists.
+  --
+  -- The card cast is a SECOND Auriok Replica, so the spell is a permanent spell
+  -- (CR 111.4c) and Pawl.Engine.Stack's permanent-spell branch is the one that
+  -- runs. Four Plains: three pay the spell's {3}, the fourth the ability's {W}.
+  Spec.it s "CR 400.7c the shield follows the chosen permanent spell onto the battlefield" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    replica <- S.printingOf s registry "Auriok Replica"
+    let base = S.landsInPlay plains 4
+        (replicaId, g1) = S.addCreature replica S.alice base
+        (decoy, g2) = S.addCreature pikerPrinting S.bob g1
+        (g3, cardId) = S.handOne replica g2
+        -- The SPELL's own id, read off the stack rather than reused from the
+        -- hand: casting is a zone change, so CR 400.7 already made the card and
+        -- the spell two objects and `cardId` names neither candidate.
+        afterCast = S.runPure S.identityAnswer g3 (S.cast S.alice cardId)
+        spellId = case GameState.stack afterCast of
+          oid : _ -> oid
+          [] -> cardId
+        shieldAgainst src =
+          S.runPure
+            (chooseDamageSourceOf src)
+            afterCast
+            ( Activate.activateAbility S.alice replicaId (theAbility replica)
+                Monad.>> Stack.resolveTop
+                Monad.>> Stack.resolveTop
+            )
+        shielded = shieldAgainst spellId
+        elsewhere = shieldAgainst decoy
+        arrived gs = Set.toList (Set.difference (GameState.battlefield gs) (GameState.battlefield afterCast))
+        -- The permanent the spell became. Taken as what the battlefield GAINED
+        -- over the post-cast board, so nothing about it is assumed: the two
+        -- setup assertions below pay for the fallback.
+        became gs = case arrived gs of
+          [oid] -> oid
+          _ -> spellId
+        strike src n gs = S.runPure S.identityAnswer gs (Damage.applyDamage [hit src (Recipient.ToPlayer S.alice) n])
+    -- THE gameplay assertion: the shield alice aimed at the SPELL prevents the
+    -- damage the PERMANENT deals. Before carryOver re-keyed the row this 3 landed
+    -- in full, the shield left naming an id nothing on the board carries.
+    Spec.assertEqWith s "the permanent the chosen spell became deals no damage" (S.lifeOf S.alice (strike (became shielded) 3 shielded)) (Just 20)
+    -- Its twin, differing in the ANSWER alone: aim the same shield at the Piker
+    -- and the same permanent's 3 lands, so the case cannot pass on an engine that
+    -- carried the shield to whatever resolved.
+    Spec.assertEqWith s "and aiming the same shield elsewhere leaves that permanent's 3 landing in full" (S.lifeOf S.alice (strike (became elsewhere) 3 elsewhere)) (Just 17)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "setup: exactly one permanent arrived from the resolution" (length (arrived shielded)) 1
+    Spec.assertEqWith s "setup: CR 400.7 gave that permanent an id the spell did not have" (became shielded == spellId) False
+    Spec.assertEqWith s "setup: the shield is a floating replacement" (length (GameState.replacements shielded)) 1
+    Spec.assertEqWith s "alice was asked which source, and answered the spell" (chosenSourcesIn (answersFor (chooseDamageSourceOf spellId) afterCast (Activate.activateAbility S.alice replicaId (theAbility replica) Monad.>> Stack.resolveTop Monad.>> Stack.resolveTop))) [spellId]
 
 -- CR 615.5's ADDITIONAL EFFECT, whose producer is Test of Faith ({1}{W} Instant:
 -- "Prevent the next 3 damage that would be dealt to target creature this turn.
