@@ -5,19 +5,26 @@
 -- game), the two fields that carry it -- Pawl.Types.Deck's sideboard (CR 103.2a)
 -- and Pawl.Types.Player's outsideTheGame -- Pawl.Engine.Setup.createDeck's copy
 -- between them, and Pawl.Engine.Resolve's two arms:
--- Effect.RevealFromOutsideTheGame and Effect.ExileThisSpell (CR 608.2n).
+-- Effect.RevealFromOutsideTheGame and Effect.ExileThisSpell (CR 608.2n). Also
+-- CR 729.4's second place a card can be outside the game: the main game as a
+-- subgame sees it, which is Pawl.Engine.Setup's subgameStateFrom and
+-- applyCrossings with Pawl.Engine.Engine.playSubgame between them.
 --
--- Gameplay-level throughout but for the setup case at the end: every other case
--- casts the printed Burning Wish ({1}{R} sorcery, "You may reveal a sorcery card
--- you own from outside the game and put it into your hand. Exile Burning Wish.")
--- and resolves it through the stack, so what is asserted is the whole path from
--- card JSON to the card in hand.
+-- Gameplay-level but for three cases: the CR 103.2a setup case and the two CR
+-- 729.4 cases before it call the unit under test directly. Every other case
+-- casts a printed wish and resolves it through the stack, so what is asserted is
+-- the whole path from card JSON to the card in hand -- Burning Wish ({1}{R}
+-- sorcery, "You may reveal a sorcery card you own from outside the game and put
+-- it into your hand. Exile Burning Wish.") for the pool, and Living Wish inside a
+-- Shahrazad subgame for CR 729.4's main game, in the last case of all.
 module Pawl.OutsideTheGameSpec where
 
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Engine as Engine
@@ -29,11 +36,18 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CounterChange as CounterChange
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.OutsideCard as OutsideCard
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
@@ -83,6 +97,31 @@ printingsIn zone pid gs = Maybe.mapMaybe (\oid -> Game.printingOfObject oid gs) 
 -- What is left in a player's pool, by printing.
 poolOf :: PlayerId.PlayerId -> GameState.GameState -> Map.Map PrintingId.PrintingId Natural.Natural
 poolOf pid gs = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs))
+
+-- n fresh objects of one printing at the back of a player's library: what CR
+-- 729.2 moves into the subgame, and the one main-game zone that does move. Mints
+-- through S.addHandCard and relocates, the way Pawl.GameSpec's own subgame
+-- fixtures stock a library.
+stockLibrary :: Printing.Printing -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+stockLibrary printing n pid gs0 =
+  let one gs =
+        let (oid, gs1) = S.addHandCard printing pid gs
+         in gs1
+              { GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Library}) oid (GameState.objects gs1),
+                GameState.hand = Map.adjust (Seq.filter (/= oid)) pid (GameState.hand gs1),
+                GameState.library = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.library gs1)
+              }
+   in List.foldl' (\gs _ -> one gs) gs0 (replicate n ())
+
+-- CR 122.1a: the +1/+1 counters on one object.
+plusOneCounters :: ObjectId.ObjectId -> GameState.GameState -> Natural.Natural
+plusOneCounters oid gs =
+  maybe 0 (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Map.lookup oid (GameState.objects gs))
+
+-- Where in the log the first event a predicate admits sits, so a case can compare
+-- WHEN two things were recorded and not merely that both were.
+eventIndex :: (GameEvent.GameEvent -> Bool) -> GameState.GameState -> Maybe Int
+eventIndex predicate gs = List.findIndex (predicate . LoggedEvent.event) (Foldable.toList (GameState.events gs))
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
@@ -209,3 +248,91 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
         after = snd (Engine.runGamePure S.identityAnswer sub (OutsideTheGame.reveal predicate bobsBearId S.alice))
     Spec.assertEqWith s "alice's hand stays empty: bob's creature is not hers to reach" (printingsIn Zone.Hand S.alice after) []
     Spec.assertEqWith s "and bob's card is untouched" (Map.member bobsBearId (GameState.outsideObjects after)) True
+  -- CR 729.4 / 729.4a / 729.5, the whole road at gameplay level and the case #152
+  -- is about. alice casts Shahrazad in the main game; inside the subgame she casts
+  -- Living Wish ({1}{G} sorcery, "You may reveal a creature or land card you own
+  -- from outside the game and put it into your hand. Exile Living Wish.") twice
+  -- and takes one of her main-game Goblin Pikers each time. Each Piker leaves the
+  -- MAIN GAME as it crosses (CR 729.4a), and bob's Super Shredder ("whenever
+  -- another permanent leaves the battlefield, put a +1/+1 counter on Super
+  -- Shredder") is the main-game ability that watches it go.
+  --
+  -- TWO crossings and not one. A single crossing cannot tell a batch read against
+  -- one frozen board from a batch read against the running one (CR 608.2h), which
+  -- is the distinction Setup.applyCrossings' fold draws; it is also what makes
+  -- the wish be cast twice, so a pool spent by the first cast would show up here.
+  --
+  -- The sizing, which is what the fixture is built around: alice starts the
+  -- subgame (CR 729.2), so she skips her first draw (CR 103.8a) and her turns are
+  -- 1, 3 and 5. One land per turn (CR 305.2) puts her second land down on turn 3,
+  -- which is the first turn the {1}{G} wish is castable, and the second wish waits
+  -- for turn 5. Both libraries hold nine cards: seven go to an opening hand, so
+  -- bob draws his last two on turns 2 and 4 and draws from an empty library on
+  -- turn 6, which ends the subgame under CR 704.5b -- one turn after alice's
+  -- second cast. Nine is also over CR 729.3's seven, so neither player decks
+  -- during setup. alice's nine are the two wishes and seven Forests; whichever end
+  -- the shuffle answer leaves them at she holds both wishes by turn 5, since seven
+  -- opening cards plus her turn-3 and turn-5 draws are her whole library.
+  --
+  -- The Plains she cast Shahrazad with are LANDS she owns on the main-game
+  -- battlefield, so CR 729.4 offers them to the wish alongside the Pikers; the
+  -- answerer names a Piker rather than taking the head of the offer.
+  Spec.it s "CR 729.4/729.4a/729.5 gameplay: Living Wish takes two main-game creatures out of a Shahrazad subgame, and the triggers wait for the main game" $ do
+    plains <- S.printingOf s registry "Plains"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    shahrazad <- S.printingOf s registry "Shahrazad"
+    livingWish <- S.printingOf s registry "Living Wish"
+    piker <- S.printingOf s registry "Goblin Piker"
+    shredder <- S.printingOf s registry "Super Shredder"
+    let g0 = Setup.emptyGame S.bothPlayers
+        (firstPiker, g1) = S.addCreature piker S.alice g0
+        (secondPiker, g2) = S.addCreature piker S.alice g1
+        (shredderId, g3) = S.addCreature shredder S.bob g2
+        g4 = S.landsFor plains S.alice 2 g3
+        g5 = stockLibrary mountain 9 S.bob (stockLibrary forest 7 S.alice (stockLibrary livingWish 2 S.alice g4))
+        (_shahrazadId, g6) = S.addHandCard shahrazad S.alice g5
+        before =
+          g6
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        isPiker candidate = case candidate of
+          OutsideCard.InAnotherGame oid -> oid == firstPiker || oid == secondPiker
+          OutsideCard.InPool _ -> False
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          -- Living Wish's printed "may" (CR 608.2d), taken both times.
+          Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+          Prompt.ChooseFromOutsideTheGame _ _ offered ->
+            Maybe.fromMaybe (NonEmpty.head offered) (List.find isPiker (NonEmpty.toList offered))
+          -- CR 729.2's roll, answered so the turn count above is the one played.
+          Prompt.RandomFirstPlayer _ -> S.alice
+          _ -> S.castAnswer p
+        after = snd (Engine.runGamePure answer before Engine.priorityLoop)
+        isLifeLoss e = case e of
+          GameEvent.LifeLost {} -> True
+          _ -> False
+        isShredderCounter e = case e of
+          GameEvent.CountersPut change -> CounterChange.object change == shredderId
+          _ -> False
+        -- CR 729.5's last sentence, read off the one log both are recorded in:
+        -- Shahrazad's own LoseLife clause runs while it finishes resolving, and
+        -- the trigger's counter cannot be placed until it has gone on the stack
+        -- after that.
+        counterFollowsTheLifeLoss = case (eventIndex isLifeLoss after, eventIndex isShredderCounter after) of
+          (Just loss, Just counter) -> Just (counter > loss)
+          _ -> Nothing
+    -- The fixture's own preconditions, which the runner under test cannot redden.
+    Spec.assertEqWith s "both of alice's creatures start on the main-game battlefield" (Set.member firstPiker (GameState.battlefield before), Set.member secondPiker (GameState.battlefield before)) (True, True)
+    Spec.assertEqWith s "and bob's Super Shredder starts with no counters" (plusOneCounters shredderId before) 0
+    Spec.assertEqWith s "CR 729.4: both main-game creatures left the main game for the subgame" (Set.member firstPiker (GameState.battlefield after), Set.member secondPiker (GameState.battlefield after)) (False, False)
+    Spec.assertEqWith s "CR 729.4a: Super Shredder's leaves-the-battlefield trigger resolved once per crossing" (plusOneCounters shredderId after) 2
+    Spec.assertEqWith s "CR 729.5: the triggers went on the stack only after Shahrazad finished resolving" counterFollowsTheLifeLoss (Just True)
+    Spec.assertEqWith s "CR 729.5: the cards the wishes took come back to her main-game library" (length (filter (== piker) (printingsIn Zone.Library S.alice after))) 2
+    Spec.assertEqWith s "CR 729.5: and the subgame's own cards -- the wishes it exiled included -- came back with them" (length (printingsIn Zone.Library S.alice after)) 11
+    -- CR 729.1b: alice won the subgame (bob decked), so she is the one player the
+    -- follow-on LoseLife excludes. 20 halves to 10.
+    Spec.assertEqWith s "CR 729.1b: only bob paid, which is how the subgame ended" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 20, Just 10)
+    Spec.assertEqWith s "CR 729.1a: the subgame did not decide the main game" (GameState.result after) Nothing
