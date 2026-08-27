@@ -6551,6 +6551,10 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           -- holds this arrival AND every arrival that came after it in the same
           -- batch. Deleting this one from that entry left the batch's others in,
           -- and each of a doubled pair then read the other as a prior blocker.
+          -- A REGRESSION FENCE on this arm, where the count arm below proves it:
+          -- no pooled board reaches a doubled arrival this Filter admits, Flash
+          -- Foliage's Saprolings being green where the one filtered printing
+          -- asks for black.
           --
           -- A blocker that has since left keeps its id in that entry, and
           -- `admits` reads it through CR 608.2h last known information -- which
