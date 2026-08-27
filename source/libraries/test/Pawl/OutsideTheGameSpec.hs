@@ -117,8 +117,9 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
     -- The second wish still resolved and still exiled itself, which is what tells
     -- "found nothing" apart from "did not resolve".
     Spec.assertEqWith s "and exiled itself all the same" (length (printingsIn Zone.Exile S.alice twice)) 2
-  -- CR 100.4a's sideboard is a multiset, which is the one place this pool parts
-  -- from Player.dungeons' set: two copies are two cards.
+  -- A sideboard is a multiset -- CR 100.4a caps it at fifteen CARDS and applies CR
+  -- 100.2a's four-card limit across deck and sideboard together -- which is the one
+  -- place this pool parts from Player.dungeons' set: two copies are two cards.
   Spec.it s "CR 100.4a two copies of one printing are two cards: the second wish finds the second copy" $ do
     mountain <- S.printingOf s registry "Mountain"
     wish <- S.printingOf s registry "Burning Wish"

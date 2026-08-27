@@ -89,7 +89,8 @@ eligible predicate source pid gs =
 -- falls back to the first offered.
 --
 -- A player with no eligible card reveals nothing and puts nothing into their
--- hand, which is CR 608.2a's "as much of the effect as possible" -- and is why
+-- hand, which is CR 609.3's "if an effect attempts to do something impossible,
+-- it does only as much as possible" -- and is why
 -- this returns unit rather than the id: nothing about Burning Wish's sentence
 -- reads the card back.
 --
@@ -163,8 +164,9 @@ bringIn pid printingId gs =
             Object.doesNotUntapNext = False,
             Object.exertedBy = Set.empty
           }
-      -- One copy, not the entry: CR 100.4a's sideboard is a multiset, so a player
-      -- who set aside two copies of a card can be brought the second one later.
+      -- One copy, not the entry: CR 100.2a's four-card limit is applied to the
+      -- combined deck and sideboard (CR 100.4a), so copies of a card are COUNTED
+      -- and a player who set aside two can be brought the second one later.
       spend n = if n <= 1 then Nothing else Just (n - 1)
       spent p = p {Player.outsideTheGame = Map.update spend printingId (Player.outsideTheGame p)}
       gs3 =

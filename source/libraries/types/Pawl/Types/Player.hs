@@ -136,7 +136,7 @@ data Player = MkPlayer
     -- nothing else can reach these in the meantime.
     --
     -- COUNTED and not a set, which is where this parts from `dungeons` above: this
-    -- is a STOCK. Pawl.Engine.OutsideTheGame.take spends an entry, because a card
+    -- is a STOCK. Pawl.Engine.OutsideTheGame.bringIn spends an entry, because a card
     -- brought into the game is in the game (CR 400.11b) and the next Burning Wish
     -- cannot find that same copy again. A dungeon card is never spent (CR 309.5b),
     -- so its field forgets its counts.
