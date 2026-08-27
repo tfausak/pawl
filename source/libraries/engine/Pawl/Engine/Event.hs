@@ -921,16 +921,22 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --      sacrifices nothing" is the proof: without it Ashaya, Soul of the Wild makes
 --      a bystanding Goblin Piker a Forest land, and the Wood Elemental arriving
 --      beside it eats the Piker.
---   4. Board membership -- a CARD-AUTHORED count, either in the CR 604.2 clause
---      that gates a row (Pawl.Types.PrintedReplacement) or in the amount a rewrite
---      places (the EntryRewrite.WithCounters arm below). Both fold over the
+--   4. Board membership -- a CARD-AUTHORED count, either in the clause that gates
+--      a row (Pawl.Types.PrintedReplacement's, on a permanent's static ability,
+--      and Pawl.Types.ActiveReplacement's, on the floating row a resolution
+--      installed) or in the amount a rewrite places (the
+--      EntryRewrite.WithCounters arm below). All of them fold over the
 --      battlefield, which holds the sibling whether or not its abilities function,
 --      so channel 3 does not reach them; and this is the one channel the loop's
 --      own SUBJECT is on the wrong side of as well. Excluded by
 --      Pawl.Engine.Projection.boardAsEntering, which subtracts
---      GameState.enteringSubjects too. Pawl.ReplacementSpec's Frontier Mastodon
---      pairs are the proof, one per direction; the amount half has no board that
---      observes it (#2431).
+--      GameState.enteringSubjects too -- the same board for every segment, since
+--      CR 614.12a's "before the permanent enters the battlefield" is about zone
+--      membership rather than about which segment asks. The CLAUSE half is proven
+--      in both segments, one pair per direction each: Pawl.ReplacementSpec's
+--      Frontier Mastodon for the printed one and its Synthetic Magnetic Lockdown
+--      for the floating one. The amount half has no board that observes it
+--      (#2431).
 applyReplacementsIn :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
 applyReplacementsIn asOf batch event = do
   (outcome, _, _) <- applyReplacementsFully asOf batch event
