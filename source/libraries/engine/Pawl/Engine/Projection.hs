@@ -151,6 +151,7 @@ import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
@@ -4404,10 +4405,11 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 -- ability, so the layer system has nothing to remove.
 --
 -- The rule's FROM-ZONE is not in the pattern -- Pawl.Types.ZoneChangePattern has
--- no such field -- and does not need to be: replacementsAffecting gathers only
--- battlefield permanents, so a row minted here can only ever be a candidate
--- while its source is on the battlefield, which is exactly "from the
--- battlefield". Filter.IsSource is the rule's "this permanent", the self-scope
+-- no such field -- and does not need to be: replacementsAffecting gathers
+-- battlefield permanents and the command zone's emblems, and CR 122.1h mints
+-- this row from counters on a PERMANENT, which CR 114.5 says an emblem is not --
+-- so a row minted here can only ever be a candidate while its source is on the
+-- battlefield, which is exactly "from the battlefield". Filter.IsSource is the rule's "this permanent", the self-scope
 -- CR 614.1c's entry rows use.
 finalityOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 finalityOf oid gs =
@@ -4525,9 +4527,10 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
     -- same projection for CR 306.5b's reason: a subtype is not an ability.
     <> Saga.entryReplacementsOf pc
 
--- CR 614.1: every replacement effect active on the battlefield, PAIRED WITH ITS
--- SOURCE -- a ControllerRelation pattern (CR 109.5's "you") is unanswerable
--- without it. Short-circuits when no permanent has one in its copiable rules text.
+-- CR 614.1: every replacement effect active on the battlefield -- plus the
+-- emblems CR 113.6p keeps working in the command zone, see the walk -- PAIRED
+-- WITH ITS SOURCE, since a ControllerRelation pattern (CR 109.5's "you") is
+-- unanswerable without it. Short-circuits when nothing in either place has one.
 --
 -- The short-circuit reads COPIABLE values while the result reads the PROJECTION,
 -- sound only because every route to an unprinted replacement effect is covered:
@@ -4546,6 +4549,9 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- beside them: storedWrites is its `stored` arm (CR 611.2a) and elsewhereGrants
 -- its emblem, stack, graveyard, hand and library arms (CR 114.4, CR 113.6).
 -- Pawl.ProjectionSpec's three "still prevents the damage" boards are one each.
+-- A third disjunct sits beside them for a question that is not about a grant at
+-- all -- an emblem carrying its OWN printed row -- and the walk widens with it;
+-- both are argued where they are written.
 --
 -- gatherGiven's remaining three arms need no disjunct, and each for a reason
 -- rather than by omission. `designations` emits only menace (CR 701.60c) and
@@ -4592,9 +4598,48 @@ replacementsAffecting gs =
       -- ability does.
       mints m = grantsKeywordWhere Keyword.mintsReplacement m || grantsMintingType m
       elsewhereHas = storedWrites mints gs || elsewhereGrants mints gs
-   in if not (any baseHas onBattlefield || elsewhereHas)
+      -- CR 604.2's second limb: a static ability's replacement effect stays
+      -- active while the object with the ability remains "in the appropriate
+      -- zone, as described in rule 113.6", and CR 113.6p is the arm of that list
+      -- which names emblems -- CR 114.4 again, from the emblem's own rule. So an
+      -- emblem's own printed rows are gathered here, where the two grantor
+      -- disjuncts above find nothing: an emblem that grants nobody anything
+      -- writes no Modification for either of them to read, and CR 114.5 keeps it
+      -- off the battlefield `baseHas` walks.
+      --
+      -- EMBLEMS alone, where the gather takes the whole zone -- the narrowing
+      -- Pawl.Engine.CombatRestriction.inForce and Pawl.Engine.Event's `inCommand`
+      -- make for the same reason: the command zone also holds a commander and a
+      -- dungeon card, whose printed abilities CR 113.6's default leaves
+      -- functioning on the battlefield. Asking Source.OfEmblem is reading the
+      -- rulebook's own list (CR 113.6p), not an effect's identity. Nothing
+      -- OBSERVES that narrowing yet -- no card in data/cards/ puts a commander
+      -- carrying a printed replacement row into the command zone, and dropping
+      -- the filter leaves the suite green -- so it is a regression fence resting
+      -- on CR 113.6's default rather than a proved behaviour.
+      --
+      -- The gate disjunct is deliberately NOT folded into elsewhereGrants beside
+      -- it: that function asks what a Modification WRITES, and it is shared
+      -- verbatim with CombatRestriction.inForce's `anyMinted`, which does not ask
+      -- this question at all. Copiability is not asked either, unlike `baseHas`:
+      -- CR 114.3 makes the emblem's abilities the whole of it, and no copy effect
+      -- has an emblem to copy.
+      --
+      -- Not implemented: a printed replacement row functioning from a graveyard,
+      -- a hand, a library or the stack under CR 113.6b's stated set.
+      -- Pawl.Types.PrintedReplacement carries no functionsFrom field, where
+      -- Pawl.Types.StaticAbility does, so no row can state a zone and a walk past
+      -- this one has nothing to gate on (#2462).
+      isEmblem oid = case fmap Object.source (Game.lookupObject oid gs) of
+        Just (Source.OfEmblem _) -> True
+        _ -> False
+      emblems = filter isEmblem (Set.toList (GameState.command gs))
+      emblemHas oid = case Game.faceOf oid gs of
+        Nothing -> False
+        Just face -> not (null (Face.replacementEffects face))
+   in if not (any baseHas onBattlefield || elsewhereHas || any emblemHas emblems)
         then []
-        else concatMap forOne onBattlefield
+        else concatMap forOne (onBattlefield <> emblems)
 
 -- CR 611.2a: does any STORED continuous effect write a modification satisfying
 -- `p`? gatherGiven's `stored` arm, and a disjunct of each of the two
@@ -4617,8 +4662,9 @@ storedWrites p gs = any (p . ContinuousEffect.modification) (GameState.continuou
 -- write a modification satisfying `p`? storedWrites' sibling disjunct in both
 -- gates, and the other half of what a walk of the permanents cannot reach: an
 -- emblem's abilities function in the command zone and an emblem is neither a
--- card nor a permanent (CR 114.4 / 114.5), and CR 113.6 / 113.6b / 113.6f put a
--- card's abilities to work from the stack, a graveyard, a hand or a library.
+-- card nor a permanent (CR 114.4 / 114.5, the arm CR 113.6p names), and CR
+-- 113.6b / 113.6f put a card's abilities to work from the stack, a graveyard, a
+-- hand or a library.
 --
 -- anyConditional's walk with its predicate swapped, and sound for that
 -- function's reason: each arm reads the SAME list its walk in gatherGiven does.
