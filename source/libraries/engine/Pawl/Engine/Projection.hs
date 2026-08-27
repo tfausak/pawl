@@ -4391,13 +4391,20 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- answers off the text it copied rather than the copier's (CR 707.2), which is
 -- what Pawl.CopySpec's copiedAbilitySpec proves a disjunct at a time.
 --
+-- The two grantor disjuncts are asked of the BATTLEFIELD, which is not where every
+-- granting object stands: an emblem's abilities function in the command zone (CR
+-- 114.4) and an emblem is no permanent (CR 114.5), so commandGrants asks them
+-- there as well. Pawl.ProjectionSpec's "CR 702.16e an emblem's granted protection
+-- still prevents the damage" is the board.
+--
 -- No face is looked up here any more: each of those four readers falls back to
 -- the printed face on its own, and an object that has none answers False from
 -- inside them rather than from a guard around the lot.
 --
 -- Not implemented: a minting keyword or a minting TYPE reaching a permanent
 -- through a stored continuous effect, and a minting keyword arriving on a keyword
--- counter, are on no base face (#833).
+-- counter, are on no base face (#833). Nor is a grant from a zone other than the
+-- battlefield and the command zone (#2436).
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
@@ -4423,9 +4430,36 @@ replacementsAffecting gs =
           -- whole.
           || any (any grantsMintingType . StaticAbility.modifications) (staticAbilitiesOf oid gs)
       forOne oid = fmap (\(provenance, re) -> (oid, provenance, re)) (replacementsOf oid gs)
-   in if not (any baseHas onBattlefield)
+      -- CR 114.4's grantor, standing where `baseHas` cannot see it. Both of
+      -- baseHas's grantor disjuncts again, since an emblem writes the same two
+      -- modifications a permanent's static ability does.
+      commandHas = commandGrants (\m -> grantsKeywordWhere Keyword.mintsReplacement m || grantsMintingType m) gs
+   in if not (any baseHas onBattlefield || commandHas)
         then []
         else concatMap forOne onBattlefield
+
+-- CR 114.4 / 114.5: an emblem is neither a card nor a permanent, and its
+-- abilities function in the COMMAND ZONE, so it is a granting object that a walk
+-- of the battlefield cannot reach. The command-zone half of the two
+-- battlefield-wide short-circuits -- replacementsAffecting's `baseHas` and
+-- Pawl.Engine.CombatRestriction.inForce's `anyMinted` -- each of which asks its
+-- grantor question of the permanents alone.
+--
+-- Reads the SAME list gatherGiven's emblem branch does, which is what makes it
+-- sound: the whole command zone rather than the emblems in it, through the same
+-- functionsFromZone default. A commander card sitting there over-trips the gate,
+-- which costs the board one walk it did not need and can never drop a row.
+--
+-- Not implemented: the other zones gatherGiven gathers static abilities from --
+-- the stack, graveyards, hands and libraries (CR 113.6) -- are not walked here,
+-- so a minting keyword granted from one of them is still missed (#2436). The
+-- command zone is normally empty, where a graveyard walk on every gather is not.
+commandGrants :: (Modification -> Bool) -> GameState -> Bool
+commandGrants p gs =
+  let grants oid = case Game.faceOf oid gs of
+        Nothing -> False
+        Just face -> any (\sa -> functionsFromZone Zone.Command sa && any p (StaticAbility.modifications sa)) (Face.staticAbilities face)
+   in any grants (Set.toList (GameState.command gs))
 
 -- Does this modification hand its affected objects a keyword satisfying `p`?
 -- Exhaustive rather than a catch-all: a modification added later that also hands

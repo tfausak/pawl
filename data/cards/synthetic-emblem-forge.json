@@ -1,0 +1,92 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "CreateEmblem",
+                        "value": {
+                          "faces": [
+                            {
+                              "name": "Synthetic Emblem Forge Emblem",
+                              "staticAbilities": [
+                                {
+                                  "affected": {
+                                    "type": "Matching",
+                                    "value": {
+                                      "type": "And",
+                                      "value": [
+                                        {
+                                          "type": "HasCardType",
+                                          "value": {
+                                            "type": "Creature"
+                                          }
+                                        },
+                                        {
+                                          "type": "ControlledBy",
+                                          "value": {
+                                            "type": "You"
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "modifications": [
+                                    {
+                                      "type": "GainKeyword",
+                                      "value": {
+                                        "type": "Protection",
+                                        "value": {
+                                          "type": "HasColor",
+                                          "value": {
+                                            "type": "Red"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Synthetic Emblem Forge",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}
