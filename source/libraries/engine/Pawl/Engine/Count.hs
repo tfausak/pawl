@@ -329,6 +329,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.IsRingBearer -> predicate
   Filter.Type.HasDesignation _ -> predicate
   Filter.Type.HasCounters _ -> predicate
+  Filter.Type.HasCountersOfAnyKind -> predicate
   Filter.Type.HasNonManaActivatedAbility -> predicate
   Filter.Type.IsInZone _ -> predicate
   where

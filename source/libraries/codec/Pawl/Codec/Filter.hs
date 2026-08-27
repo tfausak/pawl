@@ -98,6 +98,7 @@ codec keywordCodec =
       Arm.nullary "IsRingBearer" Filter.IsRingBearer,
       Arm.payload "HasDesignation" Designation.codec Filter.HasDesignation (\x -> case x of Filter.HasDesignation y -> Just y; _ -> Nothing),
       Arm.payload "HasCounters" (CounterKind.codec keywordCodec) Filter.HasCounters (\x -> case x of Filter.HasCounters y -> Just y; _ -> Nothing),
+      Arm.nullary "HasCountersOfAnyKind" Filter.HasCountersOfAnyKind,
       Arm.nullary "HasNonManaActivatedAbility" Filter.HasNonManaActivatedAbility,
       Arm.payload "IsInZone" Zone.codec Filter.IsInZone (\x -> case x of Filter.IsInZone y -> Just y; _ -> Nothing),
       Arm.payload "And" (Common.list (codec keywordCodec)) Filter.And (\x -> case x of Filter.And y -> Just y; _ -> Nothing),

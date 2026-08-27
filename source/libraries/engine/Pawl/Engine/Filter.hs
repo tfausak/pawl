@@ -1112,6 +1112,15 @@ matches context view predicate = case predicate of
   -- HasDesignation's live read, of counters instead of a designation: CR 400.7's new
   -- incarnation arrives with none, so nothing is stamped on the candidate.
   Filter.HasCounters kind -> Map.findWithDefault 0 kind (counters view) > 0
+  -- CR 122.1 again, of the same field and without a kind to look up. `any (> 0)`
+  -- and NOT `not (Map.null ...)`: the map is keyed per kind, so a key standing at
+  -- zero is a permanent with no counters on it and a null test would answer True
+  -- for one. The atom above compares > 0 for the same reason. No door in the
+  -- engine writes such a key today -- Pawl.Engine.Event's settleCounters declines
+  -- a zero placement outright, and its removeCounters DELETES the key rather than
+  -- leaving it at zero -- so that half is a regression fence rather than a
+  -- behaviour a board can show. Pawl.FilterSpec's own case says so at the site.
+  Filter.HasCountersOfAnyKind -> any (> 0) (Map.elems (counters view))
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs
   Filter.Not f -> not (matches context view f)
@@ -1232,6 +1241,10 @@ rewrite pairs predicate = case predicate of
   Filter.IsInZone _ -> predicate
   -- Rewritten THROUGH the kind, for the reason rewriteCounterKind gives.
   Filter.HasCounters kind -> Filter.HasCounters (rewriteCounterKind pairs kind)
+  -- Left standing where the atom above is rewritten: CR 612.1 swaps WORDS, and a
+  -- kind-agnostic atom names none -- there is no CounterKind here to carry a
+  -- subtype word through the swap.
+  Filter.HasCountersOfAnyKind -> predicate
 
 -- CR 612.1's word swap inside a COUNTER KIND. Rewritten THROUGH the kind: CR
 -- 122.1b's keyword counter carries a keyword, and rule 612.1 reaches a word
@@ -1618,6 +1631,7 @@ bakeBound players predicate = case predicate of
   Filter.IsRingBearer -> predicate
   Filter.HasDesignation _ -> predicate
   Filter.HasCounters _ -> predicate
+  Filter.HasCountersOfAnyKind -> predicate
   Filter.HasNonManaActivatedAbility -> predicate
   Filter.IsInZone _ -> predicate
 
@@ -1708,6 +1722,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsRingBearer -> []
   Filter.HasDesignation _ -> []
   Filter.HasCounters _ -> []
+  Filter.HasCountersOfAnyKind -> []
   Filter.HasNonManaActivatedAbility -> []
   Filter.IsInZone _ -> []
 
@@ -1811,6 +1826,7 @@ statesAQuality predicate = case predicate of
   Filter.IsRingBearer -> True
   Filter.HasDesignation _ -> True
   Filter.HasCounters _ -> True
+  Filter.HasCountersOfAnyKind -> True
   Filter.HasNonManaActivatedAbility -> True
   -- CR 400.1 states a quality like any other atom here: a search whose predicate
   -- names a zone is looking for cards with a stated quality, so CR 701.23b's

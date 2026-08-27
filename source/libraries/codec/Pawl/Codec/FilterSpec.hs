@@ -393,6 +393,15 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.HasCounters CounterKind.PlusOnePlusOne)
       " {\"type\":\"HasCounters\",\"value\":{\"type\":\"PlusOnePlusOne\"}} "
+  -- CR 122.1's kind-agnostic presence read. Razorfin Abolisher's whole target
+  -- filter is this atom BARE, so this case is also the card's own round trip and
+  -- there is nothing for it to add to the nested-composite list below.
+  Spec.it s "HasCountersOfAnyKind" $
+    Common.assertCodec
+      s
+      codec
+      Filter.HasCountersOfAnyKind
+      " {\"type\":\"HasCountersOfAnyKind\"} "
   Spec.it s "And" $
     Common.assertCodec
       s

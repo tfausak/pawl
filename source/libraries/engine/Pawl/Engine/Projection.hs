@@ -3635,6 +3635,9 @@ filterReads f = case f of
   -- Reads nothing: CR 109.3's characteristics do not include counters. The P/T a
   -- +1/+1 counter grants is CR 613.4c's, applied over the top of the set.
   Filter.Type.HasCounters _ -> Set.empty
+  -- CR 122.1 again, and reading nothing for the atom above's reason: CR 109.3's
+  -- list of characteristics has no counters in it, whichever kind is asked about.
+  Filter.Type.HasCountersOfAnyKind -> Set.empty
   -- CR 202.3 reads the printed mana cost, which no Modification writes.
   Filter.Type.ManaValueAtMost _ -> Set.empty
   Filter.Type.ManaValueIsEven -> Set.empty
