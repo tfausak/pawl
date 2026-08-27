@@ -1763,9 +1763,9 @@ razorfinBoard s registry = do
           board = (S.addCounter CounterKind.Stun 1 giantId g5) {GameState.priority = Just S.alice}
        in Just (board, ability, giantId, pikerId)
 
--- Activate `ability` off `srcId` aimed at `oid`, and resolve it. Both the
--- announcement and the resolution answer the same way, since CR 608.2b re-reads
--- the targets when the ability resolves.
+-- Activate `ability` off `srcId` aimed at `oid`, and resolve it. One answerer
+-- serves both halves -- CR 602.2b's announcement and the resolution -- which is
+-- the shape the Withered Wretch cases above already have.
 activateAt :: ObjectId.ObjectId -> GameState.GameState -> ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> GameState.GameState
 activateAt oid board srcId ability =
   S.runPure (aimAtCreature oid) (S.runPure (aimAtCreature oid) board (Activate.activateAbility S.alice srcId ability)) Stack.resolveTop

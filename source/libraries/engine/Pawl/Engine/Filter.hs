@@ -1113,11 +1113,13 @@ matches context view predicate = case predicate of
   -- incarnation arrives with none, so nothing is stamped on the candidate.
   Filter.HasCounters kind -> Map.findWithDefault 0 kind (counters view) > 0
   -- CR 122.1 again, of the same field and without a kind to look up. `any (> 0)`
-  -- and NOT `not (Map.null ...)`: the map is keyed per kind and a key can stand
-  -- at zero -- Pawl.Engine.Event bumps with Map.insertWith (+) and only deletes a
-  -- key when a REMOVAL takes it there -- so a null test would answer True for a
-  -- permanent carrying no counters at all. The atom above compares > 0 for the
-  -- same reason.
+  -- and NOT `not (Map.null ...)`: the map is keyed per kind, so a key standing at
+  -- zero is a permanent with no counters on it and a null test would answer True
+  -- for one. The atom above compares > 0 for the same reason. No door in the
+  -- engine writes such a key today -- Pawl.Engine.Event's settleCounters declines
+  -- a zero placement outright, and its removeCounters DELETES the key rather than
+  -- leaving it at zero -- so that half is a regression fence rather than a
+  -- behaviour a board can show. Pawl.FilterSpec's own case says so at the site.
   Filter.HasCountersOfAnyKind -> any (> 0) (Map.elems (counters view))
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs

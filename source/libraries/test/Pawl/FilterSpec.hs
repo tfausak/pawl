@@ -1407,8 +1407,8 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.HasCounters CounterKind.PlusOnePlusOne))) "player"
 
   -- CR 122.1 again with no kind to look up. The gameplay-level proof is
-  -- Pawl.TargetSpec's Razorfin Abolisher group; these cases are the ones a board
-  -- cannot reach, since no opcode in the pool leaves a counter map keyed at zero.
+  -- Pawl.TargetSpec's Razorfin Abolisher group; these cases are the plumbing
+  -- around it.
   Spec.describe s "HasCountersOfAnyKind" $ do
     -- The kind is what the atom above reads and this one does not: the same view
     -- bears no -1/-1 counter, so a HasCounters MinusOneMinusOne written by
@@ -1420,9 +1420,11 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "does not match a permanent with no counters at all" $ do
       Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.HasCountersOfAnyKind)) "none"
 
-    -- The `any (> 0)` half, which `not . Map.null` would get wrong: the map is
-    -- keyed per kind and a key can stand at zero, since Pawl.Engine.Event bumps
-    -- with Map.insertWith (+) and only drops a key when a REMOVAL takes it there.
+    -- The `any (> 0)` half, which `not . Map.null` would get wrong. A REGRESSION
+    -- FENCE and not a proved behaviour: no door in the engine writes a
+    -- zero-valued key today (Pawl.Engine.Event's settleCounters declines a zero
+    -- placement, its removeCounters deletes the key), so no board reaches this
+    -- and the mutation to Map.null reddens here and nowhere else.
     Spec.it s "does not match a permanent whose counter map is keyed at zero" $ do
       Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.counters = Map.fromList [(CounterKind.Stun, 0)]}) Filter.Type.HasCountersOfAnyKind)) "zero"
 

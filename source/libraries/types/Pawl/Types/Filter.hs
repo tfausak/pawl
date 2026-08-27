@@ -915,7 +915,7 @@ data Filter keyword
     --
     -- A SEPARATE nullary atom rather than a Maybe payload on HasCounters above,
     -- which is the call Quantity.ObjectCountersOfAnyKind made one type over
-    -- (#994): an absent payload standing for "every kind" makes a field's
+    -- (see #994): an absent payload standing for "every kind" makes a field's
     -- ABSENCE the way a reader tells two questions apart, and the two questions
     -- are asked by different printings rather than by one printing with a hole
     -- in it. It also keeps CR 612.1's rewrite simple -- HasCounters is rewritten
