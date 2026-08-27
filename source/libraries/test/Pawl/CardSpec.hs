@@ -3055,6 +3055,10 @@ objectRefFilters ref = case ref of
   -- only the PlayerRef naming whose hand, so there is nothing here to lint
   -- (gap #1742).
   ObjectRef.RandomCardInHand _ -> []
+  -- Tovolar's "any number of Human Werewolves you control": EachMatching's
+  -- Filter position exactly -- same zone, same sweep, the chooser standing
+  -- between the matches and the set -- so it is framed the same way.
+  ObjectRef.AnyNumberMatching f -> [f]
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -4022,8 +4026,8 @@ effectFilters effect = case effect of
 -- Which chooser-shaped ObjectRef arms Pawl.Engine.Resolve can ASK for at the
 -- position this tags. A CR 608.2d choice is announced while the effect is
 -- applied, so an opcode that never reaches the Game monad for its objects cannot
--- make one -- and today exactly two arms of Resolve do, over different subsets.
--- Named for those two ARMS rather than for the opcodes: this is a property of
+-- make one -- and today exactly three arms of Resolve do, over different subsets.
+-- Named for those ARMS rather than for the opcodes: this is a property of
 -- what Pawl.Engine.Resolve implements, not of the card's alphabet.
 data Asks
   = -- | Read through Pawl.Engine.Resolve.objectRefObjects, which is pure and so
@@ -4038,10 +4042,14 @@ data Asks
     -- Prompt.RandomObject, and falls through to the pure sweep for the two
     -- zone-keyed chosen arms.
     AsksRevealArm
+  | -- | Pawl.Engine.Resolve's Effect.Transform gather. It asks the any-number
+    -- arm and nothing else: the four card-shaped chosen arms name cards in a
+    -- graveyard, a hand or a group, and CR 701.27a turns over PERMANENTS.
+    AsksTransformGather
   deriving (Eq, Show)
 
 -- Whether an ObjectRef arm is a resolution-time QUESTION rather than a read --
--- the four arms Pawl.Types.ObjectRef documents as such, and exactly the four
+-- the five arms Pawl.Types.ObjectRef documents as such, and exactly the five
 -- Pawl.Engine.Resolve.objectRefObjects answers [] for.
 --
 -- ObjectRef.ChosenPlayer is NOT one, despite the name: the seat was chosen on
@@ -4071,6 +4079,7 @@ chooserRef ref = case ref of
   ObjectRef.ChosenCardInHand {} -> True
   ObjectRef.ChosenCardFromAmong {} -> True
   ObjectRef.RandomCardInHand {} -> True
+  ObjectRef.AnyNumberMatching {} -> True
 
 -- The asking matrix itself: whether the site an Asks names asks THIS arm. A
 -- per-(site, arm) pair and not a per-site or per-arm predicate, because both
@@ -4088,6 +4097,12 @@ asksFor asks ref = case asks of
   AsksRevealArm -> case ref of
     ObjectRef.ChosenCardFromAmong {} -> True
     ObjectRef.RandomCardInHand {} -> True
+    _ -> False
+  -- One arm and one only, which is what keeps the widening from weakening the
+  -- guarantee: this site asks for the battlefield subset and for nothing else,
+  -- so every (site, arm) pair the three arms above classify is unmoved.
+  AsksTransformGather -> case ref of
+    ObjectRef.AnyNumberMatching {} -> True
     _ -> False
 
 -- Every ObjectRef position one effect holds, each tagged with the asking site
@@ -4179,7 +4194,7 @@ effectObjectRefs effect = case effect of
   Effect.Goad ref -> read_ [ref]
   Effect.MakePlotted ref -> read_ [ref]
   Effect.DoesNotUntapNext ref -> read_ [ref]
-  Effect.Transform ref -> read_ [ref]
+  Effect.Transform ref -> [(AsksTransformGather, ref)]
   Effect.PhaseOut ref -> read_ [ref]
   Effect.AddPhases {} -> []
   Effect.EndTurn -> []
@@ -6067,6 +6082,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- One card per SEAT, the arm above's answer with randomness in the
           -- chooser's place: Merfolk Spy's slot names one seat and so one card.
           ObjectRef.RandomCardInHand player -> namesOneSeat player
+          -- FALSE, EachCardFromAmong's answer over the battlefield: "any number"
+          -- states no bound, so nothing about the ref caps how many permanents
+          -- the chooser may name.
+          ObjectRef.AnyNumberMatching _ -> False
         -- Does this PlayerRef name at most ONE seat? A per-player count over it
         -- -- a library's top card, a card chosen out of a hand -- moves at most
         -- one object exactly when it does.
@@ -6199,12 +6218,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- against hand-built effects (never a card file -- a misauthored card must not
   -- be loadable).
   --
-  -- Both asking arms get an accept case AND a reject case, and the three
+  -- Every asking arm gets an accept case AND a reject case, and the four
   -- degenerate classifications this rules out are why. "Every pair asks" is ruled
-  -- out by Transform and by MoveToZone's random arm; "MoveToZone asks everything"
-  -- by that same random arm (#1733); "the three chosen arms always ask, the
-  -- random one never does" by Reveal accepting the random arm and rejecting both
-  -- zone-keyed chosen ones.
+  -- out by Transform's four rejects and by MoveToZone's random arm; "MoveToZone
+  -- asks everything" by that same random arm (#1733); "the three chosen arms
+  -- always ask, the random one never does" by Reveal accepting the random arm and
+  -- rejecting both zone-keyed chosen ones; "the battlefield subset asks
+  -- everywhere" by the last assertion, which rejects it at three sites and
+  -- accepts it at one.
   Spec.it s "the lint itself catches a chosen card under an opcode that cannot ask" $ do
     exhume <- S.printingOf s registry "Exhume"
     let anyCard = Filter.Type.HasCardType CardType.Creature
@@ -6213,6 +6234,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         inHand = ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard)
         fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard)
         atRandom = ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.You)
+        anyNumber = ObjectRef.AnyNumberMatching anyCard
         moves ref = Effect.MoveToZone (MoveToZone.MkMoveToZone ref Zone.Battlefield EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
         reveals ref = Effect.Reveal (Reveal.MkReveal ref Nothing)
         inert :: [Effect.Effect Card.Type.Card] -> [Bool]
@@ -6227,13 +6249,25 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "CR 701.20a's reveal asks from-among and at-random, and neither zone-keyed chosen arm"
       (inert (fmap reveals [inGraveyard, inHand, fromAmong, atRandom]))
       [True, True, False, False]
-    -- #774's counterexample opcode: Tovolar, Dire Overlord transforms rather than
-    -- moving or revealing, so a chosen set written there would be inert.
+    -- Tovolar, Dire Overlord's opcode. CR 701.27a turns over PERMANENTS, so its
+    -- gather asks for the battlefield subset and for NONE of the four
+    -- card-shaped arms: a chosen card written here would still be inert.
     Spec.assertEqWith
       s
-      "no other opcode asks any of the four"
+      "the transform gather asks none of the four card-shaped chosen arms"
       (inert (fmap Effect.Transform [inGraveyard, inHand, fromAmong, atRandom]))
       [True, True, True, True]
+    -- The fourth degenerate classification, and the one widening the matrix for
+    -- #774 introduced: "the new arm asks everywhere". Accepted under Transform,
+    -- whose gather asks it, and rejected under every other site -- MoveToZone's
+    -- gather and Reveal's arm, the two that DO ask other arms, plus Tap, an
+    -- AsksNothing opcode. Without this leg an asksFor row answering True for the
+    -- new arm at every site would pass the three assertions above unchanged.
+    Spec.assertEqWith
+      s
+      "the battlefield subset is asked by the transform gather alone"
+      (inert [Effect.Transform anyNumber, moves anyNumber, reveals anyNumber, Effect.Tap anyNumber])
+      [False, True, True, True]
     -- The other direction on the same opcode: a ref that is a READ rather than a
     -- CR 608.2d question is fine anywhere, so the lint is about the arm and not
     -- about Transform.

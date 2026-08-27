@@ -123,6 +123,7 @@ encode p answer = case p of
   Prompt.ChooseSacrifices {} -> Response.ChoseSacrifices answer
   Prompt.ChooseExilesFromGraveyard {} -> Response.ChoseExilesFromGraveyard answer
   Prompt.ChooseAnyNumberToSacrifice {} -> Response.ChoseSacrifices answer
+  Prompt.ChooseAnyNumberOfPermanents {} -> Response.ChoseAnyNumberOfPermanents answer
   Prompt.ChooseTapsForTotalPower {} -> Response.ChoseTaps answer
   Prompt.ChooseTaps {} -> Response.ChoseTaps answer
   Prompt.ChooseAttachment {} -> Response.ChoseAttachment answer
@@ -372,6 +373,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseAnyNumberToSacrifice {} -> case response of
     Response.ChoseSacrifices ids -> Just ids
+    _ -> Nothing
+  Prompt.ChooseAnyNumberOfPermanents {} -> case response of
+    Response.ChoseAnyNumberOfPermanents ids -> Just ids
     _ -> Nothing
   Prompt.ChooseTapsForTotalPower {} -> case response of
     Response.ChoseTaps ids -> Just ids
@@ -730,6 +734,10 @@ defaultAnswer p = case p of
   -- Every candidate. The maximal subset, mirroring the arm above taking the first
   -- `count` rather than the last: a deterministic fallback, not a recommendation.
   Prompt.ChooseAnyNumberToSacrifice _ _ _ candidates -> Set.fromList candidates
+  -- Every candidate, the arm above's maximal subset: CR 608.2d admits every
+  -- subset here, so no answer can be illegal. A deterministic fallback, not a
+  -- recommendation.
+  Prompt.ChooseAnyNumberOfPermanents _ _ _ candidates -> Set.fromList candidates
   -- CR 702.122a: every candidate, the arm above's maximal subset. Legal whenever
   -- the cost is payable at all, save for a board where some candidate has
   -- NEGATIVE power and dragging it in drops the total back under the threshold

@@ -185,6 +185,35 @@
                         "value": {
                           "type": "Night"
                         }
+                      },
+                      {
+                        "type": "Transform",
+                        "value": {
+                          "type": "AnyNumberMatching",
+                          "value": {
+                            "type": "And",
+                            "value": [
+                              {
+                                "type": "HasSubtype",
+                                "value": {
+                                  "type": "Human"
+                                }
+                              },
+                              {
+                                "type": "HasSubtype",
+                                "value": {
+                                  "type": "Werewolf"
+                                }
+                              },
+                              {
+                                "type": "ControlledBy",
+                                "value": {
+                                  "type": "You"
+                                }
+                              }
+                            ]
+                          }
+                        }
                       }
                     ]
                   }
