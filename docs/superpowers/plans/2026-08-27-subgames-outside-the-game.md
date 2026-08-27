@@ -170,7 +170,7 @@ Expected: green, and `Pawl.Codec.GameStateSpec`'s round trip covers the new fiel
 ```haskell
   Spec.it s "CR 729.4: the subgame sees the main game's cards as outside it, minus the ones it took" $ do
     mountain <- S.printingOf s registry "Mountain"
-    bear <- S.printingOf s registry "Grizzly Bears"
+    bear <- S.printingOf s registry "Goblin Piker"
     let g0 = poolToLibraryG S.alice (addManyG mountain 3 S.alice (Setup.emptyGame S.bothPlayers))
         (bearId, g1) = S.addCreature bear S.alice g0
         sub = Setup.subgameStateFrom S.alice g1
@@ -231,7 +231,7 @@ and write `GameState.outsideObjects = outside` into the record update.
 
 Why a new type rather than reusing `PrintingId`: the two are NOT
 indistinguishable. Which zone the card leaves decides which main-game abilities
-trigger (CR 729.4a), so a player holding a Grizzly Bears in the pool and another
+trigger (CR 729.4a), so a player holding a Goblin Piker in the pool and another
 on the main-game battlefield is making a real choice, and the engine may not
 make it for them.
 
@@ -263,7 +263,7 @@ make it for them.
 `bringIn` and the crossing share).
 
 - [ ] **Step 1: write the failing test.** A subgame state built by
-      `Setup.subgameStateFrom` from a parent holding alice's Grizzly Bears on the
+      `Setup.subgameStateFrom` from a parent holding alice's Goblin Piker on the
       battlefield; alice casts Living Wish in the SUBGAME (unit level: call
       `OutsideTheGame.reveal` directly with `Or [HasCardType Creature, HasCardType Land]`)
       and answers `InAnotherGame bearId`.
@@ -316,7 +316,7 @@ bringInFrom :: PlayerId -> ObjectId -> GameState -> (Maybe ObjectId, GameState)
 
 **Consumes:** `GameState.broughtIn` from Task 4.
 
-- [ ] **Step 1: write the failing test.** A parent with alice's Grizzly Bears on
+- [ ] **Step 1: write the failing test.** A parent with alice's Goblin Piker on
       the battlefield; run `Engine.playSubgame` under an answer that takes the
       wish (the subgame fixture from Task 7's shape, or a hand-built `finalSub`
       passed straight to the new pure function). Assert: the bear is gone from the
@@ -400,7 +400,7 @@ This is the case that proves #152. All three cards are printed and in the pool
 after Task 6.
 
 **Fixture.** Main game: alice has Shahrazad in hand and two Plains untapped; her
-Grizzly Bears and bob's Super Shredder ("whenever another permanent leaves the
+Goblin Piker and bob's Super Shredder ("whenever another permanent leaves the
 battlefield, put a +1/+1 counter on Super Shredder") are on the battlefield.
 alice's main-game library is Living Wish plus enough Forests that she reaches two
 lands inside the subgame before bob decks; bob's library is sized so his deck-out
@@ -414,10 +414,10 @@ lands inside the subgame before bob decks; bob's library is sized so his deck-ou
 - [ ] **Step 1: write the failing test**, asserting in this order:
 
 ```haskell
-    Spec.assertEqWith s "CR 729.4: the main-game creature left the main game for the subgame" (nameOnBattlefield "Grizzly Bears" after) False
+    Spec.assertEqWith s "CR 729.4: the main-game creature left the main game for the subgame" (nameOnBattlefield "Goblin Piker" after) False
     Spec.assertEqWith s "CR 729.4a/729.5: Super Shredder's leaves-the-battlefield trigger resolved once the main game resumed" (countersOn shredderId after) 1
     Spec.assertEqWith s "CR 729.5: it went on the stack AFTER Shahrazad finished resolving" (counterEventIndex after > lifeLossEventIndex after) True
-    Spec.assertEqWith s "CR 729.5: the card the wish took comes back to her main-game library" (namesInLibrary S.alice after) ["Grizzly Bears", ...]
+    Spec.assertEqWith s "CR 729.5: the card the wish took comes back to her main-game library" (namesInLibrary S.alice after) ["Goblin Piker", ...]
     Spec.assertEqWith s "the main game did not end" (GameState.result after) Nothing
 ```
 
