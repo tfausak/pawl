@@ -2,6 +2,7 @@
 
 module Pawl.Codec.LastKnown where
 
+import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PlayerId as PlayerId
@@ -13,7 +14,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.LastKnown as LastKnown
 
--- | All six axes, none derivable from another: the type's own haddock says why
+-- | All seven axes, none derivable from another: the type's own haddock says why
 -- CR 608.2h needs each of them beside the projection.
 codec :: Codec.Codec LastKnown.LastKnown
 codec = Fields.object $ do
@@ -23,6 +24,7 @@ codec = Fields.object $ do
   counters <- Fields.required "counters" (Common.multiset (CounterKind.codec Keyword.codec)) LastKnown.counters
   copiable <- Fields.required "copiable" ProjectedCharacteristics.codec LastKnown.copiable
   attachedTo <- Fields.required "attachedTo" (Common.maybe Recipient.codec) LastKnown.attachedTo
+  chosenNames <- Fields.required "chosenNames" (Common.set CardName.codec) LastKnown.chosenNames
   pure
     LastKnown.MkLastKnown
       { LastKnown.characteristics = characteristics,
@@ -30,5 +32,6 @@ codec = Fields.object $ do
         LastKnown.source = source,
         LastKnown.counters = counters,
         LastKnown.copiable = copiable,
-        LastKnown.attachedTo = attachedTo
+        LastKnown.attachedTo = attachedTo,
+        LastKnown.chosenNames = chosenNames
       }

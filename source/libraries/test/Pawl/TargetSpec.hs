@@ -1055,7 +1055,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
             Spec.assertEqWith s "alice's life is untouched: Adric's ability countered the ping (CR 701.6a)" (S.lifeOf S.alice after) (Just 20)
             Spec.assertEqWith s "and no damage was ever dealt" (fmap DamageEvent.amount (Maybe.mapMaybe Event.damageOf (S.eventsOf after))) []
             -- Supporting, not discriminating: an ability leaves the stack
-            -- whether it resolved (CR 608.2m) or was countered (CR 608.2n), so
+            -- whether it resolved (CR 608.2n) or was countered (CR 701.6a), so
             -- this and the two below hold under both readings. They are here to
             -- stop a green that came from the activation never happening.
             Spec.assertEqWith s "the ping is no longer an object at all" (Game.lookupObject pingId after) Nothing

@@ -835,6 +835,7 @@ applyCrossings finalSub parent =
                 (Object.counters obj)
                 (Event.copiedSnapshot oid g)
                 (Object.attachedTo obj)
+                (Object.chosenNames obj)
             )
       -- One crossing: file, delete, then record. The event LAST, so that
       -- Event.recordEvent's CR 603.10 sample is of the board immediately after

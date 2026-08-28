@@ -357,6 +357,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
 
   aetherfluxReservoirSpec s registry
   tobiasSpec s registry
+  charnelTallySpec s registry
   roothaSpec s registry
   mimingSlimeSpec s registry
   tyranidInvasionSpec s registry
@@ -564,9 +565,88 @@ tobiasSpec s registry =
               after = kill tid (kill b1 stolen)
           Spec.assertEqWith s "bob's Giant and Tobias" (zombies after) 2
 
--- CR 608.2i's look-back with a GREATEST over it: the first card whose fold reads
--- a per-member quantity off an event's CR 608.2h snapshot rather than off a live
--- object. GAMEPLAY LEVEL for the Aetherflux group's reason.
+-- CR 122.1 / CR 608.2i: the counters an object HAD, read off a look-back count's
+-- snapshot. CR 122.2 destroyed them as it left the battlefield and CR 613.4c had
+-- already consumed them into the projected power the snapshot records, so the
+-- only surviving record is CR 608.2h's, which Count.snapshotView's Moved arm
+-- reads. GAMEPLAY LEVEL for the Aetherflux group's reason.
+--
+-- Synthetic. Scryfall on 2026-08-27 finds no printing that counts the counters
+-- on things that died: o:"died this turn" o:"counters on" returns eight cards,
+-- every one of which PUTS counters, and o:"greatest number of counters" returns
+-- none. Felisa, Fang of Silverquill and Angelic Sleuth read "the number of
+-- counters it had on it" off the TRIGGER's own object, which reaches
+-- Projection.viewWithLastKnownAnywhere instead and is blocked on #2347 besides.
+--
+-- Synthetic Charnel Tally, {2}{B} Creature -- Zombie 2/2: "When this creature
+-- dies, you gain X life, where X is the greatest number of counters among
+-- creatures that died this turn."
+--
+-- THREE seats, and the biggest tally is on BOB's creature, so "creatures" and
+-- "creatures you control" are different sentences. Every reading of the fold is
+-- a different number: greatest 4, greatest among alice's 1, sum 5, members 3.
+charnelTallySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+charnelTallySpec s registry =
+  let withCounters n oid gs =
+        gs
+          { GameState.objects =
+              Map.adjust
+                (\obj -> obj {Object.counters = Map.insert CounterKind.PlusOnePlusOne n (Object.counters obj)})
+                oid
+                (GameState.objects gs)
+          }
+      board tally piker =
+        let (tid, gs0) = S.addCreature tally S.alice S.threePlayerGame
+            (a1, gs1) = S.addCreature piker S.alice gs0
+            (b1, gs2) = S.addCreature piker S.bob gs1
+         in ( tid,
+              a1,
+              b1,
+              gs2
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+      -- Tobias' helper, and for its reason: one route to every death here, so
+      -- the tallying death takes the same road as the deaths it counts.
+      kill oid gs = S.runPure S.identityAnswer (S.markDamage oid 9 gs) Engine.priorityLoop
+   in Spec.describe s "Synthetic Charnel Tally" $ do
+        Spec.it s "CR 608.2h X is the GREATEST counter tally among the creatures that died" $ do
+          tally <- S.printingOf s registry "Synthetic Charnel Tally"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (tid, a1, b1, gs0) = board tally piker
+              counted = withCounters 4 b1 (withCounters 1 a1 gs0)
+              dead = kill b1 (kill a1 counted)
+              after = kill tid dead
+          -- CR 613.4c on the board, which is what makes the counters real rather
+          -- than a field the fixture wrote and nothing reads: a 2/1 Piker under
+          -- four +1/+1 counters is a 6/5.
+          Spec.assertEqWith s "bob's Piker is a 6/5 under its four counters" (S.powerToughnessOf b1 counted) (Just (6, 5))
+          Spec.assertEqWith s "no life gained before the Tally dies" (S.lifeOf S.alice dead) (Just 20)
+          Spec.assertEqWith s "4, not 1, 3 or 5 -- bob's four counters, the greatest tally" (S.lifeOf S.alice after) (Just 24)
+          Spec.assertEqWith s "the Tally's death triggered once" (length (filter isAbilityTriggered (S.eventsOf after))) 1
+          Spec.assertEqWith s "three creatures died, so a member count would read 3" (length (filter isDeath (S.zoneChangesOf after))) 3
+        -- The control the case above cannot be read without: a fold that answered
+        -- some fixed nonzero tally would pass there and fail here. Same board,
+        -- same three deaths, same trigger -- the counters are the one difference.
+        Spec.it s "CR 122.1 creatures that died with NO counters tally 0" $ do
+          tally <- S.printingOf s registry "Synthetic Charnel Tally"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (tid, a1, b1, gs0) = board tally piker
+              dead = kill b1 (kill a1 gs0)
+              after = kill tid dead
+          Spec.assertEqWith s "no life at all, not the 4 the counted board gains" (S.lifeOf S.alice after) (Just 20)
+          Spec.assertEqWith s "and the trigger did fire, so the 0 is the fold's answer" (length (filter isAbilityTriggered (S.eventsOf after))) 1
+          Spec.assertEqWith s "the same three deaths" (length (filter isDeath (S.zoneChangesOf after))) 3
+
+isDeath :: ZoneChange.ZoneChange -> Bool
+isDeath zc = ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard
+
+-- CR 608.2i's look-back with a GREATEST over it: a fold whose per-member
+-- quantity is read off an event's CR 608.2h snapshot rather than off a live
+-- object, over the SpellCast shape where the group above takes the Moved one.
+-- GAMEPLAY LEVEL for the Aetherflux group's reason.
 --
 -- Rootha, Mastering the Moment, {2}{U}{R} Legendary Creature -- Orc Sorcerer 3/4:
 -- "At the beginning of combat on your turn, if you've cast an instant or sorcery
