@@ -4372,6 +4372,10 @@ abilitiesFromCharacteristics peers pc oid gs =
         Just cond -> Condition.holds peers (Filter.contextFor (controllerOf oid gs) (Just oid)) gs oid cond
    in -- Rule 702's own activated abilities are appended here, minted from the
       -- POST-LAYER keyword map, so Humility takes crew away with the rest.
+      --
+      -- Unlike mintedTriggeredAbilitiesOf, no CR 612.2a rewrite is applied here:
+      -- none of the activated abilities rule 702 mints writes a creature-type
+      -- word (gap #2495).
       filter
         granted
         ( PC.activatedAbilities pc
@@ -4604,6 +4608,8 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
        | Set.member CardType.Battle (PC.cardTypes pc),
          Defense.MkDefense n <- Maybe.maybeToList (PC.defense pc)
        ]
+    -- No CR 612.2a rewrite here either, for abilitiesFromCharacteristics' reason
+    -- (gap #2495).
     <> Keyword.mintedReplacementsOf (PC.keywords pc)
     -- CR 714.3a's intrinsic lore counter -- or CR 714.3b's chosen number, which
     -- rule 714.3b substitutes for it on a Saga with read ahead -- minted off the
@@ -4913,12 +4919,17 @@ triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 -- GRANTED at CR 613.1f layer 6 arrives after the swap and keeps rule 702's printed
 -- word. PC.textChangedKeywords is the layer-3 count and PC.keywords the live one,
 -- so the split is per INSTANCE (CR 702.135b) rather than per object -- a permanent
--- printing afterlife and granted afterlife again mints one token of each word.
+-- printing afterlife and granted afterlife again mints its printed instance with
+-- the swapped word and its granted one with rule 702.135a's own.
 --
--- `min` clamps: Modification.LoseKeyword at layer 6 is a delete, so the live count
--- can be the smaller of the two, and the rewritten share is never more than what
--- is left. Which surviving instance counts as the printed one is not a question
--- the rules ask -- CR 702.135b makes the instances interchangeable.
+-- `min` keeps `live - changed` total. It cannot bite today, and the mutation that
+-- removes it leaves the suite green: every layer-6 write to PC.keywords either
+-- adds one instance, DELETES the whole key (Modification.LoseKeyword, which the
+-- CR gives no way to spend one instance of) or empties the map, so a live count
+-- strictly between zero and the layer-3 count is unreachable, and a deleted key
+-- is not walked at all. It is arithmetic insurance, not a rule -- which surviving
+-- instance counts as the printed one is a question CR 702.135b leaves moot, the
+-- instances being interchangeable.
 mintedTriggeredAbilitiesOf :: ProjectedCharacteristics -> [TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 mintedTriggeredAbilitiesOf pc =
   let pairs = fmap (\c -> (ChangeSubtypeWord.from c, ChangeSubtypeWord.to c)) (PC.subtypeWordChanges pc)

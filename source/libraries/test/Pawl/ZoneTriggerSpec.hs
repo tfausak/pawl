@@ -3179,7 +3179,10 @@ afterlifeSpec s registry =
           Spec.assertEqWith s "and no tokens were created" (spirits after) []
         -- CR 702.135b: "if a permanent has multiple instances of afterlife, each
         -- triggers separately". Asserted of the MINT, as renown's multiplicity
-        -- is, no card in the pool printing afterlife twice.
+        -- is, no card in the pool printing afterlife twice. A permanent that
+        -- HOLDS two -- one printed, one Afterlife Insurance granted -- is a
+        -- gameplay-level board, and Pawl.CounterspellSpec's "an evolved Ministrant
+        -- plus a granted afterlife" is where it is played out.
         Spec.it s "CR 702.135b each instance of afterlife is its own ability" $ do
           Spec.assertEqWith s "afterlife 2 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Afterlife 2) 2)) [Keyword.afterlife 2, Keyword.afterlife 2]
           Spec.assertEqWith s "and afterlife 3 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Afterlife 3) 1)) [Keyword.afterlife 3]

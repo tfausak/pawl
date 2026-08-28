@@ -1628,7 +1628,8 @@ insuredChain s registry hostName swap = do
       (insuranceId, g4) = S.addHandCard insurance S.alice g3
       (murderId, g5) = S.addHandCard murder S.alice g4
       -- The Insurance draws, so alice needs a library: CR 104.3c would otherwise
-      -- lose her the game at the next state-based check, before the trigger.
+      -- lose her the game the next time a player would receive priority, which is
+      -- before the dies trigger goes on the stack.
       g6 = snd (S.addLibraryCard swamp S.alice g5)
       evolved = case swap of
         Nothing -> g6

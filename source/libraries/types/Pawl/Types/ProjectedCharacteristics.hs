@@ -203,8 +203,8 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     --
     -- Counts and not a Set, because CR 702.135b makes each instance its own
     -- ability: a permanent printing afterlife and granted afterlife again holds
-    -- two, and only the first is rewritten. The mint clamps to the live count,
-    -- since Modification.LoseKeyword can leave fewer instances than layer 3 saw.
+    -- two, and only the first is rewritten. The mint reads it against the live
+    -- `keywords` above rather than trusting it alone; the clamp there says why.
     --
     -- EMPTY when no text change ran, which reads as "every instance is granted".
     -- That is inert rather than wrong: subtypeWordChanges is empty in the same
