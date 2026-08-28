@@ -298,6 +298,7 @@ vanillaFace name typeLine =
       Face.triggeredAbilities = [],
       Face.delayedAbilities = Map.empty,
       Face.rooms = Seq.empty,
+      Face.dungeonEntryQuality = Nothing,
       Face.castingPermissions = [],
       Face.castingRestrictions = [],
       Face.characteristicPT = Nothing,
@@ -841,7 +842,7 @@ effectCounts effect = case effect of
   -- from here.
   Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> quantityCounts quantity
   Effect.RestartGame _ -> []
@@ -1149,7 +1150,7 @@ effectNestedEffects effect = case effect of
   Effect.Amass {} -> []
   Effect.Blight {} -> []
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame {} -> []
@@ -1616,7 +1617,7 @@ effectReplacements effect = case effect of
   Effect.Amass _ -> []
   Effect.Blight _ -> []
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame _ -> []
@@ -2351,7 +2352,7 @@ effectMintedFaces effect = case effect of
   Effect.Amass _ -> []
   Effect.Blight _ -> []
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame _ -> []
@@ -3951,7 +3952,7 @@ effectFilters effect = case effect of
   -- arm below answers the same way.
   Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ f quantity) -> unframed (f : quantityFilters quantity)
   -- CR 727.5's exemption is an ObjectRef like every other, and Karn Liberated's
@@ -4212,7 +4213,7 @@ effectObjectRefs effect = case effect of
   Effect.Amass {} -> []
   Effect.Blight {} -> []
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   -- CR 727.5's exemption, optional: a card saying nothing about it exempts

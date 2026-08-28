@@ -1974,7 +1974,13 @@ rewriteEffect pairs effect = case effect of
     Effect.Amass (Amass.MkAmass quantity (List.foldl' (\s (from, to) -> if s == from && Subtype.isCreatureType from then to else s) subtype pairs))
   Effect.Blight _ -> effect
   Effect.TemptWithTheRing -> effect
-  Effect.Venture -> effect
+  -- CR 612.2's gate, and this arm is where it bites rather than where it is
+  -- restated: the payload IS a subtype word (CR 701.49d's quality), but a pair
+  -- reaching it would have to come from a Pawl.Types.SubtypeFamily, and that type
+  -- has only CR 205.3m's creature types and the basic land types -- the two
+  -- families CR 612.2 names. CR 205.3p's dungeon type is in neither, so no swap
+  -- this function can be given names it.
+  Effect.Venture {} -> effect
   Effect.ExileHandThenDraw -> effect
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot (Filter.rewrite pairs filter_) quantity)
   Effect.RestartGame exempt -> Effect.RestartGame (fmap (rewriteObjectRef pairs) exempt)

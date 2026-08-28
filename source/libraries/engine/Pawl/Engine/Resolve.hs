@@ -466,7 +466,7 @@ slotsOf effect = case effect of
   Effect.Amass (Amass.Type.MkAmass quantity _) -> quantitySlots quantity
   Effect.Blight (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.TemptWithTheRing -> Map.empty
-  Effect.Venture -> Map.empty
+  Effect.Venture {} -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
   -- CR 101.4's "each player sacrifices": the arm takes every player recipient
   -- the slot holds, so the read is Many.
@@ -762,7 +762,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.TemptWithTheRing -> True
-  Effect.Venture -> True
+  Effect.Venture {} -> True
   Effect.ExileHandThenDraw -> True
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.RestartGame _ -> True
@@ -933,7 +933,7 @@ readsX = any effectReadsX
       Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.readsX quantity
       Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.TemptWithTheRing -> False
-      Effect.Venture -> False
+      Effect.Venture {} -> False
       Effect.ExileHandThenDraw -> False
       Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.readsX quantity
       Effect.RestartGame _ -> False
@@ -1136,7 +1136,7 @@ boundSlots effect = case effect of
   Effect.Amass _ -> Set.empty
   Effect.Blight _ -> Set.empty
   Effect.TemptWithTheRing -> Set.empty
-  Effect.Venture -> Set.empty
+  Effect.Venture {} -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
   Effect.PlayerSacrifices {} -> Set.empty
   Effect.RestartGame _ -> Set.empty
@@ -6280,7 +6280,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Pawl.Engine.Ring.tempt's.
   Effect.TemptWithTheRing -> Ring.tempt controller
   -- CR 701.49: the whole keyword action, which Pawl.Engine.Dungeon owns.
-  Effect.Venture -> Dungeon.venture controller
+  Effect.Venture quality -> Dungeon.venture controller quality
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref kind quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs

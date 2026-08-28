@@ -70,6 +70,7 @@ import qualified Pawl.Codec.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Codec.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.SpeedDecrease as SpeedDecrease
+import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Codec.TurnFaceDown as TurnFaceDown
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -94,7 +95,7 @@ codec cardCodec abilityCodec =
       Arm.payload "Amass" Amass.codec Effect.Amass (\x -> case x of Effect.Amass y -> Just y; _ -> Nothing),
       Arm.payload "Blight" PlayerQuantity.codec Effect.Blight (\x -> case x of Effect.Blight y -> Just y; _ -> Nothing),
       Arm.nullary "TemptWithTheRing" Effect.TemptWithTheRing,
-      Arm.nullary "Venture" Effect.Venture,
+      Arm.optionalPayload "Venture" Subtype.codec Effect.Venture (\x -> case x of Effect.Venture y -> Just y; _ -> Nothing),
       Arm.nullary "ExileHandThenDraw" Effect.ExileHandThenDraw,
       Arm.payload "PlayerSacrifices" PlayerSacrifices.codec Effect.PlayerSacrifices (\x -> case x of Effect.PlayerSacrifices y -> Just y; _ -> Nothing),
       Arm.optionalPayload "RestartGame" ObjectRef.codec Effect.RestartGame (\x -> case x of Effect.RestartGame y -> Just y; _ -> Nothing),

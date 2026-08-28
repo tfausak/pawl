@@ -98,6 +98,7 @@ armyToken subtype =
               Face.triggeredAbilities = [],
               Face.delayedAbilities = Map.empty,
               Face.rooms = Seq.empty,
+              Face.dungeonEntryQuality = Nothing,
               Face.castingPermissions = [],
               Face.castingRestrictions = [],
               Face.enchant = [],
