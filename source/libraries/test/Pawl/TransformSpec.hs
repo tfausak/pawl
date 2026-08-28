@@ -1363,12 +1363,16 @@ moreThanMeetsTheEyeSpec s registry = Spec.describe s "MoreThanMeetsTheEye" $ do
   -- of those out of a printed card, Wild Evocation.
   --
   -- ONE board and one field apart, CastOffer.withoutPayingManaCost: same seat,
-  -- same card, same three Plains, same answerer asking for the back face. The
-  -- offer is built here rather than played off a card because no printing pairs
-  -- an alternative-free OfferCast with a card that prints the keyword -- Harness
-  -- the Storm is the pool's only such offer and its slot names an instant or
-  -- sorcery card sharing a name with the spell just cast, which no card printing
-  -- more than meets the eye is.
+  -- same card, same three Plains, same answerer asking for the back face.
+  --
+  -- The offer is BUILT here rather than played off a card. data/cards/ holds two
+  -- Effect.OfferCast producers, Wild Evocation and Harness the Storm, and only
+  -- the latter states no alternative cost -- its slot names an instant or sorcery
+  -- card sharing a name with the spell just cast, and every card printing the
+  -- keyword is an artifact creature (Scryfall `keyword:"More Than Meets the
+  -- Eye"`, 2026-08-28, fifteen cards, every front face Legendary Artifact
+  -- Creature -- Robot). A printing whose alternative-free offer could name one
+  -- would be the card that replaces this construction.
   Spec.it s "CR 118.9a an offer stating no alternative cost still reaches the converted face" $ do
     ratchet <- S.printingOf s registry "Ratchet, Field Medic"
     plains <- S.printingOf s registry "Plains"

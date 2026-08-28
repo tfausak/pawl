@@ -2761,16 +2761,20 @@ slotOne slot resolving gs = do
 offerCast :: ObjectId -> PlayerId -> SlotName -> CastObligation.CastObligation -> CastOffer.CastOffer -> Game ()
 offerCast resolving caster slot optionality offer = do
   gs <- State.get
-  let -- CR 712.11a for the transformed rider; CR 709.3, CR 712.11b and CR 715.3
+  let -- Whether this offer states CR 118.9's alternative cost, in either of the
+      -- two wordings `applied` below reads. NOT `transformed`, which is CR
+      -- 712.11a's rider about which face goes on the stack and says nothing about
+      -- payment.
+      alternative = CastOffer.withoutPayingManaCost offer || Maybe.isJust (CastOffer.payingInstead offer)
+      -- CR 712.11a for the transformed rider; CR 709.3, CR 712.11b and CR 715.3
       -- otherwise, via Card.castableFaces. Nothing for a card with no back face
       -- (CR 712.14a): an offer that cannot be made is not made.
-      -- CR 118.9a: only one alternative cost per spell. Card.convertedFace is
-      -- offered only because CR 702.162a's alternative cost puts it there, so an
-      -- offer carrying an alternative of its own cannot reach it and CR 712.11's
-      -- default -- the front face -- is the whole answer. `transformed` is not an
-      -- alternative cost (CR 712.11a is about which face, not about payment), so
-      -- the arm above is unaffected.
-      alternative = CastOffer.withoutPayingManaCost offer || Maybe.isJust (CastOffer.payingInstead offer)
+      --
+      -- Less Card.convertedFace under an alternative, which is CR 118.9a: a spell
+      -- takes one alternative cost, and that face is on the list only because CR
+      -- 702.162a's alternative cost put it there, so an offer spending the
+      -- spell's one alternative on something else cannot also reach it. CR
+      -- 712.11's default -- the front face -- is then the whole answer.
       faces card
         | CastOffer.transformed offer = fmap pure (Card.backFace card)
         | alternative = Just (filter (\face -> fmap Face.name (Card.convertedFace card) /= Just (Face.name face)) (Card.castableFaces card))
