@@ -136,6 +136,10 @@ data Object = MkObject
     -- | CR 601.2: the choices bound while casting, by slot name. Empty for
     -- everything but a spell or ability on the stack. Per-incarnation state:
     -- reset by newIncarnation, so CR 400.7 forgets them when the object moves.
+    --
+    -- A resolution can outlive the object holding them, which is CR 729.5's
+    -- subgame case; GameState.detachedBindings is where the slots it fills after
+    -- that go.
     bindings :: Map.Map SlotName.SlotName Binding.Binding,
     -- | CR 122.1: counters placed on this permanent, counted per kind. Persistent
     -- permanent state -- unlike `damage`, cleanup does NOT clear it (a counter is
