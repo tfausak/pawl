@@ -471,12 +471,7 @@ castableFaces card = case Card.layout card of
   -- a double-faced spell already on the stack to enter transformed is a
   -- replacement effect, EntryRewrite.EntersTransformed. CR 701.28's convert
   -- OPCODE turns a permanent already on the battlefield over.
-  Layout.Transforming ->
-    NonEmpty.head (Card.faces card)
-      : [ back
-        | not (null (Keyword.moreThanMeetsTheEyeCosts (Face.keywords (NonEmpty.head (Card.faces card))))),
-          back <- Maybe.maybeToList (backFace card)
-        ]
+  Layout.Transforming -> NonEmpty.head (Card.faces card) : Maybe.maybeToList (convertedFace card)
   -- CR 712.11b: "A player casting a modal double-faced card or a copy of a modal
   -- double-faced card as a spell chooses which face they are casting before
   -- putting it onto the stack." EVERY face, for Split's and Adventure's reason:
@@ -499,6 +494,27 @@ castableFaces card = case Card.layout card of
   -- 712.4c's refusal to transform both land on `backFace` and `turnedOver`
   -- below, and both answer Nothing for this layout.
   Layout.Meld -> [NonEmpty.head (Card.faces card)]
+
+-- The face `castableFaces` above offers only because CR 702.162a's more than
+-- meets the eye put it there: the back face of a nonmodal transforming card
+-- whose FRONT face prints the keyword (CR 712.11d). Nothing for every other
+-- card and every other layout.
+--
+-- Named separately because reaching it is not free. CR 702.162a states the
+-- permission and its price in one breath -- "you may cast this card converted by
+-- paying [cost] rather than its mana cost" -- so the only route to this face is
+-- paying that alternative cost, which is why Pawl.Engine.Cost.candidateCostsFor
+-- REPLACES the zone's candidates with it. CR 118.9a allows a spell one
+-- alternative cost, so an effect offering a cast under an alternative of its own
+-- cannot reach this face at all; Pawl.Engine.Resolve.offerCast drops it, and
+-- Pawl.InvestigateSpec's "CR 118.9a a free offer does not also offer the
+-- converted face" is the proof.
+convertedFace :: Card.Card -> Maybe (Face.Face Card.Card)
+convertedFace card = case Card.layout card of
+  Layout.Transforming
+    | not (null (Keyword.moreThanMeetsTheEyeCosts (Face.keywords (NonEmpty.head (Card.faces card))))) ->
+        backFace card
+  _ -> Nothing
 
 -- CR 305.1 / 712.12: the faces of this card a player may PLAY as a land, each
 -- paired with the name the play carries -- the castableFaces of the special

@@ -64,6 +64,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
@@ -82,6 +83,8 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastObligation as CastObligation
+import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Destroy as Destroy
@@ -104,6 +107,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -1321,7 +1325,7 @@ ratchetBackReadings = (Set.singleton ratchetBack, Just (1, 4), Set.singleton Sub
 -- action-list assertion is the one that reads that -- without it the two
 -- played-out casts below would pass on Pawl.Engine.Cast.castSpell being handed a
 -- face name directly, which no player ever does.
-moreThanMeetsTheEyeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+moreThanMeetsTheEyeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 moreThanMeetsTheEyeSpec s registry = Spec.describe s "MoreThanMeetsTheEye" $ do
   Spec.it s "CR 702.162a / 712.11a Ratchet cast converted costs {1}{W} and arrives with its back face up" $ do
     ratchet <- S.printingOf s registry "Ratchet, Field Medic"
@@ -1349,6 +1353,53 @@ moreThanMeetsTheEyeSpec s registry = Spec.describe s "MoreThanMeetsTheEye" $ do
       "both casts are legal actions, the converted one included"
       (List.sort [n | A.Cast o n _ <- Action.legalActions S.alice board, o == oid])
       (List.sort [ratchetFront, ratchetBack])
+  -- CR 118.9a from the other side, and the pair the case above cannot make. An
+  -- offered cast (CR 608.2g) that states NO alternative cost of its own leaves
+  -- rule 702.162a's the only one the spell could take, so the converted face is
+  -- still on offer and still costs {1}{W}; an offer that DOES state one --
+  -- "without paying its mana cost" -- takes the spell's single alternative, so CR
+  -- 712.11's default front face is the whole answer. Pawl.InvestigateSpec's "CR
+  -- 118.9a a free offer does not also offer the converted face" plays the second
+  -- of those out of a printed card, Wild Evocation.
+  --
+  -- ONE board and one field apart, CastOffer.withoutPayingManaCost: same seat,
+  -- same card, same three Plains, same answerer asking for the back face. The
+  -- offer is built here rather than played off a card because no printing pairs
+  -- an alternative-free OfferCast with a card that prints the keyword -- Harness
+  -- the Storm is the pool's only such offer and its slot names an instant or
+  -- sorcery card sharing a name with the spell just cast, which no card printing
+  -- more than meets the eye is.
+  Spec.it s "CR 118.9a an offer stating no alternative cost still reaches the converted face" $ do
+    ratchet <- S.printingOf s registry "Ratchet, Field Medic"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (handed, oid) = S.handOne ratchet (S.landsInPlay plains 3)
+        -- Something for the offer to resolve OFF: Resolve.offerCast reads the
+        -- slot off the resolving object's own bindings (CR 603.7c), so the
+        -- Ratchet is named by a binding on a spell already on the stack. Which
+        -- spell is immaterial -- it is never resolved.
+        (resolving, staged) = S.spellOnStack piker S.alice handed
+        slot = SlotName.MkSlotName (Text.pack "offered")
+        bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToObject oid))) Nothing Seq.empty
+        board = staged {GameState.objects = Map.adjust (\o -> o {Object.bindings = bindings}) resolving (GameState.objects staged)}
+        -- Asks for the BACK face wherever CR 709.3's choice is put, and takes
+        -- every offer. Resolve.offerCast rejects rather than repairs, so the leg
+        -- that stops offering that face casts the front one instead of nothing.
+        wantingBack :: Prompt.Prompt r -> r
+        wantingBack p = case p of
+          Prompt.ChooseOfferedCastFace {} -> ratchetBack
+          Prompt.OfferedCast {} -> OptionalDecision.Exercises
+          _ -> S.identityAnswer p
+        offered = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Nothing}
+        under o = S.runPure wantingBack board (Resolve.offerCast resolving S.alice slot CastObligation.Optional o)
+        resolvedUnder o = S.runPure wantingBack (under o) Stack.resolveTop
+        free = offered {CastOffer.withoutPayingManaCost = True}
+        ratchetIn gs = filter (\o -> fmap S.nameOf (Game.cardOf o gs) == Just (S.printingName ratchet)) (Game.zoneMembers Zone.Battlefield S.alice gs)
+        readingsIn gs = fmap (\o -> ratchetReadings o gs) (ratchetIn gs)
+    Spec.assertEqWith s "no alternative on the offer: the converted face is reached and arrives" (readingsIn (resolvedUnder offered)) [ratchetBackReadings]
+    Spec.assertEqWith s "a free offer reaches the front face, though the back was asked for" (readingsIn (resolvedUnder free)) [ratchetFrontReadings]
+    Spec.assertEqWith s "rule 702.162a's {1}{W} was paid for the converted cast" (S.tappedCount S.alice (under offered)) 2
+    Spec.assertEqWith s "and the free cast paid nothing" (S.tappedCount S.alice (under free)) 0
 
 -- alice's copies of a printing in one zone, each as its CR 110.5b tap status.
 --

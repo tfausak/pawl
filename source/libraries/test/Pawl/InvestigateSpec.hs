@@ -969,6 +969,26 @@ wildEvocationSpec s registry =
           Spec.assertEqWith s "exactly one half-choice, carrying both halves in printed order" (halvesOffered gs) [[named "Embereth Shieldbreaker", named "Battle Display"]]
           Spec.assertEqWith s "and that is the only question: CR 608.2g's may is not asked of a mandatory offer" (offersUnder 0 gs) 1
           Spec.assertEqWith s "stack empty in both legs" (length (GameState.stack adventureLeg), length (GameState.stack creatureLeg)) (0, 0)
+        -- CR 118.9a, which the pair above never had to ask: this offer CARRIES
+        -- an alternative cost ("without paying its mana cost"), and a spell takes
+        -- only one, so rule 702.162a's converted cast is not on offer beside it.
+        -- Ratchet, Field Medic prints more than meets the eye, so
+        -- Pawl.Engine.Card.castableFaces hands Resolve.offerCast two faces (CR
+        -- 712.11d) and the back one is reachable only by paying the keyword's own
+        -- alternative cost. CR 712.11 leaves the front face as the whole answer.
+        --
+        -- The answerer ASKS for the back face and must not get it: Resolve
+        -- rejects rather than repairs, so a leg whose half stopped being offered
+        -- casts the front face instead of quietly going green.
+        Spec.it s "CR 118.9a a free offer does not also offer the converted face" $ do
+          evocation <- S.printingOf s registry "Wild Evocation"
+          ratchet <- S.printingOf s registry "Ratchet, Field Medic"
+          let gs = board evocation [ratchet]
+              after = runBobsUpkeep (choosingHalf (named "Ratchet, Rescue Racer")) gs
+          Spec.assertEqWith s "the FRONT face is the permanent, though the back was asked for" (zoneOf Zone.Battlefield after) ["Ratchet, Field Medic"]
+          Spec.assertEqWith s "and it really was cast: bob's hand is empty and the stack is clear" (bobsHand after, length (GameState.stack after)) ([], 0)
+          Spec.assertEqWith s "one option is no CR 709.3 choice, so no half was offered at all" (halvesOffered gs) []
+          Spec.assertEqWith s "and CR 608.2g's instruction asked nothing either" (offersUnder 0 gs) 0
 
 -- CR 601.2c's announcement, answered with a stated number for every variable
 -- slot -- where S.identityAnswer announces as many as the board allows.
