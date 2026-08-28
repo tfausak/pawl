@@ -4,6 +4,26 @@
       "keywords": [
         {
           "type": "Lifelink"
+        },
+        {
+          "type": "MoreThanMeetsTheEye",
+          "value": {
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 1
+              },
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "White"
+                  }
+                }
+              }
+            ]
+          }
         }
       ],
       "manaCost": [

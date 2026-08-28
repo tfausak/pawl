@@ -2790,6 +2790,9 @@ keywordFilters keyword = case keyword of
   -- CR 702.103a: the bestow cost, whose components may hold a Filter exactly as
   -- flashback's may.
   Keyword.Bestow cost -> costFilters cost
+  -- CR 702.162a: the more than meets the eye cost, whose components may hold a
+  -- Filter exactly as flashback's and bestow's may.
+  Keyword.MoreThanMeetsTheEye cost -> costFilters cost
   Keyword.Kicker cost -> costFilters cost
   Keyword.Entwine cost -> costFilters cost
   -- CR 702.170a: the plot cost, whose components may hold a Filter exactly as

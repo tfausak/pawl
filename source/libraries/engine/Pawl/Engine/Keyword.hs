@@ -230,6 +230,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
   Keyword.LivingMetal -> []
+  Keyword.MoreThanMeetsTheEye _ -> []
   Keyword.Protection _ -> []
   Keyword.Reach -> []
   Keyword.Shroud -> []
@@ -319,6 +320,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
   Keyword.LivingMetal -> []
+  Keyword.MoreThanMeetsTheEye _ -> []
   Keyword.Protection _ -> []
   Keyword.Reach -> []
   Keyword.Shroud -> []
@@ -523,6 +525,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
   Keyword.LivingMetal -> []
+  Keyword.MoreThanMeetsTheEye _ -> []
   Keyword.Protection _ -> []
   Keyword.Reach -> []
   Keyword.Shroud -> []
@@ -860,6 +863,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
   Keyword.LivingMetal -> []
+  Keyword.MoreThanMeetsTheEye _ -> []
   Keyword.Protection _ -> []
   Keyword.Reach -> []
   Keyword.Shroud -> []
@@ -1027,6 +1031,24 @@ bestowCosts :: Set Keyword -> [Cost Keyword]
 bestowCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Bestow cost -> Just cost
+        _ -> Nothing
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.162a: the MORE THAN MEETS THE EYE costs -- "you may cast this card
+-- converted by paying [cost] rather than its mana cost" -- offered by
+-- Pawl.Engine.Cost.candidateCostsFor for the back face
+-- Pawl.Engine.Card.castableFaces put on the table (CR 712.11d).
+--
+-- A LIST for flashbackCosts' reason: rule 702.162a states no limit, and CR 601.2b
+-- makes two of them a choice rather than a sum. Offered from EVERY zone the card
+-- can be cast from, bestowCosts' half of rule 702.103a, which is this rule's
+-- first sentence too.
+--
+-- A wildcard rather than an exhaustive case, flashbackCosts' reason.
+moreThanMeetsTheEyeCosts :: Set Keyword -> [Cost Keyword]
+moreThanMeetsTheEyeCosts keywords =
+  let costOf keyword = case keyword of
+        Keyword.MoreThanMeetsTheEye cost -> Just cost
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
@@ -1333,6 +1355,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
   Keyword.LivingMetal -> []
+  Keyword.MoreThanMeetsTheEye _ -> []
   -- CR 702.16e's clause: "Any damage that would be dealt by sources that have
   -- the stated quality to a permanent or player with protection is prevented."
   -- Glittering Lion's printed shield with the quality written into the SOURCE
@@ -1544,6 +1567,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
   Keyword.LivingMetal -> []
+  Keyword.MoreThanMeetsTheEye _ -> []
   -- CR 702.16f: "Attacking creatures with protection can't be blocked by
   -- creatures that have the stated quality." The one clause of rule 702.16 that
   -- is already a printed shape -- Questing Beast's row with the quality in the
@@ -1681,6 +1705,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
   Keyword.LivingMetal -> []
+  Keyword.MoreThanMeetsTheEye _ -> []
   -- CR 702.16c and CR 702.16d, as ONE row: "a permanent or player with
   -- protection can't be enchanted by Auras that have the stated quality", and
   -- "a permanent with protection can't be equipped by Equipment that have the
@@ -1884,6 +1909,7 @@ familyOf keyword = case keyword of
   Keyword.Indestructible -> Nothing
   Keyword.Lifelink -> Nothing
   Keyword.LivingMetal -> Nothing
+  Keyword.MoreThanMeetsTheEye _ -> Just KeywordFamily.MoreThanMeetsTheEye
   Keyword.Reach -> Nothing
   Keyword.Shroud -> Nothing
   Keyword.Trample -> Nothing

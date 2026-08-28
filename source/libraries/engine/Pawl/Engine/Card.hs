@@ -17,6 +17,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
@@ -439,22 +440,43 @@ castableFaces card = case Card.layout card of
   -- Adventure half, and Pawl.Engine.Cast is where that is read.
   Layout.Adventure -> NonEmpty.toList (Card.faces card)
   -- CR 712.11: "A double-faced spell is cast with its front face up by default."
-  -- ONE option, and no choice to leave the player: unlike Split's halves and
-  -- Adventure's two ways to play, a nonmodal double-faced card's back face is not
-  -- something a player may elect to cast. Only an effect allowing the card to be
-  -- cast "transformed" or "converted" puts a back face on the stack (CR 712.8c /
-  -- 712.11a), and such an effect names the face itself rather than reaching this
-  -- list -- Effect.OfferCast carries CR 310.12b's "transformed" rider and
-  -- Pawl.Engine.Resolve answers it with `backFace` below. CR 712.14a's wording
-  -- reaches a back face without one on the stack, and likewise does not come
-  -- through here: Pawl.Types.EntryRiders carries it and
+  -- The front face always, and the BACK face as a second option exactly when the
+  -- front prints CR 702.162a's more than meets the eye -- "you may cast this card
+  -- converted by paying [cost]". CR 712.11d is the rule that puts it in this list
+  -- rather than leaving it to an effect: "if an ability of a double-faced card's
+  -- FRONT FACE allows it to be cast 'transformed' or 'converted', that ability is
+  -- also considered when evaluating that spell to determine if it can be cast.
+  -- This is an exception to 712.11c." So the ability is the card's own and the
+  -- offer is the card's own, which is what makes it a second entry here beside
+  -- the front rather than a rider some opcode carries.
+  --
+  -- Two entries and never a choice the engine makes, Split's reason: casting for
+  -- the printed cost and casting converted are two different casts of one card,
+  -- so they are two actions and the player picks (Pawl.Engine.Cast.castableSpells
+  -- gates each on its own, CR 712.11c). Pawl.Engine.Cost.candidateCostsFor is
+  -- where the second one is priced at rule 702.162a's cost, and
+  -- Pawl.Engine.Card.enteringFace carries the chosen face onto the battlefield.
+  --
+  -- Read off the front face's PRINTED keywords, which is CR 712.11d's own scope
+  -- and the posture Pawl.Engine.Cast.castableSpells takes for rule 702.37a's morph
+  -- ability. A more than meets the eye ability GRANTED to a card in a hand is not
+  -- expanded here (gap #1859).
+  --
+  -- The other roads to a back face still do not come through this list. An effect
+  -- allowing the card to be cast "transformed" names the face itself --
+  -- Effect.OfferCast carries CR 310.12b's rider and Pawl.Engine.Resolve answers it
+  -- with `backFace` below. CR 712.14a's wording reaches a back face with none on
+  -- the stack: Pawl.Types.EntryRiders carries it and
   -- Pawl.Engine.Event.changeZoneEntering applies it. CR 712.13a's ability causing
-  -- a double-faced spell already on the stack to enter transformed does not
-  -- either -- it is a replacement effect, EntryRewrite.EntersTransformed. What is
-  -- still absent is the CONVERT wording, which is CR 702.162a's more than meets
-  -- the eye (#2521); CR 701.28's convert OPCODE, which turns a permanent already
-  -- on the battlefield over, does not come through here either.
-  Layout.Transforming -> [NonEmpty.head (Card.faces card)]
+  -- a double-faced spell already on the stack to enter transformed is a
+  -- replacement effect, EntryRewrite.EntersTransformed. CR 701.28's convert
+  -- OPCODE turns a permanent already on the battlefield over.
+  Layout.Transforming ->
+    NonEmpty.head (Card.faces card)
+      : [ back
+        | not (null (Keyword.moreThanMeetsTheEyeCosts (Face.keywords (NonEmpty.head (Card.faces card))))),
+          back <- Maybe.maybeToList (backFace card)
+        ]
   -- CR 712.11b: "A player casting a modal double-faced card or a copy of a modal
   -- double-faced card as a spell chooses which face they are casting before
   -- putting it onto the stack." EVERY face, for Split's and Adventure's reason:
@@ -622,10 +644,14 @@ backFace card =
         -- The two rules answer different questions and this arm answers only CR
         -- 712.11a's.
         --
-        -- No printing reaches it today: the pool's only producer of a cast
+        -- No printing reaches it today. The pool's only producer of a cast
         -- "transformed" is CR 310.12b's defeated Siege, and no battle is a modal
-        -- double-faced card. The wording that could is CR 702.162a's "cast
-        -- this card converted" (#2521), which CR 712.3 names on exactly this layout.
+        -- double-faced card; CR 702.162a's "cast this card converted" is the other
+        -- wording, and `castableFaces` above offers a back face for it, but
+        -- Scryfall `keyword:"More Than Meets the Eye"`, 2026-08-28, returns fifteen
+        -- cards and every one of them is a nonmodal transforming card. A modal
+        -- double-faced card printing that keyword would be the card that reaches
+        -- this arm, and CR 712.3 permits one.
         Layout.ModalDoubleFaced -> successor
         -- CR 712.4b: the back face of a meld card determines nothing off a
         -- melded permanent, so there is none to answer with -- and pawl stores
@@ -751,10 +777,12 @@ enteringFace card shown = case Card.layout card of
   Layout.Adventure -> Nothing
   -- CR 712.11 casts one with its front face up, so for an ordinary cast `shown`
   -- IS the front face and CR 712.8a would resolve Nothing to that same face. The
-  -- two answers part where CR 712.11a's "transformed" cast does put a back face
-  -- on the stack, which CR 310.12b's defeated Siege reaches (Pawl.BattleSpec's
-  -- "she may then cast it TRANSFORMED and FREE" is the proof). The CONVERT
-  -- spelling of the same permission is still absent (#2521).
+  -- two answers part where CR 712.11a's cast does put a back face on the stack.
+  -- Both of that rule's wordings reach it: "transformed", which CR 310.12b's
+  -- defeated Siege reaches (Pawl.BattleSpec's "she may then cast it TRANSFORMED
+  -- and FREE" is the proof), and "converted", which CR 702.162a's more than meets
+  -- the eye reaches (Pawl.TransformSpec's "CR 702.162a / 712.11a it arrives with
+  -- its back face up" is the proof).
   Layout.Transforming -> shown
   -- The arm CR 712.13 is written for in this pool: CR 712.11b let the caster
   -- choose either face, so the face that was up on the stack is genuinely a

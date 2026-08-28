@@ -1417,6 +1417,8 @@ rewriteKeyword pairs keyword = case keyword of
   -- of the keyword, so rewriteCost carries CR 612.1 into it.
   Keyword.Type.Kicker cost -> Keyword.Type.Kicker (rewriteCost pairs cost)
   Keyword.Type.Flashback cost -> Keyword.Type.Flashback (rewriteCost pairs cost)
+  -- CR 702.162a states its cost as part of the keyword too.
+  Keyword.Type.MoreThanMeetsTheEye cost -> Keyword.Type.MoreThanMeetsTheEye (rewriteCost pairs cost)
   -- CR 702.103a states its cost as part of the keyword too.
   Keyword.Type.Bestow cost -> Keyword.Type.Bestow (rewriteCost pairs cost)
   Keyword.Type.Fear -> keyword
