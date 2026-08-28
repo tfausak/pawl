@@ -7,11 +7,13 @@
 -- GameState's daytime and spellsCastLastTurn fields.
 --
 -- Also CR 702.145b's FIRST static ability -- "if it is night and this permanent
--- is represented by a double-faced card, it enters transformed" -- which is CR
--- 712.13a's replacement effect, Pawl.Types.EntryRewrite's EntersTransformed,
--- minted by Pawl.Engine.Keyword.mintedReplacementsFor and applied by
--- Pawl.Engine.Event's arm under CR 616.1d's bucket. See entrySpec, whose fixture
--- is Infestation Expert // Infested Werewolf.
+-- is represented by a double-faced card, it enters transformed" -- which is a
+-- replacement effect (CR 614.1d) ranked by CR 616.1d,
+-- Pawl.Types.EntryRewrite's EntersTransformed, minted from rule 702.145b by
+-- Pawl.Engine.Keyword.mintedReplacementsFor and applied by Pawl.Engine.Event's
+-- arm. NOT CR 712.13a, which governs a resolving double-faced spell and is the
+-- stack road alone -- the case citations below are on that road and say so. See
+-- entrySpec, whose fixture is Infestation Expert // Infested Werewolf.
 --
 -- Also CR 702.145b's third static ability and CR 702.145e's second -- "this
 -- permanent can't transform except due to its daybound/nightbound ability" --
