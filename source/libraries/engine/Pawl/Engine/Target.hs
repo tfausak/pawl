@@ -323,8 +323,8 @@ slotContext pcs perspective bindings source amount gs =
       -- THIS is the one site that fills it, sourcePower's and slotNames' sibling
       -- in that respect and for the same reason: the atom lives in a target
       -- slot's Filter, and this is where one is matched -- at both of CR 115's
-      -- moments, so a candidate the board moves out of range between CR 601.2c
-      -- and CR 608.2b stops being a legal target.
+      -- moments, so the bound is read again at CR 608.2b rather than frozen at
+      -- CR 601.2c.
       --
       -- Evaluated against the SOURCE (Celestine's "the amount of life YOU gained
       -- this turn" is CR 109.5's you, which `perspective` above carries), never

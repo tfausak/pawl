@@ -193,9 +193,11 @@ data Filter keyword
     -- Pawl.Types.TargetSlot's `amount` field is where the Quantity lives and why;
     -- Pawl.Engine.Filter.Context's slotAmount is where the evaluated number
     -- arrives, filled by Pawl.Engine.Target.slotContext -- the one site that
-    -- evaluates a target slot's Filter, at both of CR 115's moments, so a
-    -- candidate that goes out of range between CR 601.2c and CR 608.2b stops
-    -- being a legal target.
+    -- evaluates a target slot's Filter, at both of CR 115's moments -- so the
+    -- bound is READ AGAIN at CR 608.2b rather than frozen at announcement. Which
+    -- direction that can move is a fact about the quantities cards name rather
+    -- than about this atom: a turn's life gain only grows, so today the re-read
+    -- can only widen.
     --
     -- AT MOST only, ManaValueAtMost's reason one atom over: that is the direction
     -- the printed cards ask in.
