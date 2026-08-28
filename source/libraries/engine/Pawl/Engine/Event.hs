@@ -288,9 +288,8 @@ battlefieldCandidates gs =
 -- bracket leaves a gap rather than leaking its group to the next event.
 --
 -- Not bracketed: CR 510.2's combat damage, CR 701.21's fold over a bound group
--- (#757), Effect.PutCounters over a swept set (gap #2533), token creation and CR
--- 508.1's attacker declaration, so the events each records are read as a
--- sequence (see #441).
+-- (#757), token creation and CR 508.1's attacker declaration, so the events each
+-- records are read as a sequence (see #441).
 simultaneously :: Game a -> Game a
 simultaneously body = do
   State.modify' openEventGroup
