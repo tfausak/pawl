@@ -6,6 +6,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -1375,7 +1376,7 @@ resolveSpellWith runSubgame oid = do
                       applyOne eff = do
                         -- Re-read the live bindings for THIS effect: a prior
                         -- PlaySubgame may have bound its winner slot.
-                        bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
+                        bindingsNow <- State.gets (liveBindings obj oid)
                         let chosenNow = Binding.targetsOf bindingsNow
                             legalNow = Map.mapWithKey legalSlot chosenNow
                         applyEffectWith
@@ -1402,7 +1403,7 @@ resolveSpellWith runSubgame oid = do
                         -- is part of the state this one is read against, and the
                         -- re-read adds only defined slots. A REGRESSION FENCE --
                         -- mutating this half back leaves the suite green.
-                        gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
+                        gateBindings <- State.gets (liveBindings obj oid)
                         gated <- if hangs then gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Binding.targetsOf gateBindings)) (Binding.groupsOf gateBindings) clause else pure False
                         -- CR 603.5 / 608.2d: then the printed "may", against the
                         -- SAME live bindings CR 608.2b's filter is applied to, so
@@ -1534,7 +1535,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                   -- maps come from the SAME bindings: `legalNow` is `chosenNow`
                   -- with CR 608.2b's illegal recipients dropped, so re-reading one
                   -- without the other would lose the bindings it just gained.
-                  bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
+                  bindingsNow <- State.gets (liveBindings obj stackId)
                   let chosenNow = Binding.targetsOf bindingsNow
                       legalNow = Map.mapWithKey legalSlot chosenNow
                   applyEffectWith runSubgame stackId srcId effectController (instanceView legalNow) (instanceView chosenNow) eff
@@ -1556,7 +1557,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                       -- `payGatePaid` is given `srcId`. Off the LIVE bindings of
                       -- the STACK object (CR 608.2c), where this resolution's
                       -- slots are bound (see bindSlot).
-                      gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
+                      gateBindings <- State.gets (liveBindings obj stackId)
                       gated <- if hangs then gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) (Binding.groupsOf gateBindings) clause else pure False
                       -- CR 603.5 / 608.2d: then the printed "may", against the
                       -- SAME live bindings CR 608.2b's filter is applied to, so a
@@ -3743,6 +3744,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- passes as both, and differ for an ability, whose source is the permanent it
   -- came from (CR 113.7) -- so binding onto `source` left an ability's follow-on
   -- reading an unbound slot; see #137.
+  --
+  -- That object may not survive the subgame it started: CR 729.4 offers the main
+  -- game's stack to a wish cast inside, so the subgame can take this very spell's
+  -- card. bindPlayerSlot files the winner off-object when that has happened and
+  -- liveBindings reads it back, which is CR 729.5's "finishes resolving, even if
+  -- it was created by a spell card that's no longer on the stack".
   Effect.PlaySubgame slot -> do
     result <- runSubgame
     case result of
@@ -6829,10 +6836,55 @@ noSubgame = pure Result.Drawn
 -- resolution loops re-read before each effect: CR 729.1b's subgame winner and CR
 -- 608.2d's chosen opponent are each read by the effect after the one that bound
 -- it, through that re-read (`legalNow`).
+--
+-- A holder that no longer EXISTS writes to GameState.detachedBindings instead,
+-- which `liveBindings` reads back. Map.adjust is silent on a missing key, so
+-- without that branch the binding is simply dropped.
+--
+-- CR 729.5 is the branch's reason: a wish cast inside a subgame can take the
+-- resolving spell's own card, and "the spell or ability that created the subgame
+-- finishes resolving, even if it was created by a spell card that's no longer on
+-- the stack" is what keeps the resolution going anyway. It is not the only way an
+-- id can cease mid-resolution -- Effect.ExileThisSpell mints a fresh incarnation
+-- (CR 400.7) and leaves the old id naming nothing too -- and the read side treats
+-- both the same.
+--
+-- The sibling writers below are NOT given the same fallback. bindPlayersSlot's
+-- one caller is CR 118.12a's per-player gate, which cannot lose its holder.
+-- bindAmountSlot writes onto `source`, which for a SPELL is the same id a subgame
+-- can take, but an amount is read back by Pawl.Engine.Quantity's own lookup
+-- rather than through liveBindings, so a fallback here would not reach it
+-- (#2493).
 bindPlayerSlot :: ObjectId -> SlotName -> PlayerId -> GameState -> GameState
 bindPlayerSlot holder slot player gs =
-  let put obj = obj {Object.bindings = Map.insert slot (Binding.toPlayer player) (Object.bindings obj)}
-   in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+  let binding = Binding.toPlayer player
+      put obj = obj {Object.bindings = Map.insert slot binding (Object.bindings obj)}
+   in if Map.member holder (GameState.objects gs)
+        then gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+        else gs {GameState.detachedBindings = Map.insertWith Map.union holder (Map.singleton slot binding) (GameState.detachedBindings gs)}
+
+-- CR 608.2c: the bindings a resolution reads before each of its own effects --
+-- the LIVE ones off the stack object, so a slot an earlier effect DEFINED is
+-- visible to a later one. `obj` is the object as resolution began, the fallback
+-- for the reads below.
+--
+-- CR 729.5 is why the fallback is not just that snapshot: "the spell or ability
+-- that created the subgame finishes resolving, even if it was created by a spell
+-- card that's no longer on the stack". A wish cast INSIDE a subgame may name the
+-- very spell that is resolving -- CR 729.4 puts the main game's stack outside the
+-- subgame -- and Pawl.Engine.Setup.applyCrossings then deletes that object before
+-- the resolution resumes. What it bound meanwhile is in
+-- GameState.detachedBindings, and takes precedence over the announced bindings
+-- the snapshot carries.
+--
+-- Not implemented: the readers that look the resolving object up by id rather
+-- than coming through here -- Pawl.Engine.Count.playersFor's EachPlayerExcept
+-- arm and Pawl.Engine.Quantity's InSlot arm -- stay unanswered on that path
+-- (#2493).
+liveBindings :: Object.Object -> ObjectId -> GameState -> Map SlotName Binding.Type.Binding
+liveBindings obj oid gs = case Game.lookupObject oid gs of
+  Just live -> Object.bindings live
+  Nothing -> Map.union (Map.findWithDefault Map.empty oid (GameState.detachedBindings gs)) (Object.bindings obj)
 
 -- bindPlayerSlot's plural: bind SEVERAL players a resolution named into `slot` on
 -- `holder`. CR 118.12a's per-player gate is the one caller, and the set is
