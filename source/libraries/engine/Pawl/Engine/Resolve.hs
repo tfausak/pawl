@@ -2739,7 +2739,9 @@ slotOne slot resolving gs = do
 --   1. IS THERE ANYTHING TO OFFER -- the slot's id (CR 400.7) may no longer
 --      resolve to an object (CR 603.7c).
 --   2. WHICH FACE: CR 712.11a for the `transformed` rider, otherwise
---      Card.castableFaces (CR 709.3, CR 712.11b, CR 715.3).
+--      Card.castableFaces (CR 709.3, CR 712.11b, CR 715.3), less the face CR
+--      702.162a's alternative cost is the only road to when this offer states an
+--      alternative cost of its own (CR 118.9a).
 --   3. WHAT IT COSTS (CR 118.9): `withoutPayingManaCost` or a stated
 --      `payingInstead` (CR 702.94a); otherwise CR 601.2b's own candidates.
 --   4. MAY IT BE CAST AT ALL -- Cast.castableWhenOffered, asked BEFORE the
@@ -2759,11 +2761,23 @@ slotOne slot resolving gs = do
 offerCast :: ObjectId -> PlayerId -> SlotName -> CastObligation.CastObligation -> CastOffer.CastOffer -> Game ()
 offerCast resolving caster slot optionality offer = do
   gs <- State.get
-  let -- CR 712.11a for the transformed rider; CR 709.3, CR 712.11b and CR 715.3
+  let -- Whether this offer states CR 118.9's alternative cost, in either of the
+      -- two wordings `applied` below reads. NOT `transformed`, which is CR
+      -- 712.11a's rider about which face goes on the stack and says nothing about
+      -- payment.
+      alternative = CastOffer.withoutPayingManaCost offer || Maybe.isJust (CastOffer.payingInstead offer)
+      -- CR 712.11a for the transformed rider; CR 709.3, CR 712.11b and CR 715.3
       -- otherwise, via Card.castableFaces. Nothing for a card with no back face
       -- (CR 712.14a): an offer that cannot be made is not made.
+      --
+      -- Less Card.convertedFace under an alternative, which is CR 118.9a: a spell
+      -- takes one alternative cost, and that face is on the list only because CR
+      -- 702.162a's alternative cost put it there, so an offer spending the
+      -- spell's one alternative on something else cannot also reach it. CR
+      -- 712.11's default -- the front face -- is then the whole answer.
       faces card
         | CastOffer.transformed offer = fmap pure (Card.backFace card)
+        | alternative = Just (filter (\face -> fmap Face.name (Card.convertedFace card) /= Just (Face.name face)) (Card.castableFaces card))
         | otherwise = Just (Card.castableFaces card)
       -- One proposal per half, gated on its own (CR 709.3a, CR 712.11c), which
       -- is why the whole tuple is built per face rather than once per card.
