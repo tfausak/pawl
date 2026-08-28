@@ -3433,9 +3433,12 @@ playerEffectFilters playerEffect = case playerEffect of
   -- how many lands, never which spells.
   PlayerEffect.PlayAdditionalLands _ -> []
   PlayerEffect.NoMaximumHandSize -> []
-  -- CR 402.2 carries a bare count of cards for the same reason: it names how many
-  -- cards a hand may hold, never which spells.
+  -- CR 402.2's three number-carrying arms carry a bare count of cards for the
+  -- same reason: each names how many cards a hand may hold, or by how much that
+  -- number moves, never which spells.
   PlayerEffect.SetMaximumHandSize _ -> []
+  PlayerEffect.IncreaseMaximumHandSize _ -> []
+  PlayerEffect.ReduceMaximumHandSize _ -> []
   -- CR 500.5 carries a ManaFilter, not a Filter: the set it names is MANA, and
   -- this traversal is about the spells a player effect names.
   PlayerEffect.DontLoseUnspentMana _ -> []
@@ -3541,6 +3544,8 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.PlayAdditionalLands _ -> False
   PlayerEffect.NoMaximumHandSize -> False
   PlayerEffect.SetMaximumHandSize _ -> False
+  PlayerEffect.IncreaseMaximumHandSize _ -> False
+  PlayerEffect.ReduceMaximumHandSize _ -> False
   PlayerEffect.DontLoseUnspentMana _ -> False
   PlayerEffect.SpendManaAsThough _ -> False
   PlayerEffect.CantBeTargetedBy _ -> False
@@ -3594,6 +3599,8 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.PlayAdditionalLands _ -> False
   PlayerEffect.NoMaximumHandSize -> False
   PlayerEffect.SetMaximumHandSize _ -> False
+  PlayerEffect.IncreaseMaximumHandSize _ -> False
+  PlayerEffect.ReduceMaximumHandSize _ -> False
   PlayerEffect.DontLoseUnspentMana _ -> False
   PlayerEffect.SpendManaAsThough _ -> False
   PlayerEffect.CantBeTargetedBy _ -> False

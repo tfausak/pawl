@@ -174,6 +174,33 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.SetMaximumHandSize 4)
       " {\"type\":\"SetMaximumHandSize\",\"value\":4} "
+  -- CR 402.2 / 613.11 / Minamo Scrollkeeper. This is the shape
+  -- data/cards/minamo-scrollkeeper.json carries.
+  Spec.it s "IncreaseMaximumHandSize, Minamo Scrollkeeper's one" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.IncreaseMaximumHandSize 1)
+      " {\"type\":\"IncreaseMaximumHandSize\",\"value\":1} "
+  -- CR 402.2 / 613.11 / Gnat Miser. This is the shape
+  -- data/cards/gnat-miser.json carries -- a DIFFERENT tag from the increase
+  -- above, not the same tag with a sign, and the two cases together are what a
+  -- codec collapsing the pair would fail.
+  Spec.it s "ReduceMaximumHandSize, Gnat Miser's one" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.ReduceMaximumHandSize 1)
+      " {\"type\":\"ReduceMaximumHandSize\",\"value\":1} "
+  -- CR 402.2: the OTHER number on the reducing arm, so a codec that dropped the
+  -- payload would round-trip one of these and not both. Thought Nibbler prints
+  -- this two; no file in data/cards/ carries it.
+  Spec.it s "ReduceMaximumHandSize, a second number" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.ReduceMaximumHandSize 2)
+      " {\"type\":\"ReduceMaximumHandSize\",\"value\":2} "
   -- CR 500.5 / 703.4q / Upwelling: no mana type named.
   Spec.it s "DontLoseUnspentMana, Upwelling's whole pool" $
     Common.assertCodec
