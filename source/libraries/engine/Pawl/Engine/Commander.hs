@@ -76,6 +76,10 @@ isCommander oid gs = case Game.lookupObject oid gs of
   Just obj -> case Object.source obj of
     Source.OfCard printingId ->
       fmap Player.commander (Map.lookup (Object.owner obj) (GameState.players gs)) == Just (Just printingId)
+    -- Not implemented: a melded permanent one of whose components is the
+    -- designated commander, which this answers False for -- the fallthrough sorts
+    -- it with the tokens and the abilities, so CR 903.9b's offer below is never
+    -- made for it (#2265).
     _ -> False
 
 -- | CR 903.10a's key: the owner of the commander that dealt this damage, or

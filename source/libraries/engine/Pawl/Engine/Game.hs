@@ -399,12 +399,15 @@ cardOfPrinting pid gs = fmap Printing.card (printingOf pid gs)
 -- the meld recorded them.
 --
 -- A CLASSIFIER over Source rather than a case on OfMeld at each reader, because
--- the readers are shared: CR 730.3 through 730.3e restate CR 712.21 through
--- 712.21e almost word for word -- one permanent leaves and each component is put
+-- the readers are shared: CR 730.3 through 730.3d restate CR 712.21 through
+-- 712.21d almost word for word -- one permanent leaves and each component is put
 -- into the appropriate zone, the owner arranges them, the exiler fixes their
 -- relative timestamp order, an effect that finds the new object finds all of
--- them -- so mutate (#874) extends this one function rather than the three rules
--- that read it. CR 202.3c and CR 701.27g read it too.
+-- them, and one replacement effect applies to all of them -- so mutate (#874)
+-- extends this one function rather than the rules that read it. Each series then
+-- ends on a sentence the other has no counterpart for: CR 712.21e counts a
+-- melded permanent as one object but two cards, and CR 730.3e is about a merged
+-- permanent's token components. CR 202.3c and CR 701.27g read this too.
 --
 -- EMPTY rather than a singleton for OfCard: the question is which cards
 -- represent an object that several may, and a one-card object has nothing for CR

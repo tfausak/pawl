@@ -7,12 +7,14 @@ import qualified Pawl.Types.PrintingId as PrintingId
 -- represented by two cards". The printing the combined back face was interned
 -- as, plus the printings of the cards representing it.
 --
--- The RESULT is not one of the components and is never a card in anyone's deck:
--- CR 712.4b leaves a meld card's half of the oversized face meaningless on its
--- own, so the combined face is interned by the ability that melds rather than
--- read out of the pool. CR 712.8g is what the field is for -- the object "has
--- only the characteristics of the combined back face" -- so every characteristic
--- read in the engine resolves through it and needs to know nothing about meld.
+-- The RESULT is what CR 712.8g reads: the object "has only the characteristics of
+-- the combined back face", so every characteristic read in the engine resolves
+-- through this field and needs to know nothing about meld. The ability that melds
+-- is what fills it in, and what it interns there is the combined back face rather
+-- than either component -- CR 712.4b leaves a meld card's own half of the
+-- oversized face meaningless on its own, so that face is carried inline by the
+-- ability and is never a card in anyone's deck. Nothing here enforces that: this
+-- is plain data, and MkMeldSource will take any printing.
 --
 -- The COMPONENTS are read by the rules that look past those characteristics to
 -- the cards themselves: CR 202.3c's mana value ("as though it had the combined
