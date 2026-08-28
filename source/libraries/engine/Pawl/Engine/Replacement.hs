@@ -583,7 +583,7 @@ applies gs event candidate =
         (ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR pat rewrite), ProposedEvent.WouldLoseLife cause pid n) ->
           maybe True (== cause) (LifeLossPattern.whichCause pat)
             && matchesPlayer gs src (LifeLossPattern.whose pat) pid
-            && breaches gs rewrite pid n
+            && breaches gs (ReplacementCandidate.controller candidate) rewrite pid n
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
         -- MISMATCHED class, where False is the correct answer rather than a
@@ -607,8 +607,18 @@ applies gs event candidate =
 -- and it states it as APPLICABILITY rather than as a rewrite that changes nothing:
 -- "Worship's effect sees that the damage event would not reduce the player's life
 -- total to less than 1, so Worship's effect is not applied."
-breaches :: GameState -> LifeLossRewrite.LifeLossRewrite -> PlayerId -> Natural -> Bool
-breaches gs rewrite pid n = case rewrite of
+--
+-- `you` is CR 109.5's, the APPLYING row's controller, which is a different seat
+-- from `pid` for any pattern but LifeLossPattern's Yours. Nothing where the row
+-- has no controller: an ability whose "you" names nobody states no condition it
+-- can meet.
+--
+-- An arm may read the PROPOSED AMOUNT here rather than in the printed CR 604.2
+-- condition a Pawl.Types.PrintedReplacement carries, because no
+-- Pawl.Types.Condition can see it: a condition is asked of the BOARD, and "at
+-- least that many" is asked of the event.
+breaches :: GameState -> Maybe PlayerId -> LifeLossRewrite.LifeLossRewrite -> PlayerId -> Natural -> Bool
+breaches gs you rewrite pid n = case rewrite of
   -- Read off the LIVE board rather than off the event, because the event carries
   -- only the loss and the rule's threshold is on the resulting TOTAL. A player
   -- already at or below the floor answers True -- the loss would still take them
@@ -629,6 +639,17 @@ breaches gs rewrite pid n = case rewrite of
   -- printing in data/cards/ scales a life loss by an identity, so the refusal is a
   -- fence rather than a proved behaviour.
   LifeLossRewrite.Scaled scaling -> scale scaling n /= n
+  -- Ashiok, Wicked Manipulator's "while your library has at least that many cards
+  -- in it". Its own ruling states the other side: "If you would pay life while
+  -- you control Ashiok and your library does not have at least that many cards in
+  -- it, you'll just pay life as normal."
+  --
+  -- A COUNT of the library rather than a check that the top `n` exist, which is
+  -- the same question asked of a list -- Pawl.Engine.Game.zoneMembers is the
+  -- library in top-first order, and Pawl.Engine.Event's arm takes its cards off
+  -- the front of that same list.
+  LifeLossRewrite.ExileFromTopOfYourLibrary ->
+    maybe False (\owner -> Natural.length (Game.zoneMembers Zone.Library owner gs) >= n) you
 
 -- Does the REWRITE itself admit this entry, over and above the pattern matching
 -- the entering object? `admits` and `unspent` above, for the entry class.
@@ -1391,7 +1412,25 @@ readsApplier re = case re of
   -- already named, so two rows alike in `effect` resize the same loss the same way
   -- whoever holds them. CR 109.5's "your" is read in `applies` rather than in
   -- Event.apply, which is CounterR's split exactly.
-  ReplacementEffect.LifeLossR {} -> False
+  --
+  -- The inner sum is cased, TurnUpR's discipline above for its reason: a rewrite
+  -- that DOES read the applier has to be decided here rather than inheriting this
+  -- answer, and nothing else in this module would break its build.
+  ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR _ (LifeLossRewrite.LeaveAtLeast _)) -> False
+  ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR _ (LifeLossRewrite.Scaled _)) -> False
+  -- CR 616.1 / 109.5: the exile comes off the CANDIDATE's own controller's
+  -- library, so two rows alike in `effect` and unlike in `you` empty different
+  -- libraries -- and `breaches` asks that same seat's count, so one may apply
+  -- where the other does not. The other arm that answers True,
+  -- EntryRewrite.UnderSourceControl, answers it under a different rule; what the
+  -- two share is reading the candidate's own `controller` to apply.
+  --
+  -- A FENCE rather than a proved behaviour, and provably so: the only printing
+  -- with this rewrite pairs it with LifeLossPattern's Yours, so two such rows
+  -- match one loss only if their two controllers are the same seat -- which CR
+  -- 704.5j's legend rule does not leave standing. No board can put the two
+  -- answers apart, and False would still be the wrong classification.
+  ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR _ LifeLossRewrite.ExileFromTopOfYourLibrary) -> True
   -- CR 614.10: a skip replaces the step or phase with nothing. The player it is
   -- ABOUT is baked into PhasePattern.whosePhase, on the EFFECT, where this
   -- comparison already sees it.
@@ -2268,10 +2307,17 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.TokenR {} -> Nothing
   ReplacementEffect.TurnUpR {} -> Nothing
   ReplacementEffect.UntapR _ -> Nothing
-  -- CR 614.1a: neither life-total rewrite is a supply a batch can run out of. A
-  -- floor is re-read off the board every application, and once the player is at it
-  -- a further loss is cut to nothing rather than exhausting anything; a scaling is
-  -- arithmetic on whatever amount arrives.
+  -- CR 614.1a: neither resizing life-total rewrite is a supply a batch can run out
+  -- of. A floor is re-read off the board every application, and once the player is
+  -- at it a further loss is cut to nothing rather than exhausting anything; a
+  -- scaling is arithmetic on whatever amount arrives.
+  --
+  -- A LIBRARY is a supply, and a batch could in principle empty one -- but this
+  -- classification is only ever asked of a CR 510.2 damage batch (`contested`
+  -- above filters by WouldDealDamage), and no LifeLossR row matches one. So the
+  -- answer for the exiling rewrite is Nothing because the question never arrives,
+  -- not because the resource is inexhaustible; `breaches` is where the count is
+  -- actually read, once per proposal.
   ReplacementEffect.LifeLossR {} -> Nothing
   ReplacementEffect.PhaseR _ -> Nothing
 

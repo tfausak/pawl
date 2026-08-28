@@ -40,11 +40,8 @@ data LifeLossCause
     -- by a different road than rule 119.3 does -- a cost the player chooses to
     -- pay, not an effect instructing them -- and a printed clause narrows by
     -- exactly that grain: Ashiok, Wicked Manipulator says "if you would pay life",
-    -- where Zof Consumption's loss is an effect's.
-    --
-    -- Not implemented: no card in data/cards/ narrows a
-    -- Pawl.Types.LifeLossPattern to this cause; Ashiok, Wicked Manipulator would
-    -- be the producer, and its rewrite (exile that many cards instead) is a shape
-    -- Pawl.Types.LifeLossRewrite has no arm for (gap #2549).
+    -- where Zof Consumption's loss is an effect's. That card is the producer, and
+    -- Pawl.ReplacementSpec's Ashiok group is what proves the grain: a payment is
+    -- replaced where damage on the same board is not.
     ByPayment
   deriving (Bounded, Enum, Eq, Ord, Show)
