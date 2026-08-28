@@ -5503,9 +5503,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- through a Printing.
   --
   -- Hand-built, in the two self-tests' posture above, because no card in the
-  -- pool names a reserved slot anywhere -- and the two cards that print a
-  -- CreateEmblem, Ajani, Adversary of Tyrants and Elspeth, Sun's Champion, mint
-  -- emblems that name none either; the corpus sweeps are
+  -- pool names a reserved slot anywhere -- and every card that prints a
+  -- CreateEmblem mints an emblem that names none either; the corpus sweeps are
   -- a regression guard for this, never its proof. Each
   -- case is asserted TWICE: the sweep sees the grafted offender, and the
   -- minting face's OWN slots stay empty. The second half is what makes this a

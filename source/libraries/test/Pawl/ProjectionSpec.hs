@@ -86,6 +86,8 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -560,14 +562,11 @@ elspethEmblemBoard s registry ultimate = do
   pure (mine, theirs, carols, used {GameState.activePlayer = S.bob})
 
 -- alice puts an emblem-minting artifact out and taps it, so CR 114.2's emblem is
--- in the command zone. Two cards take this route, and they are unlike in the one
--- way the gates below care about: Synthetic Emblem Forge's emblem GRANTS
--- ("{T}: You get an emblem with 'Creatures you control have protection from
--- red.'", data/cards/synthetic-emblem-forge.json), where Synthetic Emblem
--- Aegis's emblem carries a replacement row of its own and grants nothing
--- ("{T}: You get an emblem with 'If a source would deal noncombat damage to a
--- creature you control, prevent that damage.'",
--- data/cards/synthetic-emblem-aegis.json).
+-- in the command zone. Synthetic Emblem Forge's emblem GRANTS ("{T}: You get an
+-- emblem with 'Creatures you control have protection from red.'",
+-- data/cards/synthetic-emblem-forge.json); serraEmblemBoard below is the other
+-- half of the pair the gates below care about, an emblem that grants nothing and
+-- carries a replacement row of its own.
 --
 -- Activated rather than cast, elspethEmblemBoard's route: no fixture here has
 -- mana, and the ability states no timing restriction, so it also reaches a board
@@ -592,6 +591,60 @@ dealTo src victim amount gs =
         S.identityAnswer
         gs
         (Damage.applyDamage [DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) amount False False False 0 Nothing DamageKind.Noncombat])
+    )
+
+-- Serra the Benevolent {2}{W}{W} Legendary Planeswalker -- Serra, loyalty 4.
+-- "+2: Creatures you control with flying get +1/+1 until end of turn. -3: Create
+-- a 4/4 white Angel creature token with flying and vigilance. -6: You get an
+-- emblem with 'If you control a creature, damage that would reduce your life
+-- total to less than 1 reduces it to 1 instead.'" (Name, cost, type line,
+-- loyalty and all three loyalty abilities checked against api.scryfall.com
+-- 2026-08-28.) forgedBoard's counterpart: the emblem grants nobody anything and
+-- carries a printed replacement row instead, which is the shape the case below
+-- needs.
+--
+-- The Bool is the single ACT that separates the two boards, elspethEmblemBoard's
+-- shape: whether the ultimate was activated.
+--
+-- Six counters exactly, the ability's own cost, so paying it leaves zero and CR
+-- 704.5i puts Serra into the graveyard -- which is why the state-based actions
+-- are settled here rather than left to the caller. That is not tidying: it is
+-- what shuts replacementsAffecting's battlefield gate. Serra is a PLANESWALKER,
+-- so copiableMintsType is True of her and her mere presence would open the gate
+-- for CR 306.5b's intrinsic row; with her buried the battlefield holds Goblin
+-- Pikers alone, which trip no disjunct, and the emblem's own row is the only
+-- thing that can open it.
+--
+-- alice's precombat main phase with an empty stack, which is the window CR 606.3
+-- gives a loyalty ability -- Setup.emptyGame leaves the board in the untap step.
+serraEmblemBoard :: Bool -> Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+serraEmblemBoard ultimate serra gs =
+  let (serraId, placed) = S.addCreature serra S.alice gs {GameState.phase = Phase.PrecombatMain}
+      armed = S.addCounter CounterKind.Loyalty 6 serraId placed
+   in ( serraId,
+        S.settleSba
+          -- The third loyalty ability, in printed order: +2, -3, -6.
+          ( case (ultimate, drop 2 (Face.activatedAbilities (S.combinedFace serra))) of
+              (True, ability : _) -> S.runPure S.identityAnswer armed (do Activate.activateAbility S.alice serraId ability; Stack.resolveTop)
+              _ -> armed
+          )
+      )
+
+-- Put one player at an exact life total, so the very next event would carry them
+-- past the emblem's floor. Pawl.ReplacementSpec's Worship group keeps its own
+-- copy beside itself.
+atLife :: PlayerId.PlayerId -> Integer -> GameState.GameState -> GameState.GameState
+atLife pid n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) pid (GameState.players gs)}
+
+-- dealTo's player half: CR 120.3a's life loss, through the CR 120.4c step that
+-- consults the replacement effects.
+dealToPlayer :: ObjectId.ObjectId -> PlayerId.PlayerId -> Natural.Natural -> GameState.GameState -> GameState.GameState
+dealToPlayer src victim amount gs =
+  S.settleSba
+    ( S.runPure
+        S.identityAnswer
+        gs
+        (Damage.applyDamage [DamageEvent.MkDamageEvent src (Recipient.ToPlayer victim) amount False False False 0 Nothing DamageKind.Noncombat])
     )
 
 -- CR 702.16's quality: red, the colour Goblin Piker is and Cabal Evangel is not.
@@ -3432,46 +3485,61 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- zone, as described in rule 113.6" -- and CR 113.6p is the arm of that list
   -- which closes it for an emblem, with CR 114.4 saying the same in the emblem's
   -- own rule. This is a PRINTED row, which is what makes CR 604.2 the rule that
-  -- decides its zone; the BOARD a row's condition would be read against is the
-  -- separate question CR 614.12 answers (Projection.boardAsEntering), and this
-  -- row carries no condition.
+  -- decides its zone. The row also carries a CONDITION ("if you control a
+  -- creature"), so the case pins the second question with it: CR 614.12's board,
+  -- Projection.boardAsEntering, asked of an object CR 114.5 keeps off the
+  -- battlefield.
   --
-  -- The board differs in exactly one thing across the pair: whether the Aegis
-  -- was tapped for its emblem. Everything else trips neither gate, the reason the
-  -- pair above gives -- two Cabal Evangels, a Goblin Piker, no land, and the
-  -- Aegis's own ability activated rather than static.
+  -- Serra the Benevolent's emblem is Worship's clause word for word, and
+  -- data/cards/worship.json authors the identical ReplacementEffect.LifeLossR
+  -- from the BATTLEFIELD -- Pawl.ReplacementSpec's Worship group proves it there,
+  -- against the same rules. What is new here is only the zone the row is read out
+  -- of, which is the whole point of the case.
   --
-  -- SYNTHETIC because no printed emblem carries a replacement row pawl can
-  -- author. Scryfall `o:"emblem with"`, 2026-08-27, is every card that makes one
-  -- (96, has_more false), and the emblems on it that print a replacement effect
-  -- each need a capability that does not exist: Ajani Steadfast needs a "prevent
-  -- all but 1" rewrite (#2443), Serra the Benevolent replaces a LIFE TOTAL's
-  -- reduction rather than a damage event (#2526), and Jaya Ballard's "cast this
-  -- way" is a back-reference to the permission the same emblem grants. The pool's other
-  -- two Effect.CreateEmblem producers are Ajani, Adversary of Tyrants and
-  -- Elspeth, Sun's Champion, and neither emblem carries a replacementEffects row.
-  -- CR 114.2 lets the creating effect give an emblem any ability and CR 114.3
-  -- bounds only its characteristics, so nothing in the CR forbids the card.
-  Spec.it s "CR 113.6p an emblem's own replacement row prevents the damage from the command zone" $ do
-    aegis <- S.printingOf s registry "Synthetic Emblem Aegis"
-    evangel <- S.printingOf s registry "Cabal Evangel"
+  -- Each board differs from `board` by exactly one ACT: whether the ultimate was
+  -- activated, whether alice controls a creature, or how much life is at stake.
+  -- Activating it costs Serra her last loyalty counter and CR 704.5i buries her,
+  -- which is the game's own consequence rather than a second knob -- and it is
+  -- what leaves the armed battlefield holding Goblin Pikers alone, so
+  -- replacementsAffecting's short-circuit is shut on everything but the emblem
+  -- (serraEmblemBoard argues this where it is written). A Piker is a red 2/1 with
+  -- no abilities, and it is not a creature the emblem's own "you control a
+  -- creature" could be read off for BOB, because CR 109.5's "you" is the
+  -- emblem's controller.
+  --
+  -- Every number distinct: alice at 2 (or 9 for the shallow board), bob at 3, a
+  -- 4-damage hit, a floor of 1. The floored total is 1, the unfloored ones -2 and
+  -- -1, and the shallow one 5; no two readings of the rule land on the same
+  -- number.
+  Spec.it s "CR 113.6p an emblem's own replacement row floors the life total from the command zone" $ do
+    serra <- S.printingOf s registry "Serra the Benevolent"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (mineId, g1) = S.addCreature evangel S.alice (Setup.emptyGame S.bothPlayers)
-        (theirsId, g2) = S.addCreature evangel S.bob g1
-        (srcId, g3) = S.addCreature piker S.bob g2
-        board = forgedBoard aegis g3
-        unarmed = snd (S.addCreature aegis S.alice g3)
-        mine = dealTo srcId mineId 2 board
-        theirs = dealTo srcId theirsId 2 board
-        without = dealTo srcId mineId 2 unarmed
-    Spec.assertBool s (S.onBattlefield mineId mine) "the emblem's own row prevents the 2"
-    Spec.assertEqWith s "CR 615.6 with nothing marked on it" (S.damageOf mineId mine) (Just 0)
-    Spec.assertBool s (not (S.onBattlefield mineId without)) "and the same 2 kills it with the Aegis never tapped, so 2 really is lethal here"
-    Spec.assertBool s (not (S.onBattlefield theirsId theirs)) "CR 109.5 bob's identical creature is outside the emblem's \"you\""
+    let (srcId, g1) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        (mineId, g2) = S.addCreature piker S.alice g1
+        lives = atLife S.alice 2 . atLife S.bob 3
+        (serraId, armedBoard) = serraEmblemBoard True serra g2
+        (idleId, idleBoard) = serraEmblemBoard False serra g2
+        board = lives armedBoard
+        unarmed = lives idleBoard
+        creatureless = lives (snd (serraEmblemBoard True serra g1))
+        shallow = atLife S.alice 9 board
+        mine = dealToPlayer srcId S.alice 4 board
+        theirs = dealToPlayer srcId S.bob 4 board
+        without = dealToPlayer srcId S.alice 4 unarmed
+        alone = dealToPlayer srcId S.alice 4 creatureless
+        glancing = dealToPlayer srcId S.alice 4 shallow
+    Spec.assertEqWith s "CR 614.1a the emblem's own row stops alice at 1 from the command zone" (S.lifeOf S.alice mine) (Just 1)
+    Spec.assertEqWith s "and the same 4 takes her to -2 with the ultimate never activated, so 4 really is lethal here" (S.lifeOf S.alice without) (Just (-2))
+    Spec.assertEqWith s "CR 109.5 bob is outside the emblem's \"your life total\", so his 3 takes the whole 4" (S.lifeOf S.bob theirs) (Just (-1))
+    Spec.assertEqWith s "CR 604.2 with alice's creature gone the printed condition is false and the whole 4 lands" (S.lifeOf S.alice alone) (Just (-2))
+    Spec.assertEqWith s "CR 120.4d a loss that does not reach the floor is left alone: 9 - 4 = 5, not clamped" (S.lifeOf S.alice glancing) (Just 5)
     -- The fixture's own preconditions, after the behaviour so neither can absorb
     -- a mutation aimed at it.
     Spec.assertEqWith s "one emblem, in the command zone" (Set.size (GameState.command board)) 1
-    Spec.assertEqWith s "and none without it" (Set.size (GameState.command unarmed)) 0
+    Spec.assertEqWith s "and none without the ultimate" (Set.size (GameState.command unarmed)) 0
+    Spec.assertEqWith s "CR 114.2 the creatureless board has its emblem too, so the clause is what differs and not the zone" (Set.size (GameState.command creatureless)) 1
+    Spec.assertBool s (not (S.onBattlefield serraId board)) "CR 704.5i Serra paid her last loyalty and is buried, so nothing on the battlefield opens replacementsAffecting's gate"
+    Spec.assertBool s (S.onBattlefield idleId unarmed) "where the unactivated board still has her, at the six counters she never spent"
     Spec.assertBool s (not (Projection.hasKeyword fromRed mineId board)) "and this emblem hands out no protection, unlike the Forge's above"
 
   -- The same two short-circuits against the OTHER arms of
