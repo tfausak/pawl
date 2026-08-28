@@ -1077,10 +1077,12 @@ readsX = any effectReadsX
 -- Ratchet. When you do, return target artifact card ..." converts the permanent
 -- and arms the reflexive in ONE clause (CR 608.2c's written order), so by the
 -- time the arm runs the face that declared the ability is no longer the one up.
--- CR 603.7c makes the text a property of the ability that CREATED the delayed
--- one, not of whichever face the permanent happens to show as the opcode runs, so
--- letting a turn earlier in the same resolution blank it would be the wrong
--- reading of the rule as well as an unfireable trigger.
+-- CR 603.7a makes the delayed ability something the RESOLVING ability creates,
+-- and CR 603.7c is the same posture from the other end -- a delayed ability
+-- survives its object changing characteristics -- so which face the permanent
+-- happens to show as the opcode runs is not what says whether the text exists.
+-- Letting a turn earlier in the same resolution blank it would be the wrong
+-- reading of the rule as well as a trigger that could never fire.
 --
 -- Pawl.CardSpec's D4 dataflow lint is per FACE, so a name is declared on the face
 -- that arms it and the fallback cannot pick up somebody else's ability: two faces

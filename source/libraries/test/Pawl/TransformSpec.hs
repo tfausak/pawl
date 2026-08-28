@@ -1463,6 +1463,11 @@ playMedic decision wanted spellId gs =
 -- Celestine, the Living Saint proves the bound off a slot the engine matches at
 -- CR 601.2c; this group proves it off one CR 603.3d fills, which is a different
 -- door into Pawl.Engine.Target.slotContext.
+--
+-- Not implemented: the reflexive is created whenever the CR 603.5 "may" is taken,
+-- so a convert CR 701.28e would have IGNORED still arms it (#2541). Nothing in
+-- `data/cards/` can turn Ratchet over in that window, so no board here tells the
+-- two readings apart.
 gainLifeConvertSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 gainLifeConvertSpec s registry = Spec.describe s "GainLifeConvert" $ do
   -- THE proving case: all four limbs on one board. alice casts Blossoming Calm
