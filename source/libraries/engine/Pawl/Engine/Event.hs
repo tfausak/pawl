@@ -389,8 +389,11 @@ canPayLife pid n gs =
 -- is why this goes through resolveLifeLoss, CR 614.1's funnel for the class, and
 -- carries LifeLossCause.ByPayment: a replacement that watches life loss reaches a
 -- payment, and one scoped to damage does not. What is SUBTRACTED is the settled
--- loss, which a row may have grown or shrunk; what the cost charged is unchanged
--- and is `canPayLife`'s business, not this function's.
+-- loss, which a row may have grown, shrunk, or removed outright -- Ashiok, Wicked
+-- Manipulator exiles cards instead and no life moves at all (CR 614.6). What the
+-- cost CHARGED is unchanged either way, and is `canPayLife`'s business rather than
+-- this function's, which is Ashiok's own ruling: its ability "doesn't allow you to
+-- attempt to pay an amount of life greater than your current life total".
 --
 -- Monadic, unlike the pure writes beside it, because applying a replacement can
 -- ask a player a CR 616.1 question. All three callers -- the mana-and-life
@@ -2981,7 +2984,9 @@ resolvePlayerCounters cause pid kind n = do
 -- arms, and payLife above -- so a row cannot reach one road and miss another.
 --
 -- The SETTLED amount may be larger than what came in, not only smaller: a
--- Pawl.Types.LifeLossRewrite may be a scaling.
+-- Pawl.Types.LifeLossRewrite may be a scaling. It is 0 for a CANCELLED event too
+-- -- CR 614.6's "it never happens" -- which a caller cannot tell from a loss
+-- rewritten to nothing, and need not: either way no life moves.
 --
 -- Not implemented: CR 701.12c's exchange and CR 119.7's redistribution do not come
 -- through here (#2544).

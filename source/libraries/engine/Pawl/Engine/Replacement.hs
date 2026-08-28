@@ -1424,6 +1424,12 @@ readsApplier re = case re of
   -- where the other does not. The other arm that answers True,
   -- EntryRewrite.UnderSourceControl, answers it under a different rule; what the
   -- two share is reading the candidate's own `controller` to apply.
+  --
+  -- A FENCE rather than a proved behaviour, and provably so: the only printing
+  -- with this rewrite pairs it with LifeLossPattern's Yours, so two such rows
+  -- match one loss only if their two controllers are the same seat -- which CR
+  -- 704.5j's legend rule does not leave standing. No board can put the two
+  -- answers apart, and False would still be the wrong classification.
   ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR _ LifeLossRewrite.ExileFromTopOfYourLibrary) -> True
   -- CR 614.10: a skip replaces the step or phase with nothing. The player it is
   -- ABOUT is baked into PhasePattern.whosePhase, on the EFFECT, where this
