@@ -648,15 +648,21 @@ data Object = MkObject
     -- permanent is the object the rule is still about. Every other destination
     -- ends the effect, since a card in a graveyard is not a bestowed Aura.
     --
-    -- Cleared by Pawl.Engine.Sba when CR 702.103f's "becomes unattached" fires;
-    -- that is what "ceases to be bestowed" IS, and it is one-way.
+    -- Cleared by Pawl.Engine.Sba when CR 702.103f's "becomes unattached" fires,
+    -- and by Pawl.Engine.Stack.resolveTopWith when CR 702.103e's target has
+    -- become illegal as the spell begins resolving. Both are what "ceases to be
+    -- bestowed" IS, and it is one-way.
     --
-    -- Not implemented: CR 702.103c's copy of a bestowed Aura spell, which CR
-    -- 707.10 never sends through the casting path that writes this (#2355), and
-    -- CR 702.103e's illegal target on resolution (#2357) -- two more ways to
-    -- become, or stop being, bestowed. CR 702.103g's phasing in unattached
-    -- reaches Pawl.Engine.Sba's CR 702.103f pass one pass later, since
-    -- Pawl.Engine.Phasing.phaseIn detaches first; see #2358.
+    -- CR 702.103c's copy of a bestowed Aura spell is bestowed by construction:
+    -- Pawl.Engine.Resolve's CopySpell arm builds the copy from the original's
+    -- record and overwrites this field on neither road, and
+    -- Pawl.Engine.Projection.bestowGathered keys off nothing else. Unobserved
+    -- rather than unimplemented -- the pool's one copier reaches instants and
+    -- sorceries alone, so no board mints such a copy; see #2355.
+    --
+    -- CR 702.103g's phasing in unattached reaches Pawl.Engine.Sba's CR 702.103f
+    -- pass one pass later, since Pawl.Engine.Phasing.phaseIn detaches first;
+    -- see #2358.
     bestowed :: Bool,
     -- | CR 601.2b with CR 107.4f: how many of the Phyrexian mana symbols in the
     -- cost of the SPELL that became this permanent its controller announced they
