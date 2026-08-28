@@ -2659,9 +2659,10 @@ paysWard who p = case p of
 -- because it SETS a card type in CR 613.1d's layer 4 rather than adding one:
 -- "enchanted permanent is a colorless Forest land", so a face-down permanent
 -- under it stops being a creature at every projected read. An adding effect could
--- not discriminate -- CR 708.2a has already made the permanent a creature. Every case asserts that through
--- Projection.isCreatureOf BEFORE it activates anything, which is what stops a
--- turn-over from being read as evidence the Song never applied.
+-- not discriminate -- CR 708.2a has already made the permanent a creature. Every
+-- case asserts the Song's reach through Projection.isCreatureOf BEFORE it
+-- activates anything, which is what stops a turn-over from being read as evidence
+-- the Song never applied.
 --
 -- Two cards go under the manifest, and the pair separates the two readings from
 -- opposite sides: Thragtusk, a creature card, and Forest, a land card. A
@@ -2716,6 +2717,10 @@ shriekerSpec s registry = Spec.describe s "Revealing a face-down permanent (CR 7
     case victim of
       Just oid -> do
         Spec.assertBool s (Projection.isCreatureOf oid board) "before: CR 708.2a has made the manifested land a 2/2 creature"
+        -- `shriek` is a no-op on a card printing no activated ability, and a
+        -- no-op leaves exactly the board this case asserts. Naming the ability
+        -- count is what keeps the assertion below about rule 708.12.
+        Spec.assertEqWith s "and the Shrieker prints the one activated ability" (length (Face.activatedAbilities (S.combinedFace shrieker))) 1
         let after = shriek shrieker shriekerId oid board
         -- THE GAMEPLAY ASSERTION, and the falsifier for a projected read.
         Spec.assertEqWith s "CR 708.12 the land card stayed face down" (fmap Object.facing (Game.lookupObject oid after)) (Just (Facing.faceDown FaceDownReason.Manifested))

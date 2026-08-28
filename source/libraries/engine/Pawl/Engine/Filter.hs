@@ -1264,6 +1264,10 @@ rewrite pairs predicate = case predicate of
   -- the HOST ("attached to a Swamp"), so CR 612.1's word swap reaches it exactly
   -- as it reaches the same description written at the top level.
   Filter.AttachedTo f -> Filter.AttachedTo (rewrite pairs f)
+  -- DESCENT, for the atom above's reason: the nest is a description a card
+  -- author wrote ("if it's a Forest card"), so CR 612.1's word swap reaches it
+  -- exactly as it reaches the same description written at the top level. The
+  -- swap is on the ABILITY's text and never on the card the nest describes.
   Filter.RepresentedByCard f -> Filter.RepresentedByCard (rewrite pairs f)
   -- DESCENT, for the atom above's reason one direction over: the nest describes
   -- the ATTACHER ("enchanted by an Aura"), so CR 612.1's word swap reaches it as
@@ -1662,6 +1666,9 @@ bakeBound players predicate = case predicate of
   -- top level would be. Pawl.Engine.Filter.boundSlots descends to match, which is
   -- the pairing that function's comment insists on.
   Filter.AttachedTo f -> Filter.AttachedTo (bakeBound players f)
+  -- DESCENT, for the atom above's reason: a ControlledByBound written into the
+  -- represented card's description is baked exactly as the same atom at the top
+  -- level would be, and Pawl.Engine.Filter.boundSlots descends to match.
   Filter.RepresentedByCard f -> Filter.RepresentedByCard (bakeBound players f)
   -- DESCENT, for the atom above's reason: a ControlledByBound written into the
   -- ATTACHER's description is baked exactly as the same atom at the top level
@@ -1755,6 +1762,9 @@ manaValueThresholds predicate = case predicate of
   -- literals inside bound the HOST's mana value and never the candidate's. Only
   -- widening CR 601.3a's sample is the safe direction.
   Filter.AttachedTo f -> manaValueThresholds f
+  -- Descended into, and OVER-reporting for the atom above's reason: the literals
+  -- inside bound the represented CARD's mana value and never the candidate's.
+  -- Only widening CR 601.3a's sample is the safe direction.
   Filter.RepresentedByCard f -> manaValueThresholds f
   -- Descended into, and OVER-reporting for the atom above's reason: the literals
   -- inside bound an ATTACHER's mana value and never the candidate's. Only
