@@ -457,6 +457,11 @@ castableFaces card = case Card.layout card of
   -- where the second one is priced at rule 702.162a's cost, and `enteringFace`
   -- below carries the chosen face onto the battlefield (CR 712.13).
   --
+  -- That second entry is `convertedFace` below, named because a reader who
+  -- cannot pay rule 702.162a's cost cannot have it: CR 118.9a gives a spell one
+  -- alternative cost, so Pawl.Engine.Resolve.offerCast drops it from an offer
+  -- that states an alternative of its own.
+  --
   -- Read off the front face's PRINTED keywords, which is CR 712.11d's own scope
   -- and the posture Pawl.Engine.Cast.castableSpells takes for rule 702.37a's morph
   -- ability. A more than meets the eye ability GRANTED to a card in a zone is not
