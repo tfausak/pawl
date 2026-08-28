@@ -479,8 +479,10 @@ library codec
     Pawl.Codec.ManaTypeSpec
     Pawl.Codec.ManaUnit
     Pawl.Codec.ManaUnitSpec
+    Pawl.Codec.Meld
     Pawl.Codec.MeldSource
     Pawl.Codec.MeldSourceSpec
+    Pawl.Codec.MeldSpec
     Pawl.Codec.Mentored
     Pawl.Codec.MentoredSpec
     Pawl.Codec.Mill
@@ -1455,6 +1457,7 @@ library types
     Pawl.Types.ManaSymbol
     Pawl.Types.ManaType
     Pawl.Types.ManaUnit
+    Pawl.Types.Meld
     Pawl.Types.MeldSource
     Pawl.Types.Mentored
     Pawl.Types.Mill

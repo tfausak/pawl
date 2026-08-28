@@ -158,6 +158,12 @@ zoneFunctionedFrom effect = case effect of
   Effect.MakePlotted _ -> Nothing
   Effect.DoesNotUntapNext _ -> Nothing
   Effect.Transform _ -> Nothing
+  -- CR 113.6m asks which zone an ability functions FROM by where the object it is
+  -- on moves. A meld moves the cards the ability NAMED, and the melding ability's
+  -- own source is one of them only because an earlier instruction exiled it --
+  -- that instruction is the move, and this one puts cards onto the battlefield
+  -- from wherever they already are.
+  Effect.Meld {} -> Nothing
   Effect.PhaseOut _ -> Nothing
   Effect.AddPhases _ -> Nothing
   Effect.EndTurn -> Nothing

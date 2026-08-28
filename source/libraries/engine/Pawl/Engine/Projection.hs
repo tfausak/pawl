@@ -109,6 +109,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
+import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Milled as Milled
@@ -2014,6 +2015,10 @@ rewriteEffect pairs effect = case effect of
   Effect.MakePlotted ref -> Effect.MakePlotted (rewriteObjectRef pairs ref)
   Effect.DoesNotUntapNext ref -> Effect.DoesNotUntapNext (rewriteObjectRef pairs ref)
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
+  -- CR 612.2a through the combined back face as well as the ref, Effect.Create's
+  -- reason one opcode over: the face is card data the ability carries, and its
+  -- words are the ability's words.
+  Effect.Meld (Meld.MkMeld ref card) -> Effect.Meld (Meld.MkMeld (rewriteObjectRef pairs ref) (rewriteCard pairs card))
   Effect.PhaseOut ref -> Effect.PhaseOut (rewriteObjectRef pairs ref)
   Effect.AddPhases _ -> effect
   Effect.EndTurn -> effect

@@ -127,10 +127,12 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
@@ -154,6 +156,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import Pawl.Types.Prevention (Prevention)
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.ProposedEvent (ProposedEvent)
@@ -4480,6 +4483,173 @@ recordTokenEntry newId = do
   placed <- State.get
   let snapshot = Projection.project newId placed
   State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange newId newId Zone.Battlefield Zone.Battlefield) snapshot)))
+
+-- CR 701.42a: meld these cards -- "put them onto the battlefield with their back
+-- faces up and combined. The resulting permanent is a single object represented by
+-- two cards". Answers the id the melded permanent arrived under, or Nothing where
+-- CR 701.42b refuses, which by CR 701.42c leaves every card in the zone it is in.
+--
+-- Here rather than beside Pawl.Engine.Resolve's opcode arm for placeObject's and
+-- runEntry's sake: this is a battlefield ENTRY, so it mints an object, writes a
+-- zone index and runs CR 616.1's entry loop, and those three are this module's
+-- and are reached from nowhere else. createTokens is the model throughout -- a
+-- permanent that no single prior incarnation maps onto -- and the differences are
+-- the two rules meld has and CR 111.2 does not: the result is interned from the
+-- COMBINED BACK FACE the ability carried (CR 712.8g), and the cards that were
+-- melded stop being objects.
+--
+-- The EXILE is not here and is not the caller's either: rule 701.42a is only the
+-- putting-onto-the-battlefield, and Hanweir Battlements' "exile them, then meld
+-- them" is an ordinary earlier instruction. That separation is what makes CR
+-- 701.42c's Graf Rats example come out right with no rollback -- a refusal below
+-- does nothing at all, so the cards stay wherever that instruction left them.
+--
+-- CR 712.14c ("those cards enter the battlefield as a single permanent with their
+-- back faces up") is why runEntry runs: the entry replacement loop of rule 616.1
+-- and the enters-the-battlefield trigger scan must both see one permanent enter.
+-- The back faces are up by construction -- CR 712.4b leaves a meld card's own half
+-- of the oversized face meaningless alone, so pawl prints neither half's back and
+-- the interned result IS the combined face, face up on its only face.
+meld :: [ObjectId] -> Card -> Game (Maybe ObjectId)
+meld victims resultCard = do
+  gs <- State.get
+  case meldable victims gs of
+    -- CR 701.42b/701.42c. Nothing is written, so nothing moves.
+    Nothing -> pure Nothing
+    Just (owner, origin, components) -> do
+      -- CR 712.8g: the melded permanent "has only the characteristics of the
+      -- combined back face", which Game.cardOfSource answers by resolving
+      -- MeldSource.result -- so the face is interned exactly as createTokens
+      -- interns a token's card, and every characteristic read past here is the
+      -- ordinary one.
+      resultId <- State.state (Game.intern (Printing.MkPrinting resultCard))
+      -- CR 701.42a's "single object": the melded cards stop being objects BEFORE
+      -- the entry loop, so no projection, replacement or trigger scan inside it
+      -- can find two cards where one permanent is entering. Their ids are dropped
+      -- outright rather than filed under GameState.lastKnown: CR 608.2h's
+      -- look-back exists for what left the BATTLEFIELD, and these cards were not
+      -- on it. What answers for them afterwards is Game.componentsOf over the new
+      -- permanent's source, which is the reader CR 202.3c, CR 712.21 and CR
+      -- 701.27g share.
+      State.modify' (\g -> foldl forgetObject g victims)
+      let mkObj ts =
+            Object.MkObject
+              { -- CR 701.42b's shared owner, checked by `meldable`. Controller
+                -- follows through Projection.defaultControllerOf's CR 109.4c
+                -- default, `enteredUnder` being Nothing: the ability that melds
+                -- requires the activating player to own and control both halves,
+                -- and no other road to a meld exists in the pool.
+                Object.owner = owner,
+                Object.enteredUnder = Nothing,
+                Object.source = Source.OfMeld (MeldSource.MkMeldSource {MeldSource.result = resultId, MeldSource.components = components}),
+                Object.zone = Zone.Battlefield,
+                -- CR 110.5b: nothing in rule 701.42 says otherwise.
+                Object.tapped = TapState.Untapped,
+                -- CR 712.14c's "back faces up", which for the interned combined
+                -- face is its only face; Object.face = Nothing is that face.
+                Object.facing = Facing.FaceUp,
+                Object.exiledFaceDown = False,
+                Object.damage = 0,
+                -- CR 302.6 through CR 400.7: a permanent that has just entered is
+                -- a new object nobody has controlled for any time.
+                Object.sickness = Sickness.Sick,
+                Object.bindings = Map.empty,
+                Object.counters = Map.empty,
+                Object.counterTimestamps = Map.empty,
+                Object.attachedTo = Nothing,
+                Object.chosenColor = Nothing,
+                Object.chosenSubtype = Nothing,
+                Object.chosenNames = Set.empty,
+                Object.chosenPlayer = Nothing,
+                Object.timestamp = ts,
+                Object.face = Nothing,
+                Object.turnedOverAt = Nothing,
+                Object.worldSince = Nothing,
+                Object.playableFromExile = Nothing,
+                Object.plotted = Nothing,
+                Object.foretold = Nothing,
+                Object.ringBearerFor = Nothing,
+                Object.protector = Nothing,
+                Object.ventureRoom = Nothing,
+                Object.classLevel = Nothing,
+                Object.unlockedHalves = Set.empty,
+                Object.designations = Set.empty,
+                Object.kicked = False,
+                Object.bestowed = False,
+                Object.phyrexianLifePaid = 0,
+                Object.manaSpent = Mana.MkMana [],
+                Object.announcedX = Nothing,
+                Object.detainedUntil = Set.empty,
+                Object.goadedBy = Set.empty,
+                Object.doesNotUntapNext = False,
+                Object.exertedBy = Set.empty
+              }
+      newId <- placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue
+      -- CR 712.14c / CR 616.1: ONE permanent enters, so ONE entry loop, with no
+      -- simultaneously-entering sibling to exclude. createTokens' order exactly:
+      -- the object is materialized first, because CR 614.12 asks for the
+      -- characteristics it would have on the battlefield.
+      runEntry Set.empty newId
+      -- CR 603.6a's enters-the-battlefield triggers scan this, and it is recorded
+      -- after the entry loop so the snapshot describes a settled permanent --
+      -- recordTokenEntry's reasons, one zone over. `from` is where the cards were,
+      -- so an "enters from exile" read sees the truth of rule 701.42a.
+      --
+      -- Not implemented: a ZoneChange names ONE departing incarnation and ONE
+      -- origin where a meld has one of each PER CARD, so a meld whose cards sit in
+      -- different zones reports the first card's zone, and only the first card's
+      -- id is named as having departed (#2492).
+      placed <- State.get
+      let snapshot = Projection.project newId placed
+          departed = case victims of
+            first : _ -> first
+            [] -> newId
+      State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed newId origin Zone.Battlefield) snapshot)))
+      pure (Just newId)
+
+-- CR 701.42b: "only two cards belonging to the same meld pair can be melded.
+-- Tokens, cards that aren't meld cards, or meld cards that don't form a meld pair
+-- can't be melded." What can be read off the board is: every named object is a
+-- CARD (CR 108.2, so Source.OfCard and not a token, a copy or an ability), each
+-- such card's layout is Meld (CR 712.4), and they share an owner. Answers that
+-- owner, the zone the cards are in, and their printings in the order they were
+-- named.
+--
+-- WHICH pair a meld card belongs to is not read, and cannot be: the pairing lives
+-- in the ability's own text, which names both halves and the combined face, so a
+-- card file that named the wrong counterpart would be the error rather than a
+-- board state this could catch.
+--
+-- Two or more, from rule 701.42a's "the two cards in a meld pair": one object is
+-- not a meld, and a melding ability whose counterpart is gone by resolution
+-- refuses here. Not EXACTLY two -- MeldSource and Game.componentsOf both quantify
+-- over "each card that represents it" and nothing downstream fixes the number --
+-- and the difference is unobservable, CR 712.5's meld pairs being pairs.
+meldable :: [ObjectId] -> GameState -> Maybe (PlayerId, Zone, NonEmpty.NonEmpty PrintingId.PrintingId)
+meldable victims gs = do
+  objects <- traverse (`Game.lookupObject` gs) victims
+  (first, rest) <- case objects of
+    a : b : cs -> Just (a, b : cs)
+    _ -> Nothing
+  let owner = Object.owner first
+      origin = Object.zone first
+      printingOf obj = case Object.source obj of
+        Source.OfCard pid | Object.owner obj == owner -> do
+          card <- Game.cardOfPrinting pid gs
+          if Card.Type.layout card == Layout.Meld then Just pid else Nothing
+        _ -> Nothing
+  components <- traverse printingOf (first NonEmpty.:| rest)
+  pure (owner, origin, components)
+
+-- Stop being an object at all, the CR 701.42a half of melding that
+-- Game.removeFromZones alone does not do: the id leaves its zone AND the object
+-- table, so nothing can look it up afterwards. Unknown ids are left alone.
+forgetObject :: GameState -> ObjectId -> GameState
+forgetObject gs oid = case Game.lookupObject oid gs of
+  Nothing -> gs
+  Just obj ->
+    let cleared = Game.removeFromZones (Object.owner obj) oid gs
+     in cleared {GameState.objects = Map.delete oid (GameState.objects cleared)}
 
 -- CR 121.1, one card at a time per CR 121.2. An empty library records the failed
 -- draw, which CR 704.5b makes a loss at the next state-based-action check. Shared

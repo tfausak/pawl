@@ -157,6 +157,7 @@ import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaUnit as ManaUnit
+import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
@@ -574,6 +575,9 @@ slotsOf effect = case effect of
   Effect.MakePlotted ref -> objectRefSlots ref
   Effect.DoesNotUntapNext ref -> objectRefSlots ref
   Effect.Transform ref -> objectRefSlots ref
+  -- A READ of the cards to meld; the combined back face is literal card data and
+  -- names no slot.
+  Effect.Meld (Meld.MkMeld ref _) -> objectRefSlots ref
   Effect.PhaseOut ref -> objectRefSlots ref
   Effect.AddPhases _ -> Map.empty
   Effect.EndTurn -> Map.empty
@@ -832,6 +836,9 @@ slotsAreExhaustive effect = case effect of
   Effect.MakePlotted _ -> True
   Effect.DoesNotUntapNext _ -> True
   Effect.Transform _ -> True
+  -- The combined face is interned with EMPTY bindings, CreateEmblem's reason, so
+  -- its text is literal.
+  Effect.Meld _ -> True
   Effect.PhaseOut _ -> True
   Effect.AddPhases _ -> True
   Effect.EndTurn -> True
@@ -995,6 +1002,7 @@ readsX = any effectReadsX
       Effect.MakePlotted _ -> False
       Effect.DoesNotUntapNext _ -> False
       Effect.Transform _ -> False
+      Effect.Meld _ -> False
       Effect.PhaseOut _ -> False
       Effect.AddPhases _ -> False
       Effect.EndTurn -> False
@@ -1196,6 +1204,9 @@ boundSlots effect = case effect of
   Effect.MakePlotted _ -> Set.empty
   Effect.DoesNotUntapNext _ -> Set.empty
   Effect.Transform _ -> Set.empty
+  -- CR 701.42a's melded permanent is bound to nothing: no printing names it later
+  -- in its own instruction list.
+  Effect.Meld _ -> Set.empty
   Effect.PhaseOut _ -> Set.empty
   Effect.AddPhases _ -> Set.empty
   Effect.EndTurn -> Set.empty
@@ -6350,6 +6361,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
        in Event.recordTransformed
             (Game.facesTurned (GameState.objects g1) turned victims)
             g1 {GameState.objects = turned}
+  Effect.Meld (Meld.MkMeld ref resultCard) -> do
+    gs <- State.get
+    -- An ordinary read of the ref (CR 608.2c), not a question: the cards were
+    -- named by the ability that melds -- for the pool's only pair, the slot its
+    -- own "exile them" bound (CR 400.7j) -- so there is nothing here to ask. The
+    -- one choice this card makes is WHICH counterpart to exile, and it is made an
+    -- instruction earlier.
+    --
+    -- Event.meld is the whole of CR 701.42a, gate included: it refuses (CR
+    -- 701.42b) by writing nothing, which is CR 701.42c's "they stay in their
+    -- current zone" -- the cards are wherever the exile left them, and this
+    -- resolution simply had no effect. Nothing is bound and no slot is filled: no
+    -- printing names the melded permanent later in its own instruction list.
+    Monad.void (Event.meld (objectRefObjects legal resolving controller source gs ref) resultCard)
   Effect.PhaseOut ref ->
     State.modify' $ \gs ->
       -- CR 702.26b: each named permanent phases out; the victims are enumerated

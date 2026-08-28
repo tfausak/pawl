@@ -170,6 +170,7 @@ import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaRider as ManaRider
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modal as Modal
@@ -925,6 +926,9 @@ effectCounts effect = case effect of
   Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
+  -- CR 701.42a's combined back face, Create's token one opcode over: card data
+  -- nested in card data, so its own counts are swept.
+  Effect.Meld (Meld.MkMeld _ card) -> overFaces cardCounts card
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -1194,6 +1198,9 @@ effectNestedEffects effect = case effect of
   Effect.MakePlotted {} -> []
   Effect.DoesNotUntapNext {} -> []
   Effect.Transform {} -> []
+  -- Create's answer: the combined face's effects belong to ANOTHER object, and
+  -- effectMintedFaces is what reaches them.
+  Effect.Meld {} -> []
   Effect.PhaseOut {} -> []
   Effect.AddPhases {} -> []
   Effect.EndTurn -> []
@@ -1667,6 +1674,9 @@ effectReplacements effect = case effect of
   Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
+  -- CR 614: the combined back face may print its own entry replacement, so the
+  -- sweep descends into it as it does a token's.
+  Effect.Meld (Meld.MkMeld _ card) -> overFaces cardReplacementEffects card
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -2315,10 +2325,15 @@ mintedFacesTagged card =
   let minted = concatMap effectMintedFaces (cardResolutionEffects card)
    in minted <> concatMap (mintedFacesTagged . snd) minted
 
--- CR 111.1 and CR 114.1: the two kinds of object a card's own effects mint.
+-- CR 111.1, CR 114.1 and CR 701.42a: the kinds of object a card's own effects
+-- mint a face for.
 data MintedKind
   = MintedToken
   | MintedEmblem
+  | -- | CR 701.42a's combined back face, which the melding ability carries
+    -- inline. A face like a token's for this lint's purposes: CR 712.8g gives
+    -- the melded permanent that face's characteristics, card types included.
+    MintedMeld
   deriving (Eq, Ord, Show)
 
 -- The faces one effect mints. Exhaustive and hand-maintained, with
@@ -2403,6 +2418,9 @@ effectMintedFaces effect = case effect of
   Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
+  -- CR 701.42a: the combined back face is a face this card mints, interned at
+  -- resolution exactly as a token's card is.
+  Effect.Meld (Meld.MkMeld _ card) -> fmap ((,) MintedMeld) (NonEmpty.toList (Card.Type.faces card))
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -4029,6 +4047,7 @@ effectFilters effect = case effect of
   Effect.MakePlotted ref -> sourceHosted (objectRefFilters ref)
   Effect.DoesNotUntapNext ref -> sourceHosted (objectRefFilters ref)
   Effect.Transform ref -> sourceHosted (objectRefFilters ref)
+  Effect.Meld (Meld.MkMeld ref card) -> sourceHosted (objectRefFilters ref) <> overFaces cardFilters card
   Effect.PhaseOut ref -> sourceHosted (objectRefFilters ref)
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -4252,6 +4271,8 @@ effectObjectRefs effect = case effect of
   Effect.MakePlotted ref -> read_ [ref]
   Effect.DoesNotUntapNext ref -> read_ [ref]
   Effect.Transform ref -> [(AsksTransformGather, ref)]
+  -- A plain READ: Pawl.Engine.Resolve's Meld arm sweeps the ref and asks nothing.
+  Effect.Meld (Meld.MkMeld ref _) -> read_ [ref]
   Effect.PhaseOut ref -> read_ [ref]
   Effect.AddPhases {} -> []
   Effect.EndTurn -> []

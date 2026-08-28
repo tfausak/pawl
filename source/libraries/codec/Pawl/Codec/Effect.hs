@@ -42,6 +42,7 @@ import qualified Pawl.Codec.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.LookAt as LookAt
 import qualified Pawl.Codec.ManaAddition as ManaAddition
+import qualified Pawl.Codec.Meld as Meld
 import qualified Pawl.Codec.Mill as Mill
 import qualified Pawl.Codec.ModifyTarget as ModifyTarget
 import qualified Pawl.Codec.MonarchTarget as MonarchTarget
@@ -145,6 +146,7 @@ codec cardCodec abilityCodec =
       Arm.payload "Goad" ObjectRef.codec Effect.Goad (\x -> case x of Effect.Goad y -> Just y; _ -> Nothing),
       Arm.payload "DoesNotUntapNext" ObjectRef.codec Effect.DoesNotUntapNext (\x -> case x of Effect.DoesNotUntapNext y -> Just y; _ -> Nothing),
       Arm.payload "Transform" ObjectRef.codec Effect.Transform (\x -> case x of Effect.Transform y -> Just y; _ -> Nothing),
+      Arm.payload "Meld" meldCodec Effect.Meld (\x -> case x of Effect.Meld y -> Just y; _ -> Nothing),
       Arm.payload "PhaseOut" ObjectRef.codec Effect.PhaseOut (\x -> case x of Effect.PhaseOut y -> Just y; _ -> Nothing),
       Arm.payload "AddPhases" (Common.list ExtraPhase.codec) Effect.AddPhases (\x -> case x of Effect.AddPhases y -> Just y; _ -> Nothing),
       Arm.nullary "EndTurn" Effect.EndTurn,
@@ -184,6 +186,7 @@ codec cardCodec abilityCodec =
     ]
   where
     createCodec = Create.codec cardCodec
+    meldCodec = Meld.codec cardCodec
     replaceCodec = Replace.codec (codec cardCodec abilityCodec)
     preventCodec = PreventNextDamage.codec (codec cardCodec abilityCodec)
     preventAllCodec = PreventAllDamage.codec (codec cardCodec abilityCodec)
