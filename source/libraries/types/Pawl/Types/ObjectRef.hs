@@ -589,15 +589,20 @@ data ObjectRef
     -- that asks.
     AnyNumberMatching (Filter.Filter Keyword.Keyword)
   | -- | EXACTLY ONE of the permanents on the battlefield matching the Filter,
-    -- chosen as the effect runs -- Hanweir Battlements' "exile ... and a creature
-    -- named Hanweir Garrison you control" (CR 701.42a).
+    -- chosen as the effect runs -- the Garrison in Hanweir Battlements' "If you
+    -- both own and control this land and a creature named Hanweir Garrison, exile
+    -- them, then meld them into Hanweir, the Writhing Township" (CR 701.42a).
     --
     -- The arm above's singular, and its Filter position exactly: the same zone,
     -- the same sweep, the same shared candidate function, so a card cannot find
-    -- the sweep and the offer disagreeing about what matches, and "you control"
-    -- is a conjunct of the Filter here as it is there (CR 109.5 answers "you"
-    -- against the resolving controller). The RESOLVING CONTROLLER chooses, by CR
-    -- 608.2c, so there is no Pawl.Types.Chooser beside the Filter.
+    -- the sweep and the offer disagreeing about what matches. Every relative
+    -- word the printed sentence uses is a conjunct of that Filter, as it is
+    -- there -- for Hanweir Battlements OWNERSHIP AND CONTROL together, since it
+    -- prints "you both own and control" and a Garrison you control but do not own
+    -- is not one the ability may name. CR 109.5 answers "you" against the
+    -- ability's controller, which for an activated ability is the player who
+    -- activated it. The RESOLVING CONTROLLER chooses, by CR 608.2c, so there is
+    -- no Pawl.Types.Chooser beside the Filter.
     --
     -- NOT A TARGET (CR 115.10a): the printed sentence does not say "target", so
     -- CR 115.1 declares nothing at announcement, nothing narrows the offered set

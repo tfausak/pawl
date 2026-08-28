@@ -3091,9 +3091,11 @@ objectRefFilters ref = case ref of
   -- Filter position exactly -- same zone, same sweep, the chooser standing
   -- between the matches and the set -- so it is framed the same way.
   ObjectRef.AnyNumberMatching f -> [f]
-  -- Hanweir Battlements' "a creature named Hanweir Garrison you control": the
-  -- arm above's Filter position, one permanent instead of a subset, so it is
-  -- framed the same way.
+  -- The Garrison in Hanweir Battlements' "If you both own and control this land
+  -- and a creature named Hanweir Garrison": the arm above's Filter position, one
+  -- permanent instead of a subset, so it is framed the same way -- and the
+  -- ownership and control the card prints are conjuncts of that Filter, which is
+  -- what this traversal hands to the Filter lints.
   ObjectRef.ChosenPermanent f -> [f]
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family

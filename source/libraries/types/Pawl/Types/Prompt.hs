@@ -835,8 +835,9 @@ data Prompt r where
   -- target" triggers observe this choice (CR 115.10a).
   ChooseAnyNumberOfPermanents :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 608.2d: WHICH ONE of the permanents an effect offers it acts on, where
-  -- the effect names exactly one -- Hanweir Battlements' "a creature named
-  -- Hanweir Garrison you control", Pawl.Types.ObjectRef.ChosenPermanent. The
+  -- the effect names exactly one -- the Garrison in Hanweir Battlements' "If you
+  -- both own and control this land and a creature named Hanweir Garrison, exile
+  -- them, then meld them ...", Pawl.Types.ObjectRef.ChosenPermanent. The
   -- ObjectId is the effect's source; the NonEmpty is the matching permanents,
   -- engine-pre-filtered against that ref's Filter.
   --

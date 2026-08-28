@@ -2494,7 +2494,8 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.RandomCardInHand _ -> []
   -- No recipients: only the Effect.Transform gather can ask the chooser.
   ObjectRef.AnyNumberMatching _ -> []
-  -- No recipients: nothing can ask the chooser yet (#369).
+  -- No recipients: the arm above's answer, for its reason -- only a gather that
+  -- reaches the Game monad can ask the chooser.
   ObjectRef.ChosenPermanent _ -> []
 
 -- CR 608.2f's order for the per-object loop: APNAP first, reading a player
