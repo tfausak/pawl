@@ -391,7 +391,9 @@ data View = MkView
     -- 608.2h's record for an object whose id names nothing.
     --
     -- Empty for every candidate with no counters to read: a printed card off the
-    -- battlefield, a player, an event snapshot.
+    -- battlefield, a player, a spell that was cast. An event snapshot of a MOVE
+    -- is not one of them -- CR 608.2i looks back at what the object HAD, which
+    -- Pawl.Engine.Count.snapshotView answers off the same CR 608.2h record.
     counters :: Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural.Natural,
     -- CR 701.54a-b: which player this candidate is the Ring-bearer FOR, or Nothing
     -- for the overwhelming majority of permanents, which carry no such
