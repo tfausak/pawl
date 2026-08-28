@@ -58,6 +58,7 @@ import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -354,7 +355,10 @@ affectedBy pid oid gs =
 -- direction Modification.AddChosenColor reads a colour. A stored CR 611.2c effect
 -- carries one too -- ActivePlayerEffect.source is the object that resolved -- and
 -- it is what makes Filter.IsSource answerable for Lava Burst's self-naming
--- clause, which was vacuously False while this walk hardcoded Nothing.
+-- clause, which was vacuously False while this walk hardcoded Nothing. It is also
+-- what carries Conjurer's Ban's own chosen name, through CR 608.2h rather than
+-- off the board, since that source is in a graveyard by then (chosenNamesOf
+-- below).
 applying :: PlayerId -> GameState -> [(Maybe ObjectId, PlayerEffect)]
 applying pid gs =
   let printed = printedRows gs
@@ -835,14 +839,37 @@ prohibitsBecomingMonarch pid gs =
 
 -- CR 201.4: the card names chosen for this effect's source, as it entered (CR
 -- 614.1c) or while it resolved (CR 608.2c) -- Object.chosenNames. Empty for an
--- effect with no source -- a stored CR 611.2c row -- and for a permanent that
--- chose nothing.
+-- effect with no source at all, and for a source that chose nothing.
+--
+-- CR 608.2h is what the fallback is: this asks for information from a SPECIFIC
+-- object, so it reads that object's current information while the object is
+-- there and its LAST KNOWN information once it is gone. Both roads are live.
+-- Null Chamber is a permanent and answers off the board; Conjurer's Ban chooses
+-- during its own resolution and is in a graveyard by CR 608.2m before the two
+-- rows it stored are ever read, so a current-information-only reading would make
+-- that card's whole sentence do nothing (Pawl.PlayerEffectSpec's ConjurersBan
+-- group is the proof).
+--
+-- The names are NOT baked into Pawl.Types.ActivePlayerEffect as the controller
+-- is, and CR 608.2h is why: a baked value would freeze what the rule says to
+-- re-read, and the row already carries the id that reads it.
+--
+-- Not implemented: a stored row whose source is still on the battlefield and
+-- chooses a SECOND name afterwards reads the later name too, where CR 608.2h's
+-- current information is what the rule asks for only because pawl keeps a name
+-- on the object. No printed card can reach it -- every chosen-name prohibition
+-- in the pool either is a permanent's own static ability or comes from a
+-- resolution that leaves the zone at once (#2531).
 --
 -- The empty set is the answer that matches NO object rather than every object,
 -- which is the shape CR 201.2a describes for an object with no name: having no
 -- name is not sharing one.
 chosenNamesOf :: Maybe ObjectId -> GameState -> Set.Set CardName
-chosenNamesOf source gs = maybe Set.empty Object.chosenNames (source >>= \oid -> Game.lookupObject oid gs)
+chosenNamesOf source gs = case source of
+  Nothing -> Set.empty
+  Just oid -> case Game.lookupObject oid gs of
+    Just object -> Object.chosenNames object
+    Nothing -> maybe Set.empty LastKnown.chosenNames (Map.lookup oid (GameState.lastKnown gs))
 
 -- Does this OBJECT match a player effect's Filter? Shared by the four questions
 -- that carry one -- CR 601.2f's cost adjustments in both of their moments, CR
@@ -873,10 +900,14 @@ chosenNamesOf source gs = maybe Set.empty Object.chosenNames (source >>= \oid ->
 -- never Nothing by default -- which is what makes CR 303.4b's IsHostOfSource
 -- answerable here at all. It was a literal Nothing until this function grew the
 -- argument, so Oppressive Rays' "activated abilities of ENCHANTED CREATURE"
--- matched nothing whatever the board held; see #1242. A stored CR 611.2c effect
--- legitimately has none: it came from a resolved spell and there is no permanent
--- behind it -- `applying` hands Nothing for every stored row, for the reason its
--- own haddock gives -- so CR 303.4b's atom is simply False there.
+-- matched nothing whatever the board held; see #1242. A stored CR 611.2c row
+-- names one too (ActivePlayerEffect.source), so Filter.IsSource and
+-- Filter.IsHostOfSource are answerable under a stored row rather than vacuously
+-- False -- which is what Lava Burst's self-naming redirection clause needs.
+-- CR 303.4b's atom still answers False for the usual stored row, but by the
+-- BOARD rather than by fiat: an instant's source is in a graveyard enchanting
+-- nothing by the time the row is read, and `sourceAttachedTo` below is a live
+-- lookup that finds no host for it.
 --
 -- The source's HOST comes off the board here rather than riding in the row,
 -- because it is a map lookup with no projection behind it

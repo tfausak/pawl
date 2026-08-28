@@ -871,7 +871,9 @@ lastKnownRiderSpec s registry =
                     -- The Sorcerer wears the Collar rather than the other way
                     -- round, so the object this record is about is attached to
                     -- nothing.
-                    LastKnown.attachedTo = Nothing
+                    LastKnown.attachedTo = Nothing,
+                    -- CR 201.4: nothing named a card here.
+                    LastKnown.chosenNames = Set.empty
                   }
               humbled = S.withHumility humility equipped
               planted =

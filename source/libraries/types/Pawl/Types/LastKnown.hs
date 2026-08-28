@@ -1,7 +1,9 @@
 module Pawl.Types.LastKnown where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -14,7 +16,7 @@ import qualified Pawl.Types.Source as Source
 -- as the object ceases, from the same pre-move state the GameEvent.Moved
 -- snapshot is taken against.
 --
--- Six things rather than the characteristics alone, because the other five
+-- Seven things rather than the characteristics alone, because the other six
 -- questions CR 608.2h is asked have no home in that fold. Control is not a
 -- characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
 -- asks of a triggered ability whose source is gone. Neither is the object's
@@ -25,9 +27,10 @@ import qualified Pawl.Types.Source as Source
 -- projection actively CONSUMES them (CR 613.4c), so the record has to be taken
 -- beside it rather than out of it. The COPIABLE values are the fourth, for the
 -- reason its own field gives. Nor is the ATTACHMENT, the fifth -- CR 109.3
--- names "what an Aura enchants" as an example of what is not one.
+-- names "what an Aura enchants" as an example of what is not one. Nor are the
+-- CHOSEN NAMES, the sixth, for the reason its own field gives.
 --
--- All six fields STRICT (!): entries are keyed by an id that no longer exists
+-- All seven fields STRICT (!): entries are keyed by an id that no longer exists
 -- and are never pruned, so an unforced field would be a thunk retaining the whole
 -- pre-move GameState for the rest of the game.
 data LastKnown = MkLastKnown
@@ -83,6 +86,18 @@ data LastKnown = MkLastKnown
     --
     -- Nothing for an object that was attached to nothing, which is every object
     -- that is not an Aura, an Equipment or a Fortification.
-    attachedTo :: !(Maybe Recipient.Recipient)
+    attachedTo :: !(Maybe Recipient.Recipient),
+    -- | CR 201.4: the card names that had been chosen for it -- the same
+    -- Object.chosenNames the live object carried. What CR 608.2h answers for a
+    -- CR 611.2c effect whose source chose a name and then left the zone it was
+    -- expected to be in: Conjurer's Ban chooses during its own resolution and is
+    -- in a graveyard by the time the prohibition it stored is first read
+    -- (Pawl.Engine.PlayerEffect.chosenNamesOf).
+    --
+    -- Not a characteristic either -- CR 109.3's list has no chosen name -- and
+    -- not recoverable from `characteristics` or `copiable`, since choosing a name
+    -- changes nothing the projection folds. So it sits beside them for
+    -- `controller`'s reason.
+    chosenNames :: !(Set.Set CardName.CardName)
   }
   deriving (Eq, Ord, Show)

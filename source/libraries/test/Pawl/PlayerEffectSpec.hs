@@ -29,6 +29,11 @@
 -- Null Chamber also brings CR 201.4's card-name choice and CR 614.1c's entry
 -- replacement in with it, so the group covers Pawl.Engine.Replacement's
 -- EntryRewrite.ChooseCardNames arm and Pawl.Engine.Action.playableLands as well.
+-- Conjurer's Ban is the same two prohibitions on the STORED carrier, which is
+-- what makes the pair worth having: its name is chosen by CR 608.2c during the
+-- resolution rather than by CR 614.1c as a permanent enters, and its source is in
+-- a graveyard before the rows it stored are read, so it is the only card that
+-- reaches CR 608.2h's last-known road into Pawl.Engine.PlayerEffect.chosenNamesOf.
 --
 -- Artificial Evolution and Magical Hack join Edgewalker for CR 612.1, the second
 -- rule reaching this axis from outside it: the word naming which spells a player
@@ -3830,10 +3835,10 @@ nullChamberSpec s registry =
     -- destroying the Chamber lifts both halves with nothing to unwind.
     --
     -- The names go with it too -- CR 400.7 mints a new incarnation in the
-    -- graveyard and Event.changeZone empties its chosenNames -- but that is a
-    -- separate fact and NOT what this case observes: `applying` walks only the
-    -- battlefield, so both prohibitions would lift here even if the names had
-    -- survived the move.
+    -- graveyard and Event.changeZone empties its chosenNames, CR 608.2h's record
+    -- of them staying behind under the OLD id -- but that is a separate fact and
+    -- NOT what this case observes: `applying` walks only the battlefield, so both
+    -- prohibitions would lift here even if the names had survived the move.
     Spec.it s "CR 604.2 destroying the Chamber lifts both prohibitions" $ do
       plains <- S.printingOf s registry "Plains"
       mountain <- S.printingOf s registry "Mountain"
@@ -4052,6 +4057,87 @@ isPlay action = case action of
   Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
   Action.Type.Pass -> False
+
+-- Conjurer's Ban {W}{B} Sorcery: "Choose a card name. Until your next turn,
+-- spells with the chosen name can't be cast and lands with the chosen name can't
+-- be played. Draw a card."
+--
+-- The STORED twin of nullChamberSpec above, and the whole reason this group
+-- exists: it is the pool's only writer of either chosen-name arm as a resolution
+-- (CR 611.2c) rather than as a permanent's printed ability, so it is the only
+-- card that reaches PlayerEffect.chosenNamesOf through a GameState.playerEffects
+-- row. The name is chosen by CR 201.4 during the resolution (Effect
+-- .ChooseCardName) and the two rows stored a clause later read it back.
+--
+-- alice has four Plains, four Mountains and four Swamps -- mana is never the
+-- reason a cast is unavailable, before or after the Ban's own {W}{B} is paid --
+-- the Ban in hand, and a Plains in her library for the card it draws.
+conjurersBanBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, GameState.GameState)
+conjurersBanBoard plains mountain swamp ban =
+  let lands = S.landsFor swamp S.alice 4 (S.landsFor mountain S.alice 4 (S.landsInPlay plains 4))
+      (gs, oid) = S.handOne ban lands
+   in (oid, snd (S.addLibraryCard plains S.alice gs))
+
+-- Cast the Ban and let it resolve, answering CR 201.4's one name choice.
+castBan :: CardName.CardName -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+castBan name gs oid =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseCardName {} -> name
+        _ -> S.identityAnswer p
+      cast = snd (Engine.runGamePure answer gs (S.cast S.alice oid))
+   in snd (Engine.runGamePure answer cast Stack.resolveTop)
+
+conjurersBanSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+conjurersBanSpec s registry =
+  Spec.describe s "ConjurersBan" $ do
+    -- CR 601.3's prohibit half carrying a QUALITY, read off a stored row. The
+    -- Bolt is the falsifier twice over: a blanket prohibition would take it away
+    -- too, and it is castable on the same board with the same untapped lands, so
+    -- mana is not what stops the Piker.
+    Spec.it s "CR 611.2c a spell with the name the resolution chose can't be cast, and its neighbour still can" $ do
+      plains <- S.printingOf s registry "Plains"
+      mountain <- S.printingOf s registry "Mountain"
+      swamp <- S.printingOf s registry "Swamp"
+      ban <- S.printingOf s registry "Conjurer's Ban"
+      piker <- S.printingOf s registry "Goblin Piker"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      let (oid, board) = conjurersBanBoard plains mountain swamp ban
+          (pikerId, withPiker) = S.addHandCard piker S.alice board
+          (boltId, before) = S.addHandCard lightningBolt S.alice withPiker
+          after = castBan (S.printingName piker) before oid
+          castPiker = Action.Type.Cast pikerId (S.printingName piker) Facing.FaceUp
+          castBolt = Action.Type.Cast boltId (S.printingName lightningBolt) Facing.FaceUp
+      Spec.assertBool s (elem castPiker (Action.legalActions S.alice before)) "alice may cast her Piker before the Ban resolves"
+      Spec.assertBool s (notElem castPiker (Action.legalActions S.alice after)) "and may not once it has"
+      Spec.assertBool s (elem castBolt (Action.legalActions S.alice after)) "the unnamed Bolt still is offered"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) after) "and the prohibition is the named one"
+      -- The carrier, asserted AFTER the behaviour: nothing this card makes is a
+      -- permanent, so both rows are CR 611.2c stored ones.
+      Spec.assertEqWith s "two stored rows" (length (GameState.playerEffects after)) 2
+
+    -- CR 305.1: the land half is a special action and a different gate
+    -- (Action.playableLands), exactly as Null Chamber's is. The Plains is the
+    -- falsifier.
+    Spec.it s "CR 305.1 a land with the chosen name can't be played, and an unnamed one still can" $ do
+      plains <- S.printingOf s registry "Plains"
+      mountain <- S.printingOf s registry "Mountain"
+      swamp <- S.printingOf s registry "Swamp"
+      ban <- S.printingOf s registry "Conjurer's Ban"
+      ashBarrens <- S.printingOf s registry "Ash Barrens"
+      let (oid, board) = conjurersBanBoard plains mountain swamp ban
+          (barrensId, withBarrens) = S.addHandCard ashBarrens S.alice board
+          (plainsId, before) = S.addHandCard plains S.alice withBarrens
+          after = castBan (S.printingName ashBarrens) before oid
+      Spec.assertBool s (elem (barrensId, Nothing) (Action.playableLands S.alice before)) "alice may play her Ash Barrens before the Ban resolves"
+      Spec.assertBool s (notElem (barrensId, Nothing) (Action.playableLands S.alice after)) "and may not once it has"
+      Spec.assertBool s (elem (plainsId, Nothing) (Action.playableLands S.alice after)) "the unnamed Plains still is playable"
+      Spec.assertBool s (notElem (Action.Type.Play barrensId Nothing) (Action.legalActions S.alice after)) "and no Play is offered for the Barrens"
 
 -- Exploration {G} Enchantment: "You may play an additional land on each of your
 -- turns." Azusa, Lost but Seeking {2}{G} Legendary Creature -- Human Monk: "You
@@ -5283,6 +5369,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
   nullChamberSpec s registry
+  conjurersBanSpec s registry
   adjustmentSpec s
   thaliaSpec s registry
   medallionSpec s registry
