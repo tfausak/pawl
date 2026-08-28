@@ -4464,11 +4464,14 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
     Spec.assertBool s paid "the {G} was paid"
     Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
 
-  -- The gate is BOARD-WIDE, not pairwise: a stored continuous effect anywhere
-  -- retires the elision, because deciding a pair against one means asking every
-  -- effect whether it names one of them. Here the effect sits on the
-  -- Bonesplitter, which is attached to nothing, so the three Elves still agree
-  -- field for field and projection for projection -- and are still asked about.
+  -- The gate over GameState.continuousEffects is still BOARD-WIDE rather than
+  -- pairwise, where the id-keyed relations below are searched: a stored
+  -- continuous effect anywhere retires the elision, because deciding a pair
+  -- against one means asking every effect whether it names one of them, over an
+  -- Affected that may be a Filter rather than a set of ids (#1969). Here the
+  -- effect sits on the Bonesplitter, which is attached to nothing, so the three
+  -- Elves still agree field for field and projection for projection -- and are
+  -- still asked about.
   Spec.it s "CR 601.2g a stored continuous effect anywhere retires the elision" $ do
     elf <- S.printingOf s registry "Llanowar Elves"
     splitter <- S.printingOf s registry "Bonesplitter"
@@ -4477,6 +4480,53 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
         board = S.withEffect weapon (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))) armed
         (offers, paid, after) = greenWindow board
     Spec.assertEqWith s "asked once, with all three Elves on offer" (fmap length offers) [3]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- GameState.haunting (CR 702.55b) is one of the id-keyed relations
+  -- Pawl.Engine.Interchangeable.namedByRelation SEARCHES rather than requires
+  -- empty. Here the row names bob's Piker, so it says nothing about any Elf and
+  -- the three are still one option -- where the board-wide gate would have
+  -- retired the elision for a haunt anywhere on the board.
+  --
+  -- The control below is the same board with the row's VALUE moved onto an Elf,
+  -- which is what makes this a pair differing in exactly one thing rather than a
+  -- board that happens to elide.
+  Spec.it s "CR 702.55b a haunt row that names no Elf leaves the elision standing" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hunter <- S.printingOf s registry "Blind Hunter"
+    let (elves, plain) = elfBoard elf 3
+        (pikerId, withPiker) = S.addCreature piker S.bob plain
+        (hunterId, exiled) = S.addExiledCard hunter S.bob withPiker
+        board = haunts hunterId pikerId exiled
+        (offers, paid, after) = greenWindow board
+    Spec.assertEqWith s "asked once, and the three Elves are one candidate" (fmap length offers) [1]
+    Spec.assertBool s paid "the {G} was paid"
+    Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
+
+  -- The control, and the load-bearing half: CR 702.55b's "creature it haunts"
+  -- names ONE Elf, and nothing about that Elf's own record or projection says so
+  -- -- the haunting card is in exile. Tapping it is a different act from tapping
+  -- either of the other two, so the prompt must still be asked, with the haunted
+  -- Elf beside the two that are alike.
+  Spec.it s "CR 702.55b an Elf a haunting card in exile haunts is a candidate of its own" $ do
+    elf <- S.printingOf s registry "Llanowar Elves"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hunter <- S.printingOf s registry "Blind Hunter"
+    let (elves, plain) = elfBoard elf 3
+        (_, withPiker) = S.addCreature piker S.bob plain
+        (hunterId, exiled) = S.addExiledCard hunter S.bob withPiker
+        board = haunts hunterId (NonEmpty.head elves) exiled
+        (offers, paid, after) = greenWindow board
+    Spec.assertEqWith s "asked once, with the haunted Elf beside the two that are alike" (fmap length offers) [2]
+    -- After the offer assertion, so it cannot absorb a mutation aimed at the
+    -- relation: nothing but GameState.haunting separates these three.
+    Spec.assertEqWith
+      s
+      "and the three Elves project identically, power, toughness and abilities alike"
+      (fmap (\oid -> (S.powerToughnessOf oid board, length (Projection.triggeredAbilitiesOf oid board))) (NonEmpty.toList elves))
+      (replicate 3 (Just (1, 1), 0))
     Spec.assertBool s paid "the {G} was paid"
     Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
 
@@ -4502,6 +4552,17 @@ greenWindow board =
 -- How many of these permanents are tapped.
 tappedCount :: [ObjectId.ObjectId] -> GameState.GameState -> Int
 tappedCount oids gs = length (filter (\oid -> fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Tapped) oids)
+
+-- A fixture write standing in for haunt's dies trigger (CR 702.55b): the row
+-- saying which object a card already in exile haunts. Blind Hunter writing one
+-- through the real trigger is Pawl.ZoneTriggerSpec's "CR 702.55c whole card"
+-- case; only the ROW matters here, and writing it by hand is what keeps the two
+-- boards above one field apart.
+haunts :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+haunts hauntingCard haunted gs =
+  gs
+    { GameState.haunting = Map.insert hauntingCard haunted (GameState.haunting gs)
+    }
 
 -- A fixture write standing in for Elvish Hunter's resolution, sicken's shape.
 freeze :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
