@@ -926,13 +926,17 @@ data Prompt r where
   -- Asked only where the order is observable within a pass, which
   -- Pawl.Engine.Cost.orderObservable decides.
   OrderCostComponents :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [CostComponent.CostComponent Keyword.Keyword] -> Prompt [Natural.Natural]
-  -- | CR 608.2f's secondary sentence: the controller of the RESOLVING spell or
-  -- ability chooses the relative order of a per-object body over objects one
-  -- player controls. The [Recipient] is one such group in the engine's
-  -- canonical order; the answer is a permutation of its indices.
+  -- | The relative order of a per-object batch over objects ONE player
+  -- controls. The [Recipient] is one such group in the engine's canonical
+  -- order; the answer is a permutation of its indices.
   --
-  -- The chooser is the resolving controller, generally NOT the player whose
-  -- permanents these are, which is the whole difference from OrderTriggers.
+  -- WHO is asked is the rule's, and the two rules that reach this disagree: CR
+  -- 608.2f's secondary sentence gives it to the controller of the RESOLVING
+  -- spell or ability, generally NOT the player whose permanents these are,
+  -- which is the whole difference from OrderTriggers; CR 701.44d's simultaneous
+  -- explores give it to that seat itself. The PlayerId field is whichever, so
+  -- the prompt carries the answer to that question rather than assuming one.
+  --
   -- Asked once per GROUP rather than once per loop, the primary determination
   -- being APNAP (CR 101.4) and nobody's choice; the groups are asked in APNAP
   -- order, which CR 101.4c leaves open.

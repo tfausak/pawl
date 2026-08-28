@@ -418,8 +418,11 @@ data Effect card ability
     -- which is why an empty library still reaches the counter, and CR 701.44c
     -- reads the controller from last known information.
     --
-    -- Not implemented: CR 701.44d's choice of WHICH of several simultaneous
-    -- explores goes first (#1345).
+    -- CR 701.44d orders several simultaneous explores: APNAP across the seats
+    -- that control them, then that seat's OWN choice within its group, asked as
+    -- Prompt.OrderForEach by Pawl.Engine.Resolve.forEachOrder. The chooser is the
+    -- permanents' controller and NOT the resolving controller CR 608.2f names one
+    -- rule up.
     Explore ObjectRef.ObjectRef
   | -- | CR 701.9: the slot's target player discards this many. The DISCARDING
     -- player chooses which (CR 701.9b) via Prompt.ChooseDiscard. A hand smaller
