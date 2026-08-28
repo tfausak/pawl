@@ -24,6 +24,7 @@ import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Natural as Natural
@@ -35,11 +36,13 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
@@ -51,6 +54,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- Secret Door's one activated ability, "{4}{U}: Venture into the dungeon.
 -- Activate only as a sorcery." Taken off the printing rather than rebuilt, so the
@@ -164,6 +168,58 @@ ventureOnce answer ability doorId gs =
 -- `n` ventures in a row, all answered the same way.
 ventureTimes :: Int -> (forall r. Prompt.Prompt r -> r) -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> ObjectId -> GameState.GameState -> GameState.GameState
 ventureTimes n answer ability doorId gs = List.foldl' (\acc _ -> ventureOnce answer ability doorId acc) gs [1 .. n]
+
+-- The battlefield objects whose face carries this name, as `namesInPlay` spells
+-- one.
+inPlayNamed :: String -> GameState.GameState -> [ObjectId]
+inPlayNamed name gs =
+  filter
+    (\oid -> fmap (show . CardName.unwrap . Face.name) (Game.faceOf oid gs) == Just name)
+    (Set.toList (GameState.battlefield gs))
+
+-- alice controls a Synthetic Undercity Stair and 25 untapped Islands -- five
+-- activations of its {4}{U} -- owns Undercity outside the game, and has a library
+-- of exactly TEN cards: Goblin Piker, Cabal Evangel and eight Islands.
+--
+-- Ten so that Throne of the Dead Three's "reveal the top ten cards of your
+-- library" covers the WHOLE library whatever order the earlier rooms leave it in.
+-- Every card the room's "then shuffle" randomises is then one the reveal left in
+-- place, which is the negative the case below turns on, and both creature cards
+-- are among the revealed however the shuffles fell.
+--
+-- Nothing on the last-arrow path leaves the library: Secret Entrance's search is
+-- declined, Lost Well only scries, and Stash and Catacombs create tokens. So the
+-- count holds through all five ventures without the case having to predict a
+-- permutation.
+throneBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId, ObjectId, ObjectId, GameState.GameState)
+throneBoard island piker evangel stair undercity =
+  let stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) (S.landsInPlay island 25) [1 .. (8 :: Int)]
+      (pikerId, g1) = S.addLibraryCard piker S.alice stocked
+      (evangelId, g2) = S.addLibraryCard evangel S.alice g1
+      (stairId, g3) = S.addCreature stair S.alice g2
+      (dungeonId, g4) = Game.intern undercity g3
+      owned p = p {Player.dungeons = Set.singleton dungeonId}
+   in (stairId, pikerId, evangelId, g4 {GameState.players = Map.adjust owned S.alice (GameState.players g4)})
+
+-- `payingLastRoom`, plus the two answers Throne of the Dead Three needs.
+--
+-- Prompt.Shuffle is REVERSED. CR 701.24a leaves a shuffle observable only through
+-- the order it produces, and the engine rolls nothing -- it asks -- so this
+-- fixture's permutation is the whole of the randomness and the case is
+-- deterministic. Reversing rather than permuting: a library of two or more
+-- distinct cards is never its own reverse, so "the order changed" is decidable
+-- against the pre-shuffle list rather than against a seed.
+--
+-- Prompt.ChooseCardFromAmong is FILTERED to `chosen` rather than answered by
+-- position: the offered set is what the engine built out of the revealed group,
+-- and picking out of it is what makes "the room asked and honoured the answer"
+-- observable -- the other creature card is left in the library, where the
+-- assertions read it.
+throneAnswer :: ObjectId -> Prompt.Prompt r -> r
+throneAnswer chosen p = case p of
+  Prompt.Shuffle ids -> reverse ids
+  Prompt.ChooseCardFromAmong _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== chosen) (NonEmpty.toList offered))
+  _ -> payingLastRoom p
 
 -- alice controls a Secret Door and `lands` untapped Islands, owns `dungeons`
 -- outside the game (CR 309.2), and has cards left to draw.
@@ -454,10 +510,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
   -- data/cards/undercity.json is the DUNGEON face alone. The printing's other
   -- face, The Initiative, is a reminder rather than a source: CR 726.2 makes the
   -- three initiative abilities inherent, with no source, so transcribing them onto
-  -- a face would be wrong as well as unreachable, and rule 726 is #746's. Its
-  -- bottommost room carries no ability at all (#2518). Synthetic Undercity Stair
-  -- is the producer meanwhile, since CR 726.2's inherent ability is the only
-  -- printed "venture into Undercity" there is.
+  -- a face would be wrong as well as unreachable, and rule 726 is #746's.
+  -- Synthetic Undercity Stair is the producer meanwhile, since CR 726.2's
+  -- inherent ability is the only printed "venture into Undercity" there is.
   --
   -- ONE board, two abilities on it: Synthetic Undercity Stair's "venture into
   -- Undercity" and Secret Door's plain "venture into the dungeon". alice owns
@@ -504,3 +559,65 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
     -- variant changes which card comes in, and nothing else about entering.
     Spec.assertEqWith s "one dungeon apiece" (length (dungeonsOf S.alice quality), length (dungeonsOf S.alice plain)) (1, 1)
     Spec.assertEqWith s "each with its marker on the topmost room" (markerOf S.alice quality, markerOf S.alice plain) (Just RoomIndex.topmost, Just RoomIndex.topmost)
+  -- CR 701.24a: "to shuffle a library ... randomize the cards within it so that no
+  -- player knows their order" -- and nothing else. Undercity's bottommost room,
+  -- Throne of the Dead Three, is the pool's producer for that sentence standing
+  -- alone: "Reveal the top ten cards of your library. Put a creature card from
+  -- among them onto the battlefield with three +1/+1 counters on it. It gains
+  -- hexproof until your next turn. Then shuffle."
+  --
+  -- Five ventures down the LAST arrow each time -- Secret Entrance, Lost Well,
+  -- Stash, Catacombs, Throne of the Dead Three -- which is the one path to the
+  -- bottommost room on which no room takes a card out of the library, so the
+  -- reveal covers the whole of it.
+  --
+  -- The CONTROL is the fourth venture, Catacombs' "create a 4/1 black Skeleton
+  -- creature token with menace", under the SAME interpreter: it touches no library,
+  -- so the order is unchanged across it. The two boards differ in exactly one
+  -- thing, which room the marker reached.
+  --
+  -- Then the negative CR 701.24a is about. The nine revealed cards that stay in
+  -- the library keep the OBJECT IDS they had: CR 400.7 mints a fresh id for every
+  -- completed zone change, so identical ids are what "nothing moved" means, and
+  -- the fifth venture's zone-change log holds the one move the room does state and
+  -- nothing into a library.
+  Spec.it s "CR 701.24a Throne of the Dead Three's \"then shuffle\" randomises the library and moves nothing" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    stair <- S.printingOf s registry "Synthetic Undercity Stair"
+    undercity <- S.printingOf s registry "Undercity"
+    let (stairId, pikerId, evangelId, gs) = throneBoard island piker evangel stair undercity
+        answering :: Prompt.Prompt r -> r
+        answering = throneAnswer evangelId
+        libraryOf = Game.zoneMembers Zone.Library S.alice
+        atStash = ventureTimes 3 answering (ventureAbility stair) stairId gs
+        atCatacombs = ventureOnce answering (ventureAbility stair) stairId atStash
+        atThrone = ventureOnce answering (ventureAbility stair) stairId atCatacombs
+        -- The fifth venture's own zone changes, the fourth's log subtracted off:
+        -- S.zoneChangesOf accumulates over the whole turn and all five run in one.
+        thisVenture = drop (length (S.zoneChangesOf atCatacombs)) (S.zoneChangesOf atThrone)
+    -- CR 701.24a, at gameplay level: the library the room left in place comes back
+    -- in a different order, and under this interpreter exactly the reversed one.
+    -- An implementation that shuffled nothing would answer
+    -- `List.delete evangelId (libraryOf atCatacombs)`, which is the same list the
+    -- other way round.
+    Spec.assertEqWith s "the room's \"then shuffle\" reversed what the reveal left in the library" (libraryOf atThrone) (reverse (List.delete evangelId (libraryOf atCatacombs)))
+    -- The control: the venture before it, answered the same way, creates a token
+    -- and shuffles nothing.
+    Spec.assertEqWith s "where Catacombs, one room earlier, left the order alone" (libraryOf atCatacombs) (libraryOf atStash)
+    -- CR 400.7: the same objects, so the shuffle was not nine library-to-library
+    -- zone changes.
+    Spec.assertEqWith s "and every card that stayed kept its object id" (Set.fromList (libraryOf atThrone)) (Set.delete evangelId (Set.fromList (libraryOf atCatacombs)))
+    Spec.assertEqWith s "the only zone change the room made is the creature card's, to the battlefield" (fmap (\zc -> (ZoneChange.departed zc, ZoneChange.from zc, ZoneChange.to zc)) thisVenture) [(evangelId, Zone.Library, Zone.Battlefield)]
+    -- The clauses the shuffle follows, so the room is transcribed whole. The
+    -- chosen card is the one the answerer picked out of the offered pair, and the
+    -- other is still in the library -- which is how "the room asked" is read.
+    Spec.assertEqWith s "Cabal Evangel was put onto the battlefield" (length (inPlayNamed "\"Cabal Evangel\"" atThrone)) 1
+    Spec.assertBool s (List.elem pikerId (libraryOf atThrone)) "and Goblin Piker, the creature card not chosen, stayed in the library"
+    Spec.assertEqWith
+      s
+      "with three +1/+1 counters on it"
+      (fmap (\oid -> Map.lookup CounterKind.PlusOnePlusOne (maybe Map.empty Object.counters (Game.lookupObject oid atThrone))) (inPlayNamed "\"Cabal Evangel\"" atThrone))
+      [Just 3]
+    Spec.assertBool s (all (\oid -> Projection.hasKeyword (Keyword.Hexproof Nothing) oid atThrone) (inPlayNamed "\"Cabal Evangel\"" atThrone)) "and hexproof until alice's next turn"

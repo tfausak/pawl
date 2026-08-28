@@ -2176,6 +2176,8 @@ rewriteEffect pairs effect = case effect of
   Effect.FlipCoin {} -> effect
   Effect.TakeExtraTurn {} -> effect
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (rewriteObjectRef pairs ref))
+  -- No ObjectRef to rewrite: the opcode names a library and no objects.
+  Effect.Shuffle {} -> effect
   Effect.OfferCast {} -> effect
   Effect.GrantPlayFromExile grant ->
     Effect.GrantPlayFromExile

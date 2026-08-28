@@ -262,6 +262,7 @@ manaProduced effect = case effect of
   Effect.FlipCoin {} -> Nothing
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary {} -> Nothing
+  Effect.Shuffle {} -> Nothing
   Effect.OfferCast {} -> Nothing
   Effect.GrantPlayFromExile {} -> Nothing
   -- Descended into, unlike CR 615.5's rider above: rule 608.2f's body runs as
@@ -304,6 +305,9 @@ movesLibraryCard effect = case effect of
   Effect.Search {} -> True
   -- Both halves of its name: cards go INTO a library.
   Effect.ShuffleIntoLibrary {} -> True
+  -- CR 701.24a randomises a library WITHIN itself, which is Scry's and Fateseal's
+  -- answer above: no card crosses the zone's boundary in either direction.
+  Effect.Shuffle {} -> False
   -- The draw half.
   Effect.ExileHandThenDraw -> True
   -- CR 727.2 / 103.3: every card involved in the restarted game is in the new
