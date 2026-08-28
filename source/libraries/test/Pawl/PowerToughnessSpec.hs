@@ -1879,9 +1879,9 @@ castDraught recipient draughtId gs =
 --
 -- CR 608.2c is what makes the card read its own gain: the two instructions are
 -- followed in printed order, so by the time the modification is created the
--- Draught's own 2 is already in the log. CR 611.2b/613.4c then freeze the value
--- into the stored effect (Projection.freezeQuantities), which is why a later gain
--- does not grow a pump that has already been made.
+-- Draught's own 2 is already in the log. CR 608.2h / 611.2d then freeze the value
+-- into the stored layer-7c effect (Projection.freezeQuantities), which is why a
+-- later gain does not grow a pump that has already been made.
 fortifyingDraughtSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fortifyingDraughtSpec s registry = Spec.describe s "Fortifying Draught" $ do
   -- THE PROVING CASE, and the ACCUMULATION control: the second Draught reads 4

@@ -305,7 +305,7 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       (Quantity.CardsDiscardedThisTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"CardsDiscardedThisTurn\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- CR 119.3, on CardsDiscardedThisTurn's terms: a PlayerRef and nothing else,
-  -- with the same recursive-decoder pair. Ratchet, Field Medic's is the Relative
+  -- with the same recursive-decoder pair. Fortifying Draught's is the Relative
   -- arm.
   Spec.it s "LifeGainedThisTurn, relative and from a slot" $ do
     Common.assertCodec
