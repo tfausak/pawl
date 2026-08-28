@@ -1172,10 +1172,20 @@ copiableSnapshotOf oid gs = Game.lookupObject oid gs >>= (Binding.copyOf . Objec
 -- the ordinary permanent, where the seed spends Game.namesOf and two
 -- Quantity.evaluates, so the readers below stay as cheap as the printed read
 -- they replace.
+-- CR 702.161a's living metal is APPENDED rather than read at a use site, and
+-- appended HERE rather than at the one caller that folds these into layers: the
+-- list's index is CR 613.6's memo key and Pawl.Engine.Event's departure handover
+-- indexes the same list, so the two walks must agree on what is at each position.
+-- Printed abilities keep their indices; a minted one takes the position after.
+--
+-- Off the COPIABLE keywords, like the rest of this function. So a living metal
+-- another object's static ability grants is not expanded (#2523), the way a
+-- granted devoid (#793) and a granted changeling (#1288) are not: what a keyword
+-- MEANS would otherwise have to be known before layer 6 has decided who holds it.
 staticAbilitiesOf :: ObjectId -> GameState -> [StaticAbility.StaticAbility Card.Type.Card]
 staticAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
-  Just snapshot -> PC.staticAbilities snapshot
-  Nothing -> foldMap Face.staticAbilities (Game.faceOf oid gs)
+  Just snapshot -> PC.staticAbilities snapshot <> Keyword.mintedStaticAbilitiesOf (Map.keysSet (PC.keywords snapshot))
+  Nothing -> foldMap (\face -> Face.staticAbilities face <> Keyword.mintedStaticAbilitiesOf (Face.keywords face)) (Game.faceOf oid gs)
 
 -- CR 707.2a: the replacement effects this object's copiable rules text gives it,
 -- staticAbilitiesOf's sibling for the ability kind CR 614 asks about, written
@@ -2068,6 +2078,7 @@ rewriteEffect pairs effect = case effect of
   Effect.MakePlotted ref -> Effect.MakePlotted (rewriteObjectRef pairs ref)
   Effect.DoesNotUntapNext ref -> Effect.DoesNotUntapNext (rewriteObjectRef pairs ref)
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
+  Effect.Convert ref -> Effect.Convert (rewriteObjectRef pairs ref)
   Effect.PhaseOut ref -> Effect.PhaseOut (rewriteObjectRef pairs ref)
   Effect.AddPhases _ -> effect
   Effect.EndTurn -> effect

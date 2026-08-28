@@ -925,6 +925,7 @@ effectCounts effect = case effect of
   Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
+  Effect.Convert _ -> []
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -1194,6 +1195,7 @@ effectNestedEffects effect = case effect of
   Effect.MakePlotted {} -> []
   Effect.DoesNotUntapNext {} -> []
   Effect.Transform {} -> []
+  Effect.Convert {} -> []
   Effect.PhaseOut {} -> []
   Effect.AddPhases {} -> []
   Effect.EndTurn -> []
@@ -1667,6 +1669,7 @@ effectReplacements effect = case effect of
   Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
+  Effect.Convert _ -> []
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -2404,6 +2407,7 @@ effectMintedFaces effect = case effect of
   Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
+  Effect.Convert _ -> []
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -2831,6 +2835,7 @@ keywordFilters keyword = case keyword of
   -- CR 702.15a: lifelink is a static ability with no payload -- its rider rides
   -- the damage event, not the keyword.
   Keyword.Lifelink -> []
+  Keyword.LivingMetal -> []
   -- CR 702.16a's "[quality]", which every protection ability states.
   Keyword.Protection quality -> [quality]
   Keyword.Reach -> []
@@ -4054,6 +4059,7 @@ effectFilters effect = case effect of
   Effect.MakePlotted ref -> sourceHosted (objectRefFilters ref)
   Effect.DoesNotUntapNext ref -> sourceHosted (objectRefFilters ref)
   Effect.Transform ref -> sourceHosted (objectRefFilters ref)
+  Effect.Convert ref -> sourceHosted (objectRefFilters ref)
   Effect.PhaseOut ref -> sourceHosted (objectRefFilters ref)
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -4276,6 +4282,9 @@ effectObjectRefs effect = case effect of
   Effect.MakePlotted ref -> read_ [ref]
   Effect.DoesNotUntapNext ref -> read_ [ref]
   Effect.Transform ref -> [(AsksTransformGather, ref)]
+  -- The SAME gather, CR 701.28a routing a convert through CR 701.27a-f and
+  -- Pawl.Engine.Resolve applying both opcodes through one turnPermanentsOver.
+  Effect.Convert ref -> [(AsksTransformGather, ref)]
   Effect.PhaseOut ref -> read_ [ref]
   Effect.AddPhases {} -> []
   Effect.EndTurn -> []
@@ -6375,6 +6384,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "the battlefield subset is asked by the transform gather alone"
       (inert [Effect.Transform anyNumber, moves anyNumber, reveals anyNumber, Effect.Tap anyNumber])
       [False, True, True, True]
+    -- CR 701.28a's convert, classified with Transform because it IS Transform's
+    -- gather (Pawl.Engine.Resolve.turnPermanentsOver): the same four card-shaped
+    -- arms are inert under it and the same battlefield subset is asked.
+    Spec.assertEqWith
+      s
+      "the convert gather answers exactly as the transform gather does"
+      (inert (fmap Effect.Convert [inGraveyard, inHand, fromAmong, atRandom, anyNumber]))
+      [True, True, True, True, False]
     -- The other direction on the same opcode: a ref that is a READ rather than a
     -- CR 608.2d question is fine anywhere, so the lint is about the arm and not
     -- about Transform.

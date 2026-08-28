@@ -109,6 +109,7 @@ import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellCast as SpellCast
+import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
@@ -228,6 +229,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
+  Keyword.LivingMetal -> []
   Keyword.Protection _ -> []
   Keyword.Reach -> []
   Keyword.Shroud -> []
@@ -316,6 +318,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
+  Keyword.LivingMetal -> []
   Keyword.Protection _ -> []
   Keyword.Reach -> []
   Keyword.Shroud -> []
@@ -519,6 +522,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
+  Keyword.LivingMetal -> []
   Keyword.Protection _ -> []
   Keyword.Reach -> []
   Keyword.Shroud -> []
@@ -855,6 +859,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
+  Keyword.LivingMetal -> []
   Keyword.Protection _ -> []
   Keyword.Reach -> []
   Keyword.Shroud -> []
@@ -1210,6 +1215,60 @@ castFromGraveyardExile =
         Zone.Exile
     )
 
+-- The static continuous abilities rule 702 states as a keyword's whole meaning,
+-- for the object those keywords are on. Today CR 702.161a's living metal is the
+-- only one.
+--
+-- MEMBERSHIP and not a count, unlike mintedReplacementsOf below: rule 702.161a
+-- adds card types the object already has once the first instance has applied, so
+-- a second instance is redundant -- lifelink's reading, not toxic's.
+--
+-- NOT exhaustive, where mintedReplacementsFor is. The pattern here is
+-- Pawl.Engine.Projection.definesColorless: one function that decides what one
+-- rule means, named after the rule rather than after the shape. A keyword whose
+-- meaning is a static ability is rare enough that a hundred-arm case would say
+-- nothing a reader could not get from the rule number.
+mintedStaticAbilitiesOf :: Set Keyword -> [StaticAbility.StaticAbility Card]
+mintedStaticAbilitiesOf keywords = [livingMetal | Set.member Keyword.LivingMetal keywords]
+
+-- CR 702.161a: "During your turn, this permanent is an artifact creature in
+-- addition to its other types."
+--
+-- ADDS two card types and sets none, which is CR 205.1b naming this exact phrase
+-- -- crew's reading (see `crew` above), so the Vehicle stays a Vehicle and keeps
+-- its artifact type when the condition is false. TWO parts of ONE ability rather
+-- than two abilities, so CR 613.6 chooses the affected set once and CR 613.7a
+-- stamps both at the permanent's own timestamp. Layer 4 (CR 613.1d), which
+-- Pawl.Engine.Projection.layer reads off the modification.
+--
+-- "DURING YOUR TURN" is CR 604.2's "as long as" clause and not a duration: the
+-- effect is re-asked on every projection (CR 613.5), so it switches off at the
+-- turn handoff with no resolution and nothing to expire. CR 102.1's active player
+-- is the whole of it -- rule 702.161a says "your turn", so the comparison is
+-- against the ability's own controller (PlayerRelation.You).
+--
+-- No functionsFrom, leaving CR 113.6's battlefield default standing: rule
+-- 702.161a says "this permanent".
+livingMetal :: StaticAbility.StaticAbility Card
+livingMetal =
+  StaticAbility.MkStaticAbility
+    { StaticAbility.affected = Affected.Matching Filter.IsSource,
+      StaticAbility.condition =
+        Just
+          ( Condition.Compares
+              ( Compares.MkCompares
+                  (Quantity.IsActivePlayer (PlayerRef.Relative PlayerRelation.You))
+                  Comparison.Exactly
+                  (Quantity.Literal 1)
+              )
+          ),
+      StaticAbility.functionsFrom = Set.empty,
+      StaticAbility.lingers = Nothing,
+      StaticAbility.modifications =
+        Modification.AddCardType CardType.Artifact
+          NonEmpty.:| [Modification.AddCardType CardType.Creature]
+    }
+
 -- CR 702.136a: the AS-ENTERS REPLACEMENT rule 702 gives a permanent for holding
 -- riot. Gathered by the PROJECTION off POST-LAYER keyword COUNTS, since rule
 -- 702.136a functions on the battlefield -- so Humility takes it away and a static
@@ -1273,6 +1332,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
+  Keyword.LivingMetal -> []
   -- CR 702.16e's clause: "Any damage that would be dealt by sources that have
   -- the stated quality to a permanent or player with protection is prevented."
   -- Glittering Lion's printed shield with the quality written into the SOURCE
@@ -1483,6 +1543,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
+  Keyword.LivingMetal -> []
   -- CR 702.16f: "Attacking creatures with protection can't be blocked by
   -- creatures that have the stated quality." The one clause of rule 702.16 that
   -- is already a printed shape -- Questing Beast's row with the quality in the
@@ -1619,6 +1680,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
+  Keyword.LivingMetal -> []
   -- CR 702.16c and CR 702.16d, as ONE row: "a permanent or player with
   -- protection can't be enchanted by Auras that have the stated quality", and
   -- "a permanent with protection can't be equipped by Equipment that have the
@@ -1821,6 +1883,7 @@ familyOf keyword = case keyword of
   Keyword.Haste -> Nothing
   Keyword.Indestructible -> Nothing
   Keyword.Lifelink -> Nothing
+  Keyword.LivingMetal -> Nothing
   Keyword.Reach -> Nothing
   Keyword.Shroud -> Nothing
   Keyword.Trample -> Nothing
