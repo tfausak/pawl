@@ -3441,17 +3441,18 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- pair above gives -- two Cabal Evangels, a Goblin Piker, no land, and the
   -- Aegis's own ability activated rather than static.
   --
-  -- SYNTHETIC because no printed emblem carries a replacement row pawl can
-  -- author. Scryfall `o:"emblem with"`, 2026-08-27, is every card that makes one
-  -- (96, has_more false), and the emblems on it that print a replacement effect
-  -- each need a capability that does not exist: Ajani Steadfast needs a "prevent
-  -- all but 1" rewrite (#2443), Serra the Benevolent replaces a LIFE TOTAL's
-  -- reduction rather than a damage event (#2526), and Jaya Ballard's "cast this
-  -- way" is a back-reference to the permission the same emblem grants. The pool's other
-  -- two Effect.CreateEmblem producers are Ajani, Adversary of Tyrants and
-  -- Elspeth, Sun's Champion, and neither emblem carries a replacementEffects row.
-  -- CR 114.2 lets the creating effect give an emblem any ability and CR 114.3
-  -- bounds only its characteristics, so nothing in the CR forbids the card.
+  -- SYNTHETIC, and no longer for want of a capability: Serra the Benevolent's
+  -- emblem prints Worship's clause, which data/cards/worship.json now authors as
+  -- a ReplacementEffect.LifeLossR, so that emblem could stand here once the card
+  -- is written (#2545). Scryfall `o:"emblem with"`, 2026-08-27, is every card
+  -- that makes one (96, has_more false); of the emblems on it that print a
+  -- replacement effect, Ajani Steadfast still needs a "prevent all but 1" rewrite
+  -- (#2443), and Jaya Ballard's "cast this way" is a back-reference to the
+  -- permission the same emblem grants. The pool's other two Effect.CreateEmblem
+  -- producers are Ajani, Adversary of Tyrants and Elspeth, Sun's Champion, and
+  -- neither emblem carries a replacementEffects row. CR 114.2 lets the creating
+  -- effect give an emblem any ability and CR 114.3 bounds only its
+  -- characteristics, so nothing in the CR forbids the card.
   Spec.it s "CR 113.6p an emblem's own replacement row prevents the damage from the command zone" $ do
     aegis <- S.printingOf s registry "Synthetic Emblem Aegis"
     evangel <- S.printingOf s registry "Cabal Evangel"

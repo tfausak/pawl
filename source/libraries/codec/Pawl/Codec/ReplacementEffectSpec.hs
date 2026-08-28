@@ -26,6 +26,10 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LifeLossCause as LifeLossCause
+import qualified Pawl.Types.LifeLossPattern as LifeLossPattern
+import qualified Pawl.Types.LifeLossR as LifeLossR
+import qualified Pawl.Types.LifeLossRewrite as LifeLossRewrite
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -147,6 +151,21 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       codec
       (ReplacementEffect.UntapR UntapRewrite.RemoveStunCounter)
       " {\"type\":\"UntapR\",\"value\":{\"type\":\"RemoveStunCounter\"}} "
+  -- CR 614.1a / 120.4c: Worship, LifeLossR's sole producer.
+  Spec.it s "LifeLossR (Worship)" $
+    Common.assertCodec
+      s
+      codec
+      ( ReplacementEffect.LifeLossR
+          ( LifeLossR.MkLifeLossR
+              LifeLossPattern.MkLifeLossPattern
+                { LifeLossPattern.whose = ControllerRelation.Yours,
+                  LifeLossPattern.whichCause = Just LifeLossCause.ByDamage
+                }
+              (LifeLossRewrite.LeaveAtLeast 1)
+          )
+      )
+      " {\"type\":\"LifeLossR\",\"value\":{\"matching\":{\"whose\":{\"type\":\"Yours\"},\"whichCause\":{\"type\":\"ByDamage\"}},\"rewrite\":{\"type\":\"LeaveAtLeast\",\"value\":1}}} "
   -- A fixed kind, a real filter, and CR 614.16's AddMore.
   Spec.it s "CounterR (Hardened Scales)" $
     Common.assertCodec

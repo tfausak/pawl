@@ -7,6 +7,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -56,7 +57,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- nothing and pays nothing. Nothing is what a reader gating on a paid cost -- CR
 -- 702.37b's megamorph counter, the only such reader -- correctly declines.
 --
--- Ten arms, not every replaceable event class the rules define: each of the rest
+-- Eleven arms, not every replaceable event class the rules define: each of the rest
 -- is one more arm plus the funnel that raises it.
 data ProposedEvent
   = WouldChangeZone ZoneChange.ZoneChange
@@ -120,4 +121,20 @@ data ProposedEvent
     -- proposed for an already-untapped permanent and a stun counter is never
     -- spent on one.
     WouldUntap ObjectId.ObjectId
+  | -- | CR 119.3 / 120.4c: a player would lose life. Two funnels raise it, one
+    -- per cause: Pawl.Engine.Damage.applyDamage at CR 120.4c's result-processing
+    -- step, and Pawl.Engine.Resolve's Effect.LoseLife arm.
+    --
+    -- The LifeLossCause is the same shape of fact WouldPutCounters' CounterCause
+    -- is, and for its reason: nothing about the loss itself says where it came
+    -- from, and Worship's ruling makes a card split on it ("loss of life bypasses
+    -- Worship"). It gates which candidates are offered the event and is not a
+    -- property of the player.
+    --
+    -- The Natural is the life that WOULD be lost, never the resulting total: a
+    -- rewrite that states a total (Pawl.Types.LifeLossRewrite's LeaveAtLeast)
+    -- reads the player's current life off the board and answers in this
+    -- field's currency, so CR 616.2's next iteration sees a smaller loss rather
+    -- than a differently-shaped event.
+    WouldLoseLife LifeLossCause.LifeLossCause PlayerId.PlayerId Natural.Natural
   deriving (Eq, Ord, Show)

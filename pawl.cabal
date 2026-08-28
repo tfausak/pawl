@@ -445,6 +445,14 @@ library codec
     Pawl.Codec.LibraryPositionSpec
     Pawl.Codec.LifeChange
     Pawl.Codec.LifeChangeSpec
+    Pawl.Codec.LifeLossCause
+    Pawl.Codec.LifeLossCauseSpec
+    Pawl.Codec.LifeLossPattern
+    Pawl.Codec.LifeLossPatternSpec
+    Pawl.Codec.LifeLossR
+    Pawl.Codec.LifeLossRewrite
+    Pawl.Codec.LifeLossRewriteSpec
+    Pawl.Codec.LifeLossRSpec
     Pawl.Codec.LimitUnless
     Pawl.Codec.LimitUnlessSpec
     Pawl.Codec.LoggedEvent
@@ -1442,6 +1450,10 @@ library types
     Pawl.Types.LibraryPlacement
     Pawl.Types.LibraryPosition
     Pawl.Types.LifeChange
+    Pawl.Types.LifeLossCause
+    Pawl.Types.LifeLossPattern
+    Pawl.Types.LifeLossR
+    Pawl.Types.LifeLossRewrite
     Pawl.Types.LimitUnless
     Pawl.Types.LoggedEvent
     Pawl.Types.LookAt

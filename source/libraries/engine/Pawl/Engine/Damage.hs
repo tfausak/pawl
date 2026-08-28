@@ -36,6 +36,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
@@ -926,22 +927,13 @@ applyDamage events = do
         Recipient.ToPlaneswalker oid -> onPermanent ev oid g
         Recipient.ToBattle oid -> onPermanent ev oid g
         Recipient.ToObject oid -> onPermanent ev oid g
-        Recipient.ToPlayer pid ->
-          -- CR 120.3a: the life loss, and only it. Both poison diversions -- CR
-          -- 120.3b / 702.90b's infect, which replaces the life loss, and CR 120.3g
-          -- / 702.164c's toxic, which adds poison alongside it -- are in
-          -- `counterResults` below, since they go through
-          -- Event.putPlayerCounters, CR 122.6's player funnel. What stays here is
-          -- WHETHER life is lost, which is the half infect replaces.
-          --
-          -- WITHER IS ABSENT ON PURPOSE. CR 120.3d pairs it with infect for a
-          -- creature recipient only; CR 120.3a's exception names infect alone, so
-          -- a wither source drains a player's life like any other.
-          if DamageEvent.dealtByInfect ev
-            then g
-            else
-              let drain player = player {Player.life = Player.life player - toInteger (DamageEvent.amount ev)}
-               in g {GameState.players = Map.adjust drain pid (GameState.players g)}
+        -- CR 120.3a's life loss is NOT here. It is the one result of CR 120.3 a
+        -- replacement effect can rewrite (CR 120.4c, Worship), so it goes through
+        -- Event.resolveLifeLoss and the CR 616.1 loop -- a Game action, where this
+        -- fold is pure. The `lost` pass below performs it, exactly as
+        -- `counterResults` below performs CR 120.3b/d/g's counters, and for the
+        -- same reason.
+        Recipient.ToPlayer _ -> g
       -- CR 120.3f: lifelink damage gains its source's controller that much life,
       -- IN ADDITION to the damage's other results. A second pass over the same
       -- survivors, deliberately not a branch inside markOne: "in addition" is
@@ -1016,11 +1008,14 @@ applyDamage events = do
       -- Infect and NOT wither, which is CR 120.3a's own wording. Pinned by
       -- DamageSpec's Wither group, which asserts the recorded LifeLost event and
       -- not merely the total.
-      lifeLostBy ev = case DamageEvent.target ev of
+      -- The amount is the one the `lost` pass below settled and wrote, never the
+      -- damage: under Worship a player dealt 10 at 5 life loses 4, and the record
+      -- has to say so or a "whenever you lose life" clause reads the wrong number.
+      lifeLostBy ev losing = case DamageEvent.target ev of
         Recipient.ToPlayer pid
           | not (DamageEvent.dealtByInfect ev),
-            DamageEvent.amount ev > 0 ->
-              [GameEvent.LifeLost (LifeChange.MkLifeChange pid (DamageEvent.amount ev))]
+            losing > 0 ->
+              [GameEvent.LifeLost (LifeChange.MkLifeChange pid losing)]
         _ -> []
       -- CR 120.3f's gain, recorded where `gainOne` above performs it, so that
       -- "whenever you gain life" sees lifelink (CR 702.15b) and not only an
@@ -1170,6 +1165,46 @@ applyDamage events = do
                       Recipient.ToBattle oid -> onObject oid
                       Recipient.ToObject oid -> onObject oid
                       Recipient.ToPlayer pid -> place poison (Event.putPlayerCounters cause pid PlayerCounterKind.Poison)
+  -- CR 120.4c: "damage that's been dealt is processed into its results, as
+  -- modified by replacement effects that interact with those results (such as
+  -- life loss or counters)". This is that step for CR 120.3a's life loss, and the
+  -- counter half of the same sentence is `counterResults` below.
+  --
+  -- A monadic pass rather than an arm of `markOne`, because Event.resolveLifeLoss
+  -- runs the CR 616.1 loop and that fold is pure -- `counterResults`' split
+  -- exactly. It runs BEFORE the fold, which reorders the player write against the
+  -- object marks and nothing else; the two touch disjoint maps, and nothing
+  -- observes the board in between.
+  --
+  -- The guard is CR 120.3a's own wording, and it is `lifeLostBy`'s below: infect
+  -- replaces the life loss with poison (CR 120.3b), which `counterResults` places.
+  -- WITHER IS ABSENT ON PURPOSE -- CR 120.3d pairs it with infect for a CREATURE
+  -- recipient only, so a wither source drains a player like any other. A 0-damage
+  -- event needs no guard here: Event.resolveLifeLoss declines a zero itself.
+  --
+  -- Sequential in the running life total, and that is the rule rather than an
+  -- accident: each proposal reads the live board, which the previous one has
+  -- already written, so a player at 2 taking two simultaneous lethal hits under
+  -- Worship has the first cut to a loss of 1 and the second cut to nothing, and
+  -- ends at 1. Reading every proposal against the pre-batch board would cut both
+  -- to 1 and kill them. CR 120.4d's second example is that board with its Awe
+  -- Strike taken away.
+  --
+  -- The DAMAGE is untouched: `gainOne`, `tallyOne` and the DamageDealt record
+  -- below all still read DamageEvent.amount. CR 120.4b dealt it, and this
+  -- replaces a RESULT of it -- Worship's ruling, "any damage rendered useless by
+  -- Worship was still dealt".
+  --
+  -- Aligned with `survivors` by position, so the fold below can zip the two.
+  lost <-
+    Monad.forM survivors $ \ev -> case DamageEvent.target ev of
+      Recipient.ToPlayer pid | not (DamageEvent.dealtByInfect ev) -> do
+        n <- Event.resolveLifeLoss LifeLossCause.ByDamage pid (DamageEvent.amount ev)
+        Monad.when (n > 0) . State.modify' $ \gs ->
+          let drain player = player {Player.life = Player.life player - toInteger n}
+           in gs {GameState.players = Map.adjust drain pid (GameState.players gs)}
+        pure n
+      _ -> pure 0
   -- CR 608.2i: each surviving event is RECORDED, not enqueued. Sba consumes by
   -- bumping GameState.damageScannedThrough; the record survives the check.
   --
@@ -1217,7 +1252,7 @@ applyDamage events = do
             List.foldl'
               (flip Event.recordEvent)
               dealt
-              (concatMap (\ev -> lifeLostBy ev <> lifeGainedBy ev) survivors <> removalsBetween board marked)
+              (concatMap (\(ev, n) -> lifeLostBy ev n <> lifeGainedBy ev) (zip survivors lost) <> removalsBetween board marked)
     )
   -- CR 120.3's counter results, run AFTER the records above for `lifeLostBy`'s
   -- reason: putCounters records CR 122.6's own CountersPut, and a cause reads
