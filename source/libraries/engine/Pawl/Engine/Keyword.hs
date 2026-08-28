@@ -1295,6 +1295,9 @@ mintedReplacementsFor keyword count = case keyword of
                 { DamagePattern.whichKind = Nothing,
                   DamagePattern.whatSource = quality,
                   DamagePattern.whatRecipient = Just Filter.IsSource,
+                  -- CR 702.16e names no player, so the printed recipient side
+                  -- is the object half alone.
+                  DamagePattern.whoRecipient = Nothing,
                   DamagePattern.whichRecipient = Nothing,
                   DamagePattern.whichSource = Nothing
                 },

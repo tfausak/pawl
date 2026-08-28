@@ -817,9 +817,46 @@ matchesDamagePattern :: GameState -> Filter.Context -> DamagePattern.DamagePatte
 matchesDamagePattern gs context pat de =
   maybe True (== DamageEvent.kind de) (DamagePattern.whichKind pat)
     && matchesDamageSource gs context (DamagePattern.whatSource pat) de
-    && maybe True (matchesDamageRecipient gs context de) (DamagePattern.whatRecipient pat)
+    && matchesPrintedRecipient gs context de pat
     && maybe True (== DamageEvent.target de) (DamagePattern.whichRecipient pat)
     && maybe True (== DamageEvent.source de) (DamagePattern.whichSource pat)
+
+-- CR 615.1: does the damage's recipient satisfy the pattern's PRINTED recipient
+-- side, which is the DISJUNCTION of its object half and its player half?
+--
+-- Divine Deflection's "you and/or permanents you control" is one CR 615.7 shield
+-- over both kinds of recipient, so the two halves are joined by `or` and not by
+-- the `and` every other conjunct of matchesDamagePattern uses. Reading them as a
+-- conjunction would admit nothing at all: CR 120.3a's two kinds of recipient are
+-- disjoint, so no damage event satisfies an object filter and a player relation
+-- at once.
+--
+-- Neither half is a pattern that says nothing about the recipient: that pattern
+-- carries Nothing on BOTH halves and admits every recipient, which is the
+-- unrestricted reading DamagePattern documents and the empty disjunction would
+-- get backwards.
+matchesPrintedRecipient :: GameState -> Filter.Context -> DamageEvent.DamageEvent -> DamagePattern.DamagePattern -> Bool
+matchesPrintedRecipient gs context de pat = case (DamagePattern.whatRecipient pat, DamagePattern.whoRecipient pat) of
+  (Nothing, Nothing) -> True
+  (what, who) ->
+    maybe False (matchesDamageRecipient gs context de) what
+      || maybe False (matchesRecipientPlayer context de) who
+
+-- CR 120.3a / 109.5: is this damage addressed to a PLAYER the pattern's printed
+-- clause names -- Divine Deflection's "dealt to you"?
+--
+-- False for an OBJECT recipient, matchesDamageRecipient's answer with the kinds
+-- swapped: the two halves each admit one of CR 120.3a's two kinds and neither
+-- guesses about the other.
+--
+-- "You" is the CONTEXT's perspective, which for a floating row is the controller
+-- baked when the row was installed (candidateContext) rather than a controller
+-- re-derived from a source the resolution has already left behind. A context with
+-- no perspective has no "you" and admits no player, matchesPlayer's posture.
+matchesRecipientPlayer :: Filter.Context -> DamageEvent.DamageEvent -> PlayerRelation.PlayerRelation -> Bool
+matchesRecipientPlayer context de relation = case Recipient.playerOf (DamageEvent.target de) of
+  Nothing -> False
+  Just pid -> maybe False (\you -> PlayerRelation.holds relation you pid) (Filter.perspective context)
 
 -- CR 615.1: does the damage's RECIPIENT have the qualities the pattern's PRINTED
 -- clause names -- Stormwild Capridor's "if noncombat damage would be dealt to
@@ -832,7 +869,9 @@ matchesDamagePattern gs context pat de =
 -- False for a PLAYER recipient (CR 120.3a), which is the only answer a Filter can
 -- give about something that is not an object. Nothing is lost by it: a pattern
 -- saying nothing about the recipient carries Nothing rather than a trivial
--- filter, so this is reached only where a card really did describe an object.
+-- filter, so this is reached only where a card really did describe an object, and
+-- a pattern whose sentence ALSO names a player says so in `whoRecipient`, which
+-- matchesPrintedRecipient asks beside this one.
 matchesDamageRecipient :: GameState -> Filter.Context -> DamageEvent.DamageEvent -> Filter.Type.Filter Keyword.Type.Keyword -> Bool
 matchesDamageRecipient gs context de filter_ = case Recipient.objectOf (DamageEvent.target de) of
   Nothing -> False
@@ -1800,12 +1839,14 @@ printedBy candidate = case candidate of
 --
 -- Keyed on the RECIPIENT as well as the instance, which is narrower than the
 -- rule's own unit -- 615.13 counts one application of one prevention effect,
--- whoever the simultaneous events were addressed to. Every prevention the ENGINE
--- bakes names exactly one recipient (Resolve's two prevention arms), and the one
--- card-authored prevention that names none -- Fog's -- has no CR 615.13 trigger
--- paired with it, so the two readings coincide today. Not implemented: a
--- prevention effect naming NO recipient that reaches two recipients in one batch
--- reports two preventions where the rule describes one (#688).
+-- whoever the simultaneous events were addressed to. Not implemented: a
+-- prevention effect covering SEVERAL recipients that reaches two of them in one
+-- batch reports two preventions where the rule describes one (#688). Divine
+-- Deflection is the producer that reaches it -- one shield over a player and the
+-- permanents they control -- so a batch that spends its pool across both runs CR
+-- 615.5's rider twice, once per recipient, rather than once with the total. The
+-- TOTAL dealt is the same either way, which is why Pawl.ReplacementSpec's group
+-- can assert the rider's damage without settling this.
 --
 -- Ascending by key, so the CR 608.2i record -- and therefore the CR 603.3b order
 -- these triggers are offered in -- is canonical rather than gather-dependent.
@@ -1854,14 +1895,14 @@ groupPreventions ps =
 -- can be honoured at all.
 --
 -- The two rules order DIFFERENT LEVELS and so cannot contend for this list. CR
--- 615.7's freedom is entirely within one chooser: a shield names one recipient --
--- and CR 122.1c's pair protects the one permanent it is minted onto -- so every
--- event it contests is addressed to one player's object, and that is
--- the same player CR 616.1 asks about those events -- `contested` and `choose`
--- both read the chooser off the recipient through `chooserOf`. `askOne` then
--- permutes only within that player's own positions. CR 101.4c is the rule that
--- licenses it: a player making several simultaneous choices makes them in the
--- order specified, or chooses the order themselves.
+-- 615.7's freedom is entirely within one chooser: `contested` splits a shield's
+-- contested hits by whoever CR 616.1 asks about each of them -- both read the
+-- chooser off the recipient through `chooserOf` -- so a shield covering
+-- recipients with two different choosers contributes one group each rather than
+-- one group asked of the wrong player. `askOne` then permutes only within that
+-- player's own positions. CR 101.4c is the rule that licenses it: a player
+-- making several simultaneous choices makes them in the order specified, or
+-- chooses the order themselves.
 orderBatch :: [DamageEvent.DamageEvent] -> Game [DamageEvent.DamageEvent]
 orderBatch events = do
   gs <- State.get
@@ -1967,21 +2008,33 @@ contested gs events =
                 && applies gs (ProposedEvent.WouldDealDamage (snd entry)) candidate
           )
           indexed
-      contestedBy candidate = do
+      -- CR 615.7's chooser is CR 616.1's, read off each hit's own shielded
+      -- recipient and GROUPED, since one shield can cover recipients with
+      -- different choosers: Divine Deflection's covers a player and the
+      -- permanents they control, and nothing in a DamagePattern's recipient side
+      -- confines a described set to one seat. A hit whose recipient has left has
+      -- no chooser and is dropped, there being no one to ask about it.
+      --
+      -- The CONTEST is judged over the whole shield before the split, which is
+      -- the rule's own unit: the pool is exhausted by everything it admits, not
+      -- by one seat's share of it.
+      contestedBy candidate = Maybe.fromMaybe [] $ do
         (left, demand) <- contestedResource gs candidate
         case hitsOf candidate of
-          hits@(firstHit : _ : _)
-            | left < demand (fmap snd hits) -> do
-                -- CR 615.7's chooser is CR 616.1's, read off the shielded
-                -- recipient -- and every hit of ONE shield shares that
-                -- recipient, since Resolve's PreventNextDamage arm always names
-                -- one and CR 122.1c's pair is minted onto the permanent it
-                -- protects, so the head is the whole answer. Nothing means the
-                -- shielded object has left and no one is there to be asked.
-                pid <- chooserOf gs (ProposedEvent.WouldDealDamage (snd firstHit))
-                pure (pid, fmap fst hits)
+          hits@(_ : _ : _)
+            | left < demand (fmap snd hits) ->
+                pure
+                  ( Map.toList
+                      ( Map.fromListWith
+                          (<>)
+                          [ (pid, [position])
+                          | (position, event) <- hits,
+                            Just pid <- [chooserOf gs (ProposedEvent.WouldDealDamage event)]
+                          ]
+                      )
+                  )
           _ -> Nothing
-      groups = Maybe.mapMaybe contestedBy (collect gs (GameState.replacements gs))
+      groups = concatMap contestedBy (collect gs (GameState.replacements gs))
       merged = Map.fromListWith (<>) groups
    in [ (pid, List.sort (List.nub positions))
       | (pid, positions) <- List.sortOn (seatOf gs . fst) (Map.toList merged)

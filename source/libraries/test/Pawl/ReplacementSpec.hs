@@ -1572,6 +1572,100 @@ decoratedGriffinSpec s registry = Spec.describe s "Decorated Griffin (CR 510.2)"
     Spec.assertEqWith s "and the shield is spent to 0 and dropped (CR 615.7)" (shieldsLeft after) []
     Spec.assertEqWith s "where the unshielded board takes all 5" (S.lifeOf S.alice control) (Just 15)
 
+-- Cast Divine Deflection for `x`, aiming CR 615.5's rider at a player. The target
+-- is FILTERED out of the offered set rather than built, so an aim the card's pool
+-- excludes leaves the slot empty instead of quietly becoming a legal one.
+castDeflection :: Natural.Natural -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+castDeflection x pid p = case p of
+  Prompt.ChooseX {} -> x
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToPlayer pid) . snd) sets
+  _ -> S.identityAnswer p
+
+-- Attack with everything, block `attacker` with `blocker`, and spend a contested
+-- prevention shield on the batch's hits in `wanted` order -- by RECIPIENT rather
+-- than by position, so the assertions do not depend on the order the batch was
+-- gathered in.
+deflectionCombat :: ObjectId.ObjectId -> ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt.Prompt r -> r
+deflectionCombat blocker attacker wanted p = case p of
+  Prompt.DeclareAttackers _ _ ids -> ids
+  Prompt.DeclareBlockers {} -> Map.singleton blocker (Set.singleton attacker)
+  Prompt.OrderDamage _ _ events ->
+    let rank e = Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)
+     in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
+  _ -> S.identityAnswer p
+
+-- CR 615.7's shield over SEVERAL recipients at once, whose producer is Divine
+-- Deflection ({X}{W} Instant: "Prevent the next X damage that would be dealt to
+-- you and/or permanents you control this turn. If damage is prevented this way,
+-- Divine Deflection deals that much damage to any target" -- name, cost, type
+-- line and Oracle text checked against api.scryfall.com 2026-08-27).
+--
+-- The card the rest of the prevention pool cannot reach: every other shield in
+-- data/cards/ names ONE recipient, so none of them can tell a shared pool from a
+-- shield per recipient. This one covers a player AND a described set of
+-- permanents, which is what the DISJOINED recipient side of a DamagePattern is
+-- for, and CR 615.7's "such effects count only the amount of damage; the number
+-- of events or sources dealing it doesn't matter" is what makes the two
+-- recipients share one X rather than each getting their own. CR 615.11's
+-- shield-per-creature is the other shape, and that rule scopes itself to a card
+-- saying "each", which this one does not.
+--
+-- REAL COMBAT, unlike the hand-built batches the Mending Hands group settles for:
+-- CR 510.2 is what makes two hits simultaneous, and simultaneity is the whole
+-- question here -- a batch the shield cannot cover is what raises CR 615.7's
+-- allocation choice, and sequential damage would never contest it.
+--
+-- The numbers are all distinct -- shield 3, 5 at alice, 2 at her creature, 5 back
+-- at the attacker -- so no two readings of the rule land on the same board.
+divineDeflectionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)" $ do
+  -- THE case. One shield of 3 against 5 aimed at alice and 2 aimed at her
+  -- creature, in one combat damage batch: a shield per recipient would prevent
+  -- all 7 and hand the rider 7 to throw back, where the rule's one pool prevents
+  -- exactly 3 and the other 4 are dealt.
+  --
+  -- The CR 615.7 allocation choice needs no prompt assertion of its own: the two
+  -- orderings below leave different boards, which nothing but a raised and
+  -- honoured Prompt.OrderDamage can produce.
+  Spec.it s "CR 615.7 one shield over you AND your permanents is a single shared pool" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    piker <- S.printingOf s registry "Goblin Piker"
+    deflection <- S.printingOf s registry "Divine Deflection"
+    let base = S.landsInPlay plains 4
+        (mine, g1) = S.addCreature jedit S.alice base
+        (_, g2) = S.addCreature jedit S.bob g1
+        (blocked, g3) = S.addCreature piker S.bob g2
+        (unshielded, spellId) = S.handOne deflection g3
+        shielded = castAndResolve (castDeflection 3 S.bob) unshielded spellId
+        strike order g = S.runCombat (deflectionCombat mine blocked order) (bobAttacks g)
+        aliceFirst = strike [Recipient.ToPlayer S.alice, Recipient.ToCreature mine] shielded
+        creatureFirst = strike [Recipient.ToCreature mine, Recipient.ToPlayer S.alice] shielded
+        control = strike [] unshielded
+    Spec.assertEqWith s "setup: the resolution installed ONE shield, holding 3" (shieldsLeft shielded) [3]
+    -- The pool ran out on alice's 5, so her creature's 2 is dealt in full. Under
+    -- a shield per recipient this reads 0.
+    Spec.assertEqWith s "spent on alice, the pool leaves her creature's 2 unprevented" (S.damageOf mine aliceFirst) (Just 2)
+    Spec.assertEqWith s "and 3 of the 5 aimed at alice were prevented" (S.lifeOf S.alice aliceFirst) (Just 18)
+    -- CR 615.5's rider, and the arithmetic that tells the two readings apart: the
+    -- shield prevented 3, so Divine Deflection throws 3 -- not the 7 a shield per
+    -- recipient would have prevented.
+    Spec.assertEqWith s "so the rider deals exactly the 3 that was prevented" (S.lifeOf S.bob aliceFirst) (Just 17)
+    -- The other allocation, which is the ruling's own example: the creature's 2
+    -- is prevented whole and the last 1 goes to alice, so the rider runs once per
+    -- recipient and deals 2 then 1. Same total, different board.
+    Spec.assertEqWith s "spent on the creature instead, its 2 never happens" (S.damageOf mine creatureFirst) (Just 0)
+    Spec.assertEqWith s "and only 1 of alice's 5 is prevented" (S.lifeOf S.alice creatureFirst) (Just 16)
+    Spec.assertEqWith s "the rider still deals 3 in total, in two lots" (S.lifeOf S.bob creatureFirst) (Just 17)
+    -- The fences. The shield covers what is dealt TO alice's side, never what she
+    -- deals: her blocker's 5 kills the Piker either way. And the unshielded board
+    -- differs in exactly the shield.
+    Spec.assertBool s (not (S.onBattlefield blocked aliceFirst)) "her blocker's own 5 was not prevented"
+    Spec.assertEqWith s "without the shield alice takes all 5" (S.lifeOf S.alice control) (Just 15)
+    Spec.assertEqWith s "her creature takes all 2" (S.damageOf mine control) (Just 2)
+    Spec.assertEqWith s "and bob is untouched, there being no rider to run" (S.lifeOf S.bob control) (Just 20)
+    Spec.assertEqWith s "the shield is spent to 0 and dropped either way (CR 615.7)" (shieldsLeft aliceFirst, shieldsLeft creatureFirst) ([], [])
+
 -- CR 615.5's additional effect on the UNBOUNDED shield (CR 615.1 / 615.3), which
 -- Test of Faith's countdown shield above cannot reach. Brace for Impact ({4}{W}
 -- Instant) prints "Prevent all damage that would be dealt to target multicolored
@@ -2145,8 +2239,10 @@ spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
 --
 -- Not a claim about Magic: an effect reachable from two players' events at once
 -- and spendable only once WOULD make this board-visible, and pawl has no such
--- effect to build with today. Every replacement the pool can produce is either
--- unlimited (Furnace of Rath) or names one recipient (Mending Hands).
+-- effect to build with today. Every replacement the pool can produce is
+-- unlimited (Furnace of Rath), names one recipient (Mending Hands), or describes
+-- a set of recipients that is one player's own (Divine Deflection's "you and/or
+-- permanents you control") -- and the third is still one chooser's.
 choosersAsked :: GameState.GameState -> [DamageEvent.DamageEvent] -> [PlayerId.PlayerId]
 choosersAsked gs batch =
   let step :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
@@ -4649,6 +4745,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   scarecrowSpec s registry
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
+  divineDeflectionSpec s registry
   braceForImpactSpec s registry
   inkshieldSpec s registry
   stormwildCapridorSpec s registry
@@ -5534,7 +5631,7 @@ blastShape :: ObjectId.ObjectId -> Timestamp.Timestamp -> ActiveReplacement.Acti
 blastShape src ts =
   ActiveReplacement.MkActiveReplacement
     { ActiveReplacement.effect =
-        ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern Nothing Filter.Type.IsSource Nothing Nothing Nothing) (DamageRewrite.SetAmount 4) Seq.empty),
+        ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern Nothing Filter.Type.IsSource Nothing Nothing Nothing Nothing) (DamageRewrite.SetAmount 4) Seq.empty),
       ActiveReplacement.source = src,
       ActiveReplacement.controller = S.alice,
       ActiveReplacement.timestamp = ts,

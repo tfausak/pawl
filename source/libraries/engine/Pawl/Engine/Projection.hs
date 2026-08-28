@@ -2001,8 +2001,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Replace {} -> effect
   Effect.SkipNextPhase {} -> effect
   -- CR 612.1: a rider's text is as changeable as any other.
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref chosenSource quantity rider) ->
-    Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage (rewriteDuration pairs duration) kind ref chosenSource quantity (fmap (rewriteEffect pairs) rider))
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref whatRecipient whoRecipient chosenSource quantity rider) ->
+    Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage (rewriteDuration pairs duration) kind ref whatRecipient whoRecipient chosenSource quantity (fmap (rewriteEffect pairs) rider))
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref direction chosenSource whatSource rider) ->
     Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage (rewriteDuration pairs duration) kind ref direction chosenSource whatSource (fmap (rewriteEffect pairs) rider))
   Effect.RedirectDamage {} -> effect
@@ -4440,6 +4440,7 @@ shieldOf oid gs =
                   -- Rule 122.1c's recipient is the permanent the pair was minted
                   -- onto, which the CR 616.1 loop already scopes by source.
                   DamagePattern.whatRecipient = Nothing,
+                  DamagePattern.whoRecipient = Nothing,
                   DamagePattern.whichRecipient = Nothing,
                   -- No player chose this pair's source (CR 609.7a) and nothing
                   -- targeted it (CR 601.2c); rule 122.1c minted it off the
