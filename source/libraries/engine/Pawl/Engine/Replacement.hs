@@ -599,21 +599,28 @@ applies gs event candidate =
         (ReplacementEffect.LifeLossR {}, _) -> False
         (ReplacementEffect.PhaseR _, _) -> False
 
--- CR 120.4d: would this loss carry the player PAST the total the rewrite would
--- leave them at? `admits` and `unspent` above, for the life-total class.
---
--- Read off the LIVE board rather than off the event, because the event carries
--- only the loss and the rule's threshold is on the resulting TOTAL. A player
--- already at or below the floor answers True -- the loss would still take them
--- lower -- and the rewrite then cuts it to nothing.
---
--- A player id nothing is filed under answers False: no total to compare, so
--- nothing to replace.
+-- CR 120.4d: would this rewrite actually change the loss? `admits` and `unspent`
+-- above, for the life-total class. The rule states applicability rather than a
+-- rewrite that changes nothing, so a row this answers False for never reaches CR
+-- 616.1's choice, is never spent under CR 614.5, and prompts nobody.
 breaches :: GameState -> LifeLossRewrite.LifeLossRewrite -> PlayerId -> Natural -> Bool
 breaches gs rewrite pid n = case rewrite of
+  -- Read off the LIVE board rather than off the event, because the event carries
+  -- only the loss and the rule's threshold is on the resulting TOTAL. A player
+  -- already at or below the floor answers True -- the loss would still take them
+  -- lower -- and the rewrite then cuts it to nothing.
+  --
+  -- A player id nothing is filed under answers False: no total to compare, so
+  -- nothing to replace.
   LifeLossRewrite.LeaveAtLeast floor_ -> case Map.lookup pid (GameState.players gs) of
     Nothing -> False
     Just player -> Player.life player - toInteger n < toInteger floor_
+  -- The board is not consulted: a scaling's whole applicability is arithmetic on
+  -- the proposed amount, and rule 119.6's own death check is a state-based action
+  -- rather than a bound this may not cross. `Scaled (Multiply 1)` and
+  -- `Scaled (AddMore 0)` resize nothing and so are refused here, which is the same
+  -- sentence LeaveAtLeast's comparison spells for a floor already reached.
+  LifeLossRewrite.Scaled scaling -> scale scaling n /= n
 
 -- Does the REWRITE itself admit this entry, over and above the pattern matching
 -- the entering object? `admits` and `unspent` above, for the entry class.

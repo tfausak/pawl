@@ -1686,6 +1686,122 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
     Spec.assertEqWith s "alice loses the whole 3, floor and all: 2 - 3 = -1" (S.lifeOf S.alice after) (Just (-1))
     Spec.assertEqWith s "and bob, controlling no creature, loses nothing" (S.lifeOf S.bob after) (Just 20)
 
+-- CR 614.1a with CR 119.4 and CR 119.5: Bloodletter of Aclazotz ({1}{B}{B}{B}
+-- Creature -- Vampire Demon, 2/4, "Flying / If an opponent would lose life during
+-- your turn, they lose twice that much life instead. (Damage causes loss of
+-- life.)" -- name, cost, type line, power, toughness and Oracle text checked
+-- against api.scryfall.com 2026-08-28).
+--
+-- The pool's only life-total replacement whose clause is NOT scoped to damage --
+-- Scryfall o:"lose life" o:instead -o:damage and o:"much life instead" -o:gain,
+-- 2026-08-28, return it and no other loss-side card -- which is what makes CR
+-- 119.4's payment road and CR 119.5's set-a-total road observable at all.
+-- Worship, Ali from Cairo, Angel's Grace, Angel of Grace, Fortune Thief,
+-- Elderscale Wurm, Sustaining Spirit and Serra the Benevolent's emblem all print
+-- "DAMAGE that would reduce your life total to less than 1", so none of them can
+-- see either road.
+--
+-- Its own ruling fixes the half this does NOT touch: "Bloodletter of Aclazotz's
+-- last ability doesn't change the amount of damage dealt to opponents", which is
+-- CR 120.4c again -- the loss is resized, the damage is not.
+--
+-- THREE SEATS, because "an opponent" and "you" cannot be told apart on a board
+-- where one of the two players holds both roles, and because a downward set, an
+-- upward set and a self-set have to be read off one board to prove the row
+-- discriminates rather than that three boards differ.
+bloodletterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 / 119.5)" $ do
+  -- CR 119.4's second sentence is the whole of this case: "If a player pays life,
+  -- the payment is subtracted from their life total; in other words, the player
+  -- loses that much life." A payment is a life loss, so a row watching life loss
+  -- reaches it. Greed ({3}{B} Enchantment, "{2}{B}, Pay 2 life: Draw a card") is
+  -- the payer, and the COST it charges is unchanged at 2 -- what doubles is the
+  -- loss the payment causes.
+  Spec.it s "CR 119.4 life paid as a cost is a life loss, so the row resizes it" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    greed <- S.printingOf s registry "Greed"
+    bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g1) = S.addCreature bloodletter S.alice S.threePlayerGame
+        (bobsGreed, g2) = S.addCreature greed S.bob g1
+        (alicesGreed, g3) = S.addCreature greed S.alice g2
+        -- A card to draw for each activation, so no seat is decked out from under
+        -- the assertion (CR 104.3c) and the draw is a real one.
+        (_, g4) = S.addLibraryCard piker S.bob g3
+        (_, g5) = S.addLibraryCard piker S.alice g4
+        withMana = S.landsFor swamp S.bob 3 (S.landsFor swamp S.alice 3 g5)
+        pay who what = S.runPure S.identityAnswer withMana (Activate.activateAbility who what (theAbility greed))
+        bobPaid = pay S.bob bobsGreed
+        alicePaid = pay S.alice alicesGreed
+    Spec.assertEqWith s "CR 119.4 bob is alice's opponent on alice's turn, so his 2-life payment costs him 4" (S.lifeOf S.bob bobPaid) (Just 16)
+    -- CR 109.5: "an opponent" is read against the ROW's controller, and alice is
+    -- not her own opponent. The same card, the same payment, the same turn.
+    Spec.assertEqWith s "alice paying the same 2 life loses exactly 2" (S.lifeOf S.alice alicePaid) (Just 18)
+    Spec.assertEqWith s "and bob's payment left alice alone" (S.lifeOf S.alice bobPaid) (Just 20)
+  -- CR 120.4c, the control that matters: Worship's clause names DAMAGE, so it must
+  -- not see a payment. The two boards differ in one thing -- what takes alice's
+  -- last 2 life -- and Worship's own ruling says which way it falls: "Worship does
+  -- not prevent loss of life, so loss of life bypasses Worship."
+  Spec.it s "CR 120.4c a damage-scoped row does not see a payment" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    greed <- S.printingOf s registry "Greed"
+    worship <- S.printingOf s registry "Worship"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g1) = S.addCreature worship S.alice S.threePlayerGame
+        (_, g2) = S.addCreature piker S.alice g1
+        (alicesGreed, g3) = S.addCreature greed S.alice g2
+        (_, g4) = S.addLibraryCard piker S.alice g3
+        (bobsPiker, g5) = S.addCreature piker S.bob g4
+        base = atLife S.alice 2 (S.landsFor swamp S.alice 3 g5)
+        paid = S.runPure S.identityAnswer base (Activate.activateAbility S.alice alicesGreed (theAbility greed))
+        damaged =
+          S.runPure
+            S.identityAnswer
+            base
+            (Damage.applyDamage [DamageEvent.MkDamageEvent bobsPiker (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing DamageKind.Noncombat])
+    Spec.assertEqWith s "CR 119.4 the payment bypasses Worship's floor: 2 - 2 = 0" (S.lifeOf S.alice paid) (Just 0)
+    Spec.assertEqWith s "CR 120.4c the same board's DAMAGE is still floored at 1" (S.lifeOf S.alice damaged) (Just 1)
+  -- CR 120.4c is untouched by this unit, and this is the case that says so: the
+  -- damage road proposes its loss ONCE. A second proposal would double it again
+  -- and leave bob at 8.
+  Spec.it s "CR 120.4c the damage road proposes its loss once, and the row resizes it once" $ do
+    bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (source, g1) = S.addCreature bloodletter S.alice S.threePlayerGame
+        (_, g2) = S.addCreature piker S.bob g1
+        after =
+          S.runPure
+            S.identityAnswer
+            g2
+            (Damage.applyDamage [DamageEvent.MkDamageEvent source (Recipient.ToPlayer S.bob) 3 False False False 0 Nothing DamageKind.Noncombat])
+    Spec.assertEqWith s "3 damage costs bob 6 life, not the 12 a second application would" (S.lifeOf S.bob after) (Just 14)
+    Spec.assertEqWith s "CR 120.4b the damage event itself is undiminished" (fmap DamageEvent.amount (S.damageEventsOf after)) [3]
+  -- CR 119.5: "If an effect sets a player's life total to a specific number, the
+  -- player gains or loses the necessary amount of life to end up with the new
+  -- total." Biorhythm ({6}{G}{G} Sorcery, "Each player's life total becomes the
+  -- number of creatures they control") sets three seats at once off one pre-effect
+  -- board (CR 608.2f), which is what lets one case read all three answers:
+  -- an opponent's LOSS is resized, the controller's own loss is not, and a GAIN is
+  -- not a loss at all and proposes nothing.
+  --
+  -- Every number is distinct -- alice 20 -> 1, bob 20 -> -20 rather than 0, carol
+  -- 2 -> 3 rather than 4 -- so no two readings of the rule land on the same total.
+  Spec.it s "CR 119.5 a total set LOWER is a life loss the row resizes, and one set higher is not" $ do
+    forest <- S.printingOf s registry "Forest"
+    biorhythm <- S.printingOf s registry "Biorhythm"
+    bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g1) = S.addCreature bloodletter S.alice S.threePlayerGame
+        (_, g2) = S.addCreature piker S.carol g1
+        (_, g3) = S.addCreature piker S.carol g2
+        (_, g4) = S.addCreature piker S.carol g3
+        (held, g5) = S.addHandCard biorhythm S.alice g4
+        ready = inMainPhase S.alice (atLife S.carol 2 (S.landsFor forest S.alice 8 g5))
+        after = S.runPure S.identityAnswer ready (S.cast S.alice held Monad.>> Stack.resolveTop)
+    Spec.assertEqWith s "CR 119.5 bob's total becomes 0, a loss of 20, which the row doubles to 40" (S.lifeOf S.bob after) (Just (-20))
+    Spec.assertEqWith s "alice's own loss of 19 down to her one creature is not an opponent's" (S.lifeOf S.alice after) (Just 1)
+    Spec.assertEqWith s "carol's three creatures RAISE her, and a gain is no life loss to resize" (S.lifeOf S.carol after) (Just 3)
+
 -- Cast Divine Deflection for `x`, aiming CR 615.5's rider at a player. The target
 -- is FILTERED out of the offered set rather than built, so an aim the card's pool
 -- excludes leaves the slot empty instead of quietly becoming a legal one.
@@ -5241,6 +5357,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
   worshipSpec s registry
+  bloodletterSpec s registry
   divineDeflectionSpec s registry
   braceForImpactSpec s registry
   inkshieldSpec s registry
@@ -6987,7 +7104,7 @@ bloodthirstSpec s registry =
           vampire <- S.printingOf s registry "Bloodrage Vampire"
           sentry <- S.printingOf s registry "Ogre Sentry"
           let (gs0, held, _) = bloodthirstBoard swamp vampire sentry
-              after = enters (Event.payLife S.bob 6 gs0) held
+              after = enters (S.runPure S.identityAnswer gs0 (Event.payLife S.bob 6)) held
           case vampireIn after of
             Nothing -> Spec.assertFailure s "Bloodrage Vampire did not reach the battlefield"
             Just vamp -> Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne vamp after) 0

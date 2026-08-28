@@ -5120,6 +5120,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Evaluated ONCE PER RECIPIENT, a card being able to name a number that is each
   -- recipient's own (Biorhythm). Every evaluation and delta is read off `gs`, the
   -- state before any life moves (CR 608.2f).
+  --
+  -- A DOWNWARD delta goes through Event.resolveLifeLoss first, CR 614.1's funnel
+  -- for the class, since rule 119.5 spells a lower total as the player losing "the
+  -- necessary amount of life" and a replacement watching life loss reaches it. The
+  -- SETTLED loss is what moves the total, so a row may leave the player somewhere
+  -- other than the number the card named. An upward delta is a life GAIN and
+  -- proposes nothing here.
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -5133,7 +5140,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- An undeterminable total is no instruction, asked per recipient: one
         -- seat's unanswerable count says nothing about the others.
         Monad.forM_ (evaluateForRecipient viewOf context gs resolving source pid quantity) $ \total ->
-          changeLife pid (total - Player.life player)
+          let delta = total - Player.life player
+           in if delta < 0
+                then do
+                  settled <- Event.resolveLifeLoss LifeLossCause.ByEffect pid (Integer.toNaturalSaturating (negate delta))
+                  changeLife pid (negate (toInteger settled))
+                else changeLife pid delta
   -- CR 119.7 / 119.8: redistribute life totals, each new total being CR 119.5's
   -- gain or loss of the necessary amount. The roster is CR 102.1's players IN the
   -- game, not the keys of GameState.players, which keep a departed seat's row.
