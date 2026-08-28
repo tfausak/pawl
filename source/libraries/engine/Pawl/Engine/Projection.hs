@@ -3995,6 +3995,15 @@ projectDeciding admits cands = forObject
                 -- what makes the object agree with itself: the final noValuePT
                 -- would otherwise answer 0 for a creature the fold had already
                 -- thrown a modification away for.
+                --
+                -- The SUBLAYER GATE here is a regression fence, not a proven
+                -- behaviour: seedFor has already run applyCharacteristicPT by the
+                -- time layer 7a reaches this, so widening the bound to noValueAt
+                -- Layer.SwitchPT -- substituting from layer 4 on -- left the whole
+                -- suite green (2026-08-27). It is `lyr` so that the accumulator
+                -- and the two views that read it (viewUpTo, viewOfBoard) cannot
+                -- drift on the same question. The substitution ITSELF is proved by
+                -- Pawl.PowerToughnessSpec's Glorious Anthem case.
                 seeded = noValueAt lyr (seedFor oid partial)
                 -- CR 613.6: the affected set is asked ONCE per effect, at the
                 -- lowest layer it reaches, and remembered for its other layers.

@@ -11,8 +11,10 @@
 -- none), CR 613.4c's layer 7c anthem narrowed by a keyword its affected
 -- objects have (Hand of the Praetors), and CR 208.5's 0 for a creature left
 -- with no value for its power or toughness (Ashaya, Soul of the Wild under
--- Blood Moon) -- read both off the finished fold and, through Synthetic
--- Withering Comparison, off the MID-FOLD view a same-layer count gets --, plus
+-- Blood Moon) -- read off the finished fold, off the MID-FOLD view a same-layer
+-- count gets (Synthetic Withering Comparison), and off the fold's own
+-- accumulator, where CR 613.4c's modification has to have the substituted 0 to
+-- add to (Glorious Anthem) --, plus
 -- CR 109.5's static-ability perspective on a player-scoped
 -- count (Empyrial Armor on an opponent's creature) and CR 613.4c's NEGATIVE
 -- layer-7c modification of an announced value (Toxic Deluge's -X/-X, CR 107.1b),
