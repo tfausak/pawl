@@ -1695,14 +1695,16 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
 -- life.)" -- name, cost, type line, power, toughness and Oracle text checked
 -- against api.scryfall.com 2026-08-28).
 --
--- The pool's only life-total replacement whose clause is NOT scoped to damage --
--- Scryfall o:"lose life" o:instead -o:damage and o:"much life instead" -o:gain,
--- 2026-08-28, return it and no other loss-side card -- which is what makes CR
--- 119.4's payment road and CR 119.5's set-a-total road observable at all.
--- Worship, Ali from Cairo, Angel's Grace, Angel of Grace, Fortune Thief,
--- Elderscale Wurm, Sustaining Spirit and Serra the Benevolent's emblem all print
--- "DAMAGE that would reduce your life total to less than 1", so none of them can
--- see either road.
+-- The life-total replacement whose clause is NOT scoped to damage, which is what
+-- makes CR 119.4's payment road and CR 119.5's set-a-total road observable at
+-- all. Every FLOOR-shaped printing is scoped to damage instead: Scryfall
+-- o:"life total to less than", 2026-08-28, is eight cards -- Ali from Cairo,
+-- Angel of Grace, Angel's Grace, Elderscale Wurm, Fortune Thief, Serra the
+-- Benevolent, Sustaining Spirit, Worship -- and all eight print "DAMAGE that
+-- would reduce your life total to less than 1". A printing worded "if you would
+-- lose life ... instead", with no damage clause, would refute that and belongs
+-- here beside this one; Scryfall o:"lose life" o:instead -o:damage and
+-- o:"much life instead" -o:gain on the same date name none but this card.
 --
 -- Its own ruling fixes the half this does NOT touch: "Bloodletter of Aclazotz's
 -- last ability doesn't change the amount of damage dealt to opponents", which is

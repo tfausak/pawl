@@ -599,10 +599,14 @@ applies gs event candidate =
         (ReplacementEffect.LifeLossR {}, _) -> False
         (ReplacementEffect.PhaseR _, _) -> False
 
--- CR 120.4d: would this rewrite actually change the loss? `admits` and `unspent`
--- above, for the life-total class. The rule states applicability rather than a
--- rewrite that changes nothing, so a row this answers False for never reaches CR
+-- CR 614.1a: would this rewrite actually change the loss? `admits` and `unspent`
+-- above, for the life-total class. A row this answers False for never reaches CR
 -- 616.1's choice, is never spent under CR 614.5, and prompts nobody.
+--
+-- CR 120.4d's own Worship example is where the CR states that posture out loud,
+-- and it states it as APPLICABILITY rather than as a rewrite that changes nothing:
+-- "Worship's effect sees that the damage event would not reduce the player's life
+-- total to less than 1, so Worship's effect is not applied."
 breaches :: GameState -> LifeLossRewrite.LifeLossRewrite -> PlayerId -> Natural -> Bool
 breaches gs rewrite pid n = case rewrite of
   -- Read off the LIVE board rather than off the event, because the event carries
@@ -617,9 +621,13 @@ breaches gs rewrite pid n = case rewrite of
     Just player -> Player.life player - toInteger n < toInteger floor_
   -- The board is not consulted: a scaling's whole applicability is arithmetic on
   -- the proposed amount, and rule 119.6's own death check is a state-based action
-  -- rather than a bound this may not cross. `Scaled (Multiply 1)` and
-  -- `Scaled (AddMore 0)` resize nothing and so are refused here, which is the same
-  -- sentence LeaveAtLeast's comparison spells for a floor already reached.
+  -- rather than a bound this may not cross.
+  --
+  -- `Scaled (Multiply 1)` and `Scaled (AddMore 0)` resize nothing and are refused
+  -- here. That is the Worship example's posture carried over rather than a rule of
+  -- its own -- the CR states applicability only for the floor case -- and no
+  -- printing in data/cards/ scales a life loss by an identity, so the refusal is a
+  -- fence rather than a proved behaviour.
   LifeLossRewrite.Scaled scaling -> scale scaling n /= n
 
 -- Does the REWRITE itself admit this entry, over and above the pattern matching
