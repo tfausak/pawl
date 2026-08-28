@@ -226,6 +226,7 @@ manaProduced effect = case effect of
   Effect.MakePlotted _ -> Nothing
   Effect.DoesNotUntapNext _ -> Nothing
   Effect.Transform _ -> Nothing
+  Effect.Convert _ -> Nothing
   Effect.PhaseOut _ -> Nothing
   Effect.AddPhases _ -> Nothing
   Effect.EndTurn -> Nothing
@@ -419,6 +420,7 @@ movesLibraryCard effect = case effect of
   Effect.MakePlotted _ -> False
   Effect.DoesNotUntapNext _ -> False
   Effect.Transform _ -> False
+  Effect.Convert _ -> False
   Effect.PhaseOut _ -> False
   -- CR 500.1: the added phases bring their own turn-based actions, and a draw
   -- step's draw is one of those rather than an effect of this ability. Same for

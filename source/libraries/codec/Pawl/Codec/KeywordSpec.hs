@@ -149,6 +149,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Lifelink
       " {\"type\":\"Lifelink\"} "
+  -- CR 702.161a. Nullary on the wire, the rule stating no parameter.
+  Spec.it s "LivingMetal" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.LivingMetal
+      " {\"type\":\"LivingMetal\"} "
   -- CR 702.16a states a quality on EVERY protection ability, so the payload is
   -- required where hexproof's is optional: there is no bare protection tag to
   -- write, and rule 702.16j's "protection from everything" -- the variant that

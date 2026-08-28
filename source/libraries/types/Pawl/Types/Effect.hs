@@ -773,9 +773,27 @@ data Effect card ability
     -- whether anything happens (CR 701.27c, CR 701.27d) are read off the card's
     -- LAYOUT by Pawl.Engine.Card.turnedOver, never off which card it is.
     --
-    -- The transform WORDING only. CR 701.28's convert turns a permanent over by
-    -- the same subrules (CR 701.28a) and needs its own opcode (#698).
+    -- The transform WORDING only. CR 701.28's convert is Convert below, which
+    -- shares this opcode's whole implementation because CR 701.28a says to.
     Transform ObjectRef.ObjectRef
+  | -- | CR 701.28a: turn the permanents the ObjectRef names over, so each shows
+    -- its other face -- the Transformers cards' word for Transform above.
+    --
+    -- A SECOND opcode and not an alias, though CR 701.28a routes a convert
+    -- through rules 701.27a-f, 712.9-10 and 712.18 unchanged. What the CR does
+    -- NOT do is collapse the two: CR 701.28c and CR 701.28d restate 701.27c and
+    -- 701.27d in convert's own words rather than deferring to them, and CR
+    -- 701.28f has to state that "can't transform" also forbids converting --
+    -- which a synonym would not need. So a card file says which word its card
+    -- prints, and no reader has to guess.
+    --
+    -- Where the two must NOT come apart, they share one implementation rather
+    -- than agreeing by inspection: Pawl.Engine.Resolve applies both arms through
+    -- the same turnPermanentsOver, so CR 701.27f's already-turned gate (which CR
+    -- 701.28e counts a transform and a convert alike for), CR 701.27e's
+    -- "transforms into" trigger, CR 702.145b's daybound restriction and CR
+    -- 701.28f's prohibition are one code path with one event.
+    Convert ObjectRef.ObjectRef
   | -- | CR 702.26b: the permanents the ObjectRef names phase out.
     --
     -- NOT a zone change, which is CR 702.26d in as many words, so this does not
