@@ -24,10 +24,27 @@ data LifeLossCause
     -- why a lifelink source still gains its controller the whole amount dealt.
     ByDamage
   | -- | CR 119.3: the life an effect causes a player to lose --
-    -- Pawl.Engine.Resolve's Effect.LoseLife arm.
+    -- Pawl.Engine.Resolve's Effect.LoseLife arm, and its Effect.SetLifeTotal arm
+    -- where the new total is lower, CR 119.5 spelling that as the player losing
+    -- "the necessary amount of life".
     --
-    -- Not implemented: CR 118.3b's life PAYMENT, CR 119.5's set-a-total downward
-    -- and CR 701.12c's exchange raise no event of their own, so no replacement
-    -- reaches any of them (#2544).
+    -- Not implemented: CR 701.12c's exchange and CR 119.7's redistribution move a
+    -- life total without proposing a loss of their own, so no replacement reaches
+    -- either (#2544).
     ByEffect
+  | -- | CR 119.4: the life a PAYMENT costs its payer -- Pawl.Engine.Event.payLife,
+    -- reached from a cost component, from CR 107.4f's Phyrexian symbol and from
+    -- CR 614.1c's pay-or-enter-tapped rewrite.
+    --
+    -- Its own arm rather than ByEffect's, because rule 119.4 arrives at the loss
+    -- by a different road than rule 119.3 does -- a cost the player chooses to
+    -- pay, not an effect instructing them -- and a printed clause narrows by
+    -- exactly that grain: Ashiok, Wicked Manipulator says "if you would pay life",
+    -- where Zof Consumption's loss is an effect's.
+    --
+    -- Not implemented: no card in data/cards/ narrows a
+    -- Pawl.Types.LifeLossPattern to this cause; Ashiok, Wicked Manipulator would
+    -- be the producer, and its rewrite (exile that many cards instead) is a shape
+    -- Pawl.Types.LifeLossRewrite has no arm for (gap #2549).
+    ByPayment
   deriving (Bounded, Enum, Eq, Ord, Show)

@@ -13,4 +13,7 @@ spec s = Spec.describe s "Pawl.Codec.LifeLossCause" $ do
   -- CR 119.3.
   Spec.it s "ByEffect" $
     Common.assertCodec s LifeLossCause.codec LifeLossCause.ByEffect " {\"type\":\"ByEffect\"} "
+  -- CR 119.4: a cost paid in life.
+  Spec.it s "ByPayment" $
+    Common.assertCodec s LifeLossCause.codec LifeLossCause.ByPayment " {\"type\":\"ByPayment\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s LifeLossCause.codec

@@ -599,21 +599,36 @@ applies gs event candidate =
         (ReplacementEffect.LifeLossR {}, _) -> False
         (ReplacementEffect.PhaseR _, _) -> False
 
--- CR 120.4d: would this loss carry the player PAST the total the rewrite would
--- leave them at? `admits` and `unspent` above, for the life-total class.
+-- CR 614.1a: would this rewrite actually change the loss? `admits` and `unspent`
+-- above, for the life-total class. A row this answers False for never reaches CR
+-- 616.1's choice, is never spent under CR 614.5, and prompts nobody.
 --
--- Read off the LIVE board rather than off the event, because the event carries
--- only the loss and the rule's threshold is on the resulting TOTAL. A player
--- already at or below the floor answers True -- the loss would still take them
--- lower -- and the rewrite then cuts it to nothing.
---
--- A player id nothing is filed under answers False: no total to compare, so
--- nothing to replace.
+-- CR 120.4d's own Worship example is where the CR states that posture out loud,
+-- and it states it as APPLICABILITY rather than as a rewrite that changes nothing:
+-- "Worship's effect sees that the damage event would not reduce the player's life
+-- total to less than 1, so Worship's effect is not applied."
 breaches :: GameState -> LifeLossRewrite.LifeLossRewrite -> PlayerId -> Natural -> Bool
 breaches gs rewrite pid n = case rewrite of
+  -- Read off the LIVE board rather than off the event, because the event carries
+  -- only the loss and the rule's threshold is on the resulting TOTAL. A player
+  -- already at or below the floor answers True -- the loss would still take them
+  -- lower -- and the rewrite then cuts it to nothing.
+  --
+  -- A player id nothing is filed under answers False: no total to compare, so
+  -- nothing to replace.
   LifeLossRewrite.LeaveAtLeast floor_ -> case Map.lookup pid (GameState.players gs) of
     Nothing -> False
     Just player -> Player.life player - toInteger n < toInteger floor_
+  -- The board is not consulted: a scaling's whole applicability is arithmetic on
+  -- the proposed amount, and rule 119.6's own death check is a state-based action
+  -- rather than a bound this may not cross.
+  --
+  -- `Scaled (Multiply 1)` and `Scaled (AddMore 0)` resize nothing and are refused
+  -- here. That is the Worship example's posture carried over rather than a rule of
+  -- its own -- the CR states applicability only for the floor case -- and no
+  -- printing in data/cards/ scales a life loss by an identity, so the refusal is a
+  -- fence rather than a proved behaviour.
+  LifeLossRewrite.Scaled scaling -> scale scaling n /= n
 
 -- Does the REWRITE itself admit this entry, over and above the pattern matching
 -- the entering object? `admits` and `unspent` above, for the entry class.
@@ -1372,10 +1387,10 @@ readsApplier re = case re of
   -- CR 122.1d acts on the permanent becoming untapped and names no player -- CR
   -- 701.19a's answer one event class over, and for its reason.
   ReplacementEffect.UntapR _ -> False
-  -- The floor is the effect's own field and the player is the one the event
-  -- already named, so two rows alike in `effect` cut the same loss to the same
-  -- amount whoever holds them. CR 109.5's "your" is read in `applies` rather
-  -- than in Event.apply, which is CounterR's split exactly.
+  -- The rewrite is the effect's own field and the player is the one the event
+  -- already named, so two rows alike in `effect` resize the same loss the same way
+  -- whoever holds them. CR 109.5's "your" is read in `applies` rather than in
+  -- Event.apply, which is CounterR's split exactly.
   ReplacementEffect.LifeLossR {} -> False
   -- CR 614.10: a skip replaces the step or phase with nothing. The player it is
   -- ABOUT is baked into PhasePattern.whosePhase, on the EFFECT, where this
@@ -2253,9 +2268,10 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.TokenR {} -> Nothing
   ReplacementEffect.TurnUpR {} -> Nothing
   ReplacementEffect.UntapR _ -> Nothing
-  -- CR 614.1a: a floor on a life total is not a supply a batch can run out of --
-  -- it is re-read off the board every application, and once the player is at the
-  -- floor a further loss is cut to nothing rather than exhausting anything.
+  -- CR 614.1a: neither life-total rewrite is a supply a batch can run out of. A
+  -- floor is re-read off the board every application, and once the player is at it
+  -- a further loss is cut to nothing rather than exhausting anything; a scaling is
+  -- arithmetic on whatever amount arrives.
   ReplacementEffect.LifeLossR {} -> Nothing
   ReplacementEffect.PhaseR _ -> Nothing
 

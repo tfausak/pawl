@@ -5088,7 +5088,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- Not implemented: CR 701.12c's deferral to CR 119.7-8, under which an
   -- exchange that would raise a player who can't gain life doesn't happen.
-  -- Vacuous: Pawl.Types.PlayerEffect has no such arm to consult.
+  -- Vacuous: Pawl.Types.PlayerEffect has no such arm to consult. Nor does the
+  -- lowered side go through Event.resolveLifeLoss the way SetLifeTotal's does, so
+  -- no replacement reaches it (#2544).
   Effect.ExchangeLifeTotals sides -> do
     gs <- State.get
     let twoSides = case sides of
@@ -5120,6 +5122,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Evaluated ONCE PER RECIPIENT, a card being able to name a number that is each
   -- recipient's own (Biorhythm). Every evaluation and delta is read off `gs`, the
   -- state before any life moves (CR 608.2f).
+  --
+  -- A DOWNWARD delta goes through Event.resolveLifeLoss first, CR 614.1's funnel
+  -- for the class, since rule 119.5 spells a lower total as the player losing "the
+  -- necessary amount of life" and a replacement watching life loss reaches it. The
+  -- SETTLED loss is what moves the total, so a row may leave the player somewhere
+  -- other than the number the card named. An upward delta is a life GAIN and
+  -- proposes nothing here.
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -5133,7 +5142,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- An undeterminable total is no instruction, asked per recipient: one
         -- seat's unanswerable count says nothing about the others.
         Monad.forM_ (evaluateForRecipient viewOf context gs resolving source pid quantity) $ \total ->
-          changeLife pid (total - Player.life player)
+          let delta = total - Player.life player
+           in if delta < 0
+                then do
+                  settled <- Event.resolveLifeLoss LifeLossCause.ByEffect pid (Integer.toNaturalSaturating (negate delta))
+                  changeLife pid (negate (toInteger settled))
+                else changeLife pid delta
   -- CR 119.7 / 119.8: redistribute life totals, each new total being CR 119.5's
   -- gain or loss of the necessary amount. The roster is CR 102.1's players IN the
   -- game, not the keys of GameState.players, which keep a departed seat's row.
@@ -5145,7 +5159,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- Not implemented: CR 119.7-8's own restrictions on a player who can't gain or
   -- lose life (vacuous, as for ExchangeLifeTotals), nor CR 810.9f's "not more
-  -- than one member of each team", pawl having no teams (#175).
+  -- than one member of each team", pawl having no teams (#175). A lowered total
+  -- does not go through Event.resolveLifeLoss here either (#2544).
   Effect.RedistributeLifeTotals -> do
     gs <- State.get
     let candidates = Game.stillPlaying gs

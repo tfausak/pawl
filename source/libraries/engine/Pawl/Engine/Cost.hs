@@ -2343,7 +2343,13 @@ payManaExcept inFlight subject spending pid cost = do
         Nothing -> pure False
         Just (steps, life) -> do
           (Mana.Type.MkMana left, spent) <- Mana.spendChosen pid (PlayerEffect.spendManaAsThough pid gs) steps (Mana.Type.MkMana available)
-          State.modify' (recordSpent spent . Event.payLife pid life . Mana.setPool pid (Mana.Type.MkMana (withheld <> left)))
+          -- Three writes in the order the one composed `State.modify'` they
+          -- replace applied them in: the pool goes back, then the life is paid,
+          -- then CR 400.7d's record of what was spent. Event.payLife is monadic
+          -- because CR 119.4's loss goes through the replacement funnel.
+          State.modify' (Mana.setPool pid (Mana.Type.MkMana (withheld <> left)))
+          Event.payLife pid life
+          State.modify' (recordSpent spent)
           pure True
     -- CR 400.7d's cost record for the MANA, kept where CR 107.4h's third
     -- sentence can be asked about it afterwards -- "the {S} symbol can also be
@@ -2568,7 +2574,7 @@ payComponent moment pid oid component = case component of
   -- CR 119.4: the payment is subtracted from the life total, shared with CR
   -- 107.4f's Phyrexian symbol as the payability check above is.
   CostComponent.PayLife n -> do
-    State.modify' (Event.payLife pid n)
+    Event.payLife pid n
     pure bindsNothing
   -- Unpayable, `canPayComponent`'s answer and for its reason. Unpaid rather than
   -- a guessed 0, which CR 601.2h turns into the reversal of the whole casting.
