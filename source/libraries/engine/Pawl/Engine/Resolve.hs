@@ -6374,7 +6374,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- current zone" -- the cards are wherever the exile left them, and this
     -- resolution simply had no effect. Nothing is bound and no slot is filled: no
     -- printing names the melded permanent later in its own instruction list.
-    Monad.void (Event.meld (objectRefObjects legal resolving controller source gs ref) resultCard)
+    Monad.void (Event.meld controller (objectRefObjects legal resolving controller source gs ref) resultCard)
   Effect.PhaseOut ref ->
     State.modify' $ \gs ->
       -- CR 702.26b: each named permanent phases out; the victims are enumerated

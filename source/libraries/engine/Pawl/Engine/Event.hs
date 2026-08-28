@@ -4510,8 +4510,8 @@ recordTokenEntry newId = do
 -- The back faces are up by construction -- CR 712.4b leaves a meld card's own half
 -- of the oversized face meaningless alone, so pawl prints neither half's back and
 -- the interned result IS the combined face, face up on its only face.
-meld :: [ObjectId] -> Card -> Game (Maybe ObjectId)
-meld victims resultCard = do
+meld :: PlayerId -> [ObjectId] -> Card -> Game (Maybe ObjectId)
+meld controller victims resultCard = do
   gs <- State.get
   case meldable victims gs of
     -- CR 701.42b/701.42c. Nothing is written, so nothing moves.
@@ -4534,13 +4534,18 @@ meld victims resultCard = do
       State.modify' (\g -> foldl forgetObject g victims)
       let mkObj ts =
             Object.MkObject
-              { -- CR 701.42b's shared owner, checked by `meldable`. Controller
-                -- follows through Projection.defaultControllerOf's CR 109.4c
-                -- default, `enteredUnder` being Nothing: the ability that melds
-                -- requires the activating player to own and control both halves,
-                -- and no other road to a meld exists in the pool.
+              { -- CR 110.2, sentence 1: a permanent's owner is the owner of the
+                -- card that represents it, which for a melded permanent is the
+                -- one owner all of them share -- `meldable` checked that, since
+                -- CR 701.42b's pair has no other reading of "its owner".
                 Object.owner = owner,
-                Object.enteredUnder = Nothing,
+                -- CR 110.2a: "if an effect instructs a player to put an object
+                -- onto the battlefield, that object enters the battlefield under
+                -- that player's control", so the resolving controller is stamped
+                -- rather than the owner defaulted to. The two coincide for the
+                -- pool's only meld pair, whose ability requires the activating
+                -- player to own and control both halves.
+                Object.enteredUnder = Just controller,
                 Object.source = Source.OfMeld (MeldSource.MkMeldSource {MeldSource.result = resultId, MeldSource.components = components}),
                 Object.zone = Zone.Battlefield,
                 -- CR 110.5b: nothing in rule 701.42 says otherwise.

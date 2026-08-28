@@ -146,7 +146,7 @@ spec s registry = Spec.describe s "Meld" $ do
           (fmap (Maybe.mapMaybe (\pid -> fmap Printing.card (Game.printingOf pid after)) . Foldable.toList . Game.componentsOf . Object.source) (Game.lookupObject meldedId after))
           (Just [Printing.card battlements, Printing.card garrison])
         Spec.assertEqWith s "owned by the shared owner (CR 701.42b)" (fmap Object.owner (Game.lookupObject meldedId after)) (Just S.alice)
-        Spec.assertEqWith s "and controlled by them (CR 109.4c)" (Projection.controllerOf meldedId after) (Just S.alice)
+        Spec.assertEqWith s "and controlled by the player the effect instructed (CR 110.2a)" (Projection.controllerOf meldedId after) (Just S.alice)
       other -> Spec.assertFailure s ("expected exactly one permanent, got " <> show (length other))
     -- The cards stop being objects: one permanent, not two cards beside it.
     Spec.assertEqWith s "nothing is left in exile" (Game.zoneMembers Zone.Exile S.alice after) []
@@ -161,8 +161,8 @@ spec s registry = Spec.describe s "Meld" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
     piker <- S.printingOf s registry "Goblin Piker"
     let (bId, pId, after) = melded battlements piker piker
-    Spec.assertEqWith s "nothing entered the battlefield" (Set.size (GameState.battlefield after)) 0
     Spec.assertEqWith s "both cards are still in exile" (List.sort (Game.zoneMembers Zone.Exile S.alice after)) (List.sort [bId, pId])
+    Spec.assertEqWith s "nothing entered the battlefield" (Set.size (GameState.battlefield after)) 0
   -- CR 712.14c: "those cards enter the battlefield as a single permanent with
   -- their back faces up" -- an ENTRY, so CR 616.1's entry replacement loop must
   -- run over it. bob's Kismet rewrites an opponent's entering creature to tapped
