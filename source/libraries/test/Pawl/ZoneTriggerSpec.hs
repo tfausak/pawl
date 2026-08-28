@@ -1242,6 +1242,28 @@ permanentDiesSpec s registry =
 --     share one; without this board an implementation that deduped per scan
 --     rather than per group passes the other two.
 --
+-- Two more prove the same arity over the OTHER road into a graveyard, a swept
+-- Effect.MoveToZone rather than CR 704.3's pass. Synthetic Twofold Interment is
+-- both of them: a two-clause sorcery, "put all Goblins into their owners'
+-- graveyards" and then the same over Zombies. Four Goblins and no Zombie answer
+-- ONE counter, where a Goblin and a Zombie answer two -- one instruction is one
+-- event however many permanents it takes, and two instructions are two however
+-- few. The second board is what separates "one event" from "one resolution",
+-- and neither can be got from the three above, none of which moves a permanent
+-- through Pawl.Engine.Resolve's opcode at all.
+--
+-- WHY A SYNTHETIC SWEEPER. Scryfall o:"into their owners' graveyards", 2026-08-27,
+-- matches eight printings and not one of them takes a permanent off the
+-- battlefield; oracle:/put (all|each|target) .*(creature|permanent)s? .*into (its
+-- owner's|their owners') graveyard/ -o:"from your graveyard", same date, matches
+-- Bronzebeak Foragers and Gelatinous Cube, both of which move a card out of
+-- exile. Every printed mass move from the battlefield to a graveyard is worded
+-- as a destruction (CR 701.8) or a sacrifice (CR 701.21), and pawl routes those
+-- through Event.destroyIn and Event.sacrifice rather than through this opcode. A
+-- printing whose own words put several permanents into graveyards would refute
+-- the synthetic; nothing in the CR forbids one, CR 400.7 being the same funnel
+-- either way.
+--
 -- Lethal damage settled through Engine.settleForPriority rather than a sweeper on
 -- the first two boards: a sweeper kills the bearer too, and this card's payload
 -- acts on itself, so there would be nothing left to read the counter off. The
@@ -1365,6 +1387,75 @@ permanentsDieSpec s registry =
           Spec.assertEqWith s "it was a 2/2 before either batch" (S.powerToughnessOf bearer withLands) (Just (2, 2))
           Spec.assertEqWith s "the Piker and both tokens reached a graveyard" (length (filter (\zc -> ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard) (S.zoneChangesOf settled))) 3
           Spec.assertEqWith s "in two event groups, both inside one scan" (length (deathGroups settled)) 2
+          Spec.assertEqWith s "so two triggers reached the stack" (length (GameState.stack settled)) 2
+        -- CR 608.2f over the MOVES themselves. alice's Synthetic Twofold Interment
+        -- puts four Goblins into their owners' graveyards in one instruction --
+        -- three of hers and bob's -- and her Townsfolk grows by exactly one.
+        --
+        -- 4/4 is the whole discrimination, and the three Goblins of hers are what
+        -- give it room: 6/6 is the per-mover reading, one counter for each of her
+        -- creatures the sweep buried, and 3/3 is silence. bob's Goblin is in the
+        -- sweep for the first board's reason -- the Filter's "you control" half is
+        -- observed false only where a creature under another controller dies in the
+        -- same event.
+        --
+        -- The Townsfolk is a Citizen Human and survives the sweep, which is what
+        -- leaves a permanent to read the counter off; its own payload acts on
+        -- itself, so a board that buried the bearer could show nothing. No Zombie
+        -- stands here, so the card's second clause takes nothing and this board
+        -- reads one instruction alone.
+        Spec.it s "CR 608.2f four Goblins swept into graveyards give the Townsfolk one counter" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          townsfolk <- S.printingOf s registry "Vengeful Townsfolk"
+          piker <- S.printingOf s registry "Goblin Piker"
+          interment <- S.printingOf s registry "Synthetic Twofold Interment"
+          let (bearer, withBearer) = S.addCreature townsfolk S.alice (Setup.emptyGame S.bothPlayers)
+              (aliceFirst, withFirst) = S.addCreature piker S.alice withBearer
+              (aliceSecond, withSecond) = S.addCreature piker S.alice withFirst
+              (aliceThird, withThird) = S.addCreature piker S.alice withSecond
+              (bobs, withBobs) = S.addCreature piker S.bob withThird
+              withLands = List.foldl' (\gs _ -> snd (S.addCreature swamp S.alice gs)) withBobs [1 :: Int .. 3]
+              (withSpell, spell) = S.handOne interment withLands
+              afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
+              resolved = S.runPure S.identityAnswer afterCast Stack.resolveTop
+              settled = S.runPure S.identityAnswer resolved Engine.settleForPriority
+              after = resolveWholeStack settled
+          Spec.assertEqWith s "the Townsfolk is a 4/4: one +1/+1 counter for the whole sweep" (S.powerToughnessOf bearer after) (Just (4, 4))
+          Spec.assertEqWith s "it was a 3/3 before the sweep" (S.powerToughnessOf bearer withLands) (Just (3, 3))
+          Spec.assertEqWith s "all four Goblins left the battlefield" (fmap (\oid -> Game.lookupObject oid resolved) [aliceFirst, aliceSecond, aliceThird, bobs]) [Nothing, Nothing, Nothing, Nothing]
+          Spec.assertEqWith s "and they moved as one event group" (length (deathGroups resolved)) 1
+          Spec.assertEqWith s "so exactly one trigger reached the stack" (length (GameState.stack settled)) 1
+        -- The control the board above needs, on the same road and inside the same
+        -- resolution: the Interment's SECOND clause is its own instruction, so a
+        -- Goblin and a Zombie leave in two event groups and the Townsfolk takes two
+        -- counters. 5/5 is the rules answer, CR 608.2c making each clause its own
+        -- action; 4/4 is a bracket drawn around the whole resolution rather than
+        -- around one instruction's fold, which is the exact way the board above
+        -- could be passed for the wrong reason.
+        --
+        -- One creature per clause, which is the point: the board above proves that
+        -- a sweep of several fires once, so this one only has to be two sweeps --
+        -- and both sit inside ONE CR 117.5 scan, where two casts would have been
+        -- told apart by the scan boundary alone.
+        Spec.it s "CR 608.2c two clauses of one resolution are two trigger events" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          townsfolk <- S.printingOf s registry "Vengeful Townsfolk"
+          piker <- S.printingOf s registry "Goblin Piker"
+          zombie <- S.printingOf s registry "Whipstitched Zombie"
+          interment <- S.printingOf s registry "Synthetic Twofold Interment"
+          let (bearer, withBearer) = S.addCreature townsfolk S.alice (Setup.emptyGame S.bothPlayers)
+              (goblin, withGoblin) = S.addCreature piker S.alice withBearer
+              (undead, withUndead) = S.addCreature zombie S.alice withGoblin
+              withLands = List.foldl' (\gs _ -> snd (S.addCreature swamp S.alice gs)) withUndead [1 :: Int .. 3]
+              (withSpell, spell) = S.handOne interment withLands
+              afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
+              resolved = S.runPure S.identityAnswer afterCast Stack.resolveTop
+              settled = S.runPure S.identityAnswer resolved Engine.settleForPriority
+              after = resolveWholeStack settled
+          Spec.assertEqWith s "the Townsfolk is a 5/5: one +1/+1 counter per clause" (S.powerToughnessOf bearer after) (Just (5, 5))
+          Spec.assertEqWith s "it was a 3/3 before the spell" (S.powerToughnessOf bearer withLands) (Just (3, 3))
+          Spec.assertEqWith s "both creatures left the battlefield" (fmap (\oid -> Game.lookupObject oid resolved) [goblin, undead]) [Nothing, Nothing]
+          Spec.assertEqWith s "in two event groups, both inside one scan" (length (deathGroups resolved)) 2
           Spec.assertEqWith s "so two triggers reached the stack" (length (GameState.stack settled)) 2
         -- "YOU CONTROL", the ControlledBy arm (CR 109.5 against the ability's
         -- controller, CR 603.3a). The pair to the first board, differing in exactly

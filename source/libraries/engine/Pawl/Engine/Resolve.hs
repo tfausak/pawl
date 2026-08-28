@@ -4293,12 +4293,6 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- order, then moved one at a time, each judged against the board the
             -- batch began on and against the siblings that have already arrived
             -- (see moveOne). CR 400.3 files a hand arrival under Object.owner.
-            --
-            -- Not implemented: CR 608.2f's single event for the MOVES themselves.
-            -- Nothing brackets the fold below, so the sweep records one event
-            -- group per arrival; the per-arrival CR 616.1 loop is no argument for
-            -- that, Event.destroyIn running exactly such a loop inside one
-            -- Event.simultaneously (#2350).
             ObjectRef.EachMatching _ -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
@@ -4462,7 +4456,24 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               pure $ case named of
                 [attacker] -> Just attacker
                 _ -> Nothing
-          arrived <- fmap (reverse . snd) (Monad.foldM (moveOne mBlocked frozen before) (Set.empty, []) arrivals)
+          -- ONE event, which is what Event.simultaneously stamps on everything the
+          -- fold records: CR 608.2f processes an action taken on multiple objects
+          -- simultaneously, and one opcode is one such action however many objects
+          -- the ref swept. The fold's own comments already rest on that sentence --
+          -- `before` and the frozen riders are there because no member may observe
+          -- another -- so the bracket adds no claim they do not, and CR 603.2c's
+          -- batch conditions are what a board can finally read it with.
+          --
+          -- The per-member CR 616.1 loop inside Event.changeZoneEnteringIn is no
+          -- argument for N groups: Event.destroyIn runs exactly such a loop inside
+          -- one bracket, and this module's own CR 704.3 caller nests deeper still.
+          -- CR 616.1g is the rule that says so -- an event contained within an
+          -- event is the first event's, not a second one.
+          --
+          -- Around the FOLD alone. The gathers above ask CR 608.2d choices and CR
+          -- 401.4 arrangements, which move nothing and record nothing; a bracket
+          -- reaching over them would only widen what the group means.
+          arrived <- fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mBlocked frozen before) (Set.empty, []) arrivals))
           Monad.mapM_ (\slot -> bindArrivals slot (Maybe.catMaybes arrived)) mSlot
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries. Two
   -- steps: CR 400.7's move through the same changeZone funnel every destination
@@ -6032,6 +6043,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
       -- ONE evaluation for the whole set (CR 608.2f), then CR 122.6's funnel per
       -- recipient, so CR 614's counter replacements apply against each placement.
+      --
+      -- Not implemented: CR 608.2f's single event for the PLACEMENTS themselves.
+      -- Nothing brackets this fold, so a swept placement records one event group
+      -- per recipient and CR 603.2c's batch counter condition fires once for each
+      -- (#2533). The swept Effect.MoveToZone arm above is the same shape,
+      -- bracketed.
       Just n ->
         Monad.when (n > 0) . Monad.forM_ targets $ \target ->
           Event.putCounters (CounterCause.ByEffect controller) target kind (Integer.toNaturalSaturating n)
