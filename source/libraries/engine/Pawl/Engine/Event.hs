@@ -4815,7 +4815,7 @@ meldable victims gs = do
 -- CR 608.2h's record is filed in the same write, from the same pre-removal board,
 -- for changeZoneAttaching's reason: this is the last moment the object's
 -- information is known, and the id it is filed under is the id an ability on the
--- stack still carries as its source (CR 113.7). The six fields are read exactly as
+-- stack still carries as its source (CR 113.7). Every field is read exactly as
 -- that funnel reads them, off `obj` rather than off any incarnation, since nothing
 -- survives this write to read them from.
 forgetObject :: GameState -> ObjectId -> GameState
@@ -4827,7 +4827,7 @@ forgetObject gs oid = case Game.lookupObject oid gs of
         cleared = Game.removeFromZones (Object.owner obj) oid gs
      in cleared
           { GameState.objects = Map.delete oid (GameState.objects cleared),
-            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj)) (GameState.lastKnown cleared)
+            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj) (Object.chosenNames obj)) (GameState.lastKnown cleared)
           }
 
 -- CR 121.1, one card at a time per CR 121.2. An empty library records the failed
