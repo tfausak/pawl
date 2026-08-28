@@ -26,6 +26,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Resolve as Resolve
@@ -50,11 +51,13 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
@@ -521,6 +524,43 @@ spec s registry = Spec.describe s "Meld" $ do
         -- counted, so the 1 is a tally rather than a floor.
         Spec.assertEqWith s "CR 701.27a the Gargoyle is the one it counts" (Projection.namesOf gargoyleId turned) (Set.singleton (CardName.MkCardName (Text.pack "Stonewing Antagonizer")))
       other -> Spec.assertFailure s ("expected exactly one melded permanent, got " <> show (length other))
+  -- CR 712.21 and the rule's own Example, with Hanweir in place of Chittering
+  -- Host: "one permanent leaves the battlefield and two cards are put into the
+  -- appropriate zone", so an ability that triggers "whenever a creature dies"
+  -- triggers ONCE while two cards arrive in the graveyard.
+  --
+  -- Meren of Clan Nel Toth is that ability -- "whenever another creature you
+  -- control dies, you get an experience counter" -- and her counter is what
+  -- separates once from twice. The two halves of the answer discriminate in
+  -- opposite directions: a split that minted one incarnation would leave one card
+  -- in the graveyard, and a split that recorded one departure per card would give
+  -- alice two counters.
+  Spec.it s "CR 712.21 a melded permanent dies as one permanent and arrives as two cards" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    meren <- S.printingOf s registry "Meren of Clan Nel Toth"
+    let (merenId, base) = S.addCreature meren S.alice (Setup.emptyGame S.bothPlayers)
+        (mMelded, board) = meldedThrough base battlements garrison mountain
+    case mMelded of
+      Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
+      Just meldedId -> do
+        let dead = S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable [meldedId])
+            settled = S.runPure S.identityAnswer dead Engine.settleForPriority
+            after = S.runPure S.identityAnswer settled (Stack.resolveTop >> Stack.resolveTop)
+        Spec.assertEqWith
+          s
+          "CR 712.21 two cards are put into alice's graveyard"
+          (List.sort (graveyardNames dead))
+          (List.sort [CardName.MkCardName (Text.pack "Hanweir Battlements"), CardName.MkCardName (Text.pack "Hanweir Garrison")])
+        Spec.assertEqWith s "CR 712.21 and Meren saw exactly one creature die" (S.playerCounterOf PlayerCounterKind.Experience S.alice after) 1
+        -- The proxy behind that count, kept AFTER it: one trigger reached the
+        -- stack, so the 1 above is not two triggers of which one went unresolved.
+        Spec.assertEqWith s "one death trigger reached the stack" (length (GameState.stack settled)) 1
+        Spec.assertEqWith s "the melded permanent itself is gone" (Game.lookupObject meldedId dead) Nothing
+        Spec.assertEqWith s "setup: alice held no experience counters before it died" (S.playerCounterOf PlayerCounterKind.Experience S.alice board) 0
+        Spec.assertEqWith s "setup: Meren was on the battlefield to see it" (fmap Object.zone (Game.lookupObject merenId after)) (Just Zone.Battlefield)
+        Spec.assertEqWith s "setup: alice's graveyard was empty before it died" (graveyardNames board) []
 
 -- CR 701.27a as ONE instruction over the named permanents (CR 608.2f), through
 -- the opcode a card's "transform target permanent" reaches: the slot the effect
@@ -562,6 +602,12 @@ namedTownship gs = filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just to
 -- against; the names are what the rule's own example talks about.
 exileNames :: GameState.GameState -> [CardName.CardName]
 exileNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Exile S.alice gs)
+
+-- exileNames' graveyard twin, for CR 712.21's "two cards are put into the
+-- appropriate zone": the names alice's graveyard holds, since each arrival is a
+-- CR 400.7 incarnation with an id the board never saw.
+graveyardNames :: GameState.GameState -> [CardName.CardName]
+graveyardNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Graveyard S.alice gs)
 
 -- alice holding priority in her own main phase with five untapped Mountains --
 -- the {3}{R}{R} the melding ability costs, and nothing else the ability could

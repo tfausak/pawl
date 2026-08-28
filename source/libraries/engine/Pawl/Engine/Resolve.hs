@@ -3913,9 +3913,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- an empty set, so the later clause finds an unbound slot and does nothing --
     -- which is exactly what "IF a creature card is put into a graveyard this way"
     -- asks for.
+    --
+    -- EVERY arrival of each destruction, not just the first: CR 712.21c gives an
+    -- effect that finds what a melded permanent becomes both cards, and CR
+    -- 712.21e counts a melded permanent as two CARDS put into a graveyard where
+    -- the amount slot above counts it as one OBJECT destroyed.
     Monad.forM_ mBuried $ \slot -> do
       after <- State.get
-      let buriedCards = filter (\oid -> isCardInAGraveyard oid after) (Maybe.mapMaybe snd destroyed)
+      let buriedCards = concatMap (filter (\oid -> isCardInAGraveyard oid after) . Foldable.toList . snd) destroyed
       Monad.unless (null buriedCards) (State.modify' (bindObjectsSlot resolving slot (Seq.fromList buriedCards)))
     -- The THIRD reading, and the only one that keeps a controller: the PERMANENTS
     -- CR 701.8 destroyed, under the ids they held on the battlefield, for
@@ -4081,7 +4086,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- read ONCE ahead of this fold (see mBlocked below), so CR 608.2f's
             -- single event cannot see it move between members.
             Monad.forM_ mBlocked (Combat.putOntoBattlefieldBlocking newId)
-          pure (maybe sofar (`Set.insert` sofar) mNew, mNew : acc)
+          pure (foldr Set.insert sofar mNew, mNew : acc)
         -- The context a CHOICE's candidates are filtered in, off the board the
         -- choice is being made on: the resolution's own slots ride along, so a
         -- card offering "a permanent card from among them" (Midnight Tilling)
@@ -4318,7 +4323,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 [attacker] -> Just attacker
                 _ -> Nothing
           arrived <- fmap (reverse . snd) (Monad.foldM (moveOne mBlocked frozen before) (Set.empty, []) arrivals)
-          Monad.mapM_ (\slot -> bindArrivals slot (Maybe.catMaybes arrived)) mSlot
+          Monad.mapM_ (\slot -> bindArrivals slot (concatMap Foldable.toList arrived)) mSlot
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries. Two
   -- steps: CR 400.7's move through the same changeZone funnel every destination
   -- uses, so a library-entry replacement gets its CR 616.1 opportunity (CR 400.3
@@ -4496,7 +4501,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- 701.17a mills them at once -- and recorded even for a card a replacement
     -- diverted elsewhere, since it was milled wherever it ended up.
     arrivals <- fmap concat . Monad.forM milledBy $ \(pid, cards) -> do
-      arrived <- Maybe.catMaybes <$> Monad.mapM (\c -> Event.changeZoneReturning c Zone.Graveyard) cards
+      arrived <- concatMap Foldable.toList <$> Monad.mapM (\c -> Event.changeZoneReturning c Zone.Graveyard) cards
       Monad.unless (null arrived) (State.modify' (Event.recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList arrived)))))
       pure arrived
     -- CR 701.17c: a later clause naming the milled cards -- Midnight Tilling's
@@ -4719,7 +4724,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- binding below; a move that did not complete answers Nothing and is dropped.
     moved <-
       fmap concat . Monad.forM doomed $ \(victim, oids) ->
-        fmap Maybe.catMaybes (Monad.mapM (Event.discardReturning DiscardCause.Ordinary victim) oids)
+        fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.Ordinary victim) oids)
     -- The cards "discarded this way", for a later effect of the same resolution
     -- to look back at -- Psychic Miasma's "if a land card is discarded this way".
     -- The CR 400.7 incarnations the funnel MINTED, never the hand ids it was
@@ -5812,16 +5817,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- return when an opponent of `controller` (CR 102.2) BECOMES the
           -- monarch. Armed undischarged whoever holds the crown now, so an
           -- opponent who already holds it does not free the creature.
+          --
+          -- One watch per ARRIVAL, which is CR 712.21c: an effect that can find
+          -- the new object a melded permanent becomes finds both cards, and "the
+          -- same actions are taken upon each of them" -- so both come back when
+          -- an opponent becomes the monarch.
           mNew <- Event.changeZoneReturning target Zone.Exile
-          case mNew of
-            Nothing -> pure ()
-            Just newId -> do
-              let watch =
-                    MonarchWatch.MkMonarchWatch
-                      { MonarchWatch.controller = controller,
-                        MonarchWatch.due = False
-                      }
-              State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.insert newId watch (GameState.exiledUntilMonarch g)})
+          Monad.forM_ mNew $ \newId -> do
+            let watch =
+                  MonarchWatch.MkMonarchWatch
+                    { MonarchWatch.controller = controller,
+                      MonarchWatch.due = False
+                    }
+            State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.insert newId watch (GameState.exiledUntilMonarch g)})
       _ -> pure ()
   Effect.ExileHaunting (ExileHaunting.MkExileHaunting card slot) ->
     case legalOne slot legal of

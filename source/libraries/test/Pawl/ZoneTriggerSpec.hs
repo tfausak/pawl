@@ -3929,8 +3929,8 @@ hauntSpec s registry =
         [oid] ->
           let (mNew, moved) = S.runPureWith S.identityAnswer gs (Event.changeZoneReturning oid Zone.Graveyard)
               link = Map.lookup oid (GameState.haunting gs)
-           in case (mNew, link) of
-                (Just newId, Just hauntedId) -> moved {GameState.haunting = Map.insert newId hauntedId (Map.delete oid (GameState.haunting moved))}
+           in case (Foldable.toList mNew, link) of
+                (newId : _, Just hauntedId) -> moved {GameState.haunting = Map.insert newId hauntedId (Map.delete oid (GameState.haunting moved))}
                 _ -> moved
         _ -> gs
       lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
