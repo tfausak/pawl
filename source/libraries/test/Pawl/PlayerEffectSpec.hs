@@ -43,6 +43,12 @@
 -- which is where pawl's order used to come apart (Reliquary Tower is the third
 -- card in the group, and its ruling is the authority for the reading).
 --
+-- Minamo Scrollkeeper and Gnat Miser are the ADJUSTING pair on that same axis,
+-- and a pair for two reasons at once: they move the number in opposite
+-- directions, which is what tells two constructors from one signed delta, and
+-- Gnat Miser reduces each OPPONENT's maximum where every other card here writes
+-- its own controller's.
+--
 -- Void Winnower brings CR 601.3a's LOOKAHEAD, and Molten Disaster is the second
 -- half of that pair: a prohibition on even mana values, against an {X} spell
 -- whose mana value is even only while it sits in a hand (CR 202.3e).
@@ -2226,6 +2232,157 @@ theTenRingsSpec s registry =
       let after = reliquaryCleanup board
       Spec.assertEqWith s "CR 514.1 discards nothing" (S.handSize S.alice after) 11
       Spec.assertEqWith s "and only the resolved sorcery is in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+
+-- The ADJUSTING arms' board: alice controls `extra`, BOTH players hold `held`
+-- Plains, and `active` is whose cleanup step runs. Two hands, because the
+-- reducing card here is scoped to opponents and CR 514.1 trims the active player
+-- alone -- one hand could not show both halves of that.
+--
+-- The two hands are stocked to the SAME size on purpose, so the two cleanup runs
+-- differ in nothing but which seat is active and a scope read backwards has to
+-- show up as a different discard rather than as the same one from the other seat.
+adjustedHands :: Printing.Printing -> [Printing.Printing] -> Int -> PlayerId.PlayerId -> GameState.GameState
+adjustedHands plains extra held active =
+  let gs0 = (Setup.emptyGame S.bothPlayers) {GameState.activePlayer = active}
+      put g printing = snd (S.addCreature printing S.alice g)
+      withExtra = List.foldl' put gs0 extra
+      add pid g _ = snd (S.addHandCard plains pid g)
+      forAlice = List.foldl' (add S.alice) withExtra [1 .. held]
+   in List.foldl' (add S.bob) forAlice [1 .. held]
+
+-- Minamo Scrollkeeper, a Creature: "Defender / Your maximum hand size is
+-- increased by one." The INCREASING arm's producer, and the reason it is this
+-- printing rather than Trusted Advisor's "increased by two": both print the same
+-- shape, and this one prints nothing else that needs a trigger.
+--
+-- An adjustment is not a set, and CR 613.11's timestamp order is what tells them
+-- apart: laid over The Ten Rings' ten the answer is eleven, and laid under it the
+-- ten wins outright -- so both orders are built. Over Reliquary Tower there is no
+-- number left to raise at all.
+minamoScrollkeeperSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+minamoScrollkeeperSpec s registry =
+  Spec.describe s "MinamoScrollkeeper" $ do
+    Spec.it s "CR 402.2 alone it raises the maximum to eight" $ do
+      plains <- S.printingOf s registry "Plains"
+      scrollkeeper <- S.printingOf s registry "Minamo Scrollkeeper"
+      Spec.assertEqWith s "eight" (PlayerEffect.maximumHandSize S.alice (reliquaryHandOfNine plains [scrollkeeper])) (Just 8)
+
+    -- The gameplay-level case: the same nine cards the bare board discards two
+    -- of, discarding ONE here.
+    Spec.it s "CR 514.1 nine cards at cleanup discards down to eight" $ do
+      plains <- S.printingOf s registry "Plains"
+      scrollkeeper <- S.printingOf s registry "Minamo Scrollkeeper"
+      let after = reliquaryCleanup (reliquaryHandOfNine plains [scrollkeeper])
+      Spec.assertEqWith s "hand" (S.handSize S.alice after) 8
+      Spec.assertEqWith s "one discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+
+    -- CR 109.5: the You scope, as for the Tower and the Rings.
+    Spec.it s "CR 109.5 the opponent's maximum is untouched" $ do
+      plains <- S.printingOf s registry "Plains"
+      scrollkeeper <- S.printingOf s registry "Minamo Scrollkeeper"
+      Spec.assertEqWith s "seven" (PlayerEffect.maximumHandSize S.bob (reliquaryHandOfNine plains [scrollkeeper])) (Just 7)
+
+    -- CR 613.11 / Reliquary Tower's ruling: an adjustment applied after a removal
+    -- adjusts nothing, because the removal left no number. A reading that
+    -- restarted from CR 402.2's seven, or from the Tower's absent maximum treated
+    -- as a number, would answer eight here.
+    Spec.it s "CR 613.11 an increase after Reliquary Tower still leaves no maximum" $ do
+      plains <- S.printingOf s registry "Plains"
+      reliquaryTower <- S.printingOf s registry "Reliquary Tower"
+      scrollkeeper <- S.printingOf s registry "Minamo Scrollkeeper"
+      let board = reliquaryHandOfNine plains [reliquaryTower, scrollkeeper]
+          after = reliquaryCleanup board
+      Spec.assertEqWith s "CR 514.1 discards nothing" (S.handSize S.alice after) 9
+      Spec.assertEqWith s "nothing discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+      Spec.assertEqWith s "no maximum" (PlayerEffect.maximumHandSize S.alice board) Nothing
+
+    -- CR 613.11 with the Scrollkeeper LATER: it raises the ten The Ten Rings set.
+    Spec.it s "CR 613.11 an increase after The Ten Rings raises the ten it set" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      scrollkeeper <- S.printingOf s registry "Minamo Scrollkeeper"
+      let board = adjustedHands plains [tenRings, scrollkeeper] 12 S.alice
+          after = reliquaryCleanup board
+      Spec.assertEqWith s "CR 514.1 discards down to eleven" (S.handSize S.alice after) 11
+      Spec.assertEqWith s "one discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+      Spec.assertEqWith s "eleven" (PlayerEffect.maximumHandSize S.alice board) (Just 11)
+
+    -- THE ORDER CONTROL, the same two permanents entering the other way round and
+    -- nothing else changed: The Ten Rings SETS, so it overwrites the eight the
+    -- Scrollkeeper had already made of seven rather than composing with it.
+    Spec.it s "CR 613.11 The Ten Rings entering after the increase sets the maximum to ten outright" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      scrollkeeper <- S.printingOf s registry "Minamo Scrollkeeper"
+      let board = adjustedHands plains [scrollkeeper, tenRings] 12 S.alice
+          after = reliquaryCleanup board
+      Spec.assertEqWith s "CR 514.1 discards down to ten" (S.handSize S.alice after) 10
+      Spec.assertEqWith s "two discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
+      Spec.assertEqWith s "ten" (PlayerEffect.maximumHandSize S.alice board) (Just 10)
+
+-- Gnat Miser, a Creature: "Each opponent's maximum hand size is reduced by one."
+-- The REDUCING arm's producer, and the OPPONENTS scope on the same axis -- the
+-- two things the increase above cannot show. Chosen over Thought Nibbler's
+-- self-scoped "reduced by two" because it brings the scope with it and prints no
+-- keyword at all.
+--
+-- The direction is not a sign on one constructor, and this group is where that is
+-- observable: alice's Scrollkeeper takes her to eight on the very board where
+-- alice's Gnat Miser takes bob to six.
+gnatMiserSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+gnatMiserSpec s registry =
+  Spec.describe s "GnatMiser" $ do
+    Spec.it s "CR 402.2 each opponent's maximum drops to six" $ do
+      plains <- S.printingOf s registry "Plains"
+      gnatMiser <- S.printingOf s registry "Gnat Miser"
+      Spec.assertEqWith s "six" (PlayerEffect.maximumHandSize S.bob (adjustedHands plains [gnatMiser] 8 S.alice)) (Just 6)
+
+    -- CR 102.2: "each OPPONENT" is the other player, never the controller. The
+    -- scope read backwards would take alice to six and leave bob alone.
+    Spec.it s "CR 102.2 the controller's own maximum is untouched" $ do
+      plains <- S.printingOf s registry "Plains"
+      gnatMiser <- S.printingOf s registry "Gnat Miser"
+      Spec.assertEqWith s "seven" (PlayerEffect.maximumHandSize S.alice (adjustedHands plains [gnatMiser] 8 S.alice)) (Just 7)
+
+    -- The gameplay-level scope pair: ONE board, eight cards in each hand, and
+    -- only who is active differs. alice trims to CR 402.2's seven, bob to six.
+    Spec.it s "CR 514.1 alice's own cleanup trims her to seven, not six" $ do
+      plains <- S.printingOf s registry "Plains"
+      gnatMiser <- S.printingOf s registry "Gnat Miser"
+      let after = reliquaryCleanup (adjustedHands plains [gnatMiser] 8 S.alice)
+      Spec.assertEqWith s "hand" (S.handSize S.alice after) 7
+      Spec.assertEqWith s "one discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+
+    Spec.it s "CR 514.1 bob's cleanup trims him to six" $ do
+      plains <- S.printingOf s registry "Plains"
+      gnatMiser <- S.printingOf s registry "Gnat Miser"
+      let after = reliquaryCleanup (adjustedHands plains [gnatMiser] 8 S.bob)
+      Spec.assertEqWith s "hand" (S.handSize S.bob after) 6
+      Spec.assertEqWith s "two discarded" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
+
+    -- THE DIRECTION CONTROL: both producers on one board, and the two seats move
+    -- opposite ways. One constructor carrying a signed delta could still spell
+    -- this, but it could not keep the reduction's floor below -- so the pair is
+    -- read together with the zero case.
+    Spec.it s "CR 402.2 an increase and a reduction on one board move the two seats opposite ways" $ do
+      plains <- S.printingOf s registry "Plains"
+      gnatMiser <- S.printingOf s registry "Gnat Miser"
+      scrollkeeper <- S.printingOf s registry "Minamo Scrollkeeper"
+      let board = adjustedHands plains [gnatMiser, scrollkeeper] 8 S.alice
+      Spec.assertEqWith s "alice is up one" (PlayerEffect.maximumHandSize S.alice board) (Just 8)
+      Spec.assertEqWith s "bob is down one" (PlayerEffect.maximumHandSize S.bob board) (Just 6)
+
+    -- CR 107.1b: eight Misers would take seven to minus one, and the calculation
+    -- yields zero instead. Eight rather than seven so the floor is applied to a
+    -- number already AT it, which is where a subtraction would go wrong twice.
+    Spec.it s "CR 107.1b eight Gnat Misers floor the opponent's maximum at zero" $ do
+      plains <- S.printingOf s registry "Plains"
+      gnatMiser <- S.printingOf s registry "Gnat Miser"
+      let board = adjustedHands plains (replicate 8 gnatMiser) 3 S.bob
+          after = reliquaryCleanup board
+      Spec.assertEqWith s "CR 514.1 bob discards his whole hand" (S.handSize S.bob after) 0
+      Spec.assertEqWith s "three discarded" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 3
+      Spec.assertEqWith s "zero" (PlayerEffect.maximumHandSize S.bob board) (Just 0)
 
 -- Seed a stored player effect keyed to a REAL battlefield object, not
 -- S.addPlayerEffect's stand-in id 998 -- so a S.youControlSource condition
@@ -5046,6 +5203,8 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   textChangedEdgewalkerSpec s registry
   reliquaryTowerSpec s registry
   theTenRingsSpec s registry
+  minamoScrollkeeperSpec s registry
+  gnatMiserSpec s registry
   storedSpec s registry
   silenceSpec s registry
   ceaseFireSpec s registry
