@@ -298,6 +298,7 @@ vanillaFace name typeLine =
       Face.triggeredAbilities = [],
       Face.delayedAbilities = Map.empty,
       Face.rooms = Seq.empty,
+      Face.dungeonEntryQuality = Nothing,
       Face.castingPermissions = [],
       Face.castingRestrictions = [],
       Face.characteristicPT = Nothing,
@@ -841,7 +842,7 @@ effectCounts effect = case effect of
   -- from here.
   Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> quantityCounts quantity
   Effect.RestartGame _ -> []
@@ -925,6 +926,7 @@ effectCounts effect = case effect of
   Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
+  Effect.Convert _ -> []
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -1149,7 +1151,7 @@ effectNestedEffects effect = case effect of
   Effect.Amass {} -> []
   Effect.Blight {} -> []
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame {} -> []
@@ -1194,6 +1196,7 @@ effectNestedEffects effect = case effect of
   Effect.MakePlotted {} -> []
   Effect.DoesNotUntapNext {} -> []
   Effect.Transform {} -> []
+  Effect.Convert {} -> []
   Effect.PhaseOut {} -> []
   Effect.AddPhases {} -> []
   Effect.EndTurn -> []
@@ -1616,7 +1619,7 @@ effectReplacements effect = case effect of
   Effect.Amass _ -> []
   Effect.Blight _ -> []
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame _ -> []
@@ -1667,6 +1670,7 @@ effectReplacements effect = case effect of
   Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
+  Effect.Convert _ -> []
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -2351,7 +2355,7 @@ effectMintedFaces effect = case effect of
   Effect.Amass _ -> []
   Effect.Blight _ -> []
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame _ -> []
@@ -2404,6 +2408,7 @@ effectMintedFaces effect = case effect of
   Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
+  Effect.Convert _ -> []
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -2831,6 +2836,7 @@ keywordFilters keyword = case keyword of
   -- CR 702.15a: lifelink is a static ability with no payload -- its rider rides
   -- the damage event, not the keyword.
   Keyword.Lifelink -> []
+  Keyword.LivingMetal -> []
   -- CR 702.16a's "[quality]", which every protection ability states.
   Keyword.Protection quality -> [quality]
   Keyword.Reach -> []
@@ -3951,7 +3957,7 @@ effectFilters effect = case effect of
   -- arm below answers the same way.
   Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ f quantity) -> unframed (f : quantityFilters quantity)
   -- CR 727.5's exemption is an ObjectRef like every other, and Karn Liberated's
@@ -4054,6 +4060,7 @@ effectFilters effect = case effect of
   Effect.MakePlotted ref -> sourceHosted (objectRefFilters ref)
   Effect.DoesNotUntapNext ref -> sourceHosted (objectRefFilters ref)
   Effect.Transform ref -> sourceHosted (objectRefFilters ref)
+  Effect.Convert ref -> sourceHosted (objectRefFilters ref)
   Effect.PhaseOut ref -> sourceHosted (objectRefFilters ref)
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -4118,9 +4125,10 @@ data Asks
     -- Prompt.RandomObject, and falls through to the pure sweep for the two
     -- zone-keyed chosen arms.
     AsksRevealArm
-  | -- | Pawl.Engine.Resolve's Effect.Transform gather. It asks the any-number
-    -- arm and nothing else: the four card-shaped chosen arms name cards in a
-    -- graveyard, a hand or a group, and CR 701.27a turns over PERMANENTS.
+  | -- | Pawl.Engine.Resolve's turnPermanentsOver gather, shared by Effect.Transform
+    -- and Effect.Convert. It asks the any-number arm and nothing else: the four
+    -- card-shaped chosen arms name cards in a graveyard, a hand or a group, and CR
+    -- 701.27a turns over PERMANENTS.
     AsksTransformGather
   deriving (Eq, Show)
 
@@ -4212,7 +4220,7 @@ effectObjectRefs effect = case effect of
   Effect.Amass {} -> []
   Effect.Blight {} -> []
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   -- CR 727.5's exemption, optional: a card saying nothing about it exempts
@@ -4276,6 +4284,9 @@ effectObjectRefs effect = case effect of
   Effect.MakePlotted ref -> read_ [ref]
   Effect.DoesNotUntapNext ref -> read_ [ref]
   Effect.Transform ref -> [(AsksTransformGather, ref)]
+  -- The SAME gather, CR 701.28a routing a convert through CR 701.27a-f and
+  -- Pawl.Engine.Resolve applying both opcodes through one turnPermanentsOver.
+  Effect.Convert ref -> [(AsksTransformGather, ref)]
   Effect.PhaseOut ref -> read_ [ref]
   Effect.AddPhases {} -> []
   Effect.EndTurn -> []
@@ -6375,6 +6386,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "the battlefield subset is asked by the transform gather alone"
       (inert [Effect.Transform anyNumber, moves anyNumber, reveals anyNumber, Effect.Tap anyNumber])
       [False, True, True, True]
+    -- CR 701.28a's convert, classified with Transform because it IS Transform's
+    -- gather (Pawl.Engine.Resolve.turnPermanentsOver): the same four card-shaped
+    -- arms are inert under it and the same battlefield subset is asked.
+    Spec.assertEqWith
+      s
+      "the convert gather answers exactly as the transform gather does"
+      (inert (fmap Effect.Convert [inGraveyard, inHand, fromAmong, atRandom, anyNumber]))
+      [True, True, True, True, False]
     -- The other direction on the same opcode: a ref that is a READ rather than a
     -- CR 608.2d question is fine anywhere, so the lint is about the arm and not
     -- about Transform.

@@ -21,11 +21,12 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Extra.Natural as Natural
-import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Face as Face
@@ -41,10 +42,12 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
@@ -60,7 +63,7 @@ import qualified Pawl.Types.Zone as Zone
 -- zone and this reader takes the printed card (#1859) -- and because nothing
 -- in the rules changes a dungeon's card type: CR 613 layer 4 reaches permanents,
 -- and CR 309.2c makes a dungeon card never one.
-isDungeonFace :: Face.Face Card.Card -> Bool
+isDungeonFace :: Face.Face Card.Type.Card -> Bool
 isDungeonFace face = Set.member CardType.Dungeon (TypeLine.types (Face.typeLine face))
 
 -- | CR 309.3: the dungeon card this player owns in the command zone, if any. "A
@@ -78,12 +81,12 @@ inDungeon pid gs =
 -- | CR 309.4: the rooms printed on a dungeon card, topmost first. Empty for
 -- anything that is not a dungeon, which is how every other command-zone resident
 -- answers.
-roomsOf :: ObjectId -> GameState.GameState -> Seq.Seq (DungeonRoom.DungeonRoom Card.Card)
+roomsOf :: ObjectId -> GameState.GameState -> Seq.Seq (DungeonRoom.DungeonRoom Card.Type.Card)
 roomsOf oid gs = maybe Seq.empty Face.rooms (Game.faceOf oid gs)
 
 -- | CR 309.4: one room by index, or Nothing for an index the card has no room
 -- for.
-roomAt :: RoomIndex.RoomIndex -> Seq.Seq (DungeonRoom.DungeonRoom Card.Card) -> Maybe (DungeonRoom.DungeonRoom Card.Card)
+roomAt :: RoomIndex.RoomIndex -> Seq.Seq (DungeonRoom.DungeonRoom Card.Type.Card) -> Maybe (DungeonRoom.DungeonRoom Card.Type.Card)
 roomAt room = Seq.lookup (Natural.toIntSaturating (RoomIndex.unwrap room))
 
 -- | CR 309.6: is this the bottommost room of a card with this many rooms? The
@@ -100,7 +103,7 @@ isBottommost rooms room = RoomIndex.unwrap room + 1 == Natural.length rooms
 --
 -- intervening = Nothing because CR 309.4c states no "if" clause; the full text of
 -- a room ability is the sentence above and nothing else.
-roomAbility :: RoomIndex.RoomIndex -> DungeonRoom.DungeonRoom Card.Card -> TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
+roomAbility :: RoomIndex.RoomIndex -> DungeonRoom.DungeonRoom Card.Type.Card -> TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 roomAbility room dungeonRoom =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.RoomEntered room,
@@ -167,6 +170,37 @@ finished gs = filter isFinished (Set.toList (GameState.command gs))
         Nothing -> False
         Just room -> isBottommost (roomsOf oid gs) room && not (onStack oid) && not (pending oid)
 
+-- | CR 701.49a \/ 701.49d: may a venture indicating this quality bring this
+-- dungeon card into the game?
+--
+-- Read off the PRINTED card, and there is nowhere else to read it: CR 309.2 keeps
+-- a dungeon card outside the game until a venture brings it in, and outside the
+-- game is not a zone (CR 400.11), so there is no object to project and no CR
+-- 604.2 static to apply.
+--
+-- TWO clauses, and they ask different questions.
+--
+-- CR 701.49d narrows the choice to the cards "with the indicated quality", which
+-- CR 205.3p makes a dungeon TYPE -- a subtype of the printed type line. A plain
+-- venture indicates no quality and narrows nothing, which is CR 701.49a.
+--
+-- Face.dungeonEntryQuality is the card's own line rather than the rule's:
+-- Undercity's "you can't enter this dungeon unless you \"venture into
+-- Undercity\"" keeps it off the list every other venture chooses from. The two
+-- coincide on Undercity -- the only printing writing either -- but a dungeon
+-- carrying a quality and forbidding nothing would answer the first and not the
+-- second.
+enterable :: Maybe Subtype.Subtype -> GameState.GameState -> PrintingId.PrintingId -> Bool
+enterable quality gs printingId = case fmap Card.frontFace (Game.cardOfPrinting printingId gs) of
+  -- A printing this game never interned. Unreachable -- Pawl.Engine.Setup interns
+  -- every Deck.dungeons entry as it fills Player.dungeons -- and answered False
+  -- rather than True because neither clause below can be checked against a card
+  -- that cannot be read.
+  Nothing -> False
+  Just face ->
+    all (\indicated -> Set.member indicated (TypeLine.subtypes (Face.typeLine face))) quality
+      && all (\required -> quality == Just required) (Face.dungeonEntryQuality face)
+
 -- CR 701.49a: put a dungeon this player owns from outside the game into the
 -- command zone with their venture marker on the topmost room.
 --
@@ -179,20 +213,25 @@ finished gs = filter isFinished (Set.toList (GameState.command gs))
 -- CR 309.2a's "they choose a dungeon card they own from outside the game" is the
 -- prompt. FILTERED, NOT TRUSTED, `advance`'s and Ring.tempt's posture: an answer
 -- naming a printing this player does not own falls back to the first offered,
--- since entering is mandatory. Raised only for two or more, one owned dungeon
--- leaving nothing to ask.
+-- since entering is mandatory. Raised only for two or more, one `enterable`
+-- dungeon leaving nothing to ask -- which is how CR 701.49d normally costs a
+-- prompt rather than adding one.
 --
 -- Ascending by interned id, so both the single-dungeon shortcut and a transcript
 -- are deterministic -- `advance`'s ordering for its arrows.
 --
--- A player who owns no dungeon card enters none. CR 309.2a assumes they own one
--- and says nothing about a player who does not; a card that says to venture is
--- still resolved, and this is the "even if impossible" reading Ring.tempt takes.
-enter :: PlayerId -> Game ()
-enter pid = do
+-- A player with no dungeon `enterable` admits enters none. CR 309.2a assumes they
+-- own one and says nothing about a player who does not; a card that says to
+-- venture is still resolved, and this is the "even if impossible" reading
+-- Ring.tempt takes. CR 701.49d reaches the same place from the other side: a
+-- player owning no dungeon with the indicated quality is asked nothing and enters
+-- nothing.
+enter :: PlayerId -> Maybe Subtype.Subtype -> Game ()
+enter pid quality = do
   gs0 <- State.get
   let owned = maybe Set.empty Player.dungeons (Map.lookup pid (GameState.players gs0))
-  case NonEmpty.nonEmpty (Set.toAscList owned) of
+      eligible = Set.filter (enterable quality gs0) owned
+  case NonEmpty.nonEmpty (Set.toAscList eligible) of
     Nothing -> pure ()
     Just offered -> do
       printingId <- case offered of
@@ -326,6 +365,12 @@ advance pid oid room = do
 -- arrow (CR 701.49b); marker on the bottommost room, so finish this dungeon and
 -- enter another (CR 701.49c).
 --
+-- CR 701.49d's "venture into [quality]" is the same three cases with the quality
+-- carried into both roads that ENTER a dungeon, and nowhere else: the rule sends
+-- a player who already owns a dungeon card through CR 701.49b-c unchanged, and
+-- CR 701.49c's tail chooses "an appropriate dungeon card", which for a venture
+-- naming a quality is one `enterable` admits.
+--
 -- The third case is REACHABLE but rare, and that is CR 704.5t's doing rather than
 -- this module's: the state-based action removes a dungeon whose marker sits on the
 -- bottommost room as soon as its last room ability has left the stack, so a player
@@ -335,19 +380,19 @@ advance pid oid room = do
 -- CR 701.49c's "doing so causes the player to complete that dungeon" is `remove`
 -- above's business, not this case's -- which is why the tally lives there and CR
 -- 704.5t's road records it too.
-venture :: PlayerId -> Game ()
-venture pid = do
+venture :: PlayerId -> Maybe Subtype.Subtype -> Game ()
+venture pid quality = do
   gs <- State.get
   case inDungeon pid gs of
-    Nothing -> enter pid
+    Nothing -> enter pid quality
     Just oid -> case Object.ventureRoom =<< Game.lookupObject oid gs of
       -- A dungeon in the command zone with no marker on it is a state no rule
       -- describes and nothing here writes: `enter` places the marker as the card
       -- arrives. Treated as CR 701.49a's case rather than silently doing nothing,
       -- so the marker is repaired rather than left absent.
-      Nothing -> enter pid
+      Nothing -> enter pid quality
       Just room
         | isBottommost (roomsOf oid gs) room -> do
             State.modify' (remove oid)
-            enter pid
+            enter pid quality
         | otherwise -> advance pid oid room

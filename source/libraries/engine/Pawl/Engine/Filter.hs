@@ -1401,6 +1401,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Haste -> keyword
   Keyword.Type.Indestructible -> keyword
   Keyword.Type.Lifelink -> keyword
+  Keyword.Type.LivingMetal -> keyword
   Keyword.Type.Reach -> keyword
   Keyword.Type.Shroud -> keyword
   Keyword.Type.Trample -> keyword
