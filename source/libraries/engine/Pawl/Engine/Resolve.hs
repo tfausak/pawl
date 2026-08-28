@@ -3744,6 +3744,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- passes as both, and differ for an ability, whose source is the permanent it
   -- came from (CR 113.7) -- so binding onto `source` left an ability's follow-on
   -- reading an unbound slot; see #137.
+  --
+  -- That object may not survive the subgame it started: CR 729.4 offers the main
+  -- game's stack to a wish cast inside, so the subgame can take this very spell's
+  -- card. bindPlayerSlot files the winner off-object when that has happened and
+  -- liveBindings reads it back, which is CR 729.5's "finishes resolving, even if
+  -- it was created by a spell card that's no longer on the stack".
   Effect.PlaySubgame slot -> do
     result <- runSubgame
     case result of
@@ -6831,17 +6837,24 @@ noSubgame = pure Result.Drawn
 -- 608.2d's chosen opponent are each read by the effect after the one that bound
 -- it, through that re-read (`legalNow`).
 --
--- CR 729.5: a holder that no longer EXISTS writes to GameState.detachedBindings
--- instead, which `liveBindings` reads back as the fallback. Only the PlaySubgame
--- caller can reach that branch -- a subgame is the one thing that can delete the
--- resolving object out from under its own resolution -- and it is the branch that
--- rule's "even if it was created by a spell card that's no longer on the stack"
--- is written for. The Map.adjust above is silent on a missing key, so without it
--- the winner would simply be dropped.
+-- A holder that no longer EXISTS writes to GameState.detachedBindings instead,
+-- which `liveBindings` reads back. Map.adjust is silent on a missing key, so
+-- without that branch the binding is simply dropped.
 --
--- The sibling writers below are deliberately NOT given the same fallback: no
--- caller of either can lose its holder mid-resolution, so the branch would have
--- no observer.
+-- CR 729.5 is the branch's reason: a wish cast inside a subgame can take the
+-- resolving spell's own card, and "the spell or ability that created the subgame
+-- finishes resolving, even if it was created by a spell card that's no longer on
+-- the stack" is what keeps the resolution going anyway. It is not the only way an
+-- id can cease mid-resolution -- Effect.ExileThisSpell mints a fresh incarnation
+-- (CR 400.7) and leaves the old id naming nothing too -- and the read side treats
+-- both the same.
+--
+-- The sibling writers below are NOT given the same fallback. bindPlayersSlot's
+-- one caller is CR 118.12a's per-player gate, which cannot lose its holder.
+-- bindAmountSlot writes onto `source`, which for a SPELL is the same id a subgame
+-- can take, but an amount is read back by Pawl.Engine.Quantity's own lookup
+-- rather than through liveBindings, so a fallback here would not reach it
+-- (#2493).
 bindPlayerSlot :: ObjectId -> SlotName -> PlayerId -> GameState -> GameState
 bindPlayerSlot holder slot player gs =
   let binding = Binding.toPlayer player
@@ -6863,6 +6876,11 @@ bindPlayerSlot holder slot player gs =
 -- the resolution resumes. What it bound meanwhile is in
 -- GameState.detachedBindings, and takes precedence over the announced bindings
 -- the snapshot carries.
+--
+-- Not implemented: the readers that look the resolving object up by id rather
+-- than coming through here -- Pawl.Engine.Count.playersFor's EachPlayerExcept
+-- arm and Pawl.Engine.Quantity's InSlot arm -- stay unanswered on that path
+-- (#2493).
 liveBindings :: Object.Object -> ObjectId -> GameState -> Map SlotName Binding.Type.Binding
 liveBindings obj oid gs = case Game.lookupObject oid gs of
   Just live -> Object.bindings live

@@ -15,8 +15,10 @@
 -- casts a printed wish and resolves it through the stack, so what is asserted is
 -- the whole path from card JSON to the card in hand -- Burning Wish ({1}{R}
 -- sorcery, "You may reveal a sorcery card you own from outside the game and put
--- it into your hand. Exile Burning Wish.") for the pool, and Living Wish inside a
--- Shahrazad subgame for CR 729.4's main game, in the last case of all.
+-- it into your hand. Exile Burning Wish.") for the pool, and, in the last two
+-- cases, a Shahrazad subgame for CR 729.4's main game -- Living Wish reaching two
+-- main-game creatures, then Burning Wish reaching the resolving Shahrazad itself
+-- (CR 729.5).
 --
 -- Not implemented: the cycle's instant, Cunning Wish, and Ring of Ma'ruf are not
 -- in data/cards/, so nothing here casts a wish at instant speed and nothing

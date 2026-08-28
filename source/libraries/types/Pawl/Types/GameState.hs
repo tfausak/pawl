@@ -304,9 +304,10 @@ data GameState = MkGameState
     -- KEYED BY ObjectId rather than a bare slot map, so nothing has to be
     -- cleared: Pawl.Engine.Resolve's two resolution loops read this only as the
     -- fallback for an object Game.lookupObject can no longer find, and an id is
-    -- never reused (GameState.nextObjectId only ever climbs). Never pruned, as
-    -- `lastKnown` is not -- one entry per subgame a resolution outlived, each
-    -- holding one slot.
+    -- never reused -- GameState.nextObjectId only ever climbs (Game.freshObjectId
+    -- increments it, Setup.funnelBack takes the max of the two games'). Never
+    -- pruned, as `lastKnown` is not, and one entry per resolution that outlived
+    -- its own object.
     detachedBindings :: Map.Map ObjectId.ObjectId (Map.Map SlotName.SlotName Binding.Binding),
     -- | CR 614.1c: as-enters rewrites whose effects have not run yet, oldest
     -- first. `pendingPreventionRiders` above one rule over, queued for the same
