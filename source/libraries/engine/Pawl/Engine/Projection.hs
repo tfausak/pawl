@@ -566,6 +566,13 @@ setPT base new = case (base, new) of
   (Nothing, Nothing) -> Nothing
 
 -- Layer 7c adds; an unevaluable delta leaves the value, a land stays without.
+--
+-- The (Nothing, _) arm is CR 208.3a's noncreature permanent, whose premise is
+-- the other one: noncreaturePT runs at the END of the fold, so a noncreature's
+-- mid-fold power is still its printed one and only a permanent with no printed
+-- box reaches here. A CREATURE with no power is rule 208.5's premise instead,
+-- and projectDeciding has already substituted its 0 by the time layer 7c runs,
+-- so no creature reaches this arm.
 addPT :: Maybe Integer -> Maybe Integer -> Maybe Integer
 addPT base delta = case (base, delta) of
   (Just b, Just d) -> Just (b + d)
@@ -3977,7 +3984,18 @@ projectDeciding admits cands = forObject
                   Layer.Color -> applyColorDefining p
                   Layer.CharacteristicPT -> applyCharacteristicPT bounded gs o p
                   _ -> p
-                seeded = seedFor oid partial
+                -- CR 208.5 on the PROJECTED object's own running partial, at the
+                -- same sublayer gate viewOfBoard and viewUpTo read it through: a
+                -- creature whose only source of a P/T value CR 305.7 stripped is a
+                -- 0 from layer 7b on, so CR 613.4c's modification has something to
+                -- add to instead of being discarded (addPT's Nothing arm). Nothing
+                -- in rule 613 makes a layer-7c modification skip such a creature.
+                --
+                -- Substituting into the accumulator rather than at each reader is
+                -- what makes the object agree with itself: the final noValuePT
+                -- would otherwise answer 0 for a creature the fold had already
+                -- thrown a modification away for.
+                seeded = noValueAt lyr (seedFor oid partial)
                 -- CR 613.6: the affected set is asked ONCE per effect, at the
                 -- lowest layer it reaches, and remembered for its other layers.
                 -- Object-parameterised, like applyUnit and applyOne below: the
@@ -4213,8 +4231,9 @@ noValuePT pc
           PC.toughness = Just (Maybe.fromMaybe 0 (PC.toughness pc))
         }
 
--- noValuePT at a projection bounded to the layers BELOW `bound`, which is what
--- a Count reads mid-fold. "Has no value" is answerable exactly once CR 613.4a's
+-- noValuePT at a projection bounded to the layers BELOW `bound` -- what a Count
+-- reads mid-fold, and what the fold's own accumulator holds as layer `bound`
+-- begins. "Has no value" is answerable exactly once CR 613.4a's
 -- sublayer has run: below layer 7a every star creature is legitimately without
 -- a value and substituting 0 there would report it for all of them, while from
 -- 7b on the question is settled and CR 208.5 answers it -- a creature whose CDA
