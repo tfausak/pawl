@@ -4466,9 +4466,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           --
           -- The per-member CR 616.1 loop inside Event.changeZoneEnteringIn is no
           -- argument for N groups: Event.destroyIn runs exactly such a loop inside
-          -- one bracket, and this module's own CR 704.3 caller nests deeper still.
-          -- CR 616.1g is the rule that says so -- an event contained within an
-          -- event is the first event's, not a second one.
+          -- one bracket, and Pawl.Engine.Sba's CR 704.3 pass nests deeper still.
+          -- CR 616.1g is where the rules say events nest at all -- a replacement
+          -- may apply to "an event contained within the first event" -- so a
+          -- replacement opportunity per member is not a second event.
           --
           -- Around the FOLD alone. The gathers above ask CR 608.2d choices and CR
           -- 401.4 arrangements, which move nothing and record nothing; a bracket
