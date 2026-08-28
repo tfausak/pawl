@@ -14,6 +14,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -23,6 +24,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -518,10 +520,11 @@ playersFor context gs ref =
 -- -- identity and playerIdentity are Nothing, and combat status, attachment,
 -- tap status and what the object did this turn are all False.
 --
--- `controller` and `token` are the exceptions, and neither is a characteristic
--- (CR 109.3 / CR 111.6), so neither can ride the snapshot. Each arm answers
--- them for itself: CR 601.2a makes the player who cast a spell its controller,
--- and a move reads CR 608.2h's record filed under the id it left behind.
+-- `controller`, `token` and `counters` are the exceptions, and none of the
+-- three is a characteristic (CR 109.3 / CR 111.6 / CR 122.1), so none can ride
+-- the snapshot. Each arm answers them for itself: CR 601.2a makes the player
+-- who cast a spell its controller, and a move reads CR 608.2h's record filed
+-- under the id it left behind.
 snapshotView :: GameState -> EventShape.EventShape -> GameEvent.GameEvent -> Maybe Filter.View
 snapshotView gs shape event = case event of
   GameEvent.Moved (Moved.MkMoved zc snapshot) -> case shape of
@@ -541,6 +544,13 @@ snapshotView gs shape event = case event of
                 ( viewOfSnapshot
                     (fmap LastKnown.controller lastKnown)
                     (maybe (Game.isToken (ZoneChange.object zc) gs) (Game.sourceIsToken . LastKnown.source) lastKnown)
+                    -- CR 122.2 / 400.7: the counters ceased to exist as the object
+                    -- moved, so this is a CR 608.2i look-back at what it HAD --
+                    -- read off the same record `controller` above comes from,
+                    -- which the funnel took beside the projection precisely
+                    -- because CR 613.4c has already consumed them into the power
+                    -- and toughness the snapshot carries.
+                    (maybe Map.empty LastKnown.counters lastKnown)
                     snapshot
                 )
         else Nothing
@@ -564,7 +574,11 @@ snapshotView gs shape event = case event of
     -- would be asking about an incarnation that no longer exists.
     -- CR 111.1 / 111.7: a token represents a PERMANENT and ceases to exist
     -- anywhere else, so nothing on the stack to be cast was ever one.
-    EventShape.SpellCast -> Just (viewOfSnapshot (Just caster) False snapshot)
+    -- CR 122.1 places a counter on an OBJECT, and CR 122.2 makes the card that
+    -- became this spell shed whatever it carried on its way to the stack, so a
+    -- cast records none. No CR 608.2h record to read them from either: nothing
+    -- departed the battlefield here.
+    EventShape.SpellCast -> Just (viewOfSnapshot (Just caster) False Map.empty snapshot)
     EventShape.MovedBetween {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   -- CR 702.29c's cycling records no characteristics snapshot -- the Moved event
@@ -629,12 +643,12 @@ snapshotView gs shape event = case event of
 
 -- The Filter.View a recorded snapshot yields, shared by every arm of
 -- snapshotView above so that two shapes of event cannot disagree about what a
--- snapshot says. The `controller` and the tokenhood flag are the arm's to
--- supply, since they are the two fields no ProjectedCharacteristics carries
--- (CR 109.3 / CR 111.6) and the events differ on where each is recoverable
--- from.
-viewOfSnapshot :: Maybe PlayerId -> Bool -> PC.ProjectedCharacteristics -> Filter.View
-viewOfSnapshot mController isToken snapshot =
+-- snapshot says. The `controller`, the tokenhood flag and the counters are the
+-- arm's to supply, since they are the three fields no ProjectedCharacteristics
+-- carries (CR 109.3 / CR 111.6 / CR 122.1) and the events differ on where each
+-- is recoverable from.
+viewOfSnapshot :: Maybe PlayerId -> Bool -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural.Natural -> PC.ProjectedCharacteristics -> Filter.View
+viewOfSnapshot mController isToken counters snapshot =
   Filter.MkView
     { -- CR 201.1 off the snapshot, which carries the set: this reads what the
       -- object's names were AT THE EVENT, which is the whole point of a snapshot.
@@ -660,8 +674,8 @@ viewOfSnapshot mController isToken snapshot =
       Filter.manaValue = PC.manaValue snapshot,
       Filter.controller = mController,
       -- CR 108.3: an owner is read off an OBJECT, and a ProjectedCharacteristics
-      -- carries none -- the position `counters` below is in (#993). Unlike that
-      -- one the fact does not change, and the Moved arm's CR 608.2h record would
+      -- carries none. Unlike `counters` below, which the arm supplies off CR
+      -- 608.2h's record, there is nowhere to source this from: that record would
       -- be the place to keep it, but no field of it holds one (#1069).
       Filter.owner = Nothing,
       -- CR 400.1: a snapshot records characteristics (CR 608.2h) and no zone, and
@@ -727,18 +741,20 @@ viewOfSnapshot mController isToken snapshot =
       -- difference between this and an answer the rule could give.
       Filter.transformed = False,
       -- CR 122.1: a ProjectedCharacteristics records no counters -- CR 613.4c
-      -- has already folded them into the power and toughness above -- so a past
-      -- event carries none to read. The
-      -- Moved arm's CR 608.2h record does carry them, and is not read for them:
-      -- no card in the pool asks an event snapshot for a counter tally, so a
-      -- quantity that does is still answered 0 (#993).
-      Filter.counters = Map.empty,
+      -- has already folded them into the power and toughness above, which is
+      -- lossy in both directions -- so this comes from the arm, off CR 608.2h's
+      -- record for a move and empty for a cast. Synthetic Charnel Tally's
+      -- "greatest number of counters among creatures that died this turn"
+      -- (Pawl.CountSpec) is what reads it.
+      Filter.counters = counters,
       -- CR 701.54b: a designation, which a ProjectedCharacteristics does not carry
       -- and never could -- CR 109.3's characteristic list has no room for one. So a
-      -- past event records none, the position `counters` is in (#993). Nothing
-      -- rather than a remembered player: an event snapshot is not
-      -- an object, and "is your Ring-bearer" is a question about a permanent on the
-      -- battlefield now (CR 701.54e), not about one at the moment of an event.
+      -- past event records none, and no CR 608.2h record holds one for the arm to
+      -- supply the way it supplies `counters` above -- `owner`'s position, one
+      -- field of that record short. Nothing rather than a remembered player: an
+      -- event snapshot is not an object, and "is your Ring-bearer" is a question
+      -- about a permanent on the battlefield now (CR 701.54e), not about one at
+      -- the moment of an event.
       Filter.ringBearerFor = Nothing,
       Filter.designations = Set.empty,
       -- CR 716.2b: a designation too, which a ProjectedCharacteristics does not
