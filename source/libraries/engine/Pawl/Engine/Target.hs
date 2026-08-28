@@ -234,19 +234,19 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
 -- THE Filter.Context a target SLOT's own filter is matched against. Extracted
 -- from admittedGiven so that CR 608.2h's departed host (lastKnownAdmits below)
 -- is judged against the same context a live candidate is, rather than against a
--- bare Filter.contextFor that would answer differently for the three atoms
--- filled here.
+-- bare Filter.contextFor that would answer differently for the atoms filled
+-- here.
 --
--- THE one site that fills Filter.sourcePower, and one of the two that fill
--- Filter.defendingPlayer, because it is the one site that matches a TARGET
--- SLOT's Filter -- both of CR 115's moments (CR 601.2c's choosing and CR
--- 608.2b's re-check) reach those atoms through here, and CR 702.134a and CR
--- 702.39a are the only clauses that write them in a slot. CR 508.1c's gate
--- is where the other defending-player read is
--- (Pawl.Engine.CombatRestriction.inForce, Armored Galleon), and no target
--- slot can reach it. Both are thunks, like the caller's `pcs`: a slot whose
--- filter never names an atom pays for neither the source's projection nor
--- the combat lookup.
+-- THE one site that fills Filter.sourcePower and Filter.slotAmount, and one of
+-- the two that fill Filter.defendingPlayer, because it is the one site that
+-- matches a TARGET SLOT's Filter -- both of CR 115's moments (CR 601.2c's
+-- choosing and CR 608.2b's re-check) reach those atoms through here, and CR
+-- 702.134a, CR 702.39a and CR 202.3's computed bound are the only clauses that
+-- write them in a slot. CR 508.1c's gate is where the other defending-player
+-- read is (Pawl.Engine.CombatRestriction.inForce, Armored Galleon), and no
+-- target slot can reach it. All are thunks, like the caller's `pcs`: a slot
+-- whose filter never names an atom pays for neither the source's projection,
+-- the combat lookup, nor the bound's evaluation.
 slotContext :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> Maybe Quantity -> GameState -> Filter.Context
 slotContext pcs perspective bindings source amount gs =
   let base =
