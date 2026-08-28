@@ -70,6 +70,7 @@ blackCreature =
       Filter.token = False,
       Filter.tapped = False,
       Filter.faceDown = False,
+      Filter.exiledFaceDown = False,
       Filter.transformed = False,
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
@@ -118,6 +119,7 @@ devoidBigCreature =
       Filter.token = False,
       Filter.tapped = False,
       Filter.faceDown = False,
+      Filter.exiledFaceDown = False,
       Filter.transformed = False,
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
@@ -1295,6 +1297,25 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- CR 110.5d: only permanents have status, and CR 109.1 makes a player none.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsFaceDown)) "player"
+
+  -- CR 406.3. A bare field read like IsFaceDown above, and a DIFFERENT field:
+  -- CR 110.5d says a card exiled face down has no correlation to the face-down
+  -- status of a permanent. The gameplay-level proof is Pawl.TargetSpec's
+  -- face-down exile group.
+  Spec.describe s "IsExiledFaceDown" $ do
+    Spec.it s "matches a view whose card was exiled face down" $ do
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.exiledFaceDown = True}) Filter.Type.IsExiledFaceDown) "exiled face down"
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.IsExiledFaceDown)) "face up"
+
+    -- CR 110.5d in as many words: the two are separate fields, so neither
+    -- implies the other in either direction.
+    Spec.it s "is independent of the face-down status of a permanent" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.faceDown = True}) Filter.Type.IsExiledFaceDown)) "face-down permanent"
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.exiledFaceDown = True}) Filter.Type.IsFaceDown)) "face-down exiled card"
+
+    -- CR 406.2's exiled card is a card, and CR 109.1 makes a player none.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsExiledFaceDown)) "player"
 
   -- CR 701.27g. The atom itself is a bare field read; both of the rule's
   -- exclusions live in the BUILDER that fills the field, so the gameplay-level

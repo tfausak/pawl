@@ -10,6 +10,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Defender as Defender
+import qualified Pawl.Engine.Exile as Exile
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
@@ -29,7 +30,6 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.ModeIndex (ModeIndex)
 import qualified Pawl.Types.ModeIndex as ModeIndex
-import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Pool as Pool
@@ -610,15 +610,16 @@ poolsGiven pcs gs =
 -- candidate with how it is referenced (CR 115). Each arm is one field of the
 -- caller's Pools and nothing else.
 --
--- The Context is the SAME one the Filter is matched against, and only the arms
--- that name a GRAVEYARD read it -- along with `bindings`, which only they read
--- either: CR 400.1's per-player zones make a pool that names one have to say
--- whose, and a GraveyardScope answers with either the Context's perspective (CR
--- 109.5's would-be controller, the player CR 601.2c has choosing targets) or
--- another slot's own answer. Every battlefield, stack and EXILE arm ignores
--- both, because those zones are shared by all players (CR 400.1 again) -- which
--- is exactly what lets those arms be hoisted into Pools and leaves a graveyard
--- one built here, per slot, against that slot's own Context.
+-- The Context is the SAME one the Filter is matched against, and the arms that
+-- name a GRAVEYARD or EXILE read it -- `bindings` only the graveyard ones: CR
+-- 400.1's per-player zones make a pool that names one have to say whose, and a
+-- GraveyardScope answers with either the Context's perspective (CR 109.5's
+-- would-be controller, the player CR 601.2c has choosing targets) or another
+-- slot's own answer. Every battlefield and stack arm ignores both, because those
+-- zones are shared by all players (CR 400.1 again) -- which is what lets those
+-- arms be hoisted into Pools and leaves a graveyard one built here, per slot,
+-- against that slot's own Context. Exile is shared too and stays hoisted, but CR
+-- 406.4 narrows it per chooser; see its arm.
 basePoolGiven :: Pools -> Filter.Context -> Map SlotName (Set Recipient) -> Pool.Pool -> GameState -> Set Recipient
 basePoolGiven pools context bindings pool gs = case pool of
   Pool.Creatures -> creaturePool pools
@@ -629,13 +630,28 @@ basePoolGiven pools context bindings pool gs = case pool of
   Pool.Abilities -> abilityPool pools
   Pool.SpellsAndPermanents -> spellsAndPermanentsPool pools
   Pool.CardsInGraveyard scope -> graveyardRecipients context bindings scope gs
-  Pool.CardsInExile -> exilePool pools
+  -- CR 406.4's first half, and the one arm outside a graveyard that reads the
+  -- Context at all: "if a player is instructed to choose an exiled card, the
+  -- player may choose a specific face-down card ONLY IF the player is allowed to
+  -- look at that card". The zone is still shared (CR 400.1), so the SET is not
+  -- per-player the way a graveyard's is -- what is per-player is which of its
+  -- members this chooser may name, so the pool stays hoisted in Pools and only
+  -- this narrowing is taken per slot. Pawl.Engine.Exile.mayChoose is the rule.
+  Pool.CardsInExile -> Set.filter (choosableInExile context gs) (exilePool pools)
   -- The union of the two arms above, built HERE rather than hoisted into Pools for
   -- the graveyard arm's reason: half of it is per-slot. The battlefield half is the
   -- shared thunk, so a slot naming this pool pays the creature walk once with every
   -- other slot that names one.
   Pool.CreaturesAndCardsInGraveyard scope ->
     Set.union (creaturePool pools) (graveyardRecipients context bindings scope gs)
+
+-- CR 406.4's first half against one candidate of the exile pool. A recipient
+-- with no object behind it cannot arise here -- exileRecipients tags every
+-- member ToObject -- and True is the harmless answer if one ever did, since the
+-- rule is about a CARD.
+choosableInExile :: Filter.Context -> GameState -> Recipient -> Bool
+choosableInExile context gs recipient =
+  all (\oid -> Exile.mayChoose (Filter.perspective context) oid gs) (Recipient.objectOf recipient)
 
 -- CR 115.2 (only permanents are legal targets, save for the exceptions the
 -- graveyard, exile, spell and player arms above are) with CR 109.2 (an
@@ -862,25 +878,14 @@ playerOf recipient = case recipient of
 -- objects still controlled by that player are exiled, and they are owned by
 -- somebody still here.
 --
--- CR 406.4's first half is the one filter this pool does carry: "if a player is
--- instructed to choose an exiled card, the player may choose a specific
--- face-down card ONLY IF the player is allowed to look at that card". Nothing in
--- pawl grants that permission to anybody, so a card exiled face down (Ignorant
--- Bliss) is a candidate for no one -- which is also what makes Riftsweeper's
--- printed "face-up exiled card" pick out exactly this set.
---
--- Not implemented: the rule's second half, where a player who may NOT look
--- chooses a pile of face-down exiled cards and a card is taken at random out of
--- it. That is a candidate that is not an object, which no Prompt can carry, so
--- the face-down cards are offered as nothing at all rather than as a pile
--- (#1480).
+-- EVERY exiled card, face up or face down. CR 406.4's per-chooser narrowing is
+-- the caller's, at basePoolGiven's Pool.CardsInExile arm: that rule asks whether
+-- a PLAYER is allowed to look at the card, and this function has no player to
+-- ask it of -- which is the same reason the arms below take no scope. Hoisting a
+-- per-chooser filter in here would answer for whoever the first slot of the
+-- enumeration happened to belong to.
 exileRecipients :: GameState -> Set Recipient
-exileRecipients gs =
-  Set.fromList
-    ( fmap
-        Recipient.ToObject
-        (filter (\oid -> not (any Object.exiledFaceDown (Game.lookupObject oid gs))) (Set.toList (GameState.exile gs)))
-    )
+exileRecipients gs = Set.fromList (fmap Recipient.ToObject (Set.toList (GameState.exile gs)))
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is

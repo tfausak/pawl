@@ -868,6 +868,10 @@ viewOfCard face =
           -- with no object behind it -- the rule's own answer rather than an
           -- unknown, `transformed` below's reason one status category over.
           Filter.faceDown = False,
+          -- CR 406.3 writes its rider onto an object in exile, and this is a
+          -- printed FACE with no object behind it -- the line above's reason,
+          -- one rule over.
+          Filter.exiledFaceDown = False,
           -- CR 701.27g asks about a permanent on the battlefield; this is a
           -- printed FACE with no object behind it, so the rule's own answer is
           -- False rather than an unknown.
@@ -1075,6 +1079,12 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- the atom today is already scoped to the battlefield, so dropping the
       -- conjunct leaves the suite green.
       Filter.faceDown = Set.member oid (GameState.battlefield gs) && maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs),
+      -- CR 406.3's rider, and the only site that fills the field. NO zone
+      -- conjunct beside it, unlike the line above: Object.exiledFaceDown is
+      -- per-incarnation state that only the move into exile writes, and CR 400.7
+      -- mints a fresh incarnation on the way out, so the object it is True of is
+      -- in exile by construction.
+      Filter.exiledFaceDown = maybe False Object.exiledFaceDown (Game.lookupObject oid gs),
       -- CR 701.27g's two conjuncts, and the only site that fills the field. The
       -- face is read CURRENT -- Game.isFrontFaceUp reads Object.face, never the
       -- Object.turnedOverAt beside it -- which is the rule's first exclusion, a
@@ -3659,6 +3669,9 @@ filterReads f = case f of
   -- CR 110.5a again, one status category over: face-up/face-down is not a
   -- characteristic either, so no layer writes it.
   Filter.Type.IsFaceDown -> Set.empty
+  -- CR 406.3a leaves a face-down exiled card no characteristics at all, so
+  -- being one is not a characteristic either and no layer writes it.
+  Filter.Type.IsExiledFaceDown -> Set.empty
   -- Reads nothing: CR 712.8d/e make which face is up the thing characteristics
   -- are read OFF rather than one of them, so no Modification writes Object.face.
   Filter.Type.Transformed -> Set.empty

@@ -336,6 +336,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.IsFaceDown
       " {\"type\":\"IsFaceDown\"} "
+  Spec.it s "IsExiledFaceDown" $
+    Common.assertCodec
+      s
+      codec
+      Filter.IsExiledFaceDown
+      " {\"type\":\"IsExiledFaceDown\"} "
   Spec.it s "Transformed" $
     Common.assertCodec
       s

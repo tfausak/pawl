@@ -77,13 +77,13 @@ data Pool
     -- zone, and CR 109.2's battlefield default is switched off by the card's own
     -- word.
     --
-    -- "FACE-UP" is not a Filter and does not need to be: CR 406.4 lets a player
-    -- choose a specific face-down exiled card only if they are allowed to look
-    -- at it, and nothing grants that permission, so
-    -- Pawl.Engine.Target.exileRecipients leaves every face-down card out of the
-    -- pool for EVERY card that names one. Riftsweeper's qualifier is then
-    -- redundant rather than vacuous: Ignorant Bliss really does put cards into
-    -- exile that Riftsweeper may not name.
+    -- "FACE-UP" is a Filter (Filter.IsExiledFaceDown), and the two questions it
+    -- sits beside are different ones. CR 406.4 keeps a face-down exiled card out
+    -- of a chooser's candidate set unless that player is allowed to look at it,
+    -- which is the rules core's and is applied to this pool for every card that
+    -- names it; Riftsweeper's printed qualifier then narrows what remains, and
+    -- it is not redundant -- the owner of a foretold card MAY look at it, so
+    -- rule 406.4 offers it and Riftsweeper's own words refuse it.
     CardsInExile
   | -- | CR 115.2 clause (a) exercised TWICE in one slot -- Savior of Ollenbock's
     -- "up to one other target creature from the battlefield or creature card from

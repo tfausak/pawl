@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 -- Covers: CR 406.3's face-down exile -- Object.exiledFaceDown, the
 -- EntryRiders.exiledFaceDown rider Pawl.Engine.Event.changeZoneEntering reads,
 -- Pawl.Engine.Target.exileRecipients' CR 406.4 gate, and
@@ -17,6 +19,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Foretell as Foretell
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Setup as Setup
@@ -33,6 +36,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -41,6 +45,7 @@ import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Face-down exile" $ do
+  foretold s registry
   Spec.describe s "Ignorant Bliss" $ do
     -- CR 406.3a and CR 406.4's first half, read through the pool that offers
     -- exiled cards as targets. The board is deliberately one board: alice's two
@@ -96,6 +101,118 @@ spec s registry = Spec.describe s "Face-down exile" $ do
       -- this green.
       Spec.assertEqWith s "and nothing in a hand is face down in exile" (concealedIn Zone.Hand S.alice after) []
       Spec.assertEqWith s "the delayed ability was spent" (length (GameState.delayedTriggers after)) 0
+
+-- CR 702.143a's foretold card is the pool's one grant of CR 406.3's permission to
+-- look at a card exiled face down, and CR 406.4 is what turns a permission to
+-- LOOK into a permission to CHOOSE: "the player may choose a specific face-down
+-- card only if the player is allowed to look at that card".
+--
+-- ONE board, cast twice. alice foretells Augury Raven and bob has an Ogre Sentry
+-- exiled face up, so exile holds two cards under either reading and a pool that
+-- had simply lost its exile candidates could not pass. Both players then cast the
+-- same instant with the SAME answerer, aimed at the foretold card: alice reaches
+-- it and bob's aim falls through to the face-up card, which is CR 406.4's whole
+-- content and the one thing the two casts differ in.
+foretold :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+foretold s registry = Spec.describe s "Augury Raven" $ do
+  Spec.it s "CR 406.4 the owner of a foretold card shuffles it out of exile and an opponent cannot reach it" $ do
+    (downId, upId, aliceSpell, bobSpell, board) <- foretoldBoard s registry
+    let aliceAfter = resolveCast S.alice aliceSpell downId board
+        bobAfter = resolveCast S.bob bobSpell downId board
+    Spec.assertEqWith
+      s
+      "alice may look at her foretold card, so her spell takes it and leaves the face-up one"
+      (Set.toList (GameState.exile aliceAfter))
+      [upId]
+    Spec.assertEqWith
+      s
+      "bob may not, so the same spell aimed the same way takes the face-up card instead"
+      (Set.toList (GameState.exile bobAfter))
+      [downId]
+    -- Two proxies AFTER the behaviour, so neither can absorb a mutation: the
+    -- shuffle is into the chosen card's OWNER's library, so the two casts stock
+    -- different libraries.
+    Spec.assertEqWith s "the card alice took went to her own library" (length (Game.zoneMembers Zone.Library S.alice aliceAfter)) 1
+    Spec.assertEqWith s "and the card bob took went to bob's, its owner's" (length (Game.zoneMembers Zone.Library S.bob bobAfter)) 1
+  -- The same permission read off the pool rather than off a resolution, and the
+  -- third leg is what keeps CR 406.4's permission and Riftsweeper's printed
+  -- qualifier from being one question: rule 406.4 OFFERS alice her foretold card,
+  -- and Riftsweeper's own "face-up exiled card" then refuses it.
+  Spec.it s "CR 406.4 the pool offers a face-down exiled card only to a player who may look at it" $ do
+    reclamation <- S.printingOf s registry "Synthetic Blind Reclamation"
+    riftsweeper <- S.printingOf s registry "Riftsweeper"
+    (downId, upId, _, _, board) <- foretoldBoard s registry
+    case (S.spellTargetSlot reclamation, triggerTargetSlot riftsweeper) of
+      (Just unqualified, Just faceUpOnly) -> do
+        Spec.assertEqWith
+          s
+          "alice is offered both exiled cards"
+          (Target.legalRecipients (Just S.alice) S.noSource unqualified board)
+          (Set.fromList (fmap Recipient.ToObject [downId, upId]))
+        Spec.assertEqWith
+          s
+          "bob is offered only the face-up one"
+          (Target.legalRecipients (Just S.bob) S.noSource unqualified board)
+          (Set.singleton (Recipient.ToObject upId))
+        Spec.assertEqWith
+          s
+          "and Riftsweeper's printed face-up qualifier refuses the foretold card even to alice"
+          (Target.legalRecipients (Just S.alice) S.noSource faceUpOnly board)
+          (Set.singleton (Recipient.ToObject upId))
+      _ -> Spec.assertFailure s "Riftsweeper and Synthetic Blind Reclamation should each print one target slot"
+
+-- alice holds four Islands and foretells Augury Raven off two of them (CR
+-- 116.2h), leaving exactly the {1}{U} her copy of the instant costs; bob holds
+-- two Islands and a copy of his own. An Ogre Sentry sits in exile face up under
+-- bob, so the pool is never empty and the shuffle's destination tells the two
+-- cards apart by owner.
+--
+-- Returns the face-down foretold card, the face-up one, and each player's spell.
+foretoldBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+foretoldBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  raven <- S.printingOf s registry "Augury Raven"
+  sentry <- S.printingOf s registry "Ogre Sentry"
+  reclamation <- S.printingOf s registry "Synthetic Blind Reclamation"
+  let (ravenId, g1) = S.addHandCard raven S.alice (S.landsInPlay island 4)
+      (upId, g2) = S.addExiledCard sentry S.bob g1
+      (aliceSpell, g3) = S.addHandCard reclamation S.alice g2
+      (bobSpell, g4) = S.addHandCard reclamation S.bob g3
+      g5 = S.landsFor island S.bob 2 g4
+      before =
+        g5
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      board = S.runPure S.identityAnswer before (Foretell.foretell S.alice ravenId)
+      downId = case faceDownExiled board of
+        [only] -> only
+        _ -> S.noSource
+  pure (downId, upId, aliceSpell, bobSpell, board)
+
+-- One player casts their copy of the instant with the slot's whole offer FILTERED
+-- down to the foretold card, then the stack is resolved. Filtered rather than
+-- answered with a hand-built recipient, so a candidate the engine never offered
+-- cannot be smuggled past CR 601.2c; where the filter admits nothing S.preferring
+-- falls through to the offer's minimum, which is the face-up card and is exactly
+-- what a player refused the permission should get.
+resolveCast :: PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+resolveCast pid spell wanted gs =
+  S.runPure S.identityAnswer (S.runPure (aimedAt wanted) gs (S.cast pid spell)) Engine.priorityLoop
+
+aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring ((==) (Just oid) . Recipient.objectOf) sets
+  _ -> S.identityAnswer p
+
+-- The exiled cards CR 406.3's rider left face down.
+faceDownExiled :: GameState.GameState -> [ObjectId.ObjectId]
+faceDownExiled gs = filter (\oid -> any Object.exiledFaceDown (Game.lookupObject oid gs)) (Set.toList (GameState.exile gs))
 
 -- alice casts Ignorant Bliss off two Mountains with Goblin Piker and Lightning
 -- Bolt in hand, and one Ogre Sentry already exiled face up under bob. Her

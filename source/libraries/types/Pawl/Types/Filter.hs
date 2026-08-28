@@ -822,6 +822,30 @@ data Filter keyword
     -- projected normally, which is what lets a face-down permanent clear a
     -- creature pool for this atom to narrow.
     IsFaceDown
+  | -- | CR 406.3: the candidate is a card that was exiled FACE DOWN. Riftsweeper's
+    -- "target face-up exiled card" is spelled `Not IsExiledFaceDown`, the
+    -- one-relation-one-spelling posture IsToken's comment states (#163).
+    --
+    -- A SEPARATE atom from IsFaceDown above rather than a second reading of it,
+    -- and CR 110.5d says so in as many words: "although an exiled card may be
+    -- face down, this has no correlation to the face-down status of a
+    -- permanent". That atom reads Object.facing and is scoped to the
+    -- battlefield; this one reads Object.exiledFaceDown and is scoped to
+    -- nothing, because the field is only ever written on the way into exile.
+    --
+    -- NOT the same question as CR 406.4's permission to look, which is why the
+    -- card carries this and the rules core carries that: rule 406.4 keeps a
+    -- face-down exiled card out of a chooser's candidate set unless that player
+    -- may look at it (Pawl.Engine.Target's Pool.CardsInExile arm), and
+    -- Riftsweeper's printed qualifier then narrows what remains. A player who
+    -- may look at their own foretold card is offered it by rule 406.4 and
+    -- refused it by Riftsweeper's own words.
+    --
+    -- Uncharacteristic, like IsToken and IsTapped: CR 406.3a leaves a face-down
+    -- exiled card no characteristics at all, so being face down in exile is not
+    -- one either and Pawl.Engine.Projection.filterReads declares this atom as
+    -- reading nothing.
+    IsExiledFaceDown
   | -- | CR 701.27g: the candidate is a "transformed permanent" -- a double-faced
     -- permanent on the battlefield with its back face up. Mutagen Connoisseur's
     -- "for each transformed permanent you control", whose "you control" is a

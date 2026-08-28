@@ -94,6 +94,7 @@ codec keywordCodec =
       Arm.nullary "IsToken" Filter.IsToken,
       Arm.nullary "IsTapped" Filter.IsTapped,
       Arm.nullary "IsFaceDown" Filter.IsFaceDown,
+      Arm.nullary "IsExiledFaceDown" Filter.IsExiledFaceDown,
       Arm.nullary "Transformed" Filter.Transformed,
       Arm.nullary "IsRingBearer" Filter.IsRingBearer,
       Arm.payload "HasDesignation" Designation.codec Filter.HasDesignation (\x -> case x of Filter.HasDesignation y -> Just y; _ -> Nothing),

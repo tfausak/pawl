@@ -126,15 +126,16 @@ foretellable pid gs = filter (\oid -> canForetell pid oid gs) (Game.zoneMembers 
 -- The stamp is written onto the id the move RETURNS and never onto `oid`, for
 -- Plot.plot's reason: CR 400.7 mints a fresh incarnation in exile.
 --
--- Not implemented: CR 702.143a's "that player may look at that card as long as
--- it remains in exile", and CR 702.143e's ordering of one player's several
--- foretold cards. Neither hides anything, because pawl conceals nothing from an
--- answerer -- Pawl.Types.Asked hands over the whole GameState (#682). What the
--- missing permission does cost is CR 406.4's other side: Target.exileRecipients
--- drops every face-down exiled card, so a foretold card cannot be CHOSEN even by
--- the player rule 702.143a lets look at it. Stricter than printed, and
--- unobservable today -- the only card in the pool that names an exiled one asks
--- for a face-up one (#1480).
+-- CR 702.143a's "that player may look at that card as long as it remains in
+-- exile" is read off this stamp rather than stored beside it, by
+-- Pawl.Engine.Exile.mayLookAt -- so the owner of a foretold card may CHOOSE it
+-- out of exile where no other player may (CR 406.4). Pawl.TargetSpec's "CR 406.4
+-- the owner of a foretold card may choose it and an opponent may not" is the
+-- pair that proves it.
+--
+-- Not implemented: CR 702.143e's ordering of one player's several foretold
+-- cards. It hides nothing, because pawl conceals nothing from an answerer --
+-- Pawl.Types.Asked hands over the whole GameState (#682).
 foretell :: PlayerId -> ObjectId -> Game ()
 foretell pid oid = do
   before <- State.get

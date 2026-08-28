@@ -325,6 +325,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.IsToken -> predicate
   Filter.Type.IsTapped -> predicate
   Filter.Type.IsFaceDown -> predicate
+  Filter.Type.IsExiledFaceDown -> predicate
   Filter.Type.Transformed -> predicate
   Filter.Type.IsRingBearer -> predicate
   Filter.Type.HasDesignation _ -> predicate
@@ -706,6 +707,10 @@ viewOfSnapshot mController isToken snapshot =
       -- of characteristics -- so a snapshot holds nothing to answer this with,
       -- `tapped` above's reason one status category over.
       Filter.faceDown = False,
+      -- CR 406.3's exiled-face-down rider is written onto an OBJECT on its way
+      -- into exile, and a snapshot holds no object -- `faceDown` above's reason,
+      -- one rule over.
+      Filter.exiledFaceDown = False,
       -- CR 701.27g asks about a permanent ON THE BATTLEFIELD, and a snapshot is
       -- a record of a past event rather than an object standing on one -- there
       -- is no id here to ask which face is up. No card in the pool counts
