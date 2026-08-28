@@ -250,6 +250,7 @@ stackSpec s registry = Spec.describe s "Stack" $ do
           case Object.source obj of
             Source.OfCard printingId ->
               Spec.assertBool s (maybe False (Card.isCreature . Card.combined) (Game.cardOfPrinting printingId after)) "creature"
+            Source.OfMeld _ -> Spec.assertFailure s "expected a single card source"
             Source.OfToken _ -> Spec.assertFailure s "expected a card source"
             Source.OfAbility _ -> Spec.assertFailure s "expected a card source"
             Source.OfTrigger _ -> Spec.assertFailure s "expected a card source"
@@ -360,6 +361,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
           case Object.source obj of
             Source.OfCard printingId ->
               Spec.assertEqWith s "name" (fmap S.nameOf (Game.cardOfPrinting printingId after)) (Just (CardName.MkCardName $ Text.pack "Goblin Piker"))
+            Source.OfMeld _ -> Spec.assertFailure s "expected a single card source"
             Source.OfToken _ -> Spec.assertFailure s "expected a card source"
             Source.OfAbility _ -> Spec.assertFailure s "expected a card source"
             Source.OfTrigger _ -> Spec.assertFailure s "expected a card source"
@@ -3875,6 +3877,10 @@ nameOnStack :: CardName.CardName -> GameState.GameState -> ObjectId.ObjectId -> 
 nameOnStack wanted gs oid = case Game.lookupObject oid gs of
   Just o -> case Object.source o of
     Source.OfCard _ -> fmap Face.name (Game.faceOf oid gs) == Just wanted
+    -- CR 712.8g: the combined back face's name, which Game.faceOf already
+    -- resolves to. No caller reaches one -- CR 701.42a never puts it on the
+    -- stack -- so this is the OfCard read rather than a second rule.
+    Source.OfMeld _ -> fmap Face.name (Game.faceOf oid gs) == Just wanted
     Source.OfToken printingId -> fmap S.nameOf (Game.cardOfPrinting printingId gs) == Just wanted
     Source.OfAbility _ -> False
     Source.OfTrigger _ -> False

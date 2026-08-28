@@ -31,6 +31,7 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import Pawl.Types.Mana (Mana)
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.Moved as Moved
 import Pawl.Types.Object (Object)
 import qualified Pawl.Types.Object as Object
@@ -147,6 +148,9 @@ printingOfObject :: ObjectId -> GameState -> Maybe Printing.Printing
 printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
   Nothing -> Nothing
   Just (Source.OfCard pid) -> printingOf pid gs
+  -- CR 712.8g: the combined back face, which is the printing every
+  -- characteristic read of a melded permanent resolves through.
+  Just (Source.OfMeld meld) -> printingOf (MeldSource.result meld) gs
   Just (Source.OfToken pid) -> printingOf pid gs
   Just (Source.OfAbility _) -> Nothing
   Just (Source.OfTrigger _) -> Nothing
@@ -368,6 +372,11 @@ cardOfSource gs mSource = case mSource of
   Nothing -> Nothing
   Just source -> case source of
     Source.OfCard pid -> cardOfPrinting pid gs
+    -- CR 712.8g: "the object represented by those cards has only the
+    -- characteristics of the combined back face", so the result printing answers
+    -- and every reader past this point needs to know nothing about melding. The
+    -- components are read by `componentsOf` below and by nothing else.
+    Source.OfMeld meld -> cardOfPrinting (MeldSource.result meld) gs
     Source.OfToken pid -> cardOfPrinting pid gs
     Source.OfAbility _ -> Nothing
     Source.OfTrigger _ -> Nothing
@@ -383,6 +392,33 @@ cardOfSource gs mSource = case mSource of
 
 cardOfPrinting :: PrintingId.PrintingId -> GameState -> Maybe Card
 cardOfPrinting pid gs = fmap Printing.card (printingOf pid gs)
+
+-- Which cards represent this object, for the rules that look past the
+-- characteristics `cardOfSource` answers with to the cards themselves. Empty for
+-- every source but a melded permanent, whose components it lists in the order
+-- the meld recorded them.
+--
+-- A CLASSIFIER over Source rather than a case on OfMeld at each reader, because
+-- the readers are shared: CR 730.3 through 730.3e restate CR 712.21 through
+-- 712.21e almost word for word -- one permanent leaves and each component is put
+-- into the appropriate zone, the owner arranges them, the exiler fixes their
+-- relative timestamp order, an effect that finds the new object finds all of
+-- them -- so mutate (#874) extends this one function rather than the three rules
+-- that read it. CR 202.3c and CR 701.27g read it too.
+--
+-- EMPTY rather than a singleton for OfCard: the question is which cards
+-- represent an object that several may, and a one-card object has nothing for CR
+-- 712.21's split to do. A reader wanting the ordinary card asks `cardOfSource`.
+componentsOf :: Source.Source -> Seq.Seq PrintingId.PrintingId
+componentsOf source = case source of
+  Source.OfMeld meld -> Seq.fromList (NonEmpty.toList (MeldSource.components meld))
+  Source.OfCard _ -> Seq.empty
+  Source.OfToken _ -> Seq.empty
+  Source.OfAbility _ -> Seq.empty
+  Source.OfTrigger _ -> Seq.empty
+  Source.OfEmblem _ -> Seq.empty
+  Source.OfSpellCopy _ -> Seq.empty
+  Source.OfInherentTrigger _ -> Seq.empty
 
 -- `cardOf` for a member of a HAND. An emblem answers Nothing where `cardOf`
 -- answers a card: CR 114.5 keeps an emblem off the battlefield, and CR 114.1
@@ -669,6 +705,9 @@ isSpell oid gs = case lookupObject oid gs of
   Just obj ->
     Object.zone obj == Zone.Stack && case Object.source obj of
       Source.OfCard _ -> True
+      -- CR 701.42a puts a melded permanent onto the BATTLEFIELD, so it is never a
+      -- card on the stack; the zone conjunct above already answers False for it.
+      Source.OfMeld _ -> False
       Source.OfToken _ -> False
       Source.OfAbility _ -> False
       Source.OfTrigger _ -> False
@@ -700,6 +739,7 @@ isAbility oid gs = case lookupObject oid gs of
   Just obj ->
     Object.zone obj == Zone.Stack && case Object.source obj of
       Source.OfCard _ -> False
+      Source.OfMeld _ -> False
       Source.OfToken _ -> False
       Source.OfAbility _ -> True
       Source.OfTrigger _ -> True
@@ -732,6 +772,9 @@ sourceIsToken :: Source.Source -> Bool
 sourceIsToken source = case source of
   Source.OfToken _ -> True
   Source.OfCard _ -> False
+  -- CR 108.2 / 108.2b: both cards representing a melded permanent are Magic
+  -- cards, and CR 701.42b keeps a token out of a meld pair in the first place.
+  Source.OfMeld _ -> False
   Source.OfAbility _ -> False
   Source.OfTrigger _ -> False
   Source.OfEmblem _ -> False

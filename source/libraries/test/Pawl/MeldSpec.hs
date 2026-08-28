@@ -12,6 +12,8 @@
 -- the Battlements is the half CR 712.4a puts the melding ability on.
 module Pawl.MeldSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cost as Cost
@@ -29,9 +31,12 @@ import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
+import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Source as Source
 
 -- The offered set FILTERED rather than a hand-built recipient, so CR 608.2b's
 -- re-read at resolution cannot drop a target the engine never offered.
@@ -78,3 +83,23 @@ spec s registry = Spec.describe s "Meld" $ do
         let after = S.runPure (aimedAt pikerId) ready (do Activate.activateAbility S.alice battlementsId haste; Stack.resolveTop)
         Spec.assertBool s (Projection.hasKeyword Keyword.Haste pikerId after) "CR 702.10: the targeted creature gains haste"
       _ -> Spec.assertFailure s "Hanweir Battlements should print two activated abilities"
+  -- CR 701.42a: "the resulting permanent is a single object represented by two
+  -- cards", and Game.componentsOf is the one reader that can name them. Pure and
+  -- over a hand-built Source rather than a board, because the classifier is the
+  -- shared thing CR 202.3c, CR 712.21 and CR 701.27g each read: the components in
+  -- the order the meld recorded them, and nothing at all for a source that one
+  -- card represents.
+  Spec.it s "CR 701.42a the cards representing a melded permanent, and none for anything else" $ do
+    let garrison = PrintingId.MkPrintingId 9
+        battlements = PrintingId.MkPrintingId 10
+        township =
+          Source.OfMeld
+            MeldSource.MkMeldSource
+              { MeldSource.result = PrintingId.MkPrintingId 8,
+                MeldSource.components = garrison NonEmpty.:| [battlements]
+              }
+    Spec.assertEqWith s "the two cards, in order" (Game.componentsOf township) (Seq.fromList [garrison, battlements])
+    -- CR 712.8g: the combined back face is NOT one of them, so a reader summing
+    -- the components under CR 202.3c cannot pick up the result's own cost.
+    Spec.assertBool s (Seq.null (Seq.filter (== PrintingId.MkPrintingId 8) (Game.componentsOf township))) "the result is not a component"
+    Spec.assertEqWith s "CR 108.2 an ordinary card represents only itself" (Game.componentsOf (Source.OfCard garrison)) Seq.empty

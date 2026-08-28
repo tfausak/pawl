@@ -64,6 +64,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
@@ -2195,6 +2196,9 @@ namedIs wanted gs mo =
    in case mo of
         Just o -> case Object.source o of
           Source.OfCard printingId -> named printingId
+          -- CR 712.8g: the combined back face is where a melded permanent's name
+          -- comes from, so the result printing answers.
+          Source.OfMeld meld -> named (MeldSource.result meld)
           Source.OfToken printingId -> named printingId
           Source.OfAbility _ -> False
           Source.OfTrigger _ -> False

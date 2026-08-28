@@ -2001,6 +2001,7 @@ alreadyTurnedFor resolving victim gs = case Game.lookupObject resolving gs of
             Just (Maybe.fromMaybe (Object.timestamp ability) (TriggeredAbilitySource.createdAt triggered))
         | otherwise -> Nothing
       Source.OfCard _ -> Nothing
+      Source.OfMeld _ -> Nothing
       Source.OfToken _ -> Nothing
       Source.OfEmblem _ -> Nothing
       Source.OfSpellCopy _ -> Nothing
@@ -3067,6 +3068,10 @@ spellCopyOf :: Source.Source -> Maybe Source.Source
 spellCopyOf source = case source of
   Source.OfCard pid -> Just (Source.OfSpellCopy pid)
   Source.OfSpellCopy pid -> Just (Source.OfSpellCopy pid)
+  -- CR 707.10 copies a SPELL, and a melded permanent is never one (CR 701.42a
+  -- puts it onto the battlefield). CR 202.3c's copy of a melded permanent is a
+  -- permanent copy and does not come through here.
+  Source.OfMeld _ -> Nothing
   Source.OfToken _ -> Nothing
   Source.OfAbility _ -> Nothing
   Source.OfTrigger _ -> Nothing

@@ -1,5 +1,6 @@
 module Pawl.Codec.SourceSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Codec.ActivatedAbilitySourceSpec as ActivatedAbilitySourceSpec
 import qualified Pawl.Codec.Source as Source
 import qualified Pawl.Codec.TriggeredAbilitySourceSpec as TriggeredAbilitySourceSpec
@@ -7,6 +8,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
+import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -33,6 +35,19 @@ spec s = Spec.describe s "Pawl.Codec.Source" $ do
       Source.codec
       (Source.OfToken (PrintingId.MkPrintingId 3))
       " {\"type\":\"OfToken\",\"value\":3} "
+  -- CR 701.42a: a payload of its own rather than a bare id, so this arm alone
+  -- carries a list beside the printing every other card-shaped arm names.
+  Spec.it s "OfMeld" $
+    Common.assertCodec
+      s
+      Source.codec
+      ( Source.OfMeld
+          MeldSource.MkMeldSource
+            { MeldSource.result = PrintingId.MkPrintingId 8,
+              MeldSource.components = PrintingId.MkPrintingId 9 NonEmpty.:| [PrintingId.MkPrintingId 10]
+            }
+      )
+      " {\"type\":\"OfMeld\",\"value\":{\"result\":8,\"components\":[9,10]}} "
   -- CR 602.
   Spec.it s "OfAbility" $
     Common.assertCodec

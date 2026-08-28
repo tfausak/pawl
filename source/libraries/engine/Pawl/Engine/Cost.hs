@@ -281,6 +281,9 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
                 fmap untagged (printed : alternatives)
                   <> [untagged (withoutPayingManaCost face) | PlayerEffect.mayCastFromHandWithoutPayingManaCost (Object.owner obj) oid gs]
               _ -> fmap untagged (printed : alternatives)
+    -- CR 701.42a puts a melded permanent onto the battlefield rather than onto
+    -- the stack, so it is never announced and there is no cost to offer for it.
+    Source.OfMeld _ -> []
     Source.OfToken _ -> []
     Source.OfAbility _ -> []
     Source.OfTrigger _ -> []

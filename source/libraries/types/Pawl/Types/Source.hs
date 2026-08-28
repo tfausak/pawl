@@ -2,17 +2,37 @@ module Pawl.Types.Source where
 
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
+import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 
 -- | What is behind an object. The card-shaped constructors name their printing
 -- by id rather than carrying it (#1592), so the rules distinction between them
--- is the only distinction left: a card, a token, an emblem and a copy of a spell
--- are four different things under CR 108, CR 111, CR 114 and CR 707.10, and the
--- engine cases on which of the four it has.
+-- is the only distinction left: a card, a melded permanent, a token, an emblem
+-- and a copy of a spell are different things under CR 108, CR 701.42a, CR 111,
+-- CR 114 and CR 707.10, and the engine cases on which of them it has.
 data Source
   = -- | CR 108: a card, named by its entry in GameState.printings.
     OfCard PrintingId.PrintingId
+  | -- | CR 701.42a: a melded permanent -- "a single object represented by two
+    -- cards", which Pawl.Types.MeldSource carries and documents. CR 712.8g gives
+    -- it "only the characteristics of the combined back face", so the payload's
+    -- result printing is what every characteristic read resolves through, and CR
+    -- 202.3c reads its components' front faces for the mana value instead.
+    --
+    -- ITS OWN CONSTRUCTOR rather than OfCard, for the reason OfSpellCopy is not
+    -- OfCard either: the arm has to be able to answer a question the payload of a
+    -- bare printing cannot. CR 712.21 splits this object back into the cards
+    -- representing it as it leaves the battlefield, and CR 701.27g excludes an
+    -- object represented by more than one card from being a transformed
+    -- permanent -- both of which ask WHICH cards, and OfCard names one printing
+    -- that is not even a card in a deck.
+    --
+    -- Still a card for CR 108.2's purposes, so every classifier that sorts a
+    -- source into card and not-a-card answers for this arm the way it answers for
+    -- OfCard: CR 108.2b excludes tokens and nothing excludes a melded permanent,
+    -- whose components are both Magic cards.
+    OfMeld MeldSource.MeldSource
   | -- | CR 111.3/111.6: a token -- a permanent not represented by a card. Its
     -- characteristics ARE a Card (CR 111.3: effect-defined values are functionally
     -- equivalent to printed ones), interned like any other printing, and carrying

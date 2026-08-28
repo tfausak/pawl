@@ -166,7 +166,9 @@ resolveTopWith runSubgame = do
                             -- after the move (see Event.changeZoneAttaching).
                             Monad.void (Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False CarryOver.Carried)
         -- A token is never on the stack (created onto the battlefield, never
-        -- cast).
+        -- cast), and neither is a melded permanent: CR 701.42a puts the two cards
+        -- onto the battlefield directly rather than announcing anything.
+        Source.OfMeld _ -> State.put gs {GameState.stack = rest}
         Source.OfToken _ -> State.put gs {GameState.stack = rest}
         Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = srcId, ActivatedAbilitySource.ability = ability} -> do
           -- CR 601.3's offer is NOT made here. It belongs to the Search effect
