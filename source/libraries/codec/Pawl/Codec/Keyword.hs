@@ -39,6 +39,7 @@ codec =
       Arm.payload "Landwalk" (Filter.codec codec) Keyword.Landwalk (\x -> case x of Keyword.Landwalk y -> Just y; _ -> Nothing),
       Arm.nullary "Lifelink" Keyword.Lifelink,
       Arm.nullary "LivingMetal" Keyword.LivingMetal,
+      Arm.payload "MoreThanMeetsTheEye" (Cost.codec codec) Keyword.MoreThanMeetsTheEye (\x -> case x of Keyword.MoreThanMeetsTheEye y -> Just y; _ -> Nothing),
       Arm.payload "Protection" (Filter.codec codec) Keyword.Protection (\x -> case x of Keyword.Protection y -> Just y; _ -> Nothing),
       Arm.nullary "Reach" Keyword.Reach,
       Arm.nullary "Shroud" Keyword.Shroud,
