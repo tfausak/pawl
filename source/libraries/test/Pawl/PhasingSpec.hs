@@ -36,9 +36,10 @@
 -- (#877), so pawl's copy pays {2}{W}{W} in full -- stricter than printed.
 --
 -- Nyxborn Rollicker joins them for CR 702.103g, whose "phases in unattached"
--- needs a BESTOWED Aura: it is the pool's cheapest bestow printing, and its only
--- non-bestow clause is a +1/+1 on the enchanted creature. Goblin Piker is the
--- host Clever Concealment then leaves behind.
+-- needs a BESTOWED Aura: it is the one bestow printing in data/cards/, and its
+-- only non-bestow clause is a +1/+1 on the enchanted creature. Goblin Piker is
+-- the host it is cast onto, and the permanent left behind when Clever
+-- Concealment names the Aura alone.
 --
 -- Master Thief joins them for CR 702.26f, whose "for as long as" half needs a
 -- duration (CR 611.2b) tracking a permanent Reality Ripple can then send away:
@@ -908,9 +909,11 @@ bestowingOn host p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just host) . Recipient.objectOf) . snd) sets
   _ -> S.identityAnswer p
 
--- The permanent alice controls with this printing's name. Needed because CR 400.7
--- mints a new object as the bestowed spell resolves, so the id the cast returned
--- names nothing on the battlefield.
+-- The battlefield permanent alice OWNS with this printing's name --
+-- Game.zoneMembers indexes by owner (CR 108.3), which is the right question here
+-- because alice both owns and controls everything on this board. Needed because
+-- CR 400.7 mints a new object as the bestowed spell resolves, so the id the cast
+-- returned names nothing on the battlefield.
 battlefieldNamed :: Printing.Printing -> GameState.GameState -> Maybe ObjectId.ObjectId
 battlefieldNamed printing gs =
   List.find
@@ -1134,25 +1137,25 @@ attachedSpec s registry = Spec.describe s "Attached" $ do
       Just aura -> do
         let gone = concealAll (Set.singleton aura) spell attached
             dead = S.runPure S.identityAnswer gone (Event.changeZone host Zone.Graveyard)
-            orphaned = S.settleSba (untapStep S.alice dead)
+            hostless = S.settleSba (untapStep S.alice dead)
             kept = S.settleSba (untapStep S.alice gone)
         -- The premise, first, so nothing below passes for a Rollicker that was
         -- cast for its printed {R} and so never was an Aura at all.
         Spec.assertEqWith s "setup: CR 702.103b made it an Aura with no P/T of its own" (S.powerToughnessOf aura attached) Nothing
-        Spec.assertEqWith s "attached to the Piker, which it pumps to 3/2" (S.powerToughnessOf host attached) (Just (3, 2))
+        Spec.assertEqWith s "and the Piker it is attached to is pumped to 3/2" (S.powerToughnessOf host attached) (Just (3, 2))
         Spec.assertEqWith s "it phased out DIRECTLY, its host staying behind" (Phasing.phasedOutStatus aura gone) (Just (PhasedOut.Directly S.alice))
         Spec.assertEqWith s "and the host then left the battlefield" (Maybe.isJust (Game.lookupObject host dead)) False
         -- CR 702.103g itself, ahead of every reading that could absorb a mutation
         -- to it: an Aura that merely came back detached is still an Enchantment
         -- with no P/T, so the P/T is the bit only "ceases to be bestowed" sets.
-        Spec.assertEqWith s "CR 702.103g: it phases in unattached and is a 1/1 Satyr creature again" (S.powerToughnessOf aura orphaned) (Just (1, 1))
+        Spec.assertEqWith s "CR 702.103g: it phases in unattached and is a 1/1 Satyr creature again" (S.powerToughnessOf aura hostless) (Just (1, 1))
         Spec.assertEqWith
           s
           "with its printed card types and subtypes back"
-          (Projection.cardTypesOf aura orphaned, Projection.subtypesOf aura orphaned)
+          (Projection.cardTypesOf aura hostless, Projection.subtypesOf aura hostless)
           (Set.fromList [CardType.Creature, CardType.Enchantment], Set.singleton Subtype.Satyr)
-        Spec.assertEqWith s "attached to nothing" (attachedHostOf aura orphaned) Nothing
-        Spec.assertEqWith s "and on the battlefield rather than buried by CR 704.5m" (onBattlefield aura orphaned) True
+        Spec.assertEqWith s "attached to nothing" (attachedHostOf aura hostless) Nothing
+        Spec.assertEqWith s "and on the battlefield rather than buried by CR 704.5m" (onBattlefield aura hostless) True
         -- The control: the same phase-out with the host left alive. CR 702.26i
         -- returns it attached, so rule 702.103g never fires and it is still a
         -- bestowed Aura.
