@@ -136,10 +136,11 @@ data PlayerEffect
     -- why a floor never raises a cost, and why the two kinds cannot share one
     -- floor over the pool.
     --
-    -- IncreaseActivationCost above is this arm's sibling. Not implemented:
-    -- narrowing either of them by CR 605.1a's mana-ability classification, which
-    -- Suppression Field's and Zirda, the Dawnwaker's "aren't mana abilities"
-    -- needs (#2293).
+    -- IncreaseActivationCost above is this arm's sibling, and carries CR 605.1a's
+    -- mana-ability classification as its own `whichKind`. Not implemented: the
+    -- same narrowing on THIS arm, which Zirda, the Dawnwaker's "Abilities you
+    -- activate that aren't mana abilities cost {2} less to activate" needs
+    -- (#2293).
     ReduceActivationCost ReduceActivationCost.ReduceActivationCost
   | -- | CR 613.11 / 601.2f / Brutal Suppression: the activated abilities of
     -- matching permanents cost these additional NON-MANA components to activate

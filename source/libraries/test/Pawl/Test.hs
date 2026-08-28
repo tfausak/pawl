@@ -12,6 +12,7 @@ import qualified Pawl.CardsSpec
 import qualified Pawl.CaseSpec
 import qualified Pawl.CastSpec
 import qualified Pawl.ClassSpec
+import qualified Pawl.Codec.AbilityKindSpec
 import qualified Pawl.Codec.AbilityNameSpec
 import qualified Pawl.Codec.AbilityTriggeredSpec
 import qualified Pawl.Codec.ActivatedAbilitySourceSpec
@@ -535,6 +536,7 @@ spec s registry = do
   Pawl.ClassSpec.spec s registry
   Pawl.CastSpec.spec s registry
   Pawl.CoinSpec.spec s registry
+  Pawl.Codec.AbilityKindSpec.spec s
   Pawl.Codec.AbilityNameSpec.spec s
   Pawl.Codec.AbilityTriggeredSpec.spec s
   Pawl.Codec.ActivatedAbilitySourceSpec.spec s

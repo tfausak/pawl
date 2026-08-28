@@ -38,6 +38,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.ManaFilter as ManaFilter
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
@@ -1091,6 +1092,16 @@ spellCostAdjustments pid oid gs =
 -- family. Compared and never inspected further: a KeywordFamily is a rulebook
 -- designator, so nothing here learns what the reduced ability DOES.
 --
+-- `kind` is the criterion the OTHER payload reads: CR 605.1a's classification of
+-- the ability being activated, which Suppression Field's "unless they're mana
+-- abilities" narrows an increase by. The caller answers it, because only the
+-- caller has the ability -- Pawl.Engine.Cost.manaActivationAdjustmentsGiven is
+-- the mana window and says so, and Pawl.Engine.Activate's three sites are
+-- reached only for an ability activatableGiven has already refused to call a
+-- mana ability (CR 605.3b). Compared and never inspected further, exactly as
+-- `family` is: which side of a rulebook classification the ability falls on,
+-- never what it does.
+--
 -- `targets` is the THIRD criterion and the one that arrives from a different
 -- MOMENT: CR 601.2c's announced targets, which CR 601.2f's reductions may name
 -- (Dwarven Mauler's "equip abilities you activate that target this creature").
@@ -1111,8 +1122,8 @@ spellCostAdjustments pid oid gs =
 -- sentence says "this effect", so an effect that states no floor is not bound by
 -- another's, and Pawl.Engine.Cost.applyAdjustments applies each floor as its own
 -- reduction lands.
-activationCostAdjustments :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> CostAdjustments
-activationCostAdjustments targets family pid srcId gs = activationCostAdjustmentsGiven (applying pid gs) targets family srcId gs
+activationCostAdjustments :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> AbilityKind.AbilityKind -> PlayerId -> ObjectId -> GameState -> CostAdjustments
+activationCostAdjustments targets family kind pid srcId gs = activationCostAdjustmentsGiven (applying pid gs) targets family kind srcId gs
 
 -- The same gather given the effect list the CALLER has already taken, which is
 -- the half a per-permanent loop wants: `applying` is a walk of everything in
@@ -1128,8 +1139,8 @@ activationCostAdjustments targets family pid srcId gs = activationCostAdjustment
 -- The rows arrive PAIRED WITH THEIR SOURCE and not stripped to bare effects,
 -- because CR 303.4b's "enchanted" is a fact about the row's own permanent: the
 -- criterion is matched through matchesObjectFrom, which needs it.
-activationCostAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect)] -> Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> ObjectId -> GameState -> CostAdjustments
-activationCostAdjustmentsGiven effects targets family srcId gs =
+activationCostAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect)] -> Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> AbilityKind.AbilityKind -> ObjectId -> GameState -> CostAdjustments
+activationCostAdjustmentsGiven effects targets family kind srcId gs =
   let -- CR 601.2c's chosen targets, asked of ReduceActivationCost's third
       -- criterion: Dwarven Mauler's "equip abilities you activate THAT TARGET
       -- THIS CREATURE". ANY rather than all, which is what the sentence says of
@@ -1144,10 +1155,14 @@ activationCostAdjustmentsGiven effects targets family srcId gs =
       aims source criterion = any (\oid -> matchesObjectFrom source criterion oid gs) (Set.toList targets)
       -- CR 601.2f's MANA increase, the half CostAdjustments.increases was an
       -- empty literal for until Oppressive Rays gave it a producer; see #1242.
-      -- No family beside the criterion, IncreaseActivationCost's own reason.
+      -- No family beside the criterion, IncreaseActivationCost's own reason --
+      -- but `kind` is read, and CR 605.1a is the whole of that read: Suppression
+      -- Field's "unless they're mana abilities" is a fact about the ability being
+      -- activated, which no source filter could answer. An increase carrying no
+      -- `whichKind` ignores it, which is Oppressive Rays.
       increaseOf (source, effect) = case effect of
-        PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost criterion amount) ->
-          if matchesObjectFrom source criterion srcId gs then Just amount else Nothing
+        PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost criterion wanted amount) ->
+          if matchesObjectFrom source criterion srcId gs && maybe True (== kind) wanted then Just amount else Nothing
         -- Thalia, turned away by the CONSTRUCTOR and not by her Filter, which is
         -- what keeps her off Mindslaver's activation (#90) -- the reading
         -- Pawl.Types.PlayerEffect's IncreaseActivationCost haddock states.
