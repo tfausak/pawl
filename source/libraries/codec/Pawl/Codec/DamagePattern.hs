@@ -6,6 +6,7 @@ import qualified Pawl.Codec.DamageKind as DamageKind
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ObjectId as ObjectId
+import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -28,13 +29,15 @@ defaultWhatSource = Filter.And []
 -- `whosePhase`. `whichSource` is runtime-only for the same reason and swept by
 -- the same lint -- the source a shield watches is chosen (CR 609.7a) or targeted
 -- (CR 601.2c) when the shield is created.
--- `whatRecipient` beside it is the authored half and needs no such lint: it
--- describes the recipient rather than naming one.
+-- `whatRecipient` and `whoRecipient` beside them are the authored halves and
+-- need no such lint: they DESCRIBE the recipient -- by characteristic, or by CR
+-- 109.5's relation to the row's controller -- rather than naming one.
 codec :: Codec.Codec DamagePattern.DamagePattern
 codec = Fields.object $ do
   whichKind <- Fields.defaulted "whichKind" Nothing (Common.maybe DamageKind.codec) DamagePattern.whichKind
   whatSource <- Fields.defaulted "whatSource" defaultWhatSource (Filter.codec Keyword.codec) DamagePattern.whatSource
   whatRecipient <- Fields.defaulted "whatRecipient" Nothing (Common.maybe (Filter.codec Keyword.codec)) DamagePattern.whatRecipient
+  whoRecipient <- Fields.defaulted "whoRecipient" Nothing (Common.maybe PlayerRelation.codec) DamagePattern.whoRecipient
   whichRecipient <- Fields.defaulted "whichRecipient" Nothing (Common.maybe Recipient.codec) DamagePattern.whichRecipient
   whichSource <- Fields.defaulted "whichSource" Nothing (Common.maybe ObjectId.codec) DamagePattern.whichSource
   pure
@@ -42,6 +45,7 @@ codec = Fields.object $ do
       { DamagePattern.whichKind = whichKind,
         DamagePattern.whatSource = whatSource,
         DamagePattern.whatRecipient = whatRecipient,
+        DamagePattern.whoRecipient = whoRecipient,
         DamagePattern.whichRecipient = whichRecipient,
         DamagePattern.whichSource = whichSource
       }

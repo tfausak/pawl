@@ -722,13 +722,18 @@ mimingSlimeSpec s registry =
         -- 0, creating a 0/0 Ooze token that will be put into your graveyard as a
         -- state-based action (unless something else is raising its toughness)."
         --
-        -- The Anthem is that something else, and it is what makes the two
-        -- readings tell apart. A box left standing describes NOTHING through the
-        -- seed view Projection.baseCharacteristics evaluates it against, so the
-        -- Ooze arrives with no power and no toughness at all; Projection.addPT
-        -- leaves a Nothing alone, so the Anthem cannot save it and CR 208.5's
-        -- substitution makes it a 0/0 that dies. Stamped, the Ooze is a 0/0 whose
-        -- toughness the Anthem raises to 1 -- and it lives.
+        -- The Anthem is that something else: stamped, the Ooze is a 0/0 whose
+        -- toughness the Anthem raises to 1, and it lives.
+        --
+        -- A REGRESSION FENCE rather than the discriminator it once was. A box
+        -- left standing describes NOTHING through the seed view
+        -- Projection.baseCharacteristics evaluates it against, so the Ooze would
+        -- arrive with no power and no toughness at all -- but CR 208.5's 0 is now
+        -- substituted INSIDE the layer fold (Projection.noValueAt), so the Anthem
+        -- rescues that reading too and this case can no longer tell the two
+        -- apart: mutating bakeTokenCharacteristics to leave every box standing
+        -- leaves it green (2026-08-27). The group's FIRST case reddens there, and
+        -- is what tells them apart now.
         Spec.it s "CR 208.2a with no creatures X is 0, and the Anthem's +1/+1 is what the 0/0 Ooze survives on" $ do
           forest <- S.printingOf s registry "Forest"
           slime <- S.printingOf s registry "Miming Slime"
@@ -742,7 +747,8 @@ mimingSlimeSpec s registry =
         -- The ruling's main clause, on the same board minus the Anthem. A
         -- REGRESSION FENCE rather than a proof: an undeterminable box left
         -- standing also reads as no value and dies here, so this case cannot tell
-        -- the two implementations apart. The case above is the one that can.
+        -- the two implementations apart. The group's first case is the one that
+        -- can.
         Spec.it s "CR 704.5f with no creatures and nothing raising its toughness, the 0/0 Ooze dies" $ do
           forest <- S.printingOf s registry "Forest"
           slime <- S.printingOf s registry "Miming Slime"

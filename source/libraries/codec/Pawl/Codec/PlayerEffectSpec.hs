@@ -72,7 +72,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost Filter.IsHostOfSource 3))
+      (PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost Filter.IsHostOfSource Nothing 3))
       " {\"type\":\"IncreaseActivationCost\",\"value\":{\"whichAbilities\":{\"type\":\"IsHostOfSource\"},\"amount\":3}} "
   -- CR 613.11 / 601.2f / Sapphire Medallion.
   Spec.it s "ReduceSpellCost" $
@@ -271,7 +271,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing (Filter.And []) Nothing Nothing Nothing))
+      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing (Filter.And []) Nothing Nothing Nothing Nothing))
       " {\"type\":\"DamageCantBePrevented\",\"value\":{}} "
   -- CR 615.12 narrowed / Excruciator, "damage that would be dealt by this
   -- creature": the same effect keyed to its own source (CR 614.15's relation),
@@ -280,8 +280,17 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing Nothing Nothing))
+      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing Nothing Nothing Nothing))
       " {\"type\":\"DamageCantBePrevented\",\"value\":{\"whatSource\":{\"type\":\"IsSource\"}}} "
+  -- CR 614.9 / Lava Burst, "if Lava Burst would deal damage to a creature, that
+  -- damage can't be ... dealt instead to another permanent or player": the
+  -- redirection twin, narrowed on both of the pattern's printed halves at once.
+  Spec.it s "DamageCantBeRedirected, naming its own source and a recipient" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.DamageCantBeRedirected (DamagePattern.MkDamagePattern Nothing Filter.IsSource (Just (Filter.HasCardType CardType.Creature)) Nothing Nothing Nothing))
+      " {\"type\":\"DamageCantBeRedirected\",\"value\":{\"whatRecipient\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"whatSource\":{\"type\":\"IsSource\"}}} "
   -- CR 701.23 / Leonin Arbiter.
   Spec.it s "CantSearchLibraries" $
     Common.assertCodec

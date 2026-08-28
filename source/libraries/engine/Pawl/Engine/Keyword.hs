@@ -1295,6 +1295,7 @@ mintedReplacementsFor keyword count = case keyword of
                 { DamagePattern.whichKind = Nothing,
                   DamagePattern.whatSource = quality,
                   DamagePattern.whatRecipient = Just Filter.IsSource,
+                  DamagePattern.whoRecipient = Nothing,
                   DamagePattern.whichRecipient = Nothing,
                   DamagePattern.whichSource = Nothing
                 },

@@ -6,6 +6,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -71,6 +72,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
+import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
@@ -537,10 +539,10 @@ slotsOf effect = case effect of
   -- CR 615.5's rider reads slots of its own, so its reads join this effect's,
   -- LESS the reserved amount slot: the prevention binds that one itself
   -- (Event.eventBindingSlots), and Resolve.runPreventionRider is the writer.
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ ref _ quantity rider) ->
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ ref _ _ _ quantity rider) ->
     joinSlots
       [ durationSlots duration,
-        objectRefSlots ref,
+        foldMap objectRefSlots ref,
         quantitySlots quantity,
         Map.delete Binding.eventAmount (joinSlots (fmap slotsOf (Foldable.toList rider)))
       ]
@@ -817,7 +819,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Replace (Replace.MkReplace duration _ _ condition _) ->
     durationSlotsAreExhaustive duration && all conditionSlotsAreExhaustive condition
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> True
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ quantity rider) ->
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity rider) ->
     durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity && all slotsAreExhaustive rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ rider) ->
     durationSlotsAreExhaustive duration && all slotsAreExhaustive rider
@@ -983,7 +985,7 @@ readsX = any effectReadsX
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
       -- CR 601.2b's X reaches the rider too.
-      Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ quantity rider) -> Quantity.readsX quantity || readsX (Foldable.toList rider)
+      Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ quantity rider) -> Quantity.readsX quantity || readsX (Foldable.toList rider)
       Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ rider) -> readsX (Foldable.toList rider)
       Effect.RedirectDamage {} -> False
       Effect.Counter {} -> False
@@ -1182,7 +1184,7 @@ boundSlots effect = case effect of
   Effect.SkipNextPhase {} -> Set.empty
   -- The shield itself binds nothing; CR 615.5's rider is an effect list, so a
   -- name IT authors is a name this card authors. Both shields.
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ rider) -> foldMap boundSlots rider
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ _ rider) -> foldMap boundSlots rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ rider) -> foldMap boundSlots rider
   Effect.RedirectDamage {} -> Set.empty
   -- How many spells this countering ACTUALLY countered, for a "for each spell
@@ -1390,7 +1392,7 @@ resolveSpellWith runSubgame oid = do
                       applyOne eff = do
                         -- Re-read the live bindings for THIS effect: a prior
                         -- PlaySubgame may have bound its winner slot.
-                        bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
+                        bindingsNow <- State.gets (liveBindings obj oid)
                         let chosenNow = Binding.targetsOf bindingsNow
                             legalNow = Map.mapWithKey legalSlot chosenNow
                         applyEffectWith
@@ -1417,7 +1419,7 @@ resolveSpellWith runSubgame oid = do
                         -- is part of the state this one is read against, and the
                         -- re-read adds only defined slots. A REGRESSION FENCE --
                         -- mutating this half back leaves the suite green.
-                        gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
+                        gateBindings <- State.gets (liveBindings obj oid)
                         gated <- if hangs then gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Binding.targetsOf gateBindings)) (Binding.groupsOf gateBindings) clause else pure False
                         -- CR 603.5 / 608.2d: then the printed "may", against the
                         -- SAME live bindings CR 608.2b's filter is applied to, so
@@ -1549,7 +1551,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                   -- maps come from the SAME bindings: `legalNow` is `chosenNow`
                   -- with CR 608.2b's illegal recipients dropped, so re-reading one
                   -- without the other would lose the bindings it just gained.
-                  bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
+                  bindingsNow <- State.gets (liveBindings obj stackId)
                   let chosenNow = Binding.targetsOf bindingsNow
                       legalNow = Map.mapWithKey legalSlot chosenNow
                   applyEffectWith runSubgame stackId srcId effectController (instanceView legalNow) (instanceView chosenNow) eff
@@ -1571,7 +1573,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                       -- `payGatePaid` is given `srcId`. Off the LIVE bindings of
                       -- the STACK object (CR 608.2c), where this resolution's
                       -- slots are bound (see bindSlot).
-                      gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
+                      gateBindings <- State.gets (liveBindings obj stackId)
                       gated <- if hangs then gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) (Binding.groupsOf gateBindings) clause else pure False
                       -- CR 603.5 / 608.2d: then the printed "may", against the
                       -- SAME live bindings CR 608.2b's filter is applied to, so a
@@ -2678,9 +2680,17 @@ offerCast resolving caster slot optionality offer = do
 -- which differ only in the DamageRewrite -- CR 615.7's countdown, CR 615.1's
 -- unbounded shield, or CR 614.9's redirection.
 --
--- One shield PER RECIPIENT (CR 615.11), which is why the callers fold this over
--- the set their ObjectRef names; every producer in the pool names exactly one,
--- so the fold is over a singleton today (gap #1108).
+-- One shield PER RECIPIENT the caller's ObjectRef NAMES, which is why the callers
+-- fold this over that set: those recipients were fixed by the resolution (CR
+-- 615.11 for an untargeted "each", CR 601.2c for a targeted one), so a shield
+-- each is what the rules describe.
+--
+-- A recipient side the card DESCRIBES instead is the other shape and is not
+-- folded: `describedRecipient` below is written onto ONE row, which CR 615.7's
+-- "such effects count only the amount of damage; the number of events or sources
+-- dealing it doesn't matter" makes a single shared pool over every recipient it
+-- admits. Divine Deflection is the producer, and Pawl.Engine.Replacement's
+-- rewriteRemaining is where one row spends per point rather than per recipient.
 --
 -- The `rider` is CR 615.5's additional effect, Nothing for a row that has none;
 -- a redirection is not a prevention, so RedirectDamage never passes one.
@@ -2707,8 +2717,8 @@ offerCast resolving caster slot optionality offer = do
 -- pairs CR 609.7b's properties with CR 615.7's countdown or CR 614.9's
 -- redirection -- Scryfall `o:"prevent the next" o:"sources"`, 2026-08-27, no
 -- hit -- so those two opcodes carry no such field.
-installDamageRow :: Map.Map SlotName PlayerId -> PlayerId -> ObjectId -> Duration.Duration -> Maybe DamageKind.DamageKind -> DamageRewrite.DamageRewrite -> Maybe PreventionRider.PreventionRider -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> (Maybe Recipient, Maybe (Filter.Type.Filter Keyword.Type.Keyword, ObjectId)) -> GameState
-installDamageRow players controller source duration kind rewrite rider printed g (recipient, sourceChoice) = case Expiry.arm players controller source duration g of
+installDamageRow :: Map.Map SlotName PlayerId -> PlayerId -> ObjectId -> Duration.Duration -> Maybe DamageKind.DamageKind -> DamageRewrite.DamageRewrite -> Maybe PreventionRider.PreventionRider -> Filter.Type.Filter Keyword.Type.Keyword -> (Maybe (Filter.Type.Filter Keyword.Type.Keyword), Maybe PlayerRelation.PlayerRelation) -> GameState -> (Maybe Recipient, Maybe (Filter.Type.Filter Keyword.Type.Keyword, ObjectId)) -> GameState
+installDamageRow players controller source duration kind rewrite rider printed describedRecipient g (recipient, sourceChoice) = case Expiry.arm players controller source duration g of
   -- CR 611.2b: the duration never started, so no shield is installed.
   Nothing -> g
   Just expiry ->
@@ -2734,10 +2744,15 @@ installDamageRow players controller source duration kind rewrite rider printed g
                           DamagePattern.whatSource = case filter (/= Filter.Type.And []) (printed : Maybe.maybeToList (fmap fst sourceChoice)) of
                             [only] -> only
                             named -> Filter.Type.And named,
-                          -- The recipient is BAKED below rather than described:
-                          -- the resolution has already chosen it, or the row
-                          -- names none and covers every recipient.
-                          DamagePattern.whatRecipient = Nothing,
+                          -- CR 611.2c's DESCRIBED recipient side, disjoined on the
+                          -- pattern: a shield covering "you and/or permanents you
+                          -- control" is read live at each damage event, since a
+                          -- prevention effect changes no characteristic and no
+                          -- controller and so reaches objects it did not reach
+                          -- when it began. Both halves are Nothing for a row
+                          -- whose recipient the resolution BAKED below instead.
+                          DamagePattern.whatRecipient = fst describedRecipient,
+                          DamagePattern.whoRecipient = snd describedRecipient,
                           DamagePattern.whichRecipient = recipient,
                           -- CR 609.7a's chosen source or CR 601.2c's targeted
                           -- one, baked for the recipient's reason -- both were
@@ -2798,23 +2813,111 @@ chooseDamageSource controller resolving context gs filter_ = case filter_ of
           pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
       pure (Just (f, picked))
 
--- CR 609.7a's candidate set: "a permanent; a spell on the stack (including a
--- permanent spell); ... or a face-up object in the command zone", narrowed to the
--- properties the card printed. Read off the PROJECTION, so a permanent that is a
--- red source only by a continuous effect is a candidate.
+-- CR 609.7a's candidate set, its four classes in the rule's own order: "a
+-- permanent; a spell on the stack (including a permanent spell); any object
+-- referred to by an object on the stack, by a replacement or prevention effect
+-- that's waiting to apply, or by a delayed triggered ability that's waiting to
+-- trigger (even if that object is no longer in the zone it used to be in); or a
+-- face-up object in the command zone", narrowed to the properties the card
+-- printed.
 --
--- ASCENDING, so both the single-candidate shortcut and a transcript are
--- deterministic -- Pawl.Engine.Blight's posture.
+-- SPELLS on the stack, not the whole zone: the rule says "a spell", and an
+-- activated or triggered ability sharing that zone falls under none of the four
+-- classes -- it is not a permanent, not a spell, not in the command zone, and
+-- nothing refers to it. Game.isSpell asks the object's zone and its KIND, never which
+-- card it is -- the same reader ObjectRef.EachSpell above narrows with under CR
+-- 109.2b, where the CR 405.1 arm beside it takes the whole zone instead.
 --
--- Not implemented: rule 609.7a's third class, "any object referred to by an
--- object on the stack, by a replacement or prevention effect that's waiting to
--- apply, or by a delayed triggered ability that's waiting to trigger", which
--- narrows the choice a player is offered (#1904).
+-- Read off the PROJECTION, so a permanent that is a red source only by a
+-- continuous effect is a candidate -- with CR 608.2h's fallback onto last known
+-- information, since the third class admits an object "no longer in the zone it
+-- used to be in" and a departed id projects blank. Exactly the pair
+-- Pawl.Engine.Replacement.matchesDamageSource rechecks with under CR 609.7b, so
+-- the choice and the recheck cannot read one source two ways.
+--
+-- That fallback is a REGRESSION FENCE rather than a proven behaviour: every card
+-- in data/cards/ naming a chosen source writes a trivial filter, which admits a
+-- blank view as readily as a filled one, so replacing the pair with the bare
+-- viewOfObject leaves the whole suite green (#2480).
+--
+-- DEDUPED, the classes overlapping wherever a spell's living target is also a
+-- permanent, and ASCENDING out of the same Set, so both the single-candidate
+-- shortcut and a transcript are deterministic -- Pawl.Engine.Blight's posture.
 damageSourceCandidates :: Filter.Context -> GameState -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 damageSourceCandidates context gs filter_ =
   let faceUp oid = fmap Object.facing (Game.lookupObject oid gs) == Just Facing.FaceUp
-      pool = Set.toList (GameState.battlefield gs) <> GameState.stack gs <> filter faceUp (Set.toList (GameState.command gs))
-   in List.sort (filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_) pool)
+      viewOf oid = Maybe.fromMaybe (Projection.viewOfObject oid gs) (Projection.viewWithLastKnownAnywhere gs oid)
+      pool =
+        Set.fromList
+          ( Set.toList (GameState.battlefield gs)
+              <> filter (\oid -> Game.isSpell oid gs) (GameState.stack gs)
+              <> referredToSources gs
+              <> filter faceUp (Set.toList (GameState.command gs))
+          )
+   in filter (\oid -> Filter.matches context (viewOf oid) filter_) (Set.toAscList pool)
+
+-- CR 609.7a's third class, off the three carriers the sentence names: every
+-- object on the stack, every row of GameState.replacements waiting to apply, and
+-- every entry of GameState.delayedTriggers waiting to trigger. What each REFERS
+-- TO is the object it names as its source plus the objects its bindings or slots
+-- hold -- Ghitu Fire-Eater's ability naming the creature its own cost
+-- sacrificed, a shield naming "that creature", a delayed trigger naming "it".
+--
+-- The SOURCE counts as a referent for all three: CR 113.7a says an ability that
+-- causes a source to do something checks that source's information when it
+-- resolves, and a waiting row's own condition and pattern are evaluated in a
+-- Filter.Context built on its source (Pawl.Engine.Replacement.collect), so each
+-- of the three can genuinely name it.
+--
+-- NO ZONE TEST anywhere in here, which is the clause's point: an id that names
+-- nothing is exactly the case the parenthesis admits, and damageSourceCandidates
+-- reads it through CR 608.2h's last known information rather than through the
+-- blank view a live-only projection gives.
+--
+-- Only the STACK half has a card behind it -- Pawl.ReplacementSpec's "a source
+-- only a waiting ability still refers to is offered", Ghitu Fire-Eater under
+-- Auriok Replica. The replacement-row and delayed-trigger halves are REGRESSION
+-- FENCES: neutralizing either leaves the whole suite green, no board in
+-- data/cards/ putting such an object in front of a chooser. They are written
+-- because rule 609.7a's one sentence names all three carriers (#2479).
+referredToSources :: GameState -> [ObjectId]
+referredToSources gs =
+  foldMap (\oid -> foldMap referentsOfObject (Game.lookupObject oid gs)) (GameState.stack gs)
+    <> foldMap (\row -> ActiveReplacement.source row : foldMap Set.toList (ActiveReplacement.slots row)) (GameState.replacements gs)
+    <> foldMap (\entry -> DelayedTrigger.source entry : referentsOfBindings (DelayedTrigger.bindings entry)) (GameState.delayedTriggers gs)
+
+-- What one object on the stack refers to: its CR 113.7 source object, and every
+-- object its bindings name.
+referentsOfObject :: Object.Object -> [ObjectId]
+referentsOfObject obj = sourceObjectOf (Object.source obj) <> referentsOfBindings (Object.bindings obj)
+
+-- The object a Source names, and TOTAL over all seven arms rather than two and a
+-- wildcard: a future arm that names an object owes this list a line, and `_`
+-- would swallow it. Only the two on-stack ability arms name one -- CR 113.7's
+-- "the object whose ability was activated" and "the object whose ability
+-- triggered". The four card-shaped arms ARE the object rather than naming
+-- another, and CR 725.2's inherent trigger has no object source at all, which is
+-- the whole of what distinguishes it from OfTrigger.
+sourceObjectOf :: Source.Source -> [ObjectId]
+sourceObjectOf src = case src of
+  Source.OfCard _ -> []
+  Source.OfToken _ -> []
+  Source.OfAbility a -> [ActivatedAbilitySource.source a]
+  Source.OfTrigger t -> [TriggeredAbilitySource.source t]
+  Source.OfEmblem _ -> []
+  Source.OfSpellCopy _ -> []
+  Source.OfInherentTrigger _ -> []
+
+-- Every object a binding environment names, both shapes: the one object a target
+-- slot holds (CR 601.2c) and every member of a group a clause defines without
+-- targeting it (CR 115.10a). Not Pawl.Engine.Binding.slotObjects, which narrows a
+-- multi-target slot away through `onlyOne` -- a spell that targets two creatures
+-- refers to both of them, and CR 609.7a asks for every object referred to.
+-- Player recipients drop out, the rule's classes all being objects.
+referentsOfBindings :: Map.Map SlotName Binding.Type.Binding -> [ObjectId]
+referentsOfBindings bindings =
+  foldMap (Maybe.mapMaybe Recipient.objectOf . Set.toList) (Binding.targetsOf bindings)
+    <> foldMap Foldable.toList (Binding.groupsOf bindings)
 
 -- The context every effect of a resolution evaluates its quantities and its
 -- ref-borne filters in: CR 109.5's "you" is the resolving controller, the source
@@ -3690,6 +3793,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- passes as both, and differ for an ability, whose source is the permanent it
   -- came from (CR 113.7) -- so binding onto `source` left an ability's follow-on
   -- reading an unbound slot; see #137.
+  --
+  -- That object may not survive the subgame it started: CR 729.4 offers the main
+  -- game's stack to a wish cast inside, so the subgame can take this very spell's
+  -- card. bindPlayerSlot files the winner off-object when that has happened and
+  -- liveBindings reads it back, which is CR 729.5's "finishes resolving, even if
+  -- it was created by a spell card that's no longer on the stack".
   Effect.PlaySubgame slot -> do
     result <- runSubgame
     case result of
@@ -5282,18 +5391,31 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         ActiveReplacement.slots = Filter.slotObjects context
                       }
                in gs1 {GameState.replacements = active : GameState.replacements gs1}
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref sourceFilter quantity riderEffects) -> do
-    -- CR 615.3 / 615.7: install one floating prevention shield per recipient the
-    -- ref names, consulted at the damage funnel until the shield is spent or the
-    -- duration expires. Its own opcode rather than an Effect.Replace carrying a
-    -- DamageR, because the pattern has to name the shielded permanent or player
-    -- by id, which card data cannot. Through Damage.damageRecipient, so the baked
-    -- recipient is in the same vocabulary a DamageEvent's target arrives in (CR
-    -- 120.1a).
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref whatRecipient whoRecipient sourceFilter quantity riderEffects) -> do
+    -- CR 615.3 / 615.7: install a floating prevention shield, consulted at the
+    -- damage funnel until it is spent or the duration expires. Its own opcode
+    -- rather than an Effect.Replace carrying a DamageR, because the pattern has
+    -- to name the shielded permanent or player by id, which card data cannot.
+    -- Through Damage.damageRecipient, so the baked recipient is in the same
+    -- vocabulary a DamageEvent's target arrives in (CR 120.1a).
+    --
+    -- ONE ROW PER NAMED RECIPIENT, but only ONE ROW ALTOGETHER for a card that
+    -- DESCRIBES its recipients instead (Divine Deflection's "you and/or
+    -- permanents you control"): CR 615.7's shield counts damage rather than
+    -- events or recipients, so a described set shares one pool, where the
+    -- recipients a resolution named each got their own shield. A card writing
+    -- both spellings is read as the description alone, since the described row
+    -- already covers whatever it admits and a second row would be a second
+    -- shield the card never printed.
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
-        recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs ref)
+        describedRecipient = (whatRecipient, whoRecipient)
+        described = Maybe.isJust whatRecipient || Maybe.isJust whoRecipient
+        recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (foldMap (objectRefRecipients legal resolving controller source gs) ref)
+        -- The recipient each row this resolution installs bakes: one row naming
+        -- nobody for a described shield, and one per named recipient otherwise.
+        rows = if described then [Nothing] else fmap Just recipients
         -- CR 615.5: the additional effect, BAKED onto the row with this
         -- resolution's chosen targets and CR 109.5's "you".
         rider =
@@ -5314,9 +5436,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       Just n ->
         -- CR 615.7: a shield of 0 can prevent nothing, so none is installed --
         -- and neither is CR 609.7a's choice raised, a choice existing only to be
-        -- baked into a row. The recipients are asked for the same reason: CR
-        -- 608.2b's gone target leaves none, so there is nothing to shield.
-        Monad.when (n > 0 && not (null recipients)) $ do
+        -- baked into a row. The rows are counted for the same reason: CR 608.2b's
+        -- gone target leaves a named shield no recipient, so there is nothing to
+        -- shield. A DESCRIBED shield always has its one row, its recipients being
+        -- read at the damage event rather than settled here.
+        Monad.when (n > 0 && not (null rows)) $ do
           -- CR 609.7a: "the source is chosen when the effect is created", so the
           -- choice is made ONCE here and every shield this resolution installs
           -- watches the object it landed on.
@@ -5330,7 +5454,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             _ ->
               State.modify' $ \g0 ->
                 let amount = Integer.toNaturalSaturating n
-                 in List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind (DamageRewrite.PreventNext amount) rider (Filter.Type.And [])) g0 (fmap (\recipient -> (Just recipient, sourceChoice)) recipients)
+                 in List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind (DamageRewrite.PreventNext amount) rider (Filter.Type.And []) describedRecipient) g0 (fmap (\recipient -> (recipient, sourceChoice)) rows)
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref direction sourceFilter printedSource riderEffects) -> do
     -- CR 615.1 / 615.3: one floating shield per object the ref names, with no
     -- amount to count down. PreventNextDamage's row but for its rewrite, hence
@@ -5379,7 +5503,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- name, so they are threaded on this side too; every by-direction card in
       -- data/cards/ leaves them trivial.
       DamageDirection.DealtBy ->
-        State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind DamageRewrite.PreventAll rider printedSource) g0 (fmap (\oid -> (Nothing, Just (Filter.Type.And [], oid))) (Maybe.mapMaybe Recipient.objectOf named))
+        State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind DamageRewrite.PreventAll rider printedSource (Nothing, Nothing)) g0 (fmap (\oid -> (Nothing, Just (Filter.Type.And [], oid))) (Maybe.mapMaybe Recipient.objectOf named))
       DamageDirection.DealtTo ->
         -- No recipient is CR 608.2b's gone target, so there is nothing to shield
         -- and CR 609.7a's choice -- a choice existing only to be baked into a
@@ -5395,7 +5519,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- stricter than printed rather than weaker, which a row watching
             -- every source would be.
             (Just _, Nothing) -> pure ()
-            _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind DamageRewrite.PreventAll rider printedSource) g0 (fmap (\recipient -> (Just recipient, sourceChoice)) recipients)
+            _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind DamageRewrite.PreventAll rider printedSource (Nothing, Nothing)) g0 (fmap (\recipient -> (Just recipient, sourceChoice)) recipients)
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind srcRef destRef sourceFilter) -> do
     -- CR 614.9: install a floating redirection effect. BOTH sides are baked here,
     -- both being known only at resolution: the source side into
@@ -5428,7 +5552,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- than printed rather than weaker, which a row watching every source
             -- would be.
             (Just _, Nothing) -> pure ()
-            _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind (DamageRewrite.Redirect dest) Nothing (Filter.Type.And [])) g0 (fmap (\recipient -> (Just recipient, sourceChoice)) redirected)
+            _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind (DamageRewrite.Redirect dest) Nothing (Filter.Type.And []) (Nothing, Nothing)) g0 (fmap (\recipient -> (Just recipient, sourceChoice)) redirected)
       _ -> pure ()
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase ref selector) -> do
     -- CR 614.1b: "skip" is a replacement effect, installed floating because a
@@ -6824,10 +6948,55 @@ noSubgame = pure Result.Drawn
 -- resolution loops re-read before each effect: CR 729.1b's subgame winner and CR
 -- 608.2d's chosen opponent are each read by the effect after the one that bound
 -- it, through that re-read (`legalNow`).
+--
+-- A holder that no longer EXISTS writes to GameState.detachedBindings instead,
+-- which `liveBindings` reads back. Map.adjust is silent on a missing key, so
+-- without that branch the binding is simply dropped.
+--
+-- CR 729.5 is the branch's reason: a wish cast inside a subgame can take the
+-- resolving spell's own card, and "the spell or ability that created the subgame
+-- finishes resolving, even if it was created by a spell card that's no longer on
+-- the stack" is what keeps the resolution going anyway. It is not the only way an
+-- id can cease mid-resolution -- Effect.ExileThisSpell mints a fresh incarnation
+-- (CR 400.7) and leaves the old id naming nothing too -- and the read side treats
+-- both the same.
+--
+-- The sibling writers below are NOT given the same fallback. bindPlayersSlot's
+-- one caller is CR 118.12a's per-player gate, which cannot lose its holder.
+-- bindAmountSlot writes onto `source`, which for a SPELL is the same id a subgame
+-- can take, but an amount is read back by Pawl.Engine.Quantity's own lookup
+-- rather than through liveBindings, so a fallback here would not reach it
+-- (#2493).
 bindPlayerSlot :: ObjectId -> SlotName -> PlayerId -> GameState -> GameState
 bindPlayerSlot holder slot player gs =
-  let put obj = obj {Object.bindings = Map.insert slot (Binding.toPlayer player) (Object.bindings obj)}
-   in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+  let binding = Binding.toPlayer player
+      put obj = obj {Object.bindings = Map.insert slot binding (Object.bindings obj)}
+   in if Map.member holder (GameState.objects gs)
+        then gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+        else gs {GameState.detachedBindings = Map.insertWith Map.union holder (Map.singleton slot binding) (GameState.detachedBindings gs)}
+
+-- CR 608.2c: the bindings a resolution reads before each of its own effects --
+-- the LIVE ones off the stack object, so a slot an earlier effect DEFINED is
+-- visible to a later one. `obj` is the object as resolution began, the fallback
+-- for the reads below.
+--
+-- CR 729.5 is why the fallback is not just that snapshot: "the spell or ability
+-- that created the subgame finishes resolving, even if it was created by a spell
+-- card that's no longer on the stack". A wish cast INSIDE a subgame may name the
+-- very spell that is resolving -- CR 729.4 puts the main game's stack outside the
+-- subgame -- and Pawl.Engine.Setup.applyCrossings then deletes that object before
+-- the resolution resumes. What it bound meanwhile is in
+-- GameState.detachedBindings, and takes precedence over the announced bindings
+-- the snapshot carries.
+--
+-- Not implemented: the readers that look the resolving object up by id rather
+-- than coming through here -- Pawl.Engine.Count.playersFor's EachPlayerExcept
+-- arm and Pawl.Engine.Quantity's InSlot arm -- stay unanswered on that path
+-- (#2493).
+liveBindings :: Object.Object -> ObjectId -> GameState -> Map SlotName Binding.Type.Binding
+liveBindings obj oid gs = case Game.lookupObject oid gs of
+  Just live -> Object.bindings live
+  Nothing -> Map.union (Map.findWithDefault Map.empty oid (GameState.detachedBindings gs)) (Object.bindings obj)
 
 -- bindPlayerSlot's plural: bind SEVERAL players a resolution named into `slot` on
 -- `holder`. CR 118.12a's per-player gate is the one caller, and the set is

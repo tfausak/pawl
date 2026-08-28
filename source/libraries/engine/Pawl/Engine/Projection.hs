@@ -399,20 +399,30 @@ applyModification viewOf src gs oid unitTypes m pc =
         -- 702's minted abilities are built after this fold, so the pair is
         -- recorded in PC.subtypeWordChanges for the mint, in CR 613.1 order.
         --
+        -- The REWRITTEN counts also go to PC.textChangedKeywords, which is what
+        -- CR 612.3 costs: the mint has to tell the instances layer 3 reached from
+        -- the ones layer 6 grants afterwards. Taken here rather than beside the
+        -- mint so it lands after the key remap above -- a snapshot of the
+        -- pre-remap keys would miss a keyword whose own payload carries a subtype.
+        -- Later text changes overwrite it, which is right: layer 3 finishes before
+        -- layer 6 begins, so the last one holds the counts every grant follows.
+        --
         -- rewriteWithCounters below guards the same hazard on an ENTRY ROW's
         -- counter kinds, where the values are Quantities and the combiner is
         -- Quantity.Plus rather than (+).
         --
         Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to) ->
           let pairs = [(from, to)]
+              keywords = Map.mapKeysWith (+) (Filter.rewriteKeyword pairs) (PC.keywords pc)
               pc' =
                 pc
-                  { PC.keywords = Map.mapKeysWith (+) (Filter.rewriteKeyword pairs) (PC.keywords pc),
+                  { PC.keywords = keywords,
                     PC.activatedAbilities = fmap (rewriteActivatedAbility pairs) (PC.activatedAbilities pc),
                     PC.triggeredAbilities = fmap (rewriteTriggeredAbility pairs) (PC.triggeredAbilities pc),
                     PC.replacementEffects = fmap (rewritePrintedReplacement pairs) (PC.replacementEffects pc),
                     PC.characteristicPT = fmap (rewriteCharacteristicPT pairs) (PC.characteristicPT pc),
-                    PC.subtypeWordChanges = PC.subtypeWordChanges pc <> [ChangeSubtypeWord.MkChangeSubtypeWord from to]
+                    PC.subtypeWordChanges = PC.subtypeWordChanges pc <> [ChangeSubtypeWord.MkChangeSubtypeWord from to],
+                    PC.textChangedKeywords = keywords
                   }
            in if Set.member from (PC.subtypes pc')
                 then pc' {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc'))}
@@ -567,6 +577,13 @@ setPT base new = case (base, new) of
   (Nothing, Nothing) -> Nothing
 
 -- Layer 7c adds; an unevaluable delta leaves the value, a land stays without.
+--
+-- The (Nothing, _) arm is CR 208.3a's noncreature permanent, whose premise is
+-- the other one: noncreaturePT runs at the END of the fold, so a noncreature's
+-- mid-fold power is still its printed one and only an object with no printed box
+-- reaches here. A CREATURE with no power is rule 208.5's premise instead, and
+-- projectDeciding's noValueAt has already substituted its 0 by the time layer 7c
+-- runs, so no creature reaches this arm.
 addPT :: Maybe Integer -> Maybe Integer -> Maybe Integer
 addPT base delta = case (base, delta) of
   (Just b, Just d) -> Just (b + d)
@@ -745,10 +762,19 @@ powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
 -- HOST is read at this same bound, and so are the permanents attached TO it,
 -- which keeps a Filter.AttachedTo or Filter.HasAttached reached from inside the
 -- fold out of a loop.
+--
+-- CR 208.5's substituted 0 rides along through noValueAt, which is what makes
+-- this reader agree with the finished fold's projectFrom, and with
+-- projectDeciding's running board, about a creature whose only source of a P/T
+-- value was stripped. That call is a REGRESSION FENCE and not a proven
+-- behaviour: mutating it away left the suite green (2026-08-27), no board in
+-- data/cards reaching a no-value creature through this reader rather than
+-- through the running board, where Pawl.PowerToughnessSpec's Synthetic Withering
+-- Comparison case proves it.
 viewUpTo :: Layer -> [Gathered] -> GameState -> Count.ViewOf
 viewUpTo bound cands gs oid =
   if Map.member oid (GameState.objects gs)
-    then Just (viewOfCharacteristics (viewUpTo bound cands gs) oid (projectUpTo bound cands oid gs) (controllerOf oid gs) (countersOf oid gs) gs)
+    then Just (viewOfCharacteristics (viewUpTo bound cands gs) oid (noValueAt bound (projectUpTo bound cands oid gs)) (controllerOf oid gs) (countersOf oid gs) gs)
     else Nothing
 
 -- The characteristics view of a printed card, from the FACE alone. The axes that
@@ -843,6 +869,10 @@ viewOfCard face =
           -- with no object behind it -- the rule's own answer rather than an
           -- unknown, `transformed` below's reason one status category over.
           Filter.faceDown = False,
+          -- CR 406.3 writes its rider onto an object in exile, and this is a
+          -- printed FACE with no object behind it -- the line above's reason,
+          -- one rule over.
+          Filter.exiledFaceDown = False,
           -- CR 701.27g asks about a permanent on the battlefield; this is a
           -- printed FACE with no object behind it, so the rule's own answer is
           -- False rather than an unknown.
@@ -1050,6 +1080,12 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- the atom today is already scoped to the battlefield, so dropping the
       -- conjunct leaves the suite green.
       Filter.faceDown = Set.member oid (GameState.battlefield gs) && maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs),
+      -- CR 406.3's rider, and the only site that fills the field. NO zone
+      -- conjunct beside it, unlike the line above: Object.exiledFaceDown is
+      -- per-incarnation state that only the move into exile writes, and CR 400.7
+      -- mints a fresh incarnation on the way out, so the object it is True of is
+      -- in exile by construction.
+      Filter.exiledFaceDown = maybe False Object.exiledFaceDown (Game.lookupObject oid gs),
       -- CR 701.27g's three conjuncts, and the only site that fills the field. The
       -- face is read CURRENT -- Game.isFrontFaceUp reads Object.face, never the
       -- Object.turnedOverAt beside it -- which is the rule's first exclusion, a
@@ -1226,7 +1262,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.replacementEffects = [],
         PC.triggeredAbilities = [],
         PC.enchant = [],
-        PC.subtypeWordChanges = []
+        PC.subtypeWordChanges = [],
+        PC.textChangedKeywords = Map.empty
       }
   Just face ->
     -- The seed predates every layer, so it can describe no object: every view is
@@ -1298,7 +1335,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             -- a face-down permanent with none.
             PC.enchant = Face.enchant face,
             -- The seed is CR 613.1's starting point, before layer 3 has run.
-            PC.subtypeWordChanges = []
+            PC.subtypeWordChanges = [],
+            PC.textChangedKeywords = Map.empty
           }
 
 -- CR 202.2 / 204.2 / 202.2b: an object's printed colours, from its mana cost's
@@ -1863,7 +1901,7 @@ rewritePlayerEffect pairs effect = case effect of
   -- the printed road, and Liliana, Untouched by Death's "Zombie spells" does on
   -- the stored one.
   PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f n) -> PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.rewrite pairs f) n)
-  PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f n) -> PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost (Filter.rewrite pairs f) n)
+  PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f kind n) -> PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost (Filter.rewrite pairs f) kind n)
   PlayerEffect.ReduceSpellCost x -> PlayerEffect.ReduceSpellCost x {ReduceSpellCost.whichSpells = Filter.rewrite pairs (ReduceSpellCost.whichSpells x)}
   -- TWO Filters of its own, and both descend. The second names
   -- what the ability targets (Dwarven Mauler's "that target this creature",
@@ -1901,6 +1939,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.SpendManaAsThough _ -> effect
   PlayerEffect.CantBeTargetedBy _ -> effect
   PlayerEffect.DamageCantBePrevented _ -> effect
+  PlayerEffect.DamageCantBeRedirected _ -> effect
   PlayerEffect.CantSearchLibraries -> effect
   PlayerEffect.CantBecomeMonarch -> effect
   PlayerEffect.CastOnlyAtSorcerySpeed -> effect
@@ -2013,8 +2052,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Replace {} -> effect
   Effect.SkipNextPhase {} -> effect
   -- CR 612.1: a rider's text is as changeable as any other.
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref chosenSource quantity rider) ->
-    Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage (rewriteDuration pairs duration) kind ref chosenSource quantity (fmap (rewriteEffect pairs) rider))
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref whatRecipient whoRecipient chosenSource quantity rider) ->
+    Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage (rewriteDuration pairs duration) kind ref whatRecipient whoRecipient chosenSource quantity (fmap (rewriteEffect pairs) rider))
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref direction chosenSource whatSource rider) ->
     Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage (rewriteDuration pairs duration) kind ref direction chosenSource whatSource (fmap (rewriteEffect pairs) rider))
   Effect.RedirectDamage {} -> effect
@@ -3664,6 +3703,9 @@ filterReads f = case f of
   -- CR 110.5a again, one status category over: face-up/face-down is not a
   -- characteristic either, so no layer writes it.
   Filter.Type.IsFaceDown -> Set.empty
+  -- CR 406.3a leaves a face-down exiled card no characteristics at all, so
+  -- being one is not a characteristic either and no layer writes it.
+  Filter.Type.IsExiledFaceDown -> Set.empty
   -- Reads nothing: CR 712.8d/e make which face is up the thing characteristics
   -- are read OFF rather than one of them, so no Modification writes Object.face.
   Filter.Type.Transformed -> Set.empty
@@ -3914,11 +3956,14 @@ project oid gs = projectFrom (gather gs) oid gs
 -- can strip it first, and evaluated against the current state.
 --
 -- Folded in place rather than emitted as a synthetic Gathered: gather runs
--- BEFORE the fold and has no partial to read; CR 604.3 / 208.2a make a CDA
--- function in all zones while gather walks the battlefield only; a CDA has no
--- source and no timestamp to sort on under CR 613.7; and this one is DYNAMIC,
--- CR 707.2 making a copy recompute from the printed text rather than freeze a
--- number into Binding.copy at entry.
+-- BEFORE the fold and has no partial to read, and layer 6 is what decides
+-- whether the object still HAS the ability; CR 604.3 / 208.2a make a CDA
+-- function in all zones while gather walks the battlefield only; Gathered
+-- records a timestamp only for a gathered candidate, so there is none here to
+-- sort on -- an implementation fact and not a rules one, CR 604.3 making a CDA a
+-- static ability and CR 613.7a giving it the timestamp of the object it is on;
+-- and this one is DYNAMIC, CR 707.2 making a copy recompute from the printed
+-- text rather than freeze a number into Binding.copy at entry.
 --
 -- Quantity.determine rather than setPT, because CR 208.2a makes a CDA always
 -- produce a number: a creature whose CDA cannot be determined is a 0/0 that CR
@@ -3929,7 +3974,7 @@ project oid gs = projectFrom (gather gs) oid gs
 --
 -- Not implemented: CR 613.8a's clause (c) lets two CDAs depend on each other, so
 -- a CDA counting a characteristic another CDA defines sees the printed value
--- instead (#1332).
+-- instead (#2482).
 applyCharacteristicPT :: Count.ViewOf -> GameState -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyCharacteristicPT viewOf gs oid pc = case PC.characteristicPT pc of
   Nothing -> pc
@@ -3984,7 +4029,10 @@ projectDeciding admits cands = forObject
     countsItsOwnLayer c = not (Set.disjoint (modificationReads (gModification c)) (Map.findWithDefault Set.empty (gLayer c) writesByLayer))
     forObject oid gs =
       let applyLayer (partial, decided) lyr =
-            let -- What a Count sees when nothing at this layer can move it: the
+            let -- This layer's candidates, shared by the three readers below that
+                -- ask for them.
+                here = filter (\c -> gLayer c == lyr) cands
+                -- What a Count sees when nothing at this layer can move it: the
                 -- layers strictly below (CR 613.1).
                 bounded = viewUpTo lyr cands gs
                 -- CR 613.3: characteristic-defining abilities first, within the
@@ -3995,7 +4043,27 @@ projectDeciding admits cands = forObject
                   Layer.Color -> applyColorDefining p
                   Layer.CharacteristicPT -> applyCharacteristicPT bounded gs o p
                   _ -> p
-                seeded = seedFor oid partial
+                -- CR 208.5 on the PROJECTED object's own running partial, at the
+                -- same sublayer gate viewOfBoard and viewUpTo read it through: a
+                -- creature whose only source of a P/T value CR 305.7 stripped is a
+                -- 0 from layer 7b on, so CR 613.4c's modification has something to
+                -- add to instead of being discarded (addPT's Nothing arm). Nothing
+                -- in rule 613 makes a layer-7c modification skip such a creature.
+                --
+                -- Substituting into the accumulator rather than at each reader is
+                -- what makes the object agree with itself: the final noValuePT
+                -- would otherwise answer 0 for a creature the fold had already
+                -- thrown a modification away for.
+                --
+                -- The SUBLAYER GATE here is a regression fence, not a proven
+                -- behaviour: seedFor has already run applyCharacteristicPT by the
+                -- time layer 7a reaches this, so widening the bound to noValueAt
+                -- Layer.SwitchPT -- substituting from layer 4 on -- left the whole
+                -- suite green (2026-08-27). It is `lyr` so that the accumulator
+                -- and the two views that read it (viewUpTo, viewOfBoard) cannot
+                -- drift on the same question. The substitution ITSELF is proved by
+                -- Pawl.PowerToughnessSpec's Glorious Anthem case.
+                seeded = noValueAt lyr (seedFor oid partial)
                 -- CR 613.6: the affected set is asked ONCE per effect, at the
                 -- lowest layer it reaches, and remembered for its other layers.
                 -- Object-parameterised, like applyUnit and applyOne below: the
@@ -4038,15 +4106,25 @@ projectDeciding admits cands = forObject
                 --
                 -- Not implemented: a snapshot carries CR 208.3's noncreature P/T
                 -- gate, which the projected object's mid-fold partial does not
-                -- (#1111); nor are objects outside the battlefield scanned, so a
-                -- MatchingAnywhere dependency in another zone is missed (#1112).
+                -- (#1111).
                 snapshot o =
                   let (p, d) = projectDeciding (\l -> admits l && l < lyr) cands o gs
                    in (seedFor o p, d)
                 -- Keyed rather than an association list, because resolve's ViewOf
                 -- looks an object up once per candidate a Count folds over.
                 -- WHNF-strict only, so the snapshots stay lazy.
-                otherBoards = Map.fromSet snapshot (Set.delete oid (GameState.battlefield gs))
+                --
+                -- CR 613.8a asks its question over an effect's whole affected
+                -- SET, and CR 613.1 names no zone, so the range is the battlefield
+                -- plus every object this layer's candidates can reach --
+                -- MatchingAnywhere, MatchingOffBattlefield and TheseObjects all
+                -- reach out of it. Narrowed to THIS layer's candidates, and
+                -- narrowed to their affected sets: an object no same-layer effect
+                -- applies to has the same state on the running board as under the
+                -- bound, so scanning it could not change an answer, and paying for
+                -- every library card on every board would.
+                reachable = Set.unions (GameState.battlefield gs : fmap (\c -> candidatesFor (gAffected c) gs) here)
+                otherBoards = Map.fromSet snapshot (Set.delete oid reachable)
                 -- CR 613.8b: an effect that depends on another waits for it, and
                 -- CR 613.7 timestamp order picks the next among those waiting on
                 -- nothing. Re-deriving `ready` each round IS CR 613.8c, and
@@ -4070,22 +4148,17 @@ projectDeciding admits cands = forObject
                         -- the layers below AND this layer's effects that have
                         -- already applied. No recursion, so nothing here has to
                         -- terminate. An object with no entry falls back to the
-                        -- bounded view, and noncreaturePT is CR 208.3, applied so
-                        -- the two agree. Another OBJECT is read off the running
-                        -- board too (CR 701.3a / CR 613.1).
+                        -- bounded view, and noncreaturePT (CR 208.3) and noValueAt
+                        -- (CR 208.5) are applied so the two agree. Another OBJECT
+                        -- is read off the running board too (CR 701.3a / CR
+                        -- 613.1). What still falls back is an id outside every
+                        -- same-layer candidate's affected set, which no effect at
+                        -- this layer has been applied to -- see reachable above.
                         --
-                        -- Not implemented: an object off the running board is
-                        -- projected but not scanned here, so a count reading a
-                        -- same-layer effect on one still gets the bound (#1332).
-                        -- A Tale for the Ages DOES put CR 303.4b's attachment
-                        -- atom in a CR 613.8-movable layer, its affected set
-                        -- being Matching -- but the reader is still unobserved:
-                        -- mutating it to `fullView` leaves the suite green,
-                        -- because no board in the pool makes a bounded view and
-                        -- a full one disagree here, and none loops. The CR
-                        -- 702.178a gate is not reached at all (gap #1757).
+                        -- The CR 702.178a gate A Tale for the Ages puts in a CR
+                        -- 613.8-movable layer is not reached at all (gap #1757).
                         viewOfBoard board o = case Map.lookup o board of
-                          Just (p, _) -> Just (viewOfCharacteristics (viewOfBoard board) o (noncreaturePT o gs p) (controllerOf o gs) (countersOf o gs) gs)
+                          Just (p, _) -> Just (viewOfCharacteristics (viewOfBoard board) o (noValueAt lyr (noncreaturePT o gs p)) (controllerOf o gs) (countersOf o gs) gs)
                           Nothing -> bounded o
                         view = viewOfBoard running
                         -- Every object CR 613.8a's question ranges over, the
@@ -4173,7 +4246,7 @@ projectDeciding admits cands = forObject
                     | gLayer c /= lyr || Map.member k ds -> ds
                     | otherwise -> Map.insert k (affectsGiven bounded (gSource c) oid (gAffected c) seeded gs) ds
              in if movableHere
-                  then resolve (seeded, decided) otherBoards (zip [0 :: Int ..] (effectUnits (filter (\c -> gLayer c == lyr) cands)))
+                  then resolve (seeded, decided) otherBoards (zip [0 :: Int ..] (effectUnits here))
                   else
                     -- Nothing here can be moved, so no candidate depends on any
                     -- other: CR 613.8 says nothing, CR 613.7 timestamp order
@@ -4193,7 +4266,7 @@ projectDeciding admits cands = forObject
                         applies c = case gEffect c of
                           Nothing -> affectsGiven bounded (gSource c) oid (gAffected c) seeded gs
                           Just k -> Map.findWithDefault False k decided'
-                        ordered = effectUnits (List.sortOn gTimestamp (filter (\c -> gLayer c == lyr && applies c) cands))
+                        ordered = effectUnits (List.sortOn gTimestamp (filter applies here))
                      in (List.foldl' (applyUnit bounded oid) seeded ordered, decided')
           (folded, decisions) = List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers
        in (noncreaturePT oid gs folded, decisions)
@@ -4226,14 +4299,24 @@ noValuePT pc
           PC.toughness = Just (Maybe.fromMaybe 0 (PC.toughness pc))
         }
 
+-- noValuePT at a projection bounded to the layers BELOW `bound` -- what a Count
+-- reads mid-fold, and what the fold's own accumulator holds as layer `bound`
+-- begins. "Has no value" is answerable exactly once CR 613.4a's
+-- sublayer has run: below layer 7a every star creature is legitimately without
+-- a value and substituting 0 there would report it for all of them, while from
+-- 7b on the question is settled and CR 208.5 answers it -- a creature whose CDA
+-- CR 305.7 stripped is a 0, not a blank, to anything counting it.
+--
+-- Layer's derived Ord is CR 613.1's order, so the comparison is the sublayer
+-- test. The precedent is noncreaturePT, CR 208.3's sibling, which the mid-fold
+-- readers already apply.
+noValueAt :: Layer -> ProjectedCharacteristics -> ProjectedCharacteristics
+noValueAt bound = if bound > Layer.CharacteristicPT then noValuePT else id
+
 -- Project one object against a PRECOMPUTED candidate list. gather is
 -- oid-independent, so a whole-board sweep gathers once and folds each object
--- (projectAll) instead of re-gathering per object. Where CR 208.5 goes, and
--- deliberately NOT inside projectWith: "has no value" cannot be asked of a
--- layer-bounded mid-fold view.
---
--- Not implemented: CR 208.5's substitution is likewise absent from the view a
--- Count reads mid-layer (#1332).
+-- (projectAll) instead of re-gathering per object. Where CR 208.5 goes for the
+-- FINISHED fold; noValueAt above is where it goes for a bounded one.
 projectFrom :: [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
 projectFrom cands oid gs = noValuePT (projectWith (const True) cands oid gs)
 
@@ -4336,6 +4419,10 @@ abilitiesFromCharacteristics peers pc oid gs =
         Just cond -> Condition.holds peers (Filter.contextFor (controllerOf oid gs) (Just oid)) gs oid cond
    in -- Rule 702's own activated abilities are appended here, minted from the
       -- POST-LAYER keyword map, so Humility takes crew away with the rest.
+      --
+      -- Unlike mintedTriggeredAbilitiesOf, no CR 612.2a rewrite is applied here:
+      -- none of the activated abilities rule 702 mints writes a creature-type
+      -- word (gap #2495).
       filter
         granted
         ( PC.activatedAbilities pc
@@ -4416,6 +4503,7 @@ shieldOf oid gs =
                   -- Rule 122.1c's recipient is the permanent the pair was minted
                   -- onto, which the CR 616.1 loop already scopes by source.
                   DamagePattern.whatRecipient = Nothing,
+                  DamagePattern.whoRecipient = Nothing,
                   DamagePattern.whichRecipient = Nothing,
                   -- No player chose this pair's source (CR 609.7a) and nothing
                   -- targeted it (CR 601.2c); rule 122.1c minted it off the
@@ -4568,6 +4656,8 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
        | Set.member CardType.Battle (PC.cardTypes pc),
          Defense.MkDefense n <- Maybe.maybeToList (PC.defense pc)
        ]
+    -- No CR 612.2a rewrite here either, for abilitiesFromCharacteristics' reason
+    -- (gap #2495).
     <> Keyword.mintedReplacementsOf (PC.keywords pc)
     -- CR 714.3a's intrinsic lore counter -- or CR 714.3b's chosen number, which
     -- rule 714.3b substitutes for it on a Saga with read ahead -- minted off the
@@ -4873,13 +4963,32 @@ triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 -- rules text is the rule's, not the card's, so the words a text change reaches
 -- do not exist until the mint runs (CR 612.1, CR 612.2a).
 --
--- Over-reaches by CR 612.3 for a keyword GRANTED at layer 6, which arrives after
--- the layer-3 swap and should keep the printed word. No card grants afterlife,
--- fabricate or soulshift (gap #1600).
+-- CR 612.3 stops the rewrite at the instances layer 3 actually reached: an ability
+-- GRANTED at CR 613.1f layer 6 arrives after the swap and keeps rule 702's printed
+-- word. PC.textChangedKeywords is the layer-3 count and PC.keywords the live one,
+-- so the split is per INSTANCE (CR 702.135b) rather than per object -- a permanent
+-- printing afterlife and granted afterlife again mints its printed instance with
+-- the swapped word and its granted one with rule 702.135a's own.
+--
+-- `min` keeps `live - changed` total. It cannot bite today, and the mutation that
+-- removes it leaves the suite green: every layer-6 write to PC.keywords either
+-- adds one instance, DELETES the whole key (Modification.LoseKeyword, which the
+-- CR gives no way to spend one instance of) or empties the map, so a live count
+-- strictly between zero and the layer-3 count is unreachable, and a deleted key
+-- is not walked at all. It is arithmetic insurance, not a rule -- which surviving
+-- instance counts as the printed one is a question CR 702.135b leaves moot, the
+-- instances being interchangeable.
 mintedTriggeredAbilitiesOf :: ProjectedCharacteristics -> [TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 mintedTriggeredAbilitiesOf pc =
   let pairs = fmap (\c -> (ChangeSubtypeWord.from c, ChangeSubtypeWord.to c)) (PC.subtypeWordChanges pc)
-   in fmap (rewriteTriggeredAbility pairs) (Keyword.triggeredAbilitiesOf (PC.keywords pc))
+      mint keyword count = Keyword.triggeredAbilitiesOf (Map.singleton keyword count)
+      instances (keyword, live) =
+        let changed = min live (Map.findWithDefault 0 keyword (PC.textChangedKeywords pc))
+         in fmap (rewriteTriggeredAbility pairs) (mint keyword changed) <> mint keyword (live - changed)
+   in -- Keyword.triggeredAbilitiesOf's own order, one keyword at a time: it walks
+      -- Map.toAscList, so keeping that walk here leaves the CR 603.3b ordering
+      -- prompt indexing into the same canonical order it did before the split.
+      concatMap instances (Map.toAscList (PC.keywords pc))
 
 -- CR 702.5a / 613 layer 6: the object's enchant abilities after the fold --
 -- printed and granted together, which is what Modification.GainEnchant exists to

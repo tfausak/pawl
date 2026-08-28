@@ -11,7 +11,11 @@
 -- none), CR 613.4c's layer 7c anthem narrowed by a keyword its affected
 -- objects have (Hand of the Praetors), and CR 208.5's 0 for a creature left
 -- with no value for its power or toughness (Ashaya, Soul of the Wild under
--- Blood Moon), plus CR 109.5's static-ability perspective on a player-scoped
+-- Blood Moon) -- read off the finished fold, off the MID-FOLD view a same-layer
+-- count gets (Synthetic Withering Comparison), and off the fold's own
+-- accumulator, where CR 613.4c's modification has to have the substituted 0 to
+-- add to (Glorious Anthem) --, plus
+-- CR 109.5's static-ability perspective on a player-scoped
 -- count (Empyrial Armor on an opponent's creature) and CR 613.4c's NEGATIVE
 -- layer-7c modification of an announced value (Toxic Deluge's -X/-X, CR 107.1b),
 -- and CR 107.1a's rounding -- both directions in one modification (Aspect of
@@ -611,6 +615,8 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   woodElementalSpec s registry
   handOfThePraetorsSpec s registry
   ashayaBloodMoonSpec s registry
+  witheringComparisonSpec s registry
+  gloriousAnthemAshayaSpec s registry
   empyrialArmorSpec s registry
   aspectOfWolfSpec s registry
   malignusSpec s registry
@@ -694,13 +700,171 @@ ashayaBoard s registry = do
 ashayaName :: CardName.CardName
 ashayaName = CardName.MkCardName (Text.pack "Ashaya, Soul of the Wild")
 
--- How many of alice's graveyard objects show this printed name. CR 400.7 mints
--- a fresh object on the zone change, so the id the fixture held names nothing
--- there.
-namedInGraveyard :: CardName.CardName -> GameState.GameState -> Int
-namedInGraveyard wanted gs =
+-- CR 208.5 asked of a MID-FOLD view rather than of the finished one. Rule 613
+-- lets an effect's magnitude be a count, and CR 613 puts no bound on the state
+-- that count is computed from, so a count taken while layer 7c is being applied
+-- reads the same creature the rule above describes -- one whose only source of a
+-- P/T value CR 305.7 stripped. The finished fold answered 0 there long before
+-- this; the fold's own view answered "no value", and the two disagreeing is the
+-- defect.
+--
+-- The sublayer is what makes the question askable. Below CR 613.4a's layer 7a
+-- every star creature is legitimately without a value, so substituting 0 there
+-- would report it for all of them; from layer 7b on, whether the creature has one
+-- is settled. Projection.noValueAt is that gate, and CR 613.1's order is Layer's
+-- derived Ord.
+--
+-- Synthetic Withering Comparison, {2}{B} Enchantment, whole text: "Creatures your
+-- opponents control get -X/-X, where X is the greatest power among Mountain
+-- creatures you control." Synthetic because no printed card puts a P/T read
+-- inside the layer fold: every printed "greatest power" reader is a resolving
+-- spell's X, which CR 608.2h freezes at resolution and never re-reads. Nothing in
+-- the CR forbids the card -- CR 613.4c is an ordinary layer-7c modification and
+-- CR 613.8a clause (b) is what orders its magnitude.
+--
+-- Blood Moon is what makes the count's members Mountains at all, so before it
+-- resolves the count folds over an EMPTY set. Count.evaluate answers Nothing
+-- there, exactly as it does for a set holding a member with no value -- which is
+-- why the case below reads the board before and after rather than trusting one
+-- state.
+witheringComparisonSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+witheringComparisonSpec s registry = Spec.describe s "CR 208.5 inside the layer fold" $ do
+  -- The fixture's live half. No creature alice controls is a Mountain yet -- they
+  -- are Forests, by Ashaya's second sentence -- so the count is over nothing,
+  -- answers Nothing, and bob's Piker keeps its printed 2/1. Ashaya's own 5/5 says
+  -- her characteristic-defining ability is still there to be stripped.
+  Spec.it s "CR 604.3 before Blood Moon the count folds over no Mountain creature" $ do
+    (_, ashayaId, giantId, pikerId, gs) <- witheringBoard s registry
+    Spec.assertEqWith s "three Mountains, Ashaya and the Giant" (S.powerToughnessOf ashayaId gs) (Just (5, 5))
+    Spec.assertEqWith s "the Giant keeps its printed box" (S.powerToughnessOf giantId gs) (Just (3, 3))
+    Spec.assertEqWith s "bob's Piker is untouched" (S.powerToughnessOf pikerId gs) (Just (2, 1))
+  -- THE PROVING CASE, at gameplay level. alice casts Blood Moon off her three
+  -- Mountains; CR 305.7 strips Ashaya's CDA and makes both her and the Giant
+  -- Mountains, so the count now folds over the two of them. CR 208.5 makes Ashaya
+  -- a 0 there and the greatest is the Giant's 3, so bob's 2/1 Piker is a -1/-2 and
+  -- CR 704.5f buries it at the same state-based check that buries Ashaya (CR
+  -- 704.3 performs them simultaneously). Reading Ashaya as "no value" instead
+  -- poisons Count.evaluate's maximum, the modification is a no-op, and the Piker
+  -- is still standing -- the board difference this case exists to falsify.
+  Spec.it s "CR 208.5/704.5f the stripped creature counts as 0 and the maximum survives it" $ do
+    (bloodMoonId, _, _, _, gs) <- witheringBoard s registry
+    let settled = S.runPure S.identityAnswer gs (S.cast S.alice bloodMoonId >> Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith s "CR 704.5f bob's Piker was buried by the -X/-X" (namedInGraveyardOf S.bob pikerName settled) 1
+    Spec.assertEqWith s "and it is off the battlefield" (S.countOnBattlefieldByName pikerName S.bob settled) 0
+    Spec.assertEqWith s "the enchantment resolved" (GameState.stack settled) []
+    Spec.assertEqWith s "no Ashaya on the battlefield either" (S.countOnBattlefieldByName ashayaName S.alice settled) 0
+  -- The magnitude itself, read before the state-based check that removes both
+  -- creatures: CR 613.4c wrote -3/-3, not merely "something lethal". Ashaya is
+  -- still there and still a 0/0, which is the reading the case above rests on.
+  Spec.it s "CR 613.4c the modification is the greatest power among them, Ashaya read as 0" $ do
+    (bloodMoonId, ashayaId, giantId, pikerId, gs) <- witheringBoard s registry
+    let resolved = S.runPure S.identityAnswer gs (S.cast S.alice bloodMoonId >> Stack.resolveTop)
+    Spec.assertEqWith s "bob's Piker took -3/-3" (S.powerToughnessOf pikerId resolved) (Just (-1, -2))
+    Spec.assertEqWith s "CR 208.5 Ashaya is a 0/0" (S.powerToughnessOf ashayaId resolved) (Just (0, 0))
+    Spec.assertEqWith s "alice's own Giant is not an opponent's creature" (S.powerToughnessOf giantId resolved) (Just (3, 3))
+
+-- alice, with three untapped Mountains, Ashaya, a Hill Giant (3/3, vanilla) and
+-- Synthetic Withering Comparison on the battlefield, and Blood Moon in hand; bob
+-- with a Goblin Piker (2/1, vanilla). Mountains rather than Forests for
+-- ashayaBoard's reason -- they pay Blood Moon's {2}{R} and are the basic half
+-- Blood Moon does not touch.
+--
+-- Three seats are not wanted here: the roles the count tells apart are the
+-- ability's own controller ("you") and its opponents, and one opponent settles
+-- both. The Giant rather than a second Piker so the greatest power (3) is not
+-- also bob's creature's power (2), and the shrunk toughness (-2) is not any
+-- printed number on the board.
+--
+-- Returns Blood Moon, Ashaya, the Giant, bob's Piker and the board.
+witheringBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+witheringBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  giant <- S.printingOf s registry "Hill Giant"
+  piker <- S.printingOf s registry "Goblin Piker"
+  ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+  bloodMoon <- S.printingOf s registry "Blood Moon"
+  comparison <- S.printingOf s registry "Synthetic Withering Comparison"
+  let (ashayaId, g1) = S.addCreature ashaya S.alice (S.landsInPlay mountain 3)
+      (giantId, g2) = S.addCreature giant S.alice g1
+      (_, g3) = S.addCreature comparison S.alice g2
+      (pikerId, g4) = S.addCreature piker S.bob g3
+      (gs, bloodMoonId) = S.handOne bloodMoon g4
+  pure (bloodMoonId, ashayaId, giantId, pikerId, gs)
+
+-- CR 613.4c's layer-7c modification of a creature CR 208.5 has already answered
+-- for. Same board as "Ashaya, Soul of the Wild under Blood Moon" above, plus
+-- Glorious Anthem ({1}{W}{W} Enchantment, whole text: "Creatures you control get
+-- +1/+1." Oracle text verified against Scryfall).
+--
+-- Rule 208.5 substitutes 0 for a creature that has no value for its power, and
+-- nothing in rule 613 makes a layer-7c modification skip such a creature: the
+-- anthem adds to the 0, so a stripped Ashaya is a 1/1 and CR 704.5f leaves her
+-- standing. Reading her as "no value" all the way through layer 7c instead
+-- discards the +1/+1 and substitutes 0 only afterwards, which buries her -- the
+-- board difference this case exists to falsify, and it is the SURVIVAL that is
+-- the gameplay-level claim.
+--
+-- The Piker is the guard against an anthem that pumps nothing: it is under the
+-- same Blood Moon, its 2/1 is printed rather than defined, and 3/2 is a pair no
+-- other permanent on this board wears.
+gloriousAnthemAshayaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+gloriousAnthemAshayaSpec s registry = Spec.describe s "Glorious Anthem on Ashaya under Blood Moon" $ do
+  -- The fixture's live half: before Blood Moon her characteristic-defining
+  -- ability is intact, counting three Mountains, herself and the Piker, and the
+  -- anthem is already adding its +1/+1 to both creatures. A 6/6 here is what
+  -- makes the 1/1 below a change rather than a fixture that never worked.
+  Spec.it s "CR 604.3/613.4c before Blood Moon the anthem adds to the CDA's 5/5" $ do
+    (_, ashayaId, pikerId, gs) <- anthemAshayaBoard s registry
+    Spec.assertEqWith s "five lands plus the anthem" (S.powerToughnessOf ashayaId gs) (Just (6, 6))
+    Spec.assertEqWith s "the Piker's printed 2/1 plus the anthem" (S.powerToughnessOf pikerId gs) (Just (3, 2))
+  -- THE PROVING CASE, at gameplay level: alice casts Blood Moon off her three
+  -- Mountains. CR 305.7 strips Ashaya's CDA, CR 208.5 makes her a 0, CR 613.4c
+  -- adds the anthem's +1/+1, and CR 704.5f has nothing to act on.
+  Spec.it s "CR 208.5/613.4c the anthem adds to the substituted 0 and she survives" $ do
+    (bloodMoonId, ashayaId, pikerId, gs) <- anthemAshayaBoard s registry
+    let settled = S.runPure S.identityAnswer gs (S.cast S.alice bloodMoonId >> Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith s "CR 704.5f Ashaya survived the state-based check" (S.countOnBattlefieldByName ashayaName S.alice settled) 1
+    Spec.assertEqWith s "and she is not in her owner's graveyard" (namedInGraveyard ashayaName settled) 0
+    Spec.assertEqWith s "CR 208.5 plus CR 613.4c leave her a 1/1" (S.powerToughnessOf ashayaId settled) (Just (1, 1))
+    Spec.assertEqWith s "the enchantment resolved" (GameState.stack settled) []
+    Spec.assertEqWith s "the Piker is still pumped, still 3/2" (S.powerToughnessOf pikerId settled) (Just (3, 2))
+
+-- ashayaBoard plus Glorious Anthem on the battlefield. Returns Blood Moon,
+-- Ashaya, the Piker and the board.
+anthemAshayaBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+anthemAshayaBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  piker <- S.printingOf s registry "Goblin Piker"
+  ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+  bloodMoon <- S.printingOf s registry "Blood Moon"
+  anthem <- S.printingOf s registry "Glorious Anthem"
+  let (ashayaId, g1) = S.addCreature ashaya S.alice (S.landsInPlay mountain 3)
+      (pikerId, g2) = S.addCreature piker S.alice g1
+      (_, g3) = S.addCreature anthem S.alice g2
+      (gs, bloodMoonId) = S.handOne bloodMoon g3
+  pure (bloodMoonId, ashayaId, pikerId, gs)
+
+pikerName :: CardName.CardName
+pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+
+-- How many of that player's graveyard objects show this printed name. CR 400.7
+-- mints a fresh object on the zone change, so the id the fixture held names
+-- nothing there. Indexed by OWNER, which CR 400.1 makes the graveyard's key.
+namedInGraveyardOf :: PlayerId.PlayerId -> CardName.CardName -> GameState.GameState -> Int
+namedInGraveyardOf pid wanted gs =
   let named oid = fmap Face.name (Game.faceOf oid gs) == Just wanted
-   in length (filter named (Game.zoneMembers Zone.Graveyard S.alice gs))
+   in length (filter named (Game.zoneMembers Zone.Graveyard pid gs))
+
+namedInGraveyard :: CardName.CardName -> GameState.GameState -> Int
+namedInGraveyard = namedInGraveyardOf S.alice
 
 -- CR 613.4c layer 7c, narrowed by a KEYWORD the affected object has: Hand of the
 -- Praetors, {3}{B} Creature -- Phyrexian Zombie 3/2, "Other creatures you

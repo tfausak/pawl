@@ -659,12 +659,15 @@ permitsCastPlotted pid oid gs = Maybe.fromMaybe False $ do
 -- foretold card is cast whenever its own card type could be, so nothing here
 -- narrows Cast.timingOk.
 --
--- Not implemented: CR 601.3f -- "a player may begin to cast such a spell only if
--- they can look at the face-down card in exile". The foretold card IS face down
--- (CR 702.143a), and pawl grants nobody permission to look, so the gate would
--- refuse the cast this rule permits; it is unwritten rather than written wrong
--- (#1480). No player but the owner reaches the card in the first place, which is
--- the conjunct above.
+-- CR 601.3f -- "a player may begin to cast such a spell only if they can look at
+-- the face-down card in exile" -- is satisfied by construction rather than
+-- checked here: rule 702.143a grants the permission to the card's owner, which
+-- is exactly what Pawl.Engine.Exile.mayLookAt reads off the same stamp, and the
+-- owner conjunct above is the same player.
+--
+-- Not implemented: the gate itself, for the effect side rule 601.3f actually
+-- scopes itself to -- "a spell with certain qualities from among face-down cards
+-- in exile" -- which no permission pawl can express states (#2504).
 permitsCastForetold :: PlayerId -> ObjectId -> GameState -> Bool
 permitsCastForetold pid oid gs = Maybe.fromMaybe False $ do
   obj <- Game.lookupObject oid gs
@@ -693,9 +696,8 @@ permitsCastForetold pid oid gs = Maybe.fromMaybe False $ do
 -- commander's owner cast it from the command zone.
 -- Not implemented: CR 601.3f's gate on a card exiled FACE DOWN -- "a player may
 -- begin to cast such a spell only if they can look at the face-down card in
--- exile". Unreachable today, since the only card that exiles face down grants no
--- permission to play what it exiled, and Effect.GrantPlayFromExile is the only
--- writer of the permission this list is then filtered by (#1480).
+-- exile". Unreachable today, since every permission this list is then filtered
+-- by names ONE exiled object rather than rule 601.3f's qualities (#2504).
 zoneCandidates :: Zone.Zone -> PlayerId -> GameState -> [ObjectId]
 zoneCandidates zone pid gs = case zone of
   Zone.Exile -> Set.toList (GameState.exile gs)

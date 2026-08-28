@@ -2556,6 +2556,10 @@ takesIgnusOnce ignusId p = case p of
 --     Sacrifice this creature: Add {R}{R}{R}"). The Golem is a creature, so the
 --     {3} is a {2}, and the floor at one mana is not reached.
 --
+--   * the INCREASE -- Suppression Field ("Activated abilities cost {2} more to
+--     activate unless they're mana abilities"), whose "unless" is CR 605.1a's
+--     classification and reaches this seam by NOT applying here at all.
+--
 --   * the ADDITIONAL COST -- Drought ("Activated abilities cost an additional
 --     \"Sacrifice a Swamp\" to activate for each black mana symbol in their
 --     activation costs") on Transmogrant Altar's "{B}, {T}, Sacrifice a
@@ -2657,6 +2661,50 @@ activationAdjustmentSpec s registry = Spec.describe s "CR 601.2f a mana ability'
     Spec.assertBool s (not (casts taxed)) "CR 118.3 the Altar is no supply, so the Birds' one mana is the whole board and {3} is out of reach"
     Spec.assertBool s (casts untaxed) "without the Drought the Birds pays the {B} and the Altar's three colorless pay the {3}"
 
+  -- CR 605.1a's rider on the INCREASE half, which the two halves above have no
+  -- producer for: Suppression Field ("Activated abilities cost {2} more to
+  -- activate unless they're mana abilities", checked against Scryfall) is the
+  -- pool's, and its "unless" is a fact about the ABILITY rather than about the
+  -- permanent the increase's Filter is asked of.
+  --
+  -- The MANA half is the proving one, and it is proved at the PAYMENT: the offer
+  -- gate builds `plusComponents adjustments printedCost`, which adds only
+  -- components, and manaPartPayable then short-circuits on a Mountain's empty
+  -- mana part -- so the tap is on the menu whether the {2} reaches it or not, and
+  -- a case enumerating legal actions would read the same either way. What tells
+  -- the two readings apart is whether the tap PAYS: a lone {2} the Mountain has
+  -- no way to produce leaves the pool empty.
+  --
+  -- Three Mountains and not one, so that the taxed reading has a board it could
+  -- plausibly pay {2} on -- except that every Mountain is taxed the same {2}, so
+  -- there is no mana anywhere on it.
+  Spec.it s "CR 605.1a an increase that spares mana abilities does not reach one" $ do
+    field <- S.printingOf s registry "Suppression Field"
+    brothers <- S.printingOf s registry "Brothers of Fire"
+    mountain <- S.printingOf s registry "Mountain"
+    let (mountainId, _, taxed) = suppressionFieldBoard brothers mountain (Just field)
+        (_, _, printed) = suppressionFieldBoard brothers mountain Nothing
+        run gs = snd (State.evalState (Engine.runGame (takesSourceOnce mountainId) gs Engine.priorityLoop) (0 :: Int))
+    Spec.assertEqWith s "CR 605.1a the Field's {2} does not reach the Mountain's mana ability, so its {R} floats" (poolTypes S.alice (run taxed)) [ManaType.Colored Color.Red]
+    Spec.assertEqWith s "the same tap on the same board without the Field" (poolTypes S.alice (run printed)) [ManaType.Colored Color.Red]
+    Spec.assertEqWith s "one Mountain paid for it, and the other two were not asked to" (S.tappedCount S.alice (run taxed)) 1
+
+  -- The other side of the same sentence, and the reason the case above is not
+  -- passing because the card was transcribed as a {0}: Brothers of Fire ("{1}{R}{R},
+  -- {T}: Brothers of Fire deals 1 damage to any target") is no mana ability, so
+  -- the same Field taxes it to {3}{R}{R} and three Mountains stop paying for it.
+  -- Here in ManaSpec rather than in Pawl.PlayerEffectSpec because it is the half
+  -- of ONE card the case above rests on.
+  Spec.it s "CR 601.2f the same increase does reach an ability that is not one" $ do
+    field <- S.printingOf s registry "Suppression Field"
+    brothers <- S.printingOf s registry "Brothers of Fire"
+    mountain <- S.printingOf s registry "Mountain"
+    let (_, brothersId, taxed) = suppressionFieldBoard brothers mountain (Just field)
+        (_, _, printed) = suppressionFieldBoard brothers mountain Nothing
+        offers gs = length (filter (isActivationOf brothersId) (Action.legalActions S.alice gs))
+    Spec.assertEqWith s "CR 601.2f three Mountains cannot pay the taxed {3}{R}{R}" (offers taxed) 0
+    Spec.assertEqWith s "and pay the printed {1}{R}{R} on the same board without the Field" (offers printed) 1
+
 -- alice, active, in her precombat main phase: one Coal Golem, two Mountains, and
 -- the Heartstone or not. Returns the Golem.
 golemBoard :: Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
@@ -2667,6 +2715,19 @@ golemBoard golem mountain heartstone =
         Nothing -> g2
         Just printing -> snd (S.addCreature printing S.alice g2)
    in (golemId, g3 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+
+-- alice, active, in her precombat main phase: three Mountains, one Brothers of
+-- Fire, and the Suppression Field or not. Returns the first Mountain and the
+-- Brothers -- one mana ability and one ability that is not one.
+suppressionFieldBoard :: Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+suppressionFieldBoard brothers mountain field =
+  let (mountainId, g1) = S.addCreature mountain S.alice (Setup.emptyGame S.bothPlayers)
+      g2 = foldr (\_ gs -> snd (S.addCreature mountain S.alice gs)) g1 [1 :: Int, 2]
+      (brothersId, g3) = S.addCreature brothers S.alice g2
+      g4 = case field of
+        Nothing -> g3
+        Just printing -> snd (S.addCreature printing S.alice g3)
+   in (mountainId, brothersId, g4 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
 
 -- alice, active, in her precombat main phase: one Transmogrant Altar, one Goblin
 -- Piker for the printed sacrifice, one `blackSource` for the {B} -- a Swamp
@@ -3614,6 +3675,44 @@ avatarRokuSpec s registry =
               Spec.assertEqWith s "the game jumped to the cleanup step" (GameState.phase after) (Phase.Ending EndingStep.Cleanup)
               Spec.assertBool s (not (any (isActivationOf rokuId) (Action.legalActions S.alice (withPriority after)))) "and alice may no longer activate Roku off it"
               Spec.assertEqWith s "the pool says the same thing" (poolOf S.alice after) []
+            Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
+
+        -- CR 500.5 / CR 614.1b: the same phase end reached by a SKIP of the
+        -- phase's last step rather than by an effect ending the phase. CR 724.2e
+        -- is the CR contemplating exactly that pairing -- the combat phase ends
+        -- while its end of combat step does not happen -- and Engine.skipStep is
+        -- where the phase-grain sweep this retention needs now lives.
+        --
+        -- Synthetic Truncate the Fray ({1}{U} Instant, "Target player skips their
+        -- next end of combat step"), synthetic because nothing printed names that
+        -- step: Scryfall o:/skips?.*end of combat/ and o:"end of combat step"
+        -- o:skip, 2026-08-27, no hit. Pawl.TurnSpec's SkippedEndOfCombat group is
+        -- the stored-effect and combat-record twin of this case.
+        --
+        -- The skip must be aimed at the ACTIVE player, whose combat phase it is
+        -- (Event.beginsPhase asks of GameState.activePlayer), so bob casts it at
+        -- alice. BOB casts it for the case above's reason as well: he holds the
+        -- only lands, so no part of {1}{U} can come out of the retained {R}.
+        --
+        -- "The end of combat step never began" is what keeps this from passing
+        -- vacuously: a cast that silently did nothing would leave the step to run
+        -- normally, and the pool would be empty at the same moment under both
+        -- readings.
+        Spec.it s "CR 500.5 a skipped end of combat step still takes the retained mana" $ do
+          built <- fixture
+          case built of
+            Just (rokuId, _, gs) -> do
+              island <- S.printingOf s registry "Island"
+              fray <- S.printingOf s registry "Synthetic Truncate the Fray"
+              let (spell, staged) = S.addHandCard fray S.bob (S.landsFor island S.bob 2 gs)
+                  blockers = withPriority (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing staged)
+                  after = S.runToStep Phase.PostcombatMain (castingOnly spell) blockers
+                  began = filter (== GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Combat CombatStep.EndOfCombat) S.alice)) (S.eventsOf after)
+              Spec.assertEqWith s "the six retained {R} are there when the step begins" (poolOf S.alice blockers) (replicate 6 retainedRed)
+              Spec.assertEqWith s "CR 614.6 the end of combat step never began" began []
+              Spec.assertEqWith s "CR 511.3 the combat phase is over regardless" (GameState.phase after) Phase.PostcombatMain
+              Spec.assertEqWith s "and the retained mana went with the phase" (poolOf S.alice after) []
+              Spec.assertBool s (not (any (isActivationOf rokuId) (Action.legalActions S.alice (withPriority after)))) "so alice may no longer activate Roku off it"
             Nothing -> Spec.assertFailure s "fixture should give alice a Roku and bob a Piker"
 
 -- Casts that one object the first time it is offered and passes otherwise,

@@ -588,23 +588,28 @@ data Effect card ability
     -- names, for a duration (Mending Hands). The quantity is the shield's printed
     -- size, which then counts DAMAGE down (Pawl.Types.DamageRewrite.PreventNext).
     -- DealDamage's ObjectRef, because CR 115.4's "any target" reaches a PLAYER.
-    -- One shield per recipient, CR 615.11's shape for free.
+    -- One shield per recipient the ref NAMES, CR 615.11's shape for free.
     --
-    -- NOT a Replace carrying a DamageR: the pattern must name the shielded
-    -- permanent OR PLAYER, known only at resolution, so Resolve bakes the
-    -- Recipient into DamagePattern.whichRecipient. A Filter.IsBound over a slot
-    -- would reach the permanent half (that is how Replace's own ZoneChangeR names
-    -- one object), and no Filter names a player, so the two halves would need two
-    -- spellings where the baked Recipient is one. A Duration, CR 615.3 giving a
-    -- prevention effect two terminators; no Uses field, the shield being spent in
-    -- damage rather than applications.
+    -- Its own DESCRIBED recipient side beside that ref (whatRecipient and
+    -- whoRecipient), which is the other half of the same question and one shield
+    -- rather than one each: Divine Deflection's "you and/or permanents you
+    -- control" is CR 615.7's counted pool over both, read live at each damage
+    -- event under CR 611.2c. The ref is then absent, the two spellings being
+    -- alternatives.
+    --
+    -- NOT a Replace carrying a DamageR: a shield the resolution NAMES must name
+    -- the shielded permanent or player by id, known only at resolution, so
+    -- Resolve bakes the Recipient into DamagePattern.whichRecipient. A
+    -- Filter.IsBound over a slot would reach the permanent half (that is how
+    -- Replace's own ZoneChangeR names one object) and no Filter names a player,
+    -- so the two halves would need two spellings where the baked Recipient is
+    -- one. A Duration, CR 615.3 giving a prevention effect two terminators; no
+    -- Uses field, the shield being spent in damage rather than applications.
     --
     -- PreventNextDamage.riders is CR 615.5's ADDITIONAL EFFECT (Test of Faith).
     -- It rides the shield rather than being a sibling effect because it fires
     -- when the shield does, possibly turns later, and reads what that application
     -- prevented (Pawl.Engine.Binding.eventAmount).
-    --
-    -- Not implemented: a shield naming more than one recipient (gap #1108).
     PreventNextDamage (PreventNextDamage.PreventNextDamage (Effect card ability))
   | -- | CR 615.1 / 615.3: install an UNBOUNDED prevention shield over the
     -- recipients an ObjectRef names, for a duration (Selfless Squire).

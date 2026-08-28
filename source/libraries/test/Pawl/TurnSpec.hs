@@ -48,6 +48,7 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Object as Object
@@ -61,6 +62,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
@@ -1471,6 +1473,137 @@ endCombatPhaseSpec s registry = Spec.describe s "EndTheCombatPhase" $ do
     Spec.assertBool s (not (S.castable S.alice spell inMain)) "and not in her precombat main phase"
     Spec.assertBool s (S.castable S.alice spell onBobsTurn) "and castable in bob's combat phase too"
 
+-- alice, active and at her DECLARE BLOCKERS step with a Goblin Piker already
+-- attacking, holding Synthetic Truncate the Fray; bob has a Wall of Stone to
+-- block with. Returns the board, alice's Jade Statue, her attacker, bob's
+-- blocker and the spell.
+--
+-- Every element earns its place:
+--
+--   * Jade Statue is ANIMATED here, by its own {2} ability and after attackers
+--     were declared, so it is a 3/6 Golem "until end of combat" (CR 500.5a) and
+--     is NOT itself in combat -- which keeps the expiry observable on a
+--     permanent CR 511.3's removal from combat never touches.
+--   * Goblin Piker (2/1) attacks and Wall of Stone (0/8) blocks, so the record
+--     has a subject on each side and BOTH survive the combat damage step: a
+--     creature that died would leave combat by CR 506.4 and empty half the
+--     record under either reading.
+--   * The declare blockers step leaves two steps between here and the end of
+--     combat step, so nothing here depends on the skip being the very next
+--     thing that happens.
+--
+-- Four Islands pay the Statue's {2} and then the spell's {1}{U}. Both libraries
+-- are stocked so no draw decks anyone out (CR 704.5b).
+truncateBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId, ObjectId, ObjectId, ObjectId)
+truncateBoard island piker wall statue fray =
+  let (base, ours, theirs) = S.combatBoardOf [piker] [wall]
+      attacker = case ours of
+        a : _ -> a
+        [] -> error "Pawl.TurnSpec: combatBoardOf should return one creature"
+      blocker = case theirs of
+        b : _ -> b
+        [] -> error "Pawl.TurnSpec: combatBoardOf should return one blocker"
+      (jade, gs1) = S.addCreature statue S.alice base
+      gs2 = S.landsFor island S.alice 4 gs1
+      (spell, gs3) = S.addHandCard fray S.alice gs2
+      stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard piker pid g1)) g [1 .. (10 :: Int)]
+      attacking = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer (stock (stock gs3 S.alice) S.bob)
+      animated = case Face.activatedAbilities (S.combinedFace statue) of
+        [] -> error "Pawl.TurnSpec: Jade Statue should have an activated ability"
+        ability : _ ->
+          let activated = snd (Engine.runGamePure S.identityAnswer attacking (Activate.activateAbility S.alice jade ability))
+           in snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
+   in (animated, jade, attacker, blocker, spell)
+
+-- CR 500.11 / CR 614.1b: a phase's LAST step skipped on its own. CR 724.2e is
+-- the CR's own precedent for the split this asks for -- "even though the combat
+-- phase ends, 'at end of combat' triggered abilities don't trigger because the
+-- end of combat step is skipped" -- read there off a phase an effect ended, and
+-- here off a step a replacement effect removed. Either way the phase ends and
+-- the step does not happen, so the phase-grain work is owed and the step-grain
+-- work is not (Engine.skipStep).
+--
+-- Synthetic Truncate the Fray ({1}{U} Instant, "Target player skips their next
+-- end of combat step") is the producer, and it is SYNTHETIC because nothing
+-- printed names that step: Scryfall o:/skips?.*end of combat/ and
+-- o:"end of combat step" o:skip, 2026-08-27, no hit, and the nearest thing --
+-- Fatespinner -- names the draw step, a main phase or the whole combat phase.
+-- Nothing in the CR forbids the printing: CR 500.11 skips a step, CR 506.1 makes
+-- the end of combat step one, and Fatigue is the same card one step-name over.
+--
+-- TWO observables on one board, both stranded by that skip before Engine.endPhase
+-- existed: CR 511.3's removal from combat, and CR 500.5a's "until end of combat"
+-- expiry. Read in the POSTCOMBAT MAIN PHASE, which is the first moment the two
+-- readings differ -- CR 500.5a and CR 511.2 keep the animation live for the whole
+-- of an end of combat step that runs, and CR 511.3 empties combat only as that
+-- step ends.
+skippedEndOfCombatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+skippedEndOfCombatSpec s registry = Spec.describe s "SkippedEndOfCombat" $ do
+  let board = do
+        island <- S.printingOf s registry "Island"
+        piker <- S.printingOf s registry "Goblin Piker"
+        wall <- S.printingOf s registry "Wall of Stone"
+        statue <- S.printingOf s registry "Jade Statue"
+        fray <- S.printingOf s registry "Synthetic Truncate the Fray"
+        pure (truncateBoard island piker wall statue fray)
+      endOfCombat = Phase.Combat CombatStep.EndOfCombat
+      began gs = length (filter (== GameEvent.StepBegan (StepBegan.MkStepBegan endOfCombat S.alice)) (S.eventsOf gs))
+      cast = castAndResolveWith (aimPlayer S.alice)
+  -- THE CONTROL, the same board differing in exactly one thing: whether alice
+  -- casts the spell. Without it every claim below is satisfied by an engine that
+  -- empties combat and expires the animation at some quite different moment.
+  Spec.it s "CR 511.3 the control end of combat step runs, and the phase's end sweeps anyway" $ do
+    (gs, jade, _, _, _) <- board
+    let after = atPostcombatMain S.aggressiveAnswer gs
+    Spec.assertEqWith s "the end of combat step began once" (began after) 1
+    Spec.assertEqWith s "and the postcombat main phase followed it" (GameState.phase after) Phase.PostcombatMain
+    Spec.assertEqWith s "nothing is attacking" (Map.keys (Combat.Type.attackers (GameState.combat after))) []
+    Spec.assertBool s (not (Turn.afterBlockersDeclared after)) "CR 506.7b and the game is no longer past the point blockers were declared"
+    Spec.assertBool s (not (Projection.isCreatureOf jade after)) "and the animation expired with the phase"
+  -- The skip itself, in its own case so no sweep assertion below can absorb a
+  -- mutation to it. CR 614.6: a replaced event never happens, and the CR 603.2b
+  -- record Engine.runStepThatBegan writes is what says whether it did.
+  Spec.it s "CR 614.10a the end of combat step never begins, and the phase ends anyway" $ do
+    (gs, _, _, _, spell) <- board
+    let after = atPostcombatMain S.aggressiveAnswer (cast spell gs)
+    Spec.assertBool s (S.castable S.alice spell gs) "CR 117.1a the instant is castable in the declare blockers step"
+    Spec.assertEqWith s "the end of combat step never began" (began after) 0
+    Spec.assertEqWith s "CR 511.3 the combat phase is over regardless" (GameState.phase after) Phase.PostcombatMain
+    Spec.assertEqWith s "having consumed exactly the steps of this turn" (GameState.remaining after) (Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup])
+  -- CR 511.3's removal from combat, in its own case; see #2010. The identity of the
+  -- attacker and of the blocker, not merely the emptiness of the two maps: a
+  -- partial sweep that dropped one of them passes an emptiness test on the other.
+  Spec.it s "CR 511.3 combat is emptied though the end of combat step never ran" $ do
+    (gs, _, attacker, blocker, spell) <- board
+    let staged = cast spell gs
+        damage = S.runToStep (Phase.Combat CombatStep.CombatDamage) S.aggressiveAnswer staged
+        after = atPostcombatMain S.aggressiveAnswer staged
+    Spec.assertEqWith s "the fixture really did attack and block" (Map.keys (Combat.Type.attackers (GameState.combat damage)), Map.lookup attacker (Combat.Type.blockers (GameState.combat damage))) ([attacker], Just (Set.singleton blocker))
+    Spec.assertBool s (Turn.afterBlockersDeclared damage) "CR 506.7b and the game is past the point blockers were declared"
+    Spec.assertEqWith s "no creature is attacking in the postcombat main phase" (Map.keys (Combat.Type.attackers (GameState.combat after))) []
+    Spec.assertEqWith s "and none is blocking" (Map.keys (Combat.Type.blockers (GameState.combat after))) []
+    Spec.assertBool s (not (Turn.afterBlockersDeclared after)) "CR 506.7b so a card castable only after blockers are declared is out of its window again"
+    Spec.assertBool s (S.onBattlefield attacker after && S.onBattlefield blocker after) "and both creatures are still on the battlefield, so nothing was emptied by CR 506.4"
+  -- CR 500.5 / CR 500.5a's expiry, in its own case; see #2126. The animation is
+  -- STILL live in the combat damage step, which is what keeps this from passing
+  -- against an engine that ended it at the wrong boundary altogether.
+  Spec.it s "CR 500.5a an until-end-of-combat effect expires though the end of combat step never ran" $ do
+    (gs, jade, _, _, spell) <- board
+    let staged = cast spell gs
+        damage = S.runToStep (Phase.Combat CombatStep.CombatDamage) S.aggressiveAnswer staged
+        after = atPostcombatMain S.aggressiveAnswer staged
+    Spec.assertBool s (Projection.isCreatureOf jade damage) "the Statue is a creature while the combat phase is still under way"
+    Spec.assertEqWith s "a 3/6 Golem" (S.powerToughnessOf jade damage) (Just (3, 6))
+    Spec.assertBool s (not (Projection.isCreatureOf jade after)) "and a noncreature artifact once the phase has ended"
+    Spec.assertEqWith s "with no power or toughness" (S.powerToughnessOf jade after) Nothing
+    Spec.assertEqWith s "and nothing left stored" (GameState.continuousEffects after) []
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Turn" $ do
   turnSpec s
@@ -1481,3 +1614,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Turn" $ do
   turnScopedSkipSpec s registry
   endTurnSpec s registry
   endCombatPhaseSpec s registry
+  skippedEndOfCombatSpec s registry

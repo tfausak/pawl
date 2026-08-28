@@ -4,17 +4,18 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Recipient as Recipient
 
 -- | CR 614.1a / 615.1: which damage events a replacement or prevention
 -- intercepts -- both, since this type is shared. Fog's prevention is
--- (Just Combat, And [], Nothing, Nothing, Nothing); Furnace of Rath's replacement
--- is (Nothing, And [], Nothing, Nothing, Nothing); Mending Hands' shield is
--- (Nothing, And [], Nothing, Just the chosen recipient, Nothing); Healing Grace's
--- adds the chosen SOURCE in the last field, and Dovin, Hand of Control's
--- by-direction names that field and no recipient; Stormwild Capridor's is
--- (Just Noncombat, And [], Just IsSource, Nothing, Nothing). Nothing means any
--- kind.
+-- (Just Combat, And [], Nothing, Nothing, Nothing, Nothing); Furnace of Rath's
+-- replacement is (Nothing, And [], Nothing, Nothing, Nothing, Nothing); Mending
+-- Hands' shield is (Nothing, And [], Nothing, Nothing, Just the chosen
+-- recipient, Nothing); Healing Grace's adds the chosen SOURCE in the last field,
+-- and Dovin, Hand of Control's by-direction names that field and no recipient;
+-- Stormwild Capridor's is (Just Noncombat, And [], Just IsSource, Nothing,
+-- Nothing, Nothing). Nothing means any kind.
 --
 -- `whatSource` says WHAT the damage's source is (CR 120.1), as a Filter over its
 -- characteristics: Luminesce's "black sources and red sources" is
@@ -47,12 +48,32 @@ import qualified Pawl.Types.Recipient as Recipient
 -- are not one field: `whichRecipient` names an id the engine baked, where this
 -- one describes the recipient by characteristic -- Stormwild Capridor's "dealt
 -- to this creature" is `Just Filter.IsSource`, read against the candidate's own
--- source the way `whatSource` reads CR 614.15's "this way". Nothing admits EVERY
--- recipient, players included; `Just` admits only an OBJECT recipient matching
--- the filter, since a Filter describes objects and CR 120.3a's player is not one.
--- A Maybe rather than `And []`, for exactly that reason: the trivial filter would
--- otherwise have to mean "any object OR any player", which is not what any other
--- Filter position means.
+-- source the way `whatSource` reads CR 614.15's "this way". `Just` admits only an
+-- OBJECT recipient matching the filter, since a Filter describes objects and CR
+-- 120.3a's player is not one. A Maybe rather than `And []`, for exactly that
+-- reason: the trivial filter would otherwise have to mean "any object OR any
+-- player", which is not what any other Filter position means.
+--
+-- `whoRecipient` is the PLAYER half of that same printed question -- CR 120.3a's
+-- other kind of recipient, which no Filter can describe -- as CR 109.5's relation
+-- to the row's own controller. Divine Deflection's "dealt to you" is `Just You`;
+-- a pattern saying nothing about a player carries Nothing.
+--
+-- The two printed halves are DISJOINED rather than conjoined, and that is what
+-- lets ONE shield cover a player and objects at once: Divine Deflection's "you
+-- and/or permanents you control" is a single CR 615.7 shield over both, where a
+-- conjunction would admit nothing at all, no recipient being both a player and an
+-- object. Nothing on BOTH halves is the unrestricted pattern rather than the
+-- empty disjunction -- a row saying nothing about its recipient covers every one,
+-- players included -- and `whichRecipient` below is a separate conjunct that
+-- narrows whatever the printed halves admit.
+--
+-- Read LIVE at the damage event rather than swept when the effect is created,
+-- which CR 611.2c requires: a prevention effect modifies neither characteristics
+-- nor the controller of any object, so it "can affect objects that weren't
+-- affected when that continuous effect began" -- a creature that comes under your
+-- control after Divine Deflection resolves is shielded by it. That is why this
+-- side is a description rather than a baked set of recipients.
 --
 -- `whichSource` is the ONE object a row watches -- a prevention shield's or CR
 -- 614.9's redirection (Oracle's Attendants) -- baked as an id, and two
@@ -77,13 +98,15 @@ import qualified Pawl.Types.Recipient as Recipient
 -- chosen PERMANENT SPELL onto the battlefield, so Pawl.Engine.Event.carryOver
 -- re-keys this field to the permanent the spell became.
 --
--- Not implemented: a printed recipient condition naming a PLAYER, which is what
--- a static redirection ability needs -- "all damage that would be dealt to you
--- is dealt to this creature instead" (Palisade Giant, Pariah) (#1054).
+-- Not implemented: an authored DESTINATION for CR 614.9's redirection, which is
+-- the other half a static redirection ability needs -- "all damage that would be
+-- dealt to you is dealt to this creature instead" (Palisade Giant, Pariah). The
+-- recipient half of that sentence is `whoRecipient` above (#1054).
 data DamagePattern = MkDamagePattern
   { whichKind :: Maybe DamageKind.DamageKind,
     whatSource :: Filter.Filter Keyword.Keyword,
     whatRecipient :: Maybe (Filter.Filter Keyword.Keyword),
+    whoRecipient :: Maybe PlayerRelation.PlayerRelation,
     whichRecipient :: Maybe Recipient.Recipient,
     whichSource :: Maybe ObjectId.ObjectId
   }

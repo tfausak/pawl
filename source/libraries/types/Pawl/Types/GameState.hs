@@ -10,6 +10,7 @@ import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
+import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -285,6 +286,29 @@ data GameState = MkGameState
     -- Empty at every priority window the engine reaches, exactly as the queue
     -- above is: it is non-empty only for the span of one rider's effects.
     ambientAmounts :: Map.Map SlotName.SlotName Natural.Natural,
+    -- | CR 729.5: the slots a resolution filled AFTER its own object ceased to
+    -- exist, keyed by the id that object had. "The spell or ability that created
+    -- the subgame finishes resolving, even if it was created by a spell card
+    -- that's no longer on the stack" is the one rule that makes a resolution
+    -- outlive its carrier: a wish cast INSIDE a subgame may name the very
+    -- Shahrazad that is resolving (CR 729.4 puts the main game's stack outside
+    -- the subgame), and Pawl.Engine.Setup.applyCrossings then deletes that
+    -- object from the main game before CR 729.5 resumes the resolution.
+    --
+    -- `ambientAmounts` above one rule over, and off-object for its reason: an
+    -- Object.bindings write is a Map.adjust, so a slot bound onto an id that has
+    -- been deleted is silently dropped. Where that field carries CR 615.5's
+    -- amount for a recipient that is a PLAYER and so has no object at all, this
+    -- one carries a slot whose holder existed and then stopped.
+    --
+    -- KEYED BY ObjectId rather than a bare slot map, so nothing has to be
+    -- cleared: Pawl.Engine.Resolve's two resolution loops read this only as the
+    -- fallback for an object Game.lookupObject can no longer find, and an id is
+    -- never reused -- GameState.nextObjectId only ever climbs (Game.freshObjectId
+    -- increments it, Setup.funnelBack takes the max of the two games'). Never
+    -- pruned, as `lastKnown` is not, and one entry per resolution that outlived
+    -- its own object.
+    detachedBindings :: Map.Map ObjectId.ObjectId (Map.Map SlotName.SlotName Binding.Binding),
     -- | CR 614.1c: as-enters rewrites whose effects have not run yet, oldest
     -- first. `pendingPreventionRiders` above one rule over, queued for the same
     -- reason and drained the same way: Pawl.Engine.Event applies the replacement

@@ -1,0 +1,49 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Suppression Field",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "IncreaseActivationCost",
+            "value": {
+              "amount": 2,
+              "whichAbilities": {
+                "type": "And",
+                "value": []
+              },
+              "whichKind": {
+                "type": "NonManaAbility"
+              }
+            }
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

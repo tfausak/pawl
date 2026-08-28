@@ -176,7 +176,9 @@ data Response
     --
     -- Its own constructor for ChoseBolster's reason: the candidates are neither
     -- of the counter-placing pools -- CR 609.7a's set spans the battlefield, the
-    -- stack and the command zone, and is not scoped to the chooser at all.
+    -- SPELLS on the stack, the face-up command zone and every object those three
+    -- plus the waiting replacement rows and delayed triggers refer to, and is not
+    -- scoped to the chooser at all.
     ChoseDamageSource ObjectId.ObjectId
   | -- | CR 603.7b: which simultaneous occurrence of its trigger event the
     -- controller of a duration-less delayed triggered ability chose, as a

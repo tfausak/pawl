@@ -48,6 +48,7 @@ import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.Activations as Activations
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AppliedReduction as AppliedReduction
@@ -369,7 +370,7 @@ selfReductions pid oid gs =
 -- way and read by the same gather -- empty for every caller standing before CR
 -- 601.2c, which is where a reducer naming a target (Dwarven Mauler) simply does
 -- not apply.
-activationAdjustments :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
+activationAdjustments :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> AbilityKind.AbilityKind -> PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
 activationAdjustments = PlayerEffect.activationCostAdjustments
 
 -- Every way CR 118.7e's choice could resolve the reductions that apply --
@@ -1419,12 +1420,19 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
 -- Fluctuator's "cycling abilities" -- never matches one. Exact rather than
 -- elided, and CR 605.1a is the argument: a keyword-granted ability that adds
 -- mana would have to move no card to or from a library, which cycling does.
+--
+-- AbilityKind.ManaAbility is the THIRD criterion, and the Nothing above could
+-- never have stood in for it: no rule-702 provenance is equally true of every
+-- ordinary activated ability arriving through Pawl.Engine.Activate, while
+-- everything reaching this function is a mana ability by CR 605.1a -- which is
+-- what makes Suppression Field's "unless they're mana abilities" spare every
+-- activation gathered here.
 manaActivationAdjustments :: PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
 manaActivationAdjustments pid oid gs = manaActivationAdjustmentsGiven (PlayerEffect.applying pid gs) oid gs
 
 -- The same gather off a hoisted effect list; see manaActivationsGiven.
 manaActivationAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
-manaActivationAdjustmentsGiven effects = PlayerEffect.activationCostAdjustmentsGiven effects Set.empty Nothing
+manaActivationAdjustmentsGiven effects = PlayerEffect.activationCostAdjustmentsGiven effects Set.empty Nothing AbilityKind.ManaAbility
 
 -- CR 118.3 asked of a mana ability's own MANA part, and the one read
 -- manaActivations makes that could ask itself. Nothing is CR 118.6's unpayable

@@ -2572,7 +2572,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     Spec.assertBool s (not (S.castable S.bob bobsBelated later)) "not castable once that step has ended"
     Spec.assertBool s (not (any (S.isCastOf bobsBelated) (Action.legalActions S.bob later))) "and not offered"
     -- What separates "the step ended" from "combat ended": the phase-scoped
-    -- record still names bob, CR 511.3 emptying it only as the end of combat step
+    -- record still names bob, CR 511.3 emptying it only as the combat phase
     -- ends, so the answer changed because of the step and nothing else.
     Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.declaredAttacked (GameState.combat later))) "bob is still on the phase-scoped record"
     Spec.assertBool s (Set.null (Combat.Type.declaredAttackedThisStep (GameState.combat later))) "and off the step-scoped one"

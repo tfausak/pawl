@@ -538,10 +538,11 @@ emptyManaPools gs =
 --
 -- BLANKET over the arms, not ManaRetention.UntilEndOfTurn-specific, and that is
 -- a decision rather than an oversight: CR 514.2 is the backstop for any
--- retention still standing at cleanup, and an UntilEndOfCombat unit whose combat
--- phase never reported its end would otherwise sit in the pool for ever;
--- Turn.phaseEndingAt names the one such hole, see #2126. -Werror cannot see the
--- arm list here, the record update naming no constructor.
+-- retention still standing at cleanup, and it stays one even now that every road
+-- out of a combat phase ends an UntilEndOfCombat retention as the phase goes
+-- (Engine.endPhase) -- a turn can end while a combat phase is still under way
+-- (CR 724.1d), and CR 500.8 lets a combat phase be added anywhere. -Werror
+-- cannot see the arm list here, the record update naming no constructor.
 endManaRetention :: GameState -> GameState
 endManaRetention gs =
   let ordinary unit = unit {ManaUnit.retention = ManaRetention.Ordinary}

@@ -60,7 +60,45 @@ resolveTopWith runSubgame = do
           -- inserts. Drops the id rather than wedging the loop, which is what
           -- the arms below do for a source with no card behind it.
           Nothing -> State.put gs {GameState.stack = rest}
-          Just card ->
+          Just card -> do
+            -- CR 702.103e: "As a bestowed Aura spell begins resolving, if its
+            -- target is illegal, it ceases to be bestowed and the effect making
+            -- it an Aura spell ends. It continues resolving as a creature
+            -- spell." CR 608.3b is the same sentence from the resolution side,
+            -- and routes such a spell to CR 608.3a.
+            --
+            -- BEFORE the Aura test below rather than inside the CR 608.2b
+            -- fizzle arm it replaces, and that ordering is the whole of the
+            -- fix: is-it-an-Aura is a projection read, and CR 702.103b's effect
+            -- is minted from this very field
+            -- (Pawl.Engine.Projection.bestowGathered). Clearing it after the
+            -- branch was taken would leave the spell in the Aura arm it no
+            -- longer belongs in.
+            --
+            -- The CR 608.2b question (Resolve.targetsAllIllegal) stands in for
+            -- rule 702.103e's "its target": bestow grants exactly one target,
+            -- the enchant slot CR 702.103b adds, and Nyxborn Rollicker --
+            -- data/cards/'s one bestow card -- prints no other. A bestowed spell
+            -- that ALSO printed a still-legal target would keep resolving as an
+            -- Aura here, where rule 702.103e reads the enchant slot alone.
+            --
+            -- One-way, like Pawl.Engine.Sba's CR 702.103f clear: nothing sets
+            -- the field back.
+            Monad.when (Object.bestowed obj && Resolve.targetsAllIllegal oid gs) $
+              State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bestowed = False}) oid (GameState.objects g)})
+            -- Re-read, so every classification below sees the projection the
+            -- clear above produced. `obj` is NOT re-read: the clear touches one
+            -- Bool, and the fields taken off `obj` further down (its face, its
+            -- facing, its default controller) are none of them that Bool.
+            --
+            -- A REGRESSION FENCE at the Aura test alone, said plainly rather
+            -- than left to look tested: pointing that one read back at `gs`
+            -- leaves the suite green, because an unbestowed spell has no
+            -- enchant slot and Resolve.targetsAllIllegal answers False for a
+            -- spell with none, so the Aura arm hands the same board back. It is
+            -- CR 702.103e's "the effect making it an Aura spell ends" written
+            -- out, not a passing test.
+            gs1 <- State.get
             -- CR 709.3b: if this spell has a face singled out, its classification
             -- is read off THAT half, not the two combined -- routed through
             -- Game.faceOf rather than Card.combined directly, so this
@@ -74,7 +112,7 @@ resolveTopWith runSubgame = do
             -- Falls back to the combined view for parity with faceOf's own
             -- fallback; unreachable here since `obj` already resolved via this
             -- same `oid`.
-            let face = Maybe.fromMaybe (Card.combined card) (Game.faceOf oid gs)
+            let face = Maybe.fromMaybe (Card.combined card) (Game.faceOf oid gs1)
                 -- CR 712.13 / 709.5d: the half this spell showed on the stack,
                 -- carried onto the permanent for the layouts whose rules say so and
                 -- dropped for the rest (Card.enteringFace). What the permanent then
@@ -125,7 +163,7 @@ resolveTopWith runSubgame = do
                     -- itself performs the re-key, before the CR 614.1c entry loop
                     -- reads the entering permanent's own rows (Event.carryOver,
                     -- CR 614.12).
-                    if not (Set.member Subtype.Aura (Projection.subtypesOf oid gs))
+                    if not (Set.member Subtype.Aura (Projection.subtypesOf oid gs1))
                       then -- CR 708.4's last sentence: "the permanent the spell becomes
                       -- will be a face-down permanent". A STATUS carried across a
                       -- zone change, which CR 400.7 otherwise forgets -- so it is
@@ -154,17 +192,17 @@ resolveTopWith runSubgame = do
                       -- projection, so the branch and its target check cannot
                       -- disagree about what an Aura is.
                       --
-                      -- Not implemented: CR 702.103e / 608.3b's exception -- a
-                      -- bestowed Aura spell whose target has become illegal
-                      -- ceases to be bestowed and resolves as a creature spell,
-                      -- where the fizzle below bins it (#2357).
-                        if Resolve.targetsAllIllegal oid gs
+                      -- A spell that was bestowed and lost its target is not
+                      -- here: CR 702.103e unbestowed it above, so the projection
+                      -- no longer calls it an Aura and it took the branch
+                      -- above.
+                        if Resolve.targetsAllIllegal oid gs1
                           then Event.changeZone oid Zone.Graveyard
                           else
                             -- CR 303.4: an Aura ENTERS attached, so the target is
                             -- seeded into the new incarnation rather than written
                             -- after the move (see Event.changeZoneAttaching).
-                            Monad.void (Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False CarryOver.Carried)
+                            Monad.void (Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs1) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False CarryOver.Carried)
         -- A token is never on the stack (created onto the battlefield, never
         -- cast), and neither is a melded permanent: CR 701.42a puts the two cards
         -- onto the battlefield directly rather than announcing anything.

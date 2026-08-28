@@ -10,6 +10,7 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
@@ -32,7 +33,9 @@ spec s = Spec.describe s "Pawl.Codec.PreventNextDamage" $ do
       ( PreventNextDamage.MkPreventNextDamage
           { PreventNextDamage.duration = Duration.UntilEndOfTurn,
             PreventNextDamage.kind = Nothing,
-            PreventNextDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+            PreventNextDamage.ref = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
+            PreventNextDamage.whatRecipient = Nothing,
+            PreventNextDamage.whoRecipient = Nothing,
             PreventNextDamage.chosenSource = Nothing,
             PreventNextDamage.quantity = Quantity.Literal 4,
             PreventNextDamage.riders = Seq.empty
@@ -48,7 +51,9 @@ spec s = Spec.describe s "Pawl.Codec.PreventNextDamage" $ do
       ( PreventNextDamage.MkPreventNextDamage
           { PreventNextDamage.duration = Duration.UntilEndOfTurn,
             PreventNextDamage.kind = Just DamageKind.Combat,
-            PreventNextDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+            PreventNextDamage.ref = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
+            PreventNextDamage.whatRecipient = Nothing,
+            PreventNextDamage.whoRecipient = Nothing,
             PreventNextDamage.chosenSource = Nothing,
             PreventNextDamage.quantity = Quantity.Literal 3,
             PreventNextDamage.riders = Seq.singleton (Text.pack "a rider")
@@ -66,11 +71,33 @@ spec s = Spec.describe s "Pawl.Codec.PreventNextDamage" $ do
       ( PreventNextDamage.MkPreventNextDamage
           { PreventNextDamage.duration = Duration.UntilEndOfTurn,
             PreventNextDamage.kind = Nothing,
-            PreventNextDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+            PreventNextDamage.ref = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
+            PreventNextDamage.whatRecipient = Nothing,
+            PreventNextDamage.whoRecipient = Nothing,
             PreventNextDamage.chosenSource = Just (Filter.And []),
             PreventNextDamage.quantity = Quantity.Literal 3,
             PreventNextDamage.riders = Seq.empty
           }
       )
       " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"chosenSource\":{\"type\":\"And\",\"value\":[]},\"quantity\":{\"type\":\"Literal\",\"value\":3}} "
+  -- Divine Deflection's shield, which names no ref at all: the recipients are
+  -- DESCRIBED (CR 611.2c) rather than named by the resolution, so both printed
+  -- halves are written and "ref" is absent -- the shape that decodes to one
+  -- shared CR 615.7 pool instead of one shield per recipient.
+  Spec.it s "MkPreventNextDamage, a described recipient side and no ref" $
+    Common.assertCodec
+      s
+      codec
+      ( PreventNextDamage.MkPreventNextDamage
+          { PreventNextDamage.duration = Duration.UntilEndOfTurn,
+            PreventNextDamage.kind = Nothing,
+            PreventNextDamage.ref = Nothing,
+            PreventNextDamage.whatRecipient = Just (Filter.ControlledBy PlayerRelation.You),
+            PreventNextDamage.whoRecipient = Just PlayerRelation.You,
+            PreventNextDamage.chosenSource = Nothing,
+            PreventNextDamage.quantity = Quantity.Literal 3,
+            PreventNextDamage.riders = Seq.empty
+          }
+      )
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"whatRecipient\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"whoRecipient\":{\"type\":\"You\"},\"quantity\":{\"type\":\"Literal\",\"value\":3}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

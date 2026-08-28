@@ -57,14 +57,15 @@ Re-read it whenever a merged PR touches it. Derive everything against
 
 ## Procedure
 
-**Dispatch.** Pick an unassigned issue with no `blocked` label, preferring
-`priority-high`. **Do not rank by open dependents.** The dependency graph is a
-shallow forest, not a tree: the overwhelming majority of merged units report
-`dependencies/blocking` empty and unblock nothing, so "a capability that
-unblocks three issues" describes almost no issue in the backlog. Rank by
-`priority-high`, then by whatever is file-disjoint from the build.
+**Dispatch.** Pick an unassigned issue with no `needs-planning` label,
+preferring `priority-high`. **Do not rank by open dependents.** The
+dependency graph is a shallow forest, not a tree: the overwhelming majority of
+merged units report `dependencies/blocking` empty and unblock nothing, so "a
+capability that unblocks three issues" describes almost no issue in the
+backlog. Rank by `priority-high`, then by whatever is file-disjoint from the
+build.
 
-`blocked` now covers two things: an issue-to-issue blocker, and an issue
+`needs-planning` covers two things: an issue-to-issue blocker, and an issue
 awaiting a design call from the owner (#146, #1828, #2167 carry the label with
 no linked blocker). Neither is dispatchable unattended.
 
@@ -178,7 +179,7 @@ in `Set up job` looks like a real failure and is not. Retry logic must handle
 `origin/main`, never the working checkout.
 
 **Blocked is a good outcome.** If a unit cannot land unattended, the agent
-should add the `blocked` label, link the blocker as a GitHub dependency the way
-`CLAUDE.md` says, and report that. Where the blocker is a decision rather than
-an issue, the label goes on with no link and the report names the question for
-the owner. A decomposition beats a half-landed unit.
+should add the `needs-planning` label, link the blocker as a GitHub
+dependency the way `CLAUDE.md` says, and report that. Where the blocker is a
+decision rather than an issue, the label goes on with no link and the report
+names the question for the owner. A decomposition beats a half-landed unit.
