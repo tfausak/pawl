@@ -1932,6 +1932,8 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.PlayAdditionalLands _ -> effect
   PlayerEffect.NoMaximumHandSize -> effect
   PlayerEffect.SetMaximumHandSize _ -> effect
+  PlayerEffect.IncreaseMaximumHandSize _ -> effect
+  PlayerEffect.ReduceMaximumHandSize _ -> effect
   PlayerEffect.DontLoseUnspentMana _ -> effect
   PlayerEffect.SpendManaAsThough _ -> effect
   PlayerEffect.CantBeTargetedBy _ -> effect
