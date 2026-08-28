@@ -64,6 +64,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
@@ -1778,7 +1779,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     let (victim, g1) = S.addCreature piker S.carol S.threePlayerGame
         (jailer, g2) = S.addCreature palaceJailer S.bob g1
         entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
-        g3 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project jailer g2))] g2
+        g3 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project jailer g2))] g2
         resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 Engine.settleForPriority) Engine.priorityLoop
         -- CR 400.7: exiling the target gives it a new object identity, so the
         -- watch Palace Jailer's second ETB registers is keyed to a NEW id, not
@@ -2195,6 +2196,9 @@ namedIs wanted gs mo =
    in case mo of
         Just o -> case Object.source o of
           Source.OfCard printingId -> named printingId
+          -- CR 712.8g: the combined back face is where a melded permanent's name
+          -- comes from, so the result printing answers.
+          Source.OfMeld meld -> named (MeldSource.result meld)
           Source.OfToken printingId -> named printingId
           Source.OfAbility _ -> False
           Source.OfTrigger _ -> False

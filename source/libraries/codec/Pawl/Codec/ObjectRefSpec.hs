@@ -294,6 +294,16 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.AnyNumberMatching (Filter.HasCardType CardType.Creature))
       " {\"type\":\"AnyNumberMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+  -- The arm above's singular, and the same Arm.tagged risk (#2262): its payload
+  -- is a bare Filter like EachMatching's and AnyNumberMatching's, so a missing
+  -- codec arm would compile and only this case would notice, and a tag copied
+  -- from either sibling would turn one permanent into a sweep or into a subset.
+  Spec.it s "ChosenPermanent" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.ChosenPermanent (Filter.HasCardType CardType.Creature))
+      " {\"type\":\"ChosenPermanent\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- Guards against a decoder that read every payload as one arm. The arms are
   -- all objects, so only the tag separates them, and a duplicated tag would
   -- collapse two of these. The two graveyard arms are the pair it really
@@ -307,7 +317,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   Spec.it s "every arm carries a distinct tag" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, the linked exile sweep, the stack's spells, the whole stack, the player sweep, the opponent sweep, the chosen player, a library's top cards, a walk of a library, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand and a chosen subset of the battlefield all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, the linked exile sweep, the stack's spells, the whole stack, the player sweep, the opponent sweep, the chosen player, a library's top cards, a walk of a library, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a chosen subset of the battlefield and one chosen permanent all encode differently"
       ( length
           ( List.nub
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
@@ -328,11 +338,12 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Land))),
                 Codec.encode ObjectRef.codec (ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.You)),
-                Codec.encode ObjectRef.codec (ObjectRef.AnyNumberMatching (Filter.HasCardType CardType.Creature))
+                Codec.encode ObjectRef.codec (ObjectRef.AnyNumberMatching (Filter.HasCardType CardType.Creature)),
+                Codec.encode ObjectRef.codec (ObjectRef.ChosenPermanent (Filter.HasCardType CardType.Creature))
               ]
           )
       )
-      19
+      20
   -- A tag the decoder does not know is an error rather than a silent slot. The
   -- tag has to be one no arm will ever claim -- @EachOpponent@ stood here until
   -- that became a real arm, and the case then failed rather than going quiet,

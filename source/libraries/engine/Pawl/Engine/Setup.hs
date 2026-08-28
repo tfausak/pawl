@@ -339,6 +339,9 @@ startGameFromCards perform exemptions = do
       exempt =
         Map.keysSet
           (Map.filter isCard (Map.restrictKeys (GameState.objects gs) (Set.intersection exemptions (GameState.exile gs))))
+      -- Not implemented: a melded permanent, which this answers False for, so a
+      -- restart drops it instead of carrying its two cards into the new game
+      -- (#2489).
       isCard obj = case Object.source obj of
         Source.OfCard _ -> True
         _ -> False
@@ -635,6 +638,9 @@ subgameStateFrom starter parent =
         Map.union
           (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.union libIds cmdIds)))
           (GameState.outsideObjects parent)
+      -- Not implemented: a melded permanent, which this answers Nothing for. One
+      -- OutsideObject names one printing, so recording it would have to drop a
+      -- component (#2489).
       asOutside obj = case Object.source obj of
         Source.OfCard printingId -> Just (OutsideObject.MkOutsideObject (Object.owner obj) printingId)
         _ -> Nothing
@@ -910,7 +916,10 @@ applyCrossings finalSub parent =
 -- needed.
 funnelBack :: GameState -> GameState -> GameState
 funnelBack finalSub parent =
-  let isCard obj = case Object.source obj of
+  let -- Not implemented: a melded permanent, which this answers False for, so a
+      -- subgame's end drops it instead of returning its two cards to the
+      -- main-game library (#2489).
+      isCard obj = case Object.source obj of
         Source.OfCard _ -> True
         _ -> False
       -- CR 400.7, exactly as startGameFromCards' own toLibraryCard: the second

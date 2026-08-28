@@ -18,6 +18,7 @@ module Pawl.Engine.Cost where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -282,6 +283,9 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
                 fmap untagged (printed : alternatives)
                   <> [untagged (withoutPayingManaCost face) | PlayerEffect.mayCastFromHandWithoutPayingManaCost (Object.owner obj) oid gs]
               _ -> fmap untagged (printed : alternatives)
+    -- CR 701.42a puts a melded permanent onto the battlefield rather than onto
+    -- the stack, so it is never announced and there is no cost to offer for it.
+    Source.OfMeld _ -> []
     Source.OfToken _ -> []
     Source.OfAbility _ -> []
     Source.OfTrigger _ -> []
@@ -2546,7 +2550,7 @@ payComponent moment pid oid component = case component of
   CostComponent.MillCards n -> do
     gs <- State.get
     let cards = List.genericTake n (Game.zoneMembers Zone.Library pid gs)
-    arrived <- fmap Maybe.catMaybes (Monad.mapM (\card -> Event.changeZoneReturning card Zone.Graveyard) cards)
+    arrived <- fmap (concatMap Foldable.toList) (Monad.mapM (\card -> Event.changeZoneReturning card Zone.Graveyard) cards)
     Monad.unless (null arrived) (State.modify' (Event.recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList arrived)))))
     pure bindsNothing
   -- CR 701.21a: the player chooses which of their permanents dies, so this is a

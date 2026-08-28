@@ -138,8 +138,8 @@ dueToTurn gs = case GameState.daytime gs of
 --
 -- CR 702.145b's FIRST static ability -- "if it is night and this permanent is
 -- represented by a double-faced card, it enters transformed" -- is NOT this
--- sweep, and the two must not be confused. That one is CR 712.13a's replacement
--- effect (EntryRewrite.EntersTransformed, minted by
+-- sweep, and the two must not be confused. That one is a replacement effect
+-- ranked by CR 616.1d (EntryRewrite.EntersTransformed, minted by
 -- Pawl.Engine.Keyword.mintedReplacementsFor), applied as the permanent enters.
 -- This sweep is CR 702.145c and CR 702.145f, and reaches only permanents already
 -- on the battlefield. Pawl.DaytimeSpec's entrySpec proves the pair apart, on the

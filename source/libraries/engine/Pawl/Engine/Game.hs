@@ -31,6 +31,7 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import Pawl.Types.Mana (Mana)
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.Moved as Moved
 import Pawl.Types.Object (Object)
 import qualified Pawl.Types.Object as Object
@@ -147,6 +148,9 @@ printingOfObject :: ObjectId -> GameState -> Maybe Printing.Printing
 printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
   Nothing -> Nothing
   Just (Source.OfCard pid) -> printingOf pid gs
+  -- CR 712.8g: the combined back face, which is the printing every
+  -- characteristic read of a melded permanent resolves through.
+  Just (Source.OfMeld meld) -> printingOf (MeldSource.result meld) gs
   Just (Source.OfToken pid) -> printingOf pid gs
   Just (Source.OfAbility _) -> Nothing
   Just (Source.OfTrigger _) -> Nothing
@@ -368,6 +372,11 @@ cardOfSource gs mSource = case mSource of
   Nothing -> Nothing
   Just source -> case source of
     Source.OfCard pid -> cardOfPrinting pid gs
+    -- CR 712.8g: "the object represented by those cards has only the
+    -- characteristics of the combined back face", so the result printing answers
+    -- and every reader past this point needs to know nothing about melding. The
+    -- components are read by `componentsOf` below and by nothing else.
+    Source.OfMeld meld -> cardOfPrinting (MeldSource.result meld) gs
     Source.OfToken pid -> cardOfPrinting pid gs
     Source.OfAbility _ -> Nothing
     Source.OfTrigger _ -> Nothing
@@ -383,6 +392,36 @@ cardOfSource gs mSource = case mSource of
 
 cardOfPrinting :: PrintingId.PrintingId -> GameState -> Maybe Card
 cardOfPrinting pid gs = fmap Printing.card (printingOf pid gs)
+
+-- Which cards represent this object, for the rules that look past the
+-- characteristics `cardOfSource` answers with to the cards themselves. Empty for
+-- every source but a melded permanent, whose components it lists in the order
+-- the meld recorded them.
+--
+-- A CLASSIFIER over Source rather than a case on OfMeld at each reader, because
+-- the readers are shared: CR 730.3 through 730.3d restate CR 712.21 through
+-- 712.21d almost word for word -- one permanent leaves and each component is put
+-- into the appropriate zone, the owner arranges them, the exiler fixes their
+-- relative timestamp order, an effect that finds the new object finds all of
+-- them, and one replacement effect applies to all of them -- so mutate (#874)
+-- extends this one function rather than the rules that read it. Each series then
+-- ends on a sentence the other has no counterpart for: CR 712.21e counts a
+-- melded permanent as one object but two cards, and CR 730.3e is about a merged
+-- permanent's token components. CR 202.3c and CR 701.27g read this too.
+--
+-- EMPTY rather than a singleton for OfCard: the question is which cards
+-- represent an object that several may, and a one-card object has nothing for CR
+-- 712.21's split to do. A reader wanting the ordinary card asks `cardOfSource`.
+componentsOf :: Source.Source -> Seq.Seq PrintingId.PrintingId
+componentsOf source = case source of
+  Source.OfMeld meld -> Seq.fromList (NonEmpty.toList (MeldSource.components meld))
+  Source.OfCard _ -> Seq.empty
+  Source.OfToken _ -> Seq.empty
+  Source.OfAbility _ -> Seq.empty
+  Source.OfTrigger _ -> Seq.empty
+  Source.OfEmblem _ -> Seq.empty
+  Source.OfSpellCopy _ -> Seq.empty
+  Source.OfInherentTrigger _ -> Seq.empty
 
 -- `cardOf` for a member of a HAND. An emblem answers Nothing where `cardOf`
 -- answers a card: CR 114.5 keeps an emblem off the battlefield, and CR 114.1
@@ -550,17 +589,42 @@ faceUpFaceOf oid gs = do
 -- characteristic of that permanent is its back face's (CR 712.8e's first
 -- sentence). Collapsing them either way is a silent wrong answer.
 --
+-- SEVERAL faces rather than one, because CR 202.3c reads more than one card:
+-- "the mana value of a melded permanent is calculated as though it had the
+-- combined mana cost of the front faces of each card that represents it" (CR
+-- 712.8g says the same as a sum of the front faces' mana values). So the answer
+-- is the faces a mana cost is read off and the caller adds them up; every other
+-- object answers with exactly one, and an object with no card behind it answers
+-- with none -- which is not CR 202.3a's 0 (#674), the distinction the old Maybe
+-- carried and the emptiness carries now.
+--
 -- CR 708.2a's "no mana cost" wins over CR 712.8e, and the rules leave no room
 -- for it not to: a face-down permanent's characteristics are the listed ones and
 -- nothing else, so there is no front face for that rule to reach back to. The
--- mana value that falls out is CR 202.3a's 0.
-manaCostFaceOf :: ObjectId -> GameState -> Maybe (Face Card)
-manaCostFaceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
-  Just (Facing.FaceDown state) -> Just (Card.faceDownFace (FaceDownState.listed state))
-  _ -> do
-    printing <- printingOfObject oid gs
-    let card = Printing.card printing
-    Just (Card.manaCostFace card (resolveFaceFor (lookupObject oid gs) card))
+-- mana value that falls out is CR 202.3a's 0. It is asked FIRST, ahead of the
+-- meld read, for the same reason: a face-down permanent has the listed
+-- characteristics and nothing else, however many cards represent it.
+manaCostFacesOf :: ObjectId -> GameState -> Seq.Seq (Face Card)
+manaCostFacesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
+  Just (Facing.FaceDown state) -> Seq.singleton (Card.faceDownFace (FaceDownState.listed state))
+  _ -> case fmap (componentsOf . Object.source) (lookupObject oid gs) of
+    -- CR 202.3c: each COMPONENT's front face, and never the combined face the
+    -- rest of the object's characteristics come off (CR 712.8g) -- that face
+    -- prints no mana cost of its own, and CR 202.3a's exception for a melded
+    -- permanent is what keeps the 0 it would otherwise have off the answer.
+    Just components | not (Seq.null components) -> foldMap (frontFaceOfPrinting gs) components
+    _ -> Seq.fromList . Maybe.maybeToList $ do
+      printing <- printingOfObject oid gs
+      let card = Printing.card printing
+      Just (Card.manaCostFace card (resolveFaceFor (lookupObject oid gs) card))
+
+-- CR 202.3c's "the front faces of each card that represents it", one card at a
+-- time. Empty rather than an error for a printing the game does not know, the
+-- answer every other lookup here gives; a component the meld recorded is interned
+-- by construction (Pawl.Engine.Event.meld), so the empty case is unreachable and
+-- is not the rule speaking.
+frontFaceOfPrinting :: GameState -> PrintingId.PrintingId -> Seq.Seq (Face Card)
+frontFaceOfPrinting gs pid = maybe Seq.empty (Seq.singleton . Card.frontFace . Printing.card) (printingOf pid gs)
 
 -- `faceOf` for an object that may already be gone -- cardOfWithLastKnown's
 -- fallback, for its reasons (CR 608.2h). Shares resolveFace with faceOf: if the
@@ -588,13 +652,15 @@ faceOfWithLastKnown oid gs = case fmap Object.facing (lookupObject oid gs) of
 -- gate because that rule turns a permanent over from a STATIC ability rather than
 -- from an ability on the stack.
 --
--- Three ways nothing happens, and none is an error:
+-- Four ways nothing happens, and none is an error:
 --
 --   * the id names nothing on the BATTLEFIELD. CR 701.27a transforms a
 --     PERMANENT, which CR 110.1 makes an object on the battlefield.
 --   * the id names nothing at all, or nothing with a card behind it (CR 113.7a).
 --   * Card.turnedOver declines -- CR 701.27c's card that is not double-faced,
 --     CR 701.27d's instant or sorcery face.
+--   * CR 712.4c / 712.9: more than one card represents the permanent, a melded
+--     one being neither transformable nor convertible.
 --
 -- ONE FIELD, in place, because CR 712.18 says the permanent is not a new object:
 -- "when a double-faced permanent transforms or converts, it doesn't become a new
@@ -615,18 +681,42 @@ turnFaceOver :: Timestamp.Timestamp -> GameState -> ObjectId -> Map.Map ObjectId
 turnFaceOver now gs oid objects
   | not (Set.member oid (GameState.battlefield gs)) = objects
   | otherwise = case (Map.lookup oid objects, cardOf oid gs) of
+      -- CR 712.4c: "Unlike other double-faced cards, meld cards cannot be
+      -- transformed or converted. Any instructions to do so are ignored", and CR
+      -- 712.9 says it from the permanent's side. Asked of the OBJECT here, where
+      -- Pawl.Engine.Card.turnedOver asks it of a meld CARD: a melded permanent's
+      -- own card is the interned combined face (CR 712.8g), whose layout says
+      -- nothing about the pair it came from, so the cards representing it are the
+      -- only thing left that does.
+      --
+      -- In turnFaceOver rather than in Pawl.Engine.Resolve's turnOver because
+      -- this is the one writer every road reaches: Pawl.Engine.Daytime's CR
+      -- 702.145c/f sweep comes straight here, and a melded permanent whose
+      -- combined face printed nightbound would otherwise turn over that way. CR
+      -- 701.28a's convert is a third road and needs nothing of its own -- it
+      -- shares Pawl.Engine.Resolve's turnPermanentsOver with Transform, so CR
+      -- 701.28f's "can't transform" also can't convert is this same guard.
+      --
+      -- OVER-DETERMINED on every board Magic can reach: no printed meld pair
+      -- combines into a double-faced card, so Card.turnedOver would decline the
+      -- one-faced combined face anyway. What separates the two readings is
+      -- Pawl.MeldSpec's "CR 712.4c a melded permanent refuses the turn its own
+      -- card would allow", which melds into a double-faced card -- card data the
+      -- opcode carries -- so that this guard is the only thing refusing.
+      (Just object, _) | not (Seq.null (componentsOf (Object.source object))) -> objects
       (Just object, Just card) -> case Card.turnedOver (Object.face object) card of
         Nothing -> objects
         Just name -> Map.insert oid object {Object.face = Just name, Object.turnedOverAt = Just now} objects
       _ -> objects
 
 -- CR 701.27a over a swept set, from the other side: which of these ids ACTUALLY
--- turned over. `turnFaceOver` above declines four ways -- an id naming nothing on
+-- turned over. `turnFaceOver` above declines five ways -- an id naming nothing on
 -- the battlefield, no card behind it, CR 701.27c's card that is not double-faced,
--- CR 701.27d's instant or sorcery face -- and Pawl.Engine.Resolve's `turnOver`
--- adds CR 701.27f and CR 702.145b on top. A turn that did not happen is not an
--- event, so both roads read the answer here rather than each keeping its own
--- list, and neither can come to disagree with the write about what turned.
+-- CR 701.27d's instant or sorcery face, CR 712.4c's melded permanent -- and
+-- Pawl.Engine.Resolve's `turnOver` adds CR 701.27f and CR 702.145b on top. A
+-- turn that did not happen is not an event, so both roads read the answer here
+-- rather than each keeping its own list, and neither can come to disagree with
+-- the write about what turned.
 --
 -- Object.face is the whole comparison because it is the whole write; an id absent
 -- from both maps compares equal and so is not reported.
@@ -669,6 +759,9 @@ isSpell oid gs = case lookupObject oid gs of
   Just obj ->
     Object.zone obj == Zone.Stack && case Object.source obj of
       Source.OfCard _ -> True
+      -- CR 701.42a puts a melded permanent onto the BATTLEFIELD, so it is never a
+      -- card on the stack; the zone conjunct above already answers False for it.
+      Source.OfMeld _ -> False
       Source.OfToken _ -> False
       Source.OfAbility _ -> False
       Source.OfTrigger _ -> False
@@ -700,6 +793,7 @@ isAbility oid gs = case lookupObject oid gs of
   Just obj ->
     Object.zone obj == Zone.Stack && case Object.source obj of
       Source.OfCard _ -> False
+      Source.OfMeld _ -> False
       Source.OfToken _ -> False
       Source.OfAbility _ -> True
       Source.OfTrigger _ -> True
@@ -732,6 +826,9 @@ sourceIsToken :: Source.Source -> Bool
 sourceIsToken source = case source of
   Source.OfToken _ -> True
   Source.OfCard _ -> False
+  -- CR 108.2 / 108.2b: both cards representing a melded permanent are Magic
+  -- cards, and CR 701.42b keeps a token out of a meld pair in the first place.
+  Source.OfMeld _ -> False
   Source.OfAbility _ -> False
   Source.OfTrigger _ -> False
   Source.OfEmblem _ -> False
@@ -945,7 +1042,7 @@ discardOf event = case event of
 -- caller is Pawl.Engine.Quantity's EnteredThisTurn arm.
 enteredBattlefield :: GameEvent -> Maybe ObjectId
 enteredBattlefield event = case event of
-  GameEvent.Moved (Moved.MkMoved change _) ->
+  GameEvent.Moved (Moved.MkMoved change _ _) ->
     if ZoneChange.to change == Zone.Battlefield then Just (ZoneChange.object change) else Nothing
   GameEvent.Discarded {} -> Nothing
   GameEvent.Drew {} -> Nothing

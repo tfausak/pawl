@@ -209,6 +209,8 @@ import qualified Pawl.Codec.ManaSpendingSpec
 import qualified Pawl.Codec.ManaSymbolSpec
 import qualified Pawl.Codec.ManaTypeSpec
 import qualified Pawl.Codec.ManaUnitSpec
+import qualified Pawl.Codec.MeldSourceSpec
+import qualified Pawl.Codec.MeldSpec
 import qualified Pawl.Codec.MentoredSpec
 import qualified Pawl.Codec.MillSpec
 import qualified Pawl.Codec.MillTallySpec
@@ -428,6 +430,7 @@ import qualified Pawl.KeywordTriggerSpec
 import qualified Pawl.LibraryOrderSpec
 import qualified Pawl.ManaSpec
 import qualified Pawl.MassEffectSpec
+import qualified Pawl.MeldSpec
 import qualified Pawl.ModalDoubleFacedSpec
 import qualified Pawl.ModalSpec
 import qualified Pawl.MoveCounterSpec
@@ -732,6 +735,8 @@ spec s registry = do
   Pawl.Codec.ManaSymbolSpec.spec s
   Pawl.Codec.ManaTypeSpec.spec s
   Pawl.Codec.ManaUnitSpec.spec s
+  Pawl.Codec.MeldSourceSpec.spec s
+  Pawl.Codec.MeldSpec.spec s
   Pawl.Codec.MentoredSpec.spec s
   Pawl.Codec.MillSpec.spec s
   Pawl.Codec.MillTallySpec.spec s
@@ -951,6 +956,7 @@ spec s registry = do
   Pawl.LibraryOrderSpec.spec s registry
   Pawl.ManaSpec.spec s registry
   Pawl.MassEffectSpec.spec s registry
+  Pawl.MeldSpec.spec s registry
   Pawl.ModalDoubleFacedSpec.spec s registry
   Pawl.ModalSpec.spec s registry
   Pawl.MulliganSpec.spec s registry

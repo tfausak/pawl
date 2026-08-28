@@ -186,7 +186,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
       let (ratId, gs) = S.addCreature typhoidRats S.alice (Setup.emptyGame S.bothPlayers)
           zc = ZoneChange.MkZoneChange ratId ratId Zone.Battlefield Zone.Graveyard
           snapshot = Projection.project ratId gs
-      roundTrip s "moved" (Codec.encode GameEvent.Codec.codec) (Codec.decode GameEvent.Codec.codec) (GameEvent.Moved (Moved.MkMoved zc snapshot))
+      roundTrip s "moved" (Codec.encode GameEvent.Codec.codec) (Codec.decode GameEvent.Codec.codec) (GameEvent.Moved (Moved.moved zc snapshot))
     -- The snapshot's keywords are counted per keyword (CR 702.164b), so a
     -- COUNT has to survive the wire and not just a membership: the
     -- array-with-repeats encoding is what carries it. A Set-shaped encoder
@@ -200,7 +200,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
           snapshot = Projection.project oid (grant 101 (grant 100 gs0))
           zc = ZoneChange.MkZoneChange oid oid Zone.Battlefield Zone.Graveyard
       Spec.assertEqWith s "the fixture really does carry toxic 1 twice" (Map.lookup (Keyword.Toxic 1) (PC.keywords snapshot)) (Just 2)
-      roundTrip s "moved" (Codec.encode GameEvent.Codec.codec) (Codec.decode GameEvent.Codec.codec) (GameEvent.Moved (Moved.MkMoved zc snapshot))
+      roundTrip s "moved" (Codec.encode GameEvent.Codec.codec) (Codec.decode GameEvent.Codec.codec) (GameEvent.Moved (Moved.moved zc snapshot))
     -- GameEvent's own per-constructor coverage (DamageDealt, both a player
     -- and a CR 120.3c planeswalker Recipient; StepBegan; SpellCast;
     -- BecameMonarch; Discarded, both causes; AttackerDeclared;

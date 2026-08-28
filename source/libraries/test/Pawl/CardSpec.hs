@@ -170,6 +170,7 @@ import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaRider as ManaRider
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modal as Modal
@@ -927,6 +928,9 @@ effectCounts effect = case effect of
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.Convert _ -> []
+  -- CR 701.42a's combined back face, Create's token one opcode over: card data
+  -- nested in card data, so its own counts are swept.
+  Effect.Meld (Meld.MkMeld _ card) -> overFaces cardCounts card
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -1197,6 +1201,9 @@ effectNestedEffects effect = case effect of
   Effect.DoesNotUntapNext {} -> []
   Effect.Transform {} -> []
   Effect.Convert {} -> []
+  -- Create's answer: the combined face's effects belong to ANOTHER object, and
+  -- effectMintedFaces is what reaches them.
+  Effect.Meld {} -> []
   Effect.PhaseOut {} -> []
   Effect.AddPhases {} -> []
   Effect.EndTurn -> []
@@ -1671,6 +1678,9 @@ effectReplacements effect = case effect of
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.Convert _ -> []
+  -- CR 614: the combined back face may print its own entry replacement, so the
+  -- sweep descends into it as it does a token's.
+  Effect.Meld (Meld.MkMeld _ card) -> overFaces cardReplacementEffects card
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -2329,10 +2339,15 @@ mintedFacesTagged card =
   let minted = concatMap effectMintedFaces (cardResolutionEffects card)
    in minted <> concatMap (mintedFacesTagged . snd) minted
 
--- CR 111.1 and CR 114.1: the two kinds of object a card's own effects mint.
+-- CR 111.1, CR 114.1 and CR 701.42a: the kinds of object a card's own effects
+-- mint a face for.
 data MintedKind
   = MintedToken
   | MintedEmblem
+  | -- | CR 701.42a's combined back face, which the melding ability carries
+    -- inline. A face like a token's for this lint's purposes: CR 712.8g gives
+    -- the melded permanent that face's characteristics, card types included.
+    MintedMeld
   deriving (Eq, Ord, Show)
 
 -- The faces one effect mints. Exhaustive and hand-maintained, with
@@ -2418,6 +2433,9 @@ effectMintedFaces effect = case effect of
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.Convert _ -> []
+  -- CR 701.42a: the combined back face is a face this card mints, interned at
+  -- resolution exactly as a token's card is.
+  Effect.Meld (Meld.MkMeld _ card) -> fmap ((,) MintedMeld) (NonEmpty.toList (Card.Type.faces card))
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -3112,6 +3130,12 @@ objectRefFilters ref = case ref of
   -- Filter position exactly -- same zone, same sweep, the chooser standing
   -- between the matches and the set -- so it is framed the same way.
   ObjectRef.AnyNumberMatching f -> [f]
+  -- The Garrison in Hanweir Battlements' "If you both own and control this land
+  -- and a creature named Hanweir Garrison": the arm above's Filter position, one
+  -- permanent instead of a subset, so it is framed the same way -- and the
+  -- ownership and control the card prints are conjuncts of that Filter, which is
+  -- what this traversal hands to the Filter lints.
+  ObjectRef.ChosenPermanent f -> [f]
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -4149,6 +4173,7 @@ effectFilters effect = case effect of
   Effect.DoesNotUntapNext ref -> sourceHosted (objectRefFilters ref)
   Effect.Transform ref -> sourceHosted (objectRefFilters ref)
   Effect.Convert ref -> sourceHosted (objectRefFilters ref)
+  Effect.Meld (Meld.MkMeld ref card) -> sourceHosted (objectRefFilters ref) <> overFaces cardFilters card
   Effect.PhaseOut ref -> sourceHosted (objectRefFilters ref)
   Effect.AddPhases _ -> []
   Effect.EndTurn -> []
@@ -4205,8 +4230,8 @@ data Asks
     -- raises no prompt: every ObjectRef position but the three below.
     AsksNothing
   | -- | Pawl.Engine.Resolve's Effect.MoveToZone gather, which runs in the Game
-    -- monad. It asks the graveyard, hand and from-among arms; the random arm
-    -- answers @pure []@ there (#1733).
+    -- monad. It asks the graveyard, hand, from-among and one-permanent arms;
+    -- the random arm answers @pure []@ there (#1733).
     AsksMoveGather
   | -- | Pawl.Engine.Resolve's Effect.Reveal arm. It asks the from-among arm
     -- through chooseCardFromAmong and the random arm through
@@ -4252,6 +4277,7 @@ chooserRef ref = case ref of
   ObjectRef.ChosenCardFromAmong {} -> True
   ObjectRef.RandomCardInHand {} -> True
   ObjectRef.AnyNumberMatching {} -> True
+  ObjectRef.ChosenPermanent {} -> True
 
 -- The asking matrix itself: whether the site an Asks names asks THIS arm. A
 -- per-(site, arm) pair and not a per-site or per-arm predicate, because both
@@ -4265,6 +4291,7 @@ asksFor asks ref = case asks of
     ObjectRef.ChosenCardInGraveyard {} -> True
     ObjectRef.ChosenCardInHand {} -> True
     ObjectRef.ChosenCardFromAmong {} -> True
+    ObjectRef.ChosenPermanent {} -> True
     _ -> False
   AsksRevealArm -> case ref of
     ObjectRef.ChosenCardFromAmong {} -> True
@@ -4375,6 +4402,8 @@ effectObjectRefs effect = case effect of
   -- The SAME gather, CR 701.28a routing a convert through CR 701.27a-f and
   -- Pawl.Engine.Resolve applying both opcodes through one turnPermanentsOver.
   Effect.Convert ref -> [(AsksTransformGather, ref)]
+  -- A plain READ: Pawl.Engine.Resolve's Meld arm sweeps the ref and asks nothing.
+  Effect.Meld (Meld.MkMeld ref _) -> read_ [ref]
   Effect.PhaseOut ref -> read_ [ref]
   Effect.AddPhases {} -> []
   Effect.EndTurn -> []
@@ -4863,6 +4892,25 @@ sharedTypeLineOffends :: Card.Type.Card -> Bool
 sharedTypeLineOffends card =
   let lines_ = fmap Face.typeLine (Card.Type.faces card)
    in Card.hasSharedTypeLine card && any (/= NonEmpty.head lines_) lines_
+
+-- CR 712.4b: the back face of a meld card "fails to determine its
+-- characteristics" anywhere but on a melded permanent on the battlefield, so
+-- pawl stores each half of a meld pair as its front face alone
+-- (Pawl.Types.Layout's Meld arm). A file that gave one a second face would be
+-- storing characteristics no rule can read: every Pawl.Engine.Card arm for this
+-- layout answers off NonEmpty.head, so the extra face would be silently dropped
+-- rather than rejected. This is where that is made loud.
+--
+-- A `== Layout.Meld` rather than an engine classifier, unlike
+-- sharedTypeLineOffends above: nothing in Pawl.Engine.Card asks "is this a meld
+-- card?" -- CR 701.42b's and CR 712.4c's readers case on the layout directly --
+-- so there is no shared answer for the lint to range over.
+--
+-- Over the whole card rather than through anyFace, for distinctFaceNamesOffends'
+-- reason: this is a claim about the faces as a set.
+meldFaceCountOffends :: Card.Type.Card -> Bool
+meldFaceCountOffends card =
+  Card.Type.layout card == Layout.Meld && length (Card.Type.faces card) /= 1
 
 -- Two things a TriggerCondition.AnyOf may not contain, checked at every depth so
 -- that a nested one cannot smuggle either in.
@@ -6292,6 +6340,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- states no bound, so nothing about the ref caps how many permanents
           -- the chooser may name.
           ObjectRef.AnyNumberMatching _ -> False
+          -- TRUE where the arm above is False, which is the whole difference
+          -- between them: the ref names exactly one permanent however many match.
+          ObjectRef.ChosenPermanent _ -> True
         -- Does this PlayerRef name at most ONE seat? A per-player count over it
         -- -- a library's top card, a card chosen out of a hand -- moves at most
         -- one object exactly when it does.
@@ -6441,6 +6492,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard)
         atRandom = ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.You)
         anyNumber = ObjectRef.AnyNumberMatching anyCard
+        onePermanent = ObjectRef.ChosenPermanent anyCard
         moves ref = Effect.MoveToZone (MoveToZone.MkMoveToZone ref Zone.Battlefield EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
         reveals ref = Effect.Reveal (Reveal.MkReveal ref Nothing)
         inert :: [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> [Bool]
@@ -6474,6 +6526,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "the battlefield subset is asked by the transform gather alone"
       (inert [Effect.Transform anyNumber, moves anyNumber, reveals anyNumber, Effect.Tap anyNumber])
       [False, True, True, True]
+    -- The singular of the arm above, asked by the MoveToZone gather alone --
+    -- Hanweir Battlements' "exile them, then meld them", the printing that wanted
+    -- it. Rejected under Transform and Reveal, the two other sites that ask any
+    -- chooser-shaped arm, and under Tap, an AsksNothing opcode. This also asserts
+    -- the arm reaches chooserRef at all -- an arm missing from THAT traversal
+    -- would answer False here at every site and no -Werror would name it.
+    Spec.assertEqWith
+      s
+      "one chosen permanent is asked by the move gather alone"
+      (inert [Effect.Transform onePermanent, moves onePermanent, reveals onePermanent, Effect.Tap onePermanent])
+      [True, False, True, True]
     -- CR 701.28a's convert, classified with Transform because it IS Transform's
     -- gather (Pawl.Engine.Resolve.turnPermanentsOver): the same four card-shaped
     -- arms are inert under it and the same battlefield subset is asked.
@@ -7023,6 +7086,30 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- authoring rather than a defect.
     victory <- S.printingOf s registry "Onward"
     Spec.assertBool s (not (sharedTypeLineOffends (Printing.card victory))) "a Split card's halves may differ"
+  -- CR 712.4b, swept over the pool. See meldFaceCountOffends for what the rule
+  -- asks and why the check is a face count.
+  Spec.it s "CR 712.4b a meld card carries its front face alone" $ do
+    ps <- S.allPrintings s
+    let melds = filter ((== Layout.Meld) . Card.Type.layout . Printing.card) ps
+        offenders = filter (meldFaceCountOffends . Printing.card) ps
+    -- The guard the sibling lints carry: over a pool with no meld card this
+    -- sweep counts nothing.
+    Spec.assertBool s (not (null melds)) "the pool has a meld card to lint"
+    Spec.assertEqWith s "no meld card prints a second face" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The REJECTING direction, against the real pair restated rather than a card
+  -- file, as the Room lint above does it: the two halves of a meld pair stitched
+  -- into one card must not be loadable.
+  Spec.it s "the lint itself catches a meld card carrying a second face" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    ranger <- S.printingOf s registry "Daybreak Ranger"
+    let card = Printing.card battlements
+        stitched = card {Card.Type.faces = NonEmpty.head (Card.Type.faces card) NonEmpty.:| [NonEmpty.head (Card.Type.faces (Printing.card garrison))]}
+    Spec.assertBool s (not (meldFaceCountOffends card)) "the real Hanweir Battlements is accepted"
+    Spec.assertBool s (meldFaceCountOffends stitched) "a meld card carrying a second face is rejected"
+    -- NOT an offence on the layouts CR 712.1 lists alongside this one: a
+    -- nonmodal double-faced card prints two Magic card faces and stores both.
+    Spec.assertBool s (not (meldFaceCountOffends (Printing.card ranger))) "a Transforming card may print two faces"
   -- CR 603.2's event triggers and CR 603.8's state triggers are gathered by two
   -- different scans, so one ability may not be both. See anyOfOffends for the two
   -- shapes this rejects and why each would be incoherent rather than merely odd.

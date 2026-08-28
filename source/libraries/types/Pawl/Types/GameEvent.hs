@@ -654,9 +654,9 @@ data GameEvent
     -- through one turnPermanentsOver. Pawl.TransformSpec's "a convert records the
     -- transform event, not one of its own" is what proves it.
     --
-    -- NOT recorded for CR 712.13a's "enters transformed" (EntryRewrite in
-    -- Pawl.Engine.Event): nothing turns over there, the permanent arrives on its
-    -- back face.
+    -- NOT recorded for daybound's "enters transformed" (CR 702.145b, EntryRewrite
+    -- in Pawl.Engine.Event): nothing turns over there, the permanent arrives on
+    -- its back face.
     --
     -- The payload carries the names because CR 701.27e reads them "immediately
     -- after it does so"; Pawl.Types.Transformed says why they are sampled at the

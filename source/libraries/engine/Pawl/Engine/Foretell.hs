@@ -16,6 +16,7 @@
 -- which CARD is being foretold.
 module Pawl.Engine.Foretell where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -148,10 +149,11 @@ foretell pid oid = do
         -- Dropped, Pawl.Engine.Ignore's reason: this action exiles a card and
         -- resolves nothing, and the later cast pays its own cost.
         Payment.Paid _ -> do
+          -- One stamp per arrival, Pawl.Engine.Plot's reason: the funnel answers
+          -- with more than one only for a melded permanent leaving the
+          -- battlefield (CR 712.21), and this action exiles a card from a hand.
           exiled <- Event.changeZoneEntering oid Zone.Exile LibraryPosition.defaultValue riders Nothing
-          case exiled of
-            Nothing -> pure ()
-            Just newId -> State.modify' (stamp newId)
+          Monad.forM_ exiled (State.modify' . stamp)
 
 -- CR 406.3's rider and nothing else: every other rider is battlefield-only, and
 -- this move names exile.

@@ -225,7 +225,7 @@ stolenBoard island darksteelMyr masterThief ripple =
     let (myr, withMyr) = S.addCreature darksteelMyr S.bob gs
         (thief, withThief) = S.addCreature masterThief S.alice withMyr
         entered = ZoneChange.MkZoneChange thief thief Zone.Stack Zone.Battlefield
-        seen = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project thief withThief))] withThief
+        seen = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project thief withThief))] withThief
      in ((thief, myr), resolveAll (settleFor seen))
 
 -- CR 601.2c's whole announcement for Clever Concealment: as many targets as

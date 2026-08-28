@@ -5,7 +5,7 @@
 -- combined view, CR 712.11's castable half, CR 701.27a's turnedOver), the
 -- Effect.Transform arm of Pawl.Engine.Resolve with CR 701.27f's already-turned
 -- gate (alreadyTurnedFor over Object.turnedOverAt), and
--- Pawl.Engine.Game.manaCostFaceOf (CR 712.8e).
+-- Pawl.Engine.Game.manaCostFacesOf (CR 712.8e).
 --
 -- Also CR 712.14a's enter-transformed instruction, which reaches the same back
 -- face by a different road: Pawl.Types.EntryRiders carries it and
@@ -429,9 +429,9 @@ spec s registry = Spec.describe s "Transform" $ do
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
     let (oid, before) = S.addCreature gargoyle S.alice emptyBoard
         after = sweep before
-    Spec.assertEqWith s "front face up: 1" (fmap Quantity.manaValueOf (Game.manaCostFaceOf oid before)) (Just 1)
+    Spec.assertEqWith s "front face up: 1" (sum (fmap Quantity.manaValueOf (Game.manaCostFacesOf oid before))) 1
     Spec.assertEqWith s "it is the back face that is up" (faceReadings oid after) backFace
-    Spec.assertEqWith s "back face up: still 1, not the 0 its own empty cost would give" (fmap Quantity.manaValueOf (Game.manaCostFaceOf oid after)) (Just 1)
+    Spec.assertEqWith s "back face up: still 1, not the 0 its own empty cost would give" (sum (fmap Quantity.manaValueOf (Game.manaCostFacesOf oid after))) 1
     Spec.assertEqWith s "and a filter reading a mana value agrees" (Filter.manaValue (Projection.viewOfObject oid after)) (Just 1)
   -- CR 701.27c: "If a spell or ability instructs a player to transform a
   -- permanent that isn't represented by a double-faced token or a double-faced
@@ -649,9 +649,11 @@ transformedBoard tovolar wolf connoisseur gargoyle =
 -- they are there to reach Tovolar's trigger.
 --
 -- CR 701.27g's SECOND exclusion -- an object represented by more than one card
--- is never a transformed permanent -- is not asserted here because no board can
--- reach one: pawl models no melded or merged permanent, so the exclusion holds
--- uniformly. See #369.
+-- is never a transformed permanent -- is asserted in Pawl.MeldSpec instead, on
+-- the board that reaches one: "CR 701.27g a melded permanent is not a
+-- transformed permanent" puts this same Connoisseur beside a melded Hanweir and
+-- a Thraben Gargoyle, and counts the Gargoyle alone. The rule's other half, a
+-- MERGED permanent, is still unreachable (#874).
 transformedPermanentSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 transformedPermanentSpec s registry = Spec.describe s "TransformedPermanent" $ do
   -- CR 701.27g's positive: a double-faced permanent on the battlefield with its

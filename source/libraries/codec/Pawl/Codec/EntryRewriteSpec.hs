@@ -179,7 +179,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
       EntryRewrite.Tapped
       " {\"type\":\"Tapped\"} "
-  -- CR 712.13a via CR 702.145b: the enters-transformed rewrite, payload-free
+  -- CR 702.145b via CR 614.1d: the enters-transformed rewrite, payload-free
   -- because the rule fixes every half -- which face comes from the card's layout,
   -- and the condition from the game's designation.
   Spec.it s "EntersTransformed (Infestation Expert)" $

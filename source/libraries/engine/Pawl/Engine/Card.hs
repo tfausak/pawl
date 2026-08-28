@@ -221,6 +221,13 @@ combinedFaces card = case Card.layout card of
   -- writes as the spell is put onto the stack and CR 712.13 carries onto the
   -- permanent (enteringFace below).
   Layout.ModalDoubleFaced -> pure (NonEmpty.head (Card.faces card))
+  -- CR 712.4b: a meld card away from a melded permanent shows the one Magic card
+  -- face it prints, because its half of the oversized face "fails to determine
+  -- its characteristics" there. Not Transforming's expression over a different
+  -- claim but the SAME claim Normal makes, and the arm exists because the layout
+  -- is a different classification (CR 701.42b / 712.4c) rather than because the
+  -- answer differs.
+  Layout.Meld -> pure (NonEmpty.head (Card.faces card))
 
 -- CR 709.4, one pair at a time. Left-associated over the NonEmpty, so printed
 -- order decides the joined name and the concatenated mana cost.
@@ -463,6 +470,13 @@ castableFaces card = case Card.layout card of
   -- any other land (see Cost.costsFor's own note). CR 712.12's other half -- a
   -- player PLAYING such a face as a land -- is landFaces below.
   Layout.ModalDoubleFaced -> NonEmpty.toList (Card.faces card)
+  -- CR 712.8b, which is the stack's own sentence about this layout and needs no
+  -- reading from the two above: "A meld card on the stack has only the
+  -- characteristics of its front face." So there is one face to offer, and no
+  -- back face a cast could reach -- CR 712.11a's "transformed" cast and CR
+  -- 712.4c's refusal to transform both land on `backFace` and `turnedOver`
+  -- below, and both answer Nothing for this layout.
+  Layout.Meld -> [NonEmpty.head (Card.faces card)]
 
 -- CR 305.1 / 712.12: the faces of this card a player may PLAY as a land, each
 -- paired with the name the play carries -- the castableFaces of the special
@@ -509,6 +523,11 @@ landFaces card =
         -- face like any other land.
         Layout.Transforming -> byDefault
         Layout.ModalDoubleFaced -> fmap named (NonEmpty.toList (Card.faces card))
+        -- CR 712.12 names the MODAL kind alone, and a meld card is not it (CR
+        -- 712.1 lists the three kinds separately). The default view is the one
+        -- face anyway, so Hanweir Battlements is played as the land it prints
+        -- exactly as Radiant Fountain is.
+        Layout.Meld -> byDefault
    in filter (isLand . snd) offered
 
 -- CR 712.14b: "If a player is instructed to put a modal double-faced card onto
@@ -536,6 +555,11 @@ staysWhenPutOntoBattlefield card = case Card.layout card of
   Layout.Adventure -> False
   Layout.Transforming -> False
   Layout.ModalDoubleFaced -> not (isPermanent (NonEmpty.head (Card.faces card)))
+  -- CR 712.14b is written about a modal double-faced card and reaches no other
+  -- layout; CR 712.14's default puts a meld card onto the battlefield with its
+  -- one face up. Both halves of the pool's meld pair print a permanent face, so
+  -- the rule would have nothing to turn away here even if it did reach.
+  Layout.Meld -> False
 
 -- CR 712.8a / 712.11: the FRONT face of a card -- the face a double-faced card
 -- shows wherever nothing has turned it over, and the face CR 712.11 makes a
@@ -603,6 +627,18 @@ backFace card =
         -- double-faced card. The wording that could is CR 702.162a's "cast
         -- this card converted" (#2521), which CR 712.3 names on exactly this layout.
         Layout.ModalDoubleFaced -> successor
+        -- CR 712.4b: the back face of a meld card determines nothing off a
+        -- melded permanent, so there is none to answer with -- and pawl stores
+        -- none, which is what Pawl.Types.Layout's Meld arm records.
+        --
+        -- CR 712.14a's "transformed" rider reads this same answer, and Nothing is
+        -- what CR 712.4c asks for there too: a meld card IS a double-faced card
+        -- (CR 712.1), so 712.14a's second sentence is not what excludes it --
+        -- "unlike other double-faced cards, meld cards cannot be transformed or
+        -- converted. Any instructions to do so are ignored" is, and a card put
+        -- onto the battlefield with no back face to turn to enters showing its
+        -- front face under CR 712.14's default.
+        Layout.Meld -> Nothing
 
 -- CR 701.27a: "To transform a permanent, turn it over so that its other face is
 -- up." WHICH face that leaves up, by NAME -- the form Object.face stores, and
@@ -651,6 +687,13 @@ turnedOver mName card = case Card.layout card of
   Layout.Adventure -> Nothing
   Layout.Transforming -> nextFace mName card
   Layout.ModalDoubleFaced -> nextFace mName card
+  -- CR 712.4c: "Unlike other double-faced cards, meld cards cannot be transformed
+  -- or converted. Any instructions to do so are ignored." CR 712.9 says it again
+  -- from the permanent's side, excluding meld cards by name from the double-faced
+  -- cards that can turn over. This is the one arm where the layout's answer
+  -- differs from the double-faced ones above rather than agreeing with Normal by
+  -- accident.
+  Layout.Meld -> Nothing
 
 -- turnedOver's rotation, for the two layouts CR 712.9 lets a permanent turn
 -- over. Shared rather than written twice because the two differ about which
@@ -718,6 +761,19 @@ enteringFace card shown = case Card.layout card of
   -- choice and dropping it would put the OTHER face's permanent onto the
   -- battlefield.
   Layout.ModalDoubleFaced -> shown
+  -- Nothing, meaning the one face this card has. CR 712.13 is the rule this
+  -- function serves -- "a resolving double-faced spell that becomes a permanent
+  -- is put onto the battlefield with the same face up that was face up on the
+  -- stack" -- and CR 712.8b settles which face that was: "A meld card on the
+  -- stack has only the characteristics of its front face." So there is no chosen
+  -- face for the move to carry through, and dropping `shown` loses nothing. The
+  -- OTHER road into the battlefield agrees: CR 712.14's default is front face up.
+  --
+  -- CR 701.42a's melded permanent does not come through here at all. CR 712.14c
+  -- puts the pair onto the battlefield "as a single permanent with their back
+  -- faces up", which is one object arriving rather than either component card
+  -- entering with a face chosen.
+  Layout.Meld -> Nothing
 
 -- CR 202.3b / 712.8e: the face a MANA VALUE is read from, which is not always
 -- the face whose other characteristics are live. "While a nonmodal double-faced
@@ -728,7 +784,7 @@ enteringFace card shown = case Card.layout card of
 --
 -- Takes the live face rather than deriving it, so the two questions stay one
 -- call apart: every layout but Transforming answers with exactly what it was
--- given, and the reader (Pawl.Engine.Game.manaCostFaceOf) is the only place that
+-- given, and the reader (Pawl.Engine.Game.manaCostFacesOf) is the only place that
 -- has to know the difference.
 --
 -- Only CR 202.3b's FIRST sentence, which is about the object itself. Its second
@@ -754,6 +810,15 @@ manaCostFace card live = case Card.layout card of
   -- has only the characteristics of the face that's up." Mana value is a
   -- characteristic (CR 109.3), so the face that's up is where it is read from.
   Layout.ModalDoubleFaced -> live
+  -- The live face, there being one. CR 712.8e's exception is written about a
+  -- nonmodal double-faced permanent; CR 712.8g states the meld rule separately
+  -- and is about the MELDED permanent's mana value -- the sum of the two front
+  -- faces' -- which is a question about an object represented by two cards and
+  -- not one this function can be asked. Pawl.Engine.Game.manaCostFacesOf is
+  -- where CR 202.3c reads the pair, off the object's own source; what reaches
+  -- this arm is a meld CARD that is not part of a melded permanent, whose own
+  -- front face is all there is (CR 712.4b, CR 712.8b).
+  Layout.Meld -> live
 
 -- CR 202.3b, second sentence: is this card, showing this face, "the back face of
 -- a nonmodal double-faced object"? "If a permanent or spell is a copy of the
@@ -771,8 +836,11 @@ manaCostFace card live = case Card.layout card of
 -- the face that's up", its back face prints a mana cost of its own, and CR
 -- 202.3b's first sentence never reached it either.
 --
--- CR 202.3c states the identical rule for a copy of a MELDED permanent. Melding
--- is unmodelled (#369), so no object can be one for this to answer about.
+-- CR 202.3c states the identical rule for a copy of a MELDED permanent, and that
+-- one is NOT answered here: a melded permanent shows the interned combined face
+-- (CR 712.8g), whose layout carries nothing about the pair, so the question is
+-- about the object's SOURCE rather than about a card and a face.
+-- Pawl.Engine.Event's copiedSnapshot asks it there, beside the answer this gives.
 --
 -- The face is matched by NAME against the card's printed order, the way nextFace
 -- above does it, so a name that resolves to no face falls back to the front
@@ -789,6 +857,10 @@ showsBackFace card mName = case Card.layout card of
       Nothing -> False
       Just index -> index /= 0
   Layout.ModalDoubleFaced -> False
+  -- CR 202.3b names the NONMODAL kind, and CR 202.3c states the copy rule for a
+  -- melded permanent separately. A meld CARD is neither: it shows the one face it
+  -- prints (CR 712.4b), so it is never the back face of anything.
+  Layout.Meld -> False
 
 -- CR 709.5: does this card have a SHARED TYPE LINE -- is it a Room? "Some split
 -- cards are permanent cards with a single shared type line", and everything the
@@ -809,6 +881,10 @@ hasSharedTypeLine card = case Card.layout card of
   Layout.Adventure -> False
   Layout.Transforming -> False
   Layout.ModalDoubleFaced -> False
+  -- CR 709.5's shared type line belongs to a split card, and CR 712.1 counts a
+  -- meld card among the double-faced ones instead: its two sides are two sides,
+  -- not two halves of one printed line.
+  Layout.Meld -> False
 
 -- CR 709.5: what a Room permanent's characteristics ARE, given which of its
 -- halves are unlocked (CR 709.5c). The shared type line "represents two static

@@ -1962,7 +1962,7 @@ lifeGainAmountSpec s registry =
       -- settle.
       entering oid gs =
         let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-         in resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project oid gs))] gs))
+         in resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project oid gs))] gs))
    in Spec.describe s "CR 119.9 that much life" $ do
         -- The gameplay-level proof, cast to resolution. alice's Renewed Faith
         -- gains her 6 (CR 119.3), the Bond's trigger matches that event, and its
@@ -2039,7 +2039,7 @@ falseCureSpec s registry =
       -- Moved event is recorded, and CR 603.6a's scan runs at the next settle.
       entering oid gs =
         let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-         in resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project oid gs))] gs))
+         in resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project oid gs))] gs))
       -- alice casts the Cure off two Swamps on a three-seat board, and everything
       -- else is already on the battlefield: bob's Radiant Fountain (CR 119.3, "you
       -- gain 2 life" for BOB), alice's Soul Warden and a Goblin Piker under carol
@@ -2188,7 +2188,7 @@ singularCureSpec s registry =
       -- event is recorded, and CR 603.6a's scan runs at the next settle.
       entering n oid gs =
         let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-         in resolveAll n (settle n (S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project oid gs))] gs))
+         in resolveAll n (settle n (S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project oid gs))] gs))
       -- The distinct EventGroups the log's life gains carry. The precondition
       -- the whole group rests on, asserted rather than assumed: were the seats'
       -- gains not one group, the earliest-group step would already have picked a
@@ -2347,7 +2347,7 @@ apnapDelayedSpec s registry =
             cast = S.cast first firstSpell >> S.cast second secondSpell
             resolved = snd (Engine.runGamePure S.identityAnswer (snd (Engine.runGamePure S.identityAnswer withSecond cast)) Engine.priorityLoop)
             moved = ZoneChange.MkZoneChange peacemakerId peacemakerId Zone.Stack Zone.Battlefield
-        pure (S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project peacemakerId resolved))] resolved)
+        pure (S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project peacemakerId resolved))] resolved)
       -- One run, read twice, so the controllers asked and the life totals cannot
       -- come from different games.
       played gs = State.runState (Engine.runGame laterKnows gs (Engine.settleForPriority >> Engine.priorityLoop)) []
@@ -2394,7 +2394,7 @@ apnapDelayedSpec s registry =
           peacemaker <- S.printingOf s registry "Centaur Peacemaker"
           let (peacemakerId, placed) = S.addCreature peacemaker S.alice S.threePlayerGame
               moved = ZoneChange.MkZoneChange peacemakerId peacemakerId Zone.Stack Zone.Battlefield
-              gs = S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project peacemakerId placed))] placed
+              gs = S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project peacemakerId placed))] placed
           Spec.assertEqWith s "no question is raised" (asked gs) []
           Spec.assertEqWith s "alice is at 24" (S.lifeOf S.alice (after gs)) (Just 24)
           Spec.assertEqWith s "bob is at 24" (S.lifeOf S.bob (after gs)) (Just 24)
@@ -2556,7 +2556,7 @@ communalReckoningSpec s registry =
       -- event is recorded, and CR 603.6a's scan runs at the next settle.
       entering oid gs =
         let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-         in resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project oid gs))] gs))
+         in resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project oid gs))] gs))
       -- The distinct EventGroups the log's life gains carry, and how many gains
       -- there were. The precondition every case rests on, asserted rather than
       -- assumed: were the seats' gains not one group, "once for the batch" would
@@ -2691,7 +2691,7 @@ communalRelapseSpec s registry =
             (spellId, withSpell) = S.addHandCard spell S.alice withPeacemaker
             gs = resolveAll (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId)))
             moved = ZoneChange.MkZoneChange peacemakerId peacemakerId Zone.Stack Zone.Battlefield
-        pure (S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project peacemakerId gs))] gs)
+        pure (S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project peacemakerId gs))] gs)
       played gs = State.runState (Engine.runGame counting gs (Engine.settleForPriority >> Engine.priorityLoop)) 0
       -- How many times the question was asked, and the board it was asked on --
       -- one run, read twice, so the count and the totals cannot come from

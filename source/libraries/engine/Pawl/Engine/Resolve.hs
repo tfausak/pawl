@@ -159,6 +159,7 @@ import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaUnit as ManaUnit
+import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
@@ -388,6 +389,10 @@ objectRefSlots ref = case ref of
   -- EachMatching's answer: the candidates come off the battlefield, so no slot
   -- names them and the chooser is CR 608.2c's resolving controller.
   ObjectRef.AnyNumberMatching _ -> Map.empty
+  -- The arm above's answer, for its reason: the candidates come off the
+  -- battlefield, so no slot names them and the chooser is CR 608.2c's resolving
+  -- controller.
+  ObjectRef.ChosenPermanent _ -> Map.empty
 
 -- The Quantities an ObjectRef carries: the two library walks' counts.
 -- Exhaustive, no wildcard: slotsAreExhaustive, readsX and Pawl.CardSpec's Count traversal all
@@ -415,6 +420,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.EachCardFromAmong {} -> []
   ObjectRef.RandomCardInHand _ -> []
   ObjectRef.AnyNumberMatching _ -> []
+  ObjectRef.ChosenPermanent _ -> []
 
 -- The slots a MonarchTarget reads: only the targeted arm names one.
 monarchTargetSlots :: MonarchTarget.MonarchTarget -> Map.Map SlotName SlotArity
@@ -572,6 +578,9 @@ slotsOf effect = case effect of
   Effect.DoesNotUntapNext ref -> objectRefSlots ref
   Effect.Transform ref -> objectRefSlots ref
   Effect.Convert ref -> objectRefSlots ref
+  -- A READ of the cards to meld; the combined back face is literal card data and
+  -- names no slot.
+  Effect.Meld (Meld.MkMeld ref _) -> objectRefSlots ref
   Effect.PhaseOut ref -> objectRefSlots ref
   Effect.AddPhases _ -> Map.empty
   Effect.EndTurn -> Map.empty
@@ -852,6 +861,9 @@ slotsAreExhaustive effect = case effect of
   Effect.DoesNotUntapNext _ -> True
   Effect.Transform _ -> True
   Effect.Convert _ -> True
+  -- The combined face is interned with EMPTY bindings, CreateEmblem's reason, so
+  -- its text is literal.
+  Effect.Meld _ -> True
   Effect.PhaseOut _ -> True
   Effect.AddPhases _ -> True
   Effect.EndTurn -> True
@@ -1016,6 +1028,7 @@ readsX = any effectReadsX
       Effect.DoesNotUntapNext _ -> False
       Effect.Transform _ -> False
       Effect.Convert _ -> False
+      Effect.Meld _ -> False
       Effect.PhaseOut _ -> False
       Effect.AddPhases _ -> False
       Effect.EndTurn -> False
@@ -1218,6 +1231,9 @@ boundSlots effect = case effect of
   Effect.DoesNotUntapNext _ -> Set.empty
   Effect.Transform _ -> Set.empty
   Effect.Convert _ -> Set.empty
+  -- CR 701.42a's melded permanent is bound to nothing: no printing names it later
+  -- in its own instruction list.
+  Effect.Meld _ -> Set.empty
   Effect.PhaseOut _ -> Set.empty
   Effect.AddPhases _ -> Set.empty
   Effect.EndTurn -> Set.empty
@@ -2101,6 +2117,7 @@ alreadyTurnedFor resolving victim gs = case Game.lookupObject resolving gs of
             Just (Maybe.fromMaybe (Object.timestamp ability) (TriggeredAbilitySource.createdAt triggered))
         | otherwise -> Nothing
       Source.OfCard _ -> Nothing
+      Source.OfMeld _ -> Nothing
       Source.OfToken _ -> Nothing
       Source.OfEmblem _ -> Nothing
       Source.OfSpellCopy _ -> Nothing
@@ -2272,6 +2289,12 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- which Pawl.CardSpec's inertChoosers rejects at load time --
   -- ChosenCardInGraveyard's note below is the shape.
   ObjectRef.AnyNumberMatching _ -> []
+  -- The arm above's answer, for its reason: a CR 608.2d question, so this pure
+  -- sweep answers nothing for it. The Effect.MoveToZone gather is the one arm
+  -- that reaches the Game monad to ask it; under any other opcode this empty
+  -- answer is an inert card-data error, which Pawl.CardSpec's inertChoosers
+  -- rejects at load time.
+  ObjectRef.ChosenPermanent _ -> []
   -- EachMatching's sweep with CR 109.2's battlefield default switched off by the
   -- card's own words (CR 109.2a), over CR 400.1's per-player zone. Whose
   -- graveyards is graveyardScopePlayers below -- either the perspective's own
@@ -2310,6 +2333,12 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- two abilities of one OBJECT and for a dies trigger the two ids differ. Read
   -- off GameState.exile directly because CR 400.1 makes exile one SHARED zone --
   -- no player to ask, and no APNAP sort, so ascending id and thus arrival order.
+  --
+  -- The SAME read answers a second wording that rule 607.2a does not cover: one
+  -- ability referring back to what its own earlier instruction exiled, which is
+  -- CR 400.7j in CR 608.2c's written order rather than a link between two printed
+  -- abilities. Hanweir Battlements' "exile them, then meld them into Hanweir, the
+  -- Writhing Township" is that printing, and this is the ref its Meld reads.
   ObjectRef.EachCardExiledWithSource mFilter ->
     let context = effectContext controller source legal (slotGroups resolving gs)
         stated oid = case mFilter of
@@ -2583,6 +2612,9 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.RandomCardInHand _ -> []
   -- No recipients: only turnPermanentsOver's gather can ask the chooser.
   ObjectRef.AnyNumberMatching _ -> []
+  -- No recipients: the arm above's answer, for its reason -- only a gather that
+  -- reaches the Game monad can ask the chooser.
+  ObjectRef.ChosenPermanent _ -> []
 
 -- CR 608.2f's order for the per-object loop: APNAP first, reading a player
 -- recipient as that seat and an object as its controller's. Imposed here rather
@@ -2957,16 +2989,18 @@ referredToSources gs =
 referentsOfObject :: Object.Object -> [ObjectId]
 referentsOfObject obj = sourceObjectOf (Object.source obj) <> referentsOfBindings (Object.bindings obj)
 
--- The object a Source names, and TOTAL over all seven arms rather than two and a
+-- The object a Source names, and TOTAL over every arm rather than two and a
 -- wildcard: a future arm that names an object owes this list a line, and `_`
 -- would swallow it. Only the two on-stack ability arms name one -- CR 113.7's
 -- "the object whose ability was activated" and "the object whose ability
--- triggered". The four card-shaped arms ARE the object rather than naming
--- another, and CR 725.2's inherent trigger has no object source at all, which is
--- the whole of what distinguishes it from OfTrigger.
+-- triggered". The card-shaped arms ARE the object rather than naming another --
+-- a melded permanent included, CR 701.42a making it one object however many
+-- cards represent it -- and CR 725.2's inherent trigger has no object source at
+-- all, which is the whole of what distinguishes it from OfTrigger.
 sourceObjectOf :: Source.Source -> [ObjectId]
 sourceObjectOf src = case src of
   Source.OfCard _ -> []
+  Source.OfMeld _ -> []
   Source.OfToken _ -> []
   Source.OfAbility a -> [ActivatedAbilitySource.source a]
   Source.OfTrigger t -> [TriggeredAbilitySource.source t]
@@ -3268,6 +3302,10 @@ spellCopyOf :: Source.Source -> Maybe Source.Source
 spellCopyOf source = case source of
   Source.OfCard pid -> Just (Source.OfSpellCopy pid)
   Source.OfSpellCopy pid -> Just (Source.OfSpellCopy pid)
+  -- CR 707.10 copies a SPELL, and a melded permanent is never one (CR 701.42a
+  -- puts it onto the battlefield). CR 202.3c's copy of a melded permanent is a
+  -- permanent copy and does not come through here.
+  Source.OfMeld _ -> Nothing
   Source.OfToken _ -> Nothing
   Source.OfAbility _ -> Nothing
   Source.OfTrigger _ -> Nothing
@@ -4084,9 +4122,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- an empty set, so the later clause finds an unbound slot and does nothing --
     -- which is exactly what "IF a creature card is put into a graveyard this way"
     -- asks for.
+    --
+    -- EVERY arrival of each destruction, not just the first: CR 712.21c gives an
+    -- effect that finds what a melded permanent becomes both cards, and CR
+    -- 712.21e counts a melded permanent as two CARDS put into a graveyard where
+    -- the amount slot above counts it as one OBJECT destroyed.
     Monad.forM_ mBuried $ \slot -> do
       after <- State.get
-      let buriedCards = filter (\oid -> isCardInAGraveyard oid after) (Maybe.mapMaybe snd destroyed)
+      let buriedCards = concatMap (filter (\oid -> isCardInAGraveyard oid after) . Foldable.toList . snd) destroyed
       Monad.unless (null buriedCards) (State.modify' (bindObjectsSlot resolving slot (Seq.fromList buriedCards)))
     -- The THIRD reading, and the only one that keeps a controller: the PERMANENTS
     -- CR 701.8 destroyed, under the ids they held on the battlefield, for
@@ -4252,7 +4295,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- read ONCE ahead of this fold (see mBlocked below), so CR 608.2f's
             -- single event cannot see it move between members.
             Monad.forM_ mBlocked (Combat.putOntoBattlefieldBlocking newId)
-          pure (maybe sofar (`Set.insert` sofar) mNew, mNew : acc)
+          pure (foldr Set.insert sofar mNew, mNew : acc)
         -- The context a CHOICE's candidates are filtered in, off the board the
         -- choice is being made on: the resolution's own slots ride along, so a
         -- card offering "a permanent card from among them" (Midnight Tilling)
@@ -4430,6 +4473,32 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- opcode names no object; the destination and CR 400.7's funnel
             -- need a producer first (gap #2418).
             ObjectRef.AnyNumberMatching _ -> pure []
+            -- CR 608.2d's singular of the arm above: "a creature named Hanweir
+            -- Garrison" in Hanweir Battlements' "exile them, then meld them",
+            -- announced while the effect is applied. The candidates are
+            -- EachMatching's sweep of the same Filter, read live off the pre-move
+            -- board (CR 608.2c), so the sweep and the offer cannot disagree about
+            -- what matches.
+            --
+            -- Asked only at TWO or more candidates, which is the whole of what
+            -- parts this from the arm above: CR 608.2d admits only a legal
+            -- option, so one candidate leaves one legal announcement and no
+            -- decision to put to anybody, and none makes the instruction
+            -- impossible -- CR 101.3 ignores that part and CR 609.3 leaves the
+            -- rest of the effect to do as much as it can.
+            -- Pawl.Types.Prompt.ChoosePermanent is where that posture is written.
+            --
+            -- FILTERED, not trusted (#222), the hand arm's reason: an answer
+            -- naming a permanent that was never offered would otherwise be moved.
+            ObjectRef.ChosenPermanent filter_ -> do
+              gs <- State.get
+              case battlefieldMatching legal resolving controller source gs filter_ of
+                [] -> pure []
+                [only] -> pure [only]
+                first : second : more -> do
+                  let offered = first NonEmpty.:| (second : more)
+                  answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
+                  pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
           arrivals <- settleArrivals zone placement targets
           -- The batch's own board, read after CR 401.4's arrangement asks (which
           -- move nothing) and before any member does.
@@ -4475,7 +4544,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- 401.4 arrangements, which move nothing and record nothing; a bracket
           -- reaching over them would only widen what the group means.
           arrived <- fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mBlocked frozen before) (Set.empty, []) arrivals))
-          Monad.mapM_ (\slot -> bindArrivals slot (Maybe.catMaybes arrived)) mSlot
+          Monad.mapM_ (\slot -> bindArrivals slot (concatMap Foldable.toList arrived)) mSlot
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries. Two
   -- steps: CR 400.7's move through the same changeZone funnel every destination
   -- uses, so a library-entry replacement gets its CR 616.1 opportunity (CR 400.3
@@ -4653,7 +4722,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- 701.17a mills them at once -- and recorded even for a card a replacement
     -- diverted elsewhere, since it was milled wherever it ended up.
     arrivals <- fmap concat . Monad.forM milledBy $ \(pid, cards) -> do
-      arrived <- Maybe.catMaybes <$> Monad.mapM (\c -> Event.changeZoneReturning c Zone.Graveyard) cards
+      arrived <- concatMap Foldable.toList <$> Monad.mapM (\c -> Event.changeZoneReturning c Zone.Graveyard) cards
       Monad.unless (null arrived) (State.modify' (Event.recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList arrived)))))
       pure arrived
     -- CR 701.17c: a later clause naming the milled cards -- Midnight Tilling's
@@ -4876,7 +4945,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- binding below; a move that did not complete answers Nothing and is dropped.
     moved <-
       fmap concat . Monad.forM doomed $ \(victim, oids) ->
-        fmap Maybe.catMaybes (Monad.mapM (Event.discardReturning DiscardCause.Ordinary victim) oids)
+        fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.Ordinary victim) oids)
     -- The cards "discarded this way", for a later effect of the same resolution
     -- to look back at -- Psychic Miasma's "if a land card is discarded this way".
     -- The CR 400.7 incarnations the funnel MINTED, never the hand ids it was
@@ -5984,16 +6053,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- return when an opponent of `controller` (CR 102.2) BECOMES the
           -- monarch. Armed undischarged whoever holds the crown now, so an
           -- opponent who already holds it does not free the creature.
+          --
+          -- One watch per ARRIVAL, which is CR 712.21c: an effect that can find
+          -- the new object a melded permanent becomes finds both cards, and "the
+          -- same actions are taken upon each of them" -- so both come back when
+          -- an opponent becomes the monarch.
           mNew <- Event.changeZoneReturning target Zone.Exile
-          case mNew of
-            Nothing -> pure ()
-            Just newId -> do
-              let watch =
-                    MonarchWatch.MkMonarchWatch
-                      { MonarchWatch.controller = controller,
-                        MonarchWatch.due = False
-                      }
-              State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.insert newId watch (GameState.exiledUntilMonarch g)})
+          Monad.forM_ mNew $ \newId -> do
+            let watch =
+                  MonarchWatch.MkMonarchWatch
+                    { MonarchWatch.controller = controller,
+                      MonarchWatch.due = False
+                    }
+            State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.insert newId watch (GameState.exiledUntilMonarch g)})
       _ -> pure ()
   Effect.ExileHaunting (ExileHaunting.MkExileHaunting card slot) ->
     case legalOne slot legal of
@@ -6512,6 +6584,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- SAME call and not a similar one. The two opcodes stay distinct in the card
   -- data (Pawl.Types.Effect.Convert) and identical in behaviour here.
   Effect.Convert ref -> turnPermanentsOver legal resolving controller source ref
+  Effect.Meld (Meld.MkMeld ref resultCard) -> do
+    gs <- State.get
+    -- An ordinary read of the ref (CR 608.2c), not a question: the cards were
+    -- named by the ability that melds -- for the pool's only pair, the slot its
+    -- own "exile them" bound (CR 400.7j) -- so there is nothing here to ask. The
+    -- one choice this card makes is WHICH counterpart to exile, and it is made an
+    -- instruction earlier.
+    --
+    -- Event.meld is the whole of CR 701.42a, gate included: it refuses (CR
+    -- 701.42b) by writing nothing, which is CR 701.42c's "they stay in their
+    -- current zone" -- the cards are wherever the exile left them, and this
+    -- resolution simply had no effect. Nothing is bound and no slot is filled: no
+    -- printing names the melded permanent later in its own instruction list.
+    Monad.void (Event.meld controller (objectRefObjects legal resolving controller source gs ref) resultCard)
   Effect.PhaseOut ref ->
     State.modify' $ \gs ->
       -- CR 702.26b: each named permanent phases out; the victims are enumerated

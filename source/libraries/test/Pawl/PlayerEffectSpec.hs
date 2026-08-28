@@ -5100,7 +5100,7 @@ jaredBoard jared jailer piker =
 etbResolved :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 etbResolved oid gs =
   let entered = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-      withEvent = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project oid gs))] gs
+      withEvent = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project oid gs))] gs
    in S.runPure S.identityAnswer (S.runPure S.identityAnswer withEvent Engine.settleForPriority) Engine.priorityLoop
 
 -- CR 725.2's crown steal, as the event it triggers off: `attacker` deals combat

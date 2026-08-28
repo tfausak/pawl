@@ -9,7 +9,7 @@ module Pawl.Types.ReplacementBucket where
 -- Blast creates one. ControlOnEntry (616.1b) is EntryR UnderSourceControl, from
 -- Gather Specimens. CopyOnEntry (616.1c) is EntryR AsCopy, from Clone, split from
 -- EntryR ChoiceOf, which stays in Other with every other arm. BackFaceOnEntry
--- (616.1d) is EntryR EntersTransformed, from CR 712.13a -- daybound's "if it is
+-- (616.1d) is EntryR EntersTransformed, from daybound's "if it is
 -- night ... it enters transformed" (CR 702.145b). Not CR 712.14a's "put onto the
 -- battlefield transformed", which is an instruction the effect carries
 -- (Pawl.Types.EntryRiders) rather than a replacement effect, and so takes no

@@ -527,7 +527,7 @@ playersFor context gs ref =
 -- under the id it left behind.
 snapshotView :: GameState -> EventShape.EventShape -> GameEvent.GameEvent -> Maybe Filter.View
 snapshotView gs shape event = case event of
-  GameEvent.Moved (Moved.MkMoved zc snapshot) -> case shape of
+  GameEvent.Moved (Moved.MkMoved zc snapshot _) -> case shape of
     EventShape.MovedBetween (MovedBetween.MkMovedBetween from to) ->
       if ZoneChange.from zc == from && ZoneChange.to zc == to
         then -- CR 608.2h: who controlled it and what KIND of object it was, read

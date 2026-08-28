@@ -256,7 +256,7 @@ spec s registry = Spec.describe s "ModalDoubleFaced" $ do
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     case nonLand resolved of
       [permId] -> do
-        Spec.assertEqWith s "Harnfel's own {4}{R}, not Birgi's {2}{R}" (fmap Quantity.manaValueOf (Game.manaCostFaceOf permId resolved)) (Just 5)
+        Spec.assertEqWith s "Harnfel's own {4}{R}, not Birgi's {2}{R}" (sum (fmap Quantity.manaValueOf (Game.manaCostFacesOf permId resolved))) 5
         Spec.assertEqWith s "and a filter reading a mana value agrees" (Filter.manaValue (Projection.viewOfObject permId resolved)) (Just 5)
       other -> Spec.assertFailure s ("expected one nonland permanent, got " <> show (length other))
   -- CR 712.9: "Only permanents represented by double-faced tokens and

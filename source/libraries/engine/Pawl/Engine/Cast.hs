@@ -1275,9 +1275,13 @@ castSpellWith applied pid oid name facing = do
       -- face down BEFORE it is put onto the stack, so the move carries the
       -- facing too and no reader inside it sees a face-up incarnation.
       moved <- Event.changeZoneCasting pid oid Zone.Stack (Just name) facing
-      case moved of
-        Nothing -> State.put before
-        Just sid -> do
+      -- ONE object on the stack, which is CR 601.2a's "the spell": the funnel
+      -- answers with more than one arrival only for a melded permanent leaving
+      -- the battlefield (CR 712.21), and CR 601.2's cast moves a CARD or a copy
+      -- of one from a zone that holds no permanent.
+      case Seq.viewl moved of
+        Seq.EmptyL -> State.put before
+        sid Seq.:< _ -> do
           -- CR 400.7h, run BEFORE the announcement so every step below reads one
           -- board: the rest of the effect that allowed this cast now names the
           -- spell rather than the card. CR 601.2e's rejection puts `before` back,
