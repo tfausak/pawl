@@ -2655,10 +2655,11 @@ paysWard who p = case p of
 -- the printed card. Static abilities that affect the characteristics of
 -- permanents on the battlefield aren't taken into account."
 --
--- Song of the Dryads is the CONTINUOUS EFFECT rule 708.12 says to ignore, and the
--- pool's only Aura that SETS a card type (CR 613.1d layer 4): "enchanted
--- permanent is a colorless Forest land", so a face-down permanent under it stops
--- being a creature at every projected read. Every case asserts that through
+-- Song of the Dryads is the CONTINUOUS EFFECT rule 708.12 says to ignore, chosen
+-- because it SETS a card type in CR 613.1d's layer 4 rather than adding one:
+-- "enchanted permanent is a colorless Forest land", so a face-down permanent
+-- under it stops being a creature at every projected read. An adding effect could
+-- not discriminate -- CR 708.2a has already made the permanent a creature. Every case asserts that through
 -- Projection.isCreatureOf BEFORE it activates anything, which is what stops a
 -- turn-over from being read as evidence the Song never applied.
 --
