@@ -282,6 +282,15 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing Nothing Nothing Nothing))
       " {\"type\":\"DamageCantBePrevented\",\"value\":{\"whatSource\":{\"type\":\"IsSource\"}}} "
+  -- CR 614.9 / Lava Burst, "if Lava Burst would deal damage to a creature, that
+  -- damage can't be ... dealt instead to another permanent or player": the
+  -- redirection twin, narrowed on both of the pattern's printed halves at once.
+  Spec.it s "DamageCantBeRedirected, naming its own source and a recipient" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.DamageCantBeRedirected (DamagePattern.MkDamagePattern Nothing Filter.IsSource (Just (Filter.HasCardType CardType.Creature)) Nothing Nothing Nothing))
+      " {\"type\":\"DamageCantBeRedirected\",\"value\":{\"whatRecipient\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"whatSource\":{\"type\":\"IsSource\"}}} "
   -- CR 701.23 / Leonin Arbiter.
   Spec.it s "CantSearchLibraries" $
     Common.assertCodec
