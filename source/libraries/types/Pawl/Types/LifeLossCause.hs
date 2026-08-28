@@ -30,7 +30,7 @@ data LifeLossCause
     --
     -- Not implemented: CR 701.12c's exchange and CR 119.7's redistribution move a
     -- life total without proposing a loss of their own, so no replacement reaches
-    -- either (#2548).
+    -- either (#2544).
     ByEffect
   | -- | CR 119.4: the life a PAYMENT costs its payer -- Pawl.Engine.Event.payLife,
     -- reached from a cost component, from CR 107.4f's Phyrexian symbol and from

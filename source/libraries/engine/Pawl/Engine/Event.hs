@@ -2953,7 +2953,7 @@ resolvePlayerCounters cause pid kind n = do
 -- Pawl.Types.LifeLossRewrite may be a scaling.
 --
 -- Not implemented: CR 701.12c's exchange and CR 119.7's redistribution do not come
--- through here (#2548).
+-- through here (#2544).
 --
 -- It does not WRITE the life total, unlike resolveUntap and the counter funnels
 -- above: every caller already owns that write, and the damage one has to fold its
