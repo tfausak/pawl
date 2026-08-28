@@ -1,6 +1,8 @@
 module Pawl.Types.DamageRewrite where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Scaling as Scaling
 
@@ -40,7 +42,15 @@ import qualified Pawl.Types.Scaling as Scaling
 -- 615 prevention -- it never says "prevent" (CR 615.1a) -- so `prevents` refuses
 -- it and CR 615.13's trigger never sees it. Its Recipient is engine-baked and
 -- never authored, exactly as DamagePattern.whichRecipient is: card data cannot
--- name an ObjectId, so Resolve's RedirectDamage arm is the one producer.
+-- name an ObjectId, so Resolve's RedirectDamage arm is the one producer, and
+-- Pawl.CardSpec's engineOnlyOffends is what keeps the corpus off it.
+--
+-- RedirectMatching is the CARD-PRINTED half of that same question, and the two
+-- are not one arm for DamagePattern's `whichRecipient` / `whatRecipient`
+-- reason: Redirect names an id the engine baked, where this one DESCRIBES the
+-- destination by characteristic -- Pariah's "is dealt to enchanted creature
+-- instead" is `Filter.IsHostOfSource`, and a permanent redirecting to itself
+-- (Palisade Giant) would write `Filter.IsSource`.
 --
 -- Not implemented: a redirect with a remaining AMOUNT, PreventNext's counted
 -- twin -- Harm's Way's "the next 2 damage ... is dealt to any target instead"
@@ -68,4 +78,32 @@ data DamageRewrite
   | SetAmount Natural.Natural
   | Scale Scaling.Scaling
   | Redirect Recipient.Recipient
+  | -- | CR 614.9's redirection with a PRINTED destination: the damage is dealt
+    -- instead to the one permanent on the battlefield this Filter describes.
+    --
+    -- A Filter rather than an identity enum beside it, for the reason
+    -- DamagePattern's `whatRecipient` gives and #163 states: "the enchanted
+    -- creature" and "this permanent" are one relation asked in two directions,
+    -- and Pawl.Types.Filter already spells both (IsHostOfSource, IsSource).
+    --
+    -- The rule redirects to ONE recipient -- "the same damage dealt to another
+    -- battle, creature, planeswalker, or player" -- so the destination is the
+    -- UNIQUE match, and a filter admitting none or several redirects nowhere:
+    -- CR 614.9's "the effect does nothing", which
+    -- Pawl.Engine.Replacement.printedDestination answers. Nothing in this type
+    -- stops a card describing several; the pool's one destination is
+    -- Filter.IsHostOfSource, which cannot.
+    --
+    -- A PLAYER destination has no spelling here: a Filter describes objects and
+    -- CR 120.3's other kind of recipient is not one, which is why DamagePattern
+    -- splits its printed recipient across `whatRecipient` and `whoRecipient`
+    -- rather than widening the Filter.
+    --
+    -- Nothing is lost by it today. The printings that redirect damage to a
+    -- player -- Blood of the Martyr, Sivvi's Valor and Vassal's Duty, Scryfall
+    -- `o:/dealt to you instead/`, 2026-08-28 -- are all one-shot RESOLUTIONS, so
+    -- their destination is baked by Effect.RedirectDamage into the Redirect
+    -- above. A card that printed a static one on a permanent would refute this,
+    -- and would want a player half here the way DamagePattern has one.
+    RedirectMatching (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

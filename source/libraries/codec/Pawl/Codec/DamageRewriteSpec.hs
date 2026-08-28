@@ -4,6 +4,7 @@ import qualified Pawl.Codec.DamageRewrite as DamageRewrite
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Scaling as Scaling
@@ -57,4 +58,13 @@ spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
       DamageRewrite.codec
       (DamageRewrite.Redirect (Recipient.ToCreature (ObjectId.MkObjectId 7)))
       " {\"type\":\"Redirect\",\"value\":{\"type\":\"ToCreature\",\"value\":7}} "
+  -- CR 614.9's redirection with a PRINTED destination (Pariah's "dealt to
+  -- enchanted creature instead"). The authored twin of Redirect above, so this
+  -- wire form IS a card's.
+  Spec.it s "RedirectMatching" $
+    Common.assertCodec
+      s
+      DamageRewrite.codec
+      (DamageRewrite.RedirectMatching Filter.IsHostOfSource)
+      " {\"type\":\"RedirectMatching\",\"value\":{\"type\":\"IsHostOfSource\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s DamageRewrite.codec
