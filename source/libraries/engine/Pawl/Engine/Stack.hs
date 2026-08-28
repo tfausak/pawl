@@ -77,11 +77,10 @@ resolveTopWith runSubgame = do
             --
             -- The CR 608.2b question (Resolve.targetsAllIllegal) stands in for
             -- rule 702.103e's "its target": bestow grants exactly one target,
-            -- the enchant slot CR 702.103b adds, and no bestow card in the pool
-            -- prints another. A bestowed spell with a second, still-legal
-            -- target would keep resolving as an Aura here, which is CR 608.3b's
-            -- own reading of "a spell with an illegal target" only if that
-            -- target is the enchant slot's.
+            -- the enchant slot CR 702.103b adds, and Nyxborn Rollicker --
+            -- data/cards/'s one bestow card -- prints no other. A bestowed spell
+            -- that ALSO printed a still-legal target would keep resolving as an
+            -- Aura here, where rule 702.103e reads the enchant slot alone.
             --
             -- One-way, like Pawl.Engine.Sba's CR 702.103f clear: nothing sets
             -- the field back.
@@ -91,6 +90,14 @@ resolveTopWith runSubgame = do
             -- clear above produced. `obj` is NOT re-read: the clear touches one
             -- Bool, and the fields taken off `obj` further down (its face, its
             -- facing, its default controller) are none of them that Bool.
+            --
+            -- A REGRESSION FENCE at the Aura test alone, said plainly rather
+            -- than left to look tested: pointing that one read back at `gs`
+            -- leaves the suite green, because an unbestowed spell has no
+            -- enchant slot and Resolve.targetsAllIllegal answers False for a
+            -- spell with none, so the Aura arm hands the same board back. It is
+            -- CR 702.103e's "the effect making it an Aura spell ends" written
+            -- out, not a passing test.
             gs1 <- State.get
             -- CR 709.3b: if this spell has a face singled out, its classification
             -- is read off THAT half, not the two combined -- routed through

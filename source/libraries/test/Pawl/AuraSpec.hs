@@ -2751,11 +2751,12 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
   -- never bestowed still goes to the graveyard, so a fix that dropped the fizzle
   -- wholesale reddens there rather than passing here.
   --
-  -- Card types, subtypes, P/T and the attachment are all read, because two wrong
-  -- readings survive a bare "it is on the battlefield": one that ends CR
-  -- 702.103b's effect but still takes the Aura arm enters attached to a host
-  -- that is gone, and one that leaves the spell bestowed enters as an
-  -- Enchantment with no P/T.
+  -- Card types, subtypes and P/T are all read, because "it is on the
+  -- battlefield" alone does not separate this from a reading that stopped
+  -- countering the spell without ending CR 702.103b's effect: that one leaves an
+  -- Enchantment Aura with no P/T of its own, exactly as the CR 702.103f case
+  -- above reads it while its host is alive. The attachment is read because CR
+  -- 608.3a enters the permanent attached to nothing.
   Spec.it s "CR 702.103e / 608.3b: a bestowed spell whose host died resolves as a 1/1 Satyr rather than being countered" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"

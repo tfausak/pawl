@@ -655,8 +655,9 @@ data Object = MkObject
     --
     -- CR 702.103c's copy of a bestowed Aura spell is bestowed by construction:
     -- Pawl.Engine.Resolve's CopySpell arm builds the copy from the original's
-    -- record and overwrites this field on neither road, and
-    -- Pawl.Engine.Projection.bestowGathered keys off nothing else. Unobserved
+    -- own record and rewrites every field CR 707.10 names, this one not among
+    -- them, and Pawl.Engine.Projection.bestowGathered keys off nothing else than
+    -- this field and Object.timestamp. Unobserved
     -- rather than unimplemented -- the pool's one copier reaches instants and
     -- sorceries alone, so no board mints such a copy; see #2355.
     --
