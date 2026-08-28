@@ -1642,7 +1642,6 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
         aliceFirst = strike [Recipient.ToPlayer S.alice, Recipient.ToCreature mine] shielded
         creatureFirst = strike [Recipient.ToCreature mine, Recipient.ToPlayer S.alice] shielded
         control = strike [] unshielded
-    Spec.assertEqWith s "setup: the resolution installed ONE shield, holding 3" (shieldsLeft shielded) [3]
     -- The pool ran out on alice's 5, so her creature's 2 is dealt in full. Under
     -- a shield per recipient this reads 0.
     Spec.assertEqWith s "spent on alice, the pool leaves her creature's 2 unprevented" (S.damageOf mine aliceFirst) (Just 2)
@@ -1665,6 +1664,11 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     Spec.assertEqWith s "her creature takes all 2" (S.damageOf mine control) (Just 2)
     Spec.assertEqWith s "and bob is untouched, there being no rider to run" (S.lifeOf S.bob control) (Just 20)
     Spec.assertEqWith s "the shield is spent to 0 and dropped either way (CR 615.7)" (shieldsLeft aliceFirst, shieldsLeft creatureFirst) ([], [])
+    -- The structural fence, AFTER the behaviour it explains rather than before
+    -- it: the resolution installed one row holding 3, not one per recipient.
+    -- Ordered last on purpose, since a row count sitting first absorbs every
+    -- mutation of the arm that builds the rows and reports itself instead.
+    Spec.assertEqWith s "and the resolution installed ONE shield, holding 3" (shieldsLeft shielded) [3]
 
 -- CR 615.5's additional effect on the UNBOUNDED shield (CR 615.1 / 615.3), which
 -- Test of Faith's countdown shield above cannot reach. Brace for Impact ({4}{W}
