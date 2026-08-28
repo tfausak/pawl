@@ -386,6 +386,10 @@ objectRefSlots ref = case ref of
   -- EachMatching's answer: the candidates come off the battlefield, so no slot
   -- names them and the chooser is CR 608.2c's resolving controller.
   ObjectRef.AnyNumberMatching _ -> Map.empty
+  -- The arm above's answer, for its reason: the candidates come off the
+  -- battlefield, so no slot names them and the chooser is CR 608.2c's resolving
+  -- controller.
+  ObjectRef.ChosenPermanent _ -> Map.empty
 
 -- The Quantities an ObjectRef carries: the two library walks' counts.
 -- Exhaustive, no wildcard: slotsAreExhaustive, readsX and Pawl.CardSpec's Count traversal all
@@ -413,6 +417,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.EachCardFromAmong {} -> []
   ObjectRef.RandomCardInHand _ -> []
   ObjectRef.AnyNumberMatching _ -> []
+  ObjectRef.ChosenPermanent _ -> []
 
 -- The slots a MonarchTarget reads: only the targeted arm names one.
 monarchTargetSlots :: MonarchTarget.MonarchTarget -> Map.Map SlotName SlotArity
@@ -2173,6 +2178,11 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- which Pawl.CardSpec's inertChoosers rejects at load time --
   -- ChosenCardInGraveyard's note below is the shape.
   ObjectRef.AnyNumberMatching _ -> []
+  -- The arm above's answer, for its reason: a CR 608.2d question, so this pure
+  -- sweep answers nothing for it. No opcode asks it yet, so a card writing it is
+  -- an inert card-data error wherever it stands, which is what Pawl.CardSpec's
+  -- inertChoosers says at load time (#369).
+  ObjectRef.ChosenPermanent _ -> []
   -- EachMatching's sweep with CR 109.2's battlefield default switched off by the
   -- card's own words (CR 109.2a), over CR 400.1's per-player zone. Whose
   -- graveyards is graveyardScopePlayers below -- either the perspective's own
@@ -2484,6 +2494,8 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.RandomCardInHand _ -> []
   -- No recipients: only the Effect.Transform gather can ask the chooser.
   ObjectRef.AnyNumberMatching _ -> []
+  -- No recipients: nothing can ask the chooser yet (#369).
+  ObjectRef.ChosenPermanent _ -> []
 
 -- CR 608.2f's order for the per-object loop: APNAP first, reading a player
 -- recipient as that seat and an object as its controller's. Imposed here rather
@@ -4234,6 +4246,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- opcode names no object; the destination and CR 400.7's funnel
             -- need a producer first (gap #2418).
             ObjectRef.AnyNumberMatching _ -> pure []
+            -- Not implemented: the one chosen permanent meld's exile names. The
+            -- arm above's state for the singular -- nothing gathers it here, so a
+            -- card writing the ref under this opcode names no object (#369).
+            ObjectRef.ChosenPermanent _ -> pure []
           arrivals <- settleArrivals zone placement targets
           -- The batch's own board, read after CR 401.4's arrangement asks (which
           -- move nothing) and before any member does.

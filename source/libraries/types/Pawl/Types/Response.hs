@@ -394,6 +394,12 @@ data Response
     -- ChoseTaps' reason: replaying a transcript against the wrong one would
     -- sacrifice what it should have transformed.
     ChoseAnyNumberOfPermanents (Set.Set ObjectId.ObjectId)
+  | -- | CR 608.2d: the ONE permanent a player chose out of the ones an effect
+    -- offered, where the effect named exactly one. A separate constructor from
+    -- ChoseAttachment below, though the payload has the same shape, for
+    -- ChoseTaps' reason: replaying a transcript against the wrong one would
+    -- attach a permanent where it should have named one to act on.
+    ChosePermanent ObjectId.ObjectId
   | -- | CR 701.3a: the object a player chose to attach a moving permanent to.
     ChoseAttachment ObjectId.ObjectId
   | -- | CR 601.2b: the cost a caster announced they would pay.

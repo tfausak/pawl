@@ -346,6 +346,9 @@ movesLibraryCard effect = case effect of
       -- The battlefield, the arm this one offers a subset of: EachMatching's
       -- answer, unchanged by a chooser standing between the sweep and the set.
       ObjectRef.AnyNumberMatching _ -> False
+      -- The battlefield again, the arm above's answer: taking one match instead
+      -- of a subset changes nothing about which zone the ref reaches.
+      ObjectRef.ChosenPermanent _ -> False
   Effect.AddMana _ -> False
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> False
   Effect.Fight {} -> False

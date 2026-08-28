@@ -834,6 +834,24 @@ data Prompt r where
   -- names, and conflating them would let shroud, hexproof and "becomes the
   -- target" triggers observe this choice (CR 115.10a).
   ChooseAnyNumberOfPermanents :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt (Set.Set ObjectId.ObjectId)
+  -- | CR 608.2d: WHICH ONE of the permanents an effect offers it acts on, where
+  -- the effect names exactly one -- Hanweir Battlements' "a creature named
+  -- Hanweir Garrison you control", Pawl.Types.ObjectRef.ChosenPermanent. The
+  -- ObjectId is the effect's source; the NonEmpty is the matching permanents,
+  -- engine-pre-filtered against that ref's Filter.
+  --
+  -- The arm above's singular, and the count is the whole of what parts them:
+  -- there is one answer rather than a subset, so this is asked only at TWO or
+  -- more candidates. At one the answer is forced -- CR 608.2d admits only a legal
+  -- option and there is exactly one -- so the caller takes it without asking,
+  -- ChooseAttachment's posture rather than ChooseAnyNumberToSacrifice's. At none
+  -- the instruction is impossible, which CR 101.3 ignores and CR 609.3 leaves the
+  -- rest of the effect to work around, so the caller never builds the NonEmpty.
+  --
+  -- NOT ChooseTargets: CR 115.1 makes a target only what the word "target"
+  -- names, and conflating them would let shroud, hexproof and "becomes the
+  -- target" triggers observe this choice (CR 115.10a).
+  ChoosePermanent :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 702.122a: which permanents to TAP to pay a cost measured by their
   -- TOTAL POWER. The ObjectId is the Vehicle; the [ObjectId] is the payer's
   -- matching untapped permanents, engine-pre-filtered; the Natural is a

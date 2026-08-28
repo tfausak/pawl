@@ -588,4 +588,39 @@ data ObjectRef
     -- cannot ask. Today Pawl.Engine.Resolve's Effect.Transform arm is the one
     -- that asks.
     AnyNumberMatching (Filter.Filter Keyword.Keyword)
+  | -- | EXACTLY ONE of the permanents on the battlefield matching the Filter,
+    -- chosen as the effect runs -- Hanweir Battlements' "exile ... and a creature
+    -- named Hanweir Garrison you control" (CR 701.42a).
+    --
+    -- The arm above's singular, and its Filter position exactly: the same zone,
+    -- the same sweep, the same shared candidate function, so a card cannot find
+    -- the sweep and the offer disagreeing about what matches, and "you control"
+    -- is a conjunct of the Filter here as it is there (CR 109.5 answers "you"
+    -- against the resolving controller). The RESOLVING CONTROLLER chooses, by CR
+    -- 608.2c, so there is no Pawl.Types.Chooser beside the Filter.
+    --
+    -- NOT A TARGET (CR 115.10a): the printed sentence does not say "target", so
+    -- CR 115.1 declares nothing at announcement, nothing narrows the offered set
+    -- for the player, and shroud, hexproof and "becomes the target" triggers must
+    -- not observe the choice. CR 608.2b has nothing to re-validate.
+    --
+    -- EXACTLY ONE, which is the whole of what parts this arm from the one above
+    -- and is why it is NOT asked at a single candidate: CR 608.2d lets the player
+    -- announce only a legal option, so with one candidate there is one legal
+    -- announcement and no decision in the prompt at all -- the posture
+    -- Pawl.Types.Prompt.ChooseAttachment and ChooseSacrifices already take, and
+    -- not an elision, since eliding needs indistinguishable OPTIONS and here
+    -- there is one option. At zero candidates the instruction is impossible and
+    -- CR 101.3 ignores it, CR 609.3 leaving the rest of the effect to do as much
+    -- as it can.
+    --
+    -- MANDATORY: no arm of this type declines, so a card printing "you may"
+    -- around such a choice writes the may as the enclosing effect, never here.
+    --
+    -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
+    -- read, so objectRefObjects answers nothing for it -- ChosenCardInGraveyard's
+    -- note above says why, and the same lint rejects it under an opcode that
+    -- cannot ask. Today NO opcode asks it: the exile that wants it is a
+    -- Pawl.Types.Effect.MoveToZone gather, which does not yet gather it (#369).
+    ChosenPermanent (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

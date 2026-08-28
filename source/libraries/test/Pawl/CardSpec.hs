@@ -3091,6 +3091,10 @@ objectRefFilters ref = case ref of
   -- Filter position exactly -- same zone, same sweep, the chooser standing
   -- between the matches and the set -- so it is framed the same way.
   ObjectRef.AnyNumberMatching f -> [f]
+  -- Hanweir Battlements' "a creature named Hanweir Garrison you control": the
+  -- arm above's Filter position, one permanent instead of a subset, so it is
+  -- framed the same way.
+  ObjectRef.ChosenPermanent f -> [f]
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -4125,6 +4129,7 @@ chooserRef ref = case ref of
   ObjectRef.ChosenCardFromAmong {} -> True
   ObjectRef.RandomCardInHand {} -> True
   ObjectRef.AnyNumberMatching {} -> True
+  ObjectRef.ChosenPermanent {} -> True
 
 -- The asking matrix itself: whether the site an Asks names asks THIS arm. A
 -- per-(site, arm) pair and not a per-site or per-arm predicate, because both
@@ -6181,6 +6186,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- states no bound, so nothing about the ref caps how many permanents
           -- the chooser may name.
           ObjectRef.AnyNumberMatching _ -> False
+          -- TRUE where the arm above is False, which is the whole difference
+          -- between them: the ref names exactly one permanent however many match.
+          ObjectRef.ChosenPermanent _ -> True
         -- Does this PlayerRef name at most ONE seat? A per-player count over it
         -- -- a library's top card, a card chosen out of a hand -- moves at most
         -- one object exactly when it does.
@@ -6330,6 +6338,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard)
         atRandom = ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.You)
         anyNumber = ObjectRef.AnyNumberMatching anyCard
+        onePermanent = ObjectRef.ChosenPermanent anyCard
         moves ref = Effect.MoveToZone (MoveToZone.MkMoveToZone ref Zone.Battlefield EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
         reveals ref = Effect.Reveal (Reveal.MkReveal ref Nothing)
         inert :: [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> [Bool]
@@ -6363,6 +6372,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "the battlefield subset is asked by the transform gather alone"
       (inert [Effect.Transform anyNumber, moves anyNumber, reveals anyNumber, Effect.Tap anyNumber])
       [False, True, True, True]
+    -- The singular of the arm above, and today NO site asks it: the exile that
+    -- wants it is a MoveToZone gather (#369), so until that gather learns the arm
+    -- every opcode leaves it naming nothing and the lint says so. This asserts
+    -- the arm reaches chooserRef at all -- an arm missing from THAT traversal
+    -- would answer False here at every site and no -Werror would name it.
+    Spec.assertEqWith
+      s
+      "one chosen permanent is asked by no site yet (#369)"
+      (inert [Effect.Transform onePermanent, moves onePermanent, reveals onePermanent, Effect.Tap onePermanent])
+      [True, True, True, True]
     -- The other direction on the same opcode: a ref that is a READ rather than a
     -- CR 608.2d question is fine anywhere, so the lint is about the arm and not
     -- about Transform.
