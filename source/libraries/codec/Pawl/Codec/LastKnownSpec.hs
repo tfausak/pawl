@@ -1,10 +1,13 @@
 module Pawl.Codec.LastKnownSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Codec.LastKnown as LastKnown
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteristicsSpec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -20,7 +23,7 @@ minimalJson = "{\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
-  -- CR 608.2h, all six axes. `characteristics` and `copiable` are the same type
+  -- CR 608.2h, all seven axes. `characteristics` and `copiable` are the same type
   -- and hold DIFFERENT values here, because CR 707.2's layer-1-only reading is
   -- exactly what the whole fold loses -- an encoder writing one where the other
   -- belongs would round trip against equal values.
@@ -34,7 +37,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.source = Source.OfCard (PrintingId.MkPrintingId 2),
           LastKnown.counters = Map.singleton CounterKind.PlusOnePlusOne 3,
           LastKnown.copiable = ProjectedCharacteristicsSpec.minimalCharacteristics,
-          LastKnown.attachedTo = Just (Recipient.ToCreature (ObjectId.MkObjectId 8))
+          LastKnown.attachedTo = Just (Recipient.ToCreature (ObjectId.MkObjectId 8)),
+          LastKnown.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker"))
         }
       ( " {\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
@@ -42,11 +46,13 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> ",\"counters\":[{\"key\":{\"type\":\"PlusOnePlusOne\"},\"value\":3}]"
           <> ",\"copiable\":"
           <> minimalJson
-          <> ",\"attachedTo\":{\"type\":\"ToCreature\",\"value\":8}} "
+          <> ",\"attachedTo\":{\"type\":\"ToCreature\",\"value\":8}"
+          <> ",\"chosenNames\":[\"Goblin Piker\"]} "
       )
-  -- CR 109.3: an attachment is not a characteristic, and most objects have none,
-  -- so the absent case is written out rather than left to the case above.
-  Spec.it s "an object that was attached to nothing, and carried no counters" $
+  -- CR 109.3: neither an attachment nor a chosen name is a characteristic, and
+  -- most objects have neither, so the absent case is written out rather than left
+  -- to the case above.
+  Spec.it s "an object that was attached to nothing, carried no counters and chose no name" $
     Common.assertCodec
       s
       LastKnown.codec
@@ -56,7 +62,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.source = Source.OfToken (PrintingId.MkPrintingId 5),
           LastKnown.counters = Map.empty,
           LastKnown.copiable = ProjectedCharacteristicsSpec.minimalCharacteristics,
-          LastKnown.attachedTo = Nothing
+          LastKnown.attachedTo = Nothing,
+          LastKnown.chosenNames = Set.empty
         }
       ( " {\"characteristics\":"
           <> minimalJson
@@ -64,7 +71,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> ",\"counters\":[]"
           <> ",\"copiable\":"
           <> minimalJson
-          <> ",\"attachedTo\":null} "
+          <> ",\"attachedTo\":null"
+          <> ",\"chosenNames\":[]} "
       )
   Spec.it s "has a schema" $
     Common.assertHasSchema s LastKnown.codec

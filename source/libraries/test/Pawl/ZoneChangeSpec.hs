@@ -1691,7 +1691,7 @@ redistributeLifeTotalsSpec s registry =
           -- that handed out totals blindly would still have "given" him one.
           -- Taking his own is a delta of 0 and therefore no life event at all.
           Spec.assertEqWith s "bob's Pridemate stayed silent: his own total back is no gain" (countersOn bobMate after) (Just 0)
-          -- 14 milled, plus the spent sorcery itself (CR 608.2m), which is alice's
+          -- 14 milled, plus the spent sorcery itself (CR 608.2n), which is alice's
           -- card and lands in her graveyard -- so this also witnesses that the
           -- spell really resolved rather than fizzling quietly.
           Spec.assertEqWith s "bob's Mindcrank milled alice for exactly what she lost" (graveyardSize S.alice after) 15

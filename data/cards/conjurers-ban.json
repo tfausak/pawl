@@ -1,0 +1,110 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Conjurer's Ban",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ChooseCardName",
+                    "value": {
+                      "type": "And",
+                      "value": []
+                    }
+                  }
+                ]
+              },
+              {
+                "effects": [
+                  {
+                    "type": "AffectPlayers",
+                    "value": {
+                      "duration": {
+                        "type": "UntilYourNextTurn"
+                      },
+                      "effect": {
+                        "type": "CantCastChosenName"
+                      },
+                      "players": {
+                        "type": "Scoped",
+                        "value": {
+                          "type": "EachPlayer"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "AffectPlayers",
+                    "value": {
+                      "duration": {
+                        "type": "UntilYourNextTurn"
+                      },
+                      "effect": {
+                        "type": "CantPlayLandChosenName"
+                      },
+                      "players": {
+                        "type": "Scoped",
+                        "value": {
+                          "type": "EachPlayer"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "effects": [
+                  {
+                    "type": "Draw",
+                    "value": {
+                      "player": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -50,7 +50,15 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- progress has to be writable to JSON (#126); see #1059 for the older claim that
 -- a stored carrier had none.
 data ActivePlayerEffect = MkActivePlayerEffect
-  { source :: ObjectId.ObjectId,
+  { -- | The object that resolved -- for an activated or triggered ability, CR
+    -- 113.7's source of it. Often an id nothing holds any more: an instant is in
+    -- its owner's graveyard (CR 608.2n) under a fresh id (CR 400.7) before its
+    -- own effect is ever read. That is not a reason to drop it:
+    -- Pawl.Engine.PlayerEffect.applying hands it to every consumer, and CR
+    -- 608.2h's last-known record is filed under exactly this id, which is what
+    -- lets `chosenNamesOf` still answer Conjurer's Ban's chosen name. A dead id
+    -- equals no live candidate, so Filter.IsSource simply answers False for one.
+    source :: ObjectId.ObjectId,
     controller :: PlayerId.PlayerId,
     timestamp :: Timestamp.Timestamp,
     expiry :: Expiry.Expiry,
