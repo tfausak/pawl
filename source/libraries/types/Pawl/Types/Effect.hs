@@ -236,7 +236,7 @@ data Effect card ability
     -- source and cannot be the entrant; AttachTarget's mover is the target and
     -- its destination is picked as the effect resolves, which CR 115.10a says is
     -- not a target at all. Only this opcode puts the destination's choice at CR
-    -- 603.3d, so only here do hexproof, CR 115.7's retargeting and CR 608.2b
+    -- 603.3d, so only here do shroud, CR 115.7's retargeting and CR 608.2b
     -- reach it. Pawl.Types.AttachBound names the two slots.
     AttachBound AttachBound.AttachBound
   | -- | CR 400.7: move the objects the ObjectRef names to a zone through the

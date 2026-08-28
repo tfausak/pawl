@@ -3085,7 +3085,7 @@ attachingTo oid p = case p of
 sigardasAidSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 sigardasAidSpec s registry = Spec.describe s "AttachBound" $ do
   -- Two boards differing in ONE thing: which 2/1 alice controls alongside
-  -- Sigarda's Aid. Blurred Mongoose has shroud (CR 702.18b), so it is a
+  -- Sigarda's Aid. Blurred Mongoose has shroud (CR 702.18a), so it is a
   -- "creature you control" that cannot be targeted -- exactly the creature a
   -- resolution-time choice WOULD have taken. CR 603.3d then removes the whole
   -- ability from the stack, since it has no legal target.
@@ -3119,7 +3119,7 @@ sigardasAidSpec s registry = Spec.describe s "AttachBound" $ do
     -- The gameplay-level pair. Bonesplitter's +2/+0 arrives only where the
     -- trigger could target.
     Spec.assertEqWith s "CR 701.3a: the entering Bonesplitter is attached to the targeted Piker, so it is a 4/1" (S.powerToughnessOf pikerId pikerAfter) (Just (4, 1))
-    Spec.assertEqWith s "CR 702.18b/603.3d: the shroud creature was no legal target, so it is still a 2/1" (S.powerToughnessOf mongooseId mongooseAfter) (Just (2, 1))
+    Spec.assertEqWith s "CR 702.18a/603.3d: the shroud creature was no legal target, so it is still a 2/1" (S.powerToughnessOf mongooseId mongooseAfter) (Just (2, 1))
     Spec.assertEqWith s "and the Bonesplitter really is on the Piker (CR 701.3a)" (fmap (\oid -> fmap Object.attachedTo (Game.lookupObject oid pikerAfter)) (splitterOn pikerAfter)) [Just (Just (Recipient.ToCreature pikerId))]
     Spec.assertEqWith s "while the other Bonesplitter sits on the battlefield unattached" (fmap (\oid -> fmap Object.attachedTo (Game.lookupObject oid mongooseAfter)) (splitterOn mongooseAfter)) [Just Nothing]
     -- The mechanism behind the second board, distinguishing "no legal target"

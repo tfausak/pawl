@@ -13,7 +13,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- source and Effect.AttachTarget's destination is picked as the effect resolves
 -- (CR 115.10a: not a target), so neither can say "attach IT to TARGET creature".
 -- Here CR 115.1d puts the destination's choice at CR 603.3d, which is what makes
--- hexproof (CR 702.11b) refuse it, CR 115.7 able to move it, and CR 608.2b able
+-- shroud (CR 702.18a) refuse it, CR 115.7 able to move it, and CR 608.2b able
 -- to fizzle it.
 data AttachBound = MkAttachBound
   { subject :: SlotName.SlotName,

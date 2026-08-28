@@ -6169,8 +6169,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- MOVER is whatever a binding names -- Sigarda's Aid's "it", CR 400.7e's
   -- entrant under Binding.became -- and the DESTINATION is targeted rather than
   -- found now. Nothing is chosen here, which is the observable difference from
-  -- AttachTarget above: the destination was fixed at CR 603.3d, so hexproof
-  -- refused it then (CR 702.11b) and CR 608.2b has already dropped it from
+  -- AttachTarget above: the destination was fixed at CR 603.3d, so shroud
+  -- refused it then (CR 702.18a) and CR 608.2b has already dropped it from
   -- `legal` if it went illegal, leaving this a no-op.
   --
   -- The mover is read through objectRefObjects rather than legalOne so that a
