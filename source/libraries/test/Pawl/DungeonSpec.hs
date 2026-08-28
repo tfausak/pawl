@@ -165,6 +165,10 @@ ventureOnce answer ability doorId gs =
   let activated = S.runPure answer gs (Activate.activateAbility S.alice doorId ability)
    in resolveAll answer (S.runPure answer activated Engine.settleForPriority)
 
+-- `n` ventures in a row, all answered the same way.
+ventureTimes :: Int -> (forall r. Prompt.Prompt r -> r) -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> ObjectId -> GameState.GameState -> GameState.GameState
+ventureTimes n answer ability doorId gs = List.foldl' (\acc _ -> ventureOnce answer ability doorId acc) gs [1 .. n]
+
 -- The battlefield objects whose face carries this name, as `namesInPlay` spells
 -- one.
 inPlayNamed :: String -> GameState.GameState -> [ObjectId]
@@ -216,10 +220,6 @@ throneAnswer chosen p = case p of
   Prompt.Shuffle ids -> reverse ids
   Prompt.ChooseCardFromAmong _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== chosen) (NonEmpty.toList offered))
   _ -> payingLastRoom p
-
--- `n` ventures in a row, all answered the same way.
-ventureTimes :: Int -> (forall r. Prompt.Prompt r -> r) -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> ObjectId -> GameState.GameState -> GameState.GameState
-ventureTimes n answer ability doorId gs = List.foldl' (\acc _ -> ventureOnce answer ability doorId acc) gs [1 .. n]
 
 -- alice controls a Secret Door and `lands` untapped Islands, owns `dungeons`
 -- outside the game (CR 309.2), and has cards left to draw.
