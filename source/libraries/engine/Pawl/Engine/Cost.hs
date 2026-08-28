@@ -236,7 +236,9 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
             -- The keywords are the FRONT face's, printed, which is CR 712.11d's own
             -- scope: the ability is "an ability of a double-faced card's front
             -- face". So it is read off the card rather than off the projection of
-            -- the half being proposed, which carries the BACK face's keywords.
+            -- the half being proposed, which carries the BACK face's keywords. A
+            -- more than meets the eye ability GRANTED to a card in a zone is
+            -- therefore not expanded (gap #1859).
             converted =
               if fmap Face.name (Card.backFace card) == Just (Face.name face)
                 then

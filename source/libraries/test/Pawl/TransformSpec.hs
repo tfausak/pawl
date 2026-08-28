@@ -271,6 +271,12 @@ spec s registry = Spec.describe s "Transform" $ do
   -- The falsifier -- Pawl.Engine.Card.castableFaces answering with the whole
   -- NonEmpty, as it does for Split and Adventure -- is caught only by asking
   -- that function directly, so both are here and neither stands alone.
+  --
+  -- The Gargoyle and not Ratchet, because CR 712.11's "by default" has a printed
+  -- exception and Ratchet prints it: a transforming card whose front face has
+  -- more than meets the eye offers two names, which is CR 712.11d and is
+  -- moreThanMeetsTheEyeSpec's. This case is about a card that has no such
+  -- ability, which is what leaves CR 712.11's default the whole answer.
   Spec.it s "CR 712.11 only the front face is offered from a hand" $ do
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
     island <- S.printingOf s registry "Island"
