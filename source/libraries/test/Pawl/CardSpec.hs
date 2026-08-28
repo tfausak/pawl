@@ -4125,9 +4125,10 @@ data Asks
     -- Prompt.RandomObject, and falls through to the pure sweep for the two
     -- zone-keyed chosen arms.
     AsksRevealArm
-  | -- | Pawl.Engine.Resolve's Effect.Transform gather. It asks the any-number
-    -- arm and nothing else: the four card-shaped chosen arms name cards in a
-    -- graveyard, a hand or a group, and CR 701.27a turns over PERMANENTS.
+  | -- | Pawl.Engine.Resolve's turnPermanentsOver gather, shared by Effect.Transform
+    -- and Effect.Convert. It asks the any-number arm and nothing else: the four
+    -- card-shaped chosen arms name cards in a graveyard, a hand or a group, and CR
+    -- 701.27a turns over PERMANENTS.
     AsksTransformGather
   deriving (Eq, Show)
 

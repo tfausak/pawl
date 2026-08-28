@@ -585,7 +585,7 @@ data ObjectRef
     -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
     -- read, so objectRefObjects answers nothing for it -- ChosenCardInGraveyard's
     -- note above says why, and the same lint rejects it under an opcode that
-    -- cannot ask. Today Pawl.Engine.Resolve's Effect.Transform arm is the one
-    -- that asks.
+    -- cannot ask. Today Pawl.Engine.Resolve's turnPermanentsOver is the one
+    -- that asks, reached by Effect.Transform and Effect.Convert alike.
     AnyNumberMatching (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

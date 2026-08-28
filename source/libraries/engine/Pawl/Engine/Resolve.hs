@@ -2246,8 +2246,8 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.EachMatching filter_ -> battlefieldMatching legal resolving controller source gs filter_
   -- A CR 608.2d question, so this pure sweep answers nothing for it: the
   -- candidates are battlefieldMatching's, but WHICH of them the instruction names
-  -- is the chooser's, and only the Effect.Transform arm reaches the Game monad to
-  -- ask. Under any other opcode this empty answer is an inert card-data error,
+  -- is the chooser's, and only turnPermanentsOver -- the body Effect.Transform and
+  -- Effect.Convert share -- reaches the Game monad to ask. Under any other opcode this empty answer is an inert card-data error,
   -- which Pawl.CardSpec's inertChoosers rejects at load time --
   -- ChosenCardInGraveyard's note below is the shape.
   ObjectRef.AnyNumberMatching _ -> []
@@ -2560,7 +2560,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardFromAmong {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- No recipients: only the Reveal arm can ask the interpreter.
   ObjectRef.RandomCardInHand _ -> []
-  -- No recipients: only the Effect.Transform gather can ask the chooser.
+  -- No recipients: only turnPermanentsOver's gather can ask the chooser.
   ObjectRef.AnyNumberMatching _ -> []
 
 -- CR 608.2f's order for the per-object loop: APNAP first, reading a player
