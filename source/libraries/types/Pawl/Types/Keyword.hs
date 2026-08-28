@@ -153,6 +153,23 @@ data Keyword
     -- CR 702.15d makes it zone-independent, so this is never asked of a live board
     -- when the life is handed over.
     Lifelink
+  | -- | 702.161a: "During your turn, this permanent is an artifact creature in
+    -- addition to its other types." Nullary -- rule 702.161a takes no parameter,
+    -- and a second instance says the same thing, so its reader takes membership
+    -- rather than a count. No Pawl.Types.KeywordFamily twin for that reason:
+    -- there is no "a Vehicle with living metal N" for a card to ask about.
+    --
+    -- MINTS A STATIC ABILITY (Pawl.Engine.Keyword.livingMetal) rather than being
+    -- read at a use site, because rule 702.161a's meaning IS a continuous effect:
+    -- two AddCardType parts in layer 4 (CR 613.1d), gated by the "as long as"
+    -- clause every other conditional static ability uses. Crew's shape one
+    -- ability-kind over -- CR 702.122a's "becomes an artifact creature" adds the
+    -- same two types for the same CR 205.1b reason, so a Vehicle keeps being a
+    -- Vehicle either way.
+    --
+    -- Not a characteristic-defining ability: CR 604.3 wants one that functions in
+    -- every zone, and "this permanent" confines this to the battlefield.
+    LivingMetal
   | -- | 702.16a: "Protection from [quality]." FOUR SEPARATE PROHIBITIONS, stated
     -- in five clauses and reaching four different readers: CR 702.16b's targeting
     -- (Pawl.Engine.Target.targetable), CR 702.16e's damage (a prevent-all row

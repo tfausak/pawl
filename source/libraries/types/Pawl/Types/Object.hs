@@ -293,7 +293,7 @@ data Object = MkObject
     -- names the half being put onto the stack (CR 709.3a) and the face a
     -- resolving permanent spell enters with (CR 712.13), the gate-side
     -- Pawl.Engine.Cast.asProposed names that same half (CR 709.3b), and
-    -- Pawl.Engine.Resolve's Transform arm names the face CR 701.27a turned the
+    -- Pawl.Engine.Resolve's turnPermanentsOver names the face CR 701.27a turned the
     -- permanent over to.
     --
     -- Per-incarnation state, like damage and counters: cleared by newIncarnation,

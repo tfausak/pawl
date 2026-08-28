@@ -1096,6 +1096,28 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Transform (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
       " {\"type\":\"Transform\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  -- CR 701.28a. Transform's wire shape exactly, and the assertion that matters is
+  -- that the two do not share a TAG: they resolve through one code path, so a
+  -- collapsed encoding would be invisible everywhere else.
+  Spec.it s "Convert round-trips both ObjectRef arms, and is not Transform" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Convert (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
+      " {\"type\":\"Convert\",\"value\":{\"type\":\"InSlot\",\"value\":\"self\"}} "
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Convert (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"Convert\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+    Spec.assertBool
+      s
+      ( toJson (Effect.Convert (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
+          /= toJson (Effect.Transform (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
+      )
+      "Convert and Transform of the same slot encode differently"
   -- CR 702.26b. Both ObjectRef arms, since the pool prints one of each: Reality
   -- Ripple's "target artifact, creature, or land phases out" is the slot, and
   -- Teferi's Protection's "all permanents you control phase out" is the filter. It
@@ -1605,15 +1627,25 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.TemptWithTheRing
       " {\"type\":\"TemptWithTheRing\"} "
-  -- CR 701.49: nullary for TemptWithTheRing's reason -- rule 701.49 fixes the
-  -- venturer and which dungeon, leaving an author nothing to write.
+  -- CR 701.49: the plain keyword action, whose payload is absent -- rule 701.49
+  -- fixes the venturer, and CR 701.49a lets the player choose from every dungeon
+  -- card they own, leaving an author nothing to write.
   Spec.it s "Venture" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      Effect.Venture
+      (Effect.Venture Nothing)
       " {\"type\":\"Venture\"} "
+  -- CR 701.49d: the "venture into [quality]" variant, whose payload is CR 205.3p's
+  -- dungeon type.
+  Spec.it s "Venture into a quality" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Venture (Just Subtype.Undercity))
+      " {\"type\":\"Venture\",\"value\":{\"type\":\"Undercity\"}} "
   Spec.it s "PlayerSacrifices" $
     Common.assertJsonCodec
       s

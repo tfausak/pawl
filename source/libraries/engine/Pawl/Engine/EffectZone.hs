@@ -99,7 +99,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Amass _ -> Nothing
   Effect.Blight _ -> Nothing
   Effect.TemptWithTheRing -> Nothing
-  Effect.Venture -> Nothing
+  Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
   Effect.RestartGame _ -> Nothing
@@ -157,6 +157,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.MakePlotted _ -> Nothing
   Effect.DoesNotUntapNext _ -> Nothing
   Effect.Transform _ -> Nothing
+  Effect.Convert _ -> Nothing
   Effect.PhaseOut _ -> Nothing
   Effect.AddPhases _ -> Nothing
   Effect.EndTurn -> Nothing

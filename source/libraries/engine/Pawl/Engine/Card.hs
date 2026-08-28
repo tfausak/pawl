@@ -109,6 +109,7 @@ faceDownFace listed =
       Face.triggeredAbilities = [],
       Face.delayedAbilities = Map.empty,
       Face.rooms = Seq.empty,
+      Face.dungeonEntryQuality = Nothing,
       Face.castingPermissions = [],
       Face.castingRestrictions = [],
       Face.enchant = [],
@@ -269,6 +270,10 @@ merge2 l r =
       -- point into the left half's rooms -- but with one side always empty this
       -- picks whichever side has them.
       Face.rooms = Face.rooms l <> Face.rooms r,
+      -- Unreachable for the same reason and settled the same way: a dungeon card
+      -- has no halves, so at most one side carries this. The LEFT half wins where
+      -- both somehow do, which is what a record update would have done silently.
+      Face.dungeonEntryQuality = Face.dungeonEntryQuality l <|> Face.dungeonEntryQuality r,
       Face.castingPermissions = Face.castingPermissions l <> Face.castingPermissions r,
       Face.castingRestrictions = Face.castingRestrictions l <> Face.castingRestrictions r,
       Face.additionalCosts = Face.additionalCosts l <> Face.additionalCosts r,
@@ -439,7 +444,9 @@ castableFaces card = case Card.layout card of
   -- Pawl.Engine.Event.changeZoneEntering applies it. CR 712.13a's ability causing
   -- a double-faced spell already on the stack to enter transformed does not
   -- either -- it is a replacement effect, EntryRewrite.EntersTransformed. What is
-  -- still absent is the CONVERT wording (#698).
+  -- still absent is the CONVERT wording, which is CR 702.162a's more than meets
+  -- the eye (#2521); CR 701.28's convert OPCODE, which turns a permanent already
+  -- on the battlefield over, does not come through here either.
   Layout.Transforming -> [NonEmpty.head (Card.faces card)]
   -- CR 712.11b: "A player casting a modal double-faced card or a copy of a modal
   -- double-faced card as a spell chooses which face they are casting before
@@ -593,8 +600,8 @@ backFace card =
         --
         -- No printing reaches it today: the pool's only producer of a cast
         -- "transformed" is CR 310.12b's defeated Siege, and no battle is a modal
-        -- double-faced card. The wording that could is CR 701.28's "converted"
-        -- (#698), which CR 712.3 names on exactly this layout.
+        -- double-faced card. The wording that could is CR 702.162a's "cast
+        -- this card converted" (#2521), which CR 712.3 names on exactly this layout.
         Layout.ModalDoubleFaced -> successor
 
 -- CR 701.27a: "To transform a permanent, turn it over so that its other face is
@@ -704,7 +711,7 @@ enteringFace card shown = case Card.layout card of
   -- two answers part where CR 712.11a's "transformed" cast does put a back face
   -- on the stack, which CR 310.12b's defeated Siege reaches (Pawl.BattleSpec's
   -- "she may then cast it TRANSFORMED and FREE" is the proof). The CONVERT
-  -- spelling of the same permission is still absent (#698).
+  -- spelling of the same permission is still absent (#2521).
   Layout.Transforming -> shown
   -- The arm CR 712.13 is written for in this pool: CR 712.11b let the caster
   -- choose either face, so the face that was up on the stack is genuinely a
@@ -893,6 +900,7 @@ subtractHalf face =
       Face.triggeredAbilities = [],
       Face.delayedAbilities = Map.empty,
       Face.rooms = Seq.empty,
+      Face.dungeonEntryQuality = Nothing,
       Face.castingPermissions = [],
       Face.castingRestrictions = [],
       Face.enchant = [],
