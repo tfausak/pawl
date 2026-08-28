@@ -2336,9 +2336,9 @@ gnatMiserSpec s registry =
       gnatMiser <- S.printingOf s registry "Gnat Miser"
       Spec.assertEqWith s "six" (PlayerEffect.maximumHandSize S.bob (adjustedHands plains [gnatMiser] 8 S.alice)) (Just 6)
 
-    -- CR 109.5: "each OPPONENT" is not the controller. The scope read backwards
-    -- would take alice to six and leave bob alone.
-    Spec.it s "CR 109.5 the controller's own maximum is untouched" $ do
+    -- CR 102.2: "each OPPONENT" is the other player, never the controller. The
+    -- scope read backwards would take alice to six and leave bob alone.
+    Spec.it s "CR 102.2 the controller's own maximum is untouched" $ do
       plains <- S.printingOf s registry "Plains"
       gnatMiser <- S.printingOf s registry "Gnat Miser"
       Spec.assertEqWith s "seven" (PlayerEffect.maximumHandSize S.alice (adjustedHands plains [gnatMiser] 8 S.alice)) (Just 7)
