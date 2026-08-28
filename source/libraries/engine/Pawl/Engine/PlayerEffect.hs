@@ -351,9 +351,10 @@ affectedBy pid oid gs =
 -- The SOURCE rides out alongside the effect, and only because CR 601.3a's
 -- quality-bearing prohibitions read it: Null Chamber's "the chosen names" are
 -- Object.chosenNames on the permanent that printed the ability, the same
--- direction Modification.AddChosenColor reads a colour. Nothing for a stored
--- CR 611.2c effect, which came from a resolved spell or ability and has no
--- permanent behind it -- and no such effect names a source-carried quality.
+-- direction Modification.AddChosenColor reads a colour. A stored CR 611.2c effect
+-- carries one too -- ActivePlayerEffect.source is the object that resolved -- and
+-- it is what makes Filter.IsSource answerable for Lava Burst's self-naming
+-- clause, which was vacuously False while this walk hardcoded Nothing.
 applying :: PlayerId -> GameState -> [(Maybe ObjectId, PlayerEffect)]
 applying pid gs =
   let printed = printedRows gs
@@ -370,9 +371,14 @@ applying pid gs =
       -- carrier has none behind it. The words a stored effect holds were fixed by
       -- the spell that made it, whose own text a swap reaches while it is still on
       -- the stack (Pawl.Engine.Projection.rewriteEffect).
+      --
+      -- The SOURCE is the object that resolved (ActivePlayerEffect.source), so a
+      -- stored effect answers Filter.IsSource about itself -- which is what Lava
+      -- Burst's "if Lava Burst would deal damage" needs and what a hardcoded
+      -- Nothing here made vacuously False.
       storedOne active =
         ( ActivePlayerEffect.timestamp active,
-          Nothing,
+          Just (ActivePlayerEffect.source active),
           ActivePlayerEffect.controller active,
           ActivePlayerEffect.scope active,
           ActivePlayerEffect.effect active
@@ -385,17 +391,19 @@ applying pid gs =
       --
       -- Only the PRINTED carrier can be ignored, which is exact rather than a
       -- shortcut: CR 116.2d's subject is "effects from static abilities", and a
-      -- stored effect came from a resolution instead (Silence). Those arrive
-      -- with source Nothing and so match nothing here.
-      keep (_, source, controller, scope, _) =
-        applies pid controller gs scope
-          && not (any (ignores source) (GameState.ignoredAbilities gs))
+      -- stored effect came from a resolution instead (Silence). Applied to
+      -- `printed` alone rather than to the concatenation, and that placement is
+      -- load-bearing now that a stored row names its source: an activated
+      -- ability of a permanent stores rows under that permanent's own id, which
+      -- a shared filter would suppress on a rule the ability is not subject to.
+      notIgnored (_, source, _, _, _) = not (any (ignores source) (GameState.ignoredAbilities gs))
+      applyingScope (_, _, controller, scope, _) = applies pid controller gs scope
       ignores source ignored =
         IgnoredAbility.player ignored == pid
           && Just (IgnoredAbility.source ignored) == source
       effectOf (_, source, _, _, effect) = (source, effect)
       stampOf (timestamp, _, _, _, _) = timestamp
-   in fmap effectOf (List.sortOn stampOf (filter keep (printed <> stored)))
+   in fmap effectOf (List.sortOn stampOf (filter applyingScope (filter notIgnored printed <> stored)))
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over the
 -- whole event log, which is exactly "this turn" because Engine.handoffTurn clears
@@ -517,9 +525,11 @@ prohibitsCasting pid oid name gs =
         -- 601.3 is about beginning to cast one: an uncounterable spell is not a
         -- spell anyone is more or less allowed to cast.
         PlayerEffect.CantBeCountered _ -> False
-        -- CR 615.12 edits what CR 615.1's shields do to a damage event. Nobody
-        -- is more or less allowed to cast a spell for it.
+        -- CR 615.12 edits what CR 615.1's shields do to a damage event, and CR
+        -- 614.9's redirections likewise. Nobody is more or less allowed to cast
+        -- a spell for either.
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
         -- CR 601.3a's other quality shape: a Filter over the spell's own
@@ -644,6 +654,7 @@ prohibitsPlayingLand pid names gs =
         -- countering reaches a land play.
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
         -- CR 305.1 once more: Damping Engine's own cast half stops no land play,
@@ -693,6 +704,7 @@ prohibitsSearching pid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
@@ -745,6 +757,7 @@ prohibitsCounters pid kind gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
@@ -799,6 +812,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
@@ -974,6 +988,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -1008,6 +1023,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -1045,6 +1061,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -1185,6 +1202,7 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -1225,6 +1243,7 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -1260,6 +1279,7 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -1331,6 +1351,7 @@ mayCastAsThoughItHadFlash pid oid gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
@@ -1434,6 +1455,7 @@ mayCastFromGraveyard pid oid gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
         -- A PROHIBITION, and CR 601.3 asks the two halves separately:
@@ -1508,6 +1530,7 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
         -- The PROHIBITIONS, read at their own gate (prohibitsCasting above): CR
@@ -1564,6 +1587,7 @@ mayPlayLandsFromGraveyard pid gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
         -- The PROHIBITIONS, which prohibitsPlayingLand above is what reads: CR
@@ -1635,6 +1659,7 @@ protectedFromTargeting caster pid gs =
         -- protects still targets it legally and still resolves.
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
@@ -1697,6 +1722,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -1754,6 +1780,7 @@ maximumHandSize pid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> current
         PlayerEffect.CantBeCountered _ -> current
         PlayerEffect.DamageCantBePrevented _ -> current
+        PlayerEffect.DamageCantBeRedirected _ -> current
         PlayerEffect.CantSearchLibraries -> current
         PlayerEffect.CantBecomeMonarch -> current
         PlayerEffect.CantCastMatching _ -> current
@@ -1813,6 +1840,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -1863,6 +1891,7 @@ spendManaAsThough pid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -1927,9 +1956,10 @@ cantBeCountered pid oid gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         -- Spider-Punk's OTHER sentence, and no part of this answer: CR 615.12
-        -- is about a damage event and CR 701.6a about an object on the stack.
-        -- The two travel together on one card and share nothing.
+        -- and CR 614.9 are about a damage event and CR 701.6a about an object on
+        -- the stack. The two travel together on one card and share nothing.
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
@@ -1957,9 +1987,10 @@ cantBeCountered pid oid gs =
 -- The SOURCE rides out because the pattern's Filter is resolved against it --
 -- Filter.IsSource is Excruciator's clause naming the permanent that prints it,
 -- and CR 109.5's "you" inside such a filter is that permanent's controller -- and
--- it is the Maybe `applying` already carries: Nothing for a stored CR 611.2c
--- effect, which has no permanent behind it, and no printing pairs one with a
--- self-naming pattern.
+-- it is the Maybe `applying` already carries. A stored CR 611.2c effect names one
+-- too: it is the object that resolved (Lava Burst's own "if Lava Burst would deal
+-- damage"), so Filter.IsSource is answerable on both carriers -- the Maybe is the
+-- shape Filter.contextFor takes rather than a row that lacks an id.
 --
 -- Gathered from EVERY still-playing player rather than from one, because
 -- `applying` is indexed by player and this effect is not. That reading is EXACT
@@ -1986,6 +2017,65 @@ unpreventable :: GameState -> [(Maybe ObjectId, DamagePattern.DamagePattern)]
 unpreventable gs =
   let says (src, effect) = case effect of
         PlayerEffect.DamageCantBePrevented pattern_ -> Just (src, pattern_)
+        PlayerEffect.DamageCantBeRedirected _ -> Nothing
+        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
+        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CastFromGraveyard _ -> Nothing
+        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
+        PlayerEffect.CantGetCounters _ -> Nothing
+        PlayerEffect.CantBeCountered _ -> Nothing
+        PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantCastMoreThan _ -> Nothing
+        PlayerEffect.CantCastChosenName -> Nothing
+        PlayerEffect.CantPlayLandChosenName -> Nothing
+        PlayerEffect.IncreaseSpellCost {} -> Nothing
+        PlayerEffect.IncreaseActivationCost {} -> Nothing
+        PlayerEffect.ReduceSpellCost {} -> Nothing
+        PlayerEffect.ReduceActivationCost {} -> Nothing
+        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AddSpellCost {} -> Nothing
+        PlayerEffect.PlayAdditionalLands _ -> Nothing
+        PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.SetMaximumHandSize _ -> Nothing
+        PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.SpendManaAsThough _ -> Nothing
+        PlayerEffect.CantBeTargetedBy _ -> Nothing
+        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+   in concatMap (\pid -> Maybe.mapMaybe says (applying pid gs)) (Game.stillPlaying gs)
+
+-- CR 614.9: the patterns of every "that damage can't be ... dealt instead to
+-- another permanent or player" applying right now (Lava Burst), each paired with
+-- the SOURCE of the effect that says it. The redirection twin of `unpreventable`
+-- above, and a separate gather for the reason its own carrier is a separate arm:
+-- the two sentences are separable, so a board carrying one must not answer the
+-- other's question.
+--
+-- Hands back the PATTERNS, `unpreventable`'s posture and for its reason: CR
+-- 614.9's sentence is about a damage EVENT and the printed narrowing names its
+-- qualities -- Lava Burst's names both its own source and a recipient -- which
+-- Pawl.Engine.Replacement.matchesDamagePattern already knows how to read.
+--
+-- What the caller does with a match DIFFERS from the prevention side's, and the
+-- rulebook is why: CR 615.12 keeps an inapplicable prevention in the applicable
+-- set ("any applicable prevention effects are still applied to it"), where CR
+-- 614.9 states no such twin -- its only "the effect does nothing" case is a
+-- destination that left the battlefield or a player who left the game. So
+-- Pawl.Engine.Replacement.applies filters the redirection out of CR 616.1's
+-- choice rather than applying it inertly.
+--
+-- Gathered from EVERY still-playing player, and read LIVE, for the two reasons
+-- `unpreventable` gives: PlayerScope.EachPlayer is the only scope a card may
+-- pair with this carrier (Pawl.CardSpec lints it), so "some player has it
+-- applying" and "it applies" are the same fact.
+unredirectable :: GameState -> [(Maybe ObjectId, DamagePattern.DamagePattern)]
+unredirectable gs =
+  let says (src, effect) = case effect of
+        PlayerEffect.DamageCantBeRedirected pattern_ -> Just (src, pattern_)
+        PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing

@@ -3366,6 +3366,11 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- Filter here either.
   TriggerCondition.ControllerBecomesTarget {} -> []
 
+-- The Filters a DamagePattern carries -- its source half and its printed
+-- recipient half, the two axes of that type that ARE predicates over an object.
+damagePatternFilters :: DamagePattern.DamagePattern -> [Filter.Type.Filter Keyword.Keyword]
+damagePatternFilters pattern_ = DamagePattern.whatSource pattern_ : Maybe.maybeToList (DamagePattern.whatRecipient pattern_)
+
 -- CR 613.11: which objects a player effect names -- a cost modifier's (CR
 -- 601.2f), a timing permission's (CR 601.3b) or a countering prohibition's (CR
 -- 701.6a).
@@ -3428,11 +3433,15 @@ playerEffectFilters playerEffect = case playerEffect of
   -- exactly as a cost modifier's is (Spider-Punk's is `And []`, Prowling
   -- Serpopard's is HasCardType Creature).
   PlayerEffect.CantBeCountered f -> [f]
-  -- CR 615.12 narrows by a DamagePattern, one of whose three axes IS a Filter
-  -- over the damage's source (Excruciator's "by this creature", `IsSource`); the
-  -- kind and the recipient beside it are not predicates over an object. The
-  -- pattern's authorability is linted by unpreventablePatternOffends below.
-  PlayerEffect.DamageCantBePrevented pattern_ -> [DamagePattern.whatSource pattern_]
+  -- CR 615.12 narrows by a DamagePattern, two of whose axes are Filters over an
+  -- object: the damage's SOURCE (Excruciator's "by this creature", `IsSource`)
+  -- and its printed RECIPIENT (Lava Burst's "to a creature"). The kind, the
+  -- player relation and the two baked fields beside them are not predicates over
+  -- an object. The pattern's authorability is linted by
+  -- unpreventablePatternOffends below.
+  PlayerEffect.DamageCantBePrevented pattern_ -> damagePatternFilters pattern_
+  -- CR 614.9's twin, patterned by the same type and read the same way.
+  PlayerEffect.DamageCantBeRedirected pattern_ -> damagePatternFilters pattern_
   -- CR 701.23 names no quality of the libraries it stops being searched.
   PlayerEffect.CantSearchLibraries -> []
   -- CR 725 names no quality either: the designation has no parts (Jared
@@ -3480,6 +3489,9 @@ playerEffectFilters playerEffect = case playerEffect of
 -- an effect applies TO, and a damage event between two creatures applies to no
 -- player at all.
 --
+-- Asked of CR 614.9's redirection twin too, and for the identical reason: its
+-- subject is a damage event as well, so its narrowings ride in the same pattern.
+--
 -- Exhaustive rather than a wildcard, this file's discipline for a sum: a second
 -- player effect whose reading depends on its scope must break this build.
 unpreventableScopeOffends :: AffectedPlayers.AffectedPlayers SlotName.SlotName -> PlayerEffect.PlayerEffect -> Bool
@@ -3487,6 +3499,10 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   -- A NAMED seat is a narrowing like any other, and the strictest one there is:
   -- "target player" reaches one player where CR 615.12 reaches the whole table.
   PlayerEffect.DamageCantBePrevented _ -> scope /= AffectedPlayers.Scoped PlayerScope.EachPlayer
+  -- CR 614.9's twin, banned on the same axis for the same reason: its subject is
+  -- a damage event too, so Pawl.Engine.PlayerEffect.unredirectable's board-wide
+  -- fold is exact only while EachPlayer is the one scope a card may write.
+  PlayerEffect.DamageCantBeRedirected _ -> scope /= AffectedPlayers.Scoped PlayerScope.EachPlayer
   PlayerEffect.CantSearchLibraries -> False
   PlayerEffect.CantBecomeMonarch -> False
   -- Every other arm IS asked about a player, so its scope is read exactly as
@@ -3519,8 +3535,9 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
   PlayerEffect.CantGetCounters _ -> False
 
--- The OTHER half of the same carrier, now that CR 615.12's narrowing rides in a
--- DamagePattern: does this card author a field of that pattern the engine bakes?
+-- The OTHER half of the same carrier -- and of CR 614.9's twin beside it, whose
+-- narrowing rides in the same type -- now that the narrowing is a DamagePattern:
+-- does this card author a field of that pattern the engine bakes?
 --
 -- `whichRecipient` and `whichSource` are the two, and for engineOnlyOffends'
 -- reason -- a card cannot name an ObjectId or a PlayerId. Whippoorwill's "damage
@@ -3530,7 +3547,9 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
 -- of answer. `whichKind`, `whatSource`, `whatRecipient` and `whoRecipient` are
 -- all authorable here; the first two are exactly what Frenzied Baloth and
 -- Excruciator print, and the last two describe a recipient rather than naming
--- one, so no card in the pool writes either on THIS carrier.
+-- one -- Lava Burst's "if Lava Burst would deal damage to a creature" writes
+-- `whatRecipient`, and no printing in the pool writes `whoRecipient` on THIS
+-- carrier.
 --
 -- Not implemented: no resolution bakes a recipient into THIS pattern, the way
 -- Resolve's prevention arms bake one into a shield's, so the field has no
@@ -3540,6 +3559,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
 unpreventablePatternOffends :: PlayerEffect.PlayerEffect -> Bool
 unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.DamageCantBePrevented pattern_ -> Maybe.isJust (DamagePattern.whichRecipient pattern_) || Maybe.isJust (DamagePattern.whichSource pattern_)
+  PlayerEffect.DamageCantBeRedirected pattern_ -> Maybe.isJust (DamagePattern.whichRecipient pattern_) || Maybe.isJust (DamagePattern.whichSource pattern_)
   PlayerEffect.CantSearchLibraries -> False
   PlayerEffect.CantBecomeMonarch -> False
   PlayerEffect.IncreaseSpellCost {} -> False
@@ -3568,12 +3588,14 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
   PlayerEffect.CantGetCounters _ -> False
 
--- The non-vacuity half of both lints above: is this CR 615.12's effect at all?
--- A wildcard is right here, where it is not above -- this asks "did the sweep
--- have anything to look at", not "is it well-formed". isPhaseR's shape.
+-- The non-vacuity half of both lints above: is this a damage-event prohibition
+-- at all -- CR 615.12's or CR 614.9's? A wildcard is right here, where it is not
+-- above -- this asks "did the sweep have anything to look at", not "is it
+-- well-formed". isPhaseR's shape.
 isUnpreventable :: PlayerEffect.PlayerEffect -> Bool
 isUnpreventable playerEffect = case playerEffect of
   PlayerEffect.DamageCantBePrevented _ -> True
+  PlayerEffect.DamageCantBeRedirected _ -> True
   _ -> False
 
 -- The pattern that narrows nothing: Spider-Punk's, and what a fixture below
@@ -6627,10 +6649,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- that legitimately says PlayerScope.You.
     serpopard <- S.printingOf s registry "Prowling Serpopard"
     Spec.assertBool s (not (offends (S.combinedFace serpopard))) "a You-scoped countering prohibition is accepted"
-    -- And the STORED carrier, which no printing pairs with CR 615.12 yet:
-    -- Silence's own Effect.AffectPlayers, saying "damage can't be prevented"
-    -- instead of what it says. Skullcrack is the printing that would make this
-    -- shape real, and this is what keeps the sweep honest until it lands.
+    -- And the STORED carrier, which Lava Burst really does pair with CR 615.12:
+    -- restated onto Silence's own Effect.AffectPlayers here, so the rejecting
+    -- direction is proven on a card whose scope is NOT EachPlayer to begin with.
     silence <- S.printingOf s registry "Silence"
     let unpreventable effect = case effect of
           Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration scope _) -> Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration scope (PlayerEffect.DamageCantBePrevented anyDamage))
@@ -6657,8 +6678,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let patterns = concatMap (overFaces (fmap snd . cardPlayerScopes) . Printing.card) ps
         offenders = filter (anyFace (any (unpreventablePatternOffends . snd) . cardPlayerScopes) . Printing.card) ps
     -- The non-vacuity guard, and the guard that the AUTHORABLE axes really are
-    -- authored: Spider-Punk narrows nothing and Excruciator names TheSource, so
-    -- the sweep has both a permissive and a narrowed pattern to look at.
+    -- authored: Spider-Punk narrows nothing and Excruciator writes
+    -- Filter.IsSource, so the sweep has both a permissive and a narrowed pattern
+    -- to look at.
     Spec.assertBool s (any isUnpreventable patterns) "the pool has a card printing unpreventable damage"
     Spec.assertBool s (elem (PlayerEffect.DamageCantBePrevented anyDamage) patterns) "Spider-Punk's pattern narrows nothing"
     Spec.assertBool s (elem (PlayerEffect.DamageCantBePrevented anyDamage {DamagePattern.whatSource = Filter.Type.IsSource}) patterns) "Excruciator's names its own source"
