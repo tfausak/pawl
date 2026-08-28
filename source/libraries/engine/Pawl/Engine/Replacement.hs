@@ -448,8 +448,15 @@ applies gs event candidate =
         -- CR 615.1: which events the pattern admits (see matchesDamagePattern),
         -- plus the one fact about the ROW rather than the event -- a shield
         -- spent to nothing is no longer a prevention effect.
+        --
+        -- CR 614.9's prohibition is asked HERE and not in an inert application,
+        -- which is the asymmetry `redirectable` below derives: a redirection a
+        -- card forbids is not applicable, so it never reaches CR 616.1's choice.
         (ReplacementEffect.DamageR (DamageR.MkDamageR pat rewrite _), ProposedEvent.WouldDealDamage de) ->
-          matchesDamagePattern gs (candidateContext candidate) pat de && unspent rewrite && admitsRecipient src rewrite de
+          matchesDamagePattern gs (candidateContext candidate) pat de
+            && unspent rewrite
+            && admitsRecipient src rewrite de
+            && (not (redirects rewrite) || redirectable gs de)
         -- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the
         -- ability's own source, so a destruction replacement is self-only. CR
         -- 122.1c's "this permanent" is the same self-scope reached from the other
@@ -1723,13 +1730,56 @@ redirectDestination gs dest = case Recipient.objectOf dest of
 --
 -- CR 109.5's "you" for one of these patterns is the controller of the ability's
 -- own source (Questing Beast's "creatures you control"), derived here rather than
--- carried: unlike a floating shield row, CR 615.12's carriers are the printed
--- static ability -- whose source is on the battlefield to be asked about -- and a
--- stored effect that names no source at all, and so has no "you" either.
+-- carried: unlike a floating shield row, both of CR 615.12's carriers name a
+-- source to derive it from -- the printed static ability's permanent, and the
+-- object a CR 611.2c stored effect resolved off (Lava Burst's own spell, still on
+-- the stack while the damage it deals is proposed).
 preventable :: GameState -> DamageEvent.DamageEvent -> Bool
-preventable gs de =
-  let context src = Filter.contextFor (src >>= \oid -> Projection.controllerOf oid gs) src
-   in not (any (\(src, pat) -> matchesDamagePattern gs (context src) pat de) (PlayerEffect.unpreventable gs))
+preventable gs de = not (any (\(src, pat) -> matchesDamagePattern gs (patternContext gs src) pat de) (PlayerEffect.unpreventable gs))
+
+-- CR 109.5's Context for a CR 613.10/613.11 pattern: the perspective is the
+-- controller of the effect's own source, derived off the board rather than
+-- carried. Shared by the two questions of that shape so they cannot disagree
+-- about what "you" and IsSource mean.
+patternContext :: GameState -> Maybe ObjectId -> Filter.Context
+patternContext gs src = Filter.contextFor (src >>= \oid -> Projection.controllerOf oid gs) src
+
+-- CR 614.9: is this rewrite a REDIRECTION -- "dealt instead to another permanent
+-- or player"? The classification `redirectable` below is gated on, in the genre
+-- of `prevents` and `spentInertly` above: one arm per constructor, no wildcard,
+-- so a second rewrite that moves a damage event's recipient is asked here rather
+-- than silently escaping a card's prohibition.
+redirects :: DamageRewrite.DamageRewrite -> Bool
+redirects rewrite = case rewrite of
+  DamageRewrite.Redirect _ -> True
+  DamageRewrite.PreventNext _ -> False
+  DamageRewrite.PreventAll -> False
+  DamageRewrite.PreventRemovingShieldCounter -> False
+  -- CR 614.1a's two amount rewrites leave the recipient where it was, so neither
+  -- deals the damage "instead to another permanent or player".
+  DamageRewrite.SetAmount _ -> False
+  DamageRewrite.Scale _ -> False
+
+-- CR 614.9: may a redirection effect move this damage event, or does a card
+-- forbid it (Lava Burst)?
+--
+-- FALSE means the redirection is NOT APPLICABLE, and that is where this parts
+-- company with `preventable` beside it. CR 615.12 keeps an inapplicable
+-- prevention in the applicable set -- "any applicable prevention effects are
+-- still applied to it ... any additional effects they have will take place" --
+-- and rule 614.9 states no twin of that sentence; its only "the effect does
+-- nothing" case is a destination that left the battlefield or a player who left
+-- the game (redirectDestination above). So `applies` drops the row instead, and
+-- CR 616.1's loop never offers it as a choice.
+--
+-- Asked per EVENT for `preventable`'s reason, and read through the same
+-- matchesDamagePattern, so one reading of what a DamagePattern means serves CR
+-- 615.1's shields, CR 615.12's prohibition and this one.
+--
+-- Delegated to Pawl.Engine.PlayerEffect, which owns the CR 613.10/613.11 axis:
+-- this module sees a DamagePattern and never a PlayerEffect constructor.
+redirectable :: GameState -> DamageEvent.DamageEvent -> Bool
+redirectable gs de = not (any (\(src, pat) -> matchesDamagePattern gs (patternContext gs src) pat de) (PlayerEffect.unredirectable gs))
 
 -- CR 615.12: is this the pairing the rule describes -- a PREVENTION effect
 -- chosen against damage that CAN'T BE PREVENTED? Just means the application

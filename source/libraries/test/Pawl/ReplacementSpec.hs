@@ -3447,6 +3447,156 @@ oraclesAttendantsSpec s registry = Spec.describe s "Oracle's Attendants (CR 614.
     Spec.assertEqWith s "omega's 3 stays on the victim" (S.damageOf victim (strike omega 3 aimed)) (Just 3)
     Spec.assertEqWith s "alice was asked which source, and answered alpha" (chosenSourcesIn (answersFor (aimAndChoose victim alpha) g4 activate)) [alpha]
 
+-- Aim every target slot at one object, and answer CR 601.2b's X with `n`.
+-- FILTERED and not built, aimAndChoose's posture: the recipient comes out of the
+-- set the prompt offered, so a Pool.AnyTarget slot's own tag is what reaches the
+-- engine rather than a hand-made Recipient that CR 608.2b would drop.
+aimObjectWithX :: Natural.Natural -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimObjectWithX n oid p = case p of
+  Prompt.ChooseX {} -> n
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just oid) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
+
+-- The same, aimed at a PLAYER instead: CR 115.4's "any target" offers both kinds
+-- of recipient, and Lava Burst's clause narrows to one of them.
+aimPlayerWithX :: Natural.Natural -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+aimPlayerWithX n pid p = case p of
+  Prompt.ChooseX {} -> n
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just pid) . Recipient.playerOf) . snd) sets
+  _ -> S.identityAnswer p
+
+-- CR 615.12 and CR 614.9 on the CR 611.2c STORED carrier -- a spell speaking
+-- about the damage its own resolution is about to deal -- whose producer is Lava
+-- Burst ({X}{R} Sorcery, "Lava Burst deals X damage to any target. If Lava Burst
+-- would deal damage to a creature, that damage can't be prevented or dealt
+-- instead to another permanent or player"; name, cost, type line and Oracle text
+-- checked against api.scryfall.com 2026-08-27, printed on paper in Ice Age and
+-- Deckmasters).
+--
+-- Excruciator's clause above says the same thing from the PRINTED carrier, where
+-- the source is a permanent on the battlefield to be asked about. This one is
+-- the other carrier: Effect.AffectPlayers stores the effect with
+-- ActivePlayerEffect.source set to the resolving spell, and Filter.IsSource in
+-- the pattern names that spell. Nothing here was observable while
+-- Pawl.Engine.PlayerEffect.applying hardcoded Nothing in that position -- the
+-- card loaded, round-tripped and silently never fired.
+--
+-- The DURATION is UntilEndOfTurn where the sentence is about one resolution, and
+-- the two are observably the same: CR 400.7 mints a new object as the spell
+-- leaves the stack, so the id Filter.IsSource holds matches nothing once Lava
+-- Burst is in the graveyard.
+--
+-- FOUR cases, and each of the first three is paired on ONE board with a control
+-- differing in a single thing -- the source, or the recipient's kind -- so
+-- neither can pass on an engine that suppressed the whole class.
+lavaBurstSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lavaBurstSpec s registry = Spec.describe s "Lava Burst (CR 615.12, CR 614.9)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+  -- CR 615.12 from the stored carrier, with its control on the same board: the
+  -- shield prevents the Piker's damage whole and none of Lava Burst's.
+  Spec.it s "CR 615.12 the shield prevents none of Lava Burst's 3 and is not reduced by it" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    lavaBurst <- S.printingOf s registry "Lava Burst"
+    let base = S.landsFor mountain S.alice 4 (S.landsInPlay plains 1)
+        (victim, g1) = S.addCreature jedit S.alice base
+        (decoy, g2) = S.addCreature pikerPrinting S.bob g1
+        (g3, mendId) = S.handOne mendingHands g2
+        (g4, burstId) = S.handOne lavaBurst g3
+        -- The shield is REALLY cast, so its pattern and its stored amount are the
+        -- codec's parse of the committed card rather than a hand-built row.
+        shielded = S.runPure (aimObjectWithX 0 victim) g4 (S.cast S.alice mendId Monad.>> Stack.resolveTop)
+        burnt = S.runPure (aimObjectWithX 3 victim) shielded (S.cast S.alice burstId Monad.>> Stack.resolveTop)
+    -- THE gameplay assertion, and the one #844 existed for: the whole 3 is marked
+    -- on the shielded creature. With the source dropped on the way out of
+    -- `applying`, Filter.IsSource answered False and the shield ate all of it.
+    Spec.assertEqWith s "the whole 3 is marked on the shielded creature" (S.damageOf victim burnt) (Just 3)
+    -- CR 615.12's last sentence: "existing damage prevention shields won't be
+    -- reduced by damage that can't be prevented".
+    Spec.assertEqWith s "and the shield still holds all 4" (shieldsLeft burnt) [4]
+    -- THE CONTROL, on the same board and differing in the SOURCE alone: the
+    -- Piker's 2 is a source Lava Burst's clause does not name, so the same shield
+    -- prevents it whole and is spent for it.
+    let elsewhere = settleDamage S.identityAnswer burnt [hit decoy (Recipient.ToCreature victim) 2]
+    Spec.assertEqWith s "the Piker's 2 is prevented, so nothing more is marked" (S.damageOf victim elsewhere) (Just 3)
+    Spec.assertEqWith s "and 2 of the shield's 4 were spent for it" (shieldsLeft elsewhere) [2]
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "setup: the shield is a floating replacement holding 4" (shieldsLeft shielded) [4]
+    Spec.assertEqWith s "setup: Lava Burst resolved out of hand" (length (GameState.stack burnt)) 0
+  -- The RECIPIENT limb, which is the other half of Lava Burst's condition: the
+  -- clause says "if Lava Burst would deal damage to A CREATURE", so its own
+  -- damage dealt to a PLAYER is preventable like anybody's. Same card, same
+  -- shield, same X -- only the recipient's kind differs.
+  Spec.it s "CR 615.12 the same shield still prevents Lava Burst's 3 dealt to a player" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    lavaBurst <- S.printingOf s registry "Lava Burst"
+    let base = S.landsFor mountain S.alice 4 (S.landsInPlay plains 1)
+        (g1, mendId) = S.handOne mendingHands base
+        (g2, burstId) = S.handOne lavaBurst g1
+        shielded = S.runPure (aimPlayerWithX 0 S.bob) g2 (S.cast S.alice mendId Monad.>> Stack.resolveTop)
+        burnt = S.runPure (aimPlayerWithX 3 S.bob) shielded (S.cast S.alice burstId Monad.>> Stack.resolveTop)
+    Spec.assertEqWith s "bob loses no life, the shield having prevented the lot" (S.lifeOf S.bob burnt) (Just 20)
+    Spec.assertEqWith s "and 3 of the shield's 4 were spent for it" (shieldsLeft burnt) [1]
+    Spec.assertEqWith s "setup: the shield is a floating replacement holding 4" (shieldsLeft shielded) [4]
+  -- CR 614.9, the redirection limb, and #1681's own case. Oracle's Attendants
+  -- ({3}{W} Creature -- Human Soldier, 1/5: "{T}: All damage that would be dealt
+  -- to target creature this turn by a source of your choice is dealt to this
+  -- creature instead") is the pool's redirection of damage aimed at a CREATURE,
+  -- which is exactly the class Lava Burst's clause forbids. Turn the Tables
+  -- cannot be used here: its redirection moves damage dealt to YOU, which the
+  -- clause never reaches, so a board built on it reads the same either way.
+  --
+  -- TWO Attendants, one watching Lava Burst and one watching bob's Piker, so the
+  -- prohibited redirect and the permitted one are on ONE board and differ only in
+  -- which source their controller chose.
+  Spec.it s "CR 614.9 Lava Burst's damage to a creature is not redirected, and another source's still is" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    attendants <- S.printingOf s registry "Oracle's Attendants"
+    lavaBurst <- S.printingOf s registry "Lava Burst"
+    let base = S.landsInPlay mountain 4
+        (watchingBurst, g1) = S.addCreature attendants S.alice base
+        (watchingPiker, g2) = S.addCreature attendants S.alice g1
+        (victim, g3) = S.addCreature jedit S.alice g2
+        (decoy, g4) = S.addCreature pikerPrinting S.bob g3
+        (g5, burstId) = S.handOne lavaBurst g4
+        -- The SPELL's own id, read off the stack: CR 609.7a's candidate classes
+        -- include "a spell on the stack", and CR 400.7 already made the card and
+        -- the spell two objects, so the hand id names neither.
+        cast_ = S.runPure (aimObjectWithX 3 victim) g5 (S.cast S.alice burstId)
+        spellId = case GameState.stack cast_ of
+          oid : _ -> oid
+          [] -> burstId
+        arm oid src gs =
+          S.runPure
+            (aimAndChoose victim src)
+            gs
+            (Activate.activateAbility S.alice oid (theAbility attendants) Monad.>> Stack.resolveTop)
+        armed = arm watchingPiker decoy (arm watchingBurst spellId cast_)
+        resolved = S.runPure S.identityAnswer armed Stack.resolveTop
+    -- THE gameplay assertion, and the one #1681 existed for: the redirection is
+    -- not applicable, so the damage stays where Lava Burst aimed it. Without the
+    -- gate the whole 3 moved onto the Attendants.
+    Spec.assertEqWith s "Lava Burst's 3 stays on the creature it was aimed at" (S.damageOf victim resolved) (Just 3)
+    Spec.assertEqWith s "and nothing landed on the Attendants watching Lava Burst" (S.damageOf watchingBurst resolved) (Just 0)
+    -- THE CONTROL, same board, differing in the SOURCE alone: the Piker is a
+    -- source Lava Burst's clause does not name, so the other Attendants' row
+    -- still moves its 2. A blanket suppression of redirection would fail here.
+    let struck = settleDamage S.identityAnswer resolved [hit decoy (Recipient.ToCreature victim) 2]
+    Spec.assertEqWith s "the Piker's 2 leaves the victim" (S.damageOf victim struck) (Just 3)
+    Spec.assertEqWith s "and lands whole on the Attendants watching the Piker" (S.damageOf watchingPiker struck) (Just 2)
+    -- The proxies, after the behaviour: two rows exist, and alice was asked for
+    -- each and answered the two different sources.
+    Spec.assertEqWith s "setup: both redirection rows watch what alice chose" (redirectSources armed) [Just decoy, Just spellId]
+    Spec.assertEqWith s "setup: Lava Burst resolved out of hand" (length (GameState.stack resolved)) 0
+
 -- Apply one damage batch under a given interpreter. Top-level rather than a
 -- `where` binding for castEach's reason: the answer is rank-2 and GHC will not
 -- infer it.
@@ -4767,6 +4917,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   samiteMinistrationSpec s registry
   turnTheTablesSpec s registry
   oraclesAttendantsSpec s registry
+  lavaBurstSpec s registry
   queensBayPaladinSpec s registry
   cryogenicStasisSpec s registry
   gatherSpecimensSpec s registry

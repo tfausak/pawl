@@ -1901,6 +1901,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.SpendManaAsThough _ -> effect
   PlayerEffect.CantBeTargetedBy _ -> effect
   PlayerEffect.DamageCantBePrevented _ -> effect
+  PlayerEffect.DamageCantBeRedirected _ -> effect
   PlayerEffect.CantSearchLibraries -> effect
   PlayerEffect.CantBecomeMonarch -> effect
   PlayerEffect.CastOnlyAtSorcerySpeed -> effect
