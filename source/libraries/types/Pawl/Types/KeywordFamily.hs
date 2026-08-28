@@ -116,6 +116,11 @@ data KeywordFamily
     Afterlife
   | -- | CR 702.94a: miracle [cost].
     Miracle
+  | -- | CR 702.162a: more than meets the eye [cost]. The family a card writing
+    -- "a card with more than meets the eye" would name, as against more than
+    -- meets the eye {1}{W}; no card in the pool asks yet, and it is owed at the
+    -- keyword rather than at the first asker.
+    MoreThanMeetsTheEye
   | -- | CR 702.164a: toxic N. The family Flensing Raptor's "another target
     -- creature you control with toxic" names.
     Toxic

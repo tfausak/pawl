@@ -29,6 +29,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Blight as Blight
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Claim as Claim
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Condition as Condition
@@ -219,7 +220,45 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
               fmap
                 (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Bestow cost)) (withAdditional cost))
                 (Keyword.bestowCosts (Map.keysSet (Projection.keywordsOf oid gs)))
-         in (<> bestowed) $ case Object.zone obj of
+            -- CR 702.162a: more than meets the eye, read from EVERY zone for
+            -- bestow's reason -- "a static ability that functions in any zone from
+            -- which the spell may be cast".
+            --
+            -- Offered only for the BACK face, which is what rule 702.162a buys:
+            -- "you may cast this card CONVERTED by paying [cost]", and CR 712.11a
+            -- says a card cast converted is put on the stack with its back face
+            -- up. Pawl.Engine.Card.castableFaces is what puts that face on the
+            -- table (CR 712.11d); this prices it.
+            --
+            -- The keywords are the FRONT face's, printed, which is CR 712.11d's own
+            -- scope: the ability is "an ability of a double-faced card's front
+            -- face". So it is read off the card rather than off the projection of
+            -- the half being proposed, which carries the BACK face's keywords. A
+            -- more than meets the eye ability GRANTED to a card in a zone is
+            -- therefore not expanded (gap #1859).
+            converted =
+              if fmap Face.name (Card.backFace card) == Just (Face.name face)
+                then
+                  fmap
+                    (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.MoreThanMeetsTheEye cost)) (withAdditional cost))
+                    (Keyword.moreThanMeetsTheEyeCosts (Face.keywords (Card.frontFace card)))
+                else []
+            -- `converted` REPLACES the zone's own list rather than joining it:
+            -- the back face is a candidate at all only because rule 702.162a's
+            -- permission put it there, so that permission's cost is the only route
+            -- to casting it. CR 712.11 makes the FRONT face the default and CR
+            -- 712.11a names the converted cast as the way to a back face; no rule
+            -- offers a nonmodal back face for its own printed cost. Empty for every
+            -- other face and for every card without the ability, so each zone arm
+            -- below is reached exactly as it was.
+            --
+            -- Unobservable in this pool either way: no nonmodal back face prints a
+            -- mana cost, so the candidate this drops would have been CR 118.6's
+            -- unpayable one. Written because the alternative is a cast the rules do
+            -- not permit; a printing whose back face had a mana cost would be the
+            -- card that told the two apart.
+            orConverted zoneCandidates = if null converted then zoneCandidates else converted
+         in (<> bestowed) . orConverted $ case Object.zone obj of
               -- Four shapes, differing in what they do to the printed cost.
               -- Flashback (CR 702.34a) REPLACES the mana cost, so it is wrapped by
               -- `withAdditional`; aftermath (CR 702.127a) replaces nothing, so it

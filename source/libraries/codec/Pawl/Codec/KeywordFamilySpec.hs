@@ -228,6 +228,13 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       KeywordFamily.Afflict
       " {\"type\":\"Afflict\"} "
 
+  Spec.it s "MoreThanMeetsTheEye" $
+    Common.assertCodec
+      s
+      KeywordFamily.codec
+      KeywordFamily.MoreThanMeetsTheEye
+      " {\"type\":\"MoreThanMeetsTheEye\"} "
+
   Spec.it s "Toxic" $
     Common.assertCodec
       s

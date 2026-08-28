@@ -170,6 +170,29 @@ data Keyword
     -- Not a characteristic-defining ability: CR 604.3 wants one that functions in
     -- every zone, and "this permanent" confines this to the battlefield.
     LivingMetal
+  | -- | 702.162a: "More Than Meets the Eye [cost]" means "You may cast this card
+    -- converted by paying [cost] rather than its mana cost", a static ability
+    -- functioning in any zone from which the spell may be cast.
+    --
+    -- The cost rides the constructor, as Flashback's and Bestow's do, because rule
+    -- 702.162a states it as part of the keyword. It is NOT a
+    -- Face.alternativeCosts entry, and for a stronger reason than flashback's zone
+    -- gate: the cost buys a cast of the OTHER FACE (CR 712.11a), which no entry in
+    -- a list of alternatives to this face's mana cost can say.
+    --
+    -- TWO consequences from one value, both read by name rather than minted:
+    -- Pawl.Engine.Card.castableFaces offers the back face for a card printing this
+    -- (CR 712.11d), and Pawl.Engine.Cost.candidateCostsFor prices that offer at
+    -- this cost. CR 601.2b's alternative-cost rules then apply unchanged, which
+    -- rule 702.162a says itself: "casting a spell using its More Than Meets the
+    -- Eye ability follows the rules for paying alternative costs (see 601.2b and
+    -- 601.2f-h)".
+    --
+    -- Read off the FRONT face, which is where every printing states it and what CR
+    -- 712.11d is written about: "if an ability of a double-faced card's front face
+    -- allows it to be cast ... converted, that ability is also considered when
+    -- evaluating that spell to determine if it can be cast."
+    MoreThanMeetsTheEye (Cost.Cost Keyword)
   | -- | 702.16a: "Protection from [quality]." FOUR SEPARATE PROHIBITIONS, stated
     -- in five clauses and reaching four different readers: CR 702.16b's targeting
     -- (Pawl.Engine.Target.targetable), CR 702.16e's damage (a prevent-all row

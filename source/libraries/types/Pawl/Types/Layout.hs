@@ -57,7 +57,11 @@ data Layout
     -- kind of card ("previously called 'transforming double-faced cards'"),
     -- since turning over is exactly what separates it from CR 712.3's modal kind
     -- here: CR 712.11b lets a player choose which face of a MODAL card they cast,
-    -- where CR 712.11 casts this one with its front face up and nothing else.
+    -- where CR 712.11 casts this one with its front face up by DEFAULT. Not
+    -- always -- CR 712.11a's cast "transformed" or "converted" puts a back face
+    -- on the stack, and CR 702.162a's more than meets the eye is the ability a
+    -- card prints to reach it -- but the default is what CR 712.11b displaces and
+    -- so is what separates the two layouts.
     --
     -- FIRST face front, the rest back -- the positional reading Adventure above
     -- already takes. CR 712.2a/712.2b give the two faces printed SYMBOLS rather
@@ -72,7 +76,9 @@ data Layout
     --
     -- Independent is the whole of what separates it from Transforming above.
     -- CR 712.11b lets a player choose which face they are casting where CR
-    -- 712.11 gives a nonmodal card only its front face, and CR 712.8f gives the
+    -- 712.11 gives a nonmodal card its front face by default (CR 712.11a's
+    -- "converted" cast being the printed exception, more than meets the eye), and
+    -- CR 712.8f gives the
     -- resulting spell or permanent "only the characteristics of the face that's
     -- up" with none of CR 712.8e's mana-value exception carried over.
     --

@@ -156,6 +156,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.LivingMetal
       " {\"type\":\"LivingMetal\"} "
+  -- CR 702.162a states its cost as part of the keyword, so the payload is
+  -- required. Pinned by hand because Pawl.Codec.Keyword's arm list carries its
+  -- own `_ -> Nothing` fallthrough, which would ship a constructor with no arm
+  -- and no failing round trip (#2262).
+  Spec.it s "MoreThanMeetsTheEye carries its cost" $ do
+    let mtmte n = Keyword.MoreThanMeetsTheEye (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (mtmte 1)
+      " {\"type\":\"MoreThanMeetsTheEye\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (mtmte 1) /= Codec.encode Keyword.codec (mtmte 4)) "the cost is part of the encoding"
   -- CR 702.16a states a quality on EVERY protection ability, so the payload is
   -- required where hexproof's is optional: there is no bare protection tag to
   -- write, and rule 702.16j's "protection from everything" -- the variant that

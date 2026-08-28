@@ -17,6 +17,11 @@
 -- transformTriggerSpec, whose fixture is Blightreaper Thallid // Blightsower
 -- Thallid, the Gargoyle printing no text on its back face to trigger with.
 --
+-- Also CR 702.162a's more than meets the eye -- CR 712.11a's "converted" cast,
+-- offered by Pawl.Engine.Card.castableFaces (CR 712.11d) and priced by
+-- Pawl.Engine.Cost.candidateCostsFor. See moreThanMeetsTheEyeSpec, which shares
+-- convertSpec's Ratchet.
+--
 -- Also CR 701.28's convert and CR 702.161a's living metal, which land together
 -- because no printed card carries one without the other: the Effect.Convert arm
 -- of Pawl.Engine.Resolve (the same turnPermanentsOver the transform arm calls),
@@ -59,6 +64,7 @@ import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
@@ -81,6 +87,7 @@ import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -231,6 +238,7 @@ spec s registry = Spec.describe s "Transform" $ do
   transformedPermanentSpec s registry
   transformTriggerSpec s registry
   convertSpec s registry
+  moreThanMeetsTheEyeSpec s registry
   spellsCastLastTurnSpec s registry
   -- CR 712.8d: "While a double-faced permanent has its front face up, it has
   -- only the characteristics of its front face." Nothing has turned this one
@@ -263,6 +271,12 @@ spec s registry = Spec.describe s "Transform" $ do
   -- The falsifier -- Pawl.Engine.Card.castableFaces answering with the whole
   -- NonEmpty, as it does for Split and Adventure -- is caught only by asking
   -- that function directly, so both are here and neither stands alone.
+  --
+  -- The Gargoyle and not Ratchet, because CR 712.11's "by default" has a printed
+  -- exception and Ratchet prints it: a transforming card whose front face has
+  -- more than meets the eye offers two names, which is CR 712.11d and is
+  -- moreThanMeetsTheEyeSpec's. This case is about a card that has no such
+  -- ability, which is what leaves CR 712.11's default the whole answer.
   Spec.it s "CR 712.11 only the front face is offered from a hand" $ do
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
     island <- S.printingOf s registry "Island"
@@ -1160,9 +1174,12 @@ ratchetReadings oid gs =
 
 -- alice's Ratchet with its BACK face up, which is the only board its printed
 -- convert trigger functions on. Written onto Object.face directly rather than
--- played out, because the two printed roads to a back-face-up Ratchet are the
--- ones this unit does not implement: CR 712.11a's cast "converted" (more than
--- meets the eye, #2521) and the front face's own optional convert (#2522).
+-- played out, which keeps these cases about CR 701.28a and nothing else: one of
+-- the two printed roads to a back-face-up Ratchet now exists -- CR 712.11a's cast
+-- "converted", which moreThanMeetsTheEyeSpec below plays out of a hand -- and
+-- routing the fixture through it would make every case here also a case about
+-- casting. The other road, the front face's own optional convert, is still absent
+-- (#2522).
 --
 -- Object.turnedOverAt is deliberately left unset. CR 701.27f -- which CR 701.28e
 -- restates for convert -- ignores an instruction from an ability of a permanent
@@ -1183,10 +1200,10 @@ racerBoard ratchet gs =
 -- Ratchet. This ability triggers only once each turn."
 --
 -- The front face's third ability -- "Whenever you gain life, you may convert
--- Ratchet ..." -- is NOT transcribed (#2522), and neither is more than meets the
--- eye (#2521). Both omissions leave pawl's card able to do strictly less than the
--- printed one: an optional convert nobody may take, and an alternative cost
--- nobody may pay.
+-- Ratchet ..." -- is NOT transcribed (#2522). That omission leaves pawl's card
+-- able to do strictly less than the printed one: an optional convert nobody may
+-- take. More than meets the eye {1}{W} IS transcribed; see
+-- moreThanMeetsTheEyeSpec below.
 convertSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 convertSpec s registry = Spec.describe s "Convert" $ do
   -- THE proving case. CR 701.28a: "To convert a permanent, turn it so that its
@@ -1277,3 +1294,52 @@ convertSpec s registry = Spec.describe s "Convert" $ do
 ratchetFrontReadings, ratchetBackReadings :: (Set.Set CardName.CardName, Maybe (Integer, Integer), Set.Set Subtype.Subtype, Set.Set CardType.CardType)
 ratchetFrontReadings = (Set.singleton ratchetFront, Just (2, 4), Set.singleton Subtype.Robot, Set.fromList [CardType.Artifact, CardType.Creature])
 ratchetBackReadings = (Set.singleton ratchetBack, Just (1, 4), Set.singleton Subtype.Vehicle, Set.fromList [CardType.Artifact, CardType.Creature])
+
+-- CR 702.162a: more than meets the eye, on the same Ratchet, Field Medic //
+-- Ratchet, Rescue Racer the convert group runs on -- "More Than Meets the Eye
+-- {1}{W}" on its front face, against a printed {2}{W}.
+--
+-- The rule has two limbs and a case that proves one is half a proof. The first is
+-- a CHEAPER COST (CR 118.9, CR 601.2b's alternative-cost announcement); the
+-- second is that what arrives is the BACK FACE (CR 712.11a: "if a double-faced
+-- card ... is cast as a spell 'transformed' or 'converted,' it's put on the stack
+-- with its back face up"), which CR 712.13 then carries onto the battlefield. So
+-- both are asserted, and the cast for the PRINTED cost is the control that tells
+-- the permission from the timing class: the same card, the same board, the same
+-- seat, and a front-face permanent at the end of it.
+--
+-- CR 712.11d is what makes the converted cast an ordinary legal action rather
+-- than something an effect has to offer: "if an ability of a double-faced card's
+-- front face allows it to be cast ... 'converted,' that ability is also
+-- considered when evaluating that spell to determine if it can be cast." The
+-- action-list assertion is the one that reads that -- without it the two
+-- played-out casts below would pass on Pawl.Engine.Cast.castSpell being handed a
+-- face name directly, which no player ever does.
+moreThanMeetsTheEyeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+moreThanMeetsTheEyeSpec s registry = Spec.describe s "MoreThanMeetsTheEye" $ do
+  Spec.it s "CR 702.162a / 712.11a Ratchet cast converted costs {1}{W} and arrives with its back face up" $ do
+    ratchet <- S.printingOf s registry "Ratchet, Field Medic"
+    plains <- S.printingOf s registry "Plains"
+    -- THREE Plains, so both costs are payable on ONE board: mana, seats, timing
+    -- and stock cannot be the difference between the two casts below, and the
+    -- {1}{W} is proved by what is left untapped rather than by what was affordable.
+    let (board, oid) = S.handOne ratchet (S.landsInPlay plains 3)
+        castAs name = S.runPure S.identityAnswer board (Cast.castSpell S.alice oid name Facing.FaceUp)
+        resolveAs name = S.runPure S.identityAnswer (castAs name) Stack.resolveTop
+        -- The Ratchet permanent among alice's lands, found by the card behind it
+        -- rather than by a name, since which name it answers to is the thing
+        -- under test.
+        ratchetIn gs = filter (\o -> fmap S.nameOf (Game.cardOf o gs) == Just (S.printingName ratchet)) (Game.zoneMembers Zone.Battlefield S.alice gs)
+        readingsIn gs = fmap (\o -> ratchetReadings o gs) (ratchetIn gs)
+    Spec.assertEqWith s "converted: the back face is the permanent" (readingsIn (resolveAs ratchetBack)) [ratchetBackReadings]
+    Spec.assertEqWith s "printed cost: the front face is the permanent" (readingsIn (resolveAs ratchetFront)) [ratchetFrontReadings]
+    Spec.assertEqWith s "converted: {1}{W} tapped two of the three Plains" (S.tappedCount S.alice (castAs ratchetBack)) 2
+    Spec.assertEqWith s "printed cost: {2}{W} tapped all three" (S.tappedCount S.alice (castAs ratchetFront)) 3
+    -- CR 712.11d, and the reason CR 702.162a is a keyword rather than a rider on
+    -- some opcode: the converted cast is offered to the player from the hand,
+    -- beside the ordinary one.
+    Spec.assertEqWith
+      s
+      "both casts are legal actions, the converted one included"
+      (List.sort [n | A.Cast o n _ <- Action.legalActions S.alice board, o == oid])
+      (List.sort [ratchetFront, ratchetBack])
