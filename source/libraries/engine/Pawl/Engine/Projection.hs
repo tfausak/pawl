@@ -2323,10 +2323,10 @@ rewriteReplacementEffect pairs effect = case effect of
         { EntryR.matching = Filter.rewrite pairs (EntryR.matching r),
           EntryR.rewrite = rewriteEntryRewrite pairs (EntryR.rewrite r)
         }
-  -- The pattern's two Filters, and CR 615.5's riders. Its DamageKind, its
-  -- Recipient and its ObjectId are a rules category and two baked identities, so
-  -- none of the three holds a printed word; the DamageRewrite holds numbers, a
-  -- Scaling and a Recipient.
+  -- The pattern's two Filters, CR 614.9's printed destination, and CR 615.5's
+  -- riders. The pattern's DamageKind, its PlayerRelation, its Recipient and its
+  -- ObjectId are a rules category, a CR 109.5 relation and two baked identities,
+  -- so none of the four holds a printed word.
   ReplacementEffect.DamageR r ->
     ReplacementEffect.DamageR
       r
@@ -2335,6 +2335,7 @@ rewriteReplacementEffect pairs effect = case effect of
               { DamagePattern.whatSource = Filter.rewrite pairs (DamagePattern.whatSource (DamageR.matching r)),
                 DamagePattern.whatRecipient = fmap (Filter.rewrite pairs) (DamagePattern.whatRecipient (DamageR.matching r))
               },
+          DamageR.rewrite = rewriteDamageRewrite pairs (DamageR.rewrite r),
           DamageR.riders = fmap (rewriteEffect pairs) (DamageR.riders r)
         }
   -- CR 701.19a's regeneration and CR 122.1c's shield: two nullary rewrites with
@@ -2365,6 +2366,26 @@ rewriteReplacementEffect pairs effect = case effect of
   -- A PhasePattern is a PhaseSelector and a baked seat (CR 614.1b / 500.11), both
   -- rules categories rather than printed words.
   ReplacementEffect.PhaseR _ -> effect
+
+-- CR 612.1 through a damage REWRITE, rewriteEntryRewrite's twin one event class
+-- over. Only CR 614.9's printed destination holds a Filter for a word to sit in;
+-- the rest are numbers, a Scaling and a baked Recipient.
+--
+-- NO BOARD OBSERVES IT: the pool's one printed destination is
+-- Filter.IsHostOfSource (Pariah), which names no subtype for CR 612.1 to swap,
+-- so mutating this arm away leaves the suite green. The arm is the rule rather
+-- than a proven behaviour -- a card redirecting to "the enchanted Goblin" would
+-- be what proves it. Exhaustive rather than a wildcard,
+-- rewriteReplacementEffect's posture.
+rewriteDamageRewrite :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> DamageRewrite.DamageRewrite -> DamageRewrite.DamageRewrite
+rewriteDamageRewrite pairs rewrite = case rewrite of
+  DamageRewrite.RedirectMatching f -> DamageRewrite.RedirectMatching (Filter.rewrite pairs f)
+  DamageRewrite.Redirect _ -> rewrite
+  DamageRewrite.PreventAll -> rewrite
+  DamageRewrite.PreventRemovingShieldCounter -> rewrite
+  DamageRewrite.PreventNext _ -> rewrite
+  DamageRewrite.SetAmount _ -> rewrite
+  DamageRewrite.Scale _ -> rewrite
 
 -- CR 612.1 through what a CR 614.1c/614.1d entry replacement does. Exhaustive for
 -- rewriteReplacementEffect's reason.
