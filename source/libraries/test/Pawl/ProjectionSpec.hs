@@ -3496,6 +3496,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- against the same rules. What is new here is only the zone the row is read out
   -- of, which is the whole point of the case.
   --
+  -- The producer, out of every card that mints an emblem -- Scryfall
+  -- `o:"emblem with"`, 2026-08-27, 96 cards, has_more false. Of the emblems on
+  -- that list printing a replacement effect, Ajani Steadfast still needs a
+  -- "prevent all but 1" rewrite (#2443) and Jaya Ballard's "cast this way" is a
+  -- back-reference to the permission the same emblem grants, so Serra's is the
+  -- one pawl can author.
+  --
   -- Each board differs from `board` by exactly one ACT: whether the ultimate was
   -- activated, whether alice controls a creature, or how much life is at stake.
   -- Activating it costs Serra her last loyalty counter and CR 704.5i buries her,

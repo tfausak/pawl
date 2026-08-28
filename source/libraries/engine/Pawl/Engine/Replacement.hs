@@ -80,11 +80,15 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InstanceOrdinal as InstanceOrdinal
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.LifeLossPattern as LifeLossPattern
+import qualified Pawl.Types.LifeLossR as LifeLossR
+import qualified Pawl.Types.LifeLossRewrite as LifeLossRewrite
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PermanentCandidate as PermanentCandidate
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import Pawl.Types.PhaseSelector (PhaseSelector)
+import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -134,6 +138,7 @@ asZoneChange event = case event of
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
+  ProposedEvent.WouldLoseLife {} -> Nothing
 
 -- Every replacement effect instance in the game, in the engine's canonical
 -- order, which is what the ChooseReplacement prompt indexes into:
@@ -565,6 +570,20 @@ applies gs event candidate =
         -- WHICH untaps it reaches -- unlike CR 122.1c's "as the result of an
         -- effect" -- so there is no `admits` beside this.
         (ReplacementEffect.UntapR _, ProposedEvent.WouldUntap oid) -> src == oid
+        -- CR 614.1a / 120.4c: whose life total the row watches (CR 109.5's
+        -- "your"), what caused the loss, and whether the loss would actually
+        -- carry the player past the total the rewrite leaves them at.
+        --
+        -- That third conjunct is CR 120.4d's own Worship example, which states
+        -- it as APPLICABILITY rather than as a rewrite that changes nothing:
+        -- "Worship's effect sees that the damage event would not reduce the
+        -- player's life total to less than 1, so Worship's effect is not
+        -- applied." So a loss the row would leave alone never reaches CR 616.1's
+        -- choice, is never spent under CR 614.5, and prompts nobody.
+        (ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR pat rewrite), ProposedEvent.WouldLoseLife cause pid n) ->
+          maybe True (== cause) (LifeLossPattern.whichCause pat)
+            && matchesPlayer gs src (LifeLossPattern.whose pat) pid
+            && breaches gs rewrite pid n
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
         -- MISMATCHED class, where False is the correct answer rather than a
@@ -577,7 +596,24 @@ applies gs event candidate =
         (ReplacementEffect.TokenR {}, _) -> False
         (ReplacementEffect.TurnUpR {}, _) -> False
         (ReplacementEffect.UntapR _, _) -> False
+        (ReplacementEffect.LifeLossR {}, _) -> False
         (ReplacementEffect.PhaseR _, _) -> False
+
+-- CR 120.4d: would this loss carry the player PAST the total the rewrite would
+-- leave them at? `admits` and `unspent` above, for the life-total class.
+--
+-- Read off the LIVE board rather than off the event, because the event carries
+-- only the loss and the rule's threshold is on the resulting TOTAL. A player
+-- already at or below the floor answers True -- the loss would still take them
+-- lower -- and the rewrite then cuts it to nothing.
+--
+-- A player id nothing is filed under answers False: no total to compare, so
+-- nothing to replace.
+breaches :: GameState -> LifeLossRewrite.LifeLossRewrite -> PlayerId -> Natural -> Bool
+breaches gs rewrite pid n = case rewrite of
+  LifeLossRewrite.LeaveAtLeast floor_ -> case Map.lookup pid (GameState.players gs) of
+    Nothing -> False
+    Just player -> Player.life player - toInteger n < toInteger floor_
 
 -- Does the REWRITE itself admit this entry, over and above the pattern matching
 -- the entering object? `admits` and `unspent` above, for the entry class.
@@ -1184,6 +1220,9 @@ bucketOfEffect re = case re of
   -- CR 616.1a-d are all about entering the battlefield and copying; becoming
   -- untapped is neither, so CR 616.1e.
   ReplacementEffect.UntapR _ -> ReplacementBucket.Other
+  -- CR 616.1a-d are all about entering the battlefield and copying; a life total
+  -- is neither, so CR 616.1e.
+  ReplacementEffect.LifeLossR {} -> ReplacementBucket.Other
   -- CR 616.1a-d are all about entries and copies; a skip is none of those, so it
   -- falls to CR 616.1e.
   ReplacementEffect.PhaseR _ -> ReplacementBucket.Other
@@ -1333,6 +1372,11 @@ readsApplier re = case re of
   -- CR 122.1d acts on the permanent becoming untapped and names no player -- CR
   -- 701.19a's answer one event class over, and for its reason.
   ReplacementEffect.UntapR _ -> False
+  -- The floor is the effect's own field and the player is the one the event
+  -- already named, so two rows alike in `effect` cut the same loss to the same
+  -- amount whoever holds them. CR 109.5's "your" is read in `applies` rather
+  -- than in Event.apply, which is CounterR's split exactly.
+  ReplacementEffect.LifeLossR {} -> False
   -- CR 614.10: a skip replaces the step or phase with nothing. The player it is
   -- ABOUT is baked into PhasePattern.whosePhase, on the EFFECT, where this
   -- comparison already sees it.
@@ -1466,6 +1510,11 @@ chooserOf gs event = case event of
   -- CR 122.1d gives its controller the choice among applicable rows even at CR
   -- 502.3's turn-based action, where that controller is the active player.
   ProposedEvent.WouldUntap oid -> Projection.controllerOf oid gs
+  -- CR 616.1's affected player is the one the event happens to, which for a life
+  -- loss is the player losing it -- WouldPutPlayerCounters' answer, and for its
+  -- reason. Not the damage's source or its controller: by CR 120.4c the damage
+  -- is dealt and settled, and what is being replaced is a result of it.
+  ProposedEvent.WouldLoseLife _ pid _ -> Just pid
 
 -- CR 208.2b / 707.2: stamp a chosen entry shape into the object's copiable
 -- snapshot. Power and toughness are SET; keywords are UNIONED into whatever is
@@ -2204,6 +2253,10 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.TokenR {} -> Nothing
   ReplacementEffect.TurnUpR {} -> Nothing
   ReplacementEffect.UntapR _ -> Nothing
+  -- CR 614.1a: a floor on a life total is not a supply a batch can run out of --
+  -- it is re-read off the board every application, and once the player is at the
+  -- floor a further loss is cut to nothing rather than exhausting anything.
+  ReplacementEffect.LifeLossR {} -> Nothing
   ReplacementEffect.PhaseR _ -> Nothing
 
 asDamageEvent :: ProposedEvent -> Maybe DamageEvent.DamageEvent
@@ -2218,6 +2271,7 @@ asDamageEvent event = case event of
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
+  ProposedEvent.WouldLoseLife {} -> Nothing
 
 asDestruction :: ProposedEvent -> Maybe ObjectId
 asDestruction event = case event of
@@ -2231,6 +2285,7 @@ asDestruction event = case event of
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
+  ProposedEvent.WouldLoseLife {} -> Nothing
 
 -- asDestruction's twin one event class over: the permanent that actually becomes
 -- untapped, or Nothing when a replacement took the event.
@@ -2246,6 +2301,7 @@ asUntap event = case event of
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
+  ProposedEvent.WouldLoseLife {} -> Nothing
 
 asCounters :: ProposedEvent -> Maybe (ObjectId, CounterKind.CounterKind Keyword.Type.Keyword, Natural)
 asCounters event = case event of
@@ -2259,6 +2315,7 @@ asCounters event = case event of
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
+  ProposedEvent.WouldLoseLife {} -> Nothing
 
 -- asCounters' player half. The CAUSE is dropped by both, for the same reason: what
 -- the funnel needs back is the placement to carry out, and the provenance has
@@ -2271,6 +2328,26 @@ asPlayerCounters event = case event of
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldCreateTokens {} -> Nothing
+  ProposedEvent.WouldBeginPhase {} -> Nothing
+  ProposedEvent.WouldTurnFaceUp {} -> Nothing
+  ProposedEvent.WouldUntap _ -> Nothing
+  ProposedEvent.WouldLoseLife {} -> Nothing
+
+-- asPlayerCounters' sibling one event class over: the player who would lose life
+-- and how much of the loss has survived, or Nothing when a replacement took the
+-- event outright. The CAUSE is dropped for that function's reason -- what the
+-- funnel needs back is the loss to carry out, and the provenance has already been
+-- read by every row that could apply.
+asLifeLoss :: ProposedEvent -> Maybe (PlayerId, Natural)
+asLifeLoss event = case event of
+  ProposedEvent.WouldLoseLife _ pid n -> Just (pid, n)
+  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldEnter _ -> Nothing
+  ProposedEvent.WouldDealDamage _ -> Nothing
+  ProposedEvent.WouldBeDestroyed {} -> Nothing
+  ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldPutPlayerCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
@@ -2288,6 +2365,7 @@ asTokens event = case event of
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
+  ProposedEvent.WouldLoseLife {} -> Nothing
 
 -- CR 500.11 / 614.1b: an extra turn is beginning, so the steps and phases IT
 -- skips become floating replacement effects, one per selector. Called by
@@ -2364,3 +2442,4 @@ asPhaseBegin event = case event of
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
+  ProposedEvent.WouldLoseLife {} -> Nothing

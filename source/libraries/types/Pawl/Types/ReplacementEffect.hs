@@ -4,6 +4,7 @@ import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EntryR as EntryR
+import qualified Pawl.Types.LifeLossR as LifeLossR
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TurnUpR as TurnUpR
@@ -97,5 +98,21 @@ data ReplacementEffect effect
     -- permanent with a stun counter on it" is the object it was minted for. The
     -- field appears when a card needs it.
     UntapR UntapRewrite.UntapRewrite
+  | -- | CR 614.1a / 120.4c: "damage that would reduce your life total to less
+    -- than 1 reduces it to 1 instead" (Worship). A separate arm from DamageR
+    -- because the two intercept different event classes: CR 120.4b's damage is
+    -- already settled and dealt by the time CR 120.4c processes it "into its
+    -- results, as modified by replacement effects that interact with those
+    -- results (such as life loss or counters)". Worship's own ruling is the
+    -- observable difference -- "Worship does not prevent damage. It causes some
+    -- damage to be unable to lower your life total. So any damage rendered
+    -- useless by Worship was still dealt" -- so a lifelink source still gains
+    -- its controller every point it dealt.
+    --
+    -- The COUNTER half of that same rule already runs through CR 122.6's funnel
+    -- (Pawl.Engine.Damage.applyDamage's counterResults); this is the life-loss
+    -- half of it, and the pattern's cause field is what keeps the arm off CR
+    -- 119.3's other roads.
+    LifeLossR LifeLossR.LifeLossR
   | PhaseR PhasePattern.PhasePattern
   deriving (Eq, Ord, Show)

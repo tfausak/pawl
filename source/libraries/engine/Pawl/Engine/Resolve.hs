@@ -155,6 +155,7 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaSpending as ManaSpending
@@ -740,6 +741,10 @@ replacementPatternSlots re = case re of
   ReplacementEffect.TokenR _ -> Map.empty
   ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat _ _) -> filterSlotsOf pat
   ReplacementEffect.UntapR _ -> Map.empty
+  -- A LifeLossPattern is one ControllerRelation and one LifeLossCause, and a
+  -- LifeLossRewrite is a number: no Filter, so no slot. TokenR's answer, and for
+  -- its reason.
+  ReplacementEffect.LifeLossR {} -> Map.empty
   ReplacementEffect.PhaseR _ -> Map.empty
 
 -- The Filters a damage REWRITE holds, which is CR 614.9's printed destination and
@@ -5041,12 +5046,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Event.simultaneously . Monad.forM_ losers $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
         Just n
-          | n > 0 ->
-              -- CR 119.3: the life total is simply adjusted, directly on the player
-              -- record. Not through Pawl.Engine.Damage: CR 119.2 makes damage a
-              -- CAUSE of life loss, not a synonym. CR 704.5a's state-based action
-              -- is the existing one in Pawl.Engine.Sba.
-              changeLife pid (negate n)
+          | n > 0 -> do
+              -- CR 119.3: the life total is simply adjusted. Not through
+              -- Pawl.Engine.Damage: CR 119.2 makes damage a CAUSE of life loss,
+              -- not a synonym. CR 704.5a's state-based action is the existing one
+              -- in Pawl.Engine.Sba.
+              --
+              -- Through Event.resolveLifeLoss, CR 614.1's funnel for the class,
+              -- carrying LifeLossCause.ByEffect: a row scoped to damage does not
+              -- reach this road, which is Worship's own ruling ("Worship does not
+              -- prevent loss of life, so loss of life bypasses Worship") and what
+              -- Pawl.ReplacementSpec's Worship group proves on a board where the
+              -- same player at the same life survives 3 damage and dies to
+              -- Stronghold Discipline's 3.
+              settled <- Event.resolveLifeLoss LifeLossCause.ByEffect pid (Integer.toNaturalSaturating n)
+              changeLife pid (negate (toInteger settled))
         _ -> pure ()
   -- CR 119.3's other half, LoseLife's mirror but for the sign. The `n > 0` guard
   -- is CR 119.9: a gain of 0 is no life gain event to trigger on.
