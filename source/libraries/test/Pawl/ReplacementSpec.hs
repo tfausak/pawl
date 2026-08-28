@@ -1587,15 +1587,16 @@ atLife pid n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n})
 -- instead" -- name, cost, type line and Oracle text checked against
 -- api.scryfall.com 2026-08-28).
 --
--- The pool's only life-total replacement, and the card that separates CR 120.4b's
--- damage from CR 120.4c's results. Its own Gatherer rulings state both halves:
--- "It reduces your life total to 1, not the damage to 1", and "Worship does not
--- prevent damage. It causes some damage to be unable to lower your life total. So
--- any damage rendered useless by Worship was still dealt ... Worship does not
--- prevent loss of life, so loss of life bypasses Worship." Serra the Benevolent's
--- emblem prints the same clause word for word and is the worse producer: an
--- emblem needs a resolution to mint it, where the enchantment is a permanent a
--- fixture can place.
+-- The card that separates CR 120.4b's damage from CR 120.4c's results. Its own
+-- Gatherer rulings state both halves: "It reduces your life total to 1, not the
+-- damage to 1", and "Worship does not prevent damage. It causes some damage to be
+-- unable to lower your life total. So any damage rendered useless by Worship was
+-- still dealt ... Worship does not prevent loss of life, so loss of life bypasses
+-- Worship." data/cards/serra-the-benevolent.json's emblem prints the same clause
+-- word for word, and this group is the BATTLEFIELD half of the pair: an emblem
+-- needs a resolution to mint it, where the enchantment is a permanent a fixture
+-- can place. Pawl.ProjectionSpec proves the identical row out of the command
+-- zone (CR 113.6p), which is the half this group cannot reach.
 --
 -- REAL COMBAT with a LIFELINK attacker, because that is the board on which the
 -- two readings of the rule differ. An implementation that shrank the DAMAGE
