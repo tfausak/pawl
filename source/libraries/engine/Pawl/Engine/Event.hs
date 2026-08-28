@@ -1022,11 +1022,16 @@ loop asOf batch applied prevented exiledBy event = do
           -- standing. CR 614.1a's replacements never come here, so a Furnace of
           -- Rath still doubles unpreventable damage.
           --
-          -- Not implemented: CR 615.5's authored rider, which a row CAN carry now
-          -- but which this path still never queues -- `preventionBy` below reports
-          -- Nothing off an undiminished event, so nothing reaches the rider
-          -- (#1695).
-          outcome <- case Replacement.inertPrevention gs candidate event of
+          -- CR 615.5's AUTHORED rider is the other half of that middle clause,
+          -- and `applyInertly` cannot reach it: the rider rides on the candidate
+          -- rather than on the rewrite, and this module cannot run a card's
+          -- effects. So the classification is bound here and handed to
+          -- `preventionBy` below, which reports a prevention of 0 off the
+          -- undiminished event -- enough for Pawl.Engine.Damage to queue the
+          -- rider, and not enough for CR 615.13's record. Phantom Tiger loses a
+          -- +1/+1 counter to damage it could not prevent (Pawl.ReplacementSpec).
+          let inert = Replacement.inertPrevention gs candidate event
+          outcome <- case inert of
             Just rewrite -> applyInertly candidate rewrite event
             Nothing -> apply batch candidate event
           -- CR 615.13: read OUTSIDE `apply`, from the event before and after, so
@@ -1034,7 +1039,7 @@ loop asOf batch applied prevented exiledBy event = do
           -- What makes it exact rather than a guess is Replacement.prevents: only a
           -- PREVENTION rewrite's shrinkage is prevention, where CR 614.1a's
           -- SetAmount and Scale shrink an event without preventing a point of it.
-          let prevented1 = prevented <> Maybe.maybeToList (Replacement.preventionBy candidate event outcome)
+          let prevented1 = prevented <> Maybe.maybeToList (Replacement.preventionBy inert candidate event outcome)
           case outcome of
             Nothing -> pure (Nothing, prevented1, exiledBy)
             Just rewritten -> loop asOf batch (Set.insert (ReplacementCandidate.identity candidate) applied) prevented1 (exiledByAfter candidate event rewritten exiledBy) rewritten
@@ -1105,7 +1110,9 @@ applyInertly candidate rewrite event = do
     DamageRewrite.PreventNext _ -> pure ()
     -- Fog's blanket prevention likewise carries nothing beyond the prevention:
     -- CR 615.5's authored rider rides on the CANDIDATE rather than on the
-    -- rewrite, so it is `loop`'s business above and not this fold's.
+    -- rewrite, so it is `loop`'s business above -- which queues it through
+    -- `preventionBy` -- and not this fold's. Phantom Tiger's counter comes off
+    -- that way rather than here.
     DamageRewrite.PreventAll -> pure ()
     -- Unreachable: `Replacement.prevents` refuses these three, so no inert
     -- application ever reaches them. CR 614.1a's replacements are not preventions
