@@ -1025,11 +1025,16 @@ loop asOf batch applied prevented exiledBy event = do
           -- standing. CR 614.1a's replacements never come here, so a Furnace of
           -- Rath still doubles unpreventable damage.
           --
-          -- Not implemented: CR 615.5's authored rider, which a row CAN carry now
-          -- but which this path still never queues -- `preventionBy` below reports
-          -- Nothing off an undiminished event, so nothing reaches the rider
-          -- (#1695).
-          outcome <- case Replacement.inertPrevention gs candidate event of
+          -- CR 615.5's AUTHORED rider is the other half of that middle clause,
+          -- and `applyInertly` cannot reach it: the rider rides on the candidate
+          -- rather than on the rewrite, and this module cannot run a card's
+          -- effects. So the classification is bound here and handed to
+          -- `preventionBy` below, which reports a prevention of 0 off the
+          -- undiminished event -- enough for Pawl.Engine.Damage to queue the
+          -- rider, and not enough for CR 615.13's record. Phantom Tiger loses a
+          -- +1/+1 counter to damage it could not prevent (Pawl.ReplacementSpec).
+          let inert = Replacement.inertPrevention gs candidate event
+          outcome <- case inert of
             Just rewrite -> applyInertly candidate rewrite event
             Nothing -> apply batch candidate event
           -- CR 615.13: read OUTSIDE `apply`, from the event before and after, so
@@ -1037,7 +1042,7 @@ loop asOf batch applied prevented exiledBy event = do
           -- What makes it exact rather than a guess is Replacement.prevents: only a
           -- PREVENTION rewrite's shrinkage is prevention, where CR 614.1a's
           -- SetAmount and Scale shrink an event without preventing a point of it.
-          let prevented1 = prevented <> Maybe.maybeToList (Replacement.preventionBy candidate event outcome)
+          let prevented1 = prevented <> Maybe.maybeToList (Replacement.preventionBy inert candidate event outcome)
           case outcome of
             Nothing -> pure (Nothing, prevented1, exiledBy)
             Just rewritten -> loop asOf batch (Set.insert (ReplacementCandidate.identity candidate) applied) prevented1 (exiledByAfter candidate event rewritten exiledBy) rewritten
@@ -1108,7 +1113,9 @@ applyInertly candidate rewrite event = do
     DamageRewrite.PreventNext _ -> pure ()
     -- Fog's blanket prevention likewise carries nothing beyond the prevention:
     -- CR 615.5's authored rider rides on the CANDIDATE rather than on the
-    -- rewrite, so it is `loop`'s business above and not this fold's.
+    -- rewrite, so it is `loop`'s business above -- which queues it through
+    -- `preventionBy` -- and not this fold's. Phantom Tiger's counter comes off
+    -- that way rather than here.
     DamageRewrite.PreventAll -> pure ()
     -- Unreachable: `Replacement.prevents` refuses these three, so no inert
     -- application ever reaches them. CR 614.1a's replacements are not preventions
@@ -1116,6 +1123,7 @@ applyInertly candidate rewrite event = do
     DamageRewrite.SetAmount _ -> pure ()
     DamageRewrite.Scale _ -> pure ()
     DamageRewrite.Redirect _ -> pure ()
+    DamageRewrite.RedirectMatching _ -> pure ()
   pure (Just event)
 
 -- CR 614.6: apply one chosen effect. Nothing means the event does not happen.
@@ -1493,7 +1501,7 @@ apply batch candidate event =
       EntryRewrite.WithCounters (WithCounters.MkWithCounters counters) -> do
         gs <- State.get
         let viewOf = Projection.viewWithLastKnown oid gs
-            context = Replacement.candidateContext candidate
+            context = Replacement.candidateContext gs candidate
             announcedX = Projection.announcedXOf oid gs
         Replacement.consume (ReplacementCandidate.identity candidate)
         Foldable.for_ (Map.toList counters) $ \(kind, quantity) ->
@@ -2090,6 +2098,22 @@ apply batch candidate event =
         pure . Just $ case Replacement.redirectDestination gs dest of
           Nothing -> event
           Just live -> ProposedEvent.WouldDealDamage de {DamageEvent.target = live}
+      -- CR 614.9 with the destination PRINTED rather than baked -- Pariah's
+      -- "all damage that would be dealt to you is dealt to enchanted creature
+      -- instead". The arm above with `dest` found by description instead of read
+      -- off the row, so the rule's guard, the CR 613.1d re-tag and the
+      -- unchanged-event answer are all the same three lines
+      -- (Replacement.printedDestination).
+      --
+      -- The Filter is read in the CANDIDATE's Context, which is what makes CR
+      -- 303.4b's "enchanted" answerable: the row's source is the Aura, and
+      -- Replacement.candidateContext supplies what it is attached to.
+      DamageRewrite.RedirectMatching filter_ -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        pure . Just $ case Replacement.printedDestination gs (Replacement.candidateContext gs candidate) filter_ of
+          Nothing -> event
+          Just live -> ProposedEvent.WouldDealDamage de {DamageEvent.target = live}
     -- Unreachable: `applies` admits DamageR only against WouldDealDamage.
     (ReplacementEffect.DamageR {}, _) -> pure (Just event)
     -- CR 701.19a / 122.1c: under either arm the DESTRUCTION does not happen, so
@@ -2255,7 +2279,7 @@ apply batch candidate event =
       TurnUpRewrite.WithCounters (WithCounters.MkWithCounters counters) -> do
         gs <- State.get
         let viewOf = Projection.viewWithLastKnown oid gs
-            context = Replacement.candidateContext candidate
+            context = Replacement.candidateContext gs candidate
         Replacement.consume (ReplacementCandidate.identity candidate)
         Foldable.for_ (Map.toList counters) $ \(kind, quantity) ->
           case Quantity.evaluate viewOf context gs oid quantity of
@@ -4942,6 +4966,17 @@ discardReturning cause pid oid = do
 -- The `cause` is CR 702.94a's "this way" (see RevealCause): every caller but the
 -- draw funnel's miracle window shows a card for a reason no rule asks about
 -- again, and passes Ordinary.
+--
+-- CR 708.12 does NOT move this read, and that is the rule rather than an
+-- oversight: it governs what a revealing ability READS, not what the log records,
+-- and the read is Pawl.Types.Filter's RepresentedByCard -- Hauntwoods Shrieker's
+-- "if it's a creature card", proved at Pawl.FaceDownSpec's CR 708.12 group.
+--
+-- Not implemented: CR 708.9's reveal, which a face-down permanent's owner makes
+-- as it leaves the battlefield. Pawl.Types.Object's newIncarnation gets the
+-- OUTCOME right -- the status is back to FaceUp -- but no caller reaches this
+-- funnel, so nothing can trigger on it, and the snapshot such a reveal would
+-- record is unsettled for the same reason nothing reads it (#921).
 reveal :: RevealCause.RevealCause -> PlayerId -> ObjectId -> Game ()
 reveal cause pid oid = do
   gs <- State.get

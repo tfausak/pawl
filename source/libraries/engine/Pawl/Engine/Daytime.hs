@@ -80,6 +80,11 @@ hasKeyword kw pcs oid = case Map.lookup oid pcs of
 -- permanent stripped by Humility (CR 613.1f) has no daybound ability left, so it
 -- has no restriction either -- the restriction IS part of the ability. A GRANTED
 -- daybound brings its restriction with it by the same read.
+--
+-- Read by CR 701.28's convert too, and CR 701.28f is why it must be: "if a spell
+-- or ability states that a permanent can't transform, that permanent also can't
+-- convert". The two opcodes share one Pawl.Engine.Resolve.turnPermanentsOver, so
+-- that holds by construction rather than by a second check.
 restrictsTransform :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> Bool
 restrictsTransform pcs oid =
   hasKeyword Keyword.Daybound pcs oid || hasKeyword Keyword.Nightbound pcs oid

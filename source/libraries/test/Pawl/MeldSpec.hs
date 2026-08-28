@@ -35,12 +35,14 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaRetention as ManaRetention
@@ -486,6 +488,14 @@ spec s registry = Spec.describe s "Meld" $ do
         -- The pair: the same card, one card representing it, same instruction.
         -- CR 701.27a turns that one over, so the refusal above is the meld's.
         Spec.assertEqWith s "CR 701.27a an ordinary Thraben Gargoyle turns over" (Projection.namesOf loneId (transforming [loneId] alone)) (Set.singleton (CardName.MkCardName (Text.pack "Stonewing Antagonizer")))
+        -- CR 712.4c and CR 712.9 both name converting beside transforming, and CR
+        -- 701.28f says a permanent that can't transform can't convert either. So
+        -- the other opcode gets the same board and the same pair: the melded
+        -- permanent refuses, and the lone Gargoyle -- one card, same card --
+        -- turns over, which is what keeps the refusal from being a convert that
+        -- does nothing anywhere.
+        Spec.assertEqWith s "CR 701.28f/712.9 nor does an instruction to convert turn it over" (Projection.namesOf meldedId (converting [meldedId] after)) (Set.singleton (CardName.MkCardName (Text.pack "Thraben Gargoyle")))
+        Spec.assertEqWith s "CR 701.28a while an ordinary Thraben Gargoyle converts" (Projection.namesOf loneId (converting [loneId] alone)) (Set.singleton (CardName.MkCardName (Text.pack "Stonewing Antagonizer")))
       other -> Spec.assertFailure s ("expected exactly one permanent, got " <> show (length other))
 
   -- CR 701.27g's second exclusion where nothing else answers: a melded permanent
@@ -638,10 +648,22 @@ spec s registry = Spec.describe s "Meld" $ do
 -- the opcode a card's "transform target permanent" reaches: the slot the effect
 -- reads is the one such a card's target would have bound.
 transforming :: [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
-transforming oids gs =
+transforming = turningOver Effect.Transform
+
+-- CR 701.28a's word for the same instruction, which that rule routes through
+-- rules 701.27a-f and 712.9-10 unchanged. A SEPARATE opcode reaching one
+-- Pawl.Engine.Resolve.turnPermanentsOver, so a case run through both asserts
+-- that the shared path is shared rather than that two implementations agree.
+converting :: [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
+converting = turningOver Effect.Convert
+
+-- What the two above share: the named permanents in one slot, the way a card's
+-- target would have bound them.
+turningOver :: (ObjectRef.ObjectRef -> Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)) -> [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
+turningOver mkEffect oids gs =
   let slot = SlotName.MkSlotName (Text.pack "turning")
       bound = Map.singleton slot (Set.fromList (fmap Recipient.ToObject oids))
-   in S.runPure S.identityAnswer gs (Resolve.applyEffect S.noSource S.noSource S.alice bound Map.empty (Effect.Transform (ObjectRef.InSlot slot)))
+   in S.runPure S.identityAnswer gs (Resolve.applyEffect S.noSource S.noSource S.alice bound Map.empty (mkEffect (ObjectRef.InSlot slot)))
 
 -- alice's Hanweir Battlements and Hanweir Garrison added to `base`, her five
 -- Mountains beside them, and the printed melding ability activated and resolved:

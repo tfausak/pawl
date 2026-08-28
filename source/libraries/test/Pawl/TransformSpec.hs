@@ -17,6 +17,13 @@
 -- transformTriggerSpec, whose fixture is Blightreaper Thallid // Blightsower
 -- Thallid, the Gargoyle printing no text on its back face to trigger with.
 --
+-- Also CR 701.28's convert and CR 702.161a's living metal, which land together
+-- because no printed card carries one without the other: the Effect.Convert arm
+-- of Pawl.Engine.Resolve (the same turnPermanentsOver the transform arm calls),
+-- and the static ability Pawl.Engine.Keyword.livingMetal mints for
+-- Pawl.Engine.Projection.staticAbilitiesOf. See convertSpec, whose fixture is
+-- Ratchet, Field Medic // Ratchet, Rescue Racer.
+--
 -- Also CR 701.27g's "transformed permanent", the phrase a CARD asks rather than
 -- the engine: Pawl.Types.Filter's Transformed atom, filled by
 -- Pawl.Engine.Projection.viewOfCharacteristics. See transformedPermanentSpec,
@@ -223,6 +230,7 @@ spec s registry = Spec.describe s "Transform" $ do
   enterTransformedSpec s registry
   transformedPermanentSpec s registry
   transformTriggerSpec s registry
+  convertSpec s registry
   spellsCastLastTurnSpec s registry
   -- CR 712.8d: "While a double-faced permanent has its front face up, it has
   -- only the characteristics of its front face." Nothing has turned this one
@@ -1128,3 +1136,144 @@ spellsCastLastTurnSpec s registry = Spec.describe s "SpellsCastLastTurn" $ do
     -- takes for 0.
     Spec.assertEqWith s "bob cast one during alice's turn and alice cast none" (GameState.castsLastTurn handed) (Map.fromList [(S.bob, 1)])
     Spec.assertEqWith s "and CR 502.2's scalar still answers about alice alone" (GameState.spellsCastLastTurn handed) 0
+
+-- The two names Ratchet, Field Medic // Ratchet, Rescue Racer prints. CR 701.28
+-- and CR 702.161's group reads both.
+ratchetFront, ratchetBack :: CardName.CardName
+ratchetFront = CardName.MkCardName (Text.pack "Ratchet, Field Medic")
+ratchetBack = CardName.MkCardName (Text.pack "Ratchet, Rescue Racer")
+
+-- Everything the two Ratchet faces disagree about, read through the projection:
+-- name, power and toughness, subtypes and CARD TYPES. The last is what CR
+-- 702.161a moves and the first three are what CR 701.28a moves, so one tuple
+-- covers both rules and a change reaching only one of them cannot pass.
+ratchetReadings ::
+  ObjectId.ObjectId ->
+  GameState.GameState ->
+  (Set.Set CardName.CardName, Maybe (Integer, Integer), Set.Set Subtype.Subtype, Set.Set CardType.CardType)
+ratchetReadings oid gs =
+  ( Projection.namesOf oid gs,
+    S.powerToughnessOf oid gs,
+    Projection.subtypesOf oid gs,
+    Projection.cardTypesOf oid gs
+  )
+
+-- alice's Ratchet with its BACK face up, which is the only board its printed
+-- convert trigger functions on. Written onto Object.face directly rather than
+-- played out, because the two printed roads to a back-face-up Ratchet are the
+-- ones this unit does not implement: CR 712.11a's cast "converted" (more than
+-- meets the eye, #2521) and the front face's own optional convert (#2522).
+--
+-- Object.turnedOverAt is deliberately left unset. CR 701.27f -- which CR 701.28e
+-- restates for convert -- ignores an instruction from an ability of a permanent
+-- that has already turned over since that ability was put onto the stack, so a
+-- fixture that stamped one would gate the very behaviour these cases assert.
+racerBoard :: Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+racerBoard ratchet gs =
+  let (oid, placed) = S.addCreature ratchet S.alice gs
+      showBack o = o {Object.face = Just ratchetBack}
+   in (oid, placed {GameState.objects = Map.adjust showBack oid (GameState.objects placed)})
+
+-- CR 701.28's convert and CR 702.161a's living metal, on the one printed card
+-- that carries both with nothing else pawl cannot say: Ratchet, Field Medic //
+-- Ratchet, Rescue Racer. Its front face is a {2}{W} 2/4 Legendary Artifact
+-- Creature -- Robot with lifelink; its back face a 1/4 Legendary Artifact --
+-- Vehicle with lifelink, living metal, and "Whenever one or more nontoken
+-- artifacts you control are put into a graveyard from the battlefield, convert
+-- Ratchet. This ability triggers only once each turn."
+--
+-- The front face's third ability -- "Whenever you gain life, you may convert
+-- Ratchet ..." -- is NOT transcribed (#2522), and neither is more than meets the
+-- eye (#2521). Both omissions leave pawl's card able to do strictly less than the
+-- printed one: an optional convert nobody may take, and an alternative cost
+-- nobody may pay.
+convertSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+convertSpec s registry = Spec.describe s "Convert" $ do
+  -- THE proving case. CR 701.28a: "To convert a permanent, turn it so that its
+  -- other face is up."
+  --
+  -- Played out from the card's own text: alice's Icehide Golem, a nontoken
+  -- artifact creature, takes CR 704.5g lethal damage, the CR 704.3 pass buries
+  -- it, and the back face's trigger resolves. Every characteristic reader is
+  -- asked before and after, so an engine that turned the permanent over for some
+  -- of them and not others fails here rather than in one narrow assertion.
+  Spec.it s "CR 701.28a the Racer's own trigger converts it, and every reader sees the front face" $ do
+    ratchet <- S.printingOf s registry "Ratchet, Field Medic"
+    golem <- S.printingOf s registry "Icehide Golem"
+    let (ratchetId, withRatchet) = racerBoard ratchet emptyBoard
+        (golemId, board) = S.addCreature golem S.alice withRatchet
+        settled = S.runPure S.identityAnswer (S.markDamage golemId 2 board) Engine.settleForPriority
+        after = S.runPure S.identityAnswer settled Stack.resolveTop
+    Spec.assertEqWith s "after: Ratchet, Field Medic" (ratchetReadings ratchetId after) ratchetFrontReadings
+    Spec.assertEqWith s "before: Ratchet, Rescue Racer" (ratchetReadings ratchetId board) ratchetBackReadings
+    -- CR 701.28a happens at RESOLUTION, so the death alone is not what turns the
+    -- permanent over.
+    Spec.assertEqWith s "still the back face while the trigger is on the stack" (ratchetReadings ratchetId settled) ratchetBackReadings
+    Spec.assertEqWith s "the Golem died" (Maybe.isNothing (Game.lookupObject golemId settled)) True
+    Spec.assertEqWith s "and exactly one trigger reached the stack" (length (GameState.stack settled)) 1
+  -- CR 701.27b, which CR 701.28b restates for convert: turning over is its own
+  -- game action, so it records CR 701.27a's event rather than a second one of its
+  -- own -- the same GameEvent.Transformed a transform writes, which is what makes
+  -- CR 701.27e's "transforms into" trigger fire on a convert.
+  Spec.it s "CR 701.27e / 701.28a a convert records the transform event, not one of its own" $ do
+    ratchet <- S.printingOf s registry "Ratchet, Field Medic"
+    golem <- S.printingOf s registry "Icehide Golem"
+    let (ratchetId, withRatchet) = racerBoard ratchet emptyBoard
+        (golemId, board) = S.addCreature golem S.alice withRatchet
+        settled = S.runPure S.identityAnswer (S.markDamage golemId 2 board) Engine.settleForPriority
+        after = S.runPure S.identityAnswer settled Stack.resolveTop
+        transformedInto =
+          [ Transformed.names t
+          | GameEvent.Transformed t <- S.eventsOf after,
+            Transformed.object t == ratchetId
+          ]
+    Spec.assertEqWith s "the convert recorded a Transformed naming the face it landed on" transformedInto [Set.singleton ratchetFront]
+    Spec.assertEqWith s "and the permanent really is on that face" (faceNameOf ratchetId after) (Just ratchetFront)
+  -- CR 702.161a: "During your turn, this permanent is an artifact creature in
+  -- addition to its other types."
+  --
+  -- ONE board, handed over to bob. That is what tells the rule from a type
+  -- granted outright: a permanent that were simply an artifact creature would
+  -- read the same on alice's turn and differ on bob's.
+  --
+  -- "In addition to its other types" is the second half, and the Vehicle subtype
+  -- surviving on both turns is what proves it -- CR 205.1b, the same reading crew
+  -- gets.
+  Spec.it s "CR 702.161a living metal makes the Vehicle a creature during its controller's turn only" $ do
+    ratchet <- S.printingOf s registry "Ratchet, Field Medic"
+    let (ratchetId, board) = racerBoard ratchet emptyBoard
+        bobsTurn = S.runPure S.identityAnswer board Engine.handoffTurn
+    Spec.assertEqWith
+      s
+      "during alice's turn it is an artifact creature"
+      (Projection.cardTypesOf ratchetId board)
+      (Set.fromList [CardType.Artifact, CardType.Creature])
+    Spec.assertEqWith
+      s
+      "during bob's turn it is an artifact and not a creature"
+      (Projection.cardTypesOf ratchetId bobsTurn)
+      (Set.singleton CardType.Artifact)
+    Spec.assertEqWith s "it is a Vehicle on both, the types being ADDED" (Projection.subtypesOf ratchetId bobsTurn) (Set.singleton Subtype.Vehicle)
+    Spec.assertEqWith s "bob's turn began" (GameState.activePlayer bobsTurn) S.bob
+    Spec.assertEqWith s "and nothing turned the permanent over" (faceNameOf ratchetId bobsTurn) (Just ratchetBack)
+  -- The control the case above cannot supply on its own: the FRONT face is a
+  -- printed artifact creature, so it stays one on bob's turn. Without this leg
+  -- "not a creature during an opponent's turn" could be an answer about the card
+  -- rather than about living metal, which only the back face has.
+  Spec.it s "CR 702.161a the front face, which has no living metal, is a creature on either turn" $ do
+    ratchet <- S.printingOf s registry "Ratchet, Field Medic"
+    let (ratchetId, board) = S.addCreature ratchet S.alice emptyBoard
+        bobsTurn = S.runPure S.identityAnswer board Engine.handoffTurn
+    Spec.assertEqWith
+      s
+      "the front face is an artifact creature during bob's turn"
+      (Projection.cardTypesOf ratchetId bobsTurn)
+      (Set.fromList [CardType.Artifact, CardType.Creature])
+    Spec.assertEqWith s "and it is the front face that is up" (faceNameOf ratchetId bobsTurn) (Just ratchetFront)
+
+-- The two readings ratchetReadings answers with, one per face. The back face's
+-- card types are alice's-turn ones: CR 702.161a is why a Vehicle reads as an
+-- artifact creature there, and its own case above is what proves that.
+ratchetFrontReadings, ratchetBackReadings :: (Set.Set CardName.CardName, Maybe (Integer, Integer), Set.Set Subtype.Subtype, Set.Set CardType.CardType)
+ratchetFrontReadings = (Set.singleton ratchetFront, Just (2, 4), Set.singleton Subtype.Robot, Set.fromList [CardType.Artifact, CardType.Creature])
+ratchetBackReadings = (Set.singleton ratchetBack, Just (1, 4), Set.singleton Subtype.Vehicle, Set.fromList [CardType.Artifact, CardType.Creature])

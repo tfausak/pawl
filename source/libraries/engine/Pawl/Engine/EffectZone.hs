@@ -100,7 +100,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Amass _ -> Nothing
   Effect.Blight _ -> Nothing
   Effect.TemptWithTheRing -> Nothing
-  Effect.Venture -> Nothing
+  Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
   Effect.RestartGame _ -> Nothing
@@ -158,6 +158,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.MakePlotted _ -> Nothing
   Effect.DoesNotUntapNext _ -> Nothing
   Effect.Transform _ -> Nothing
+  Effect.Convert _ -> Nothing
   -- CR 113.6m asks which zone an ability functions FROM by where the object it is
   -- on moves. A meld moves the cards the ability NAMED, and the melding ability's
   -- own source is one of them only because an earlier instruction exiled it --

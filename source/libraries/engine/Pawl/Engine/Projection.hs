@@ -583,7 +583,9 @@ setPT base new = case (base, new) of
 -- mid-fold power is still its printed one and only an object with no printed box
 -- reaches here. A CREATURE with no power is rule 208.5's premise instead, and
 -- projectDeciding's noValueAt has already substituted its 0 by the time layer 7c
--- runs, so no creature reaches this arm.
+-- runs -- on BOTH accumulators the fold applies an effect to, `seeded` for the
+-- projected object and `snapshot` for every other one on the running board, so
+-- no creature reaches this arm.
 addPT :: Maybe Integer -> Maybe Integer -> Maybe Integer
 addPT base delta = case (base, delta) of
   (Just b, Just d) -> Just (b + d)
@@ -869,6 +871,10 @@ viewOfCard face =
           -- with no object behind it -- the rule's own answer rather than an
           -- unknown, `transformed` below's reason one status category over.
           Filter.faceDown = False,
+          -- Nothing rather than this very view: CR 708.12's subject is the card
+          -- representing an object, and this builder IS a printed face, so a
+          -- self-reference would only recur. Filter.representedCard says so.
+          Filter.representedCard = Nothing,
           -- CR 406.3 writes its rider onto an object in exile, and this is a
           -- printed FACE with no object behind it -- the line above's reason,
           -- one rule over.
@@ -1080,6 +1086,15 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- the atom today is already scoped to the battlefield, so dropping the
       -- conjunct leaves the suite green.
       Filter.faceDown = Set.member oid (GameState.battlefield gs) && maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs),
+      -- CR 708.12's "ignoring any continuous effects", and the only site that
+      -- fills the field: the card representing this object, read off
+      -- Game.faceUpFaceOf so that CR 708.2a's substitution in Game.faceOf does not
+      -- reach it. Nothing where no card is behind the object -- a token, an
+      -- ability on the stack -- and Filter.RepresentedByCard is False there.
+      --
+      -- NOT scoped to the battlefield, unlike `faceDown` above: CR 708.12's read
+      -- is of a card, which an object in any zone either has or has not.
+      Filter.representedCard = fmap viewOfCard (Game.faceUpFaceOf oid gs),
       -- CR 406.3's rider, and the only site that fills the field. NO zone
       -- conjunct beside it, unlike the line above: Object.exiledFaceDown is
       -- per-incarnation state that only the move into exile writes, and CR 400.7
@@ -1179,10 +1194,20 @@ copiableSnapshotOf oid gs = Game.lookupObject oid gs >>= (Binding.copyOf . Objec
 -- the ordinary permanent, where the seed spends Game.namesOf and two
 -- Quantity.evaluates, so the readers below stay as cheap as the printed read
 -- they replace.
+-- CR 702.161a's living metal is APPENDED rather than read at a use site, and
+-- appended HERE rather than at the one caller that folds these into layers: the
+-- list's index is CR 613.6's memo key and Pawl.Engine.Event's departure handover
+-- indexes the same list, so the two walks must agree on what is at each position.
+-- Printed abilities keep their indices; a minted one takes the position after.
+--
+-- Off the COPIABLE keywords, like the rest of this function. So a living metal
+-- another object's static ability grants is not expanded (#2523), the way a
+-- granted devoid (#793) and a granted changeling (#1288) are not: what a keyword
+-- MEANS would otherwise have to be known before layer 6 has decided who holds it.
 staticAbilitiesOf :: ObjectId -> GameState -> [StaticAbility.StaticAbility Card.Type.Card]
 staticAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
-  Just snapshot -> PC.staticAbilities snapshot
-  Nothing -> foldMap Face.staticAbilities (Game.faceOf oid gs)
+  Just snapshot -> PC.staticAbilities snapshot <> Keyword.mintedStaticAbilitiesOf (Map.keysSet (PC.keywords snapshot))
+  Nothing -> foldMap (\face -> Face.staticAbilities face <> Keyword.mintedStaticAbilitiesOf (Face.keywords face)) (Game.faceOf oid gs)
 
 -- CR 707.2a: the replacement effects this object's copiable rules text gives it,
 -- staticAbilitiesOf's sibling for the ability kind CR 614 asks about, written
@@ -1935,6 +1960,8 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.PlayAdditionalLands _ -> effect
   PlayerEffect.NoMaximumHandSize -> effect
   PlayerEffect.SetMaximumHandSize _ -> effect
+  PlayerEffect.IncreaseMaximumHandSize _ -> effect
+  PlayerEffect.ReduceMaximumHandSize _ -> effect
   PlayerEffect.DontLoseUnspentMana _ -> effect
   PlayerEffect.SpendManaAsThough _ -> effect
   PlayerEffect.CantBeTargetedBy _ -> effect
@@ -1987,7 +2014,13 @@ rewriteEffect pairs effect = case effect of
     Effect.Amass (Amass.MkAmass quantity (List.foldl' (\s (from, to) -> if s == from && Subtype.isCreatureType from then to else s) subtype pairs))
   Effect.Blight _ -> effect
   Effect.TemptWithTheRing -> effect
-  Effect.Venture -> effect
+  -- CR 612.2's gate, and this arm is where it bites rather than where it is
+  -- restated: the payload IS a subtype word (CR 701.49d's quality), but a pair
+  -- reaching it would have to come from a Pawl.Types.SubtypeFamily, and that type
+  -- has only CR 205.3m's creature types and the basic land types -- the two
+  -- families CR 612.2 names. CR 205.3p's dungeon type is in neither, so no swap
+  -- this function can be given names it.
+  Effect.Venture {} -> effect
   Effect.ExileHandThenDraw -> effect
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot (Filter.rewrite pairs filter_) quantity)
   Effect.RestartGame exempt -> Effect.RestartGame (fmap (rewriteObjectRef pairs) exempt)
@@ -2081,6 +2114,7 @@ rewriteEffect pairs effect = case effect of
   Effect.MakePlotted ref -> Effect.MakePlotted (rewriteObjectRef pairs ref)
   Effect.DoesNotUntapNext ref -> Effect.DoesNotUntapNext (rewriteObjectRef pairs ref)
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
+  Effect.Convert ref -> Effect.Convert (rewriteObjectRef pairs ref)
   -- CR 612.2a through the combined back face as well as the ref, Effect.Create's
   -- reason one opcode over: the face is card data the ability carries, and its
   -- words are the ability's words.
@@ -2324,10 +2358,10 @@ rewriteReplacementEffect pairs effect = case effect of
         { EntryR.matching = Filter.rewrite pairs (EntryR.matching r),
           EntryR.rewrite = rewriteEntryRewrite pairs (EntryR.rewrite r)
         }
-  -- The pattern's two Filters, and CR 615.5's riders. Its DamageKind, its
-  -- Recipient and its ObjectId are a rules category and two baked identities, so
-  -- none of the three holds a printed word; the DamageRewrite holds numbers, a
-  -- Scaling and a Recipient.
+  -- The pattern's two Filters, CR 614.9's printed destination, and CR 615.5's
+  -- riders. The pattern's DamageKind, its PlayerRelation, its Recipient and its
+  -- ObjectId are a rules category, a CR 109.5 relation and two baked identities,
+  -- so none of the four holds a printed word.
   ReplacementEffect.DamageR r ->
     ReplacementEffect.DamageR
       r
@@ -2336,6 +2370,7 @@ rewriteReplacementEffect pairs effect = case effect of
               { DamagePattern.whatSource = Filter.rewrite pairs (DamagePattern.whatSource (DamageR.matching r)),
                 DamagePattern.whatRecipient = fmap (Filter.rewrite pairs) (DamagePattern.whatRecipient (DamageR.matching r))
               },
+          DamageR.rewrite = rewriteDamageRewrite pairs (DamageR.rewrite r),
           DamageR.riders = fmap (rewriteEffect pairs) (DamageR.riders r)
         }
   -- CR 701.19a's regeneration and CR 122.1c's shield: two nullary rewrites with
@@ -2366,6 +2401,26 @@ rewriteReplacementEffect pairs effect = case effect of
   -- A PhasePattern is a PhaseSelector and a baked seat (CR 614.1b / 500.11), both
   -- rules categories rather than printed words.
   ReplacementEffect.PhaseR _ -> effect
+
+-- CR 612.1 through a damage REWRITE, rewriteEntryRewrite's twin one event class
+-- over. Only CR 614.9's printed destination holds a Filter for a word to sit in;
+-- the rest are numbers, a Scaling and a baked Recipient.
+--
+-- NO BOARD OBSERVES IT: the pool's one printed destination is
+-- Filter.IsHostOfSource (Pariah), which names no subtype for CR 612.1 to swap,
+-- so mutating this arm away leaves the suite green. The arm is the rule rather
+-- than a proven behaviour -- a card redirecting to "the enchanted Goblin" would
+-- be what proves it. Exhaustive rather than a wildcard,
+-- rewriteReplacementEffect's posture.
+rewriteDamageRewrite :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> DamageRewrite.DamageRewrite -> DamageRewrite.DamageRewrite
+rewriteDamageRewrite pairs rewrite = case rewrite of
+  DamageRewrite.RedirectMatching f -> DamageRewrite.RedirectMatching (Filter.rewrite pairs f)
+  DamageRewrite.Redirect _ -> rewrite
+  DamageRewrite.PreventAll -> rewrite
+  DamageRewrite.PreventRemovingShieldCounter -> rewrite
+  DamageRewrite.PreventNext _ -> rewrite
+  DamageRewrite.SetAmount _ -> rewrite
+  DamageRewrite.Scale _ -> rewrite
 
 -- CR 612.1 through what a CR 614.1c/614.1d entry replacement does. Exhaustive for
 -- rewriteReplacementEffect's reason.
@@ -3546,6 +3601,35 @@ bestowGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs) 
             ]
       _ -> []
 
+-- CR 601.3b / 702.103b: the view this object WOULD have if its controller chose
+-- bestow while proposing it -- an Aura enchantment with enchant creature, off the
+-- same Pawl.Engine.Keyword.bestowModifications bestowGathered above emits. A
+-- HYPOTHETICAL, and its caller is a lookahead:
+-- Pawl.Engine.PlayerEffect.choiceCouldApply asks whether a permission naming Aura
+-- spells could come to name this card, exactly as CR 601.3a's twin asks its
+-- question of a mana value the object does not have.
+--
+-- The card need not carry bestow and this asks nothing about whether the cost is
+-- payable: the caller owns both questions, this one only says what the choice
+-- would do.
+--
+-- Applied ON TOP of the finished projection rather than inside CR 613's fold,
+-- which is timestamp order rather than a shortcut past it: rule 702.103b's effect
+-- starts "as a spell cast bestowed is put onto the stack", and CR 613.7a gives it
+-- the timestamp of the object it is on, which CR 613.7d makes a new and later one
+-- at that move. So nothing already affecting the card where it lies can outrank
+-- it.
+--
+-- CR 205.3d is asked over the WHOLE unit before any part of it lands, which is
+-- applyUnit's own reading and matters here: the AddSubtype and the SetCardType
+-- are one effect, so Aura is admitted by the Enchantment its sibling gives.
+bestowedView :: ObjectId -> GameState -> Filter.View
+bestowedView oid gs =
+  let pc = project oid gs
+      unitTypes = List.foldl' (flip cardTypesAfter) (PC.cardTypes pc) Keyword.bestowModifications
+      bestowed = List.foldl' (flip (applyModification (fullView gs) oid gs oid unitTypes)) pc Keyword.bestowModifications
+   in viewOfCharacteristics (fullView gs) oid bestowed (controllerOf oid gs) (countersOf oid gs) gs
+
 -- CR 701.60c / 613.1f: a SUSPECTED permanent has menace, emitted as a layer-6
 -- grant on the permanent itself. Read off Object.designations on every
 -- projection rather than stamped when the designation is set, which IS "for as
@@ -3703,6 +3787,11 @@ filterReads f = case f of
   -- CR 110.5a again, one status category over: face-up/face-down is not a
   -- characteristic either, so no layer writes it.
   Filter.Type.IsFaceDown -> Set.empty
+  -- Reads NOTHING even though the nest names characteristics, and this is the
+  -- one atom carrying a Filter that does not descend into it: CR 708.12 reads
+  -- the PRINTED card, which is Pawl.Engine.Game.faceUpFaceOf and which no layer
+  -- can reach, so no Modification can make the nest flip.
+  Filter.Type.RepresentedByCard _ -> Set.empty
   -- CR 406.3a leaves a face-down exiled card no characteristics at all, so
   -- being one is not a characteristic either and no layer writes it.
   Filter.Type.IsExiledFaceDown -> Set.empty
@@ -4107,9 +4196,17 @@ projectDeciding admits cands = forObject
                 -- Not implemented: a snapshot carries CR 208.3's noncreature P/T
                 -- gate, which the projected object's mid-fold partial does not
                 -- (#1111).
+                --
+                -- CR 208.5's substitution, at the same gate `seeded` takes it:
+                -- these partials are what `resolve` applies each effect to, so a
+                -- creature CR 305.7 left with no value for its power needs the 0
+                -- BEFORE applyUnit runs, or addPT's Nothing arm discards CR
+                -- 613.4c's modification and viewOfBoard substitutes the 0 only
+                -- afterwards. Proved by Pawl.PowerToughnessSpec's "CR 208.5
+                -- mid-fold under an anthem".
                 snapshot o =
                   let (p, d) = projectDeciding (\l -> admits l && l < lyr) cands o gs
-                   in (seedFor o p, d)
+                   in (noValueAt lyr (seedFor o p), d)
                 -- Keyed rather than an association list, because resolve's ViewOf
                 -- looks an object up once per candidate a Count folds over.
                 -- WHNF-strict only, so the snapshots stay lazy.

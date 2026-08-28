@@ -299,6 +299,7 @@ vanillaFace name typeLine =
       Face.triggeredAbilities = [],
       Face.delayedAbilities = Map.empty,
       Face.rooms = Seq.empty,
+      Face.dungeonEntryQuality = Nothing,
       Face.castingPermissions = [],
       Face.castingRestrictions = [],
       Face.characteristicPT = Nothing,
@@ -842,7 +843,7 @@ effectCounts effect = case effect of
   -- from here.
   Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> quantityCounts quantity
   Effect.RestartGame _ -> []
@@ -926,6 +927,7 @@ effectCounts effect = case effect of
   Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
+  Effect.Convert _ -> []
   -- CR 701.42a's combined back face, Create's token one opcode over: card data
   -- nested in card data, so its own counts are swept.
   Effect.Meld (Meld.MkMeld _ card) -> overFaces cardCounts card
@@ -1153,7 +1155,7 @@ effectNestedEffects effect = case effect of
   Effect.Amass {} -> []
   Effect.Blight {} -> []
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame {} -> []
@@ -1198,6 +1200,7 @@ effectNestedEffects effect = case effect of
   Effect.MakePlotted {} -> []
   Effect.DoesNotUntapNext {} -> []
   Effect.Transform {} -> []
+  Effect.Convert {} -> []
   -- Create's answer: the combined face's effects belong to ANOTHER object, and
   -- effectMintedFaces is what reaches them.
   Effect.Meld {} -> []
@@ -1623,7 +1626,7 @@ effectReplacements effect = case effect of
   Effect.Amass _ -> []
   Effect.Blight _ -> []
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame _ -> []
@@ -1674,6 +1677,7 @@ effectReplacements effect = case effect of
   Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
+  Effect.Convert _ -> []
   -- CR 614: the combined back face may print its own entry replacement, so the
   -- sweep descends into it as it does a token's.
   Effect.Meld (Meld.MkMeld _ card) -> overFaces cardReplacementEffects card
@@ -1773,7 +1777,9 @@ engineOnlyOffends replacement = case replacement of
   -- `whatRecipient` and `whoRecipient` beside it are the PRINTED halves and are
   -- not swept: a card may describe the recipient it shields (Stormwild Capridor)
   -- and name CR 109.5's relation to the row's controller (Divine Deflection's
-  -- "to you"), it just may not name one by id.
+  -- "to you"), it just may not name one by id. The REWRITE's destination is the
+  -- same split one field over -- DamageRewrite.RedirectMatching describes and is
+  -- printed (Pariah), DamageRewrite.Redirect names and is swept.
   ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern rewrite _) ->
     Maybe.isJust (DamagePattern.whichRecipient damagePattern) || Maybe.isJust (DamagePattern.whichSource damagePattern) || engineMintedDamage rewrite
   -- CR 122.1c's destruction half is engine-minted for the same reason its damage
@@ -1792,14 +1798,17 @@ engineOnlyOffends replacement = case replacement of
   ReplacementEffect.TokenR {} -> False
   ReplacementEffect.TurnUpR {} -> False
 
--- Is this damage rewrite one the ENGINE mints and no card may print? Two of them,
--- for two rules:
+-- Is this damage rewrite one the ENGINE mints and no card may print? Three of
+-- them, for three rules:
 --
 --   * CR 615.7 versus CR 615.10 -- a counted shield is generated "by the resolution
 --     of a spell or ability", never by the static ability a card prints.
 --   * CR 122.1c -- the prevention shield counters create is created by the RULE, off
 --     a permanent's counters (Pawl.Engine.Projection.shieldOf), so a card printing
 --     it would be claiming a static ability the rule does not give it.
+--   * CR 614.9 -- a redirection whose destination is a Recipient names an
+--     ObjectId or a PlayerId, which is card data's own prohibition; Resolve's
+--     RedirectDamage arm is the one producer (#2378).
 --
 -- A printed one either way would be a rule that does not exist.
 engineMintedDamage :: DamageRewrite.DamageRewrite -> Bool
@@ -1809,8 +1818,11 @@ engineMintedDamage rewrite = case rewrite of
   DamageRewrite.PreventAll -> False
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
-  -- CR 614.9's redirection is neither counted nor a prevention.
-  DamageRewrite.Redirect _ -> False
+  DamageRewrite.Redirect _ -> True
+  -- CR 614.9's redirection with the destination DESCRIBED rather than named,
+  -- which is exactly the shape a card may print: Pariah's "dealt to enchanted
+  -- creature instead" is a Filter and names no id.
+  DamageRewrite.RedirectMatching _ -> False
 
 -- The destruction half of the same question. CR 701.19a's regeneration IS printed
 -- (Drudge Skeletons), where CR 122.1c's removal is minted.
@@ -1886,6 +1898,7 @@ preventsDamage rewrite = case rewrite of
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
   DamageRewrite.Redirect _ -> False
+  DamageRewrite.RedirectMatching _ -> False
 
 -- The non-vacuity half of riderWithoutPreventionOffends' lint, isPhaseR's shape.
 hasRider :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
@@ -2366,7 +2379,7 @@ effectMintedFaces effect = case effect of
   Effect.Amass _ -> []
   Effect.Blight _ -> []
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame _ -> []
@@ -2419,6 +2432,7 @@ effectMintedFaces effect = case effect of
   Effect.MakePlotted _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
+  Effect.Convert _ -> []
   -- CR 701.42a: the combined back face is a face this card mints, interned at
   -- resolution exactly as a token's card is.
   Effect.Meld (Meld.MkMeld _ card) -> fmap ((,) MintedMeld) (NonEmpty.toList (Card.Type.faces card))
@@ -2719,6 +2733,10 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsToken -> 0
   Filter.Type.IsTapped -> 0
   Filter.Type.IsFaceDown -> 0
+  -- A DESCENT for AttachedTo's reason, the nest describing the CARD representing
+  -- the candidate: CR 708.12's atom is a Filter position a card author writes
+  -- into like any other.
+  Filter.Type.RepresentedByCard f -> canHostSubjects f
   Filter.Type.IsExiledFaceDown -> 0
   Filter.Type.Transformed -> 0
   Filter.Type.HasNonManaActivatedAbility -> 0
@@ -2845,6 +2863,7 @@ keywordFilters keyword = case keyword of
   -- CR 702.15a: lifelink is a static ability with no payload -- its rider rides
   -- the damage event, not the keyword.
   Keyword.Lifelink -> []
+  Keyword.LivingMetal -> []
   -- CR 702.16a's "[quality]", which every protection ability states.
   Keyword.Protection quality -> [quality]
   Keyword.Reach -> []
@@ -3438,9 +3457,12 @@ playerEffectFilters playerEffect = case playerEffect of
   -- how many lands, never which spells.
   PlayerEffect.PlayAdditionalLands _ -> []
   PlayerEffect.NoMaximumHandSize -> []
-  -- CR 402.2 carries a bare count of cards for the same reason: it names how many
-  -- cards a hand may hold, never which spells.
+  -- CR 402.2's three number-carrying arms carry a bare count of cards for the
+  -- same reason: each names how many cards a hand may hold, or by how much that
+  -- number moves, never which spells.
   PlayerEffect.SetMaximumHandSize _ -> []
+  PlayerEffect.IncreaseMaximumHandSize _ -> []
+  PlayerEffect.ReduceMaximumHandSize _ -> []
   -- CR 500.5 carries a ManaFilter, not a Filter: the set it names is MANA, and
   -- this traversal is about the spells a player effect names.
   PlayerEffect.DontLoseUnspentMana _ -> []
@@ -3546,6 +3568,8 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.PlayAdditionalLands _ -> False
   PlayerEffect.NoMaximumHandSize -> False
   PlayerEffect.SetMaximumHandSize _ -> False
+  PlayerEffect.IncreaseMaximumHandSize _ -> False
+  PlayerEffect.ReduceMaximumHandSize _ -> False
   PlayerEffect.DontLoseUnspentMana _ -> False
   PlayerEffect.SpendManaAsThough _ -> False
   PlayerEffect.CantBeTargetedBy _ -> False
@@ -3599,6 +3623,8 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.PlayAdditionalLands _ -> False
   PlayerEffect.NoMaximumHandSize -> False
   PlayerEffect.SetMaximumHandSize _ -> False
+  PlayerEffect.IncreaseMaximumHandSize _ -> False
+  PlayerEffect.ReduceMaximumHandSize _ -> False
   PlayerEffect.DontLoseUnspentMana _ -> False
   PlayerEffect.SpendManaAsThough _ -> False
   PlayerEffect.CantBeTargetedBy _ -> False
@@ -3748,22 +3774,46 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   -- Blast's `IsSource`), and by their printed RECIPIENT, which is a second
   -- Filter over the object being dealt to (Stormwild Capridor's `IsSource`). The
   -- kind and the baked recipient beside them are not Filters.
-  ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _ _) ->
-    DamagePattern.whatSource damagePattern : Maybe.maybeToList (DamagePattern.whatRecipient damagePattern)
+  --
+  -- The REWRITE holds one too, on a third axis: CR 614.9's printed destination
+  -- (Pariah's "enchanted creature"), which damageRewriteFilters below answers.
+  ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern rewrite _) ->
+    DamagePattern.whatSource damagePattern : Maybe.maybeToList (DamagePattern.whatRecipient damagePattern) <> damageRewriteFilters rewrite
   ReplacementEffect.DestructionR _ -> []
   ReplacementEffect.TokenR {} -> []
   ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern _ turnUpRewrite) -> turnUpPattern : turnUpRewriteFilters turnUpRewrite
   ReplacementEffect.UntapR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
+-- CR 614.9's printed destination, the one Filter a damage REWRITE carries.
+--
+-- Exhaustive rather than a wildcard, this file's discipline for a sum: a second
+-- rewrite that describes something must be classified here rather than have its
+-- Filter go unlinted.
+damageRewriteFilters :: DamageRewrite.DamageRewrite -> [Filter.Type.Filter Keyword.Keyword]
+damageRewriteFilters rewrite = case rewrite of
+  DamageRewrite.RedirectMatching f -> [f]
+  DamageRewrite.Redirect _ -> []
+  DamageRewrite.PreventAll -> []
+  DamageRewrite.PreventRemovingShieldCounter -> []
+  DamageRewrite.PreventNext _ -> []
+  DamageRewrite.SetAmount _ -> []
+  DamageRewrite.Scale _ -> []
+
 -- A face's printed replacement ability reaches a Filter on a second axis beside
 -- the rewrite's: CR 604.2's "as long as" clause counts objects, exactly as the
 -- clause on Effect.Replace does (effectFilters' Replace arm) and as a static
 -- ability's does (staticAbilityFilters).
-printedReplacementFilters :: PrintedReplacement.PrintedReplacement (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Filter.Type.Filter Keyword.Keyword]
+--
+-- The two axes are framed DIFFERENTLY, which is why this returns tagged pairs
+-- where its neighbours return bare Filters: the row's own Filters are read
+-- through Pawl.Engine.Replacement.candidateContext, which supplies the source's
+-- host, and the CR 604.2 clause beside them through
+-- Pawl.Engine.Projection.replacementsOf, whose bare Filter.contextFor does not.
+printedReplacementFilters :: PrintedReplacement.PrintedReplacement (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 printedReplacementFilters printedReplacement =
-  foldMap conditionFilters (PrintedReplacement.condition printedReplacement)
-    <> replacementEffectFilters (PrintedReplacement.effect printedReplacement)
+  unframed (foldMap conditionFilters (PrintedReplacement.condition printedReplacement))
+    <> replacementRowFramed (replacementEffectFilters (PrintedReplacement.effect printedReplacement))
 
 -- Both the subject and CR 508.1c's "unless some condition is met": Blind-Spot
 -- Giant's gate carries `Not IsSource`, which is as much card data as the affected
@@ -3832,14 +3882,27 @@ blockPermissionFilters permission =
 --     Filter.Context.slotNames. CR 709.4a's Filter.SameNameAsBound belongs here
 --     and nowhere else.
 --   * SourceHostFramed -- a position whose evaluator fills
---     Filter.Context.sourceAttachedTo, which is four rather than one: a static
+--     Filter.Context.sourceAttachedTo, which is five rather than one: a static
 --     ability's CR 604.2 clause (Pawl.Engine.Projection.conditionHolds), a
 --     triggered ability's CR 603.4 clause (Pawl.Engine.Event.interveningHolds and
 --     Pawl.Engine.Stack's CR 608.2a re-check), an effect's
---     Pawl.Types.ObjectRef (Pawl.Engine.Resolve.objectRefObjects), and a printed
+--     Pawl.Types.ObjectRef (Pawl.Engine.Resolve.objectRefObjects), a printed
 --     PLAYER ability's own effect (Pawl.Engine.PlayerEffect.matchesObjectFrom,
---     which takes the source off the row `applying` returns). CR 303.4b's
---     Filter.IsHostOfSource belongs in those four and nowhere else.
+--     which takes the source off the row `applying` returns), and a CR 614.1
+--     replacement ROW's own Filters -- its pattern's two and CR 614.9's printed
+--     destination -- which Pawl.Engine.Replacement.candidateContext reads
+--     (Pariah's "enchanted creature"). CR 303.4b's Filter.IsHostOfSource belongs
+--     in those five and nowhere else.
+--
+--     A printed replacement's CR 604.2 clause is NOT one of them, though it sits
+--     on the same ability: Pawl.Engine.Projection.replacementsOf evaluates it
+--     through a bare Filter.contextFor. printedReplacementFilters is where that
+--     split is made.
+--
+--     The fifth of those positions carries its OWN constructor below rather than
+--     this one, for a reason that is about the lints and not about the rule:
+--     `hostFramed` treats the two alike, and only the ObjectRef twin lint tells
+--     them apart.
 --   * Unframed -- everything else.
 --
 -- CR 303.4a's enchant slot (Face.enchant) is Unframed rather than InTargetSlot,
@@ -3865,7 +3928,31 @@ data Framing
     -- reaches it. The mistagging can only REJECT a legal card, never admit an
     -- unanswerable one, and no printing writes the atom there.
     SearchFramed
+  | -- | A CR 614.1 replacement ROW's own Filters -- its DamagePattern's source
+    -- and printed-recipient halves, CR 614.9's printed destination, an entry
+    -- pattern, and every other Filter a ReplacementEffect holds. Every one of
+    -- them is read through Pawl.Engine.Replacement.candidateContext, so the
+    -- source's host IS supplied and `hostFramed` below admits this exactly as it
+    -- admits SourceHostFramed.
+    --
+    -- A constructor of its own only because effectFilters' SourceHostFramed
+    -- positions are compared, tag for tag, against effectObjectRefs' by the twin
+    -- lint below -- SourceHostFramed inside an Effect means "an ObjectRef's
+    -- filter" to that lint, and a stored Effect.Replace's row would otherwise
+    -- appear on one side of the comparison and not the other.
+    ReplacementRowFramed
   deriving (Eq, Ord, Show)
+
+-- Does this position's evaluator supply CR 303.4b's host? Two constructors
+-- answer yes, for the reason ReplacementRowFramed gives.
+hostFramed :: Framing -> Bool
+hostFramed framing = case framing of
+  SourceHostFramed -> True
+  ReplacementRowFramed -> True
+  Unframed -> False
+  AttachDestination -> False
+  InTargetSlot -> False
+  SearchFramed -> False
 
 -- Tag a Filter position as UNFRAMED -- one none of the framings above applies
 -- to, which is every position in the type except the ones they name.
@@ -3873,11 +3960,18 @@ unframed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filte
 unframed = fmap ((,) Unframed)
 
 -- Tag a Filter position as one whose evaluator supplies the SOURCE's host -- the
--- three listed on Framing above. An ObjectRef's own Filter is always one, whatever
+-- first four listed on Framing above, the fifth carrying ReplacementRowFramed
+-- instead for the reason that constructor gives. An ObjectRef's own Filter is
+-- always one, whatever
 -- effect carries it, because Pawl.Engine.Resolve.objectRefObjects is the single
 -- site that turns an ObjectRef into objects.
 sourceHosted :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 sourceHosted = fmap ((,) SourceHostFramed)
+
+-- Tag a Filter position as a CR 614.1 replacement ROW's -- SourceHostFramed's
+-- twin, kept apart from it for the reason that constructor gives.
+replacementRowFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+replacementRowFramed = fmap ((,) ReplacementRowFramed)
 
 -- Tag a Filter position as a SEARCH's, the one position whose evaluator supplies
 -- Filter.View.canAttachToSubject (CR 701.3a from the candidate's side).
@@ -3971,7 +4065,7 @@ effectFilters effect = case effect of
   -- arm below answers the same way.
   Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ f quantity) -> unframed (f : quantityFilters quantity)
   -- CR 727.5's exemption is an ObjectRef like every other, and Karn Liberated's
@@ -4025,7 +4119,11 @@ effectFilters effect = case effect of
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> sourceHosted (objectRefFilters original <> objectRefFilters subject)
   -- The one ref, CreateCopy's arm above: an EachMatching Filter is card text.
   Effect.CopySpell (CopySpell.MkCopySpell ref _) -> sourceHosted (objectRefFilters ref)
-  Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement) <> concatMap effectFilters (replacementEffectRiders replacement)
+  -- The ROW's own Filters are framed for printedReplacementFilters' reason: a
+  -- stored row is read through the same
+  -- Pawl.Engine.Replacement.candidateContext a printed one is, where the
+  -- duration and the CR 604.2 clause beside it are not.
+  Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> unframed (durationFilters duration <> foldMap conditionFilters condition) <> replacementRowFramed (replacementEffectFilters replacement) <> concatMap effectFilters (replacementEffectRiders replacement)
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- The rider's Filters too, for CR 615.5. This is the traversal that dropped
   -- landwalk's payload once, so a nested effect list is exactly what it must not
@@ -4074,6 +4172,7 @@ effectFilters effect = case effect of
   Effect.MakePlotted ref -> sourceHosted (objectRefFilters ref)
   Effect.DoesNotUntapNext ref -> sourceHosted (objectRefFilters ref)
   Effect.Transform ref -> sourceHosted (objectRefFilters ref)
+  Effect.Convert ref -> sourceHosted (objectRefFilters ref)
   Effect.Meld (Meld.MkMeld ref card) -> sourceHosted (objectRefFilters ref) <> overFaces cardFilters card
   Effect.PhaseOut ref -> sourceHosted (objectRefFilters ref)
   Effect.AddPhases _ -> []
@@ -4139,9 +4238,10 @@ data Asks
     -- Prompt.RandomObject, and falls through to the pure sweep for the two
     -- zone-keyed chosen arms.
     AsksRevealArm
-  | -- | Pawl.Engine.Resolve's Effect.Transform gather. It asks the any-number
-    -- arm and nothing else: the four card-shaped chosen arms name cards in a
-    -- graveyard, a hand or a group, and CR 701.27a turns over PERMANENTS.
+  | -- | Pawl.Engine.Resolve's turnPermanentsOver gather, shared by Effect.Transform
+    -- and Effect.Convert. It asks the any-number arm and nothing else: the four
+    -- card-shaped chosen arms name cards in a graveyard, a hand or a group, and CR
+    -- 701.27a turns over PERMANENTS.
     AsksTransformGather
   deriving (Eq, Show)
 
@@ -4235,7 +4335,7 @@ effectObjectRefs effect = case effect of
   Effect.Amass {} -> []
   Effect.Blight {} -> []
   Effect.TemptWithTheRing -> []
-  Effect.Venture -> []
+  Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   -- CR 727.5's exemption, optional: a card saying nothing about it exempts
@@ -4299,6 +4399,9 @@ effectObjectRefs effect = case effect of
   Effect.MakePlotted ref -> read_ [ref]
   Effect.DoesNotUntapNext ref -> read_ [ref]
   Effect.Transform ref -> [(AsksTransformGather, ref)]
+  -- The SAME gather, CR 701.28a routing a convert through CR 701.27a-f and
+  -- Pawl.Engine.Resolve applying both opcodes through one turnPermanentsOver.
+  Effect.Convert ref -> [(AsksTransformGather, ref)]
   -- A plain READ: Pawl.Engine.Resolve's Meld arm sweeps the ref and asks nothing.
   Effect.Meld (Meld.MkMeld ref _) -> read_ [ref]
   Effect.PhaseOut ref -> read_ [ref]
@@ -4494,7 +4597,6 @@ cardFilters card =
         <> concatMap quantityFilters (Maybe.maybeToList (Face.maximumX card))
         <> concatMap (\(Power.MkPower quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.power card))
         <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.toughness card))
-        <> concatMap printedReplacementFilters (Face.replacementEffects card)
         <> concatMap targetSlotFilters (Face.enchant card)
         <> concatMap costComponentFilters (Face.additionalCosts card)
         <> concatMap alternativeCostFilters (Face.alternativeCosts card)
@@ -4514,6 +4616,7 @@ cardFilters card =
         <> concatMap (affectedFilters . EntryRestriction.affected) (Face.entryRestrictions card)
         <> concatMap (affectedFilters . CounterRestriction.affected) (Face.counterRestrictions card)
     )
+    <> concatMap printedReplacementFilters (Face.replacementEffects card)
     <> concatMap staticAbilityFilters (Face.staticAbilities card)
     -- SOURCE-HOSTED for staticAbilityFilters' reason: a clause on a static
     -- ability is framed against the permanent that has it, so an IsSource inside
@@ -4715,12 +4818,12 @@ hostOfSourceTag = Text.pack "IsHostOfSource"
 -- offence; the first is what Ray of Frost legitimately has three of.
 hostOfSourceCounts :: Face.Face Card.Type.Card -> (Int, Int)
 hostOfSourceCounts card =
-  let total wanted = sum [filterAtoms hostOfSourceTag f | (framing, f) <- cardFilters card, (framing == SourceHostFramed) == wanted]
+  let total wanted = sum [filterAtoms hostOfSourceTag f | (framing, f) <- cardFilters card, hostFramed framing == wanted]
    in (total True, total False)
 
 -- CR 303.4b's "enchanted" is answerable only where Filter.Context.sourceAttachedTo
--- is filled, which is the positions Framing's SourceHostFramed names and
--- nothing else: Filter.contextFor, Filter.contextWithSlots and
+-- is filled, which is the positions `hostFramed` admits and nothing else:
+-- Filter.contextFor, Filter.contextWithSlots and
 -- Filter.contextComparingPower all leave it Nothing, so Filter.IsHostOfSource in an
 -- affected set, a target slot or a search filter is a silent False rather than a
 -- rejected card. This is where that is made loud.
@@ -6434,6 +6537,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "one chosen permanent is asked by the move gather alone"
       (inert [Effect.Transform onePermanent, moves onePermanent, reveals onePermanent, Effect.Tap onePermanent])
       [True, False, True, True]
+    -- CR 701.28a's convert, classified with Transform because it IS Transform's
+    -- gather (Pawl.Engine.Resolve.turnPermanentsOver): the same four card-shaped
+    -- arms are inert under it and the same battlefield subset is asked.
+    Spec.assertEqWith
+      s
+      "the convert gather answers exactly as the transform gather does"
+      (inert (fmap Effect.Convert [inGraveyard, inHand, fromAmong, atRandom, anyNumber]))
+      [True, True, True, True, False]
     -- The other direction on the same opcode: a ref that is a READ rather than a
     -- CR 608.2d question is fine anywhere, so the lint is about the arm and not
     -- about Transform.
@@ -6455,6 +6566,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- two differ in how often they reach a nested ref and never in WHICH. Sound
   -- because effectNestedEffects reaches a superset of effectFilters' own
   -- recursion (replacementPrintedEffects contains replacementEffectRiders).
+  --
+  -- SourceHostFramed and not `hostFramed`: inside an Effect that tag means "an
+  -- ObjectRef's filter" to this comparison, which is why a stored Effect.Replace's
+  -- own row carries ReplacementRowFramed instead.
   Spec.it s "every ObjectRef position the Filter traversal reaches is one the asking traversal reaches" $ do
     ps <- S.allPrintings s
     let viaFilters card = Set.fromList [f | effect <- cardResolutionEffects card, (SourceHostFramed, f) <- effectFilters effect]
@@ -6655,12 +6770,25 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         bakeCounterShield replacement = case replacement of
           ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _ riders) -> ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern DamageRewrite.PreventRemovingShieldCounter riders)
           other -> other
+        bakeRedirect replacement = case replacement of
+          ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _ riders) -> ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern (DamageRewrite.Redirect (Recipient.ToCreature (ObjectId.MkObjectId 7))) riders)
+          other -> other
+        printRedirect replacement = case replacement of
+          ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _ riders) -> ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern (DamageRewrite.RedirectMatching Filter.Type.IsHostOfSource) riders)
+          other -> other
     Spec.assertBool s (any isDamageR printed) "setup: Fog prints a damage replacement to bake"
     Spec.assertBool s (not (any engineOnlyOffends printed)) "the real Fog names no recipient and counts nothing"
     Spec.assertBool s (any (engineOnlyOffends . bakeRecipient) printed) "the same effect naming a shielded player is rejected"
     Spec.assertBool s (any (engineOnlyOffends . bakeShield) printed) "and so is one counting a shield down"
     -- CR 122.1c's prevention, which only Projection.shieldOf may mint.
     Spec.assertBool s (any (engineOnlyOffends . bakeCounterShield) printed) "and so is one removing a shield counter"
+    -- CR 614.9's destination, the pair this lint was blind to (#2378): a
+    -- Recipient names an id and only Resolve's RedirectDamage arm may write one,
+    -- where the printed twin describes and is accepted. The two assertions
+    -- together are the lint, since either alone passes on a predicate that
+    -- answered one way for every redirect.
+    Spec.assertBool s (any (engineOnlyOffends . bakeRedirect) printed) "and so is a redirection naming its destination by id"
+    Spec.assertBool s (not (any (engineOnlyOffends . printRedirect) printed)) "while one describing that destination is accepted"
     Spec.assertBool s (engineOnlyOffends (ReplacementEffect.DestructionR DestructionRewrite.RemoveShieldCounter)) "and so is CR 122.1c's destruction half"
     Spec.assertBool s (not (engineOnlyOffends (ReplacementEffect.DestructionR DestructionRewrite.Regenerate))) "while CR 701.19a's printed regeneration is accepted"
     -- CR 122.1d's row, which only Projection.stunOf may mint -- the whole arm,
@@ -7158,8 +7286,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (length (filter ((== InTargetSlot) . fst) positions) > 10) "and target slot filters for the accepted side to be about"
   -- CR 303.4b's Filter.IsHostOfSource is CR 709.4a's atom one axis over again:
   -- answerable only where Filter.Context.sourceAttachedTo is filled, which is the
-  -- positions Framing's SourceHostFramed names. See hostOfSourceOffends for
-  -- the two offences.
+  -- positions `hostFramed` admits. See hostOfSourceOffends for the two offences.
   Spec.it s "CR 303.4b no card asks IsHostOfSource where the source's host is unknown" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace hostOfSourceOffends . Printing.card) ps
@@ -7167,7 +7294,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- NOT vacuous: the pool authors the atom, and the cards that do are ACCEPTED
     -- here rather than skipped. Ray of Frost writes it three times, once per
     -- accepted position -- a CR 604.2 clause, a CR 603.4 clause and an
-    -- Effect.Tap's ObjectRef -- so three of the four legs of the tagging are
+    -- Effect.Tap's ObjectRef -- so three of the five legs of the tagging are
     -- exercised there.
     ray <- S.printingOf s registry "Ray of Frost"
     Spec.assertEqWith
@@ -7185,11 +7312,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "Oppressive Rays' one atom is framed too"
       (hostOfSourceCounts (S.combinedFace rays))
       (1, 0)
+    -- The fifth leg: a CR 614.1 replacement ROW's own Filter, read through
+    -- Pawl.Engine.Replacement.candidateContext. Pariah writes it as CR 614.9's
+    -- printed destination -- "is dealt to enchanted creature instead" -- and its
+    -- behaviour is Pawl.ReplacementSpec's Pariah group.
+    pariah <- S.printingOf s registry "Pariah"
+    Spec.assertEqWith
+      s
+      "Pariah's redirect destination is framed too"
+      (hostOfSourceCounts (S.combinedFace pariah))
+      (1, 0)
     Spec.assertEqWith
       s
       "and they are the pool's only ones"
       (sum (fmap (uncurry (+) . hostOfSourceCounts . S.combinedFace) ps))
-      4
+      5
     -- The rejected side, which the sweep above cannot show while the pool has no
     -- offender: the same atom planted in a target slot -- the position a card
     -- author would most plausibly reach for -- IS counted as elsewhere.

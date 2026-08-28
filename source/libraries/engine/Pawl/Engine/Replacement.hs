@@ -407,8 +407,10 @@ unspent rewrite = case rewrite of
   DamageRewrite.SetAmount _ -> True
   DamageRewrite.Scale _ -> True
   -- CR 614.9's redirection has nothing to spend: it moves the recipient and
-  -- leaves the amount alone, so no application can exhaust it.
+  -- leaves the amount alone, so no application can exhaust it. Its printed twin
+  -- is the same rewrite with the destination described rather than named.
   DamageRewrite.Redirect _ -> True
+  DamageRewrite.RedirectMatching _ -> True
 
 -- CR 122.1c: does this damage rewrite admit the event's RECIPIENT? The shield's
 -- prevention says "if damage would be dealt to THIS permanent", and that
@@ -429,6 +431,7 @@ admitsRecipient src rewrite de = case rewrite of
   DamageRewrite.SetAmount _ -> True
   DamageRewrite.Scale _ -> True
   DamageRewrite.Redirect _ -> True
+  DamageRewrite.RedirectMatching _ -> True
 
 applies :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
 applies gs event candidate =
@@ -453,7 +456,7 @@ applies gs event candidate =
         -- which is the asymmetry `redirectable` below derives: a redirection a
         -- card forbids is not applicable, so it never reaches CR 616.1's choice.
         (ReplacementEffect.DamageR (DamageR.MkDamageR pat rewrite _), ProposedEvent.WouldDealDamage de) ->
-          matchesDamagePattern gs (candidateContext candidate) pat de
+          matchesDamagePattern gs (candidateContext gs candidate) pat de
             && unspent rewrite
             && admitsRecipient src rewrite de
             && (not (redirects rewrite) || redirectable gs de)
@@ -1008,7 +1011,7 @@ sacrificeCandidates pid source filter_ gs =
 -- Replacement.applicable passed down, which is that same reading.
 matchesFiltered :: GameState -> ReplacementCandidate -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesFiltered gs candidate filter_ oid =
-  Filter.matches (candidateContext candidate) (Projection.viewOfObject oid gs) filter_
+  Filter.matches (candidateContext gs candidate) (Projection.viewOfObject oid gs) filter_
 
 -- The Context a candidate's own Filters are read in: CR 109.5's "you" is the
 -- ROW's controller -- the baked one for a floating row, since deriving it from
@@ -1023,12 +1026,21 @@ matchesFiltered gs candidate filter_ oid =
 -- pattern's Filter.IsBound name the object the INSTALLING resolution bound
 -- (Dire Fleet Daredevil's "that spell"); empty for a permanent's static ability,
 -- where the atom is vacuously False.
-candidateContext :: ReplacementCandidate -> Filter.Context
-candidateContext candidate =
-  Filter.contextWithSlots
-    (ReplacementCandidate.controller candidate)
-    (Just (ReplacementCandidate.source candidate))
-    (ReplacementCandidate.slots candidate)
+--
+-- CR 303.4b's host rides along too, read LIVE off the board rather than carried:
+-- the source of a permanent's static replacement is on the battlefield to be
+-- asked what it is attached to, which is what lets Pariah's printed redirect
+-- destination say "enchanted creature" (Filter.IsHostOfSource). Nothing for a
+-- floating row whose source has left, the atom's ordinary vacuous answer.
+candidateContext :: GameState -> ReplacementCandidate -> Filter.Context
+candidateContext gs candidate =
+  ( Filter.contextWithSlots
+      (ReplacementCandidate.controller candidate)
+      (Just (ReplacementCandidate.source candidate))
+      (ReplacementCandidate.slots candidate)
+  )
+    { Filter.sourceAttachedTo = Projection.hostOf (ReplacementCandidate.source candidate) gs
+    }
 
 -- The counters `oid` is so far entering with, empty outside an entry (see
 -- GameState.enteringCounters).
@@ -1636,6 +1648,7 @@ prevents rewrite = case rewrite of
   -- is what keeps `preventionBy`, `inertPrevention` and CR 615.13's trigger away
   -- from it.
   DamageRewrite.Redirect _ -> False
+  DamageRewrite.RedirectMatching _ -> False
 
 -- CR 615.12: applied to damage that CAN'T be prevented, does this rewrite still
 -- spend what `contestedResource` counts? The rule's middle and last sentences
@@ -1663,6 +1676,7 @@ spentInertly rewrite = case rewrite of
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
   DamageRewrite.Redirect _ -> False
+  DamageRewrite.RedirectMatching _ -> False
 
 -- CR 614.9: the destination a redirection effect may still use, re-derived
 -- against the CURRENT state at redirect time. Nothing is the rule's guard --
@@ -1692,12 +1706,46 @@ spentInertly rewrite = case rewrite of
 redirectDestination :: GameState -> Recipient.Recipient -> Maybe Recipient.Recipient
 redirectDestination gs dest = case Recipient.objectOf dest of
   Nothing -> Just dest
-  Just oid
-    | not (Set.member oid (GameState.battlefield gs)) -> Nothing
-    | Projection.isCreatureOf oid gs -> Just (Recipient.ToCreature oid)
-    | Projection.isPlaneswalkerOf oid gs -> Just (Recipient.ToPlaneswalker oid)
-    | Projection.isBattleOf oid gs -> Just (Recipient.ToBattle oid)
-    | otherwise -> Nothing
+  Just oid -> liveDestination gs oid
+
+-- CR 614.9's two conditions asked of ONE object id, and the CR 613.1d re-tag
+-- beside them. Split out of redirectDestination above so the PRINTED
+-- destination below reaches the same three lines: a description and a baked id
+-- must agree about what a live destination is, or Pariah and Turn the Tables
+-- would disagree about a phased-out creature.
+liveDestination :: GameState -> ObjectId -> Maybe Recipient.Recipient
+liveDestination gs oid
+  | not (Set.member oid (GameState.battlefield gs)) = Nothing
+  | Projection.isCreatureOf oid gs = Just (Recipient.ToCreature oid)
+  | Projection.isPlaneswalkerOf oid gs = Just (Recipient.ToPlaneswalker oid)
+  | Projection.isBattleOf oid gs = Just (Recipient.ToBattle oid)
+  | otherwise = Nothing
+
+-- CR 614.9: which recipient a PRINTED redirection sends the damage to --
+-- Pariah's "is dealt to enchanted creature instead".
+--
+-- The battlefield's UNIQUE match, read live at the damage event rather than
+-- swept when the ability began, for the CR 611.2c reason DamagePattern's
+-- printed recipient halves give: a static ability's destination is a
+-- description, so an Aura that changes what it enchants redirects somewhere
+-- else from then on.
+--
+-- None is CR 614.9's "the effect does nothing", which Pawl.Engine.Event.apply
+-- turns into the event handed back unchanged -- the same answer a baked
+-- destination that left the battlefield gets, and for the same sentence.
+-- SEVERAL is that answer too, and no card in the pool reaches it: the pool's one
+-- printed destination is Filter.IsHostOfSource (Pariah), which names at most one
+-- permanent. Nothing in the type stops a card describing several, so this is the
+-- answer the rule leaves for that shape -- it redirects to "another battle,
+-- creature, planeswalker, or player" and never to a set.
+--
+-- The battlefield rather than every object, because that is where CR 614.9's
+-- own guard puts a destination; liveDestination then answers the rest.
+printedDestination :: GameState -> Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> Maybe Recipient.Recipient
+printedDestination gs context filter_ =
+  case [oid | oid <- Set.toList (GameState.battlefield gs), Filter.matches context (Projection.viewOfObject oid gs) filter_] of
+    [oid] -> liveDestination gs oid
+    _ -> Nothing
 
 -- CR 615.12: could a prevention effect prevent any of this damage event, or is
 -- this damage that "can't be prevented" (Spider-Punk)?
@@ -1752,6 +1800,9 @@ patternContext gs src = Filter.contextFor (src >>= \oid -> Projection.controller
 redirects :: DamageRewrite.DamageRewrite -> Bool
 redirects rewrite = case rewrite of
   DamageRewrite.Redirect _ -> True
+  -- The same rule with the destination described rather than named, so a card
+  -- forbidding redirection (Lava Burst) stops both.
+  DamageRewrite.RedirectMatching _ -> True
   DamageRewrite.PreventNext _ -> False
   DamageRewrite.PreventAll -> False
   DamageRewrite.PreventRemovingShieldCounter -> False
@@ -1810,24 +1861,41 @@ inertPrevention gs candidate event = case (ReplacementCandidate.effect candidate
         Just rewrite
   _ -> Nothing
 
--- CR 615.13: how much of this event the candidate just applied PREVENTED, or
--- Nothing when it prevented nothing.
+-- CR 615.5 / 615.13: the application of a prevention effect that just happened,
+-- carrying how much of the event it prevented and the additional effect it owes.
+-- Nothing means the pair is not a prevention of damage at all.
 --
 -- `before` is the event as it was offered to Event.apply and `after` what came back,
--- so this is the CR 615.6 arithmetic read off the pair: Nothing means the event
+-- so the amount is the CR 615.6 arithmetic read off the pair: Nothing means the event
 -- does not happen at all, which is the whole of it prevented.
+--
+-- `inert` is Event.loop's own `inertPrevention` answer, Just when CR 615.12 made
+-- this application prevent nothing, and it is what makes an UNDIMINISHED event
+-- still report a prevention -- at an amount of 0. The rule is emphatic that such
+-- an effect is still applied and that "any additional effects they have will take
+-- place", and CR 615.5's rider travels on this record. Passed in rather than
+-- re-derived: this function is handed no board, and the board it would have to
+-- ask is not the one the classification was made against -- `applyInertly` has
+-- run in between.
+--
+-- ZERO is therefore a load-bearing amount, and the two consumers in
+-- Pawl.Engine.Damage read it differently. The CR 615.5 rider queue takes every
+-- entry, the rule owing the rider nothing about how much was prevented; CR
+-- 615.13's DamagePrevented record is gated above 0, which is that rule's own
+-- condition -- such an ability triggers each time a prevention effect is applied
+-- "and prevents some or all of that damage".
 --
 -- The wildcard is over (effect, event) PAIRS, where it is the only way to say
 -- "this pair is not a prevention of damage"; the per-constructor obligation this
 -- module carries is discharged by `prevents` above, which the guard delegates to.
-preventionBy :: ReplacementCandidate -> ProposedEvent -> Maybe ProposedEvent -> Maybe Prevention
-preventionBy candidate before after = case (ReplacementCandidate.effect candidate, before) of
+preventionBy :: Maybe DamageRewrite.DamageRewrite -> ReplacementCandidate -> ProposedEvent -> Maybe ProposedEvent -> Maybe Prevention
+preventionBy inert candidate before after = case (ReplacementCandidate.effect candidate, before) of
   (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _), ProposedEvent.WouldDealDamage de)
     | prevents rewrite ->
         let was = DamageEvent.amount de
             -- The event that did not happen prevented all of it (CR 615.6).
             now = maybe 0 DamageEvent.amount (after >>= asDamageEvent)
-         in if was > now
+         in if Maybe.isJust inert || was > now
               then
                 Just
                   Prevention.MkPrevention
@@ -1844,6 +1912,8 @@ preventionBy candidate before after = case (ReplacementCandidate.effect candidat
                       -- prevents nothing (CR 615.1a) -- `prevents` refuses it
                       -- above, so no redirect ever reaches here.
                       Prevention.recipient = DamageEvent.target de,
+                      -- Zero on the CR 615.12 path, which `applyInertly` makes
+                      -- exact: it hands the event back whole, so `now` is `was`.
                       Prevention.amount = was - now,
                       -- CR 615.5's additional effect, carried out of the loop
                       -- so a caller that CAN run effects finds it. Copied, not
@@ -1900,6 +1970,13 @@ printedBy candidate = case candidate of
 --
 -- Ascending by key, so the CR 608.2i record -- and therefore the CR 603.3b order
 -- these triggers are offered in -- is canonical rather than gather-dependent.
+--
+-- A CR 615.12 entry, whose amount is 0, merges harmlessly and is the rule: one
+-- application of one prevention effect to several simultaneous events reports
+-- what it prevented across all of them, which the unpreventable ones added
+-- nothing to. So a batch mixing the two still records CR 615.13's trigger --
+-- some of the damage WAS prevented -- and a batch of only inert ones sums to 0,
+-- which Pawl.Engine.Damage's record then leaves out.
 --
 -- Only the AMOUNTS are summed. CR 615.5's rider is a property of the INSTANCE,
 -- and the key already fixes the instance, so every entry merged here carries the
@@ -2119,6 +2196,7 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
     DamageRewrite.SetAmount _ -> Nothing
     DamageRewrite.Scale _ -> Nothing
     DamageRewrite.Redirect _ -> Nothing
+    DamageRewrite.RedirectMatching _ -> Nothing
   ReplacementEffect.ZoneChangeR {} -> Nothing
   ReplacementEffect.EntryR {} -> Nothing
   ReplacementEffect.DestructionR _ -> Nothing

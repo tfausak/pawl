@@ -58,6 +58,7 @@ import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 
@@ -773,9 +774,27 @@ data Effect card ability
     -- whether anything happens (CR 701.27c, CR 701.27d) are read off the card's
     -- LAYOUT by Pawl.Engine.Card.turnedOver, never off which card it is.
     --
-    -- The transform WORDING only. CR 701.28's convert turns a permanent over by
-    -- the same subrules (CR 701.28a) and needs its own opcode (#698).
+    -- The transform WORDING only. CR 701.28's convert is Convert below, which
+    -- shares this opcode's whole implementation because CR 701.28a says to.
     Transform ObjectRef.ObjectRef
+  | -- | CR 701.28a: turn the permanents the ObjectRef names over, so each shows
+    -- its other face -- the Transformers cards' word for Transform above.
+    --
+    -- A SECOND opcode and not an alias, though CR 701.28a routes a convert
+    -- through rules 701.27a-f, 712.9-10 and 712.18 unchanged. What the CR does
+    -- NOT do is collapse the two: CR 701.28c and CR 701.28d restate 701.27c and
+    -- 701.27d in convert's own words rather than deferring to them, and CR
+    -- 701.28f has to state that "can't transform" also forbids converting --
+    -- which a synonym would not need. So a card file says which word its card
+    -- prints, and no reader has to guess.
+    --
+    -- Where the two must NOT come apart, they share one implementation rather
+    -- than agreeing by inspection: Pawl.Engine.Resolve applies both arms through
+    -- the same turnPermanentsOver, so CR 701.27f's already-turned gate (which CR
+    -- 701.28e counts a transform and a convert alike for), CR 701.27e's
+    -- "transforms into" trigger, CR 702.145b's daybound restriction and CR
+    -- 701.28f's prohibition are one code path with one event.
+    Convert ObjectRef.ObjectRef
   | -- | CR 701.42a: meld the cards the payload's ObjectRef names -- put them onto
     -- the battlefield with their back faces up and combined, as one permanent
     -- represented by all of them.
@@ -1248,15 +1267,24 @@ data Effect card ability
     -- cannot stop early (CR 701.54d).
     TemptWithTheRing
   | -- | CR 701.49: the resolving controller ventures into the dungeon -- they
-    -- enter the dungeon they own if they are in none (CR 701.49a), and otherwise
+    -- enter a dungeon they own if they are in none (CR 701.49a), and otherwise
     -- move their venture marker along one arrow (CR 701.49b). CHOOSE, not target;
     -- Prompt.ChooseRoom asks on resolution. Performed by
-    -- Pawl.Engine.Dungeon.venture. Nullary: the venturer is "you", and which
-    -- dungeon is answered by CR 701.49a from the cards that player owns.
+    -- Pawl.Engine.Dungeon.venture. The venturer is "you" either way.
     --
-    -- Not implemented: CR 701.49d's "venture into [quality]", the variant naming
-    -- a particular dungeon, which would be the one payload (#1334).
-    Venture
+    -- The payload is CR 701.49d's "[quality]": Nothing for a plain "venture into
+    -- the dungeon", and Just for the variant "venture into [quality]", which
+    -- narrows CR 701.49a's choice to the dungeon cards that player owns carrying
+    -- the indicated quality. A Subtype rather than a Filter because CR 205.3p is
+    -- what a quality IS -- a dungeon type, which is that rule's name for the
+    -- subtype a dungeon card carries -- and a Filter would be a second way to ask
+    -- a question CR 205.3p has already answered.
+    --
+    -- CR 701.49d's second sentence needs no payload of its own: a player who
+    -- already owns a dungeon card in the command zone follows CR 701.49b-c, and
+    -- only CR 701.49c's tail enters a dungeon at all, where the same quality
+    -- narrows the same choice.
+    Venture (Maybe Subtype.Subtype)
   | -- | CR 701.21a: the PLAYERS the slot names each sacrifice this many
     -- permanents matching the Filter, each chosen by that player (Diabolic
     -- Edict names one; Rishadan Cutpurse's gate binds several).

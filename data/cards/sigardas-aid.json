@@ -1,0 +1,52 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Sigarda's Aid",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "CastAsThoughItHadFlash",
+            "value": {
+              "type": "Or",
+              "value": [
+                {
+                  "type": "HasSubtype",
+                  "value": {
+                    "type": "Aura"
+                  }
+                },
+                {
+                  "type": "HasSubtype",
+                  "value": {
+                    "type": "Equipment"
+                  }
+                }
+              ]
+            }
+          },
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

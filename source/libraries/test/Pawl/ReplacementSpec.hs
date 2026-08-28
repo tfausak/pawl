@@ -2116,9 +2116,9 @@ glitteringLionSpec s registry = Spec.describe s "Glittering Lion (CR 613.1f)" $ 
 -- over-reaching into it. The MIDDLE clause is shieldCounterSpec's, where CR
 -- 122.1c's amount-independent counter removal makes it observable.
 --
--- Not implemented: CR 615.5's authored rider, the other thing that clause would
--- carry (testOfFaithSpec above). No rider in the pool is amount-independent, so
--- nothing here can see it (#1695).
+-- The MIDDLE clause's other half -- CR 615.5's authored rider, which an
+-- amount-scaled one (testOfFaithSpec above) cannot show at a prevented amount of
+-- 0 -- is phantomTigerSpec's, on this same Spider-Punk pairing.
 --
 -- EVERY case here has a CONTROL on a board that differs in Spider-Punk and in
 -- nothing else, so no assertion can pass because the damage would have got
@@ -2229,6 +2229,150 @@ spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
       Spec.assertEqWith s "both events happened in full" (amounts after) [5, 3]
       Spec.assertEqWith s "the whole 8 is marked" (S.damageOf victim after) (Just 8)
       Spec.assertEqWith s "and the shield is untouched" (shieldsLeft after) [4]
+
+-- CR 615.12's MIDDLE clause on an AUTHORED rider: an inapplicable prevention is
+-- still applied, "those effects won't prevent any damage, but any additional
+-- effects they have will take place". Phantom Tiger ({2}{G} Creature -- Cat
+-- Spirit 1/0: "This creature enters with two +1/+1 counters on it. If damage
+-- would be dealt to this creature, prevent that damage. Remove a +1/+1 counter
+-- from this creature." -- Oracle text fetched from Scryfall 2026-08-28) is the
+-- producer, and the only shape of producer that can be one: its removal is a CR
+-- 615.5 rider of the prevention effect itself and is AMOUNT-INDEPENDENT, so it
+-- is visible when the amount prevented is 0. shieldCounterSpec below proves the
+-- same clause for the rules-MINTED half, CR 122.1c's counter; this is the
+-- AUTHORED half, which travels on the candidate rather than on the rewrite.
+--
+-- An amount-SCALED rider is applied to unpreventable damage just the same and
+-- does nothing, CR 615.5's "amount of damage that was prevented" being 0 -- Test
+-- of Faith, Stormwild Capridor, Protean Hydra, Brace for Impact, Divine
+-- Deflection and Inkshield all read the amount that way. That is why none of
+-- them can show this clause and why this card can.
+--
+-- NOT a CR 615.13 trigger, which is the distinction the whole group turns on:
+-- "when damage is prevented this way" triggers only where the application
+-- "prevents some or all of that damage", so Phyrexian Vindicator must stay
+-- silent on exactly the board that moves the Tiger's counter. That pair is the
+-- last case here.
+--
+-- Set against Spider-Punk, the pool's producer of damage that can't be prevented
+-- (spiderPunkSpec). Every case is a PAIR of boards differing in Spider-Punk and
+-- in nothing else.
+--
+-- Numbers all distinct: the Bolt is 3, the Tiger is placed with 4 counters, the
+-- rider takes 1, and the printed body is a 1/0. Four is the value that makes the
+-- removal decide the Tiger's LIFE -- a 5/4 survives 3 damage and the 4/3 the
+-- rider leaves does not -- so no reading of the rule meets another on it: an
+-- unrun rider leaves a live 5/4, and a rider run twice would leave a 3/2.
+phantomTigerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+phantomTigerSpec s registry = Spec.describe s "Phantom Tiger (CR 615.12)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      named = CardName.MkCardName . Text.pack
+  -- CR 614.1c's entry replacement first, so the counters the cases below hand
+  -- the Tiger directly are the ones its own card puts there.
+  Spec.it s "CR 614.1c it enters with two +1/+1 counters, so the printed 1/0 is a 3/2" $ do
+    forest <- S.printingOf s registry "Forest"
+    tigerPrinting <- S.printingOf s registry "Phantom Tiger"
+    let (g1, spellId) = S.handOne tigerPrinting (S.landsInPlay forest 3)
+        after = castAndResolve S.identityAnswer g1 spellId
+        -- CR 400.7 with CR 601.2a: casting and resolving each minted a new
+        -- object, so the permanent is neither `spellId` nor one of the lands. It
+        -- is what the battlefield gained (proteanHydraSpec's reading).
+        tiger = case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield g1)) of
+          oid : _ -> oid
+          [] -> S.noSource
+    Spec.assertEqWith s "two +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne tiger after) 2
+    Spec.assertEqWith s "so the printed 1/0 is a 3/2" (S.powerToughnessOf tiger after) (Just (3, 2))
+  -- THE CASE. One Lightning Bolt at one Phantom Tiger, on two boards differing
+  -- in Spider-Punk alone. With him the 3 cannot be prevented and lands whole,
+  -- and the rider still takes the counter that makes it lethal; without him the
+  -- same 3 is prevented (CR 615.6) and the same counter still comes off.
+  Spec.it s "CR 615.12 the rider takes its counter off damage the prevention could not prevent" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    tigerPrinting <- S.printingOf s registry "Phantom Tiger"
+    punkPrinting <- S.printingOf s registry "Spider-Punk"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let build withPunk =
+          let base = S.landsInPlay mountain 1
+              (cat, g1) = S.addCreature tigerPrinting S.alice base
+              g2 = S.addCounter CounterKind.PlusOnePlusOne 4 cat g1
+              (_, g3) = S.addCreature punkPrinting S.alice g2
+              (g4, spellId) = S.handOne bolt (if withPunk then g3 else g2)
+           in (cat, g4, S.runPure (aimCreature cat) g4 (S.cast S.alice spellId >> Stack.resolveTop >> Engine.settleForPriority))
+        (tiger, before, after) = build True
+        (controlTiger, _, control) = build False
+    Spec.assertEqWith s "setup: four +1/+1 counters make the printed 1/0 a 5/4" (S.powerToughnessOf tiger before) (Just (5, 4))
+    -- The gameplay assertion, ahead of every proxy: the counter the rider took
+    -- is what left the Tiger a 4/3 under 3 damage, so CR 704.5g destroys it. An
+    -- application that ran no rider leaves a live 5/4 here.
+    Spec.assertEqWith s "the Tiger is destroyed by damage its own prevention could not prevent" (graveyardNames S.alice after) [named "Lightning Bolt", named "Phantom Tiger"]
+    Spec.assertBool s (not (S.onBattlefield tiger after)) "so it has left the battlefield"
+    -- THE CONTROL, differing in Spider-Punk alone: the prevention does its
+    -- ordinary job, and the rider is unchanged by that -- CR 615.5 runs it
+    -- either way, which is what stops the case above passing for a board where
+    -- riders fire only on unpreventable damage.
+    Spec.assertBool s (S.onBattlefield controlTiger control) "without Spider-Punk the same Bolt is prevented and the Tiger lives"
+    Spec.assertEqWith s "CR 615.6: with nothing marked on it" (S.damageOf controlTiger control) (Just 0)
+    Spec.assertEqWith s "and one counter gone all the same, so a 4/3" (S.powerToughnessOf controlTiger control) (Just (4, 3))
+    Spec.assertEqWith s "CR 615.12a: exactly one counter, so the application happened once" (countersOn CounterKind.PlusOnePlusOne controlTiger control) 3
+  -- CR 615.1's printed RECIPIENT, on the unpreventable board: the ability covers
+  -- "this creature", so a Bolt at the Piker beside it is not an application at
+  -- all and no counter moves. Without this, "any unpreventable damage runs every
+  -- rider on the board" would pass the case above.
+  Spec.it s "CR 615.1 unpreventable damage to something else applies nothing and moves no counter" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    tigerPrinting <- S.printingOf s registry "Phantom Tiger"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    punkPrinting <- S.printingOf s registry "Spider-Punk"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let base = S.landsInPlay mountain 1
+        (tiger, g1) = S.addCreature tigerPrinting S.alice base
+        g2 = S.addCounter CounterKind.PlusOnePlusOne 4 tiger g1
+        (piker, g3) = S.addCreature pikerPrinting S.alice g2
+        (_, g4) = S.addCreature punkPrinting S.alice g3
+        (g5, spellId) = S.handOne bolt g4
+        after = S.runPure (aimCreature piker) g5 (S.cast S.alice spellId >> Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith s "the Tiger keeps all four counters, so it is still a 5/4" (S.powerToughnessOf tiger after) (Just (5, 4))
+    Spec.assertEqWith s "all four counters, none of them spent on somebody else's damage" (countersOn CounterKind.PlusOnePlusOne tiger after) 4
+    Spec.assertBool s (not (S.onBattlefield piker after)) "and the Piker the Bolt did name is dead"
+  -- CR 615.13's control, and the one that fixes WHICH clause the fix implements.
+  -- Phyrexian Vindicator prints the same PreventAll over itself, but its extra
+  -- effect is a TRIGGERED ability -- "when damage is prevented this way" -- and
+  -- rule 615.13 conditions such a trigger on the application having "prevented
+  -- some or all of that damage". Against Spider-Punk it prevents none, so it must
+  -- stay silent on the very board where the Tiger's CR 615.5 rider runs. Two
+  -- boards differing in Spider-Punk alone; the control fires it.
+  Spec.it s "CR 615.13 a 'prevented this way' trigger stays silent where the CR 615.5 rider runs" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    vindicatorPrinting <- S.printingOf s registry "Phyrexian Vindicator"
+    punkPrinting <- S.printingOf s registry "Spider-Punk"
+    let build withPunk =
+          let base = S.landsInPlay plains 1
+              (attacker, g1) = S.addCreature pikerPrinting S.bob base
+              (horror, g2) = S.addCreature vindicatorPrinting S.alice g1
+              (_, g3) = S.addCreature punkPrinting S.alice g2
+           in (horror, strikeAndSettleWith (preferTarget [Recipient.ToPlayer S.bob]) (if withPunk then g3 else g2) [hit attacker (Recipient.ToCreature horror) 4])
+        (vindicator, (punkDealt, punkAfter)) = build True
+        (controlVindicator, (controlDealt, controlAfter)) = build False
+    -- The STACK is the observation here, first and deliberately, and it is the
+    -- behavioural one rather than a proxy: a CR 615.13 trigger that fired off an
+    -- inert application reads a prevented amount of 0, so every payload such a
+    -- trigger can print -- the Vindicator's "that much" damage, Selfless Squire's
+    -- "that many" counters -- does nothing at all once it resolves. What a
+    -- spurious trigger DOES do is exist: it goes on the stack, its controller
+    -- owes it a target, and CR 603.3b orders it against everything else the
+    -- boundary gathered. The two life-and-damage assertions behind it are the
+    -- vacuity guards, and the control below is what shows a real prevention
+    -- still fires it and still reaches bob.
+    Spec.assertEqWith s "no trigger was gathered: CR 615.13 wants some of the damage prevented, and none was" (length (GameState.stack punkDealt)) 0
+    Spec.assertEqWith s "so bob takes nothing" (S.lifeOf S.bob punkAfter) (Just 20)
+    Spec.assertEqWith s "and the whole 4 is marked on the Vindicator instead" (S.damageOf vindicator punkAfter) (Just 4)
+    -- THE CONTROL, differing in Spider-Punk alone: the same 4 off the same card,
+    -- and the trigger fires and lands.
+    Spec.assertEqWith s "without Spider-Punk the prevented 4 reaches bob" (S.lifeOf S.bob controlAfter) (Just 16)
+    Spec.assertEqWith s "CR 615.6: and none of it is marked on the Vindicator" (S.damageOf controlVindicator controlAfter) (Just 0)
+    Spec.assertEqWith s "one trigger was gathered" (length (GameState.stack controlDealt)) 1
 
 -- The players asked to decide something while a damage batch settles, in the
 -- order they were asked. Both batch-level questions count: CR 616.1's "which
@@ -3446,6 +3590,87 @@ oraclesAttendantsSpec s registry = Spec.describe s "Oracle's Attendants (CR 614.
     Spec.assertEqWith s "and the victim took none of it" (S.damageOf victim (strike alpha 2 aimed)) (Just 0)
     Spec.assertEqWith s "omega's 3 stays on the victim" (S.damageOf victim (strike omega 3 aimed)) (Just 3)
     Spec.assertEqWith s "alice was asked which source, and answered alpha" (chosenSourcesIn (answersFor (aimAndChoose victim alpha) g4 activate)) [alpha]
+
+-- CR 614.9 with BOTH halves of the sentence printed on a card, which is what
+-- separates this group from Turn the Tables and Oracle's Attendants above: those
+-- two are resolutions, so the engine bakes their recipient and their destination
+-- as ids. Pariah ({2}{W} Enchantment -- Aura, "Enchant creature / All damage
+-- that would be dealt to you is dealt to enchanted creature instead"; name,
+-- cost, type line and Oracle text checked against api.scryfall.com 2026-08-28,
+-- printed on paper from Urza's Saga onward) is a PERMANENT's static ability, so
+-- there is no resolution to bake anything: "you" is
+-- DamagePattern.whoRecipient and "enchanted creature" is
+-- DamageRewrite.RedirectMatching's Filter.IsHostOfSource, read live at the
+-- damage event.
+--
+-- THREE boards differing in one thing each, because a redirect that fired
+-- unconditionally is indistinguishable from one that reads its condition:
+--
+--   * the recipient is alice (the Aura's controller) -- redirected;
+--   * the recipient is bob -- CR 109.5's "you" is not him, so it lands on him;
+--   * the recipient is an OBJECT, and one alice controls -- a Filter cannot
+--     describe a player, so the pattern's player half must not admit it either.
+--
+-- TWO of alice's creatures, the Oppressive Rays board's trick for the same
+-- reason: the destination is a description, so a board with one creature cannot
+-- tell "the enchanted creature" from "a creature alice controls" from "the first
+-- permanent on the battlefield". Jedit Ojanen (5/5) is the host and survives; the
+-- Goblin Piker (2/1) beside it never takes anything.
+--
+-- Numbers all distinct -- 3 redirected, 4 to bob, 2 to the bystander -- so no two
+-- readings meet on one of them.
+pariahSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+pariahSpec s registry = Spec.describe s "Pariah (CR 614.9)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      board plains jedit pikerPrinting pariah =
+        let base = S.landsInPlay plains 1
+            (host, g1) = S.addCreature jedit S.alice base
+            (bystander, g2) = S.addCreature pikerPrinting S.alice g1
+            (source, g3) = S.addCreature pikerPrinting S.bob g2
+            (aura, g4) = S.addCreature pariah S.alice g3
+         in (host, bystander, source, aura, S.attach aura host g4)
+  Spec.it s "CR 614.9 damage that would be dealt to you is dealt to the enchanted creature instead" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    pariah <- S.printingOf s registry "Pariah"
+    let (host, bystander, source, aura, gs) = board plains jedit pikerPrinting pariah
+        atAlice = settleDamage S.identityAnswer gs [hit source (Recipient.ToPlayer S.alice) 3]
+    Spec.assertEqWith s "alice loses no life" (S.lifeOf S.alice atAlice) (Just 20)
+    -- CR 614.9 is a replacement and not a prevention (CR 615.1a), so the amount
+    -- rides across WHOLE: a prevention would have shown 0 here.
+    Spec.assertEqWith s "the 3 is marked on the enchanted creature instead" (S.damageOf host atAlice) (Just 3)
+    Spec.assertEqWith s "and none of it on the creature beside it" (S.damageOf bystander atAlice) (Just 0)
+    -- The proxy, after the behaviour.
+    Spec.assertEqWith s "setup: the Aura is attached to the host" (Projection.hostOf aura gs) (Just host)
+  -- THE CONTROL on the player half: bob is not CR 109.5's "you", so the same
+  -- source's damage reaches him. A redirect that ignored `whoRecipient` would
+  -- have moved this onto alice's creature too.
+  Spec.it s "CR 109.5 the same Aura moves nothing that was aimed at the opponent" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    pariah <- S.printingOf s registry "Pariah"
+    let (host, bystander, source, _aura, gs) = board plains jedit pikerPrinting pariah
+        aimedAtBob = settleDamage S.identityAnswer gs [hit source (Recipient.ToPlayer S.bob) 4]
+    Spec.assertEqWith s "bob loses the whole 4" (S.lifeOf S.bob aimedAtBob) (Just 16)
+    Spec.assertEqWith s "nothing is marked on the enchanted creature" (S.damageOf host aimedAtBob) (Just 0)
+    Spec.assertEqWith s "nor on the creature beside it" (S.damageOf bystander aimedAtBob) (Just 0)
+  -- THE CONTROL on the object half: CR 120.3's other kind of recipient. Pariah
+  -- names a player and no object, so damage aimed at a permanent alice controls
+  -- is not its business -- which is what keeps `whoRecipient` from being read as
+  -- "anything of yours".
+  Spec.it s "CR 120.3 damage aimed at a permanent alice controls is not redirected" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    pariah <- S.printingOf s registry "Pariah"
+    let (host, bystander, source, _aura, gs) = board plains jedit pikerPrinting pariah
+        atBystander = settleDamage S.identityAnswer gs [hit source (Recipient.ToCreature bystander) 2]
+    Spec.assertEqWith s "the 2 stays on the creature it was aimed at" (S.damageOf bystander atBystander) (Just 2)
+    Spec.assertEqWith s "and none of it moves onto the enchanted creature" (S.damageOf host atBystander) (Just 0)
+    Spec.assertEqWith s "alice still loses no life either" (S.lifeOf S.alice atBystander) (Just 20)
 
 -- Aim every target slot at one object, and answer CR 601.2b's X with `n`.
 -- FILTERED and not built, aimAndChoose's posture: the recipient comes out of the
@@ -4909,6 +5134,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   jaredCarthalionSpec s registry
   glitteringLionSpec s registry
   spiderPunkSpec s registry
+  phantomTigerSpec s registry
   apnapSpec s registry
   excruciatorSpec s registry
   questingBeastSpec s registry
@@ -4919,6 +5145,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   samiteMinistrationSpec s registry
   turnTheTablesSpec s registry
   oraclesAttendantsSpec s registry
+  pariahSpec s registry
   lavaBurstSpec s registry
   queensBayPaladinSpec s registry
   cryogenicStasisSpec s registry

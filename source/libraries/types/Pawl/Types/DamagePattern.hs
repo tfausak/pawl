@@ -97,11 +97,6 @@ import qualified Pawl.Types.Recipient as Recipient
 -- Not fixed for the row's life: CR 400.7c and CR 609.7a's last sentence follow a
 -- chosen PERMANENT SPELL onto the battlefield, so Pawl.Engine.Event.carryOver
 -- re-keys this field to the permanent the spell became.
---
--- Not implemented: an authored DESTINATION for CR 614.9's redirection, which is
--- the other half a static redirection ability needs -- "all damage that would be
--- dealt to you is dealt to this creature instead" (Palisade Giant, Pariah). The
--- recipient half of that sentence is `whoRecipient` above (#1054).
 data DamagePattern = MkDamagePattern
   { whichKind :: Maybe DamageKind.DamageKind,
     whatSource :: Filter.Filter Keyword.Keyword,

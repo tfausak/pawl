@@ -325,6 +325,11 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.IsToken -> predicate
   Filter.Type.IsTapped -> predicate
   Filter.Type.IsFaceDown -> predicate
+  -- NOT descended into, for AttachedTo's reason: CR 708.12's subject is the card
+  -- representing an OBJECT, so Pawl.Engine.Filter answers the atom False for a
+  -- player candidate whatever the nest says, and baking the nest here would bake
+  -- a question about that card against a player who is not one.
+  Filter.Type.RepresentedByCard _ -> predicate
   Filter.Type.IsExiledFaceDown -> predicate
   Filter.Type.Transformed -> predicate
   Filter.Type.IsRingBearer -> predicate
@@ -707,6 +712,10 @@ viewOfSnapshot mController isToken snapshot =
       -- of characteristics -- so a snapshot holds nothing to answer this with,
       -- `tapped` above's reason one status category over.
       Filter.faceDown = False,
+      -- CR 608.2h's record holds characteristics rather than the card that carried
+      -- them, so there is no printed face here for CR 708.12 to read -- `faceDown`
+      -- above's reason, one rule over.
+      Filter.representedCard = Nothing,
       -- CR 406.3's exiled-face-down rider is written onto an OBJECT on its way
       -- into exile, and a snapshot holds no object -- `faceDown` above's reason,
       -- one rule over.

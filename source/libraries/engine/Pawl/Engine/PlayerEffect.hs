@@ -35,6 +35,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaFilter as ManaFilter
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Turn as Turn
@@ -510,6 +511,8 @@ prohibitsCasting pid oid name gs =
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.IncreaseMaximumHandSize _ -> False
+        PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.SpendManaAsThough _ -> False
         -- CR 702.18a / 702.11c restrict TARGETING, not casting: a player with
@@ -643,6 +646,8 @@ prohibitsPlayingLand pid names gs =
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.IncreaseMaximumHandSize _ -> False
+        PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
@@ -697,6 +702,8 @@ prohibitsSearching pid gs =
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.IncreaseMaximumHandSize _ -> False
+        PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
@@ -750,6 +757,8 @@ prohibitsCounters pid kind gs =
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.IncreaseMaximumHandSize _ -> False
+        PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
@@ -800,6 +809,8 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.IncreaseMaximumHandSize _ -> False
+        PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.SpendManaAsThough _ -> False
         -- CR 702.18a/702.11c stop a SPELL from choosing this player as a target.
@@ -983,6 +994,8 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
+        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
+        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
@@ -1018,6 +1031,8 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
+        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
+        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
@@ -1056,6 +1071,8 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
+        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
+        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
@@ -1197,6 +1214,8 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
+        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
+        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
@@ -1238,6 +1257,8 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
+        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
+        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
@@ -1274,6 +1295,8 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
+        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
+        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
@@ -1320,10 +1343,9 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
 -- board with no such effect on it runs no projections at all -- the posture
 -- costAdjustments takes above.
 --
--- CR 601.3b's SECOND SENTENCE is not implemented: the rule lets a player begin
--- casting as though a spell had flash when a choice still to be made during the
--- proposal could give the spell the qualities the effect names, and nothing here
--- searches choice space (#721).
+-- CR 601.3b's SECOND SENTENCE rides the same arm, in choiceCouldApply below: the
+-- criterion is asked of the spell as it stands AND of what a choice still to be
+-- made during the proposal could make of it.
 --
 -- Takes the OBJECT and not the half being proposed, and reaches the half through
 -- the STATE instead: Pawl.Engine.Cast.castable asks this of an
@@ -1333,7 +1355,8 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
 mayCastAsThoughItHadFlash :: PlayerId -> ObjectId -> GameState -> Bool
 mayCastAsThoughItHadFlash pid oid gs =
   let allows (source, effect) = case effect of
-        PlayerEffect.CastAsThoughItHadFlash criterion -> matchesObjectFrom source criterion oid gs
+        PlayerEffect.CastAsThoughItHadFlash criterion ->
+          matchesObjectFrom source criterion oid gs || choiceCouldApply source criterion oid gs
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantCastMoreThan _ -> False
@@ -1347,6 +1370,8 @@ mayCastAsThoughItHadFlash pid oid gs =
         PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.IncreaseMaximumHandSize _ -> False
+        PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
@@ -1366,6 +1391,45 @@ mayCastAsThoughItHadFlash pid oid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
    in any allows (applying pid gs)
+
+-- CR 601.3b's LOOKAHEAD, asked of a permission that does NOT name the spell as it
+-- stands: could a choice still to be made during this spell's proposal cause the
+-- criterion to start naming it? A True here is the rule's "that player may begin
+-- to cast that spell as though it had flash", so mayCastAsThoughItHadFlash above
+-- takes it as a disjunct. CR 601.3a's twin, choiceCouldEscape above, is the same
+-- question asked of a prohibition and answered in the other direction.
+--
+-- ONE choice can do it in pawl, and bestow is that choice: CR 702.103b makes a
+-- spell cast bestowed an Aura enchantment with enchant creature, which is a card
+-- type and a subtype a criterion can read, and rule 601.3b's own example is that
+-- card in that hand. Projection.bestowedView is what the choice would make of the
+-- object, applied to no state -- nothing is stamped, since the player has not
+-- chosen anything yet.
+--
+-- Morph reaches this and needs none of it: CR 708.4 makes a face-down cast a
+-- proposal of its own, so Cast.castableSpells offers it as a separate action and
+-- Cast.asProposed has already stamped the facing by the time this is asked. The
+-- face-down spell's own characteristics are what the criterion above matches,
+-- which is why the choice space this searches holds only the choices made DURING
+-- one proposal.
+--
+-- Asks only whether the choice EXISTS, not whether its cost is payable, which is
+-- choiceCouldEscape's posture toward X: the rule lets the player BEGIN, and a
+-- proposal that then announces the printed cost instead has still begun legally.
+-- Cast.castable's own affordability conjunct is what refuses a card no cost of
+-- which can be paid.
+--
+-- Read off the PROJECTION's keywords, which is where Cost.costsFor reads the same
+-- ability from and for its CR 613.1 reason: a bestow granted where the card lies
+-- offers rule 702.103a's choice as much as a printed one does.
+--
+-- Not implemented: the other proposal choice CR 202.3e makes visible -- the X
+-- whose announcement fixes the spell's mana value -- so a permission naming a
+-- mana value this card does not yet have is not searched (#2512).
+choiceCouldApply :: Maybe ObjectId -> Filter Keyword -> ObjectId -> GameState -> Bool
+choiceCouldApply src criterion oid gs =
+  let bestowable = not (null (Keyword.bestowCosts (Map.keysSet (Projection.keywordsOf oid gs))))
+   in bestowable && Filter.matches (contextFrom src oid gs) (Projection.bestowedView oid gs) criterion
 
 -- CR 601.3: may `pid` cast `oid` from a graveyard because an EFFECT says so?
 --
@@ -1412,6 +1476,8 @@ mayCastFromGraveyard pid oid gs =
         PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.IncreaseMaximumHandSize _ -> False
+        PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
@@ -1487,6 +1553,8 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.IncreaseMaximumHandSize _ -> False
+        PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
@@ -1544,6 +1612,8 @@ mayPlayLandsFromGraveyard pid gs =
         PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.IncreaseMaximumHandSize _ -> False
+        PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
@@ -1613,6 +1683,8 @@ protectedFromTargeting caster pid gs =
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.IncreaseMaximumHandSize _ -> False
+        PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
@@ -1679,6 +1751,8 @@ landPlaysAllowed pid gs =
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
+        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
+        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
@@ -1717,14 +1791,27 @@ defaultMaximumHandSize = 7
 --
 -- A left fold from CR 402.2's seven rather than a search for the newest effect:
 -- "applied in timestamp order" is a sequence of edits to one value, and reading
--- only the last one would be a different rule the moment an arm composes with
--- what it finds instead of replacing it (a maximum hand size INCREASED by two,
--- #1238).
+-- only the last one would be a different rule for the two ADJUSTING arms, which
+-- compose with what they find instead of replacing it (Minamo Scrollkeeper's
+-- "increased by one", Gnat Miser's "reduced by one").
+--
+-- Those two adjust the Maybe rather than reaching past it, which is the whole of
+-- how they meet a removal: fmap over Nothing is Nothing, so an adjustment applied
+-- after Reliquary Tower has nothing to adjust and the player still has no maximum
+-- (Reliquary Tower's own ruling). Applied after a set, it adjusts the number that
+-- was set.
+--
+-- CR 107.1b is the reduction's floor: the calculation determining a maximum hand
+-- size cannot yield a negative number, and no exception in that rule is a hand
+-- size. Written as a comparison rather than as Natural subtraction, which would
+-- throw rather than floor.
 maximumHandSize :: PlayerId -> GameState -> Maybe Natural
 maximumHandSize pid gs =
   let apply current effect = case effect of
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize limit -> Just limit
+        PlayerEffect.IncreaseMaximumHandSize extra -> fmap (extra +) current
+        PlayerEffect.ReduceMaximumHandSize fewer -> fmap (\limit -> if fewer >= limit then 0 else limit - fewer) current
         PlayerEffect.CantCastSpells -> current
         PlayerEffect.CantCastMoreThan _ -> current
         PlayerEffect.CantCastChosenName -> current
@@ -1798,6 +1885,8 @@ keepsUnspentMana pid gs =
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
+        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
+        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
@@ -1849,6 +1938,8 @@ spendManaAsThough pid gs =
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
+        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
+        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
@@ -1913,6 +2004,8 @@ cantBeCountered pid oid gs =
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.IncreaseMaximumHandSize _ -> False
+        PlayerEffect.ReduceMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
@@ -2003,6 +2096,8 @@ unpreventable gs =
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
+        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
+        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
@@ -2061,6 +2156,8 @@ unredirectable gs =
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
+        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
+        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing

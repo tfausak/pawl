@@ -71,6 +71,7 @@ import qualified Pawl.Codec.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Codec.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.SpeedDecrease as SpeedDecrease
+import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Codec.TurnFaceDown as TurnFaceDown
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -95,7 +96,7 @@ codec cardCodec abilityCodec =
       Arm.payload "Amass" Amass.codec Effect.Amass (\x -> case x of Effect.Amass y -> Just y; _ -> Nothing),
       Arm.payload "Blight" PlayerQuantity.codec Effect.Blight (\x -> case x of Effect.Blight y -> Just y; _ -> Nothing),
       Arm.nullary "TemptWithTheRing" Effect.TemptWithTheRing,
-      Arm.nullary "Venture" Effect.Venture,
+      Arm.optionalPayload "Venture" Subtype.codec Effect.Venture (\x -> case x of Effect.Venture y -> Just y; _ -> Nothing),
       Arm.nullary "ExileHandThenDraw" Effect.ExileHandThenDraw,
       Arm.payload "PlayerSacrifices" PlayerSacrifices.codec Effect.PlayerSacrifices (\x -> case x of Effect.PlayerSacrifices y -> Just y; _ -> Nothing),
       Arm.optionalPayload "RestartGame" ObjectRef.codec Effect.RestartGame (\x -> case x of Effect.RestartGame y -> Just y; _ -> Nothing),
@@ -146,6 +147,7 @@ codec cardCodec abilityCodec =
       Arm.payload "Goad" ObjectRef.codec Effect.Goad (\x -> case x of Effect.Goad y -> Just y; _ -> Nothing),
       Arm.payload "DoesNotUntapNext" ObjectRef.codec Effect.DoesNotUntapNext (\x -> case x of Effect.DoesNotUntapNext y -> Just y; _ -> Nothing),
       Arm.payload "Transform" ObjectRef.codec Effect.Transform (\x -> case x of Effect.Transform y -> Just y; _ -> Nothing),
+      Arm.payload "Convert" ObjectRef.codec Effect.Convert (\x -> case x of Effect.Convert y -> Just y; _ -> Nothing),
       Arm.payload "Meld" meldCodec Effect.Meld (\x -> case x of Effect.Meld y -> Just y; _ -> Nothing),
       Arm.payload "PhaseOut" ObjectRef.codec Effect.PhaseOut (\x -> case x of Effect.PhaseOut y -> Just y; _ -> Nothing),
       Arm.payload "AddPhases" (Common.list ExtraPhase.codec) Effect.AddPhases (\x -> case x of Effect.AddPhases y -> Just y; _ -> Nothing),

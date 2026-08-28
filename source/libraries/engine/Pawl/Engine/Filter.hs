@@ -338,6 +338,24 @@ data View = MkView
     -- False for every candidate with no permanent behind it: a printed face, a
     -- player, an event snapshot. Each says so at its own site.
     faceDown :: Bool,
+    -- | CR 708.12's "the characteristics of that object ignoring any continuous
+    -- effects": the view of the CARD REPRESENTING the candidate, built off its
+    -- printed face by Pawl.Engine.Projection.viewOfCard, for
+    -- Filter.RepresentedByCard's nest to be matched against.
+    --
+    -- Read through Pawl.Engine.Game.faceUpFaceOf rather than Game.faceOf, which
+    -- is the whole of what the atom buys: CR 708.2a's substitution lives in
+    -- faceOf, so a projected read of a manifested land answers "2/2 creature" and
+    -- this one answers "land". The same read CR 701.40b's special action takes at
+    -- Pawl.Engine.FaceDown.manifestCostOf.
+    --
+    -- `Maybe View` and never the candidate's own view, AttachedTo's
+    -- `attachedToView` shape: an object with no card behind it -- a token, an
+    -- ability on the stack, a player -- is represented by no card at all, and the
+    -- atom is vacuously False there rather than falling back on a projection the
+    -- rule excludes. Nothing at Pawl.Engine.Projection.viewOfCard's own site too,
+    -- where the candidate IS a printed face and a nest would recur forever.
+    representedCard :: Maybe View,
     -- | CR 406.3's "exiled face down", which the line above is emphatically not:
     -- CR 110.5d says the two have no correlation, so this reads
     -- Object.exiledFaceDown and that one reads Object.facing.
@@ -580,6 +598,9 @@ playerView pid =
       -- CR 110.5d gives status to PERMANENTS, and CR 109.1 makes a player none of
       -- those either -- the line below's reason, one status category over.
       faceDown = False,
+      -- CR 708.12 asks about the card representing an OBJECT, and CR 109.1 makes a
+      -- player none -- `faceDown` above's reason, one rule over.
+      representedCard = Nothing,
       -- CR 406.2's exiled card is a CARD, and CR 109.1 makes a player none of
       -- those either.
       exiledFaceDown = False,
@@ -1092,6 +1113,11 @@ matches context view predicate = case predicate of
   -- inside the field for Transformed's reason: see the atom's own comment in
   -- Pawl.Types.Filter.
   Filter.IsFaceDown -> faceDown view
+  -- CR 708.12: the nest is matched against the PRINTED CARD's view and the SAME
+  -- context, AttachedTo's arm's posture -- CR 109.5's "you" stays the ability's
+  -- controller. False where no card represents the candidate, since rule 708.12
+  -- has nothing to read there.
+  Filter.RepresentedByCard f -> maybe False (\card -> matches context card f) (representedCard view)
   -- CR 406.3, which is NOT the status one line up: CR 110.5d says the two have
   -- no correlation, and the fields differ accordingly.
   Filter.IsExiledFaceDown -> exiledFaceDown view
@@ -1238,6 +1264,11 @@ rewrite pairs predicate = case predicate of
   -- the HOST ("attached to a Swamp"), so CR 612.1's word swap reaches it exactly
   -- as it reaches the same description written at the top level.
   Filter.AttachedTo f -> Filter.AttachedTo (rewrite pairs f)
+  -- DESCENT, for the atom above's reason: the nest is a description a card
+  -- author wrote ("if it's a Forest card"), so CR 612.1's word swap reaches it
+  -- exactly as it reaches the same description written at the top level. The
+  -- swap is on the ABILITY's text and never on the card the nest describes.
+  Filter.RepresentedByCard f -> Filter.RepresentedByCard (rewrite pairs f)
   -- DESCENT, for the atom above's reason one direction over: the nest describes
   -- the ATTACHER ("enchanted by an Aura"), so CR 612.1's word swap reaches it as
   -- it reaches the same description written at the top level.
@@ -1370,6 +1401,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Haste -> keyword
   Keyword.Type.Indestructible -> keyword
   Keyword.Type.Lifelink -> keyword
+  Keyword.Type.LivingMetal -> keyword
   Keyword.Type.Reach -> keyword
   Keyword.Type.Shroud -> keyword
   Keyword.Type.Trample -> keyword
@@ -1636,6 +1668,10 @@ bakeBound players predicate = case predicate of
   -- the pairing that function's comment insists on.
   Filter.AttachedTo f -> Filter.AttachedTo (bakeBound players f)
   -- DESCENT, for the atom above's reason: a ControlledByBound written into the
+  -- represented card's description is baked exactly as the same atom at the top
+  -- level would be, and Pawl.Engine.Filter.boundSlots descends to match.
+  Filter.RepresentedByCard f -> Filter.RepresentedByCard (bakeBound players f)
+  -- DESCENT, for the atom above's reason: a ControlledByBound written into the
   -- ATTACHER's description is baked exactly as the same atom at the top level
   -- would be, and Pawl.Engine.Filter.boundSlots descends to match.
   Filter.HasAttached f -> Filter.HasAttached (bakeBound players f)
@@ -1727,6 +1763,10 @@ manaValueThresholds predicate = case predicate of
   -- literals inside bound the HOST's mana value and never the candidate's. Only
   -- widening CR 601.3a's sample is the safe direction.
   Filter.AttachedTo f -> manaValueThresholds f
+  -- Descended into, and OVER-reporting for the atom above's reason: the literals
+  -- inside bound the represented CARD's mana value and never the candidate's.
+  -- Only widening CR 601.3a's sample is the safe direction.
+  Filter.RepresentedByCard f -> manaValueThresholds f
   -- Descended into, and OVER-reporting for the atom above's reason: the literals
   -- inside bound an ATTACHER's mana value and never the candidate's. Only
   -- widening CR 601.3a's sample is the safe direction.
@@ -1843,6 +1883,9 @@ statesAQuality predicate = case predicate of
   Filter.IsToken -> True
   Filter.IsTapped -> True
   Filter.IsFaceDown -> True
+  -- True whatever the nest says, AttachedTo's reason: "is represented by a card"
+  -- is itself a stated quality under CR 701.23b, and the trivial nest states it.
+  Filter.RepresentedByCard _ -> True
   Filter.IsExiledFaceDown -> True
   Filter.Transformed -> True
   Filter.IsRingBearer -> True
@@ -1893,6 +1936,10 @@ boundSlots predicate = case predicate of
   -- one: `bakeBound` descends into the host's description, so the catch-all below
   -- would silently bake a slot this function never reported.
   Filter.AttachedTo f -> boundSlots f
+  -- Descended into for the atom above's reason and named explicitly for the same
+  -- one: `bakeBound` descends into the represented card's description, so the
+  -- catch-all below would silently bake a slot this function never reported.
+  Filter.RepresentedByCard f -> boundSlots f
   -- Descended into for the atom above's reason, and named explicitly for the same
   -- one: `bakeBound` descends into the attacher's description, so the catch-all
   -- below would silently bake a slot this function never reported.

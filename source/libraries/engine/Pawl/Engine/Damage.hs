@@ -1179,12 +1179,23 @@ applyDamage events = do
   -- one CR 117.5 boundary, so the two kinds of trigger are gathered together
   -- either way and CR 603.3b lets their controller order them; what this fixes is
   -- the canonical order the prompt indexes into.
+  --
+  -- And only the applications that PREVENTED something are recorded, which is CR
+  -- 615.13's own condition: such an ability triggers each time a prevention
+  -- effect is applied to one or more simultaneous damage events "and prevents
+  -- some or all of that damage". CR 615.12's inert application is exactly the one
+  -- that prevents none of it, and it is on this list at an amount of 0 --
+  -- Replacement.preventionBy puts it there so that its CR 615.5 rider still
+  -- queues below, which is why the gate is here rather than on the list. The
+  -- proof is Phyrexian Vindicator's trigger staying silent against Spider-Punk's
+  -- unpreventable damage while Phantom Tiger's counter still comes off
+  -- (Pawl.ReplacementSpec).
   State.modify'
     ( \gs ->
         let marked = List.foldl' markOne gs survivors
             gained = List.foldl' gainOne marked survivors
             tallied = List.foldl' tallyOne gained survivors
-            noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (Prevention.by p) (Prevention.source p) (Prevention.recipient p) (Prevention.amount p))) g) tallied prevented
+            noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (Prevention.by p) (Prevention.source p) (Prevention.recipient p) (Prevention.amount p))) g) tallied (filter (\p -> Prevention.amount p > 0) prevented)
             dealt = List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) noted survivors
          in -- CR 119.2's life loss and CR 120.3f's life gain are recorded AFTER
             -- the damage that caused them, which is the same reasoning the
@@ -1228,6 +1239,14 @@ applyDamage events = do
   -- the CR 608.2i record is of the prevention itself and the rider is the "rest
   -- of the effect". Nothing is inspected here; the rider is an opaque payload
   -- copied from Prevention to the queue.
+  --
+  -- Filtered on the RIDER and not on the amount, which is the record above's
+  -- gate exactly reversed: CR 615.12 says an inapplicable prevention is still
+  -- applied and "any
+  -- additional effects they have will take place", so an application that
+  -- prevented 0 owes its rider just the same. An amount-scaled rider then reads
+  -- 0 through Binding.eventAmount and does nothing of its own accord (Test of
+  -- Faith puts on no counter), which is the rule as well.
   State.modify' $ \gs ->
     gs {GameState.pendingPreventionRiders = GameState.pendingPreventionRiders gs <> Seq.fromList (filter (Maybe.isJust . Prevention.rider) prevented)}
 

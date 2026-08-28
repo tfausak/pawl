@@ -94,6 +94,9 @@ codec keywordCodec =
       Arm.nullary "IsToken" Filter.IsToken,
       Arm.nullary "IsTapped" Filter.IsTapped,
       Arm.nullary "IsFaceDown" Filter.IsFaceDown,
+      -- Recursive for AttachedTo's reason, the payload describing the CARD
+      -- representing the candidate rather than the candidate.
+      Arm.payload "RepresentedByCard" (codec keywordCodec) Filter.RepresentedByCard (\x -> case x of Filter.RepresentedByCard y -> Just y; _ -> Nothing),
       Arm.nullary "IsExiledFaceDown" Filter.IsExiledFaceDown,
       Arm.nullary "Transformed" Filter.Transformed,
       Arm.nullary "IsRingBearer" Filter.IsRingBearer,

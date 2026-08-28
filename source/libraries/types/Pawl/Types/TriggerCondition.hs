@@ -994,7 +994,8 @@ data TriggerCondition
     -- characteristic immediately after it does so".
     --
     -- CR 701.28a makes a convert follow CR 701.27a-f, so this condition fires on
-    -- one too once there is such an opcode; see #698.
+    -- one too: a convert writes the same GameEvent.Transformed, there being one
+    -- code path for both opcodes.
     --
     -- Not implemented: the BYSTANDER form CR 701.27e also admits, a card
     -- watching another permanent transform (Corruption of Towashi, Neglected

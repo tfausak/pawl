@@ -692,7 +692,10 @@ turnFaceOver now gs oid objects
       -- In turnFaceOver rather than in Pawl.Engine.Resolve's turnOver because
       -- this is the one writer every road reaches: Pawl.Engine.Daytime's CR
       -- 702.145c/f sweep comes straight here, and a melded permanent whose
-      -- combined face printed nightbound would otherwise turn over that way.
+      -- combined face printed nightbound would otherwise turn over that way. CR
+      -- 701.28a's convert is a third road and needs nothing of its own -- it
+      -- shares Pawl.Engine.Resolve's turnPermanentsOver with Transform, so CR
+      -- 701.28f's "can't transform" also can't convert is this same guard.
       --
       -- OVER-DETERMINED on every board Magic can reach: no printed meld pair
       -- combines into a double-faced card, so Card.turnedOver would decline the

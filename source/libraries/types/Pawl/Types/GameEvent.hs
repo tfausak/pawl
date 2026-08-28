@@ -649,8 +649,10 @@ data GameEvent
     -- 701.27c/d/f and CR 702.145b each leave an instruction doing nothing, and a
     -- turn that did not happen is not an event.
     --
-    -- CR 701.28a routes convert through CR 701.27a-f, so whoever implements it
-    -- must record this same event rather than mint a second one; see #698.
+    -- CR 701.28a routes convert through CR 701.27a-f, so a convert records THIS
+    -- event and there is no second one: Pawl.Engine.Resolve applies both opcodes
+    -- through one turnPermanentsOver. Pawl.TransformSpec's "a convert records the
+    -- transform event, not one of its own" is what proves it.
     --
     -- NOT recorded for daybound's "enters transformed" (CR 702.145b, EntryRewrite
     -- in Pawl.Engine.Event): nothing turns over there, the permanent arrives on
