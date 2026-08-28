@@ -7360,11 +7360,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "Celestine's one atom is in the slot that names its bound"
       (manaValueAtMostAmountCounts (S.combinedFace celestine))
       (1, 0)
+    -- Ratchet, Field Medic is the pool's second author of the atom, and the one
+    -- that reaches it through a DELAYED ability rather than a triggered one --
+    -- CR 603.12's reflexive, whose slot is baked and matched exactly as an
+    -- ordinary trigger's is.
+    ratchet <- S.printingOf s registry "Ratchet, Field Medic"
     Spec.assertEqWith
       s
-      "and it is the pool's only one"
+      "Ratchet's reflexive slot names its bound too"
+      (manaValueAtMostAmountCounts (S.combinedFace ratchet))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and they are the pool's only ones"
       (sum (fmap (uncurry (+) . manaValueAtMostAmountCounts . S.combinedFace) ps))
-      1
+      2
     -- The rejected side, which the sweep above cannot show while the pool has no
     -- offender: the SAME atom, buried under all three combinators, in a target
     -- slot that names no amount -- the position a card author would most plausibly

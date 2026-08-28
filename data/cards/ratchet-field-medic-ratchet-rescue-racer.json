@@ -1,6 +1,78 @@
 {
   "faces": [
     {
+      "delayedAbilities": {
+        "return artifact": {
+          "condition": {
+            "type": "Reflexive"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
+                          },
+                          "riders": {
+                            "tapped": {
+                              "type": "Tapped"
+                            }
+                          },
+                          "zone": {
+                            "type": "Battlefield"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "target": {
+                    "amount": {
+                      "type": "LifeGainedThisTurn",
+                      "value": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    },
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Artifact"
+                          }
+                        },
+                        {
+                          "type": "ManaValueAtMostAmount"
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "CardsInGraveyard",
+                      "value": {
+                        "type": "Scoped",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
       "keywords": [
         {
           "type": "Lifelink"
@@ -50,6 +122,44 @@
         "type": "Literal",
         "value": 4
       },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "PlayerGainsLife",
+            "value": {
+              "type": "You"
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Convert",
+                        "value": {
+                          "type": "InSlot",
+                          "value": "self"
+                        }
+                      },
+                      {
+                        "type": "ArmDelayedTrigger",
+                        "value": {
+                          "name": "return artifact"
+                        }
+                      }
+                    ],
+                    "optionality": {
+                      "type": "Optional"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
       "typeLine": {
         "subtypes": [
           {
