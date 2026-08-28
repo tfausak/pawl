@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
@@ -35,6 +36,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import Pawl.Types.Quantity (Quantity)
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.SlotName (SlotName)
@@ -195,7 +197,7 @@ admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.Control
 admittedGiven pcs grants pools perspective bindings source slot gs =
   let pool = TargetSlot.pool slot
       narrowing = TargetSlot.filter slot
-      context = slotContext pcs perspective bindings source gs
+      context = slotContext pcs perspective bindings source (TargetSlot.amount slot) gs
       -- ONE whole-board projection and ONE control-grant walk for the whole
       -- slot: both the base pool's creature test and the Filter's per-candidate
       -- view are asked of every object on the battlefield, and each was a fresh
@@ -232,83 +234,105 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
 -- THE Filter.Context a target SLOT's own filter is matched against. Extracted
 -- from admittedGiven so that CR 608.2h's departed host (lastKnownAdmits below)
 -- is judged against the same context a live candidate is, rather than against a
--- bare Filter.contextFor that would answer differently for the three atoms
--- filled here.
+-- bare Filter.contextFor that would answer differently for the atoms filled
+-- here.
 --
--- THE one site that fills Filter.sourcePower, and one of the two that fill
--- Filter.defendingPlayer, because it is the one site that matches a TARGET
--- SLOT's Filter -- both of CR 115's moments (CR 601.2c's choosing and CR
--- 608.2b's re-check) reach those atoms through here, and CR 702.134a and CR
--- 702.39a are the only clauses that write them in a slot. CR 508.1c's gate
--- is where the other defending-player read is
--- (Pawl.Engine.CombatRestriction.inForce, Armored Galleon), and no target
--- slot can reach it. Both are thunks, like the caller's `pcs`: a slot whose
--- filter never names an atom pays for neither the source's projection nor
--- the combat lookup.
-slotContext :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> GameState -> Filter.Context
-slotContext pcs perspective bindings source gs =
-  Filter.MkContext
-    { Filter.perspective = perspective,
-      Filter.source = Just source,
-      Filter.sourcePower = Projection.powerWithLastKnownGiven pcs source gs,
-      -- CR 508.5, asked of the SOURCE: rule 702.39a's clause is on an
-      -- attacking creature, and `source` is the object CR 113.7 says the
-      -- ability came from.
-      Filter.defendingPlayer = Defender.playerOfAttacker source gs,
-      -- Nothing: a target slot is judged before the effect names anyone, so
-      -- there is no recipient it could have reached yet. CR 119.5's atom
-      -- lives in an effect's QUANTITY, which is evaluated later and
-      -- elsewhere.
-      Filter.recipient = Nothing,
-      -- Off `bindings`, exactly as slotNames below is and for CR 601.2c's
-      -- other sibling-slot reading: "another target creature" is a slot
-      -- forbidding what a SIBLING slot holds (Fall of the Hammer's
-      -- Not (IsBound "dealer")), and rule 601.2c makes sharing the default,
-      -- so the restriction has to be a Filter the card writes rather than
-      -- machinery. What a caller supplies no bindings for stays vacuously
-      -- False, which is the same posture every other context-relative field
-      -- here takes.
+-- THE one site that fills Filter.sourcePower and Filter.slotAmount, and one of
+-- the two that fill Filter.defendingPlayer, because it is the one site that
+-- matches a TARGET SLOT's Filter -- both of CR 115's moments (CR 601.2c's
+-- choosing and CR 608.2b's re-check) reach those atoms through here, and CR
+-- 702.134a, CR 702.39a and CR 202.3's computed bound are the only clauses that
+-- write them in a slot. CR 508.1c's gate is where the other defending-player
+-- read is (Pawl.Engine.CombatRestriction.inForce, Armored Galleon), and no
+-- target slot can reach it. All are thunks, like the caller's `pcs`: a slot
+-- whose filter never names an atom pays for neither the source's projection,
+-- the combat lookup, nor the bound's evaluation.
+slotContext :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> Maybe Quantity -> GameState -> Filter.Context
+slotContext pcs perspective bindings source amount gs =
+  let base =
+        Filter.MkContext
+          { Filter.perspective = perspective,
+            Filter.source = Just source,
+            Filter.sourcePower = Projection.powerWithLastKnownGiven pcs source gs,
+            -- Nothing HERE and filled below: CR 202.3's computed bound is the slot's
+            -- own Quantity, and evaluating one takes a Filter.Context -- so this
+            -- record is the context the evaluation runs in, and the answer is laid
+            -- over it. Nothing inside it is what makes that non-circular: no Quantity
+            -- arm reads this field.
+            Filter.slotAmount = Nothing,
+            -- CR 508.5, asked of the SOURCE: rule 702.39a's clause is on an
+            -- attacking creature, and `source` is the object CR 113.7 says the
+            -- ability came from.
+            Filter.defendingPlayer = Defender.playerOfAttacker source gs,
+            -- Nothing: a target slot is judged before the effect names anyone, so
+            -- there is no recipient it could have reached yet. CR 119.5's atom
+            -- lives in an effect's QUANTITY, which is evaluated later and
+            -- elsewhere.
+            Filter.recipient = Nothing,
+            -- Off `bindings`, exactly as slotNames below is and for CR 601.2c's
+            -- other sibling-slot reading: "another target creature" is a slot
+            -- forbidding what a SIBLING slot holds (Fall of the Hammer's
+            -- Not (IsBound "dealer")), and rule 601.2c makes sharing the default,
+            -- so the restriction has to be a Filter the card writes rather than
+            -- machinery. What a caller supplies no bindings for stays vacuously
+            -- False, which is the same posture every other context-relative field
+            -- here takes.
+            --
+            -- WIDENING at CR 601.2c is still the offer: legalSetsGiven's first
+            -- pass hands every slot the seed alone, so the union is what a
+            -- dependent slot is offered, and selectionLegal is where an
+            -- announcement naming one creature twice is rejected.
+            Filter.slotObjects = fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) bindings,
+            -- THE one site that fills it, alongside sourcePower and
+            -- defendingPlayer above and for the same reason: SameNameAsBound
+            -- lives in a target slot's Filter, and this is where one is matched.
+            --
+            -- Off `bindings`, which is what the announcement already holds --
+            -- CR 603.2's own bindings for a triggered ability (Harness the Storm's
+            -- cast spell) plus whatever sibling slots the first pass answered.
+            -- A slot holding several recipients contributes all of their names,
+            -- which is CR 709.4a's membership read once more: the candidate has
+            -- "the same name as" the slot if it shares a name with any of them.
+            --
+            -- Through CR 608.2h's last-known reader rather than a live
+            -- projection, because the bound object is NOT the target and the two
+            -- rules differ: CR 608.2b blanks a departed TARGET, while "that
+            -- spell" is a reference the ability already made and rule 608.2h
+            -- keeps answerable. Harness the Storm whose spell was countered in
+            -- response still knows the name it named.
+            --
+            -- A THUNK, like the two above: one projection per bound object, paid
+            -- for only by a filter that names the atom.
+            Filter.slotNames = fmap (foldMap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) bindings,
+            -- Nothing: CR 303.4b's atom names what the SOURCE enchants, and no
+            -- printing puts that in a target slot -- "enchanted creature" is a
+            -- reference the card already made rather than a choice CR 601.2c
+            -- leaves open. Pawl.CardSpec's position lint is what keeps that true,
+            -- and widening it here would be a capability no card asks for.
+            Filter.sourceAttachedTo = Nothing,
+            -- Empty, sourceAttachedTo's reason one atom over: CR 201.4's name is
+            -- chosen while the spell RESOLVES (CR 608.2c), and a target slot is
+            -- matched at CR 601.2c, before any of that has happened. So there is
+            -- no chosen name here even for a source that will have one, and
+            -- HasChosenName is vacuously False. Pawl.CardSpec's position lint is
+            -- what keeps a card out of the slot.
+            Filter.sourceChosenNames = Set.empty
+          }
+   in -- CR 202.3 / 601.2c: the slot's own computed mana-value bound, evaluated
+      -- against the context above and handed to Filter.ManaValueAtMostAmount.
+      -- THIS is the one site that fills it, sourcePower's and slotNames' sibling
+      -- in that respect and for the same reason: the atom lives in a target
+      -- slot's Filter, and this is where one is matched -- at both of CR 115's
+      -- moments, so the bound is read again at CR 608.2b rather than frozen at
+      -- CR 601.2c.
       --
-      -- WIDENING at CR 601.2c is still the offer: legalSetsGiven's first
-      -- pass hands every slot the seed alone, so the union is what a
-      -- dependent slot is offered, and selectionLegal is where an
-      -- announcement naming one creature twice is rejected.
-      Filter.slotObjects = fmap (Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList) bindings,
-      -- THE one site that fills it, alongside sourcePower and
-      -- defendingPlayer above and for the same reason: SameNameAsBound
-      -- lives in a target slot's Filter, and this is where one is matched.
+      -- Evaluated against the SOURCE (Celestine's "the amount of life YOU gained
+      -- this turn" is CR 109.5's you, which `perspective` above carries), never
+      -- against the candidate: the bound is one number for the whole slot.
       --
-      -- Off `bindings`, which is what the announcement already holds --
-      -- CR 603.2's own bindings for a triggered ability (Harness the Storm's
-      -- cast spell) plus whatever sibling slots the first pass answered.
-      -- A slot holding several recipients contributes all of their names,
-      -- which is CR 709.4a's membership read once more: the candidate has
-      -- "the same name as" the slot if it shares a name with any of them.
-      --
-      -- Through CR 608.2h's last-known reader rather than a live
-      -- projection, because the bound object is NOT the target and the two
-      -- rules differ: CR 608.2b blanks a departed TARGET, while "that
-      -- spell" is a reference the ability already made and rule 608.2h
-      -- keeps answerable. Harness the Storm whose spell was countered in
-      -- response still knows the name it named.
-      --
-      -- A THUNK, like the two above: one projection per bound object, paid
-      -- for only by a filter that names the atom.
-      Filter.slotNames = fmap (foldMap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) bindings,
-      -- Nothing: CR 303.4b's atom names what the SOURCE enchants, and no
-      -- printing puts that in a target slot -- "enchanted creature" is a
-      -- reference the card already made rather than a choice CR 601.2c
-      -- leaves open. Pawl.CardSpec's position lint is what keeps that true,
-      -- and widening it here would be a capability no card asks for.
-      Filter.sourceAttachedTo = Nothing,
-      -- Empty, sourceAttachedTo's reason one atom over: CR 201.4's name is
-      -- chosen while the spell RESOLVES (CR 608.2c), and a target slot is
-      -- matched at CR 601.2c, before any of that has happened. So there is
-      -- no chosen name here even for a source that will have one, and
-      -- HasChosenName is vacuously False. Pawl.CardSpec's position lint is
-      -- what keeps a card out of the slot.
-      Filter.sourceChosenNames = Set.empty
-    }
+      -- A THUNK for sourcePower's reason: a slot naming an amount whose filter
+      -- never asks pays for no evaluation.
+      base {Filter.slotAmount = amount >>= Quantity.evaluate (Projection.fullView gs) base gs source}
 
 -- CR 608.2h asked of a target SLOT: would it admit `host` as that object MOST
 -- RECENTLY existed, once `host` no longer exists at all? The counterpart of
@@ -326,7 +350,7 @@ slotContext pcs perspective bindings source gs =
 -- reader gives an id it has no record of.
 lastKnownAdmits :: Maybe PlayerId -> ObjectId -> TargetSlot -> ObjectId -> GameState -> Bool
 lastKnownAdmits perspective source slot host gs =
-  let context = slotContext (Projection.projectAll gs) perspective Map.empty source gs
+  let context = slotContext (Projection.projectAll gs) perspective Map.empty source (TargetSlot.amount slot) gs
       admits view =
         poolHeldLastKnown (TargetSlot.pool slot) view
           && Maybe.maybe True (Filter.matches context view) (TargetSlot.filter slot)
@@ -1156,8 +1180,19 @@ fillableModesGiven pcs grants pools perspective seed source extra modal gs =
 bakeSlots :: Map SlotName PlayerId -> Map SlotName TargetSlot -> Map SlotName TargetSlot
 bakeSlots players = fmap (bakeSlot players)
 
+-- The slot's `amount` is baked beside its Filter, and by the matching function:
+-- CR 202.3's computed bound is a Quantity, and a Quantity names CR 603.2's
+-- bindings through PlayerRef.InSlot exactly as a Filter names them through
+-- ControlledByBound. An unbaked one would be unanswerable where the filter beside
+-- it is answerable. A REGRESSION FENCE rather than a proved behaviour: the one
+-- card that names an amount names Quantity.LifeGainedThisTurn, which holds no
+-- slot, so no board today tells the two readings apart.
 bakeSlot :: Map SlotName PlayerId -> TargetSlot -> TargetSlot
-bakeSlot players slot = slot {TargetSlot.filter = fmap (Filter.bakeBound players) (TargetSlot.filter slot)}
+bakeSlot players slot =
+  slot
+    { TargetSlot.filter = fmap (Filter.bakeBound players) (TargetSlot.filter slot),
+      TargetSlot.amount = fmap (Quantity.bakeBound players) (TargetSlot.amount slot)
+    }
 
 -- bakeSlots over a whole modal payload, for the caller that must bake BEFORE the
 -- modes are chosen: CR 700.2b's mode selection asks which modes are fillable

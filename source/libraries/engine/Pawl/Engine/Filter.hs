@@ -655,6 +655,20 @@ data Context = MkContext
     -- Nothing wherever the atom cannot appear, which `contextFor` below is the
     -- spelling of.
     sourcePower :: Maybe Integer,
+    -- CR 202.3, the computed half: the number the TARGET SLOT being matched names
+    -- as its mana-value bound, for the one atom that asks
+    -- (ManaValueAtMostAmount) -- Celestine, the Living Saint's "where X is the
+    -- amount of life you gained this turn". The slot carries the Quantity
+    -- (Pawl.Types.TargetSlot's `amount`); this is that Quantity already
+    -- evaluated, because this module holds no game state and cannot evaluate one.
+    --
+    -- Pawl.Engine.Target.slotContext is the ONE site that fills it, which is what
+    -- makes the atom a target-slot atom: it is Nothing at every other position,
+    -- and Pawl.CardSpec's position lint is what keeps a card out of them.
+    --
+    -- LAZY like sourcePower, and load-bearingly so: filling it costs a whole
+    -- Quantity evaluation, and no filter that omits the atom ever forces it.
+    slotAmount :: Maybe Integer,
     -- CR 508.5: the DEFENDING PLAYER for the source, for the one atom that asks
     -- (ControlledByDefendingPlayer, CR 702.39a). Supplied by the caller for
     -- sourcePower's reason -- this module holds no game state and cannot read the
@@ -813,7 +827,7 @@ data Context = MkContext
 -- context from this function and then overlays sourceChosenNames. See that field
 -- above for the lint that keeps a card to that position.
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
+contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -844,7 +858,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
+contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -910,6 +924,13 @@ matches context view predicate = case predicate of
   -- Vacuously False where there is no mana value at all, exactly as the atom
   -- above is: a player, or an object with no card behind it.
   Filter.ManaValueIsEven -> maybe False even (manaValue view)
+  -- CR 202.3 against the slot's computed bound. Vacuously False when either
+  -- number is absent, PowerLessThanSource's posture: a candidate with no mana
+  -- value is not "a card with mana value X or less", and a slot naming no amount
+  -- has stated no bound for it to be under.
+  Filter.ManaValueAtMostAmount -> case (manaValue view, slotAmount context) of
+    (Just mv, Just n) -> mv <= n
+    _ -> False
   -- PlayerRelation.holds is what each arm MEANS, and its haddock carries the
   -- argument: every other player is an Opponent by construction (CR 806.1 in a
   -- free-for-all, CR 102.2 for two players), CR 102.3's teams are the one reading
@@ -1228,6 +1249,7 @@ rewrite pairs predicate = case predicate of
   Filter.PowerGreaterThanSource -> predicate
   Filter.ManaValueAtMost _ -> predicate
   Filter.ManaValueIsEven -> predicate
+  Filter.ManaValueAtMostAmount -> predicate
   Filter.ControlledBy _ -> predicate
   -- Untouched for ControlledBy's reason.
   Filter.ControlledByDefendingPlayer -> predicate
@@ -1638,6 +1660,7 @@ bakeBound players predicate = case predicate of
   Filter.PowerGreaterThanSource -> predicate
   Filter.ManaValueAtMost _ -> predicate
   Filter.ManaValueIsEven -> predicate
+  Filter.ManaValueAtMostAmount -> predicate
   Filter.ControlledBy _ -> predicate
   Filter.ControlledByDefendingPlayer -> predicate
   Filter.OwnedBy _ -> predicate
@@ -1702,9 +1725,12 @@ bakeBound players predicate = case predicate of
 -- prohibitsCasting). Asking whether some choice of X could take a spell out of a
 -- prohibition means asking one Filter at more than one mana value, and this is
 -- what BOUNDS that search: ManaValueAtMost and ManaValueIsEven are the whole of
--- this language's mana-value vocabulary, so above every literal returned here the
--- only distinction a Filter can still draw is parity, and a sample running two
--- past the greatest literal has already seen every verdict the Filter can give.
+-- the mana-value vocabulary a filter in this POSITION may use, so above every
+-- literal returned here the only distinction a Filter can still draw is parity,
+-- and a sample running two past the greatest literal has already seen every
+-- verdict the Filter can give. ManaValueAtMostAmount is the third atom that reads
+-- a mana value, and the position is why it does not widen the sample -- see its
+-- arm below.
 --
 -- Exhaustive rather than a catch-all, bakeBound's posture and for a sharper
 -- reason: an atom reading the mana value some other way -- a multiple-of-three
@@ -1727,6 +1753,16 @@ manaValueThresholds predicate = case predicate of
   -- Reads the mana value and compares it against NO literal, so it bounds
   -- nothing: parity is what the sample's two-past-the-greatest tail is for.
   Filter.ManaValueIsEven -> []
+  -- Reads the mana value and compares it against a bound this function cannot
+  -- see -- the number is on the SLOT, and is a board reading rather than a
+  -- literal -- so there is no threshold to report and reporting none is not the
+  -- vacuous answer it is for the atom above. What keeps the caller's argument
+  -- whole is position: CR 601.3a's lookahead reads a PLAYER ability's
+  -- prohibition filter (Pawl.Engine.PlayerEffect.prohibitsCasting), the atom
+  -- lives only in a target slot, and Pawl.CardSpec's position lint is what keeps
+  -- it there. An atom bounding the mana value in any position this function's
+  -- callers reach would have to break this build instead.
+  Filter.ManaValueAtMostAmount -> []
   Filter.HasCardType _ -> []
   Filter.HasSupertype _ -> []
   Filter.HasColor _ -> []
@@ -1832,6 +1868,9 @@ statesAQuality predicate = case predicate of
   Filter.ControlsMoreThanYou _ -> True
   Filter.ManaValueAtMost _ -> True
   Filter.ManaValueIsEven -> True
+  -- A quality like the literal bound's, one atom over: "with mana value X or
+  -- less" describes the card as much when X is computed as when it is printed.
+  Filter.ManaValueAtMostAmount -> True
   Filter.HasCardType _ -> True
   Filter.HasSupertype _ -> True
   Filter.HasColor _ -> True

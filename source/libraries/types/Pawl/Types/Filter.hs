@@ -180,6 +180,33 @@ data Filter keyword
     -- proposal choice moves, and it is why CR 601.3a's lookahead exists --
     -- Pawl.Engine.PlayerEffect.prohibitsCasting is where the rule is read.
     ManaValueIsEven
+  | -- | CR 202.3 compared against a COMPUTED bound rather than a literal: the
+    -- object's mana value is <= the amount the enclosing target slot names --
+    -- Celestine, the Living Saint's "target creature card with mana value X or
+    -- less from your graveyard ... where X is the amount of life you gained this
+    -- turn".
+    --
+    -- CONTEXT-RELATIVE like PowerLessThanSource, and payload-free for that atom's
+    -- reason turned around: there is no literal to carry because the bound is not
+    -- printed, and the Quantity that says what it is cannot be carried HERE --
+    -- Pawl.Types.Quantity imports Pawl.Types.Count, which imports this module.
+    -- Pawl.Types.TargetSlot's `amount` field is where the Quantity lives and why;
+    -- Pawl.Engine.Filter.Context's slotAmount is where the evaluated number
+    -- arrives, filled by Pawl.Engine.Target.slotContext -- the one site that
+    -- evaluates a target slot's Filter, at both of CR 115's moments -- so the
+    -- bound is READ AGAIN at CR 608.2b rather than frozen at announcement. Which
+    -- direction that can move is a fact about the quantities cards name rather
+    -- than about this atom: a turn's life gain only grows, so today the re-read
+    -- can only widen.
+    --
+    -- AT MOST only, ManaValueAtMost's reason one atom over: that is the direction
+    -- the printed cards ask in.
+    --
+    -- Vacuously False where either number is absent -- a candidate with no mana
+    -- value, or a slot naming no amount -- the posture PowerLessThanSource takes.
+    -- Pawl.CardSpec's position lint is what keeps a card from writing the atom
+    -- into a slot with no amount, where it would be a silent False.
+    ManaValueAtMostAmount
   | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
   | -- | CR 508.5: the candidate's controller is the DEFENDING PLAYER for the
     -- object the evaluation comes from -- CR 702.39a's "target creature defending

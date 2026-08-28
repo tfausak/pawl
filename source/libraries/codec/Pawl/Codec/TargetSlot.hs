@@ -6,6 +6,7 @@ import qualified Data.Map.Strict as Map
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Pool as Pool
+import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.TargetCount as TargetCount
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -21,16 +22,23 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 -- The count key is omitted when the slot takes exactly one, so an ordinary
 -- "target creature" renders as it always did and only CR 601.2c's variable
 -- counts spend a key.
+--
+-- The amount key is omitted the same way, and for a sharper version of the same
+-- reason: only the handful of slots printing a computed mana-value bound name one
+-- (Pawl.Types.TargetSlot's `amount`), so every other slot in the corpus renders
+-- unchanged.
 codec :: Codec.Codec TargetSlot.TargetSlot
 codec = Fields.object $ do
   pool <- Fields.required "pool" Pool.codec TargetSlot.pool
   filter_ <- Fields.defaulted "filter" Nothing (Common.maybe (Filter.codec Keyword.codec)) TargetSlot.filter
   count <- Fields.defaulted "count" TargetCount.one TargetCount.codec TargetSlot.count
+  amount <- Fields.defaulted "amount" Nothing (Common.maybe Quantity.codec) TargetSlot.amount
   pure
     TargetSlot.MkTargetSlot
       { TargetSlot.pool = pool,
         TargetSlot.filter = filter_,
-        TargetSlot.count = count
+        TargetSlot.count = count,
+        TargetSlot.amount = amount
       }
 
 -- | A slot-keyed map as a JSON object keyed by the slot name (#1303).

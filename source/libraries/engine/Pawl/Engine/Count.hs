@@ -283,6 +283,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.PowerGreaterThanSource -> predicate
   Filter.Type.ManaValueAtMost _ -> predicate
   Filter.Type.ManaValueIsEven -> predicate
+  Filter.Type.ManaValueAtMostAmount -> predicate
   Filter.Type.ControlledBy _ -> predicate
   Filter.Type.ControlledByDefendingPlayer -> predicate
   Filter.Type.ControlledByBound _ -> predicate

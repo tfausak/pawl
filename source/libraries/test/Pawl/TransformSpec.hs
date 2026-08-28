@@ -1199,13 +1199,15 @@ racerBoard ratchet gs =
 -- artifacts you control are put into a graveyard from the battlefield, convert
 -- Ratchet. This ability triggers only once each turn."
 --
--- The front face's third ability -- "Whenever you gain life, you may convert
--- Ratchet ..." -- is NOT transcribed (#2522). That omission leaves pawl's card
+-- Not implemented: the front face's third ability, "Whenever you gain life, you
+-- may convert Ratchet. When you do, return target artifact card with mana value
+-- less than or equal to the amount of life you gained this turn from your
+-- graveyard to the battlefield tapped" (#2522). That omission leaves pawl's card
 -- able to do strictly less than the printed one: an optional convert nobody may
--- take. What it waits on is the BOUND on the artifact it returns, "mana value
--- less than or equal to the amount of life you gained this turn": the amount is
--- Quantity.LifeGainedThisTurn, but no Filter compares a mana value against a
--- computed number; see #2538. More than meets the eye {1}{W} IS transcribed; see
+-- take. Its BOUND is no longer what it waits on -- Pawl.Types.TargetSlot's
+-- `amount` carrying Quantity.LifeGainedThisTurn, read by
+-- Filter.ManaValueAtMostAmount, is that clause, and Celestine, the Living Saint
+-- is the card that proves it. More than meets the eye {1}{W} IS transcribed; see
 -- moreThanMeetsTheEyeSpec below.
 convertSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 convertSpec s registry = Spec.describe s "Convert" $ do
