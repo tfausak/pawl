@@ -830,9 +830,10 @@ data Filter keyword
     -- the object shows NOW (Pawl.Engine.Game.isFrontFaceUp, off Object.face) and
     -- never Object.turnedOverAt beside it, which records when it last turned and
     -- is what a history reading would consult. The second is that an object
-    -- represented by more than one card is never transformed either; it holds
-    -- today because no object is, meld being unimplemented -- see #369, whose
-    -- lander owes this atom the conjunct.
+    -- represented by more than one card is never transformed either, "such as a
+    -- melded or merged permanent" -- Pawl.Engine.Game.componentsOf answers it
+    -- for a melded permanent, and CR 730.3's merged one is unimplemented (#874),
+    -- so that half of the exclusion is the reader's own emptiness for now.
     --
     -- The battlefield conjunct is the atom's own rather than the surrounding
     -- set's, unlike IsRingBearer's: CR 701.27g states it, and a double-faced

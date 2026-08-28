@@ -2302,10 +2302,10 @@ apply batch candidate event =
     -- Unreachable: `applies` admits TurnUpR only against WouldTurnFaceUp.
     (ReplacementEffect.TurnUpR {}, _) -> pure (Just event)
 
--- CR 707.2 / 202.3b: the copiable values a copy takes off the object it copies.
--- Projection.copiableCharacteristics answers all but one of them; the exception
--- is a mana value, and only when the copied object is a nonmodal double-faced
--- permanent with its back face up.
+-- CR 707.2 / 202.3b / 202.3c: the copiable values a copy takes off the object it
+-- copies. Projection.copiableCharacteristics answers all but one of them; the
+-- exception is a mana value, and only when the copied object is a nonmodal
+-- double-faced permanent with its back face up, or a melded permanent.
 --
 -- CR 202.3b's two sentences disagree about that permanent on purpose. Its first
 -- calculates the object's OWN mana value "as though it had the mana cost of its
@@ -2338,7 +2338,16 @@ copiedSnapshot src gs =
       backFace = case (Game.lookupObject src gs, Game.cardOf src gs) of
         (Just obj, Just card) -> Card.showsBackFace card (Object.face obj)
         _ -> False
-   in if backFace then snapshot {PC.manaValue = Just 0} else snapshot
+      -- CR 202.3c's second sentence, the melded twin of CR 202.3b's: "if a
+      -- permanent is a copy of a melded permanent (even if that copy is
+      -- represented by two other meld cards), the mana value of the copy is 0"
+      -- (CR 712.8g again). Same shape as backFace above and for the same reason
+      -- -- the copied object's own mana value is the sum CR 202.3c gives it
+      -- (Game.manaCostFacesOf), and nothing left in the snapshot says the number
+      -- came off two front faces -- so the override is made here, where the
+      -- COPIED object is still in hand, rather than in the projection.
+      melded = maybe False (not . Seq.null . Game.componentsOf . Object.source) (Game.lookupObject src gs)
+   in if backFace || melded then snapshot {PC.manaValue = Just 0} else snapshot
 
 -- CR 608.2h: `copiedSnapshot` for an object that may already be gone -- the
 -- record filed as it ceased, which is the same value this function would have

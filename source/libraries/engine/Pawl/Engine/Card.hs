@@ -777,7 +777,7 @@ enteringFace card shown = case Card.layout card of
 --
 -- Takes the live face rather than deriving it, so the two questions stay one
 -- call apart: every layout but Transforming answers with exactly what it was
--- given, and the reader (Pawl.Engine.Game.manaCostFaceOf) is the only place that
+-- given, and the reader (Pawl.Engine.Game.manaCostFacesOf) is the only place that
 -- has to know the difference.
 --
 -- Only CR 202.3b's FIRST sentence, which is about the object itself. Its second
@@ -807,7 +807,10 @@ manaCostFace card live = case Card.layout card of
   -- nonmodal double-faced permanent; CR 712.8g states the meld rule separately
   -- and is about the MELDED permanent's mana value -- the sum of the two front
   -- faces' -- which is a question about an object represented by two cards and
-  -- not one this function can be asked (#369).
+  -- not one this function can be asked. Pawl.Engine.Game.manaCostFacesOf is
+  -- where CR 202.3c reads the pair, off the object's own source; what reaches
+  -- this arm is a meld CARD that is not part of a melded permanent, whose own
+  -- front face is all there is (CR 712.4b, CR 712.8b).
   Layout.Meld -> live
 
 -- CR 202.3b, second sentence: is this card, showing this face, "the back face of
@@ -826,8 +829,11 @@ manaCostFace card live = case Card.layout card of
 -- the face that's up", its back face prints a mana cost of its own, and CR
 -- 202.3b's first sentence never reached it either.
 --
--- CR 202.3c states the identical rule for a copy of a MELDED permanent. Melding
--- is unmodelled (#369), so no object can be one for this to answer about.
+-- CR 202.3c states the identical rule for a copy of a MELDED permanent, and that
+-- one is NOT answered here: a melded permanent shows the interned combined face
+-- (CR 712.8g), whose layout carries nothing about the pair, so the question is
+-- about the object's SOURCE rather than about a card and a face.
+-- Pawl.Engine.Event's copiedSnapshot asks it there, beside the answer this gives.
 --
 -- The face is matched by NAME against the card's printed order, the way nextFace
 -- above does it, so a name that resolves to no face falls back to the front

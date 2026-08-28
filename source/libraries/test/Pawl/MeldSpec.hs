@@ -23,6 +23,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
@@ -50,10 +51,12 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -344,6 +347,164 @@ spec s registry = Spec.describe s "Meld" $ do
         -- time state-based actions are checked. The land is a card and stays.
         Spec.assertEqWith s "CR 111.8 the token ceases and the land is left exiled alone" (exileNames (S.settleSba after)) [S.nameOf (Printing.card battlements)]
       abilities -> Spec.assertFailure s ("expected three activated abilities on Hanweir Battlements, got " <> show (length abilities))
+
+  -- CR 202.3c: "the mana value of a melded permanent is calculated as though it
+  -- had the combined mana cost of the front faces of each card that represents
+  -- it" -- Hanweir Garrison's {2}{R} and Hanweir Battlements' none, which is 3.
+  -- CR 202.3a is what admits the second half: a melded permanent is exempted by
+  -- name from the 0 an object with no mana cost otherwise has.
+  --
+  -- Read by a CARD rather than off the projection: Void Winnower's "your
+  -- opponents can't block with creatures with even mana values" is CR 509.1b
+  -- narrowed by a mana value, so a melded permanent that answered 0 -- the number
+  -- its own combined face prints, and the number every reading but CR 202.3c's
+  -- gives it -- could not block. bob's Winnower and alice's Goblin Piker ({1}{R},
+  -- 2) are the pair that makes the parity readable in both directions.
+  Spec.it s "CR 202.3c a melded permanent's mana value is its components' front faces combined" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    winnower <- S.printingOf s registry "Void Winnower"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, withWinnower) = S.addCreature winnower S.bob (Setup.emptyGame S.bothPlayers)
+        (pikerId, base) = S.addCreature piker S.alice withWinnower
+        (mMelded, after) = meldedThrough base battlements garrison mountain
+    case mMelded of
+      Just meldedId -> do
+        Spec.assertBool s (Combat.canBlock S.alice meldedId after) "CR 202.3c its mana value is 3, an odd one the Winnower does not stop"
+        -- The same restriction biting on the same board, which is what makes the
+        -- assertion above a parity read rather than a Winnower that never applied.
+        Spec.assertBool s (not (Combat.canBlock S.alice pikerId after)) "and the Piker's {1}{R} is even, so the Winnower is live here"
+        -- The number itself, after the behaviour that depends on it.
+        Spec.assertEqWith s "the projected mana value" (PC.manaValue (Projection.project meldedId after)) (Just 3)
+      Nothing -> Spec.assertFailure s "the pair should have melded"
+  -- CR 202.3c's second sentence: "if a permanent is a copy of a melded permanent
+  -- (even if that copy is represented by two other meld cards), the mana value of
+  -- the copy is 0" -- CR 712.8g says it again. So the melded permanent and its
+  -- copy report DIFFERENT numbers, and the Winnower reads both off one board:
+  -- 3 is odd and blocks, the copy's 0 is even and cannot. Cackling Counterpart
+  -- ("create a token that's a copy of target creature you control") is the copy,
+  -- and the two Islands are what pay its {1}{U}.
+  Spec.it s "CR 202.3c a copy of a melded permanent has mana value 0" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    winnower <- S.printingOf s registry "Void Winnower"
+    counterpart <- S.printingOf s registry "Cackling Counterpart"
+    let base = snd (S.addCreature winnower S.bob (Setup.emptyGame S.bothPlayers))
+        (mMelded, after) = meldedThrough base battlements garrison mountain
+    case mMelded of
+      Just meldedId -> do
+        let (staged, spellId) = S.handOne counterpart (S.landsFor island S.alice 2 after)
+            copied = S.runPure (aimedAt meldedId) staged (do S.cast S.alice spellId; Stack.resolveTop)
+        case filter (`Game.isToken` copied) (Set.toList (GameState.battlefield copied)) of
+          [tokenId] -> do
+            Spec.assertBool s (not (Combat.canBlock S.alice tokenId copied)) "CR 202.3c the copy's mana value is 0, which is even"
+            Spec.assertBool s (Combat.canBlock S.alice meldedId copied) "while the permanent it copied still blocks at 3"
+            Spec.assertEqWith s "and the copy is the melded permanent in every other respect" (Projection.namesOf tokenId copied) (Set.singleton townshipName)
+          tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+      Nothing -> Spec.assertFailure s "the pair should have melded"
+  -- CR 701.27g: "an object represented by more than one card, such as a melded or
+  -- merged permanent, is never considered a transformed permanent, even if it has
+  -- components that are back face up." Mutagen Connoisseur's "for each
+  -- transformed permanent you control" is the card that asks, as it does
+  -- throughout Pawl.TransformSpec's TransformedPermanent group; the Thraben
+  -- Gargoyle beside it is turned over by the same instruction and IS one, so the
+  -- Connoisseur's power separates a tally that counts the melded permanent (2)
+  -- from the rule's answer (1).
+  Spec.it s "CR 701.27g a melded permanent is not a transformed permanent" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    connoisseur <- S.printingOf s registry "Mutagen Connoisseur"
+    gargoyle <- S.printingOf s registry "Thraben Gargoyle"
+    let (connoisseurId, withConnoisseur) = S.addCreature connoisseur S.alice (Setup.emptyGame S.bothPlayers)
+        (gargoyleId, base) = S.addCreature gargoyle S.alice withConnoisseur
+        (mMelded, after) = meldedThrough base battlements garrison mountain
+    case mMelded of
+      Just meldedId -> do
+        let turned = transforming [gargoyleId, meldedId] after
+        Spec.assertEqWith s "CR 701.27g the Connoisseur counts the Gargoyle alone" (S.powerToughnessOf connoisseurId turned) (Just (1, 5))
+        -- The control: the instruction really ran, and the permanent that CAN
+        -- turn over did, so the tally above is 1 rather than 0 by accident.
+        Spec.assertEqWith s "CR 701.27a the Gargoyle turned over" (Projection.namesOf gargoyleId turned) (Set.singleton (CardName.MkCardName (Text.pack "Stonewing Antagonizer")))
+        Spec.assertEqWith s "and the melded permanent is still on the battlefield to be counted" (S.countOnBattlefieldByName townshipName S.alice turned) 1
+      Nothing -> Spec.assertFailure s "the pair should have melded"
+  -- CR 712.4c: "unlike other double-faced cards, meld cards cannot be transformed
+  -- or converted. Any instructions to do so are ignored", and CR 712.9 excludes
+  -- meld cards by name from the permanents that can turn over. The instruction is
+  -- Pawl.Types.Effect's Transform over a slot naming the melded permanent, which
+  -- is the shape any card's "transform target permanent" reaches the opcode in.
+  --
+  -- The refusal is OVER-DETERMINED on this board and the case is a regression
+  -- fence rather than a proof: the pool's combined face prints one face, so
+  -- Pawl.Engine.Card.turnedOver would decline it as a one-faced card whatever CR
+  -- 712.4c said. The case below is the one that separates the two readings.
+  Spec.it s "CR 712.4c/712.9 the melded permanent ignores an instruction to transform" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    let (mMelded, after) = meldedThrough (Setup.emptyGame S.bothPlayers) battlements garrison mountain
+    case mMelded of
+      Just meldedId -> do
+        let turned = transforming [meldedId] after
+        Spec.assertEqWith s "its name is the combined face's still" (Projection.namesOf meldedId turned) (Set.singleton townshipName)
+        Spec.assertEqWith s "CR 712.8g and so is its 7/4" (S.powerToughnessOf meldedId turned) (Just (7, 4))
+        Spec.assertEqWith s "and its type line" (PC.subtypes (Projection.project meldedId turned)) (Set.fromList [Subtype.Eldrazi, Subtype.Ooze])
+      Nothing -> Spec.assertFailure s "the pair should have melded"
+  -- CR 712.4c asked of the OBJECT rather than of a card, which is the whole of
+  -- the rule: the melded permanent's own card is the interned combined face (CR
+  -- 712.8g), and nothing about that card says what pair it came from. So the
+  -- board is the opcode-level meld with a DOUBLE-FACED card standing in for the
+  -- combined face -- Pawl.Engine.Card.turnedOver would turn a Thraben Gargoyle
+  -- over on sight -- and the only thing refusing is the two cards representing
+  -- the permanent.
+  --
+  -- The stand-in is the same liberty the opcode cases above take (the combined
+  -- face is card DATA the opcode carries); no printed meld pair combines into a
+  -- double-faced card, so this is the board that makes the rule readable rather
+  -- than a board Magic can reach.
+  Spec.it s "CR 712.4c a melded permanent refuses the turn its own card would allow" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    gargoyle <- S.printingOf s registry "Thraben Gargoyle"
+    let (_, _, after) = melded battlements garrison gargoyle
+    case Set.toList (GameState.battlefield after) of
+      [meldedId] -> do
+        let turned = transforming [meldedId] after
+            (loneId, alone) = S.addCreature gargoyle S.alice (Setup.emptyGame S.bothPlayers)
+        Spec.assertEqWith s "CR 712.4c the melded permanent did not turn over" (Projection.namesOf meldedId turned) (Set.singleton (CardName.MkCardName (Text.pack "Thraben Gargoyle")))
+        Spec.assertEqWith s "CR 712.8g nor did its 2/2 become the back face's 4/2" (S.powerToughnessOf meldedId turned) (Just (2, 2))
+        Spec.assertEqWith s "nor its type line" (PC.subtypes (Projection.project meldedId turned)) (Set.singleton Subtype.Gargoyle)
+        -- The pair: the same card, one card representing it, same instruction.
+        -- CR 701.27a turns that one over, so the refusal above is the meld's.
+        Spec.assertEqWith s "CR 701.27a an ordinary Thraben Gargoyle turns over" (Projection.namesOf loneId (transforming [loneId] alone)) (Set.singleton (CardName.MkCardName (Text.pack "Stonewing Antagonizer")))
+      other -> Spec.assertFailure s ("expected exactly one permanent, got " <> show (length other))
+
+-- CR 701.27a as ONE instruction over the named permanents (CR 608.2f), through
+-- the opcode a card's "transform target permanent" reaches: the slot the effect
+-- reads is the one such a card's target would have bound.
+transforming :: [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
+transforming oids gs =
+  let slot = SlotName.MkSlotName (Text.pack "turning")
+      bound = Map.singleton slot (Set.fromList (fmap Recipient.ToObject oids))
+   in S.runPure S.identityAnswer gs (Resolve.applyEffect S.noSource S.noSource S.alice bound Map.empty (Effect.Transform (ObjectRef.InSlot slot)))
+
+-- alice's Hanweir Battlements and Hanweir Garrison added to `base`, her five
+-- Mountains beside them, and the printed melding ability activated and resolved:
+-- the melded permanent, and the board it is on. The real activation rather than
+-- the opcode, so every case reading it reads a board the game can reach.
+meldedThrough :: GameState.GameState -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (Maybe ObjectId.ObjectId, GameState.GameState)
+meldedThrough base battlements garrison mountain =
+  let (bId, g1) = S.addCreature battlements S.alice base
+      (_, g2) = S.addCreature garrison S.alice g1
+      board = readyFor mountain g2
+   in case Projection.abilitiesOf bId board of
+        [_, _, melding] ->
+          let after = S.runPure S.identityAnswer board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
+           in (Maybe.listToMaybe (namedTownship after (Game.zoneMembers Zone.Battlefield S.alice after)), after)
+        _ -> (Nothing, board)
 
 -- The combined back face's name, which is what a melded permanent answers to
 -- (CR 712.8g) and the one thing the three gameplay cases above count.

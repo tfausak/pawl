@@ -6081,7 +6081,7 @@ tamiyoSpec s registry = Spec.describe s "Tamiyo, Compleated Sage" $ do
       "green AND blue, not one or the other"
       (Projection.colorsOf oid gs)
       (Set.fromList [Color.Green, Color.Blue])
-    Spec.assertEqWith s "CR 202.3g: the symbol contributes 1, so {2}{G}{G/U/P}{U} is 5" (fmap Quantity.manaValueOf (Game.manaCostFaceOf oid gs)) (Just 5)
+    Spec.assertEqWith s "CR 202.3g: the symbol contributes 1, so {2}{G}{G/U/P}{U} is 5" (sum (fmap Quantity.manaValueOf (Game.manaCostFacesOf oid gs))) 5
 
   -- The gameplay-level pair, one board and two answers. Five lands pay the whole
   -- cost, so BOTH routes are live and the prompt is a real question; the answer
@@ -6265,7 +6265,7 @@ sigilSpec s registry = Spec.describe s "SyntheticHybridPhyrexianSigil" $ do
       "green AND blue, from the one symbol"
       (Projection.colorsOf oid gs)
       (Set.fromList [Color.Green, Color.Blue])
-    Spec.assertEqWith s "CR 202.3g: one symbol, mana value 1" (fmap Quantity.manaValueOf (Game.manaCostFaceOf oid gs)) (Just 1)
+    Spec.assertEqWith s "CR 202.3g: one symbol, mana value 1" (sum (fmap Quantity.manaValueOf (Game.manaCostFacesOf oid gs))) 1
 
   -- The half, at board level. Gyre Engineer ("{T}: Add {G}{U}") is the
   -- oversupply the Slippery Bogle case one group up uses for CR 107.4e's
