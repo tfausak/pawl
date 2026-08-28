@@ -6117,13 +6117,26 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- ONE evaluation for the whole set (CR 608.2f), then CR 122.6's funnel per
       -- recipient, so CR 614's counter replacements apply against each placement.
       --
-      -- Not implemented: CR 608.2f's single event for the PLACEMENTS themselves.
-      -- Nothing brackets this fold, so a swept placement records one event group
-      -- per recipient and CR 603.2c's batch counter condition fires once for each
-      -- (#2533). The swept Effect.MoveToZone arm above is the same shape,
-      -- bracketed.
+      -- ONE event for the PLACEMENTS too, which is the Event.simultaneously
+      -- bracket: CR 608.2f processes an action taken on multiple objects
+      -- simultaneously, and one written instruction is one such action however
+      -- many permanents the ref swept. CR 603.2c's batch conditions are what a
+      -- board can read that with -- TriggerCondition.PermanentsGetCounters fires
+      -- once for the sweep where its per-permanent twin fires once per recipient,
+      -- and Pawl.Engine.Event.batchScoped is that fork.
+      --
+      -- The per-recipient CR 122.6 funnel below is no argument for N groups: CR
+      -- 616.1g is where the rules say events nest at all -- a replacement may
+      -- apply to "an event contained within the first event" -- so CR 614's
+      -- per-placement replacement opportunity is not a second event. The swept
+      -- Effect.MoveToZone arm above runs the same shape, and Event.destroyIn a
+      -- whole CR 616.1 loop, inside one bracket.
+      --
+      -- Inside the `n > 0` guard rather than around it, so an instruction placing
+      -- no counters spends no group; and around the FOLD alone, the sweep above it
+      -- having taken no action for CR 608.2f to be read over.
       Just n ->
-        Monad.when (n > 0) . Monad.forM_ targets $ \target ->
+        Monad.when (n > 0) . Event.simultaneously . Monad.forM_ targets $ \target ->
           Event.putCounters (CounterCause.ByEffect controller) target kind (Integer.toNaturalSaturating n)
   -- CR 201.4 via CR 608.2c: the resolving controller names a card, and the name
   -- is stamped on the SOURCE so a later clause of the same resolution can read it
