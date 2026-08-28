@@ -77,19 +77,20 @@ isCommander oid gs = case Game.lookupObject oid gs of
   Just obj -> case Object.source obj of
     Source.OfCard printingId ->
       fmap Player.commander (Map.lookup (Object.owner obj) (GameState.players gs)) == Just (Just printingId)
-    -- False for a MELDED PERMANENT, and that is the rule rather than a gap: CR
-    -- 903.9c makes the object that goes to the command zone "the card that
-    -- represents it and is a commander", never the permanent, so CR 903.9b's
-    -- offer below must not be made for the permanent as a whole. What the rule
-    -- does ask for is asked one incarnation later -- CR 712.21's departure split
-    -- (Pawl.Engine.Event) puts each component into the graveyard or exile as its
-    -- own Source.OfCard object, and `returnable` below asks this question of
-    -- every one of them, so the commander half is offered and the other half is
-    -- not.
+    -- False for a MELDED PERMANENT, which is conservative rather than a reading
+    -- of CR 903.3: that rule makes the designation an attribute of the CARD, and
+    -- CR 903.9c speaks of "a commander [that] is a melded permanent" in as many
+    -- words, so the rules do call such a permanent a commander. The one road
+    -- this answer feeds that would then misfire is CR 903.9b's offer below,
+    -- which redirects the whole object -- and CR 903.9c replaces that procedure
+    -- for a melded permanent with one that splits the components. False keeps
+    -- the wrong procedure from running until the right one exists (#2265).
     --
-    -- Not implemented: CR 903.9b's HAND AND LIBRARY half for a melded permanent,
-    -- where there is no split to ask after -- the rule's redirect happens instead
-    -- of the move, so nothing has become a card yet (#2265).
+    -- The graveyard-and-exile road needs nothing from this arm, and that is why
+    -- the conservative answer costs nothing there: CR 712.21's departure split
+    -- (Pawl.Engine.Event) has already put each component into the zone as its own
+    -- Source.OfCard object by the time `returnable` below asks, so rule 903.9a is
+    -- applied to CARDS and the arm above answers for them.
     _ -> False
 
 -- | CR 903.10a's key: the owner of the commander that dealt this damage, or
@@ -191,14 +192,14 @@ taxCandidates pid oid gs cost =
 -- in the graveyard; ZoneChange.departed named the one that left the battlefield
 -- and no longer exists.
 --
--- Moved.arrivals and not ZoneChange.object alone, which is CR 903.9c: a melded
--- permanent's departure puts TWO cards into the zone (CR 712.21), and the one
--- that is a commander may be either of them. Reading the first alone would offer
--- the return when the commander half melded first and silently not when it melded
--- second. `isCommander` then keeps exactly the commander card, which is rule
--- 903.9c's own answer -- "that permanent and each component representing it that
--- isn't a commander are put into the appropriate zone, and the card that
--- represents it and is a commander is put into the command zone".
+-- Moved.arrivals and not ZoneChange.object alone, which is CR 903.9a read over
+-- CR 712.21's split rather than CR 903.9c: rule 903.9c governs only the CR 903.9b
+-- replacement (#2265), while this is the state-based action, and a melded
+-- permanent's departure puts TWO cards into the graveyard or exile. Rule 903.9a
+-- asks its question of each object in that zone, so each arrival is asked, and the
+-- one that is a commander may be either of them. Reading the first alone would
+-- offer the return when the commander half melded first and silently not when it
+-- melded second. `isCommander` then keeps exactly the commander card.
 --
 -- NOT a replacement effect. Rule 903.9a says "this is a state-based action" in so
 -- many words, which is why it is classified in Pawl.Engine.Sba beside CR 704.5's

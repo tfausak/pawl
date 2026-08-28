@@ -596,19 +596,21 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith s "one trigger reached the stack" (length (GameState.stack settled)) 1
         Spec.assertEqWith s "setup: both cards were in the graveyard when it resolved" (List.sort (graveyardNames settled)) bothNames
         Spec.assertEqWith s "setup: exile was empty once the meld had consumed the pair" (exileNames settled) []
-  -- CR 903.9c: "If a commander is a melded permanent... that permanent and each
-  -- component representing it that isn't a commander are put into the appropriate
-  -- zone, and the card that represents it and is a commander is put into the
-  -- command zone." The rule is reachable only because CR 712.21's split has
-  -- already made each component a card of its own -- CR 903.9a's state-based
-  -- offer then asks about both of them and the designation picks one.
+  -- CR 903.9a over CR 712.21's split, and NOT CR 903.9c -- that rule governs only
+  -- the CR 903.9b replacement (the hand and library redirect), which pawl does not
+  -- make for a melded permanent (#2265). What runs here is rule 903.9a's
+  -- state-based action: "if a commander is in a graveyard or in exile and that
+  -- object was put into that zone since the last time state-based actions were
+  -- checked, its owner may put it into the command zone." The split has already
+  -- made each component an object in that graveyard, so the offer is asked of both
+  -- and CR 903.3's designation -- an attribute of the CARD -- picks one.
   --
   -- BOTH DESIGNATIONS, which is the whole case rather than belt and braces: the
   -- two boards differ in nothing but which half of the pair alice's deck named,
   -- so an engine that read only the FIRST arriving card would answer them
   -- differently. Hanweir Garrison is the first component the meld recorded, so
   -- the Battlements board is the one such an engine gets wrong.
-  Spec.it s "CR 903.9c a melded commander's own card goes to the command zone, whichever half melded first" $ do
+  Spec.it s "CR 903.9a a melded commander's own card goes to the command zone, whichever half melded first" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
     garrison <- S.printingOf s registry "Hanweir Garrison"
     mountain <- S.printingOf s registry "Mountain"
@@ -621,9 +623,9 @@ spec s registry = Spec.describe s "Meld" $ do
               run pid = S.runPure reclaiming (designating pid board) (Event.destroy Regenerability.Regenerable [meldedId] >> Engine.settleForPriority)
               nameOf pid = fmap (S.nameOf . Printing.card) (Game.printingOf pid board)
               commandNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Set.toList (GameState.command gs))
-          Spec.assertEqWith s "CR 903.9c naming the first component puts THAT card into the command zone" (commandNames (run firstPid)) (Maybe.maybeToList (nameOf firstPid))
+          Spec.assertEqWith s "CR 903.9a naming the first component puts THAT card into the command zone" (commandNames (run firstPid)) (Maybe.maybeToList (nameOf firstPid))
           Spec.assertEqWith s "and its partner is left in the graveyard" (graveyardNames (run firstPid)) (Maybe.maybeToList (nameOf secondPid))
-          Spec.assertEqWith s "CR 903.9c naming the second component puts THAT card into the command zone instead" (commandNames (run secondPid)) (Maybe.maybeToList (nameOf secondPid))
+          Spec.assertEqWith s "CR 903.9a naming the second component puts THAT card into the command zone instead" (commandNames (run secondPid)) (Maybe.maybeToList (nameOf secondPid))
           Spec.assertEqWith s "and its partner is the one left in the graveyard" (graveyardNames (run secondPid)) (Maybe.maybeToList (nameOf firstPid))
           -- What makes the pair discriminating: the two components really are two
           -- different cards, and the meld recorded them in this order.
@@ -699,7 +701,7 @@ choosing wanted p = case p of
   _ -> S.identityAnswer p
 
 -- Accepts CR 903.9a's offer; everything else is the identity answerer. The
--- default LEAVES the commander where it is, so the CR 903.9c case has to say so.
+-- default LEAVES the commander where it is, so the CR 903.9a case has to say so.
 reclaiming :: Prompt.Prompt r -> r
 reclaiming p = case p of
   Prompt.ReturnCommander {} -> CommandZoneDecision.Returns

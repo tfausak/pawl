@@ -10646,13 +10646,22 @@ eventBindings bearerBecame cond event = case (cond, event) of
 -- ahead of the recipient path for ObjectRef.InSlot.
 --
 -- The shape is conditional because the two readers are: an ObjectRef reads
--- either, while a bare SlotName (Effect.MoveCounters' `to`, Pawl.Engine.Resolve's
--- legalOne) reads only the recipient. Every condition that can carry a split is a
--- battlefield DEPARTURE -- CR 712.21's own scope -- and all four of the pool's
--- readers of those (Promise of Tomorrow, Yedora Grave Gardener, Endless
--- Cockroaches, Screams from Within) spend the slot as an ObjectRef, so the group
--- reaches every one of them. The bare-SlotName readers (Agent's Toolkit, Unstable
--- Shapeshifter) hang on PermanentEnters, which cannot split.
+-- either, while a bare SlotName (Effect.MoveCounters' `to`, Effect.ExileHaunting's
+-- `card`, Pawl.Engine.Resolve's legalOne) reads only the recipient. Every
+-- condition that can carry a split is a battlefield DEPARTURE -- CR 712.21's own
+-- scope -- and the pool's three readers under those (Promise of Tomorrow, Yedora
+-- Grave Gardener and Endless Cockroaches, all under SelfDies or PermanentDies)
+-- spend the slot as an ObjectRef, so the group reaches every one of them.
+--
+-- Two bare-SlotName readers exist and neither is reachable. Agent's Toolkit and
+-- Unstable Shapeshifter hang on PermanentEnters, which cannot split. Rule
+-- 702.55a's haunt ability (Pawl.Engine.Keyword) hands Binding.became to
+-- Effect.ExileHaunting under SelfDies, which CAN split -- but haunt is granted by
+-- no card and printed on neither half of the pool's one meld pair, so no board
+-- reaches it (#2509). Screams from Within is NOT among these: its `became` comes
+-- from AttachedCreatureDies, which binds the AURA's own incarnation
+-- (`bearerBecame`) rather than the event's arrivals, and no Aura is a meld
+-- component.
 --
 -- Not implemented: a group and a recipient at once, which would let a bare
 -- SlotName reader see the first card while an ObjectRef reader saw both.
