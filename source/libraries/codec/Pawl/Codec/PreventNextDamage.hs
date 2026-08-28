@@ -9,6 +9,7 @@ import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ObjectRef as ObjectRef
+import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -28,7 +29,9 @@ codec ::
 codec effectCodec = Fields.object $ do
   duration <- Fields.required "duration" Duration.codec PreventNextDamage.duration
   kind <- Fields.defaulted "kind" Nothing (Common.maybe DamageKind.codec) PreventNextDamage.kind
-  ref <- Fields.required "ref" ObjectRef.codec PreventNextDamage.ref
+  ref <- Fields.defaulted "ref" Nothing (Common.maybe ObjectRef.codec) PreventNextDamage.ref
+  whatRecipient <- Fields.defaulted "whatRecipient" Nothing (Common.maybe (Filter.codec Keyword.codec)) PreventNextDamage.whatRecipient
+  whoRecipient <- Fields.defaulted "whoRecipient" Nothing (Common.maybe PlayerRelation.codec) PreventNextDamage.whoRecipient
   chosenSource <- Fields.defaulted "chosenSource" Nothing (Common.maybe (Filter.codec Keyword.codec)) PreventNextDamage.chosenSource
   quantity <- Fields.required "quantity" Quantity.codec PreventNextDamage.quantity
   riders <- Fields.defaulted "riders" Seq.empty (Common.seq effectCodec) PreventNextDamage.riders
@@ -37,6 +40,8 @@ codec effectCodec = Fields.object $ do
       { PreventNextDamage.duration = duration,
         PreventNextDamage.kind = kind,
         PreventNextDamage.ref = ref,
+        PreventNextDamage.whatRecipient = whatRecipient,
+        PreventNextDamage.whoRecipient = whoRecipient,
         PreventNextDamage.chosenSource = chosenSource,
         PreventNextDamage.quantity = quantity,
         PreventNextDamage.riders = riders

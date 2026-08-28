@@ -896,7 +896,7 @@ effectCounts effect = case effect of
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider is an effect list a card authors, so its Counts are this
   -- card's Counts -- the same recursion Create takes into a minted token.
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ quantity rider) -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity rider) -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ rider) -> durationCounts duration <> concatMap effectCounts rider
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _ _) -> durationCounts duration
   -- CR 708.2's listed characteristics are card data, so the listed power and
@@ -1124,7 +1124,7 @@ effectNestedEffects effect = case effect of
   Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> replacementPrintedEffects replacement
   -- CR 615.5's rider on the two prevention opcodes a SPELL authors: Test of
   -- Faith's counters, Inkshield's Inklings.
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ riders) -> Foldable.toList riders
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ _ riders) -> Foldable.toList riders
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ riders) -> Foldable.toList riders
   -- CR 608.2f's body, run once per member of the fold.
   Effect.ForEach (ForEach.MkForEach _ _ body) -> Foldable.toList body
@@ -1642,7 +1642,7 @@ effectReplacements effect = case effect of
   Effect.DecreaseSpeed _ -> []
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider can carry an Effect.Replace, so this descends.
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ rider) -> concatMap effectReplacements rider
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ _ rider) -> concatMap effectReplacements rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ rider) -> concatMap effectReplacements rider
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectReplacements body
@@ -1760,9 +1760,10 @@ phasePatternOffends replacement = case replacement of
 -- Exhaustive rather than a wildcard, this file's discipline for a sum.
 engineOnlyOffends :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 engineOnlyOffends replacement = case replacement of
-  -- `whatRecipient` beside it is the PRINTED half and is not swept: a card may
-  -- describe the recipient it shields (Stormwild Capridor), it just may not name
-  -- one by id.
+  -- `whatRecipient` and `whoRecipient` beside it are the PRINTED halves and are
+  -- not swept: a card may describe the recipient it shields (Stormwild Capridor)
+  -- and name CR 109.5's relation to the row's controller (Divine Deflection's
+  -- "to you"), it just may not name one by id.
   ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern rewrite _) ->
     Maybe.isJust (DamagePattern.whichRecipient damagePattern) || Maybe.isJust (DamagePattern.whichSource damagePattern) || engineMintedDamage rewrite
   -- CR 122.1c's destruction half is engine-minted for the same reason its damage
@@ -2376,7 +2377,7 @@ effectMintedFaces effect = case effect of
   Effect.DecreaseSpeed _ -> []
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider can mint a token or emblem of its own, so this descends.
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ rider) -> concatMap effectMintedFaces rider
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ _ rider) -> concatMap effectMintedFaces rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ rider) -> concatMap effectMintedFaces rider
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectMintedFaces body
@@ -3525,10 +3526,10 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
 -- that would be dealt to THAT CREATURE" does name a recipient, but the creature
 -- is the one its resolution chose, so the pattern is the engine's to bake and
 -- never the card file's to write, and CR 609.7a's chosen source is the same kind
--- of answer. `whichKind`, `whatSource` and `whatRecipient` are all authorable
--- here; the first two are exactly what Frenzied Baloth and
--- Excruciator print, and the third describes a recipient rather than naming
--- one, so no card in the pool writes it on THIS carrier.
+-- of answer. `whichKind`, `whatSource`, `whatRecipient` and `whoRecipient` are
+-- all authorable here; the first two are exactly what Frenzied Baloth and
+-- Excruciator print, and the last two describe a recipient rather than naming
+-- one, so no card in the pool writes either on THIS carrier.
 --
 -- Not implemented: no resolution bakes a recipient into THIS pattern, the way
 -- Resolve's prevention arms bake one into a shield's, so the field has no
@@ -3582,6 +3583,7 @@ anyDamage =
     { DamagePattern.whichKind = Nothing,
       DamagePattern.whatSource = Filter.Type.And [],
       DamagePattern.whatRecipient = Nothing,
+      DamagePattern.whoRecipient = Nothing,
       DamagePattern.whichRecipient = Nothing,
       DamagePattern.whichSource = Nothing
     }
@@ -3985,8 +3987,8 @@ effectFilters effect = case effect of
   -- CR 609.7a's chosen source is UNFRAMED: Pawl.Engine.Resolve evaluates it
   -- against each candidate's own view (Projection.viewOfObject), the way
   -- Replacement.matchesDamageSource evaluates the shield's rechecked half.
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ ref chosenSource quantity rider) ->
-    unframed (durationFilters duration <> quantityFilters quantity <> Maybe.maybeToList chosenSource) <> sourceHosted (objectRefFilters ref) <> concatMap effectFilters rider
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ ref whatRecipient _ chosenSource quantity rider) ->
+    unframed (durationFilters duration <> quantityFilters quantity <> Maybe.maybeToList chosenSource <> Maybe.maybeToList whatRecipient) <> sourceHosted (foldMap objectRefFilters ref) <> concatMap effectFilters rider
   -- CR 609.7b's property-named source is UNFRAMED for the chosen source's
   -- reason: Pawl.Engine.Replacement.matchesDamageSource evaluates it against the
   -- damage's own source, not against this card's frame.
@@ -4222,7 +4224,7 @@ effectObjectRefs effect = case effect of
   Effect.CopySpell (CopySpell.MkCopySpell ref _) -> read_ [ref]
   Effect.Replace {} -> []
   Effect.SkipNextPhase {} -> []
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _) -> read_ [ref]
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _) -> read_ [ref]
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ srcRef destRef _) -> read_ [srcRef, destRef]
   -- A READ and not an ask: CR 708.2's turning-over takes no choice of its own, and

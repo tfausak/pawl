@@ -6,6 +6,7 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
 
 -- | CR 615.7's prevention SHIELD: over whom, of what kind, how much, for how
@@ -22,7 +23,29 @@ data PreventNextDamage effect = MkPreventNextDamage
     -- naming no kind, taking combat and noncombat alike, and is elided rather
     -- than written null.
     kind :: Maybe DamageKind.DamageKind,
-    ref :: ObjectRef.ObjectRef,
+    -- | The recipients this RESOLUTION names -- Mending Hands' "any target" --
+    -- one CR 615.7 shield each. Nothing for a shield that describes its
+    -- recipients instead, in the two fields below; the two spellings are
+    -- alternatives, and a card writing both is read as the description alone
+    -- (Pawl.Engine.Resolve's arm).
+    ref :: Maybe ObjectRef.ObjectRef,
+    -- | CR 611.2c's LIVE description of the OBJECTS one shared shield covers --
+    -- Divine Deflection's "permanents you control", which is not a set swept when
+    -- the effect is created: a prevention effect modifies neither
+    -- characteristics nor controller, so a permanent that comes under your
+    -- control afterwards is covered too.
+    --
+    -- ONE shield over the whole description, never one per object: CR 615.7's
+    -- shield "counts only the amount of damage; the number of events or sources
+    -- dealing it doesn't matter". CR 615.11's per-creature shields are the other
+    -- shape, and the rule scopes itself to a card saying "each", which this
+    -- clause does not.
+    whatRecipient :: Maybe (Filter.Filter Keyword.Keyword),
+    -- | The PLAYER half of that same description -- Divine Deflection's "dealt to
+    -- you" -- as CR 109.5's relation, since no Filter describes a player (CR
+    -- 120.3a). DISJOINED with the field above on the row this installs, so "you
+    -- and/or permanents you control" is one shield covering both.
+    whoRecipient :: Maybe PlayerRelation.PlayerRelation,
     -- | CR 609.7a's "by a source of your choice" (Healing Grace), as the
     -- PROPERTIES the chosen source must have. Nothing is a shield naming no
     -- source at all (Mending Hands), which watches every source; `Just` makes the
