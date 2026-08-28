@@ -1785,7 +1785,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- filter must keep out.
   razorfinSpec s registry
   -- CR 202.3's bound read off the BOARD rather than off the card, which no Filter
-  -- could state before Pawl.Types.TargetSlot grew its `amount` (#2538).
+  -- could state before Pawl.Types.TargetSlot grew its `amount`; see #2538.
   celestineSpec s registry
 
 razorfinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

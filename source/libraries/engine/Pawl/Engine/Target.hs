@@ -1180,8 +1180,19 @@ fillableModesGiven pcs grants pools perspective seed source extra modal gs =
 bakeSlots :: Map SlotName PlayerId -> Map SlotName TargetSlot -> Map SlotName TargetSlot
 bakeSlots players = fmap (bakeSlot players)
 
+-- The slot's `amount` is baked beside its Filter, and by the matching function:
+-- CR 202.3's computed bound is a Quantity, and a Quantity names CR 603.2's
+-- bindings through PlayerRef.InSlot exactly as a Filter names them through
+-- ControlledByBound. An unbaked one would be unanswerable where the filter beside
+-- it is answerable. A REGRESSION FENCE rather than a proved behaviour: the one
+-- card that names an amount names Quantity.LifeGainedThisTurn, which holds no
+-- slot, so no board today tells the two readings apart.
 bakeSlot :: Map SlotName PlayerId -> TargetSlot -> TargetSlot
-bakeSlot players slot = slot {TargetSlot.filter = fmap (Filter.bakeBound players) (TargetSlot.filter slot)}
+bakeSlot players slot =
+  slot
+    { TargetSlot.filter = fmap (Filter.bakeBound players) (TargetSlot.filter slot),
+      TargetSlot.amount = fmap (Quantity.bakeBound players) (TargetSlot.amount slot)
+    }
 
 -- bakeSlots over a whole modal payload, for the caller that must bake BEFORE the
 -- modes are chosen: CR 700.2b's mode selection asks which modes are fillable

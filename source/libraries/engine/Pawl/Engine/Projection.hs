@@ -2554,8 +2554,19 @@ rewritePayGate pairs gate =
 
 -- A single target slot under CR 612.1. Top-level because Pawl.Engine.Resolve
 -- needs the same rewrite over a resolving spell's slots (CR 608.2b).
+--
+-- The slot's `amount` is descended into for the filter's reason: CR 202.3's
+-- computed bound is a Quantity, and a Quantity reaches a Count's Filter, so a
+-- word swap finds text there exactly as it finds it at the top level. A
+-- REGRESSION FENCE rather than a proved behaviour, bakeSlot's posture one module
+-- over: the one card that names an amount names Quantity.LifeGainedThisTurn,
+-- which reaches no Filter, so no board today tells the two readings apart.
 rewriteTargetSlot :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> TargetSlot.TargetSlot -> TargetSlot.TargetSlot
-rewriteTargetSlot pairs slot = slot {TargetSlot.filter = fmap (Filter.rewrite pairs) (TargetSlot.filter slot)}
+rewriteTargetSlot pairs slot =
+  slot
+    { TargetSlot.filter = fmap (Filter.rewrite pairs) (TargetSlot.filter slot),
+      TargetSlot.amount = fmap (rewriteQuantity pairs) (TargetSlot.amount slot)
+    }
 
 -- CR 612.1 through a trigger's own condition. Exhaustive rather than a wildcard,
 -- so a later condition carrying a Filter fails to compile here instead of

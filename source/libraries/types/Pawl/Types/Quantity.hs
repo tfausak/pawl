@@ -485,8 +485,9 @@ data Quantity
     CardsDiscardedThisTurn PlayerRef.PlayerRef
   | -- | CR 119.3 / 608.2i: how much life that player has GAINED this turn --
     -- Fortifying Draught's "where X is the amount of life you gained this turn".
-    -- Ratchet, Field Medic prints the same amount as a BOUND on a target's mana
-    -- value, which no Filter can state; see #2538.
+    -- Celestine, the Living Saint prints the same amount as a BOUND on a target's
+    -- mana value, which is Pawl.Types.TargetSlot's `amount` carrying this
+    -- quantity and Filter.ManaValueAtMostAmount reading it.
     --
     -- CardsDiscardedThisTurn's sibling in footing and in ARITY: a live fold over
     -- the turn-scoped GameEvent log, which CR 608.2i sanctions and whose extent is
