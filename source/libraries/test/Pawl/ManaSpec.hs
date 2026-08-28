@@ -4464,10 +4464,13 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
     Spec.assertBool s paid "the {G} was paid"
     Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
 
-  -- The gate is BOARD-WIDE, not pairwise: a stored continuous effect anywhere
-  -- retires the elision, because deciding a pair against one means asking every
-  -- effect whether it names one of them. Here the effect sits on the
-  -- Bonesplitter, which is attached to nothing, so the three Elves still agree
+  -- The gate over GameState.continuousEffects is still BOARD-WIDE rather than
+  -- pairwise, where the id-keyed relations below are searched: a stored
+  -- continuous effect anywhere retires the elision, because deciding a pair
+  -- against one means asking every effect whether it names one of them, over an
+  -- Affected that may be a Filter rather than a set of ids (#1969). Here the
+  -- effect sits on the Bonesplitter, which is attached to nothing, so the three
+  -- Elves still agree
   -- field for field and projection for projection -- and are still asked about.
   Spec.it s "CR 601.2g a stored continuous effect anywhere retires the elision" $ do
     elf <- S.printingOf s registry "Llanowar Elves"
