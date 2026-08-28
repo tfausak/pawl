@@ -230,6 +230,12 @@ mayPlayers = SlotName.MkSlotName (Text.pack "thoseWhoMay")
 -- 400.7e withholds this slot when the destination is hidden (CR 400.2), so the
 -- wider leaves-the-battlefield condition binds it for a death and not for a
 -- bounce, and no card may read it under that condition yet (#505).
+--
+-- ONE object usually, SEVERAL for a melded permanent leaving the battlefield:
+-- CR 712.21c makes an effect that finds what it became find both cards. The
+-- shape follows -- a recipient for one (setBecame), a group for several
+-- (setBecameGroup) -- and Pawl.Engine.Event.setBecameArrivals is where the
+-- choice is made and justified.
 became :: SlotName
 became = SlotName.MkSlotName (Text.pack "became")
 
