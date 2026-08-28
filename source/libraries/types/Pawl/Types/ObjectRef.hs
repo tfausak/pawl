@@ -625,7 +625,7 @@ data ObjectRef
     -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
     -- read, so objectRefObjects answers nothing for it -- ChosenCardInGraveyard's
     -- note above says why, and the same lint rejects it under an opcode that
-    -- cannot ask. Today NO opcode asks it: the exile that wants it is a
-    -- Pawl.Types.Effect.MoveToZone gather, which does not yet gather it (#369).
+    -- cannot ask. Today Pawl.Types.Effect.MoveToZone's gather is the one that
+    -- asks, which is Hanweir Battlements' exile.
     ChosenPermanent (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

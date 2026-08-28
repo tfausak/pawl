@@ -2190,9 +2190,10 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- ChosenCardInGraveyard's note below is the shape.
   ObjectRef.AnyNumberMatching _ -> []
   -- The arm above's answer, for its reason: a CR 608.2d question, so this pure
-  -- sweep answers nothing for it. No opcode asks it yet, so a card writing it is
-  -- an inert card-data error wherever it stands, which is what Pawl.CardSpec's
-  -- inertChoosers says at load time (#369).
+  -- sweep answers nothing for it. The Effect.MoveToZone gather is the one arm
+  -- that reaches the Game monad to ask it; under any other opcode this empty
+  -- answer is an inert card-data error, which Pawl.CardSpec's inertChoosers
+  -- rejects at load time.
   ObjectRef.ChosenPermanent _ -> []
   -- EachMatching's sweep with CR 109.2's battlefield default switched off by the
   -- card's own words (CR 109.2a), over CR 400.1's per-player zone. Whose
@@ -4258,10 +4259,32 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- opcode names no object; the destination and CR 400.7's funnel
             -- need a producer first (gap #2418).
             ObjectRef.AnyNumberMatching _ -> pure []
-            -- Not implemented: the one chosen permanent meld's exile names. The
-            -- arm above's state for the singular -- nothing gathers it here, so a
-            -- card writing the ref under this opcode names no object (#369).
-            ObjectRef.ChosenPermanent _ -> pure []
+            -- CR 608.2d's singular of the arm above: "a creature named Hanweir
+            -- Garrison" in Hanweir Battlements' "exile them, then meld them",
+            -- announced while the effect is applied. The candidates are
+            -- EachMatching's sweep of the same Filter, read live off the pre-move
+            -- board (CR 608.2c), so the sweep and the offer cannot disagree about
+            -- what matches.
+            --
+            -- Asked only at TWO or more candidates, which is the whole of what
+            -- parts this from the arm above: CR 608.2d admits only a legal
+            -- option, so one candidate leaves one legal announcement and no
+            -- decision to put to anybody, and none makes the instruction
+            -- impossible -- CR 101.3 ignores that part and CR 609.3 leaves the
+            -- rest of the effect to do as much as it can.
+            -- Pawl.Types.Prompt.ChoosePermanent is where that posture is written.
+            --
+            -- FILTERED, not trusted (#222), the hand arm's reason: an answer
+            -- naming a permanent that was never offered would otherwise be moved.
+            ObjectRef.ChosenPermanent filter_ -> do
+              gs <- State.get
+              case battlefieldMatching legal resolving controller source gs filter_ of
+                [] -> pure []
+                [only] -> pure [only]
+                first : second : more -> do
+                  let offered = first NonEmpty.:| (second : more)
+                  answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
+                  pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
           arrivals <- settleArrivals zone placement targets
           -- The batch's own board, read after CR 401.4's arrangement asks (which
           -- move nothing) and before any member does.

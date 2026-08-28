@@ -6,7 +6,9 @@
 -- alone (CR 712.4b), so what this spec pins first is that the front face plays
 -- exactly as a one-faced card's does -- the mana ability and the targeted grant
 -- printed on Hanweir Battlements, reached through Pawl.Engine.Cost.tapForMana
--- and Pawl.Engine.Activate.activateAbility.
+-- and Pawl.Engine.Activate.activateAbility. Then the melding ability itself --
+-- Pawl.Types.Effect's Meld opcode, Pawl.Engine.Event.meld and the CR 608.2d
+-- choice its exile makes -- driven through the printed card.
 --
 -- Hanweir Battlements and Hanweir Garrison are the pool's only meld pair, and
 -- the Battlements is the half CR 712.4a puts the melding ability on.
@@ -31,6 +33,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
@@ -44,6 +47,7 @@ import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
@@ -119,10 +123,10 @@ spec s registry = Spec.describe s "Meld" $ do
     Spec.assertBool s (Seq.null (Seq.filter (== PrintingId.MkPrintingId 8) (Game.componentsOf township))) "the result is not a component"
     Spec.assertEqWith s "CR 108.2 an ordinary card represents only itself" (Game.componentsOf (Source.OfCard garrison)) Seq.empty
   -- CR 701.42a's keyword action, driven straight rather than through the card:
-  -- the melding ability lands in a later change, and what is proven here is the
-  -- opcode. Both halves of the pool's only meld pair sit in exile, where a card's
-  -- own "exile them" would have put them, and the slot naming them is the one that
-  -- exile would have bound (CR 400.7j).
+  -- the melding ability has its own cases above, and what is proven here is the
+  -- opcode on its own. Both halves of the pool's only meld pair sit in exile,
+  -- where the card's own "exile them" puts them, and the slot naming them is a
+  -- slot such an exile would have bound (CR 400.7j).
   --
   -- The combined back face is card DATA the opcode carries, so any card stands in
   -- for it here; the Goblin Piker is a creature, which is what lets the entry cases
@@ -227,6 +231,132 @@ spec s registry = Spec.describe s "Meld" $ do
       "and a board where nothing melded leaves her at 20"
       (S.lifeOf S.alice (S.runPure S.identityAnswer base (do Engine.settleForPriority; Stack.resolveTop)))
       (Just 20)
+
+  -- The printed ability, end to end: "{3}{R}{R}, {T}: If you both own and control
+  -- this land and a creature named Hanweir Garrison, exile them, then meld them
+  -- into Hanweir, the Writhing Township." CR 712.4a puts that ability on this
+  -- half of the pair, and the five Mountains are what pay for it.
+  --
+  -- The exile is the CARD's instruction and the meld is CR 701.42a's, which is the
+  -- split that makes CR 701.42c come out right in the token case below: when the
+  -- meld refuses, the cards are already where the exile left them.
+  --
+  -- Not implemented: the printed "exile them" is ONE instruction over both
+  -- permanents (CR 608.2f), where the card file writes two Pawl.Types.Effect's
+  -- MoveToZone effects and the meld reads what they exiled rather than a slot
+  -- (#2498). Nothing in the pool tells the two batches from one.
+  Spec.it s "CR 701.42a the melding ability exiles the pair and puts one permanent onto the battlefield" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    let (bId, g1) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
+        (gId, g2) = S.addCreature garrison S.alice g1
+        board = readyFor mountain g2
+    case Projection.abilitiesOf bId board of
+      [_, _, melding] -> do
+        let after = S.runPure S.identityAnswer board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
+        Spec.assertEqWith s "one permanent named Hanweir, the Writhing Township" (S.countOnBattlefieldByName townshipName S.alice after) 1
+        case namedTownship after (Game.zoneMembers Zone.Battlefield S.alice after) of
+          [meldedId] -> do
+            -- CR 712.8g: the melded permanent has only the combined back face's
+            -- characteristics, which is where the 7/4 and the two keywords are.
+            Spec.assertEqWith s "CR 712.8g it is the combined back face's 7/4" (S.powerToughnessOf meldedId after) (Just (7, 4))
+            Spec.assertBool s (Projection.hasKeyword Keyword.Trample meldedId after) "with trample"
+            Spec.assertBool s (Projection.hasKeyword Keyword.Haste meldedId after) "and haste"
+            -- CR 701.42a's "single object represented by two cards", read back
+            -- through the classifier CR 202.3c and CR 712.21 share.
+            Spec.assertEqWith
+              s
+              "CR 701.42a both cards represent it"
+              (fmap (Maybe.mapMaybe (\pid -> fmap Printing.card (Game.printingOf pid after)) . Foldable.toList . Game.componentsOf . Object.source) (Game.lookupObject meldedId after))
+              (Just [Printing.card garrison, Printing.card battlements])
+          other -> Spec.assertFailure s ("expected exactly one melded permanent, got " <> show (length other))
+        -- Neither original is anywhere: the exile the card asked for happened, and
+        -- the meld consumed what it found there.
+        Spec.assertEqWith s "the land's own id is gone" (fmap Object.owner (Game.lookupObject bId after)) Nothing
+        Spec.assertEqWith s "and the Garrison's" (fmap Object.owner (Game.lookupObject gId after)) Nothing
+        Spec.assertEqWith s "and nothing is left in exile" (Game.zoneMembers Zone.Exile S.alice after) []
+        Spec.assertEqWith s "setup: the pair was on the battlefield before the ability resolved" (S.countOnBattlefieldByName townshipName S.alice board) 0
+      abilities -> Spec.assertFailure s ("expected three activated abilities on Hanweir Battlements, got " <> show (length abilities))
+  -- CR 608.2d: "a creature named Hanweir Garrison" is a choice announced while
+  -- the effect is applied, and with two of them it is a real one. The two boards
+  -- are identical and differ only in the ANSWER, so a run that ignored the
+  -- decider would give them the same outcome.
+  Spec.it s "CR 608.2d with two Hanweir Garrisons the resolving controller says which one melds" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    let (bId, g1) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
+        (firstG, g2) = S.addCreature garrison S.alice g1
+        (secondG, g3) = S.addCreature garrison S.alice g2
+        board = readyFor mountain g3
+    case Projection.abilitiesOf bId board of
+      [_, _, melding] -> do
+        let melding_ chosen = S.runPure (choosing chosen) board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
+            survivor picked kept = fmap Object.zone (Game.lookupObject kept (melding_ picked))
+            taken picked = fmap Object.zone (Game.lookupObject picked (melding_ picked))
+        Spec.assertEqWith s "naming the first Garrison leaves the second on the battlefield" (survivor firstG secondG) (Just Zone.Battlefield)
+        Spec.assertEqWith s "and naming the second leaves the first there instead" (survivor secondG firstG) (Just Zone.Battlefield)
+        Spec.assertEqWith s "the Garrison that was named is gone" (taken firstG) Nothing
+        Spec.assertEqWith s "in either run" (taken secondG) Nothing
+        Spec.assertEqWith s "and either way exactly one melded permanent arrived" (fmap (S.countOnBattlefieldByName townshipName S.alice . melding_) [firstG, secondG]) [1, 1]
+      abilities -> Spec.assertFailure s ("expected three activated abilities on Hanweir Battlements, got " <> show (length abilities))
+  -- CR 701.42c's own example, with Hanweir in place of Midnight Scavengers: the
+  -- counterpart is a TOKEN copy of Hanweir Garrison, which CR 701.42b bars from
+  -- melding (CR 108.2 makes a token no card at all). The card's own "exile them"
+  -- still happens, so both objects reach exile, the meld writes nothing, and CR
+  -- 111.8 removes the token at the next state-based check.
+  Spec.it s "CR 701.42b/701.42c a token counterpart melds nothing, and the land stays exiled" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    let (bId, g1) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addToken (Printing.card garrison) S.alice g1
+        board = readyFor mountain g2
+    case Projection.abilitiesOf bId board of
+      [_, _, melding] -> do
+        let after = S.runPure S.identityAnswer board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
+        Spec.assertEqWith s "CR 701.42c both objects stay in the zone the exile left them in" (List.sort (exileNames after)) (List.sort [S.nameOf (Printing.card battlements), S.nameOf (Printing.card garrison)])
+        Spec.assertEqWith s "CR 701.42b nothing melded" (S.countOnBattlefieldByName townshipName S.alice after) 0
+        -- CR 111.8: a token that has left the battlefield ceases to exist the next
+        -- time state-based actions are checked. The land is a card and stays.
+        Spec.assertEqWith s "CR 111.8 the token ceases and the land is left exiled alone" (exileNames (S.settleSba after)) [S.nameOf (Printing.card battlements)]
+      abilities -> Spec.assertFailure s ("expected three activated abilities on Hanweir Battlements, got " <> show (length abilities))
+
+-- The combined back face's name, which is what a melded permanent answers to
+-- (CR 712.8g) and the one thing the three gameplay cases above count.
+townshipName :: CardName.CardName
+townshipName = CardName.MkCardName (Text.pack "Hanweir, the Writhing Township")
+
+namedTownship :: GameState.GameState -> [ObjectId.ObjectId] -> [ObjectId.ObjectId]
+namedTownship gs = filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just townshipName)
+
+-- What alice owns in exile, by name. Each exiled object is a CR 400.7 incarnation
+-- with an id of its own, so the ids the board started with cannot be compared
+-- against; the names are what the rule's own example talks about.
+exileNames :: GameState.GameState -> [CardName.CardName]
+exileNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Exile S.alice gs)
+
+-- alice holding priority in her own main phase with five untapped Mountains --
+-- the {3}{R}{R} the melding ability costs, and nothing else the ability could
+-- name.
+readyFor :: Printing.Printing -> GameState.GameState -> GameState.GameState
+readyFor mountain gs =
+  (S.landsFor mountain S.alice 5 gs)
+    { GameState.phase = Phase.PrecombatMain,
+      GameState.activePlayer = S.alice,
+      GameState.priority = Just S.alice
+    }
+
+-- CR 608.2d's answer pinned by IDENTITY rather than by index: the named permanent
+-- if the engine offered it, and every other prompt left to the identity answerer.
+-- Filtering the offer is what makes a run that never asked distinguishable from
+-- one that did -- an answerer building its own id could not tell them apart.
+choosing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+choosing wanted p = case p of
+  Prompt.ChoosePermanent _ _ _ candidates
+    | List.elem wanted (NonEmpty.toList candidates) -> wanted
+  _ -> S.identityAnswer p
 
 -- Both cards exiled and owned by alice, bound to the slot the exile would have
 -- bound, then melded into `into` -- the shape Hanweir Battlements' "exile them,

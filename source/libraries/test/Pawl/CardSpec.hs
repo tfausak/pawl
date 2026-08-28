@@ -4104,8 +4104,8 @@ data Asks
     -- raises no prompt: every ObjectRef position but the three below.
     AsksNothing
   | -- | Pawl.Engine.Resolve's Effect.MoveToZone gather, which runs in the Game
-    -- monad. It asks the graveyard, hand and from-among arms; the random arm
-    -- answers @pure []@ there (#1733).
+    -- monad. It asks the graveyard, hand, from-among and one-permanent arms;
+    -- the random arm answers @pure []@ there (#1733).
     AsksMoveGather
   | -- | Pawl.Engine.Resolve's Effect.Reveal arm. It asks the from-among arm
     -- through chooseCardFromAmong and the random arm through
@@ -4164,6 +4164,7 @@ asksFor asks ref = case asks of
     ObjectRef.ChosenCardInGraveyard {} -> True
     ObjectRef.ChosenCardInHand {} -> True
     ObjectRef.ChosenCardFromAmong {} -> True
+    ObjectRef.ChosenPermanent {} -> True
     _ -> False
   AsksRevealArm -> case ref of
     ObjectRef.ChosenCardFromAmong {} -> True
@@ -6395,16 +6396,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "the battlefield subset is asked by the transform gather alone"
       (inert [Effect.Transform anyNumber, moves anyNumber, reveals anyNumber, Effect.Tap anyNumber])
       [False, True, True, True]
-    -- The singular of the arm above, and today NO site asks it: the exile that
-    -- wants it is a MoveToZone gather (#369), so until that gather learns the arm
-    -- every opcode leaves it naming nothing and the lint says so. This asserts
+    -- The singular of the arm above, asked by the MoveToZone gather alone --
+    -- Hanweir Battlements' "exile them, then meld them", the printing that wanted
+    -- it. Rejected under Transform and Reveal, the two other sites that ask any
+    -- chooser-shaped arm, and under Tap, an AsksNothing opcode. This also asserts
     -- the arm reaches chooserRef at all -- an arm missing from THAT traversal
     -- would answer False here at every site and no -Werror would name it.
     Spec.assertEqWith
       s
-      "one chosen permanent is asked by no site yet (#369)"
+      "one chosen permanent is asked by the move gather alone"
       (inert [Effect.Transform onePermanent, moves onePermanent, reveals onePermanent, Effect.Tap onePermanent])
-      [True, True, True, True]
+      [True, False, True, True]
     -- The other direction on the same opcode: a ref that is a READ rather than a
     -- CR 608.2d question is fine anywhere, so the lint is about the arm and not
     -- about Transform.
