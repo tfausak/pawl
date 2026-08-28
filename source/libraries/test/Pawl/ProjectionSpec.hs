@@ -3443,10 +3443,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- SYNTHETIC because no printed emblem carries a replacement row pawl can
   -- author. Scryfall `o:"emblem with"`, 2026-08-27, is every card that makes one
   -- (96, has_more false), and the emblems on it that print a replacement effect
-  -- each need a capability that does not exist: Ajani Steadfast and Serra the
-  -- Benevolent both name a PLAYER recipient (#1054), Ajani additionally needs a
-  -- "prevent all but 1" rewrite (#2443), and Jaya Ballard's "cast this way" is a
-  -- back-reference to the permission the same emblem grants. The pool's other
+  -- each need a capability that does not exist: Ajani Steadfast needs a "prevent
+  -- all but 1" rewrite (#2443), Serra the Benevolent replaces a LIFE TOTAL's
+  -- reduction rather than a damage event (#2526), and Jaya Ballard's "cast this
+  -- way" is a back-reference to the permission the same emblem grants. The pool's other
   -- two Effect.CreateEmblem producers are Ajani, Adversary of Tyrants and
   -- Elspeth, Sun's Champion, and neither emblem carries a replacementEffects row.
   -- CR 114.2 lets the creating effect give an emblem any ability and CR 114.3

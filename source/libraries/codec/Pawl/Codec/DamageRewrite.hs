@@ -1,5 +1,7 @@
 module Pawl.Codec.DamageRewrite where
 
+import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.Scaling as Scaling
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -16,5 +18,6 @@ codec =
       Arm.payload "PreventNext" Common.natural DamageRewrite.PreventNext (\x -> case x of DamageRewrite.PreventNext y -> Just y; _ -> Nothing),
       Arm.payload "SetAmount" Common.natural DamageRewrite.SetAmount (\x -> case x of DamageRewrite.SetAmount y -> Just y; _ -> Nothing),
       Arm.payload "Scale" Scaling.codec DamageRewrite.Scale (\x -> case x of DamageRewrite.Scale y -> Just y; _ -> Nothing),
-      Arm.payload "Redirect" Recipient.codec DamageRewrite.Redirect (\x -> case x of DamageRewrite.Redirect y -> Just y; _ -> Nothing)
+      Arm.payload "Redirect" Recipient.codec DamageRewrite.Redirect (\x -> case x of DamageRewrite.Redirect y -> Just y; _ -> Nothing),
+      Arm.payload "RedirectMatching" (Filter.codec Keyword.codec) DamageRewrite.RedirectMatching (\x -> case x of DamageRewrite.RedirectMatching y -> Just y; _ -> Nothing)
     ]

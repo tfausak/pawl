@@ -706,6 +706,11 @@ conditionSlots condition = case condition of
 -- installing resolution's binding environment (Pawl.Types.ActiveReplacement).
 -- Arity One, since IsBound is a membership test rather than a target slot.
 --
+-- CR 614.9's printed DESTINATION is walked with the damage pattern beside it and
+-- is the one Filter here that is not a pattern: it is read in the same
+-- Pawl.Engine.Replacement.candidateContext the pattern is, so IsBound means the
+-- same thing in both and a slot declared for one is declared for the other.
+--
 -- No wildcard: an arm added to Pawl.Types.ReplacementEffect must answer here, and
 -- the three that carry no Filter say so rather than falling through. The nested
 -- EFFECTS an EntryR rewrite or a DamageR rider carries are not walked -- see
@@ -714,14 +719,30 @@ replacementPatternSlots :: ReplacementEffect.ReplacementEffect (Effect Card.Type
 replacementPatternSlots re = case re of
   ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _) -> filterSlotsOf (ZoneChangePattern.whatObject pat)
   ReplacementEffect.EntryR (EntryR.MkEntryR pat _) -> filterSlotsOf pat
-  ReplacementEffect.DamageR (DamageR.MkDamageR pat _ _) ->
-    joinTwo (filterSlotsOf (DamagePattern.whatSource pat)) (joinSlots (fmap filterSlotsOf (Maybe.maybeToList (DamagePattern.whatRecipient pat))))
+  ReplacementEffect.DamageR (DamageR.MkDamageR pat rewrite _) ->
+    joinTwo
+      (filterSlotsOf (DamagePattern.whatSource pat))
+      (joinSlots (fmap filterSlotsOf (Maybe.maybeToList (DamagePattern.whatRecipient pat) <> damageRewriteFilters rewrite)))
   ReplacementEffect.DestructionR _ -> Map.empty
   ReplacementEffect.CounterR (CounterR.MkCounterR pat _) -> filterSlotsOf (CounterPattern.onWhat pat)
   ReplacementEffect.TokenR _ -> Map.empty
   ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat _ _) -> filterSlotsOf pat
   ReplacementEffect.UntapR _ -> Map.empty
   ReplacementEffect.PhaseR _ -> Map.empty
+
+-- The Filters a damage REWRITE holds, which is CR 614.9's printed destination and
+-- nothing else. No wildcard, replacementPatternSlots' discipline: a later rewrite
+-- describing something must answer here rather than have its slot reads go
+-- undeclared.
+damageRewriteFilters :: DamageRewrite.DamageRewrite -> [Filter.Type.Filter Keyword.Type.Keyword]
+damageRewriteFilters rewrite = case rewrite of
+  DamageRewrite.RedirectMatching f -> [f]
+  DamageRewrite.Redirect _ -> []
+  DamageRewrite.PreventAll -> []
+  DamageRewrite.PreventRemovingShieldCounter -> []
+  DamageRewrite.PreventNext _ -> []
+  DamageRewrite.SetAmount _ -> []
+  DamageRewrite.Scale _ -> []
 
 -- One Filter's slot reads, at arity One -- the same shape modeSlots folds over a
 -- mode's target-slot Filters.
