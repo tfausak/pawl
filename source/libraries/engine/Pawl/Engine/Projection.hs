@@ -1851,7 +1851,7 @@ rewritePlayerEffect pairs effect = case effect of
   -- the printed road, and Liliana, Untouched by Death's "Zombie spells" does on
   -- the stored one.
   PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f n) -> PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.rewrite pairs f) n)
-  PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f n) -> PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost (Filter.rewrite pairs f) n)
+  PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost f kind n) -> PlayerEffect.IncreaseActivationCost (IncreaseActivationCost.MkIncreaseActivationCost (Filter.rewrite pairs f) kind n)
   PlayerEffect.ReduceSpellCost x -> PlayerEffect.ReduceSpellCost x {ReduceSpellCost.whichSpells = Filter.rewrite pairs (ReduceSpellCost.whichSpells x)}
   -- TWO Filters of its own, and both descend. The second names
   -- what the ability targets (Dwarven Mauler's "that target this creature",

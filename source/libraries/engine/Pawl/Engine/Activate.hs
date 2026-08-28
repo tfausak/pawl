@@ -24,6 +24,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Card as Card
@@ -391,7 +392,14 @@ payableCostAtGiven candidates sources pcs x family pid srcId gs cost =
 -- and one payability search, as before.
 aimingSomewhere :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> (CostAdjustments.CostAdjustments -> Bool) -> Bool
 aimingSomewhere candidates family pid srcId gs payable =
-  let gather aimedAt = Cost.activationAdjustments aimedAt family pid srcId gs
+  -- CR 605.1a's kind is AbilityKind.NonManaAbility at all three sites in this
+  -- module, and CR 605.3b is why: activatableGiven refuses a mana ability
+  -- outright and the cost conjunct this gate serves sits after that refusal,
+  -- while activateAbility below puts the ability on the stack, which no mana
+  -- ability does. So Suppression Field's "unless they're mana abilities" never
+  -- turns an adjustment away on this path -- the mana window is where it does
+  -- (Cost.manaActivationAdjustments).
+  let gather aimedAt = Cost.activationAdjustments aimedAt family AbilityKind.NonManaAbility pid srcId gs
       blind = gather Set.empty
    in payable blind
         || (gather candidates /= blind && any (payable . gather . Set.singleton) (Set.toList candidates))
@@ -730,7 +738,7 @@ activateAbility pid srcId ability = do
           -- target-aware reduction therefore cannot change which nonhybrid
           -- equivalent or Phyrexian half a player would announce. The reductions
           -- themselves are gathered again below, once the targets exist.
-          let gathered = Cost.activationAdjustments Set.empty family pid srcId gs
+          let gathered = Cost.activationAdjustments Set.empty family AbilityKind.NonManaAbility pid srcId gs
           -- The Phyrexian life record is DISCARDED here: CR 702.150a reads what
           -- the player who CAST a spell announced, and no rule asks the same of
           -- an activation cost.
@@ -787,7 +795,7 @@ activateAbility pid srcId ability = do
               -- -- so the increases and the CR 601.2f components the announcement
               -- above measured are the same ones charged below.
               let aimedAt = recipientObjects chosen
-                  targeted = Cost.activationAdjustments aimedAt family pid srcId gs
+                  targeted = Cost.activationAdjustments aimedAt family AbilityKind.NonManaAbility pid srcId gs
               adjustments <- Cost.announceReductions pid srcId gs announcedCost targeted
               let paidCost = Cost.totalWith adjustments announcedCost
               -- CR 601.2g/h via Pawl.Engine.Cost.pay: the mana window, then the

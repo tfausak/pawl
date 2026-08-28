@@ -81,6 +81,8 @@ library codec
   hs-source-dirs: source/libraries/codec
   -- cabal-gild: discover source/libraries/codec
   exposed-modules:
+    Pawl.Codec.AbilityKind
+    Pawl.Codec.AbilityKindSpec
     Pawl.Codec.AbilityName
     Pawl.Codec.AbilityNameSpec
     Pawl.Codec.AbilityTriggered
@@ -1223,6 +1225,7 @@ library types
   hs-source-dirs: source/libraries/types
   -- cabal-gild: discover source/libraries/types
   exposed-modules:
+    Pawl.Types.AbilityKind
     Pawl.Types.AbilityName
     Pawl.Types.AbilityTriggered
     Pawl.Types.Action
