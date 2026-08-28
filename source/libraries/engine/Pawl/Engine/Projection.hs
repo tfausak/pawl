@@ -582,7 +582,9 @@ setPT base new = case (base, new) of
 -- mid-fold power is still its printed one and only an object with no printed box
 -- reaches here. A CREATURE with no power is rule 208.5's premise instead, and
 -- projectDeciding's noValueAt has already substituted its 0 by the time layer 7c
--- runs, so no creature reaches this arm.
+-- runs -- on BOTH accumulators the fold applies an effect to, `seeded` for the
+-- projected object and `snapshot` for every other one on the running board, so
+-- no creature reaches this arm.
 addPT :: Maybe Integer -> Maybe Integer -> Maybe Integer
 addPT base delta = case (base, delta) of
   (Just b, Just d) -> Just (b + d)
@@ -4074,9 +4076,17 @@ projectDeciding admits cands = forObject
                 -- Not implemented: a snapshot carries CR 208.3's noncreature P/T
                 -- gate, which the projected object's mid-fold partial does not
                 -- (#1111).
+                --
+                -- CR 208.5's substitution, at the same gate `seeded` takes it:
+                -- these partials are what `resolve` applies each effect to, so a
+                -- creature CR 305.7 left with no value for its power needs the 0
+                -- BEFORE applyUnit runs, or addPT's Nothing arm discards CR
+                -- 613.4c's modification and viewOfBoard substitutes the 0 only
+                -- afterwards. Proved by Pawl.PowerToughnessSpec's "CR 208.5
+                -- mid-fold under an anthem".
                 snapshot o =
                   let (p, d) = projectDeciding (\l -> admits l && l < lyr) cands o gs
-                   in (seedFor o p, d)
+                   in (noValueAt lyr (seedFor o p), d)
                 -- Keyed rather than an association list, because resolve's ViewOf
                 -- looks an object up once per candidate a Count folds over.
                 -- WHNF-strict only, so the snapshots stay lazy.
