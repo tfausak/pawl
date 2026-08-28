@@ -845,21 +845,22 @@ prohibitsBecomingMonarch pid gs =
 -- object, so it reads that object's current information while the object is
 -- there and its LAST KNOWN information once it is gone. Both roads are live.
 -- Null Chamber is a permanent and answers off the board; Conjurer's Ban chooses
--- during its own resolution and is in a graveyard by CR 608.2m before the two
+-- during its own resolution and is in a graveyard by CR 608.2n before the two
 -- rows it stored are ever read, so a current-information-only reading would make
 -- that card's whole sentence do nothing (Pawl.PlayerEffectSpec's ConjurersBan
 -- group is the proof).
 --
--- The names are NOT baked into Pawl.Types.ActivePlayerEffect as the controller
--- is, and CR 608.2h is why: a baked value would freeze what the rule says to
--- re-read, and the row already carries the id that reads it.
+-- The names are NOT baked onto Pawl.Types.ActivePlayerEffect as the controller
+-- is, because nothing in the pool can tell the two readings apart and baking
+-- would widen the (source, effect) pair `applying` deliberately holds its
+-- consumers to.
 --
 -- Not implemented: a stored row whose source is still on the battlefield and
--- chooses a SECOND name afterwards reads the later name too, where CR 608.2h's
--- current information is what the rule asks for only because pawl keeps a name
--- on the object. No printed card can reach it -- every chosen-name prohibition
--- in the pool either is a permanent's own static ability or comes from a
--- resolution that leaves the zone at once (#2531).
+-- chooses a SECOND name afterwards reads the later name too, where CR 608.2c
+-- made the choice once and the effect should hold that one. No printed card can
+-- reach it --
+-- every chosen-name prohibition in the pool either is a permanent's own static
+-- ability or comes from a resolution that leaves the zone at once (#2531).
 --
 -- The empty set is the answer that matches NO object rather than every object,
 -- which is the shape CR 201.2a describes for an object with no name: having no

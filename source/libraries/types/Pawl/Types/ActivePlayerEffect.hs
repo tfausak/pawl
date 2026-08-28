@@ -50,9 +50,10 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- progress has to be writable to JSON (#126); see #1059 for the older claim that
 -- a stored carrier had none.
 data ActivePlayerEffect = MkActivePlayerEffect
-  { -- | CR 113.7: the object that resolved. Often an id nothing holds any more --
-    -- an instant is in a graveyard under a fresh id (CR 400.7) before its own
-    -- effect is first read -- and that is not a reason to drop it:
+  { -- | The object that resolved -- for an activated or triggered ability, CR
+    -- 113.7's source of it. Often an id nothing holds any more: an instant is in
+    -- its owner's graveyard (CR 608.2n) under a fresh id (CR 400.7) before its
+    -- own effect is ever read. That is not a reason to drop it:
     -- Pawl.Engine.PlayerEffect.applying hands it to every consumer, and CR
     -- 608.2h's last-known record is filed under exactly this id, which is what
     -- lets `chosenNamesOf` still answer Conjurer's Ban's chosen name. A dead id
