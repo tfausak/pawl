@@ -73,6 +73,17 @@ dungeonsOf pid gs =
   let isDungeon oid = maybe False Dungeon.isDungeonFace (Game.faceOf oid gs)
    in filter isDungeon (Game.zoneMembers Zone.Command pid gs)
 
+-- The NAMES of the dungeon cards this player owns in the command zone. Which
+-- dungeon a venture entered is the whole subject of CR 701.49d, and a card name
+-- is how a board says it.
+dungeonNamesOf :: PlayerId -> GameState.GameState -> [String]
+dungeonNamesOf pid gs =
+  List.sort
+    ( Maybe.mapMaybe
+        (\oid -> fmap (show . CardName.unwrap . Face.name) (Game.faceOf oid gs))
+        (dungeonsOf pid gs)
+    )
+
 -- The names of everything on the battlefield, sorted. What the room abilities are
 -- read through: a Goblin token and a Treasure token are two different names, which
 -- is how "which room did the marker enter?" becomes observable at gameplay level.
@@ -104,6 +115,20 @@ paying p = case p of
 payingLastDungeon :: Prompt.Prompt r -> r
 payingLastDungeon p = case p of
   Prompt.ChooseDungeon _ _ candidates -> NonEmpty.last candidates
+  _ -> paying p
+
+-- `paying`, but answering Prompt.ChooseDungeon with the FIRST dungeon offered and
+-- running Secret Entrance's search to completion.
+--
+-- `paying` alone declines a search (S.identityAnswer's posture), which would find
+-- no land and leave the two boards of the CR 701.49d case below indistinguishable
+-- by hand size. The two search arms only make Undercity's topmost room DO its
+-- printed thing; which dungeon was entered is decided before either is raised.
+payingFirstDungeon :: Prompt.Prompt r -> r
+payingFirstDungeon p = case p of
+  Prompt.ChooseDungeon _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseSearchZones _ _ zones -> zones
+  Prompt.Search _ _ candidates count -> take (Natural.toIntSaturating count) candidates
   _ -> paying p
 
 -- `paying`, but answering Prompt.ChooseRoom with the LAST arrow offered.
@@ -421,3 +446,45 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
     -- CR 309.2 / 400.11: it begins OUTSIDE the game, so setup mints no object for
     -- it at all.
     Spec.assertEqWith s "and no object was minted for it" (Map.size (GameState.objects after)) 0
+  -- CR 701.49d: "venture into [quality] is a variant of venture into the dungeon.
+  -- If a player is instructed to 'venture into [quality]' while they don't own a
+  -- dungeon card in the command zone, they choose a dungeon card they own from
+  -- outside the game with the indicated quality."
+  --
+  -- ONE board, two abilities on it: Synthetic Undercity Stair's "venture into
+  -- Undercity" and Secret Door's plain "venture into the dungeon". alice owns
+  -- both dungeons either way, so the only difference between the two readings is
+  -- which instruction was given.
+  --
+  -- Each answer is PINNED against the clause it discriminates. The quality board
+  -- answers Prompt.ChooseDungeon with the FIRST offered, which is Lost Mine of
+  -- Phandelver (Player.dungeons is ordered by interned id and dungeonBoard interns
+  -- in the order given): an implementation ignoring CR 701.49d would offer both
+  -- and enter Lost Mine. The plain board answers with the LAST, which is Undercity:
+  -- an implementation ignoring Undercity's own "you can't enter this dungeon
+  -- unless you 'venture into Undercity'" would offer both and enter Undercity.
+  -- Neither prompt is raised at all once both clauses hold, since each venture is
+  -- left one candidate.
+  Spec.it s "CR 701.49d venturing into Undercity enters the dungeon carrying that quality, where a plain venture enters the other" $ do
+    island <- S.printingOf s registry "Island"
+    door <- S.printingOf s registry "Secret Door"
+    stair <- S.printingOf s registry "Synthetic Undercity Stair"
+    lostMine <- S.printingOf s registry "Lost Mine of Phandelver"
+    undercity <- S.printingOf s registry "Undercity"
+    let (doorId, base) = dungeonBoard island door [lostMine, undercity] 12
+        (stairId, gs) = S.addCreature stair S.alice base
+        quality = ventureOnce payingFirstDungeon (ventureAbility stair) stairId gs
+        plain = ventureOnce payingLastDungeon (ventureAbility door) doorId gs
+    -- CR 309.4c: the room ability of the TOPMOST room of whichever dungeon was
+    -- entered, which is the two dungeons' own difference on the board -- Secret
+    -- Entrance searches a basic land into its owner's hand, and Cave Entrance only
+    -- scries. Read before the marker and the name below, which are the cheaper
+    -- proxies for the same fact.
+    Spec.assertEqWith s "Secret Entrance put a basic land into alice's hand" (S.handSize S.alice quality) (S.handSize S.alice gs + 1)
+    Spec.assertEqWith s "and the plain venture reached Cave Entrance, which touches no hand" (S.handSize S.alice plain) (S.handSize S.alice gs)
+    Spec.assertEqWith s "the quality named Undercity, so Undercity is the dungeon in the command zone" (dungeonNamesOf S.alice quality) ["\"Undercity\""]
+    Spec.assertEqWith s "and the plain venture entered the dungeon Undercity's own text leaves it" (dungeonNamesOf S.alice plain) ["\"Lost Mine of Phandelver\""]
+    -- CR 309.3 / 309.4a: one dungeon each, marker on the topmost room -- the
+    -- variant changes which card comes in, and nothing else about entering.
+    Spec.assertEqWith s "one dungeon apiece" (length (dungeonsOf S.alice quality), length (dungeonsOf S.alice plain)) (1, 1)
+    Spec.assertEqWith s "each with its marker on the topmost room" (markerOf S.alice quality, markerOf S.alice plain) (Just RoomIndex.topmost, Just RoomIndex.topmost)

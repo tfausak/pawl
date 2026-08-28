@@ -51,6 +51,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -161,6 +162,23 @@ data Face card = MkFace
     -- Card DATA and not rulebook text, unlike the emblem Pawl.Engine.Ring mints:
     -- CR 309.1 makes a dungeon a card, and rooms are what is printed on it.
     rooms :: Seq.Seq (DungeonRoom.DungeonRoom card),
+    -- | CR 309.2a \/ 701.49d: the quality a venture must indicate before this
+    -- dungeon card may be brought into the game -- Undercity's "you can't enter
+    -- this dungeon unless you \"venture into Undercity.\"" Nothing for a dungeon
+    -- printing no such line, which any venture may enter, and for every card that
+    -- is not a dungeon.
+    --
+    -- Read off the PRINTED card by Pawl.Engine.Dungeon.enterable, and there is
+    -- nowhere else to read it: CR 309.2 keeps a dungeon card outside the game
+    -- until a venture brings it in, and outside the game is not a zone (CR
+    -- 400.11), so there is no object for a CR 604.2 static to be an ability of.
+    -- That is why this is a field and not a staticAbilities row.
+    --
+    -- The QUALITY and not a flag, because the sentence names one: CR 701.49d
+    -- writes the variant "venture into [quality]", and a dungeon forbidding entry
+    -- except to a venture naming a quality it does not itself carry is a card
+    -- nothing in the rules forbids. A flag could not tell the two apart.
+    dungeonEntryQuality :: Maybe Subtype.Subtype,
     -- | CR 601.3: this face's PRINTED casting permissions -- zone or condition
     -- exceptions to normal timing (Panglacial Wurm). Read directly from the card
     -- and NOT the projection: the permission functions in the library (CR 113.6),

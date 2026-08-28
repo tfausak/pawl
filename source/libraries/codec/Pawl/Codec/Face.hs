@@ -49,6 +49,7 @@ import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Codec.SpecialAction as SpecialAction
 import qualified Pawl.Codec.StaticAbility as StaticAbility
+import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.TargetSlot as TargetSlot
 import qualified Pawl.Codec.Toughness as Toughness
 import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
@@ -94,6 +95,8 @@ codec cardCodec = Fields.object $ do
   delayedAbilities <- Fields.defaulted "delayedAbilities" Map.empty (TriggeredAbility.codecDelayed cardCodec (GrantedAbility.codec cardCodec)) Face.delayedAbilities
   -- CR 309.4: the rooms of a dungeon card, topmost first.
   rooms <- Fields.defaulted "rooms" Seq.empty (Common.seq (DungeonRoom.codec cardCodec)) Face.rooms
+  -- CR 701.49d: the quality a venture must indicate to bring this dungeon in.
+  dungeonEntryQuality <- Fields.defaulted "dungeonEntryQuality" Nothing (Common.maybe Subtype.codec) Face.dungeonEntryQuality
   castingPermissions <- Fields.defaulted "castingPermissions" [] (Common.list CastingPermission.codec) Face.castingPermissions
   castingRestrictions <- Fields.defaulted "castingRestrictions" [] (Common.list CastingRestriction.codec) Face.castingRestrictions
   playerAbilities <- Fields.defaulted "playerAbilities" [] (Common.list PlayerStaticAbility.codec) Face.playerAbilities
@@ -145,6 +148,7 @@ codec cardCodec = Fields.object $ do
         Face.triggeredAbilities = triggeredAbilities,
         Face.delayedAbilities = delayedAbilities,
         Face.rooms = rooms,
+        Face.dungeonEntryQuality = dungeonEntryQuality,
         Face.castingPermissions = castingPermissions,
         Face.castingRestrictions = castingRestrictions,
         Face.playerAbilities = playerAbilities,
