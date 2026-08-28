@@ -546,10 +546,11 @@ meldedThrough base battlements garrison mountain =
            in (Maybe.listToMaybe (namedTownship after (Game.zoneMembers Zone.Battlefield S.alice after)), after)
         _ -> (Nothing, board)
 
--- The name Hanweir Battlements' combined back face prints, which is what the
--- permanent its meld pair becomes answers to (CR 712.8g). The cases that drive
--- the printed ability count by it; the opcode-level ones carry whatever card
--- stands in for the combined face and count by that name instead.
+-- The name printed on Hanweir Battlements' combined back face, which is what the
+-- permanent that pair melds into answers to (CR 712.8g). Spelled once here
+-- rather than at each reader, since it is card data no printing in the pool
+-- exposes under a name of its own. A meld into a stand-in combined face answers
+-- to that card's name instead.
 townshipName :: CardName.CardName
 townshipName = CardName.MkCardName (Text.pack "Hanweir, the Writhing Township")
 
