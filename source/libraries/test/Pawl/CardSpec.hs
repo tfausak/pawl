@@ -3929,7 +3929,9 @@ unframed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filte
 unframed = fmap ((,) Unframed)
 
 -- Tag a Filter position as one whose evaluator supplies the SOURCE's host -- the
--- five listed on Framing above. An ObjectRef's own Filter is always one, whatever
+-- first four listed on Framing above, the fifth carrying ReplacementRowFramed
+-- instead for the reason that constructor gives. An ObjectRef's own Filter is
+-- always one, whatever
 -- effect carries it, because Pawl.Engine.Resolve.objectRefObjects is the single
 -- site that turns an ObjectRef into objects.
 sourceHosted :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
@@ -4086,8 +4088,8 @@ effectFilters effect = case effect of
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> sourceHosted (objectRefFilters original <> objectRefFilters subject)
   -- The one ref, CreateCopy's arm above: an EachMatching Filter is card text.
   Effect.CopySpell (CopySpell.MkCopySpell ref _) -> sourceHosted (objectRefFilters ref)
-  -- SOURCE-HOSTED for printedReplacementFilters' reason, and only the ROW's own
-  -- Filters: a stored row is read through the same
+  -- The ROW's own Filters are framed for printedReplacementFilters' reason: a
+  -- stored row is read through the same
   -- Pawl.Engine.Replacement.candidateContext a printed one is, where the
   -- duration and the CR 604.2 clause beside it are not.
   Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> unframed (durationFilters duration <> foldMap conditionFilters condition) <> replacementRowFramed (replacementEffectFilters replacement) <> concatMap effectFilters (replacementEffectRiders replacement)
@@ -6494,6 +6496,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- two differ in how often they reach a nested ref and never in WHICH. Sound
   -- because effectNestedEffects reaches a superset of effectFilters' own
   -- recursion (replacementPrintedEffects contains replacementEffectRiders).
+  --
+  -- SourceHostFramed and not `hostFramed`: inside an Effect that tag means "an
+  -- ObjectRef's filter" to this comparison, which is why a stored Effect.Replace's
+  -- own row carries ReplacementRowFramed instead.
   Spec.it s "every ObjectRef position the Filter traversal reaches is one the asking traversal reaches" $ do
     ps <- S.allPrintings s
     let viaFilters card = Set.fromList [f | effect <- cardResolutionEffects card, (SourceHostFramed, f) <- effectFilters effect]
@@ -6694,12 +6700,25 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         bakeCounterShield replacement = case replacement of
           ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _ riders) -> ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern DamageRewrite.PreventRemovingShieldCounter riders)
           other -> other
+        bakeRedirect replacement = case replacement of
+          ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _ riders) -> ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern (DamageRewrite.Redirect (Recipient.ToCreature (ObjectId.MkObjectId 7))) riders)
+          other -> other
+        printRedirect replacement = case replacement of
+          ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _ riders) -> ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern (DamageRewrite.RedirectMatching Filter.Type.IsHostOfSource) riders)
+          other -> other
     Spec.assertBool s (any isDamageR printed) "setup: Fog prints a damage replacement to bake"
     Spec.assertBool s (not (any engineOnlyOffends printed)) "the real Fog names no recipient and counts nothing"
     Spec.assertBool s (any (engineOnlyOffends . bakeRecipient) printed) "the same effect naming a shielded player is rejected"
     Spec.assertBool s (any (engineOnlyOffends . bakeShield) printed) "and so is one counting a shield down"
     -- CR 122.1c's prevention, which only Projection.shieldOf may mint.
     Spec.assertBool s (any (engineOnlyOffends . bakeCounterShield) printed) "and so is one removing a shield counter"
+    -- CR 614.9's destination, the pair this lint was blind to (#2378): a
+    -- Recipient names an id and only Resolve's RedirectDamage arm may write one,
+    -- where the printed twin describes and is accepted. The two assertions
+    -- together are the lint, since either alone passes on a predicate that
+    -- answered one way for every redirect.
+    Spec.assertBool s (any (engineOnlyOffends . bakeRedirect) printed) "and so is a redirection naming its destination by id"
+    Spec.assertBool s (not (any (engineOnlyOffends . printRedirect) printed)) "while one describing that destination is accepted"
     Spec.assertBool s (engineOnlyOffends (ReplacementEffect.DestructionR DestructionRewrite.RemoveShieldCounter)) "and so is CR 122.1c's destruction half"
     Spec.assertBool s (not (engineOnlyOffends (ReplacementEffect.DestructionR DestructionRewrite.Regenerate))) "while CR 701.19a's printed regeneration is accepted"
     -- CR 122.1d's row, which only Projection.stunOf may mint -- the whole arm,

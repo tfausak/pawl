@@ -90,16 +90,20 @@ data DamageRewrite
     -- battle, creature, planeswalker, or player" -- so the destination is the
     -- UNIQUE match, and a filter admitting none or several redirects nowhere:
     -- CR 614.9's "the effect does nothing", which
-    -- Pawl.Engine.Replacement.printedDestination answers. Both atoms a card may
-    -- write here name at most one permanent by construction, so the several
-    -- case is unreachable from data/cards.
+    -- Pawl.Engine.Replacement.printedDestination answers. Nothing in this type
+    -- stops a card describing several; the pool's one destination is
+    -- Filter.IsHostOfSource, which cannot.
     --
-    -- A PLAYER destination has no spelling here, and that is the rule rather
-    -- than a gap in this arm: a Filter describes objects (CR 120.3a's player is
-    -- not one), which is exactly why DamagePattern splits its printed recipient
-    -- across `whatRecipient` and `whoRecipient`. No printing redirects to a
-    -- player it does not TARGET, and a targeted destination is a resolution's
-    -- Redirect above rather than a static one (gap #1098 is the counted twin of
-    -- that shape).
+    -- A PLAYER destination has no spelling here: a Filter describes objects and
+    -- CR 120.3's other kind of recipient is not one, which is why DamagePattern
+    -- splits its printed recipient across `whatRecipient` and `whoRecipient`
+    -- rather than widening the Filter.
+    --
+    -- Nothing is lost by it today. The printings that redirect damage to a
+    -- player -- Blood of the Martyr, Sivvi's Valor and Vassal's Duty, Scryfall
+    -- `o:/dealt to you instead/`, 2026-08-28 -- are all one-shot RESOLUTIONS, so
+    -- their destination is baked by Effect.RedirectDamage into the Redirect
+    -- above. A card that printed a static one on a permanent would refute this,
+    -- and would want a player half here the way DamagePattern has one.
     RedirectMatching (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

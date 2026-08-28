@@ -3446,8 +3446,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- each need a capability that does not exist: Ajani Steadfast needs a "prevent
   -- all but 1" rewrite (#2443), Serra the Benevolent replaces a LIFE TOTAL's
   -- reduction rather than a damage event (#2526), and Jaya Ballard's "cast this
-  -- way" is a
-  -- back-reference to the permission the same emblem grants. The pool's other
+  -- way" is a back-reference to the permission the same emblem grants. The pool's other
   -- two Effect.CreateEmblem producers are Ajani, Adversary of Tyrants and
   -- Elspeth, Sun's Champion, and neither emblem carries a replacementEffects row.
   -- CR 114.2 lets the creating effect give an emblem any ability and CR 114.3

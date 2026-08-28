@@ -1733,10 +1733,11 @@ liveDestination gs oid
 -- None is CR 614.9's "the effect does nothing", which Pawl.Engine.Event.apply
 -- turns into the event handed back unchanged -- the same answer a baked
 -- destination that left the battlefield gets, and for the same sentence.
--- SEVERAL is that answer too, and is unreachable from data/cards: both atoms a
--- card may write here name at most one permanent (Filter.IsSource,
--- Filter.IsHostOfSource), and the rule redirects to "another battle, creature,
--- planeswalker, or player" rather than to a set.
+-- SEVERAL is that answer too, and no card in the pool reaches it: the pool's one
+-- printed destination is Filter.IsHostOfSource (Pariah), which names at most one
+-- permanent. Nothing in the type stops a card describing several, so this is the
+-- answer the rule leaves for that shape -- it redirects to "another battle,
+-- creature, planeswalker, or player" and never to a set.
 --
 -- The battlefield rather than every object, because that is where CR 614.9's
 -- own guard puts a destination; liveDestination then answers the rest.

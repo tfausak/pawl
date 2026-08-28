@@ -3657,11 +3657,11 @@ pariahSpec s registry = Spec.describe s "Pariah (CR 614.9)" $ do
     Spec.assertEqWith s "bob loses the whole 4" (S.lifeOf S.bob aimedAtBob) (Just 16)
     Spec.assertEqWith s "nothing is marked on the enchanted creature" (S.damageOf host aimedAtBob) (Just 0)
     Spec.assertEqWith s "nor on the creature beside it" (S.damageOf bystander aimedAtBob) (Just 0)
-  -- THE CONTROL on the object half: CR 120.3a's other kind of recipient. Pariah
+  -- THE CONTROL on the object half: CR 120.3's other kind of recipient. Pariah
   -- names a player and no object, so damage aimed at a permanent alice controls
   -- is not its business -- which is what keeps `whoRecipient` from being read as
   -- "anything of yours".
-  Spec.it s "CR 120.3a damage aimed at a permanent alice controls is not redirected" $ do
+  Spec.it s "CR 120.3 damage aimed at a permanent alice controls is not redirected" $ do
     plains <- S.printingOf s registry "Plains"
     jedit <- S.printingOf s registry "Jedit Ojanen"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
