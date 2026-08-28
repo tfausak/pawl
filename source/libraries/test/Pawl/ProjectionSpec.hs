@@ -3486,9 +3486,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- which closes it for an emblem, with CR 114.4 saying the same in the emblem's
   -- own rule. This is a PRINTED row, which is what makes CR 604.2 the rule that
   -- decides its zone. The row also carries a CONDITION ("if you control a
-  -- creature"), so the case pins the second question with it: CR 614.12's board,
-  -- Projection.boardAsEntering, asked of an object CR 114.5 keeps off the
-  -- battlefield.
+  -- creature"), which CR 604.1 makes simply true rather than latched, so `lives`
+  -- reads it live off the board as the event would happen -- for an object CR
+  -- 114.5 keeps off the battlefield, and against a "you" that is CR 109.5's
+  -- controller of the emblem. No entry loop runs here, so CR 614.12's narrowing
+  -- of that board is not what this case pins; Pawl.ReplacementSpec's Frontier
+  -- Mastodon pairs are.
   --
   -- Serra the Benevolent's emblem is Worship's clause word for word, and
   -- data/cards/worship.json authors the identical ReplacementEffect.LifeLossR
@@ -3510,9 +3513,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- what leaves the armed battlefield holding Goblin Pikers alone, so
   -- replacementsAffecting's short-circuit is shut on everything but the emblem
   -- (serraEmblemBoard argues this where it is written). A Piker is a red 2/1 with
-  -- no abilities, and it is not a creature the emblem's own "you control a
-  -- creature" could be read off for BOB, because CR 109.5's "you" is the
-  -- emblem's controller.
+  -- no abilities, so it trips nothing itself -- and BOB keeps his on the
+  -- creatureless board, where alice has none: the condition is False there only
+  -- if it is read for CR 109.5's "you", the emblem's controller, rather than for
+  -- anybody at all.
   --
   -- Every number distinct: alice at 2 (or 9 for the shallow board), bob at 3, a
   -- 4-damage hit, a floor of 1. The floored total is 1, the unfloored ones -2 and
