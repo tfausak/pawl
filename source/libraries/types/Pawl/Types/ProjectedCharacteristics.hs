@@ -193,6 +193,25 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- Not copiable, and structurally so: CR 707.2's list of copiable values holds
     -- no text change, and this is written by the layer fold rather than by the
     -- seed, so copiableCharacteristics never carries one.
-    subtypeWordChanges :: [ChangeSubtypeWord.ChangeSubtypeWord]
+    subtypeWordChanges :: [ChangeSubtypeWord.ChangeSubtypeWord],
+    -- | CR 612.3: the `keywords` counts as the LAST layer-3 text change left
+    -- them. The other half of subtypeWordChanges above -- that field says which
+    -- words layer 3 swapped, and this one says which keyword instances layer 3
+    -- was in a position to reach at all, so the mint can tell a printed instance
+    -- (which the swap reached) from one CR 613.1f granted afterwards (which it
+    -- did not, and which keeps rule 702's printed word).
+    --
+    -- Counts and not a Set, because CR 702.135b makes each instance its own
+    -- ability: a permanent printing afterlife and granted afterlife again holds
+    -- two, and only the first is rewritten. The mint reads it against the live
+    -- `keywords` above rather than trusting it alone; the clamp there says why.
+    --
+    -- EMPTY when no text change ran, which reads as "every instance is granted".
+    -- That is inert rather than wrong: subtypeWordChanges is empty in the same
+    -- breath, so the mint's rewrite is the identity either way. The two are
+    -- written by the one applyModification arm precisely so they cannot disagree.
+    --
+    -- Not copiable, for subtypeWordChanges' reason and by the same construction.
+    textChangedKeywords :: Map.Map Keyword.Keyword Natural.Natural
   }
   deriving (Eq, Ord, Show)

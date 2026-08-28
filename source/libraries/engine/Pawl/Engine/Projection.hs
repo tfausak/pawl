@@ -398,20 +398,30 @@ applyModification viewOf src gs oid unitTypes m pc =
         -- 702's minted abilities are built after this fold, so the pair is
         -- recorded in PC.subtypeWordChanges for the mint, in CR 613.1 order.
         --
+        -- The REWRITTEN counts also go to PC.textChangedKeywords, which is what
+        -- CR 612.3 costs: the mint has to tell the instances layer 3 reached from
+        -- the ones layer 6 grants afterwards. Taken here rather than beside the
+        -- mint so it lands after the key remap above -- a snapshot of the
+        -- pre-remap keys would miss a keyword whose own payload carries a subtype.
+        -- Later text changes overwrite it, which is right: layer 3 finishes before
+        -- layer 6 begins, so the last one holds the counts every grant follows.
+        --
         -- rewriteWithCounters below guards the same hazard on an ENTRY ROW's
         -- counter kinds, where the values are Quantities and the combiner is
         -- Quantity.Plus rather than (+).
         --
         Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to) ->
           let pairs = [(from, to)]
+              keywords = Map.mapKeysWith (+) (Filter.rewriteKeyword pairs) (PC.keywords pc)
               pc' =
                 pc
-                  { PC.keywords = Map.mapKeysWith (+) (Filter.rewriteKeyword pairs) (PC.keywords pc),
+                  { PC.keywords = keywords,
                     PC.activatedAbilities = fmap (rewriteActivatedAbility pairs) (PC.activatedAbilities pc),
                     PC.triggeredAbilities = fmap (rewriteTriggeredAbility pairs) (PC.triggeredAbilities pc),
                     PC.replacementEffects = fmap (rewritePrintedReplacement pairs) (PC.replacementEffects pc),
                     PC.characteristicPT = fmap (rewriteCharacteristicPT pairs) (PC.characteristicPT pc),
-                    PC.subtypeWordChanges = PC.subtypeWordChanges pc <> [ChangeSubtypeWord.MkChangeSubtypeWord from to]
+                    PC.subtypeWordChanges = PC.subtypeWordChanges pc <> [ChangeSubtypeWord.MkChangeSubtypeWord from to],
+                    PC.textChangedKeywords = keywords
                   }
            in if Set.member from (PC.subtypes pc')
                 then pc' {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc'))}
@@ -1220,7 +1230,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.replacementEffects = [],
         PC.triggeredAbilities = [],
         PC.enchant = [],
-        PC.subtypeWordChanges = []
+        PC.subtypeWordChanges = [],
+        PC.textChangedKeywords = Map.empty
       }
   Just face ->
     -- The seed predates every layer, so it can describe no object: every view is
@@ -1286,7 +1297,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             -- a face-down permanent with none.
             PC.enchant = Face.enchant face,
             -- The seed is CR 613.1's starting point, before layer 3 has run.
-            PC.subtypeWordChanges = []
+            PC.subtypeWordChanges = [],
+            PC.textChangedKeywords = Map.empty
           }
 
 -- CR 202.2 / 204.2 / 202.2b: an object's printed colours, from its mana cost's
@@ -4360,6 +4372,10 @@ abilitiesFromCharacteristics peers pc oid gs =
         Just cond -> Condition.holds peers (Filter.contextFor (controllerOf oid gs) (Just oid)) gs oid cond
    in -- Rule 702's own activated abilities are appended here, minted from the
       -- POST-LAYER keyword map, so Humility takes crew away with the rest.
+      --
+      -- Unlike mintedTriggeredAbilitiesOf, no CR 612.2a rewrite is applied here:
+      -- none of the activated abilities rule 702 mints writes a creature-type
+      -- word (gap #2495).
       filter
         granted
         ( PC.activatedAbilities pc
@@ -4593,6 +4609,8 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
        | Set.member CardType.Battle (PC.cardTypes pc),
          Defense.MkDefense n <- Maybe.maybeToList (PC.defense pc)
        ]
+    -- No CR 612.2a rewrite here either, for abilitiesFromCharacteristics' reason
+    -- (gap #2495).
     <> Keyword.mintedReplacementsOf (PC.keywords pc)
     -- CR 714.3a's intrinsic lore counter -- or CR 714.3b's chosen number, which
     -- rule 714.3b substitutes for it on a Saga with read ahead -- minted off the
@@ -4898,13 +4916,32 @@ triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 -- rules text is the rule's, not the card's, so the words a text change reaches
 -- do not exist until the mint runs (CR 612.1, CR 612.2a).
 --
--- Over-reaches by CR 612.3 for a keyword GRANTED at layer 6, which arrives after
--- the layer-3 swap and should keep the printed word. No card grants afterlife,
--- fabricate or soulshift (gap #1600).
+-- CR 612.3 stops the rewrite at the instances layer 3 actually reached: an ability
+-- GRANTED at CR 613.1f layer 6 arrives after the swap and keeps rule 702's printed
+-- word. PC.textChangedKeywords is the layer-3 count and PC.keywords the live one,
+-- so the split is per INSTANCE (CR 702.135b) rather than per object -- a permanent
+-- printing afterlife and granted afterlife again mints its printed instance with
+-- the swapped word and its granted one with rule 702.135a's own.
+--
+-- `min` keeps `live - changed` total. It cannot bite today, and the mutation that
+-- removes it leaves the suite green: every layer-6 write to PC.keywords either
+-- adds one instance, DELETES the whole key (Modification.LoseKeyword, which the
+-- CR gives no way to spend one instance of) or empties the map, so a live count
+-- strictly between zero and the layer-3 count is unreachable, and a deleted key
+-- is not walked at all. It is arithmetic insurance, not a rule -- which surviving
+-- instance counts as the printed one is a question CR 702.135b leaves moot, the
+-- instances being interchangeable.
 mintedTriggeredAbilitiesOf :: ProjectedCharacteristics -> [TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 mintedTriggeredAbilitiesOf pc =
   let pairs = fmap (\c -> (ChangeSubtypeWord.from c, ChangeSubtypeWord.to c)) (PC.subtypeWordChanges pc)
-   in fmap (rewriteTriggeredAbility pairs) (Keyword.triggeredAbilitiesOf (PC.keywords pc))
+      mint keyword count = Keyword.triggeredAbilitiesOf (Map.singleton keyword count)
+      instances (keyword, live) =
+        let changed = min live (Map.findWithDefault 0 keyword (PC.textChangedKeywords pc))
+         in fmap (rewriteTriggeredAbility pairs) (mint keyword changed) <> mint keyword (live - changed)
+   in -- Keyword.triggeredAbilitiesOf's own order, one keyword at a time: it walks
+      -- Map.toAscList, so keeping that walk here leaves the CR 603.3b ordering
+      -- prompt indexing into the same canonical order it did before the split.
+      concatMap instances (Map.toAscList (PC.keywords pc))
 
 -- CR 702.5a / 613 layer 6: the object's enchant abilities after the fold --
 -- printed and granted together, which is what Modification.GainEnchant exists to
