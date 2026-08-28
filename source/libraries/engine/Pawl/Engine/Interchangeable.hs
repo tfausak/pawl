@@ -18,8 +18,10 @@ import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 
@@ -45,10 +47,13 @@ import qualified Pawl.Types.Recipient as Recipient
 --   * The board must be QUIET. Every game-state container that can name one
 --     object and not another is required to be EMPTY rather than searched for
 --     these two ids, so one stored effect anywhere retires the elision for the
---     whole board.
+--     whole board. The four ID-KEYED RELATIONS are the exception, and are
+--     SEARCHED instead -- namedByRelation below.
 --
--- Not implemented: a board that is not quiet. Deciding a pair against a stored
--- effect, a replacement, a delayed trigger or a combat assignment means asking
+-- Not implemented: the eleven containers quiet still requires empty. Deciding a
+-- pair against a stored continuous effect, a replacement, a player, block or
+-- attack row, a regeneration prohibition, an ignore, a delayed trigger, a
+-- prevention rider, a pending entry effect or a combat assignment means asking
 -- each of those whether it names one of the two, which is a per-type traversal
 -- this does not have (#1969).
 objects :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> ObjectId -> Bool
@@ -57,6 +62,8 @@ objects pcs gs a b =
     || ( quiet gs
            && Map.lookup a pcs == Map.lookup b pcs
            && sameObject
+           && not (namedByRelation a gs)
+           && not (namedByRelation b gs)
            && not (namedByAnother a gs)
            && not (namedByAnother b gs)
        )
@@ -77,7 +84,8 @@ representatives pcs gs candidates =
   where
     keep kept oid = if any (objects pcs gs oid) kept then kept else kept <> [oid]
 
--- Whether the board stores nothing that could name one object and not another.
+-- Whether the board stores nothing that could name one object and not another,
+-- BAR the four id-keyed relations namedByRelation searches instead.
 --
 -- The fields NOT listed here, and why each is safe to leave unread: the zones
 -- and GameState.objects hold every object symmetrically, and what one object
@@ -108,10 +116,6 @@ quiet gs =
     && Seq.null (GameState.pendingEntryEffects gs)
     && Set.null (GameState.enteringBeside gs)
     && Set.null (GameState.enteringSubjects gs)
-    && Map.null (GameState.phasedOut gs)
-    && Map.null (GameState.haunting gs)
-    && Map.null (GameState.exiledWith gs)
-    && Map.null (GameState.exiledUntilMonarch gs)
     && GameState.combat gs == noCombat
 
 -- An empty Combat, so that "nothing is in combat" is one equality over every
@@ -135,6 +139,61 @@ noCombat =
       Combat.blockersDeclared = False,
       Combat.defender = Nothing
     }
+
+-- Whether one of the board's four ID-KEYED RELATIONS names this object. Each is
+-- a Map from an object to what the game remembers about it, so the ids a row
+-- names are its KEY plus whatever ids its value holds -- and both are read here,
+-- which is what makes searching these four exact rather than merely likely.
+-- Everything quiet still requires empty is a container whose rows name objects
+-- through a nested structure (a Filter, an Expiry, an effect) that no traversal
+-- here can bound.
+--
+--   * GameState.phasedOut (CR 702.26b), keyed by the phased-out permanent, its
+--     value the player it phased out under.
+--   * GameState.exiledUntilMonarch (CR 725), keyed by the exiled incarnation,
+--     its value the watching player and whether the crown has moved.
+--   * GameState.haunting (CR 702.55b), keyed by the haunting card in exile, its
+--     value the object that card haunts.
+--   * GameState.exiledWith (CR 607.2), keyed by the exiled card, its value the
+--     object CR 607.2a's or CR 607.2b's link names.
+--
+-- The first two can never name a CANDIDATE through the one caller
+-- (Pawl.Engine.Cost's mana-source window): both key on an object that is not on
+-- the battlefield, and neither value holds an object at all. They are searched
+-- rather than required empty all the same, because "this row is about some other
+-- object" is the honest reading of the rule and requiring emptiness makes an
+-- unrelated phased-out permanent decide a pair it says nothing about.
+--
+-- The haunting arm is the proved one: Pawl.ManaSpec's "an Elf a haunting card in
+-- exile haunts is a candidate of its own" is a haunt row naming one of three
+-- otherwise identical Elves, beside "a haunt row that names none of them leaves
+-- the elision standing", which is the same board with the row's value moved.
+namedByRelation :: ObjectId -> GameState -> Bool
+namedByRelation oid gs =
+  relates phasedOutNames (GameState.phasedOut gs)
+    || relates monarchWatchNames (GameState.exiledUntilMonarch gs)
+    || relates Set.singleton (GameState.haunting gs)
+    || relates Set.singleton (GameState.exiledWith gs)
+  where
+    relates names = any (\(key, value) -> key == oid || Set.member oid (names value)) . Map.toList
+
+-- The objects a GameState.phasedOut row names BEYOND its key: none, since CR
+-- 702.26a's stored value is the player the permanent phased out under.
+--
+-- Total over PhasedOut's constructors and POSITIONAL, so a field added to any of
+-- them is an arity error here rather than an ObjectId this silently stops
+-- reading -- the failure mode a `_` arm or a `{}` pattern would hide.
+phasedOutNames :: PhasedOut.PhasedOut -> Set.Set ObjectId
+phasedOutNames row = case row of
+  PhasedOut.Directly _under -> Set.empty
+  PhasedOut.Indirectly _under -> Set.empty
+  PhasedOut.Orphaned _under -> Set.empty
+
+-- The objects a GameState.exiledUntilMonarch row names beyond its key: none. Its
+-- value is a player and a flag. Positional for phasedOutNames' reason.
+monarchWatchNames :: MonarchWatch.MonarchWatch -> Set.Set ObjectId
+monarchWatchNames watch = case watch of
+  MonarchWatch.MkMonarchWatch _controller _due -> Set.empty
 
 -- Whether any OTHER object names this one: an Aura or Equipment attached to it,
 -- which CR 303.4 stores on the rider rather than on the host, and a spell or
