@@ -870,6 +870,10 @@ viewOfCard face =
           -- with no object behind it -- the rule's own answer rather than an
           -- unknown, `transformed` below's reason one status category over.
           Filter.faceDown = False,
+          -- Nothing rather than this very view: CR 708.12's subject is the card
+          -- representing an object, and this builder IS a printed face, so a
+          -- self-reference would only recur. Filter.representedCard says so.
+          Filter.representedCard = Nothing,
           -- CR 406.3 writes its rider onto an object in exile, and this is a
           -- printed FACE with no object behind it -- the line above's reason,
           -- one rule over.
@@ -1081,6 +1085,15 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- the atom today is already scoped to the battlefield, so dropping the
       -- conjunct leaves the suite green.
       Filter.faceDown = Set.member oid (GameState.battlefield gs) && maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs),
+      -- CR 708.12's "ignoring any continuous effects", and the only site that
+      -- fills the field: the card representing this object, read off
+      -- Game.faceUpFaceOf so that CR 708.2a's substitution in Game.faceOf does not
+      -- reach it. Nothing where no card is behind the object -- a token, an
+      -- ability on the stack -- and Filter.RepresentedByCard is False there.
+      --
+      -- NOT scoped to the battlefield, unlike `faceDown` above: CR 708.12's read
+      -- is of a card, which an object in any zone either has or has not.
+      Filter.representedCard = fmap viewOfCard (Game.faceUpFaceOf oid gs),
       -- CR 406.3's rider, and the only site that fills the field. NO zone
       -- conjunct beside it, unlike the line above: Object.exiledFaceDown is
       -- per-incarnation state that only the move into exile writes, and CR 400.7
@@ -3678,6 +3691,11 @@ filterReads f = case f of
   -- CR 110.5a again, one status category over: face-up/face-down is not a
   -- characteristic either, so no layer writes it.
   Filter.Type.IsFaceDown -> Set.empty
+  -- Reads NOTHING even though the nest names characteristics, and this is the
+  -- one atom carrying a Filter that does not descend into it: CR 708.12 reads
+  -- the PRINTED card, which is Pawl.Engine.Game.faceUpFaceOf and which no layer
+  -- can reach, so no Modification can make the nest flip.
+  Filter.Type.RepresentedByCard _ -> Set.empty
   -- CR 406.3a leaves a face-down exiled card no characteristics at all, so
   -- being one is not a characteristic either and no layer writes it.
   Filter.Type.IsExiledFaceDown -> Set.empty

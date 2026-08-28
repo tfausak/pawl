@@ -122,6 +122,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
@@ -193,6 +194,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   faceUpEffectSpec s registry
   breakOpenSpec s registry
   primalWhispererSpec s registry
+  shriekerSpec s registry
   disguiseSpec s registry
 
 -- CR 303.4k: an Aura turned face up, choosing what it becomes attached to.
@@ -2631,3 +2633,147 @@ paysWard who p = case p of
     | d == who && player == who ->
         PaymentDecision.Pays
   _ -> S.identityAnswer p
+
+-- CR 708.12: "if a spell or ability that instructs a player to reveal a face-down
+-- permanent needs information about the revealed object, it uses the
+-- characteristics of that object ignoring any continuous effects that may be
+-- applying to it."
+--
+-- Hauntwoods Shrieker is the rule's card. {1}{G}{G} Creature -- Beast Mutant 3/3
+-- (DSK), "Whenever this creature attacks, manifest dread. / {1}{G}: Reveal target
+-- face-down permanent. If it's a creature card, you may turn it face up." (name,
+-- cost, type line, P/T and Oracle text checked against api.scryfall.com,
+-- 2026-08-28). Both lines are transcribed; the attack trigger is manifest dread's
+-- own three clauses, which manifestDreadSpec above already proves, and this group
+-- reads the activated ability alone.
+--
+-- "If it's a creature card" is Filter.RepresentedByCard, and CR 708.2a is the
+-- whole reason it cannot be a plain HasCardType conjunct: a face-down permanent
+-- IS a 2/2 creature, so a projected read answers yes to every manifested land
+-- ever put onto the battlefield. Wizards' own ruling on the card states the same
+-- thing from the other end -- the ability "considers only the characteristics of
+-- the printed card. Static abilities that affect the characteristics of
+-- permanents on the battlefield aren't taken into account."
+--
+-- Song of the Dryads is the CONTINUOUS EFFECT rule 708.12 says to ignore, chosen
+-- because it SETS a card type in CR 613.1d's layer 4 rather than adding one:
+-- "enchanted permanent is a colorless Forest land", so a face-down permanent
+-- under it stops being a creature at every projected read. An adding effect could
+-- not discriminate -- CR 708.2a has already made the permanent a creature. Every
+-- case asserts the Song's reach through Projection.isCreatureOf BEFORE it
+-- activates anything, which is what stops a turn-over from being read as evidence
+-- the Song never applied.
+--
+-- Two cards go under the manifest, and the pair separates the two readings from
+-- opposite sides: Thragtusk, a creature card, and Forest, a land card. A
+-- projected read turns both over; rule 708.12's read turns the Thragtusk over and
+-- leaves the Forest face down.
+shriekerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+shriekerSpec s registry = Spec.describe s "Revealing a face-down permanent (CR 708.12)" $ do
+  -- THE HEADLINE CASE, and the one the atom exists for: the card underneath is a
+  -- creature card, and Song of the Dryads has made the permanent a land at every
+  -- projected read. A projection-reading condition finds no creature and leaves it
+  -- face down; rule 708.12's read ignores the Song and turns it over.
+  Spec.it s "CR 708.12 the printed card is read, not the continuous effect on the permanent" $ do
+    thragtusk <- S.printingOf s registry "Thragtusk"
+    (board, shrieker, shriekerId, victim) <- shriekerBoard s registry "Thragtusk" True
+    case victim of
+      Just oid -> do
+        -- THE CONTROL: the Song genuinely applies, so the two readings differ
+        -- here. Without it the case would pass on a board where nothing was being
+        -- ignored.
+        Spec.assertBool s (not (Projection.isCreatureOf oid board)) "before: Song of the Dryads has made the face-down permanent a land"
+        Spec.assertEqWith s "and it is face down, as it entered" (fmap Object.facing (Game.lookupObject oid board)) (Just (Facing.faceDown FaceDownReason.Manifested))
+        let after = shriek shrieker shriekerId oid board
+        -- THE GAMEPLAY ASSERTION.
+        Spec.assertEqWith s "CR 708.12 the face-down permanent turned face up, the Song notwithstanding" (fmap Object.facing (Game.lookupObject oid after)) (Just Facing.FaceUp)
+        Spec.assertEqWith s "CR 708.8 and answers to its printed name" (Projection.namesOf oid after) (Set.singleton (S.printingName thragtusk))
+      Nothing -> Spec.assertFailure s "the face-down permanent did not reach the battlefield"
+
+  -- THE PAIR'S OTHER HALF: the same board with the Song on the Goblin Piker
+  -- instead. Nothing else moves, and the permanent turns over just the same,
+  -- which is what makes the case above a statement about rule 708.12 rather than
+  -- about a board the Song broke.
+  Spec.it s "CR 708.12 with the continuous effect elsewhere the same card turns face up" $ do
+    (board, shrieker, shriekerId, victim) <- shriekerBoard s registry "Thragtusk" False
+    case victim of
+      Just oid -> do
+        Spec.assertBool s (Projection.isCreatureOf oid board) "before: with the Song elsewhere the face-down permanent is CR 708.2a's 2/2 creature"
+        let after = shriek shrieker shriekerId oid board
+        Spec.assertEqWith s "CR 708.12 and it turns face up" (fmap Object.facing (Game.lookupObject oid after)) (Just Facing.FaceUp)
+      Nothing -> Spec.assertFailure s "the face-down permanent did not reach the battlefield"
+
+  -- THE OTHER DIRECTION, and the one a plain HasCardType conjunct fails: the card
+  -- underneath is a LAND card, and CR 708.2a has made the permanent a 2/2 creature
+  -- anyway. A projected read turns it over; rule 708.12's read refuses. No Song
+  -- anywhere near it, so nothing but the printed card can be what answered.
+  --
+  -- Not CR 701.40g's refusal: that rule stops an INSTANT OR SORCERY card from
+  -- turning over, and Pawl.Engine.FaceDown.revealsInsteadOfTurningUp is scoped to
+  -- exactly those two card types, so a land reaches the turning-over unguarded and
+  -- only the card's own condition can hold it face down.
+  Spec.it s "CR 708.12 a manifested land card is not a creature card, whatever CR 708.2a made the permanent" $ do
+    (board, shrieker, shriekerId, victim) <- shriekerBoard s registry "Forest" False
+    case victim of
+      Just oid -> do
+        Spec.assertBool s (Projection.isCreatureOf oid board) "before: CR 708.2a has made the manifested land a 2/2 creature"
+        -- `shriek` is a no-op on a card printing no activated ability, and a
+        -- no-op leaves exactly the board this case asserts. Naming the ability
+        -- count is what keeps the assertion below about rule 708.12.
+        Spec.assertEqWith s "and the Shrieker prints the one activated ability" (length (Face.activatedAbilities (S.combinedFace shrieker))) 1
+        let after = shriek shrieker shriekerId oid board
+        -- THE GAMEPLAY ASSERTION, and the falsifier for a projected read.
+        Spec.assertEqWith s "CR 708.12 the land card stayed face down" (fmap Object.facing (Game.lookupObject oid after)) (Just (Facing.faceDown FaceDownReason.Manifested))
+      Nothing -> Spec.assertFailure s "the face-down permanent did not reach the battlefield"
+
+-- The board rule 708.12 is read on, returned as (the board, the Shrieker's
+-- printing, the Shrieker, the face-down permanent).
+--
+-- `onTheManifest` says which permanent Song of the Dryads is attached to, and the
+-- Aura is on the board either way: removing it instead would change the board
+-- twice over, since CR 704.5m buries an unattached Aura on the next state-based
+-- pass. Goblin Piker is its other host -- "enchant permanent" admits it -- so
+-- neither leg can pass by the Song falling off.
+--
+-- Two Forests, which is {1}{G} exactly: a board that could not pay would leave the
+-- ability unactivated and every assertion below passing for that reason.
+shriekerBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  String ->
+  Bool ->
+  m (GameState.GameState, Printing.Printing, ObjectId.ObjectId, Maybe ObjectId.ObjectId)
+shriekerBoard s registry underneath onTheManifest = do
+  shrieker <- S.printingOf s registry "Hauntwoods Shrieker"
+  forest <- S.printingOf s registry "Forest"
+  song <- S.printingOf s registry "Song of the Dryads"
+  piker <- S.printingOf s registry "Goblin Piker"
+  under <- S.printingOf s registry underneath
+  let (shriekerId, g1) = S.addCreature shrieker S.alice (S.landsInPlay forest 2)
+      (bystander, g2) = S.addCreature piker S.alice g1
+      (g3, entered) = enterFaceDown under S.alice g2
+      (songId, g4) = S.addCreature song S.alice g3
+      host = if onTheManifest then entered else Just bystander
+      -- ToObject rather than S.attach's ToCreature: "enchant permanent" is a
+      -- Pool.Permanents slot, so those are the recipients casting would have left.
+      g5 = maybe g4 (\h -> S.settleSba (S.attachTo songId (Recipient.ToObject h) g4)) host
+  pure (g5 {GameState.priority = Just S.alice}, shrieker, shriekerId, entered)
+
+-- Activate the Shrieker's printed ability at the named face-down permanent and
+-- resolve it. The ability is read out of the committed card rather than
+-- hand-built, so what the cases prove is the card file.
+shriek :: Printing.Printing -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+shriek printing shriekerId oid board = case Face.activatedAbilities (S.combinedFace printing) of
+  ability : _ -> S.settleSba (S.runPure (revealing oid) board (Activate.activateAbility S.alice shriekerId ability >> Stack.resolveTop))
+  [] -> board
+
+-- CR 602.2b's targeting, which applies CR 601.2c, aimed at the face-down
+-- permanent; and CR 608.2d's announcement, taking the printed "may". Those are
+-- the two answers the Shrieker's ability asks for. Declining the "may" is the
+-- other legal answer and would leave every case's board indistinguishable from a
+-- condition that answered False, which is why it is taken rather than passed on.
+revealing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+revealing oid p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> aimedAt oid p

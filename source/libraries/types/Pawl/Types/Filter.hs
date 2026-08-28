@@ -822,6 +822,32 @@ data Filter keyword
     -- projected normally, which is what lets a face-down permanent clear a
     -- creature pool for this atom to narrow.
     IsFaceDown
+  | -- | CR 708.12: the CARD REPRESENTING the candidate matches the nested filter,
+    -- read off that card's printed face with nothing in CR 613 applied.
+    -- Hauntwoods Shrieker's "reveal target face-down permanent. If it's a
+    -- creature card, you may turn it face up" is the witness, and rule 708.12 is
+    -- what makes the nest necessary rather than a plain HasCardType conjunct: an
+    -- ability that reveals a face-down permanent and then needs information about
+    -- it "uses the characteristics of that object ignoring any continuous effects
+    -- that may be applying to it".
+    --
+    -- A PLAIN HasCardType WOULD BE VACUOUS HERE, which is the whole reason for a
+    -- second spelling: CR 708.2a leaves every face-down permanent a 2/2 creature,
+    -- so `HasCardType Creature` is true of a manifested land and this atom is
+    -- false of it. Pawl.FaceDownSpec's Hauntwoods Shrieker group is the pair of
+    -- boards that separates them.
+    --
+    -- The same read CR 701.40b's special action already takes at
+    -- Pawl.Engine.FaceDown.manifestCostOf ("show all players that the card
+    -- representing that permanent is a creature card"), given a spelling a CARD
+    -- can write. Pawl.Engine.Projection.viewOfCard builds the nested view off
+    -- Pawl.Engine.Game.faceUpFaceOf, so a face-up permanent answers about its own
+    -- card and a face-down one about the card underneath.
+    --
+    -- Uncharacteristic in Pawl.Engine.Projection.filterReads' sense even though
+    -- it names characteristics: it reads the PRINTED card, which no continuous
+    -- effect reaches, so no layer can make it flip.
+    RepresentedByCard (Filter keyword)
   | -- | CR 406.3: the candidate is a card that was exiled FACE DOWN. Riftsweeper's
     -- "target face-up exiled card" is spelled `Not IsExiledFaceDown`, the
     -- one-relation-one-spelling posture IsToken's comment states (#163).

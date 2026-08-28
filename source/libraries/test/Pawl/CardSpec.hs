@@ -2702,6 +2702,10 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsToken -> 0
   Filter.Type.IsTapped -> 0
   Filter.Type.IsFaceDown -> 0
+  -- A DESCENT for AttachedTo's reason, the nest describing the CARD representing
+  -- the candidate: CR 708.12's atom is a Filter position a card author writes
+  -- into like any other.
+  Filter.Type.RepresentedByCard f -> canHostSubjects f
   Filter.Type.IsExiledFaceDown -> 0
   Filter.Type.Transformed -> 0
   Filter.Type.HasNonManaActivatedAbility -> 0
