@@ -3817,10 +3817,12 @@ carryOver carrying oldId newId = case carrying of
 -- target is declared on the stack against a permanent (CR 601.2c), so no id it
 -- holds is ever a permanent spell's.
 --
--- PlayerEffect.DamageCantBePrevented carries the same pattern type and is left
--- alone: CR 615.12's sentence is not a prevention effect, so CR 400.7c does not
--- speak to it, and Pawl.CardSpec's engineOnlyOffends keeps card data off that
--- field anyway, so no row of it can name an object at all.
+-- PlayerEffect.DamageCantBePrevented and its CR 614.9 twin carry the same
+-- pattern type and are left alone: neither sentence is a prevention effect, so
+-- CR 400.7c does not speak to them, and Pawl.CardSpec's engineOnlyOffends keeps
+-- card data off that field anyway, so no row of either can name an object at
+-- all. Lava Burst's Filter.IsSource is the other half of the same field and is
+-- not re-keyed either -- it names a SORCERY spell, which becomes no permanent.
 rewatch :: ObjectId -> ObjectId -> ActiveReplacement.ActiveReplacement -> ActiveReplacement.ActiveReplacement
 rewatch oldId newId row = case ActiveReplacement.effect row of
   ReplacementEffect.DamageR damage

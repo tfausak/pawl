@@ -1415,7 +1415,11 @@ addRegenShield oid gs =
 -- Seed a stored player effect directly into GameState (bypasses resolving the
 -- spell that would install it; use when a test needs one active without a
 -- resolution). Object id 998 is the stand-in source, the withEffectAt posture --
--- nothing here reads the source's own characteristics.
+-- nothing here reads the source's own characteristics. It IS read as an
+-- IDENTITY: Pawl.Engine.PlayerEffect.applying threads it out, so Filter.IsSource
+-- inside a seeded effect compares against 998 and matches nothing on the board.
+-- A test whose effect names its own source must resolve the spell instead
+-- (Pawl.ReplacementSpec's lavaBurstSpec).
 addPlayerEffect ::
   Expiry.Expiry ->
   AffectedPlayers.AffectedPlayers PlayerId.PlayerId ->

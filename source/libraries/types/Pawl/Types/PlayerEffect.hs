@@ -425,10 +425,11 @@ data PlayerEffect
     -- permanent or player -- the REDIRECTION twin of the arm above.
     --
     -- CR 611.1's third clause again, and a separate arm rather than a flag on
-    -- that one because the two sentences are separable: Lava Burst prints both
-    -- limbs of one sentence and every other printing of either limb prints only
-    -- its own. Reading one carrier as saying both would make Spider-Punk stop
-    -- Turn the Tables.
+    -- the one above because the two sentences are separable: Spider-Punk,
+    -- Excruciator, Questing Beast and Malignus all say "can't be prevented" and
+    -- nothing about redirection, so a single carrier meaning both would make
+    -- Spider-Punk stop Turn the Tables. Lava Burst pairs the two limbs in one
+    -- sentence and writes both arms.
     --
     -- WHICH damage is the same Pawl.Types.DamagePattern, for the same reason and
     -- read by the same Pawl.Engine.Replacement.matchesDamagePattern: Lava Burst's
