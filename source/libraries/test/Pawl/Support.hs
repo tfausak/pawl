@@ -1611,6 +1611,7 @@ oneMountainState mountain ph =
           GameState.replacements = [],
           GameState.pendingPreventionRiders = Seq.empty,
           GameState.ambientAmounts = Map.empty,
+          GameState.detachedBindings = Map.empty,
           GameState.pendingEntryEffects = Seq.empty,
           GameState.enteringBeside = Set.empty,
           GameState.enteringSubjects = Set.empty,

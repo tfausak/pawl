@@ -375,3 +375,68 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
     -- follow-on LoseLife excludes. 20 halves to 10.
     Spec.assertEqWith s "CR 729.1b: only bob paid, which is how the subgame ended" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 20, Just 10)
     Spec.assertEqWith s "CR 729.1a: the subgame did not decide the main game" (GameState.result after) Nothing
+  -- CR 729.5's second sentence, the one the case above does not reach: "the spell
+  -- or ability that created the subgame finishes resolving, EVEN IF IT WAS
+  -- CREATED BY A SPELL CARD THAT'S NO LONGER ON THE STACK". alice casts Shahrazad
+  -- in the main game; inside the subgame she casts Burning Wish ({1}{R} sorcery,
+  -- "You may reveal a sorcery card you own from outside the game and put it into
+  -- your hand. Exile Burning Wish.") and names the Shahrazad that is resolving.
+  -- CR 729.4 offers it -- the main game's stack is outside the subgame like every
+  -- other main-game zone -- so Setup.applyCrossings deletes the main game's own
+  -- Shahrazad object and funnelBack files the subgame's incarnation in alice's
+  -- main-game library.
+  --
+  -- What CR 729.5 then requires is that Shahrazad's SECOND effect still runs with
+  -- the winner it bound. bob decks, so alice wins, and "each player who doesn't
+  -- win the subgame loses half their life" must reach bob alone.
+  --
+  -- THE DISCRIMINATING QUANTITY IS THE WINNER'S LIFE, not the loser's: bob halves
+  -- under either reading. A resolution that lost its winner binding leaves
+  -- PlayerRef.EachPlayerExcept excluding nobody, and alice halves too.
+  --
+  -- The sizing is the case above's, one wish instead of two. alice starts the
+  -- subgame (CR 729.2) so she skips her first draw (CR 103.8a) and her turns are
+  -- 1, 3 and 5; nine cards each means seven go to an opening hand and bob draws
+  -- from an empty library on turn 6, which ends the subgame under CR 704.5b.
+  -- alice's nine are one Burning Wish and eight Mountains, so by turn 5 she has
+  -- drawn her whole library and holds the wish whatever the shuffle did, with
+  -- three lands down against its {1}{R}. Nine is over CR 729.3's seven, so
+  -- neither player decks during setup.
+  Spec.it s "CR 729.5 gameplay: a wish that takes the resolving Shahrazad itself still finishes resolving with the winner it bound" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    shahrazad <- S.printingOf s registry "Shahrazad"
+    burningWish <- S.printingOf s registry "Burning Wish"
+    let g0 = Setup.emptyGame S.bothPlayers
+        g1 = S.landsFor plains S.alice 2 g0
+        g2 = stockLibrary mountain 9 S.bob (stockLibrary mountain 8 S.alice (stockLibrary burningWish 1 S.alice g1))
+        (_shahrazadId, g3) = S.addHandCard shahrazad S.alice g2
+        before =
+          g3
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        isFromAnotherGame candidate = case candidate of
+          OutsideCard.InAnotherGame _ -> True
+          OutsideCard.InPool _ -> False
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          -- Burning Wish's printed "may" (CR 608.2d), taken.
+          Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+          -- The main-game Shahrazad is the only sorcery alice owns outside the
+          -- subgame -- her main-game Plains are lands and her pool is empty -- so
+          -- this names it. The fallback is not silent: taking the head of an offer
+          -- that held anything else would leave Shahrazad's card in the main game
+          -- rather than in her library, which the second assertion reddens on.
+          Prompt.ChooseFromOutsideTheGame _ _ offered ->
+            Maybe.fromMaybe (NonEmpty.head offered) (List.find isFromAnotherGame (NonEmpty.toList offered))
+          -- CR 729.2's roll, answered so the turn count above is the one played.
+          Prompt.RandomFirstPlayer _ -> S.alice
+          _ -> S.castAnswer p
+        after = snd (Engine.runGamePure answer before Engine.priorityLoop)
+    Spec.assertEqWith s "the fixture starts both seats at twenty" (S.lifeOf S.alice before, S.lifeOf S.bob before) (Just 20, Just 20)
+    Spec.assertEqWith s "CR 729.5: the resolution finishes with the winner it bound -- alice won and is excluded, bob alone halves" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 20, Just 10)
+    Spec.assertEqWith s "CR 729.4/729.5: the wish really took the resolving Shahrazad, which came back to alice's main-game library" (length (filter (== shahrazad) (printingsIn Zone.Library S.alice after))) 1
+    Spec.assertEqWith s "CR 400.7/608.2n: and so it is in no main-game graveyard" (printingsIn Zone.Graveyard S.alice after) []
+    Spec.assertEqWith s "CR 729.1a: the subgame did not decide the main game" (GameState.result after) Nothing

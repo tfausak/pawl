@@ -10,6 +10,7 @@ import qualified Pawl.Codec.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Codec.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Codec.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Codec.BattlefieldCandidate as BattlefieldCandidate
+import qualified Pawl.Codec.Binding as Binding
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Combat as Combat
 import qualified Pawl.Codec.ContinuousEffect as ContinuousEffect
@@ -89,6 +90,7 @@ codec = Fields.object $ do
   replacements <- Fields.required "replacements" (Common.list ActiveReplacement.codec) GameState.replacements
   pendingPreventionRiders <- Fields.required "pendingPreventionRiders" (Common.seq Prevention.codec) GameState.pendingPreventionRiders
   ambientAmounts <- Fields.required "ambientAmounts" (Common.textMap SlotName.Type.unwrap (Right . SlotName.Type.MkSlotName) Common.natural) GameState.ambientAmounts
+  detachedBindings <- Fields.required "detachedBindings" (Common.naturalMap ObjectId.codec Binding.codecMap) GameState.detachedBindings
   pendingEntryEffects <- Fields.required "pendingEntryEffects" (Common.seq PendingEntryEffect.codec) GameState.pendingEntryEffects
   enteringBeside <- Fields.required "enteringBeside" (Common.set ObjectId.codec) GameState.enteringBeside
   enteringSubjects <- Fields.required "enteringSubjects" (Common.set ObjectId.codec) GameState.enteringSubjects
@@ -157,6 +159,7 @@ codec = Fields.object $ do
         GameState.replacements = replacements,
         GameState.pendingPreventionRiders = pendingPreventionRiders,
         GameState.ambientAmounts = ambientAmounts,
+        GameState.detachedBindings = detachedBindings,
         GameState.pendingEntryEffects = pendingEntryEffects,
         GameState.enteringBeside = enteringBeside,
         GameState.enteringSubjects = enteringSubjects,
