@@ -77,6 +77,7 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
@@ -4130,6 +4131,82 @@ vedalkenOrrerySpec s registry =
       Spec.assertBool s (not (any (isActivateOf equipment) (Action.legalActions S.alice board))) "still not offered"
       Spec.assertBool s (any (isActivateOf onOwnTurn) (Action.legalActions S.alice ownBoard)) "and still offered on her own turn"
 
+sigardasAidSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sigardasAidSpec s registry =
+  Spec.describe s "SigardasAid" $ do
+    -- The control, orreryBoard's: without it every refusal below would also be
+    -- true of a board where the Rollicker was unaffordable or unoffered. The
+    -- Piker on the battlefield is what bestow would enchant, and it is on every
+    -- board here, so the Aid stays the only difference.
+    Spec.it s "CR 117.1a on alice's own turn the bestow creature spell is castable already" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+      let (oid, board) = orreryOnOwnTurn mountain rollicker [piker]
+      Spec.assertBool s (S.castable S.alice oid board) "castable"
+      Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
+
+    Spec.it s "CR 117.1a on the opponent's turn it is not" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+      let (oid, _, board) = orreryBoard mountain rollicker [piker]
+      Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
+      Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice board))) "not offered"
+
+    -- CR 601.3b's SECOND SENTENCE, and rule 601.3b's own example: the Aid names
+    -- Aura spells, the card in hand is a Satyr creature card and no Aura at all,
+    -- and what carries it is the bestow choice CR 601.2b has yet to be made.
+    -- Nothing on the board says Aura until that choice is considered.
+    Spec.it s "CR 601.3b with Sigarda's Aid the bestow creature spell is castable on the opponent's turn" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+      aid <- S.printingOf s registry "Sigarda's Aid"
+      let (oid, _, board) = orreryBoard mountain rollicker [piker, aid]
+      Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
+      Spec.assertBool s (S.castable S.alice oid board) "castable"
+      Spec.assertBool s (PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board) "the permission reaches it"
+
+    -- CR 601.3b's FIRST sentence still holds the line: the permission is read,
+    -- rather than the sorcery-speed window being opened for everything. The pair
+    -- differs only in which creature card is in the hand, and the Piker has no
+    -- bestow, so no choice in its proposal can make it an Aura.
+    Spec.it s "CR 601.3b a creature card with no bestow is still refused" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      aid <- S.printingOf s registry "Sigarda's Aid"
+      let (oid, _, board) = orreryBoard mountain piker [piker, aid]
+      Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice board))) "not offered"
+      Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
+      Spec.assertBool s (not (PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board)) "the permission does not reach it"
+
+    -- CR 702.103b is what the lookahead consults and nothing else: with the
+    -- bestow card in hand and NO Aid, the window stays shut, so the choice space
+    -- is not a permission of its own.
+    Spec.it s "CR 601.3b without the Aid the bestow choice opens nothing" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+      let (oid, _, board) = orreryBoard mountain rollicker [piker]
+      Spec.assertBool s (not (PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board)) "no permission to read"
+
+    -- CR 601.2b: the choice is only CONSIDERED. Nothing is stamped by asking, so
+    -- the card in the hand is still a creature card and no Aura, on the very
+    -- board that just let it through.
+    Spec.it s "CR 601.3b considering the choice writes nothing onto the card" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+      aid <- S.printingOf s registry "Sigarda's Aid"
+      let (oid, _, board) = orreryBoard mountain rollicker [piker, aid]
+          asked = PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board
+          view = Projection.viewOfObject oid board
+      Spec.assertBool s asked "the permission reaches it"
+      Spec.assertBool s (not (Set.member Subtype.Aura (Filter.subtypes view))) "no Aura subtype"
+      Spec.assertBool s (Set.member CardType.Creature (Filter.cardTypes view)) "still a creature card"
+      Spec.assertBool s (Set.member Subtype.Aura (Filter.subtypes (Projection.bestowedView oid board))) "which only the hypothetical carries"
+
 -- ONE board for both halves of CR 701.6a's "a spell or ability": alice has a
 -- SPELL of the caller's choosing on the stack and a settled Prodigal Sorcerer
 -- whose {T} ABILITY can join it, and bob holds a Cancel for the first and a
@@ -5056,6 +5133,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   extraLandDropsSpec s registry
   matchesObjectSpec s registry
   vedalkenOrrerySpec s registry
+  sigardasAidSpec s registry
   yawgmothsWillSpec s registry
   crucibleSpec s registry
   voidWinnowerSpec s registry
