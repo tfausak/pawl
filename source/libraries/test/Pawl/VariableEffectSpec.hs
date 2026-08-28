@@ -4,7 +4,7 @@
 -- Pawl.Engine.Resolve over the effects whose size or recipients a player picks:
 -- amass, blight (CR 701.68), support, bolster, and the variable target counts --
 -- plus the swept counter placement, which picks nothing but is read by blight's
--- own CR 603.2c batch condition and so is proved on the same boards.
+-- own CR 603.2c batch watchers and so is proved beside them.
 -- The machinery is Pawl.ResolveSpec.
 module Pawl.VariableEffectSpec where
 
@@ -927,9 +927,11 @@ perCreatureCountersSpec s registry =
 -- by the CR 117.5 scan boundary alone and so would prove nothing about the
 -- group. Scryfall oracle:/put a -1\/-1 counter on [^.]*\.[^.]*put a -1\/-1
 -- counter on/, 2026-08-28, matches no printing; oracle:/put a \+1\/\+1 counter on
--- [^.(]*\.[^.(]*put a \+1\/\+1 counter on/, same date, matches Tempt with Glory,
--- Moment of Glory and Shelinda, Yevon Acolyte, so the shape is printed for +1/+1
--- counters -- but oracle:/counters are put on one or more/, same date, matches one
+-- [^.(]*\.[^.(]*put a \+1\/\+1 counter on/, same date, matches three printings, of
+-- which Tempt with Glory and Moment of Glory really do place twice in one
+-- resolution (Shelinda, Yevon Acolyte's two are exclusive branches), so the shape
+-- is printed for +1/+1 counters -- but oracle:/counters are put on one or more/,
+-- same date, matches one
 -- printing that could watch them, Cloaked Cadet, and its "This ability triggers
 -- only once each turn" (TriggerLimit.OncePerTurn) caps it at one trigger whatever
 -- the arity. A printing refuting the synthetic is one whose two clauses each place
@@ -1003,13 +1005,14 @@ sweptCountersSpec s registry =
         -- bracket drawn around the whole RESOLUTION rather than around one
         -- instruction's fold would pass it too. CR 608.2c makes each written
         -- instruction its own action, so the Wilting's two clauses are two events
-        -- and alice draws TWO cards; 1 is the resolution-wide bracket and 4 is the
-        -- once-per-permanent reading the case above rules out.
+        -- and alice draws TWO cards, where the resolution-wide bracket draws 1.
         --
         -- One creature per clause, which is the point -- the case above already
         -- proves a sweep of several fires once, so this one only has to be two
         -- sweeps -- and both sit inside ONE CR 117.5 scan, where two casts would
-        -- have been told apart by the scan boundary alone.
+        -- have been told apart by the scan boundary alone. It is the once-per-
+        -- permanent reading this board cannot see, two recipients giving 2 either
+        -- way; that is the case above's question and not this one's.
         --
         -- A Goblin Chariot is a 2/2 and Legions of Lim-Dul a 2/3, so both are still
         -- standing when the counters are read, and neither carries the other's
