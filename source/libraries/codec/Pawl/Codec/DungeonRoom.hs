@@ -21,7 +21,8 @@ codec cardCodec = Fields.object $ do
   name <- Fields.required "name" AbilityName.codec DungeonRoom.name
   -- CR 309.4c: a room whose printed effect pawl cannot express writes no
   -- ability, and the default is Face.defaultSpell -- one empty mode, the same
-  -- value a vanilla creature's spell takes.
+  -- value a vanilla creature's spell takes. No room in data/cards writes it
+  -- today; every transcribed dungeon states all of its rooms' effects.
   ability <- Fields.defaulted "ability" Face.defaultSpell (Modal.codec cardCodec (GrantedAbility.codec cardCodec)) DungeonRoom.ability
   -- CR 309.4: the bottommost room has no arrows out of it, so an empty set is
   -- the common case and writes no key.

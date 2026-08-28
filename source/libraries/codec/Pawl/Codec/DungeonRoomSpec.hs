@@ -50,9 +50,10 @@ drawOne =
     )
     (ModeSelection.ChooseExactly 1)
 
--- One constructor, so two cases: a room with arrows and an ability, and the
--- bottommost room of a dungeon whose printed effect pawl cannot express -- which
--- writes neither optional key.
+-- One constructor, so two cases: a room with arrows and an ability, and a room
+-- writing neither optional key -- the bottommost room of a dungeon whose printed
+-- effect pawl cannot express. No card in data/cards is in that state today, so
+-- this is where the codec's ability default is exercised at all.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DungeonRoom" $ do
   Spec.it s "MkDungeonRoom, Lost Mine of Phandelver's Temple of Dumathoin" $
