@@ -59,7 +59,17 @@ to agents as written. What it doesn't say:
 
 - A fresh `git worktree` has no gitignored `cabal.project.local`, so `pedantic`
   and `-Werror` are off and a green build says nothing about CI. Copy it in
-  from the primary checkout before the first build.
+  from the primary checkout before the first build --- by absolute path, never
+  by `cd`ing there.
+
+- Working in a worktree, NEVER `cd` to the primary checkout, not even to read.
+  The isolation guard redirects `git` to your own worktree but not `python`,
+  `grep`, `sed` or `cabal`, so `cd` there looks safe --- git reports your own
+  branch --- while every file edit lands in the primary checkout's working
+  tree, on whatever branch its owner has checked out. That has happened
+  (~17 files, 2026-08-28). The owner works there concurrently and often has
+  uncommitted changes, which no stash and no reflog can recover once a stray
+  edit is "reverted".
 
 - That file sets `semaphore: True`, so concurrent `cabal` runs in different
   worktrees share one GHC job semaphore --- builds are one at a time. A killed
