@@ -67,6 +67,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
+import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
@@ -614,6 +615,10 @@ slotsOf effect = case effect of
   Effect.Attach slot -> oneSlot slot
   Effect.AttachTarget (AttachTarget.MkAttachTarget slot _) -> oneSlot slot
   Effect.AttachTargetToEach (AttachTarget.MkAttachTarget slot _) -> oneSlot slot
+  -- Two READS: the binding the entrant sits in and the slot the card targeted.
+  -- Both are read rather than bound, so both belong here; CardSpec's
+  -- declared-equals-read lint subtracts the reserved `became` from this side.
+  Effect.AttachBound (AttachBound.MkAttachBound subject destination) -> joinSlots [oneSlot subject, oneSlot destination]
   -- CR 729.1/729.1b: the slot is a DEFINITION (the subgame's winner), not a read.
   Effect.PlaySubgame _ -> Map.empty
   -- A DEFINITION too: chosen as this effect is applied (CR 608.2d), never read.
@@ -912,6 +917,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Attach _ -> True
   Effect.AttachTarget (AttachTarget.MkAttachTarget _ _) -> True
   Effect.AttachTargetToEach (AttachTarget.MkAttachTarget _ _) -> True
+  Effect.AttachBound (AttachBound.MkAttachBound _ _) -> True
   -- CR 729.1b: a DEFINITION, and the subgame reads no binding of the outer game.
   Effect.PlaySubgame _ -> True
   -- PlaySubgame's answer: a definition reads no slot.
@@ -1063,6 +1069,7 @@ readsX = any effectReadsX
       Effect.Attach _ -> False
       Effect.AttachTarget {} -> False
       Effect.AttachTargetToEach {} -> False
+      Effect.AttachBound {} -> False
       Effect.PlaySubgame _ -> False
       Effect.ChooseOpponent _ -> False
       Effect.ChooseOpponentAtRandom _ -> False
@@ -1296,6 +1303,7 @@ boundSlots effect = case effect of
   Effect.Attach _ -> Set.empty
   Effect.AttachTarget {} -> Set.empty
   Effect.AttachTargetToEach {} -> Set.empty
+  Effect.AttachBound {} -> Set.empty
   Effect.TakeExtraTurn {} -> Set.empty
   Effect.ShuffleIntoLibrary {} -> Set.empty
   Effect.Shuffle {} -> Set.empty
@@ -6143,6 +6151,26 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           destination <- Attach.arbitrate subject (Attach.hostsFor controller source subject filter_ gs)
           Monad.mapM_ (Event.attach subject . Recipient.ToObject) destination
       _ -> pure ()
+  -- CR 701.3a's third arrangement, and the one the other two cannot spell: the
+  -- MOVER is whatever a binding names -- Sigarda's Aid's "it", CR 400.7e's
+  -- entrant under Binding.became -- and the DESTINATION is targeted rather than
+  -- found now. Nothing is chosen here, which is the observable difference from
+  -- AttachTarget above: the destination was fixed at CR 603.3d, so hexproof
+  -- refused it then (CR 702.11b) and CR 608.2b has already dropped it from
+  -- `legal` if it went illegal, leaving this a no-op.
+  --
+  -- The mover is read through objectRefObjects rather than legalOne so that a
+  -- GROUP binding names every member (CR 712.21c's two cards, say); each is
+  -- attached to the one destination, which CR 301.5c permits since the limit it
+  -- states is on the Equipment and not on the creature.
+  Effect.AttachBound (AttachBound.MkAttachBound subject destination) ->
+    case legalOne destination legal of
+      Just recipient -> do
+        gs <- State.get
+        Foldable.for_ (objectRefObjects legal resolving controller source gs (ObjectRef.InSlot subject)) $ \mover ->
+          Event.attach mover recipient
+      -- An unfilled slot, or one CR 608.2b has since made illegal: no-op.
+      Nothing -> pure ()
   Effect.ExileUntilMonarch slot ->
     case legalOne slot legal of
       Just recipient -> case Recipient.objectOf recipient of

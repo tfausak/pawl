@@ -74,6 +74,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Pool as Pool
@@ -81,6 +82,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
@@ -988,6 +990,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   bestowSpec s registry
   licidSpec s registry
   auraTextChangeSpec s registry
+  sigardasAidSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
@@ -3058,3 +3061,125 @@ targetingOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 targetingOnly oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
   _ -> S.identityAnswer p
+
+-- Aims the trigger's target slot at one creature by FILTERING the offer rather
+-- than replacing it -- targetingOnly's discipline, so a creature the engine
+-- never offered comes back as an empty set instead of being smuggled in -- and
+-- TAKES the printed "may", which S.identityAnswer would decline.
+attachingTo :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+attachingTo oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+-- Sigarda's Aid {W} Enchantment -- "You may cast Aura and Equipment spells as
+-- though they had flash. Whenever an Equipment you control enters, you may
+-- attach it to target creature you control."
+--
+-- The second sentence is the pool's one producer of Effect.AttachBound, CR
+-- 701.3a's third arrangement: the MOVER is the entrant CR 400.7e bound under
+-- Binding.became, and the DESTINATION is targeted. Both halves of that are
+-- observable here and neither existing opcode has them -- Effect.Attach's mover
+-- is the ability's own source, which is the enchantment and not the Equipment,
+-- and Effect.AttachTarget's destination is picked as the effect resolves, which
+-- CR 115.10a says is no target at all. The three cases below are the three
+-- consequences of it BEING a target: CR 603.3d's choice refuses a creature with
+-- shroud, CR 608.2b drops it if it goes illegal, and CR 603.5's "may" is a
+-- separate question asked later.
+sigardasAidSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sigardasAidSpec s registry = Spec.describe s "SigardasAid" $ do
+  -- Two boards differing in ONE thing: which 2/1 alice controls alongside
+  -- Sigarda's Aid. Blurred Mongoose has shroud (CR 702.18b), so it is a
+  -- "creature you control" that cannot be targeted -- exactly the creature a
+  -- resolution-time choice WOULD have taken. CR 603.3d then removes the whole
+  -- ability from the stack, since it has no legal target.
+  Spec.it s "CR 603.3d/701.3a whole cards: Sigarda's Aid equips the Piker it can target and nothing at all when the only creature has shroud" $ do
+    plains <- S.printingOf s registry "Plains"
+    aid <- S.printingOf s registry "Sigarda's Aid"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mongoose <- S.printingOf s registry "Blurred Mongoose"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let board creature =
+          let base0 = S.landsInPlay plains 1
+              (_, base1) = S.addCreature aid S.alice base0
+              (creatureId, base2) = S.addCreature creature S.alice base1
+              (splitterId, ready) = S.addHandCard bonesplitter S.alice base2
+           in (creatureId, splitterId, ready)
+        -- The answerer is spelled out at each call rather than let-bound: it is
+        -- rank-2 in the prompt's answer type, which a let binding monomorphises.
+        run (creatureId, splitterId, ready) =
+          let cast = S.runPure (attachingTo creatureId) ready (S.cast S.alice splitterId)
+              -- The Equipment resolves and ENTERS; CR 603.3 then puts the
+              -- trigger on the stack the next time a player would get priority,
+              -- which is where CR 603.3d's target is chosen.
+              entered = S.runPure (attachingTo creatureId) cast Stack.resolveTop
+              placed = S.runPure (attachingTo creatureId) entered Engine.settleForPriority
+           in (creatureId, placed, S.runPure (attachingTo creatureId) placed Stack.resolveTop)
+        (pikerId, pikerPlaced, pikerAfter) = run (board piker)
+        (mongooseId, mongoosePlaced, mongooseAfter) = run (board mongoose)
+        splitterOn gs = filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Bonesplitter"))) (Set.toList (GameState.battlefield gs))
+    Spec.assertEqWith s "before: alice's Piker is a plain 2/1" (S.powerToughnessOf pikerId pikerPlaced) (Just (2, 1))
+    Spec.assertEqWith s "before: her Mongoose is the same 2/1" (S.powerToughnessOf mongooseId mongoosePlaced) (Just (2, 1))
+    -- The gameplay-level pair. Bonesplitter's +2/+0 arrives only where the
+    -- trigger could target.
+    Spec.assertEqWith s "CR 701.3a: the entering Bonesplitter is attached to the targeted Piker, so it is a 4/1" (S.powerToughnessOf pikerId pikerAfter) (Just (4, 1))
+    Spec.assertEqWith s "CR 702.18b/603.3d: the shroud creature was no legal target, so it is still a 2/1" (S.powerToughnessOf mongooseId mongooseAfter) (Just (2, 1))
+    Spec.assertEqWith s "and the Bonesplitter really is on the Piker (CR 701.3a)" (fmap (\oid -> fmap Object.attachedTo (Game.lookupObject oid pikerAfter)) (splitterOn pikerAfter)) [Just (Just (Recipient.ToCreature pikerId))]
+    Spec.assertEqWith s "while the other Bonesplitter sits on the battlefield unattached" (fmap (\oid -> fmap Object.attachedTo (Game.lookupObject oid mongooseAfter)) (splitterOn mongooseAfter)) [Just Nothing]
+    -- The mechanism behind the second board, distinguishing "no legal target"
+    -- from "resolved and did nothing": CR 603.3d removes the ability from the
+    -- stack, so nothing is ever there to resolve.
+    Spec.assertEqWith s "the targetable board really put the trigger on the stack" (length (GameState.stack pikerPlaced)) 1
+    Spec.assertEqWith s "CR 603.3d: the shroud board's trigger is removed instead" (length (GameState.stack mongoosePlaced)) 0
+  -- CR 608.2b, the half a resolution-time destination could never have: the
+  -- target is chosen at CR 603.3d and re-checked as the ability resolves, so
+  -- killing it in response does NOT send the Equipment somewhere else. The War
+  -- Mammoth is on the board precisely so that a re-pick would be visible.
+  Spec.it s "CR 608.2b whole cards: killing the targeted creature in response leaves the Bonesplitter unattached" $ do
+    plains <- S.printingOf s registry "Plains"
+    aid <- S.printingOf s registry "Sigarda's Aid"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let base0 = S.landsInPlay plains 1
+        (_, base1) = S.addCreature aid S.alice base0
+        (pikerId, base2) = S.addCreature piker S.alice base1
+        (mammothId, base3) = S.addCreature mammoth S.alice base2
+        (splitterId, ready) = S.addHandCard bonesplitter S.alice base3
+        cast = S.runPure (attachingTo pikerId) ready (S.cast S.alice splitterId)
+        entered = S.runPure (attachingTo pikerId) cast Stack.resolveTop
+        placed = S.runPure (attachingTo pikerId) entered Engine.settleForPriority
+        targetGone = S.runPure (attachingTo pikerId) placed (Event.destroy Regenerability.Regenerable [pikerId])
+        after = S.runPure (attachingTo pikerId) targetGone Stack.resolveTop
+        splitterOn gs = filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Bonesplitter"))) (Set.toList (GameState.battlefield gs))
+    Spec.assertEqWith s "the trigger is on the stack with its target chosen" (length (GameState.stack placed)) 1
+    Spec.assertEqWith s "and the targeted Piker is gone before it resolves" (Game.lookupObject pikerId targetGone) Nothing
+    -- The gameplay-level assertion: the Mammoth is the creature a
+    -- resolution-time destination would have found, and it is untouched.
+    Spec.assertEqWith s "CR 608.2b: the surviving War Mammoth is still a plain 3/3" (S.powerToughnessOf mammothId after) (Just (3, 3))
+    Spec.assertEqWith s "and the Bonesplitter is attached to nothing" (fmap (\oid -> fmap Object.attachedTo (Game.lookupObject oid after)) (splitterOn after)) [Just Nothing]
+  -- CR 603.5's "may", asked as the ability resolves rather than when it was put
+  -- on the stack: the same board as the positive case above, answered by
+  -- S.identityAnswer, which declines every optional clause. The target was still
+  -- chosen -- declining is not the same as having no target.
+  Spec.it s "CR 603.5 whole card: declining Sigarda's Aid's may attaches nothing" $ do
+    plains <- S.printingOf s registry "Plains"
+    aid <- S.printingOf s registry "Sigarda's Aid"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let base0 = S.landsInPlay plains 1
+        (_, base1) = S.addCreature aid S.alice base0
+        (pikerId, base2) = S.addCreature piker S.alice base1
+        (splitterId, ready) = S.addHandCard bonesplitter S.alice base2
+        -- targetingOnly is attachingTo without the ChooseOptional arm, so the
+        -- target is still the Piker and S.identityAnswer declines the "may".
+        cast = S.runPure (targetingOnly pikerId) ready (S.cast S.alice splitterId)
+        entered = S.runPure (targetingOnly pikerId) cast Stack.resolveTop
+        placed = S.runPure (targetingOnly pikerId) entered Engine.settleForPriority
+        after = S.runPure (targetingOnly pikerId) placed Stack.resolveTop
+        splitterOn gs = filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Bonesplitter"))) (Set.toList (GameState.battlefield gs))
+    Spec.assertEqWith s "the trigger went on the stack and targeted the Piker" (length (GameState.stack placed)) 1
+    -- The gameplay-level assertion, against the accepting run above: the same
+    -- board, the same target, the other answer to the same question.
+    Spec.assertEqWith s "CR 603.5: the declined trigger leaves the Piker a 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
+    Spec.assertEqWith s "and the Bonesplitter unattached" (fmap (\oid -> fmap Object.attachedTo (Game.lookupObject oid after)) (splitterOn after)) [Just Nothing]

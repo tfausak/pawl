@@ -16,6 +16,7 @@ import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.AffectPlayers as AffectPlayers
 import qualified Pawl.Codec.Amass as Amass
 import qualified Pawl.Codec.ArmDelayedTrigger as ArmDelayedTrigger
+import qualified Pawl.Codec.AttachBound as AttachBound
 import qualified Pawl.Codec.AttachTarget as AttachTarget
 import qualified Pawl.Codec.BecomeCopy as BecomeCopy
 import qualified Pawl.Codec.CantBeRegenerated as CantBeRegenerated
@@ -175,6 +176,7 @@ codec cardCodec abilityCodec =
       Arm.payload "Attach" SlotName.codec Effect.Attach (\x -> case x of Effect.Attach y -> Just y; _ -> Nothing),
       Arm.payload "AttachTarget" AttachTarget.codec Effect.AttachTarget (\x -> case x of Effect.AttachTarget y -> Just y; _ -> Nothing),
       Arm.payload "AttachTargetToEach" AttachTarget.codec Effect.AttachTargetToEach (\x -> case x of Effect.AttachTargetToEach y -> Just y; _ -> Nothing),
+      Arm.payload "AttachBound" AttachBound.codec Effect.AttachBound (\x -> case x of Effect.AttachBound y -> Just y; _ -> Nothing),
       Arm.payload "PlaySubgame" SlotName.codec Effect.PlaySubgame (\x -> case x of Effect.PlaySubgame y -> Just y; _ -> Nothing),
       Arm.payload "ChooseOpponent" SlotName.codec Effect.ChooseOpponent (\x -> case x of Effect.ChooseOpponent y -> Just y; _ -> Nothing),
       Arm.payload "ChooseOpponentAtRandom" SlotName.codec Effect.ChooseOpponentAtRandom (\x -> case x of Effect.ChooseOpponentAtRandom y -> Just y; _ -> Nothing),

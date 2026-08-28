@@ -3,6 +3,7 @@ module Pawl.Types.Effect where
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
+import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
@@ -229,6 +230,15 @@ data Effect card ability
     -- moves to the subject's controller. That reassignment is the only thing
     -- observable about this opcode, and it needs two seats to see.
     AttachTargetToEach AttachTarget.AttachTarget
+  | -- | CR 701.3a, the third arrangement: a BOUND object moves, to a TARGETED
+    -- destination -- Sigarda's Aid's "whenever an Equipment you control enters,
+    -- you may attach it to target creature you control". Attach's mover is the
+    -- source and cannot be the entrant; AttachTarget's mover is the target and
+    -- its destination is picked as the effect resolves, which CR 115.10a says is
+    -- not a target at all. Only this opcode puts the destination's choice at CR
+    -- 603.3d, so only here do hexproof, CR 115.7's retargeting and CR 608.2b
+    -- reach it. Pawl.Types.AttachBound names the two slots.
+    AttachBound AttachBound.AttachBound
   | -- | CR 400.7: move the objects the ObjectRef names to a zone through the
     -- changeZone funnel. The destination is data, so this is one opcode for every
     -- zone move; Hand is owner-relative, changeZone carrying Object.owner.
