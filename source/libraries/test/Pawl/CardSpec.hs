@@ -1804,7 +1804,8 @@ engineOnlyOffends replacement = case replacement of
   ReplacementEffect.ZoneChangeR {} -> False
   ReplacementEffect.EntryR {} -> False
   ReplacementEffect.TokenR {} -> False
-  -- Worship prints this arm whole -- CR 109.5's relation and the printed floor
+  -- Every printing writes this arm whole -- CR 109.5's relation, the cause, and a
+  -- rewrite that is a printed floor, a printed scaling or a printed instead-clause
   -- name nothing an engine has to bake -- so nothing here is engine-only.
   ReplacementEffect.LifeLossR {} -> False
   ReplacementEffect.TurnUpR {} -> False

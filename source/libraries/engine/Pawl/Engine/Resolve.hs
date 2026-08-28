@@ -741,9 +741,9 @@ replacementPatternSlots re = case re of
   ReplacementEffect.TokenR _ -> Map.empty
   ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat _ _) -> filterSlotsOf pat
   ReplacementEffect.UntapR _ -> Map.empty
-  -- A LifeLossPattern is one ControllerRelation and one LifeLossCause, and a
-  -- LifeLossRewrite is a number: no Filter, so no slot. TokenR's answer, and for
-  -- its reason.
+  -- A LifeLossPattern is one ControllerRelation and one LifeLossCause, and no arm
+  -- of LifeLossRewrite carries a Filter: no Filter, so no slot. TokenR's answer,
+  -- and for its reason.
   ReplacementEffect.LifeLossR {} -> Map.empty
   ReplacementEffect.PhaseR _ -> Map.empty
 

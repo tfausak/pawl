@@ -1,0 +1,72 @@
+{
+  "faces": [
+    {
+      "loyalty": {
+        "type": "Literal",
+        "value": 5
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Ashiok, Wicked Manipulator",
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "LifeLossR",
+            "value": {
+              "matching": {
+                "whichCause": {
+                  "type": "ByPayment"
+                },
+                "whose": {
+                  "type": "Yours"
+                }
+              },
+              "rewrite": {
+                "type": "ExileFromTopOfYourLibrary"
+              }
+            }
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Ashiok"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Planeswalker"
+          }
+        ]
+      }
+    }
+  ]
+}

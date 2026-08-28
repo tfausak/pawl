@@ -22,4 +22,12 @@ spec s = Spec.describe s "Pawl.Codec.LifeLossRewrite" $ do
       LifeLossRewrite.codec
       (LifeLossRewrite.Scaled (Scaling.Multiply 2))
       " {\"type\":\"Scaled\",\"value\":{\"type\":\"Multiply\",\"value\":2}} "
+  -- Ashiok, Wicked Manipulator's "exile that many cards from the top of your
+  -- library instead".
+  Spec.it s "ExileFromTopOfYourLibrary" $
+    Common.assertCodec
+      s
+      LifeLossRewrite.codec
+      LifeLossRewrite.ExileFromTopOfYourLibrary
+      " {\"type\":\"ExileFromTopOfYourLibrary\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s LifeLossRewrite.codec

@@ -389,8 +389,11 @@ canPayLife pid n gs =
 -- is why this goes through resolveLifeLoss, CR 614.1's funnel for the class, and
 -- carries LifeLossCause.ByPayment: a replacement that watches life loss reaches a
 -- payment, and one scoped to damage does not. What is SUBTRACTED is the settled
--- loss, which a row may have grown or shrunk; what the cost charged is unchanged
--- and is `canPayLife`'s business, not this function's.
+-- loss, which a row may have grown, shrunk, or removed outright -- Ashiok, Wicked
+-- Manipulator exiles cards instead and no life moves at all (CR 614.6). What the
+-- cost CHARGED is unchanged either way, and is `canPayLife`'s business rather than
+-- this function's, which is Ashiok's own ruling: its ability "doesn't allow you to
+-- attempt to pay an amount of life greater than your current life total".
 --
 -- Monadic, unlike the pure writes beside it, because applying a replacement can
 -- ask a player a CR 616.1 question. All three callers -- the mana-and-life
@@ -2178,10 +2181,10 @@ apply batch candidate event =
         pure Nothing
     -- Unreachable: `applies` admits UntapR only against WouldUntap.
     (ReplacementEffect.UntapR _, _) -> pure (Just event)
-    -- CR 614.1a: the event survives at a REWRITTEN LOSS rather than being
-    -- cancelled, which is what makes both arms composable: CR 616.2's next
-    -- iteration re-collects against the rewritten loss, and a second row can act
-    -- on it again.
+    -- CR 614.1a: the RESIZING arms leave the event standing at a rewritten loss,
+    -- which is what makes them composable: CR 616.2's next iteration re-collects
+    -- against the rewritten loss, and a second row can act on it again. The last
+    -- arm cancels instead, and is the exception the two above are read against.
     --
     -- No arm here touches the DAMAGE, on the CR 120.4c road. By CR 120.4b it has
     -- already been dealt, and Pawl.Engine.Damage.applyDamage still gains a
@@ -2214,6 +2217,37 @@ apply batch candidate event =
       LifeLossRewrite.Scaled scaling -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         pure (Just (ProposedEvent.WouldLoseLife cause pid (Replacement.scale scaling n)))
+      -- CR 614.6 with CR 119.4: Ashiok, Wicked Manipulator's "exile that many
+      -- cards from the top of your library instead". THE ONE ARM THAT CANCELS:
+      -- rule 614.6's "if an event is replaced, it never happens", so no life is
+      -- lost, no CR 119.4 subtraction is made and no GameEvent.LifeLost is
+      -- recorded -- Nothing, not a loss rewritten to nothing. What the payment
+      -- COST is unchanged: `canPayLife` still refuses an amount the payer's life
+      -- total cannot cover, which is the card's own ruling ("Ashiok's first
+      -- ability doesn't allow you to attempt to pay an amount of life greater
+      -- than your current life total").
+      --
+      -- The cards come off CR 109.5's "your" library -- the CANDIDATE's
+      -- controller, not the player losing the life, which is why
+      -- Replacement.readsApplier answers True for this rewrite alone.
+      --
+      -- The ids are snapshotted from the pre-move board and then moved one at a
+      -- time, `drawCardReturning`'s shape: Game.zoneMembers is top-first, so
+      -- `take` off the front is the top `n`, and each move is CR 400.7's funnel
+      -- with every replacement of its own. Replacement.breaches has already
+      -- refused a library too short, so the take is never partial when it starts
+      -- -- and if an intervening move shortened it, exiling what is left is CR
+      -- 614.6's own "instructions that can't be carried out ... simply ignored".
+      LifeLossRewrite.ExileFromTopOfYourLibrary -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case ReplacementCandidate.controller candidate of
+          -- Unreachable: Replacement.breaches refuses a row whose "you" names
+          -- nobody, there being no library its clause could measure.
+          Nothing -> pure (Just event)
+          Just you -> do
+            Monad.mapM_ (`changeZone` Zone.Exile) (take (Natural.toIntSaturating n) (Game.zoneMembers Zone.Library you gs))
+            pure Nothing
     -- Unreachable: `applies` admits LifeLossR only against WouldLoseLife.
     (ReplacementEffect.LifeLossR {}, _) -> pure (Just event)
     -- CR 122.6/614.1: Hardened Scales/Doubling Season scale a counter placement.
@@ -2950,7 +2984,9 @@ resolvePlayerCounters cause pid kind n = do
 -- arms, and payLife above -- so a row cannot reach one road and miss another.
 --
 -- The SETTLED amount may be larger than what came in, not only smaller: a
--- Pawl.Types.LifeLossRewrite may be a scaling.
+-- Pawl.Types.LifeLossRewrite may be a scaling. It is 0 for a CANCELLED event too
+-- -- CR 614.6's "it never happens" -- which a caller cannot tell from a loss
+-- rewritten to nothing, and need not: either way no life moves.
 --
 -- Not implemented: CR 701.12c's exchange and CR 119.7's redistribution do not come
 -- through here (#2544).
