@@ -2891,16 +2891,18 @@ referredToSources gs =
 referentsOfObject :: Object.Object -> [ObjectId]
 referentsOfObject obj = sourceObjectOf (Object.source obj) <> referentsOfBindings (Object.bindings obj)
 
--- The object a Source names, and TOTAL over all seven arms rather than two and a
+-- The object a Source names, and TOTAL over every arm rather than two and a
 -- wildcard: a future arm that names an object owes this list a line, and `_`
 -- would swallow it. Only the two on-stack ability arms name one -- CR 113.7's
 -- "the object whose ability was activated" and "the object whose ability
--- triggered". The four card-shaped arms ARE the object rather than naming
--- another, and CR 725.2's inherent trigger has no object source at all, which is
--- the whole of what distinguishes it from OfTrigger.
+-- triggered". The card-shaped arms ARE the object rather than naming another --
+-- a melded permanent included, CR 701.42a making it one object however many
+-- cards represent it -- and CR 725.2's inherent trigger has no object source at
+-- all, which is the whole of what distinguishes it from OfTrigger.
 sourceObjectOf :: Source.Source -> [ObjectId]
 sourceObjectOf src = case src of
   Source.OfCard _ -> []
+  Source.OfMeld _ -> []
   Source.OfToken _ -> []
   Source.OfAbility a -> [ActivatedAbilitySource.source a]
   Source.OfTrigger t -> [TriggeredAbilitySource.source t]
