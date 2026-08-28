@@ -109,6 +109,7 @@ faceDownFace listed =
       Face.triggeredAbilities = [],
       Face.delayedAbilities = Map.empty,
       Face.rooms = Seq.empty,
+      Face.dungeonEntryQuality = Nothing,
       Face.castingPermissions = [],
       Face.castingRestrictions = [],
       Face.enchant = [],
@@ -269,6 +270,10 @@ merge2 l r =
       -- point into the left half's rooms -- but with one side always empty this
       -- picks whichever side has them.
       Face.rooms = Face.rooms l <> Face.rooms r,
+      -- Unreachable for the same reason and settled the same way: a dungeon card
+      -- has no halves, so at most one side carries this. The LEFT half wins where
+      -- both somehow do, which is what a record update would have done silently.
+      Face.dungeonEntryQuality = Face.dungeonEntryQuality l <|> Face.dungeonEntryQuality r,
       Face.castingPermissions = Face.castingPermissions l <> Face.castingPermissions r,
       Face.castingRestrictions = Face.castingRestrictions l <> Face.castingRestrictions r,
       Face.additionalCosts = Face.additionalCosts l <> Face.additionalCosts r,
@@ -895,6 +900,7 @@ subtractHalf face =
       Face.triggeredAbilities = [],
       Face.delayedAbilities = Map.empty,
       Face.rooms = Seq.empty,
+      Face.dungeonEntryQuality = Nothing,
       Face.castingPermissions = [],
       Face.castingRestrictions = [],
       Face.enchant = [],

@@ -171,7 +171,7 @@ manaProduced effect = case effect of
   Effect.Amass _ -> Nothing
   Effect.Blight _ -> Nothing
   Effect.TemptWithTheRing -> Nothing
-  Effect.Venture -> Nothing
+  Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
   Effect.RestartGame _ -> Nothing
@@ -365,7 +365,7 @@ movesLibraryCard effect = case effect of
   Effect.Amass _ -> False
   Effect.Blight _ -> False
   Effect.TemptWithTheRing -> False
-  Effect.Venture -> False
+  Effect.Venture {} -> False
   Effect.PlayerSacrifices {} -> False
   Effect.ControlPlayerNextTurn _ -> False
   Effect.Destroy {} -> False
