@@ -483,6 +483,36 @@ data Quantity
     --
     -- A LEAF, like LifeTotal, Speed and OpponentsAttacked: it holds no Quantity.
     CardsDiscardedThisTurn PlayerRef.PlayerRef
+  | -- | CR 119.3 / 608.2i: how much life that player has GAINED this turn --
+    -- Fortifying Draught's "where X is the amount of life you gained this turn",
+    -- and the bound Ratchet, Field Medic measures a returned artifact against.
+    --
+    -- CardsDiscardedThisTurn's sibling in footing and in ARITY: a live fold over
+    -- the turn-scoped GameEvent log, which CR 608.2i sanctions and whose extent is
+    -- "this turn" because Engine.beginTurnOf clears it at the handoff; and one
+    -- player's tally, so a reference naming several answers "whose?" rather than a
+    -- sum.
+    --
+    -- The AMOUNTS are summed where the discard tally counts EVENTS: the printed
+    -- sentence asks how much life and not how many gains, so two gains of 3 are 6.
+    -- CR 702.15e keeps them separate events, which is the right unit for the
+    -- trigger and the wrong one for this.
+    --
+    -- GameEvent.LifeGained and not the life total, and the total is wrong in both
+    -- directions: life LOST since does not undo a gain, so a player who gained 5
+    -- and then lost 5 has still gained 5 this turn; and a total that never moved
+    -- may sit on any number of gains. CR 119.9 keeps a gain of 0 out of the log
+    -- altogether, so nothing here restates it.
+    --
+    -- CR 702.15b's lifelink files its gain through that same event, which is what
+    -- makes a creature with lifelink a producer of this quantity without any card
+    -- saying "you gain life".
+    --
+    -- An EMPTY log answers 0 rather than Nothing, as CardsDiscardedThisTurn's
+    -- does: having gained no life is a number.
+    --
+    -- A LEAF, like LifeTotal and CardsDiscardedThisTurn: it holds no Quantity.
+    LifeGainedThisTurn PlayerRef.PlayerRef
   | -- | CR 120.1 / 608.2i: how many of the players this reference names WERE DEALT
     -- DAMAGE this turn -- Furious Spinesplitter's "for each opponent who was dealt
     -- damage this turn", and the measurement rule 702.54a's bloodthirst compares

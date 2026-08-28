@@ -542,6 +542,7 @@ quantityCounts quantity = case quantity of
   -- CR 701.9a's tally of logged discards: a PlayerRef and nothing else, so no
   -- Count and no Filter here either.
   Quantity.Type.CardsDiscardedThisTurn _ -> []
+  Quantity.Type.LifeGainedThisTurn _ -> []
   -- CR 120.1's tally of logged damage: a PlayerRef and nothing else, so no Count
   -- and no Filter here either.
   Quantity.Type.PlayersDealtDamageThisTurn _ -> []
@@ -1410,6 +1411,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.SnowWasSpent -> False
   Quantity.Type.OpponentsAttacked {} -> False
   Quantity.Type.CardsDiscardedThisTurn {} -> False
+  Quantity.Type.LifeGainedThisTurn {} -> False
   Quantity.Type.PlayersDealtDamageThisTurn {} -> False
   Quantity.Type.SpellsCastLastTurn {} -> False
   Quantity.Type.DungeonsCompleted {} -> False

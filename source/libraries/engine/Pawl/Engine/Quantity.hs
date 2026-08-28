@@ -403,6 +403,22 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.CardsDiscardedThisTurn ref -> case playersOf ref of
     Just [pid] -> Just (toInteger (length (filter ((== Just pid) . Game.discardOf . LoggedEvent.event) (Foldable.toList (GameState.events gs)))))
     _ -> Nothing
+  -- CR 119.3 / 608.2i: how much life that player has gained this turn.
+  -- CardsDiscardedThisTurn's arm in footing -- a live fold over GameState.events,
+  -- whose extent Engine.beginTurnOf's clearing makes "this turn" -- and in ARITY:
+  -- Nothing for a reference naming anything but exactly one player, since "whose
+  -- life?" has no sum.
+  --
+  -- The AMOUNTS are summed where the discard tally counts events, the printed
+  -- sentence asking how much life rather than how many gains.
+  -- Game.lifeGainedThisTurn is the fold, so a second reader of the same log cannot
+  -- drift from this one.
+  --
+  -- An EMPTY log answers 0 rather than Nothing, as CardsDiscardedThisTurn's does.
+  -- What is unanswered is only the reference.
+  Quantity.LifeGainedThisTurn ref -> case playersOf ref of
+    Just [pid] -> Just (toInteger (Game.lifeGainedThisTurn gs pid))
+    _ -> Nothing
   -- CR 120.1 / 608.2i: how many of the players this reference names were dealt
   -- damage this turn. CardsDiscardedThisTurn's arm in footing -- a live fold over
   -- GameState.events, whose extent Engine.beginTurnOf makes "this turn" -- and
@@ -647,6 +663,7 @@ substituteStar star quantity = case quantity of
   Quantity.SnowWasSpent -> quantity
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.CardsDiscardedThisTurn _ -> quantity
+  Quantity.LifeGainedThisTurn _ -> quantity
   Quantity.PlayersDealtDamageThisTurn _ -> quantity
   Quantity.SpellsCastLastTurn _ -> quantity
   Quantity.DungeonsCompleted _ -> quantity
@@ -774,6 +791,8 @@ slots quantity = case quantity of
   Quantity.OpponentsAttacked _ -> Set.empty
   -- And a tenth, CR 701.9a's tally having nothing beside its PlayerRef either.
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
+  -- And an eleventh, CR 119.3's life-gain tally likewise.
+  Quantity.LifeGainedThisTurn _ -> Set.empty
   -- And a ninth, CR 120.1's damage tally likewise.
   Quantity.PlayersDealtDamageThisTurn _ -> Set.empty
   -- And another in that same position, CR 601.2i's cast tally having nothing
@@ -837,6 +856,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.SnowWasSpent -> True
   Quantity.OpponentsAttacked ref -> playerRefIsSlotless ref
   Quantity.CardsDiscardedThisTurn ref -> playerRefIsSlotless ref
+  Quantity.LifeGainedThisTurn ref -> playerRefIsSlotless ref
   Quantity.PlayersDealtDamageThisTurn ref -> playerRefIsSlotless ref
   Quantity.SpellsCastLastTurn ref -> playerRefIsSlotless ref
   Quantity.DungeonsCompleted ref -> playerRefIsSlotless ref
@@ -960,6 +980,7 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (f ref) kind)
   Quantity.OpponentsAttacked ref -> Quantity.OpponentsAttacked (f ref)
   Quantity.CardsDiscardedThisTurn ref -> Quantity.CardsDiscardedThisTurn (f ref)
+  Quantity.LifeGainedThisTurn ref -> Quantity.LifeGainedThisTurn (f ref)
   Quantity.PlayersDealtDamageThisTurn ref -> Quantity.PlayersDealtDamageThisTurn (f ref)
   Quantity.SpellsCastLastTurn ref -> Quantity.SpellsCastLastTurn (f ref)
   Quantity.DungeonsCompleted ref -> Quantity.DungeonsCompleted (f ref)
@@ -1110,6 +1131,7 @@ readsX quantity = case quantity of
   Quantity.SnowWasSpent -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False
+  Quantity.LifeGainedThisTurn _ -> False
   Quantity.PlayersDealtDamageThisTurn _ -> False
   Quantity.SpellsCastLastTurn _ -> False
   Quantity.DungeonsCompleted _ -> False

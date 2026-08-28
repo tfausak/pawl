@@ -79,6 +79,11 @@ codec =
       -- rather than from anything the card names, and the turn is the log's
       -- extent rather than a window a card could state.
       Arm.payload "CardsDiscardedThisTurn" PlayerRef.codec Quantity.CardsDiscardedThisTurn (\x -> case x of Quantity.CardsDiscardedThisTurn y -> Just y; _ -> Nothing),
+      -- CR 119.3's life gained, with only a PlayerRef on the wire for
+      -- CardsDiscardedThisTurn's reason above. What is SUMMED is the amounts and
+      -- not the events, which is the arm's own reading rather than anything on
+      -- the wire.
+      Arm.payload "LifeGainedThisTurn" PlayerRef.codec Quantity.LifeGainedThisTurn (\x -> case x of Quantity.LifeGainedThisTurn y -> Just y; _ -> Nothing),
       -- CR 120.1's damage, with only a PlayerRef on the wire for
       -- CardsDiscardedThisTurn's reason above. The threshold that turns the count
       -- into "an opponent was dealt damage" is the Comparison's, not this arm's.

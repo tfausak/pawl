@@ -50,9 +50,11 @@ import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
+import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
@@ -624,6 +626,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   aspectOfWolfSpec s registry
   malignusSpec s registry
   toxicDelugeSpec s registry
+  fortifyingDraughtSpec s registry
 
 -- CR 208.5: "If a creature somehow has no value for its power, its power is 0.
 -- The same is true for toughness."
@@ -1837,3 +1840,83 @@ toxicDelugeSpec s registry = Spec.describe s "Toxic Deluge" $ do
     Spec.assertEqWith s "every printed box is intact" (fmap (`S.powerToughnessOf` after) [pikerId, wolvesId, jeditId]) [Just (2, 1), Just (3, 3), Just (5, 5)]
     Spec.assertEqWith s "three Swamps still paid {2}{B}" (S.tappedCount S.alice after) 3
     Spec.assertEqWith s "Toxic Deluge resolved out of hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
+
+-- alice has two Forests untapped, a Goblin Piker (2/1) and two Fortifying
+-- Draughts in hand; bob has Russet Wolves (3/3). BOB HAS ALREADY GAINED 7 LIFE
+-- THIS TURN, planted in the log, which is the negative control CR 109.5's "you"
+-- needs on a two-seat board: every X below is a number no reading of bob's tally
+-- can produce.
+--
+-- The numbers are chosen so no two readings coincide. Each Draught gains 2, so
+-- COUNTING the gain events (1, then 2) and SUMMING the amounts (2, then 4) never
+-- agree; 7, 9 and 11 are what a reading that saw bob's gain would give.
+draughtBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+draughtBoard forest piker wolves draught =
+  let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 2)
+      (wolvesId, withWolves) = S.addCreature wolves S.bob withPiker
+      (withOne, firstId) = S.handOne draught withWolves
+      (secondId, withTwo) = S.addHandCard draught S.alice withOne
+   in (pikerId, wolvesId, firstId, secondId, S.withEvents [GameEvent.LifeGained (LifeChange.MkLifeChange S.bob 7)] withTwo)
+
+-- Cast one Fortifying Draught at this recipient and resolve it.
+castDraught :: Recipient.Recipient -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+castDraught recipient draughtId gs =
+  S.runPure (aimRecipient recipient) gs (S.cast S.alice draughtId >> Stack.resolveTop >> Engine.settleForPriority)
+
+-- Fortifying Draught ({G} Instant, Oracle text verified against Scryfall): "You
+-- gain 2 life. Target creature gets +X/+X until end of turn, where X is the
+-- amount of life you gained this turn."
+--
+-- The card Quantity.LifeGainedThisTurn was waiting for. CR 119.3's gain is
+-- recorded as GameEvent.LifeGained, and CR 608.2i's turn-scoped log is where the
+-- total comes from -- so the quantity is a SUM of amounts over that log
+-- (Game.lifeGainedThisTurn), not a count of its entries.
+--
+-- CR 608.2c is what makes the card read its own gain: the two instructions are
+-- followed in printed order, so by the time the modification is created the
+-- Draught's own 2 is already in the log. CR 611.2b/613.4c then freeze the value
+-- into the stored effect (Projection.freezeQuantities), which is why a later gain
+-- does not grow a pump that has already been made.
+fortifyingDraughtSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+fortifyingDraughtSpec s registry = Spec.describe s "Fortifying Draught" $ do
+  -- THE PROVING CASE, and the ACCUMULATION control: the second Draught reads 4
+  -- and not 2, so the tally is the turn's whole gain rather than the last event.
+  -- Falsifiers: reading only the last gain leaves the Piker a 6/5; counting
+  -- events rather than summing amounts leaves it a 5/4; reading every player's
+  -- gain makes the first pump +9/+9.
+  Spec.it s "CR 119.3/608.2i two gains in one turn add up: +2/+2 then +4/+4" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    draught <- S.printingOf s registry "Fortifying Draught"
+    let (pikerId, _, firstId, secondId, gs) = draughtBoard forest piker wolves draught
+        afterOne = castDraught (Recipient.ToCreature pikerId) firstId gs
+        afterTwo = castDraught (Recipient.ToCreature pikerId) secondId afterOne
+    Spec.assertEqWith s "the printed box before either spell" (S.powerToughnessOf pikerId gs) (Just (2, 1))
+    Spec.assertEqWith s "the first Draught read its own 2 and nobody else's" (S.powerToughnessOf pikerId afterOne) (Just (4, 3))
+    Spec.assertEqWith s "the second read 4 -- both gains, summed" (S.powerToughnessOf pikerId afterTwo) (Just (8, 7))
+    Spec.assertEqWith s "alice gained 2 twice" (S.lifeOf S.alice afterTwo) (Just 24)
+    Spec.assertEqWith s "bob's planted 7 was never paid to anyone" (S.lifeOf S.bob afterTwo) (Just 20)
+  -- THE TURN-BOUNDARY control: the same two casts with a handoff between them.
+  -- The log Engine.beginTurnOf clears IS the quantity's window, so the second
+  -- Draught reads 2 again rather than 4. The second target is BOB's 3/3 and not
+  -- the Piker, because this fixture hands the turn over without passing through a
+  -- cleanup step, so the first pump is still standing and a shared target could
+  -- not tell the two readings apart.
+  Spec.it s "CR 608.2i last turn's life gain does not count" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    draught <- S.printingOf s registry "Fortifying Draught"
+    let (pikerId, wolvesId, firstId, secondId, gs) = draughtBoard forest piker wolves draught
+        afterOne = castDraught (Recipient.ToCreature pikerId) firstId gs
+        nextTurn = (Engine.beginTurnOf S.bob afterOne) {GameState.priority = Just S.alice}
+        afterTwo = castDraught (Recipient.ToCreature wolvesId) secondId nextTurn
+    Spec.assertEqWith s "the first Draught still read 2" (S.powerToughnessOf pikerId afterOne) (Just (4, 3))
+    Spec.assertEqWith s "and the second reads 2 across the handoff, not 4" (S.powerToughnessOf wolvesId afterTwo) (Just (5, 5))
+    Spec.assertEqWith s "alice still gained 2 twice in total" (S.lifeOf S.alice afterTwo) (Just 24)

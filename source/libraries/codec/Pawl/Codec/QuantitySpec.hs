@@ -304,6 +304,20 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.CardsDiscardedThisTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"CardsDiscardedThisTurn\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  -- CR 119.3, on CardsDiscardedThisTurn's terms: a PlayerRef and nothing else,
+  -- with the same recursive-decoder pair. Ratchet, Field Medic's is the Relative
+  -- arm.
+  Spec.it s "LifeGainedThisTurn, relative and from a slot" $ do
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.LifeGainedThisTurn (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"LifeGainedThisTurn\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.LifeGainedThisTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      " {\"type\":\"LifeGainedThisTurn\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- CR 120.1, on CardsDiscardedThisTurn's terms: a PlayerRef and nothing else,
   -- with the same recursive-decoder pair. Furious Spinesplitter's is the Relative
   -- arm, over Opponent rather than You.

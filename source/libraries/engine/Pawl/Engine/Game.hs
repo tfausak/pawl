@@ -2,6 +2,7 @@ module Pawl.Engine.Game where
 
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -28,6 +29,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import Pawl.Types.Mana (Mana)
 import qualified Pawl.Types.Mana as Mana
@@ -1197,3 +1199,78 @@ damagedObject event = damageRecipient event >>= Recipient.objectOf
 -- clears the log at the handoff, so "this turn" is what the log holds.
 wasDealtDamageThisTurn :: GameState -> PlayerId -> Bool
 wasDealtDamageThisTurn gs pid = any ((== Just pid) . damagedPlayer . LoggedEvent.event) (GameState.events gs)
+
+-- The player an event describes GAINING LIFE, and how much (CR 119.3).
+--
+-- castOf's, discardOf's, enteredBattlefield's and damageRecipient's sibling, and
+-- here for their import-graph reason: the caller is Pawl.Engine.Quantity's
+-- LifeGainedThisTurn arm.
+--
+-- The AMOUNT rides along because the question the caller asks is "how much", not
+-- "how many times" -- CR 702.15e keeps two simultaneous lifelink gains separate
+-- EVENTS, which is the right unit for a trigger and the wrong one for a total.
+--
+-- CR 119.9's zero is not fenced here, because nothing files one: the write every
+-- gain goes through (Pawl.Engine.Resolve.changeLife) skips a zero delta, and
+-- Pawl.Engine.Damage's lifelink record guards its own amount.
+lifeGainOf :: GameEvent -> Maybe (PlayerId, Natural)
+lifeGainOf event = case event of
+  GameEvent.LifeGained (LifeChange.MkLifeChange pid amount) -> Just (pid, amount)
+  -- CR 119.3's other sign. A loss is not a negative gain: "the amount of life you
+  -- gained this turn" is not reduced by life lost since, so this is not an arm.
+  GameEvent.LifeLost {} -> Nothing
+  GameEvent.Moved {} -> Nothing
+  GameEvent.Discarded {} -> Nothing
+  GameEvent.Drew {} -> Nothing
+  GameEvent.SpellCast {} -> Nothing
+  GameEvent.HalfUnlocked {} -> Nothing
+  GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.Transformed {} -> Nothing
+  GameEvent.BecameDesignated {} -> Nothing
+  GameEvent.Evolved _ -> Nothing
+  GameEvent.Mentored {} -> Nothing
+  GameEvent.Trained _ -> Nothing
+  GameEvent.PermanentSacrificed {} -> Nothing
+  GameEvent.AbilityTriggered {} -> Nothing
+  GameEvent.DamageDealt _ -> Nothing
+  GameEvent.DamagePrevented {} -> Nothing
+  GameEvent.StepBegan {} -> Nothing
+  GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.Revealed {} -> Nothing
+  GameEvent.AttackerDeclared {} -> Nothing
+  GameEvent.BecameBlocking {} -> Nothing
+  GameEvent.BlocksDeclared {} -> Nothing
+  GameEvent.AttackerBlocked {} -> Nothing
+  GameEvent.AttackerUnblocked _ -> Nothing
+  GameEvent.SpellCountered _ -> Nothing
+  GameEvent.LoyaltyAbilityActivated _ -> Nothing
+  GameEvent.CountersPut {} -> Nothing
+  GameEvent.CountersRemoved {} -> Nothing
+  GameEvent.ControlChanged {} -> Nothing
+  GameEvent.VentureMarkerEntered {} -> Nothing
+  GameEvent.BecameTarget {} -> Nothing
+  GameEvent.BecameAttached {} -> Nothing
+  GameEvent.LeftTheGame _ -> Nothing
+  GameEvent.Milled {} -> Nothing
+  GameEvent.Scried _ -> Nothing
+  GameEvent.Surveiled _ -> Nothing
+  GameEvent.DiceRolled _ -> Nothing
+  GameEvent.ClassLevelSet _ -> Nothing
+  GameEvent.Plotted _ -> Nothing
+  GameEvent.Explored _ -> Nothing
+  GameEvent.Exerted _ -> Nothing
+  GameEvent.BecameAttacked _ -> Nothing
+  GameEvent.AttackersDeclared _ -> Nothing
+  GameEvent.BecameTapped _ -> Nothing
+  GameEvent.CoinFlipped {} -> Nothing
+
+-- CR 119.3 / 608.2i: how much life this player has gained this turn. The log fold
+-- lifeGainOf exists for. The turn scope is GameState.events itself:
+-- Pawl.Engine.Engine.beginTurnOf clears the log at the handoff, so "this turn" is
+-- what the log holds -- wasDealtDamageThisTurn's footing one function up.
+--
+-- SUMMED over the amounts rather than counted over the events, which is the whole
+-- difference between this and the discard tally beside it.
+lifeGainedThisTurn :: GameState -> PlayerId -> Natural
+lifeGainedThisTurn gs pid =
+  sum (fmap snd (filter ((== pid) . fst) (Maybe.mapMaybe (lifeGainOf . LoggedEvent.event) (Foldable.toList (GameState.events gs)))))
