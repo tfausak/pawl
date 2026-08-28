@@ -610,6 +610,13 @@ setTriggerPlayer pid = Map.insert triggerPlayer (toPlayer pid)
 setBecame :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setBecame oid = Map.insert became (toObject oid)
 
+-- setBecame for CR 712.21c's plural: the SEVERAL cards a melded permanent became
+-- as it left the battlefield, bound as a group so an ObjectRef.InSlot reader acts
+-- on each of them. Pawl.Engine.Event.setBecameArrivals is the one caller and says
+-- why the shape differs from setBecame's.
+setBecameGroup :: Seq ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setBecameGroup oids = Map.insert became (toObjects oids)
+
 -- Bind an object under the reserved castSpell slot (CR 601.2i).
 setCastSpell :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setCastSpell oid = Map.insert castSpell (toObject oid)

@@ -489,7 +489,7 @@ writeUntappedIn = Map.adjust (\o -> o {Object.tapped = TapState.Untapped})
 -- The zone change an event describes, if it is one.
 movedOf :: GameEvent -> Maybe ZoneChange
 movedOf event = case event of
-  GameEvent.Moved (Moved.MkMoved zc _) -> Just zc
+  GameEvent.Moved (Moved.MkMoved zc _ _) -> Just zc
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.DamagePrevented {} -> Nothing
   GameEvent.StepBegan {} -> Nothing
@@ -3667,15 +3667,20 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- merged permanent, so mutate (#874) extends that one function
               -- rather than this branch.
               --
-              -- NOT for a battlefield destination, which is the rule's own scope
-              -- ("leaves the battlefield" into "the appropriate zone"): a melded
-              -- permanent moving battlefield-to-battlefield is no zone change at
-              -- all, and nothing else can reach this funnel with components --
-              -- Event.meld builds the melded permanent through placeObject
-              -- directly. That gate is also what keeps the CR 616.1 entry loop,
-              -- the CR 122.6a entering counters and CR 709.5d's designations
-              -- below reading one arrival, since none of them can be reached on
-              -- the split path.
+              -- The rule's own scope, both halves of it: FROM the battlefield
+              -- ("if a melded permanent leaves the battlefield") and NOT back
+              -- onto it ("two cards are put into the appropriate zone"). The
+              -- origin conjunct is the rule's condition and the destination
+              -- conjunct is what keeps the CR 616.1 entry loop, the CR 122.6a
+              -- entering counters and CR 709.5d's designations below reading one
+              -- arrival, since none of them can be reached on the split path.
+              --
+              -- The origin conjunct is not redundant with the destination one
+              -- today only because nothing can hold Source.OfMeld outside the
+              -- battlefield -- Event.meld places the melded permanent there and
+              -- this split is the one road off it. That is an invariant no type
+              -- enforces, so the rule's own condition is written out rather than
+              -- rested on.
               --
               -- Each component goes through the same `mkObj`, so CR 400.7's
               -- forgetting (Object.newIncarnation) is what the two cards arrive
@@ -3696,7 +3701,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- relative timestamp order on exile (#2508) -- they arrive in the
               -- order Game.componentsOf names, which is the order they melded
               -- in.
-              let components = if dest == Zone.Battlefield then Seq.empty else Game.componentsOf (Object.source obj)
+              let components = if fromZone /= Zone.Battlefield || dest == Zone.Battlefield then Seq.empty else Game.componentsOf (Object.source obj)
                   (leading, trailing) = case Seq.viewl components of
                     Seq.EmptyL -> (Nothing, Seq.empty)
                     c Seq.:< cs -> (Just c, cs)
@@ -3839,13 +3844,29 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- event at a time (Pawl.Engine.Count.snapshotView), so a melded
               -- permanent counts as one.
               --
-              -- Not implemented: the rule's second half, and CR 712.21's own
-              -- Example -- an ability that triggers "whenever a card is put into
-              -- a graveyard from anywhere" triggers TWICE for a melded permanent,
-              -- and an effect that finds what it became finds both cards (CR
-              -- 712.21c). This records one arrival event rather than one per card
-              -- (#2509).
-              State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange oid newId fromZone dest) snapshot)))
+              -- The OTHER arrivals ride along in Moved.others rather than in
+              -- events of their own, which is CR 712.21c: "if an effect can find
+              -- the new object that a melded permanent becomes as it leaves the
+              -- battlefield, it finds both cards." eventBindings reads them
+              -- through Moved.arrivals and binds CR 400.7e's `became` slot as a
+              -- group, so a trigger's payload acts on each card. Empty for every
+              -- move but this one.
+              --
+              -- Not implemented: CR 712.21's own Example makes an ability that
+              -- triggers "whenever a card is put into a graveyard from anywhere"
+              -- trigger TWICE, and CR 712.21e's second half counts a melded
+              -- permanent as two CARDS that changed zones. Both need one event
+              -- per arrival, which the rule's own first clause forbids for the
+              -- departure -- a "whenever a creature dies" ability must see
+              -- exactly one (#2509).
+              State.modify'
+                . recordEvent
+                . GameEvent.Moved
+                $ Moved.MkMoved
+                  { Moved.change = ZoneChange.MkZoneChange oid newId fromZone dest,
+                    Moved.characteristics = snapshot,
+                    Moved.others = trailingIds
+                  }
               pure arrivals
 
 -- CR 400.7a: effects that change a permanent spell's characteristics or
@@ -4573,7 +4594,7 @@ recordTokenEntry :: ObjectId -> Game ()
 recordTokenEntry newId = do
   placed <- State.get
   let snapshot = Projection.project newId placed
-  State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange newId newId Zone.Battlefield Zone.Battlefield) snapshot)))
+  State.modify' (recordEvent (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange newId newId Zone.Battlefield Zone.Battlefield) snapshot)))
 
 -- CR 701.42a: meld these cards -- "put them onto the battlefield with their back
 -- faces up and combined. The resulting permanent is a single object represented by
@@ -4701,7 +4722,7 @@ meld controller victims resultCard = do
       -- id is named as having departed (#2492).
       placed <- State.get
       let snapshot = Projection.project newId placed
-      State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange (fst (NonEmpty.head melding)) newId origin Zone.Battlefield) snapshot)))
+      State.modify' (recordEvent (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange (fst (NonEmpty.head melding)) newId origin Zone.Battlefield) snapshot)))
       pure (Just newId)
 
 -- CR 701.42b: "only two cards belonging to the same meld pair can be melded.
@@ -5071,7 +5092,7 @@ matchesTriggerGiven :: Map.Map SlotName.SlotName Binding -> GameState -> ObjectI
 matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 603.6a: the bearer's own object entered the battlefield.
   TriggerCondition.SelfEnters -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _) -> ZoneChange.object zc == bearer && ZoneChange.to zc == Zone.Battlefield
+    GameEvent.Moved (Moved.MkMoved zc _ _) -> ZoneChange.object zc == bearer && ZoneChange.to zc == Zone.Battlefield
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
@@ -5123,7 +5144,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- "another"), and its controller is the perspective CR 109.5 gives "you" in
   -- "a creature YOU CONTROL enters".
   TriggerCondition.PermanentEnters f -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _)
+    GameEvent.Moved (Moved.MkMoved zc _ _)
       | ZoneChange.to zc == Zone.Battlefield ->
           -- Deliberately NOT the snapshot the Moved event carries: that is the
           -- object as it last existed in the zone it LEFT, and reading it here
@@ -7201,7 +7222,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- `from` is the half that does the work: the same card discarded out of a hand
   -- or dying off the battlefield reaches the same graveyard and must not trigger.
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _) ->
       ZoneChange.object zc == bearer
         && ZoneChange.from zc == Zone.Library
         && ZoneChange.to zc == Zone.Graveyard
@@ -7262,7 +7283,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- what makes the graveyard the one zone the scan has to find the bearer in,
   -- however far away the card started.
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _) ->
       ZoneChange.object zc == bearer
         && ZoneChange.to zc == Zone.Graveyard
     GameEvent.DamageDealt _ -> False
@@ -7321,7 +7342,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- abilities look back in time, so the bearer offered here is the permanent as it
   -- was immediately before the event, never the CR 400.7 incarnation.
   TriggerCondition.SelfDies -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _) ->
       ZoneChange.departed zc == bearer
         && ZoneChange.from zc == Zone.Battlefield
         && ZoneChange.to zc == Zone.Graveyard
@@ -7391,7 +7412,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- Nothing is a permanent that is gone AND filed no last known information, about
   -- which no Filter can honestly answer.
   TriggerCondition.PermanentDies f -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _)
+    GameEvent.Moved (Moved.MkMoved zc _ _)
       | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
           let deceased = ZoneChange.departed zc
            in case Projection.viewWithLastKnown deceased gs deceased of
@@ -7477,7 +7498,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- The live read is kept ahead of it for the Equipment-shaped case, where
   -- CR 704.5n leaves the bearer standing.
   TriggerCondition.AttachedCreatureDies -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _)
+    GameEvent.Moved (Moved.MkMoved zc _ _)
       | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
           let hostOfBearer = case Game.lookupObject bearer gs of
                 Just obj -> Object.attachedTo obj
@@ -7616,7 +7637,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- SelfDies deliberately does NOT take the same arm: CR 700.4 makes "dies" a
   -- move to a graveyard, and leaving the game reaches no zone at all.
   TriggerCondition.SelfLeavesTheBattlefield -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _) ->
       ZoneChange.departed zc == bearer
         && ZoneChange.from zc == Zone.Battlefield
         && ZoneChange.to zc /= Zone.Battlefield
@@ -7680,7 +7701,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           Nothing -> False
           Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
      in case event of
-          GameEvent.Moved (Moved.MkMoved zc _)
+          GameEvent.Moved (Moved.MkMoved zc _ _)
             | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
                 admits (ZoneChange.departed zc)
           GameEvent.Moved {} -> False
@@ -7743,7 +7764,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- targeted "regardless of whether or not that object is still a creature", so a
   -- creature that was turned into a Treasure and then destroyed still fires this.
   TriggerCondition.HauntedCreatureDies -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _) ->
       ZoneChange.from zc == Zone.Battlefield
         && ZoneChange.to zc == Zone.Graveyard
         && Map.lookup bearer (GameState.haunting gs) == Just (ZoneChange.departed zc)
@@ -10194,8 +10215,8 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- CR 400.7e's public-zone proviso holds by construction here, matchesTrigger's
   -- SelfDies arm having required `to == Graveyard`; the arm below is where it
   -- becomes a real test.
-  (TriggerCondition.SelfDies, GameEvent.Moved (Moved.MkMoved zc _)) ->
-    Binding.setBecame (ZoneChange.object zc) Map.empty
+  (TriggerCondition.SelfDies, GameEvent.Moved m) ->
+    setBecameArrivals m Map.empty
   -- The same rule and the same field, watched by a BYSTANDER: Promise of
   -- Tomorrow's "whenever a creature you control dies, exile IT". What differs
   -- from the arm above is only which object CR 113.7a's source is -- there the
@@ -10215,8 +10236,8 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- PermanentDies arm has already required the battlefield-to-graveyard pair, and
   -- CR 400.2 lists the graveyard among the public zones. That is what makes
   -- eventBindingSlots' unconditional promise for this condition honest.
-  (TriggerCondition.PermanentDies _, GameEvent.Moved (Moved.MkMoved zc _)) ->
-    Binding.setBecame (ZoneChange.object zc) Map.empty
+  (TriggerCondition.PermanentDies _, GameEvent.Moved m) ->
+    setBecameArrivals m Map.empty
   -- The same rule, with its proviso doing real work for the first time: CR 603.6c's
   -- wider condition accepts ANY destination, and CR 400.2 makes two of them hidden.
   --
@@ -10227,16 +10248,16 @@ eventBindings bearerBecame cond event = case (cond, event) of
   --
   -- Classified by the ZONE, never by whether the card is currently visible -- CR
   -- 400.2 draws exactly that distinction.
-  (TriggerCondition.SelfLeavesTheBattlefield, GameEvent.Moved (Moved.MkMoved zc _))
-    | not (Game.isHiddenZone (ZoneChange.to zc)) ->
-        Binding.setBecame (ZoneChange.object zc) Map.empty
+  (TriggerCondition.SelfLeavesTheBattlefield, GameEvent.Moved m)
+    | not (Game.isHiddenZone (ZoneChange.to (Moved.change m))) ->
+        setBecameArrivals m Map.empty
   -- The bystander reading of that same arm, guarded the same way and for the same
   -- rule. Its OTHER event binds nothing and has no arm: CR 603.6c's
   -- leaving-the-game form reaches no zone at all, so there is no arriving
   -- incarnation for CR 400.7e to rescue.
-  (TriggerCondition.PermanentLeavesTheBattlefield _, GameEvent.Moved (Moved.MkMoved zc _))
-    | not (Game.isHiddenZone (ZoneChange.to zc)) ->
-        Binding.setBecame (ZoneChange.object zc) Map.empty
+  (TriggerCondition.PermanentLeavesTheBattlefield _, GameEvent.Moved m)
+    | not (Game.isHiddenZone (ZoneChange.to (Moved.change m))) ->
+        setBecameArrivals m Map.empty
   -- CR 400.7e again, read in the ENTRY direction: the object that moved is the
   -- entrant, and what it became is the permanent now on the battlefield --
   -- ZoneChange.object, the field the SelfDies arm reads for the same reason.
@@ -10256,7 +10277,7 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- RECEIVE what the payload does is the payload's question (CR 120.1a for
   -- damage), and a binding that existed only for creatures would make the slot's
   -- presence depend on the entrant, which eventBindingSlots cannot express.
-  (TriggerCondition.PermanentEnters _, GameEvent.Moved (Moved.MkMoved zc _)) ->
+  (TriggerCondition.PermanentEnters _, GameEvent.Moved (Moved.MkMoved zc _ _)) ->
     Binding.setBecame (ZoneChange.object zc) Map.empty
   -- CR 708.7's "that creature": the permanent that was turned face up, which Pine
   -- Walker untaps. The bearer is a bystander here -- CR 113.7a's source slot names
@@ -10610,6 +10631,37 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- is nothing an arm could read. What such an ability knows comes from CR
   -- 603.7c's captured environment instead.
   _ -> Map.empty
+
+-- CR 400.7e's `became` slot, in the plural CR 712.21c asks for: "if an effect
+-- can find the new object that a melded permanent becomes as it leaves the
+-- battlefield, it finds both cards... If that effect causes actions to be taken
+-- upon those cards, the same actions are taken upon each of them."
+--
+-- ONE arrival is bound exactly as it always was -- Binding.toObject, a recipient
+-- -- so every ordinary move produces the byte-identical binding it did before
+-- this rule landed, and none of the pool's eight readers of the slot can tell
+-- the difference. TWO OR MORE are bound as a GROUP (Binding.toObjects), which is
+-- the shape Pawl.Types.Binding documents for "every object one instruction
+-- produced or acted on" and which Pawl.Engine.Resolve.objectRefObjects reads
+-- ahead of the recipient path for ObjectRef.InSlot.
+--
+-- The shape is conditional because the two readers are: an ObjectRef reads
+-- either, while a bare SlotName (Effect.MoveCounters' `to`, Pawl.Engine.Resolve's
+-- legalOne) reads only the recipient. Every condition that can carry a split is a
+-- battlefield DEPARTURE -- CR 712.21's own scope -- and all four of the pool's
+-- readers of those (Promise of Tomorrow, Yedora Grave Gardener, Endless
+-- Cockroaches, Screams from Within) spend the slot as an ObjectRef, so the group
+-- reaches every one of them. The bare-SlotName readers (Agent's Toolkit, Unstable
+-- Shapeshifter) hang on PermanentEnters, which cannot split.
+--
+-- Not implemented: a group and a recipient at once, which would let a bare
+-- SlotName reader see the first card while an ObjectRef reader saw both.
+-- Pawl.Types.Binding's `objects` states the invariant that no slot carries both
+-- (#2509).
+setBecameArrivals :: Moved.Moved -> Map.Map SlotName.SlotName Binding -> Map.Map SlotName.SlotName Binding
+setBecameArrivals m = case Moved.arrivals m of
+  only Seq.:<| Seq.Empty -> Binding.setBecame only
+  every -> Binding.setBecameGroup every
 
 -- Which slots eventBindings above can stamp for a condition, as a set. A
 -- CLASSIFICATION of a rule 603 trigger condition -- the sibling of
@@ -11679,7 +11731,7 @@ eventTriggers events gs =
       -- that was standing on the battlefield when the event happened and so take
       -- only the ones CR 113.6m leaves functioning there.
       departedFrom pick event = case event of
-        GameEvent.Moved (Moved.MkMoved zc _)
+        GameEvent.Moved (Moved.MkMoved zc _ _)
           | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
               case Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs) of
                 Nothing -> Map.empty
@@ -11765,7 +11817,7 @@ eventTriggers events gs =
         Map.fromList
           ( Maybe.mapMaybe
               ( ( \event -> case event of
-                    GameEvent.Moved (Moved.MkMoved zc _)
+                    GameEvent.Moved (Moved.MkMoved zc _ _)
                       | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
                           Just (ZoneChange.departed zc, ZoneChange.object zc)
                     _ -> Nothing

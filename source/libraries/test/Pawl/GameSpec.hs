@@ -1779,7 +1779,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     let (victim, g1) = S.addCreature piker S.carol S.threePlayerGame
         (jailer, g2) = S.addCreature palaceJailer S.bob g1
         entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
-        g3 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project jailer g2))] g2
+        g3 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project jailer g2))] g2
         resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 Engine.settleForPriority) Engine.priorityLoop
         -- CR 400.7: exiling the target gives it a new object identity, so the
         -- watch Palace Jailer's second ETB registers is keyed to a NEW id, not

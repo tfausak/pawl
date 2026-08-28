@@ -74,10 +74,10 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) (ObjectId.MkObjectId 2) Zone.Battlefield Zone.Graveyard) ProjectedCharacteristicsSpec.testCharacteristics))
+      (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) (ObjectId.MkObjectId 2) Zone.Battlefield Zone.Graveyard) ProjectedCharacteristicsSpec.testCharacteristics))
       ( "{\"type\":\"Moved\",\"value\":{\"change\":{\"departed\":1,\"object\":2,\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}},\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
-          <> "}}"
+          <> ",\"others\":[]}}"
       )
   -- A NONZERO toxic value and a PRESENT lifelink payee, so the CR 702.164b and
   -- CR 702.15b riders round-trip rather than getting defaulted past.

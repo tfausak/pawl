@@ -354,7 +354,7 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
         -- itself inside the subgame, whose log is its own, and a resolved ability
         -- ceases to exist rather than moving).
         isSpellFinishing e = case e of
-          GameEvent.Moved (Moved.MkMoved zc _) -> ZoneChange.from zc == Zone.Stack && ZoneChange.to zc == Zone.Graveyard
+          GameEvent.Moved (Moved.MkMoved zc _ _) -> ZoneChange.from zc == Zone.Stack && ZoneChange.to zc == Zone.Graveyard
           _ -> False
         -- CR 729.5's last sentence, read off the one log all three are recorded
         -- in. The chain: Shahrazad's own LoseLife clause runs during resolution,

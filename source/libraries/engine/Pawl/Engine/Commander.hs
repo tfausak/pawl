@@ -27,6 +27,7 @@
 --     903.9c's melded or merged commander (#2265).
 module Pawl.Engine.Commander where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -76,10 +77,19 @@ isCommander oid gs = case Game.lookupObject oid gs of
   Just obj -> case Object.source obj of
     Source.OfCard printingId ->
       fmap Player.commander (Map.lookup (Object.owner obj) (GameState.players gs)) == Just (Just printingId)
-    -- Not implemented: a melded permanent one of whose components is the
-    -- designated commander, which this answers False for -- the fallthrough sorts
-    -- it with the tokens and the abilities, so CR 903.9b's offer below is never
-    -- made for it (#2265).
+    -- False for a MELDED PERMANENT, and that is the rule rather than a gap: CR
+    -- 903.9c makes the object that goes to the command zone "the card that
+    -- represents it and is a commander", never the permanent, so CR 903.9b's
+    -- offer below must not be made for the permanent as a whole. What the rule
+    -- does ask for is asked one incarnation later -- CR 712.21's departure split
+    -- (Pawl.Engine.Event) puts each component into the graveyard or exile as its
+    -- own Source.OfCard object, and `returnable` below asks this question of
+    -- every one of them, so the commander half is offered and the other half is
+    -- not.
+    --
+    -- Not implemented: CR 903.9b's HAND AND LIBRARY half for a melded permanent,
+    -- where there is no split to ask after -- the rule's redirect happens instead
+    -- of the move, so nothing has become a card yet (#2265).
     _ -> False
 
 -- | CR 903.10a's key: the owner of the commander that dealt this damage, or
@@ -177,9 +187,18 @@ taxCandidates pid oid gs cost =
 -- has consumed the event log, the same boundary CR 704.5h reads and the same one
 -- rule 903.9a's "since the last time" names.
 --
--- Keyed off the ZoneChange's NEW id (ZoneChange.object), because that is the
--- incarnation now sitting in the graveyard; ZoneChange.departed named the one that
--- left the battlefield and no longer exists.
+-- Keyed off the move's ARRIVALS, because those are the incarnations now sitting
+-- in the graveyard; ZoneChange.departed named the one that left the battlefield
+-- and no longer exists.
+--
+-- Moved.arrivals and not ZoneChange.object alone, which is CR 903.9c: a melded
+-- permanent's departure puts TWO cards into the zone (CR 712.21), and the one
+-- that is a commander may be either of them. Reading the first alone would offer
+-- the return when the commander half melded first and silently not when it melded
+-- second. `isCommander` then keeps exactly the commander card, which is rule
+-- 903.9c's own answer -- "that permanent and each component representing it that
+-- isn't a commander are put into the appropriate zone, and the card that
+-- represents it and is a commander is put into the command zone".
 --
 -- NOT a replacement effect. Rule 903.9a says "this is a state-based action" in so
 -- many words, which is why it is classified in Pawl.Engine.Sba beside CR 704.5's
@@ -193,11 +212,11 @@ taxCandidates pid oid gs cost =
 -- passes Event.unscannedSbaEvents, the watermark it owns anyway.
 returnable :: [GameEvent] -> GameState -> [(PlayerId, ObjectId)]
 returnable events gs =
-  let arrivals = Maybe.mapMaybe arrivalOf events
-      arrivalOf event = case event of
-        GameEvent.Moved (Moved.MkMoved zc _)
-          | elem (ZoneChange.to zc) [Zone.Graveyard, Zone.Exile] -> Just (ZoneChange.object zc)
-        _ -> Nothing
+  let arrivals = concatMap arrivalsOf events
+      arrivalsOf event = case event of
+        GameEvent.Moved m
+          | elem (ZoneChange.to (Moved.change m)) [Zone.Graveyard, Zone.Exile] -> Foldable.toList (Moved.arrivals m)
+        _ -> []
       stillThere oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj -> elem (Object.zone obj) [Zone.Graveyard, Zone.Exile]

@@ -1039,7 +1039,7 @@ discardOf event = case event of
 -- caller is Pawl.Engine.Quantity's EnteredThisTurn arm.
 enteredBattlefield :: GameEvent -> Maybe ObjectId
 enteredBattlefield event = case event of
-  GameEvent.Moved (Moved.MkMoved change _) ->
+  GameEvent.Moved (Moved.MkMoved change _ _) ->
     if ZoneChange.to change == Zone.Battlefield then Just (ZoneChange.object change) else Nothing
   GameEvent.Discarded {} -> Nothing
   GameEvent.Drew {} -> Nothing

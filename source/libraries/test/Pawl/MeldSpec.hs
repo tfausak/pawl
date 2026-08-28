@@ -36,6 +36,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
@@ -51,6 +52,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -561,6 +563,72 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith s "setup: alice held no experience counters before it died" (S.playerCounterOf PlayerCounterKind.Experience S.alice board) 0
         Spec.assertEqWith s "setup: Meren was on the battlefield to see it" (fmap Object.zone (Game.lookupObject merenId after)) (Just Zone.Battlefield)
         Spec.assertEqWith s "setup: alice's graveyard was empty before it died" (graveyardNames board) []
+  -- CR 712.21c: "If an effect can find the new object that a melded permanent
+  -- becomes as it leaves the battlefield, it finds both cards. (See rule 400.7.)
+  -- If that effect causes actions to be taken upon those cards, the same actions
+  -- are taken upon each of them." The rule's own Mimic Vat Example is this shape
+  -- -- one trigger, one choice, both cards acted on.
+  --
+  -- Promise of Tomorrow is the pool's producer: "whenever a creature you control
+  -- dies, exile IT", where "it" is CR 400.7e's `became` slot. The trigger fires
+  -- ONCE (CR 712.21's first clause) and exiles TWO cards, so the two halves of
+  -- the assertion discriminate in opposite directions -- a payload that acted on
+  -- the first arrival alone would leave Hanweir Battlements in the graveyard.
+  Spec.it s "CR 712.21c a trigger that exiles what the melded permanent became exiles both cards" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    promise <- S.printingOf s registry "Promise of Tomorrow"
+    let (_, base) = S.addCreature promise S.alice (Setup.emptyGame S.bothPlayers)
+        (mMelded, board) = meldedThrough base battlements garrison mountain
+        bothNames = List.sort [CardName.MkCardName (Text.pack "Hanweir Battlements"), CardName.MkCardName (Text.pack "Hanweir Garrison")]
+    case mMelded of
+      Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
+      Just meldedId -> do
+        let dead = S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable [meldedId])
+            settled = S.runPure S.identityAnswer dead Engine.settleForPriority
+            after = S.runPure S.identityAnswer settled Stack.resolveTop
+        Spec.assertEqWith s "CR 712.21c the trigger exiled both cards" (List.sort (exileNames after)) bothNames
+        Spec.assertEqWith s "and left neither behind in the graveyard" (graveyardNames after) []
+        -- The proxies behind that, both AFTER it: the trigger really did fire,
+        -- exactly once, and both cards really were in the graveyard for it to
+        -- find -- so the exile above is the payload's work and not the funnel's.
+        Spec.assertEqWith s "one trigger reached the stack" (length (GameState.stack settled)) 1
+        Spec.assertEqWith s "setup: both cards were in the graveyard when it resolved" (List.sort (graveyardNames settled)) bothNames
+        Spec.assertEqWith s "setup: exile was empty once the meld had consumed the pair" (exileNames settled) []
+  -- CR 903.9c: "If a commander is a melded permanent... that permanent and each
+  -- component representing it that isn't a commander are put into the appropriate
+  -- zone, and the card that represents it and is a commander is put into the
+  -- command zone." The rule is reachable only because CR 712.21's split has
+  -- already made each component a card of its own -- CR 903.9a's state-based
+  -- offer then asks about both of them and the designation picks one.
+  --
+  -- BOTH DESIGNATIONS, which is the whole case rather than belt and braces: the
+  -- two boards differ in nothing but which half of the pair alice's deck named,
+  -- so an engine that read only the FIRST arriving card would answer them
+  -- differently. Hanweir Garrison is the first component the meld recorded, so
+  -- the Battlements board is the one such an engine gets wrong.
+  Spec.it s "CR 903.9c a melded commander's own card goes to the command zone, whichever half melded first" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    let (mMelded, board) = meldedThrough (Setup.emptyGame S.bothPlayers) battlements garrison mountain
+    case mMelded >>= \meldedId -> fmap ((,) meldedId . Game.componentsOf . Object.source) (Game.lookupObject meldedId board) of
+      Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
+      Just (meldedId, components) -> case Foldable.toList components of
+        [firstPid, secondPid] -> do
+          let designating pid gs = gs {GameState.players = Map.adjust (\p -> p {Player.commander = Just pid}) S.alice (GameState.players gs)}
+              run pid = S.runPure reclaiming (designating pid board) (Event.destroy Regenerability.Regenerable [meldedId] >> Engine.settleForPriority)
+              nameOf pid = fmap (S.nameOf . Printing.card) (Game.printingOf pid board)
+              commandNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Set.toList (GameState.command gs))
+          Spec.assertEqWith s "CR 903.9c naming the first component puts THAT card into the command zone" (commandNames (run firstPid)) (Maybe.maybeToList (nameOf firstPid))
+          Spec.assertEqWith s "and its partner is left in the graveyard" (graveyardNames (run firstPid)) (Maybe.maybeToList (nameOf secondPid))
+          Spec.assertEqWith s "CR 903.9c naming the second component puts THAT card into the command zone instead" (commandNames (run secondPid)) (Maybe.maybeToList (nameOf secondPid))
+          Spec.assertEqWith s "and its partner is the one left in the graveyard" (graveyardNames (run secondPid)) (Maybe.maybeToList (nameOf firstPid))
+          -- What makes the pair discriminating: the two components really are two
+          -- different cards, and the meld recorded them in this order.
+          Spec.assertEqWith s "setup: the components are the Garrison then the Battlements" [nameOf firstPid, nameOf secondPid] [Just (S.nameOf (Printing.card garrison)), Just (S.nameOf (Printing.card battlements))]
+        other -> Spec.assertFailure s ("expected two components, got " <> show (length other))
 
 -- CR 701.27a as ONE instruction over the named permanents (CR 608.2f), through
 -- the opcode a card's "transform target permanent" reaches: the slot the effect
@@ -628,6 +696,13 @@ choosing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 choosing wanted p = case p of
   Prompt.ChoosePermanent _ _ _ candidates
     | List.elem wanted (NonEmpty.toList candidates) -> wanted
+  _ -> S.identityAnswer p
+
+-- Accepts CR 903.9a's offer; everything else is the identity answerer. The
+-- default LEAVES the commander where it is, so the CR 903.9c case has to say so.
+reclaiming :: Prompt.Prompt r -> r
+reclaiming p = case p of
+  Prompt.ReturnCommander {} -> CommandZoneDecision.Returns
   _ -> S.identityAnswer p
 
 -- Both cards exiled and owned by alice, bound to the slot the exile would have

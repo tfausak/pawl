@@ -416,7 +416,7 @@ triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.
     let gs0 = S.landsInPlay mountain 2
         (smtId, gs1) = S.addCreature smtPrinting S.alice gs0
         entered = ZoneChange.MkZoneChange smtId smtId Zone.Stack Zone.Battlefield
-        gs2 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project smtId gs1))] gs1
+        gs2 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project smtId gs1))] gs1
         answer :: Prompt.Prompt r -> r
         answer = S.identityAnswer
         placed = snd (Engine.runGamePure answer gs2 Engine.placePendingTriggers)
