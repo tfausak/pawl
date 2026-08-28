@@ -210,23 +210,41 @@ data PlayerEffect
     NoMaximumHandSize
   | -- | CR 402.2 / The Ten Rings: this player's maximum hand size IS this number.
     --
-    -- A SEPARATE constructor from NoMaximumHandSize above, and the pair is the one
-    -- place on this axis where CR 613.11's timestamp order decides an answer: a
-    -- set and a removal disagree, and the later one wins (Reliquary Tower's own
-    -- ruling names the pair). Every other arm here folds order-independently, which
-    -- is why Pawl.Engine.PlayerEffect.maximumHandSize is the axis's only ordered
-    -- fold.
+    -- A SEPARATE constructor from NoMaximumHandSize above, and hand size is the
+    -- one axis here whose arms CR 613.11's timestamp order can tell apart: a set
+    -- and a removal disagree, and the later one wins (Reliquary Tower's own ruling
+    -- names the pair). Every arm on every other axis folds order-independently,
+    -- which is why Pawl.Engine.PlayerEffect.maximumHandSize is the module's only
+    -- ordered fold.
     --
     -- The number is CARRIED for CantCastMoreThan's reason: The Ten Rings says ten,
     -- Cursed Rack says four and Null Profusion says two, and a card that says
     -- another number must not need a sibling constructor.
     --
-    -- A SET, not an adjustment. "Your maximum hand size is increased by two"
-    -- (Trusted Advisor) and "reduced by three" (Thought Eater) are a third shape
-    -- again -- they compose with whatever the current number is instead of
-    -- replacing it, and CR 613.11 orders them against this arm -- and no
-    -- constructor here can express one (#1238).
+    -- A SET, not an adjustment: the two arms below are the adjustments, and they
+    -- compose with whatever number they find instead of replacing it.
     SetMaximumHandSize Natural.Natural
+  | -- | CR 402.2 / 613.11 / Minamo Scrollkeeper: this player's maximum hand size
+    -- is INCREASED by this number.
+    --
+    -- An adjustment rather than a set, which is what makes CR 613.11's timestamp
+    -- order decide a third answer on this axis: an increase applied after
+    -- SetMaximumHandSize raises the number that was set, and one applied after
+    -- NoMaximumHandSize raises nothing at all, because there is no number left to
+    -- raise.
+    IncreaseMaximumHandSize Natural.Natural
+  | -- | CR 402.2 / 613.11 / Gnat Miser: this player's maximum hand size is
+    -- REDUCED by this number.
+    --
+    -- A SEPARATE constructor from IncreaseMaximumHandSize rather than that one
+    -- carrying a signed delta, and for the reason IncreaseSpellCost and
+    -- ReduceSpellCost are two constructors: the two directions do not have the
+    -- same range. CR 107.1b floors the reduction at zero -- a maximum hand size
+    -- is a calculation determining the result of an effect, and none of that
+    -- rule's exceptions is a hand size -- where an increase has no ceiling.
+    -- Natural says exactly that, and a signed delta would additionally spell one
+    -- effect two ways.
+    ReduceMaximumHandSize Natural.Natural
   | -- | CR 500.5 / 703.4q / Upwelling, Omnath Locus of Mana: this player does not
     -- lose the mana the filter names, out of the unspent mana in their mana pool,
     -- as a step or phase ends.
@@ -318,8 +336,10 @@ data PlayerEffect
     --
     -- The filter is CR 601.3b's "a spell with certain qualities", and is the axis
     -- that separates the producers: Vedalken Orrery says "spells" and so matches
-    -- everything (`And []`), while Yeva, Nature's Herald says "green creature
-    -- spells" and would narrow it.
+    -- everything (`And []`), while Sigarda's Aid says "Aura and Equipment spells"
+    -- and narrows it to two subtypes. A QUALIFIED filter is what gives rule
+    -- 601.3b's second sentence something to search, which
+    -- Pawl.Engine.PlayerEffect.choiceCouldApply does.
     --
     -- A PERMISSION, which Pawl.Engine.PlayerEffect folds as a disjunction -- the
     -- same shape the prohibitions take, for the opposite reason. CR 101.2 makes

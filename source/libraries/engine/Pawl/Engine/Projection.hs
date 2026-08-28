@@ -1932,6 +1932,8 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.PlayAdditionalLands _ -> effect
   PlayerEffect.NoMaximumHandSize -> effect
   PlayerEffect.SetMaximumHandSize _ -> effect
+  PlayerEffect.IncreaseMaximumHandSize _ -> effect
+  PlayerEffect.ReduceMaximumHandSize _ -> effect
   PlayerEffect.DontLoseUnspentMana _ -> effect
   PlayerEffect.SpendManaAsThough _ -> effect
   PlayerEffect.CantBeTargetedBy _ -> effect
@@ -3565,6 +3567,35 @@ bestowGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs) 
             | m <- Keyword.bestowModifications
             ]
       _ -> []
+
+-- CR 601.3b / 702.103b: the view this object WOULD have if its controller chose
+-- bestow while proposing it -- an Aura enchantment with enchant creature, off the
+-- same Pawl.Engine.Keyword.bestowModifications bestowGathered above emits. A
+-- HYPOTHETICAL, and its caller is a lookahead:
+-- Pawl.Engine.PlayerEffect.choiceCouldApply asks whether a permission naming Aura
+-- spells could come to name this card, exactly as CR 601.3a's twin asks its
+-- question of a mana value the object does not have.
+--
+-- The card need not carry bestow and this asks nothing about whether the cost is
+-- payable: the caller owns both questions, this one only says what the choice
+-- would do.
+--
+-- Applied ON TOP of the finished projection rather than inside CR 613's fold,
+-- which is timestamp order rather than a shortcut past it: rule 702.103b's effect
+-- starts "as a spell cast bestowed is put onto the stack", and CR 613.7a gives it
+-- the timestamp of the object it is on, which CR 613.7d makes a new and later one
+-- at that move. So nothing already affecting the card where it lies can outrank
+-- it.
+--
+-- CR 205.3d is asked over the WHOLE unit before any part of it lands, which is
+-- applyUnit's own reading and matters here: the AddSubtype and the SetCardType
+-- are one effect, so Aura is admitted by the Enchantment its sibling gives.
+bestowedView :: ObjectId -> GameState -> Filter.View
+bestowedView oid gs =
+  let pc = project oid gs
+      unitTypes = List.foldl' (flip cardTypesAfter) (PC.cardTypes pc) Keyword.bestowModifications
+      bestowed = List.foldl' (flip (applyModification (fullView gs) oid gs oid unitTypes)) pc Keyword.bestowModifications
+   in viewOfCharacteristics (fullView gs) oid bestowed (controllerOf oid gs) (countersOf oid gs) gs
 
 -- CR 701.60c / 613.1f: a SUSPECTED permanent has menace, emitted as a layer-6
 -- grant on the permanent itself. Read off Object.designations on every

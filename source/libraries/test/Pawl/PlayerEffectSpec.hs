@@ -43,6 +43,12 @@
 -- which is where pawl's order used to come apart (Reliquary Tower is the third
 -- card in the group, and its ruling is the authority for the reading).
 --
+-- Minamo Scrollkeeper and Gnat Miser are the ADJUSTING pair on that same axis,
+-- and a pair for two reasons at once: they move the number in opposite
+-- directions, which is what tells two constructors from one signed delta, and
+-- Gnat Miser reduces each OPPONENT's maximum where every other card here writes
+-- its own controller's.
+--
 -- Void Winnower brings CR 601.3a's LOOKAHEAD, and Molten Disaster is the second
 -- half of that pair: a prohibition on even mana values, against an {X} spell
 -- whose mana value is even only while it sits in a hand (CR 202.3e).
@@ -77,6 +83,7 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
@@ -2227,6 +2234,157 @@ theTenRingsSpec s registry =
       Spec.assertEqWith s "CR 514.1 discards nothing" (S.handSize S.alice after) 11
       Spec.assertEqWith s "and only the resolved sorcery is in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
 
+-- The ADJUSTING arms' board: alice controls `extra`, BOTH players hold `held`
+-- Plains, and `active` is whose cleanup step runs. Two hands, because the
+-- reducing card here is scoped to opponents and CR 514.1 trims the active player
+-- alone -- one hand could not show both halves of that.
+--
+-- The two hands are stocked to the SAME size on purpose, so the two cleanup runs
+-- differ in nothing but which seat is active and a scope read backwards has to
+-- show up as a different discard rather than as the same one from the other seat.
+adjustedHands :: Printing.Printing -> [Printing.Printing] -> Int -> PlayerId.PlayerId -> GameState.GameState
+adjustedHands plains extra held active =
+  let gs0 = (Setup.emptyGame S.bothPlayers) {GameState.activePlayer = active}
+      put g printing = snd (S.addCreature printing S.alice g)
+      withExtra = List.foldl' put gs0 extra
+      add pid g _ = snd (S.addHandCard plains pid g)
+      forAlice = List.foldl' (add S.alice) withExtra [1 .. held]
+   in List.foldl' (add S.bob) forAlice [1 .. held]
+
+-- Minamo Scrollkeeper, a Creature: "Defender / Your maximum hand size is
+-- increased by one." The INCREASING arm's producer, and the reason it is this
+-- printing rather than Trusted Advisor's "increased by two": both print the same
+-- shape, and this one prints nothing else that needs a trigger.
+--
+-- An adjustment is not a set, and CR 613.11's timestamp order is what tells them
+-- apart: laid over The Ten Rings' ten the answer is eleven, and laid under it the
+-- ten wins outright -- so both orders are built. Over Reliquary Tower there is no
+-- number left to raise at all.
+minamoScrollkeeperSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+minamoScrollkeeperSpec s registry =
+  Spec.describe s "MinamoScrollkeeper" $ do
+    Spec.it s "CR 402.2 alone it raises the maximum to eight" $ do
+      plains <- S.printingOf s registry "Plains"
+      scrollkeeper <- S.printingOf s registry "Minamo Scrollkeeper"
+      Spec.assertEqWith s "eight" (PlayerEffect.maximumHandSize S.alice (reliquaryHandOfNine plains [scrollkeeper])) (Just 8)
+
+    -- The gameplay-level case: the same nine cards the bare board discards two
+    -- of, discarding ONE here.
+    Spec.it s "CR 514.1 nine cards at cleanup discards down to eight" $ do
+      plains <- S.printingOf s registry "Plains"
+      scrollkeeper <- S.printingOf s registry "Minamo Scrollkeeper"
+      let after = reliquaryCleanup (reliquaryHandOfNine plains [scrollkeeper])
+      Spec.assertEqWith s "hand" (S.handSize S.alice after) 8
+      Spec.assertEqWith s "one discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+
+    -- CR 109.5: the You scope, as for the Tower and the Rings.
+    Spec.it s "CR 109.5 the opponent's maximum is untouched" $ do
+      plains <- S.printingOf s registry "Plains"
+      scrollkeeper <- S.printingOf s registry "Minamo Scrollkeeper"
+      Spec.assertEqWith s "seven" (PlayerEffect.maximumHandSize S.bob (reliquaryHandOfNine plains [scrollkeeper])) (Just 7)
+
+    -- CR 613.11 / Reliquary Tower's ruling: an adjustment applied after a removal
+    -- adjusts nothing, because the removal left no number. A reading that
+    -- restarted from CR 402.2's seven, or from the Tower's absent maximum treated
+    -- as a number, would answer eight here.
+    Spec.it s "CR 613.11 an increase after Reliquary Tower still leaves no maximum" $ do
+      plains <- S.printingOf s registry "Plains"
+      reliquaryTower <- S.printingOf s registry "Reliquary Tower"
+      scrollkeeper <- S.printingOf s registry "Minamo Scrollkeeper"
+      let board = reliquaryHandOfNine plains [reliquaryTower, scrollkeeper]
+          after = reliquaryCleanup board
+      Spec.assertEqWith s "CR 514.1 discards nothing" (S.handSize S.alice after) 9
+      Spec.assertEqWith s "nothing discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+      Spec.assertEqWith s "no maximum" (PlayerEffect.maximumHandSize S.alice board) Nothing
+
+    -- CR 613.11 with the Scrollkeeper LATER: it raises the ten The Ten Rings set.
+    Spec.it s "CR 613.11 an increase after The Ten Rings raises the ten it set" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      scrollkeeper <- S.printingOf s registry "Minamo Scrollkeeper"
+      let board = adjustedHands plains [tenRings, scrollkeeper] 12 S.alice
+          after = reliquaryCleanup board
+      Spec.assertEqWith s "CR 514.1 discards down to eleven" (S.handSize S.alice after) 11
+      Spec.assertEqWith s "one discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+      Spec.assertEqWith s "eleven" (PlayerEffect.maximumHandSize S.alice board) (Just 11)
+
+    -- THE ORDER CONTROL, the same two permanents entering the other way round and
+    -- nothing else changed: The Ten Rings SETS, so it overwrites the eight the
+    -- Scrollkeeper had already made of seven rather than composing with it.
+    Spec.it s "CR 613.11 The Ten Rings entering after the increase sets the maximum to ten outright" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      scrollkeeper <- S.printingOf s registry "Minamo Scrollkeeper"
+      let board = adjustedHands plains [scrollkeeper, tenRings] 12 S.alice
+          after = reliquaryCleanup board
+      Spec.assertEqWith s "CR 514.1 discards down to ten" (S.handSize S.alice after) 10
+      Spec.assertEqWith s "two discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
+      Spec.assertEqWith s "ten" (PlayerEffect.maximumHandSize S.alice board) (Just 10)
+
+-- Gnat Miser, a Creature: "Each opponent's maximum hand size is reduced by one."
+-- The REDUCING arm's producer, and the OPPONENTS scope on the same axis -- the
+-- two things the increase above cannot show. Chosen over Thought Nibbler's
+-- self-scoped "reduced by two" because it brings the scope with it and prints no
+-- keyword at all.
+--
+-- The direction is not a sign on one constructor, and this group is where that is
+-- observable: alice's Scrollkeeper takes her to eight on the very board where
+-- alice's Gnat Miser takes bob to six.
+gnatMiserSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+gnatMiserSpec s registry =
+  Spec.describe s "GnatMiser" $ do
+    Spec.it s "CR 402.2 each opponent's maximum drops to six" $ do
+      plains <- S.printingOf s registry "Plains"
+      gnatMiser <- S.printingOf s registry "Gnat Miser"
+      Spec.assertEqWith s "six" (PlayerEffect.maximumHandSize S.bob (adjustedHands plains [gnatMiser] 8 S.alice)) (Just 6)
+
+    -- CR 102.2: "each OPPONENT" is the other player, never the controller. The
+    -- scope read backwards would take alice to six and leave bob alone.
+    Spec.it s "CR 102.2 the controller's own maximum is untouched" $ do
+      plains <- S.printingOf s registry "Plains"
+      gnatMiser <- S.printingOf s registry "Gnat Miser"
+      Spec.assertEqWith s "seven" (PlayerEffect.maximumHandSize S.alice (adjustedHands plains [gnatMiser] 8 S.alice)) (Just 7)
+
+    -- The gameplay-level scope pair: ONE board, eight cards in each hand, and
+    -- only who is active differs. alice trims to CR 402.2's seven, bob to six.
+    Spec.it s "CR 514.1 alice's own cleanup trims her to seven, not six" $ do
+      plains <- S.printingOf s registry "Plains"
+      gnatMiser <- S.printingOf s registry "Gnat Miser"
+      let after = reliquaryCleanup (adjustedHands plains [gnatMiser] 8 S.alice)
+      Spec.assertEqWith s "hand" (S.handSize S.alice after) 7
+      Spec.assertEqWith s "one discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+
+    Spec.it s "CR 514.1 bob's cleanup trims him to six" $ do
+      plains <- S.printingOf s registry "Plains"
+      gnatMiser <- S.printingOf s registry "Gnat Miser"
+      let after = reliquaryCleanup (adjustedHands plains [gnatMiser] 8 S.bob)
+      Spec.assertEqWith s "hand" (S.handSize S.bob after) 6
+      Spec.assertEqWith s "two discarded" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
+
+    -- THE DIRECTION CONTROL: both producers on one board, and the two seats move
+    -- opposite ways. One constructor carrying a signed delta could still spell
+    -- this, but it could not keep the reduction's floor below -- so the pair is
+    -- read together with the zero case.
+    Spec.it s "CR 402.2 an increase and a reduction on one board move the two seats opposite ways" $ do
+      plains <- S.printingOf s registry "Plains"
+      gnatMiser <- S.printingOf s registry "Gnat Miser"
+      scrollkeeper <- S.printingOf s registry "Minamo Scrollkeeper"
+      let board = adjustedHands plains [gnatMiser, scrollkeeper] 8 S.alice
+      Spec.assertEqWith s "alice is up one" (PlayerEffect.maximumHandSize S.alice board) (Just 8)
+      Spec.assertEqWith s "bob is down one" (PlayerEffect.maximumHandSize S.bob board) (Just 6)
+
+    -- CR 107.1b: eight Misers would take seven to minus one, and the calculation
+    -- yields zero instead. Eight rather than seven so the floor is applied to a
+    -- number already AT it, which is where a subtraction would go wrong twice.
+    Spec.it s "CR 107.1b eight Gnat Misers floor the opponent's maximum at zero" $ do
+      plains <- S.printingOf s registry "Plains"
+      gnatMiser <- S.printingOf s registry "Gnat Miser"
+      let board = adjustedHands plains (replicate 8 gnatMiser) 3 S.bob
+          after = reliquaryCleanup board
+      Spec.assertEqWith s "CR 514.1 bob discards his whole hand" (S.handSize S.bob after) 0
+      Spec.assertEqWith s "three discarded" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 3
+      Spec.assertEqWith s "zero" (PlayerEffect.maximumHandSize S.bob board) (Just 0)
+
 -- Seed a stored player effect keyed to a REAL battlefield object, not
 -- S.addPlayerEffect's stand-in id 998 -- so a S.youControlSource condition
 -- check has something to genuinely hold or fail against. Mirrors
@@ -3796,19 +3954,19 @@ nextTurnFor pid gs =
       untapped = S.runPure S.identityAnswer (gs {GameState.activePlayer = pid, GameState.phase = untap}) (Engine.runTurnBasedActions untap)
    in untapped {GameState.phase = Phase.PrecombatMain, GameState.priority = Just pid, GameState.passes = 0}
 
--- CR 601.3b / Vedalken Orrery {4} Artifact: "You may cast spells as though they
--- had flash."
+-- CR 601.3b's board, shared by the two groups below it -- Vedalken Orrery's and
+-- Sigarda's Aid's -- since what a permission is read off is the caller's `extra`.
 --
--- One board, built twice. alice holds a Goblin Piker -- a creature card, so CR
--- 302.1 and CR 117.1a's second sentence give it the sorcery-speed window -- and a
+-- One board, built twice. alice holds `hand` -- a creature card, so CR 302.1 and
+-- CR 117.1a's second sentence give it the sorcery-speed window -- and a
 -- Mountain, behind nine untapped Mountains so that mana is never the reason a
 -- cast is unavailable. It is BOB's precombat main phase and the stack is empty,
 -- so alice's own sorcery-speed window is shut. `extra` goes onto the battlefield
--- under alice, and the Orrery is the only thing the two boards ever differ by.
--- Returns the Piker in hand, the ids of `extra` in the order given, and the board.
-orreryBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
-orreryBoard mountain piker extra =
-  let (base, oid) = S.pikerInHand mountain piker 9 Phase.PrecombatMain
+-- under alice, and is the only thing a pair of boards here ever differs by.
+-- Returns the hand card, the ids of `extra` in the order given, and the board.
+flashBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+flashBoard mountain hand extra =
+  let (base, oid) = S.pikerInHand mountain hand 9 Phase.PrecombatMain
       withLand = snd (S.addHandCard mountain S.alice base)
       put (ids, g) printing = let (i, g1) = S.addCreature printing S.alice g in (ids <> [i], g1)
       (extraIds, withExtra) = List.foldl' put ([], withLand) extra
@@ -3821,11 +3979,11 @@ orreryBoard mountain piker extra =
       )
 
 -- The same board back on ALICE's turn, which is the control every refusal below
--- is measured against: it is what says the Piker is affordable, offered and
--- unblocked by anything the Orrery is not responsible for.
-orreryOnOwnTurn :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
-orreryOnOwnTurn mountain piker extra =
-  let (oid, _, board) = orreryBoard mountain piker extra
+-- is measured against: it is what says the card in hand is affordable, offered
+-- and unblocked by anything the permission under test is not responsible for.
+flashOnOwnTurn :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
+flashOnOwnTurn mountain hand extra =
+  let (oid, _, board) = flashBoard mountain hand extra
    in (oid, board {GameState.activePlayer = S.alice})
 
 -- CR 109.5's You scope from the other seat: it is ALICE's turn, BOB holds
@@ -4011,14 +4169,14 @@ vedalkenOrrerySpec s registry =
     Spec.it s "CR 117.1a on alice's own turn the creature spell is castable already" $ do
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
-      let (oid, board) = orreryOnOwnTurn mountain piker []
+      let (oid, board) = flashOnOwnTurn mountain piker []
       Spec.assertBool s (S.castable S.alice oid board) "castable"
       Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
 
     Spec.it s "CR 117.1a on the opponent's turn it is not" $ do
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
-      let (oid, _, board) = orreryBoard mountain piker []
+      let (oid, _, board) = flashBoard mountain piker []
       Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
       Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice board))) "not offered"
 
@@ -4029,7 +4187,7 @@ vedalkenOrrerySpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       orrery <- S.printingOf s registry "Vedalken Orrery"
-      let (oid, _, board) = orreryBoard mountain piker [orrery]
+      let (oid, _, board) = flashBoard mountain piker [orrery]
       Spec.assertBool s (S.castable S.alice oid board) "castable"
       Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
 
@@ -4041,8 +4199,8 @@ vedalkenOrrerySpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       orrery <- S.printingOf s registry "Vedalken Orrery"
-      let (_, _, board) = orreryBoard mountain piker [orrery]
-          (_, _, bare) = orreryBoard mountain piker []
+      let (_, _, board) = flashBoard mountain piker [orrery]
+          (_, _, bare) = flashBoard mountain piker []
           play gs = S.runPure S.castAnswer gs Engine.priorityLoop
           after = play board
       Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
@@ -4056,7 +4214,7 @@ vedalkenOrrerySpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       orrery <- S.printingOf s registry "Vedalken Orrery"
-      let (oid, _, board) = orreryBoard mountain piker [orrery]
+      let (oid, _, board) = flashBoard mountain piker [orrery]
       Spec.assertBool s (not (Cast.instantSpeed oid (S.combinedFace piker) board)) "no flash on the card"
       Spec.assertBool s (PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board) "the permission is the player's"
 
@@ -4066,7 +4224,7 @@ vedalkenOrrerySpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       orrery <- S.printingOf s registry "Vedalken Orrery"
-      let (oid, extras, board) = orreryBoard mountain piker [orrery]
+      let (oid, extras, board) = flashBoard mountain piker [orrery]
           without = board {GameState.battlefield = foldr Set.delete (GameState.battlefield board) extras}
       Spec.assertBool s (S.castable S.alice oid board) "castable with it"
       Spec.assertBool s (not (S.castable S.alice oid without)) "not castable without it"
@@ -4079,8 +4237,8 @@ vedalkenOrrerySpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       orrery <- S.printingOf s registry "Vedalken Orrery"
-      let (_, _, board) = orreryBoard mountain piker [orrery]
-          (_, ownTurn) = orreryOnOwnTurn mountain piker [orrery]
+      let (_, _, board) = flashBoard mountain piker [orrery]
+          (_, ownTurn) = flashOnOwnTurn mountain piker [orrery]
       Spec.assertBool s (any isPlay (Action.legalActions S.alice ownTurn)) "playable on her own turn"
       Spec.assertBool s (not (any isPlay (Action.legalActions S.alice board))) "not on bob's"
 
@@ -4129,6 +4287,99 @@ vedalkenOrrerySpec s registry =
           (onOwnTurn, ownBoard) = equipBoard mountain piker bonesplitter [orrery] S.alice
       Spec.assertBool s (not (any (isActivateOf equipment) (Action.legalActions S.alice board))) "still not offered"
       Spec.assertBool s (any (isActivateOf onOwnTurn) (Action.legalActions S.alice ownBoard)) "and still offered on her own turn"
+
+sigardasAidSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sigardasAidSpec s registry =
+  Spec.describe s "SigardasAid" $ do
+    -- The control, flashBoard's: without it every refusal below would also be
+    -- true of a board where the Rollicker was unaffordable or unoffered. The
+    -- Piker on the battlefield is what bestow would enchant, and it is on every
+    -- board here, so the Aid stays the only difference.
+    Spec.it s "CR 117.1a on alice's own turn the bestow creature spell is castable already" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+      let (oid, board) = flashOnOwnTurn mountain rollicker [piker]
+      Spec.assertBool s (S.castable S.alice oid board) "castable"
+      Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
+
+    Spec.it s "CR 117.1a on the opponent's turn it is not" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+      let (oid, _, board) = flashBoard mountain rollicker [piker]
+      Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
+      Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice board))) "not offered"
+
+    -- CR 601.3b's SECOND SENTENCE, and rule 601.3b's own example: the Aid names
+    -- Aura spells, the card in hand is a Satyr creature card and no Aura at all,
+    -- and what carries it is the bestow choice CR 601.2b has yet to be made.
+    -- Nothing on the board says Aura until that choice is considered.
+    Spec.it s "CR 601.3b with Sigarda's Aid the bestow creature spell is castable on the opponent's turn" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+      aid <- S.printingOf s registry "Sigarda's Aid"
+      let (oid, _, board) = flashBoard mountain rollicker [piker, aid]
+      Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
+      Spec.assertBool s (S.castable S.alice oid board) "castable"
+      Spec.assertBool s (PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board) "the permission reaches it"
+
+    -- CR 601.3b's FIRST sentence still holds the line: the permission is read,
+    -- rather than the sorcery-speed window being opened for everything. The pair
+    -- differs only in which creature card is in the hand, and the Piker has no
+    -- bestow, so no choice in its proposal can make it an Aura.
+    Spec.it s "CR 601.3b a creature card with no bestow is still refused" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      aid <- S.printingOf s registry "Sigarda's Aid"
+      let (oid, _, board) = flashBoard mountain piker [piker, aid]
+      Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice board))) "not offered"
+      Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
+      Spec.assertBool s (not (PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board)) "the permission does not reach it"
+
+    -- The gameplay half, driven through the priority loop rather than by calling
+    -- Cast.castSpell: S.castAnswer takes whatever Cast action it is OFFERED, so
+    -- the two runs differ in the Aid and in nothing a test wrote by hand. Without
+    -- it alice is offered no cast at all and simply passes.
+    Spec.it s "CR 601.3b the offered cast resolves and the bestow creature enters on the opponent's turn" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+      aid <- S.printingOf s registry "Sigarda's Aid"
+      let (_, _, board) = flashBoard mountain rollicker [piker, aid]
+          (_, _, bare) = flashBoard mountain rollicker [piker]
+          play gs = S.runPure S.castAnswer gs Engine.priorityLoop
+          after = play board
+      Spec.assertEqWith s "the Rollicker is on the battlefield" (S.countOnBattlefieldByName (S.printingName rollicker) S.alice after) 1
+      Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
+      Spec.assertEqWith s "and without the Aid it never left her hand" (S.countOnBattlefieldByName (S.printingName rollicker) S.alice (play bare)) 0
+
+    -- CR 702.103b is what the lookahead consults and nothing else: with the
+    -- bestow card in hand and NO Aid, the window stays shut, so the choice space
+    -- is not a permission of its own.
+    Spec.it s "CR 601.3b without the Aid the bestow choice opens nothing" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+      let (oid, _, board) = flashBoard mountain rollicker [piker]
+      Spec.assertBool s (not (PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board)) "no permission to read"
+
+    -- CR 601.2b: the choice is only CONSIDERED. Nothing is stamped by asking, so
+    -- the card in the hand is still a creature card and no Aura, on the very
+    -- board that just let it through.
+    Spec.it s "CR 601.3b considering the choice writes nothing onto the card" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+      aid <- S.printingOf s registry "Sigarda's Aid"
+      let (oid, _, board) = flashBoard mountain rollicker [piker, aid]
+          asked = PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board
+          view = Projection.viewOfObject oid board
+      Spec.assertBool s asked "the permission reaches it"
+      Spec.assertBool s (not (Set.member Subtype.Aura (Filter.subtypes view))) "no Aura subtype"
+      Spec.assertBool s (Set.member CardType.Creature (Filter.cardTypes view)) "still a creature card"
+      Spec.assertBool s (Set.member Subtype.Aura (Filter.subtypes (Projection.bestowedView oid board))) "which only the hypothetical carries"
 
 -- ONE board for both halves of CR 701.6a's "a spell or ability": alice has a
 -- SPELL of the caller's choosing on the stack and a settled Prodigal Sorcerer
@@ -5046,6 +5297,8 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   textChangedEdgewalkerSpec s registry
   reliquaryTowerSpec s registry
   theTenRingsSpec s registry
+  minamoScrollkeeperSpec s registry
+  gnatMiserSpec s registry
   storedSpec s registry
   silenceSpec s registry
   ceaseFireSpec s registry
@@ -5056,6 +5309,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   extraLandDropsSpec s registry
   matchesObjectSpec s registry
   vedalkenOrrerySpec s registry
+  sigardasAidSpec s registry
   yawgmothsWillSpec s registry
   crucibleSpec s registry
   voidWinnowerSpec s registry
