@@ -336,6 +336,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.IsFaceDown
       " {\"type\":\"IsFaceDown\"} "
+  Spec.it s "RepresentedByCard" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.RepresentedByCard (Filter.HasCardType CardType.Creature))
+      " {\"type\":\"RepresentedByCard\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   Spec.it s "IsExiledFaceDown" $
     Common.assertCodec
       s

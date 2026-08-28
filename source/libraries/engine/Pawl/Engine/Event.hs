@@ -4620,6 +4620,17 @@ discardReturning cause pid oid = do
 -- The `cause` is CR 702.94a's "this way" (see RevealCause): every caller but the
 -- draw funnel's miracle window shows a card for a reason no rule asks about
 -- again, and passes Ordinary.
+--
+-- CR 708.12 does NOT move this read, and that is the rule rather than an
+-- oversight: it governs what a revealing ability READS, not what the log records,
+-- and the read is Pawl.Types.Filter's RepresentedByCard -- Hauntwoods Shrieker's
+-- "if it's a creature card", proved at Pawl.FaceDownSpec's CR 708.12 group.
+--
+-- Not implemented: CR 708.9's reveal, which a face-down permanent's owner makes
+-- as it leaves the battlefield. Pawl.Types.Object's newIncarnation gets the
+-- OUTCOME right -- the status is back to FaceUp -- but no caller reaches this
+-- funnel, so nothing can trigger on it, and the snapshot such a reveal would
+-- record is unsettled for the same reason nothing reads it (#921).
 reveal :: RevealCause.RevealCause -> PlayerId -> ObjectId -> Game ()
 reveal cause pid oid = do
   gs <- State.get
