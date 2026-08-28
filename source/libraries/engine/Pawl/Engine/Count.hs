@@ -418,6 +418,11 @@ playersFor context gs ref =
         -- is the type's stated reading and the opposite of InSlot's collapse. A
         -- reference with no source at all is still unanswerable, since without one
         -- there are no bindings to have excluded anybody.
+        --
+        -- Not implemented: a source object that EXISTED and then ceased, which CR
+        -- 729.5 leaves a resumed resolution holding -- this answers Nothing where
+        -- Pawl.Engine.Resolve.playerRefPlayers' arm answers "excludes nobody", and
+        -- neither consults GameState.detachedBindings (#2493).
         PlayerRef.EachPlayerExcept name -> do
           src <- Filter.source context
           obj <- Game.lookupObject src gs

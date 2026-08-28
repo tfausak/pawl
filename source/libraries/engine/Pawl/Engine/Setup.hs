@@ -140,6 +140,7 @@ emptyGame order =
           GameState.replacements = [],
           GameState.pendingPreventionRiders = Seq.empty,
           GameState.ambientAmounts = Map.empty,
+          GameState.detachedBindings = Map.empty,
           GameState.pendingEntryEffects = Seq.empty,
           GameState.enteringBeside = Set.empty,
           GameState.enteringSubjects = Set.empty,
@@ -482,6 +483,7 @@ restartGame perform exempt starter = do
             GameState.replacements = [],
             GameState.pendingPreventionRiders = Seq.empty,
             GameState.ambientAmounts = Map.empty,
+            GameState.detachedBindings = Map.empty,
             GameState.pendingEntryEffects = Seq.empty,
             GameState.enteringBeside = Set.empty,
             GameState.enteringSubjects = Set.empty,
@@ -622,10 +624,13 @@ subgameStateFrom starter parent =
       -- face-down main-game permanent is offered by its PRINTED face rather than
       -- by CR 708.2's characteristics (#2467).
       --
-      -- Not implemented: this reach is not scoped away from the parent's STACK,
-      -- so a wish can name the very spell that is resolving it (correct per CR
-      -- 729.4/729.5), but what Pawl.Engine.Resolve.resolveSpellWith does
-      -- afterwards, once that spell's own object is gone, is untested (#2473).
+      -- This reach is deliberately NOT scoped away from the parent's STACK: a
+      -- wish can name the very spell that is resolving it, which CR 729.4 offers
+      -- and CR 729.5 then finishes resolving "even if it was created by a spell
+      -- card that's no longer on the stack". Pawl.Engine.Resolve.liveBindings is
+      -- what makes that resumption read the slots the resolution had filled,
+      -- proved by Pawl.OutsideTheGameSpec's "a wish that takes the resolving
+      -- Shahrazad itself still finishes resolving with the winner it bound".
       outside =
         Map.union
           (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.union libIds cmdIds)))
@@ -665,6 +670,7 @@ subgameStateFrom starter parent =
           GameState.replacements = [],
           GameState.pendingPreventionRiders = Seq.empty,
           GameState.ambientAmounts = Map.empty,
+          GameState.detachedBindings = Map.empty,
           GameState.pendingEntryEffects = Seq.empty,
           GameState.enteringBeside = Set.empty,
           GameState.enteringSubjects = Set.empty,
