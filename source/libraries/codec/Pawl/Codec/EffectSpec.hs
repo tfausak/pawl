@@ -875,8 +875,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       )
       " {\"type\":\"ShuffleIntoLibrary\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
   -- CR 701.24c's named library (Dwell on the Past's "their library"): the pair
-  -- form, an ARRAY where a lone ObjectRef is a tagged object -- which is what
-  -- tells the two apart.
+  -- form: both keys written, where the case above elides the absent one.
   Spec.it s "ShuffleIntoLibrary naming the library" $
     Common.assertJsonCodec
       s
@@ -889,6 +888,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
             }
       )
       " {\"type\":\"ShuffleIntoLibrary\",\"value\":{\"library\":{\"type\":\"InSlot\",\"value\":\"player\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"cards\"}}} "
+  -- CR 701.24a on its own: the arm above with no ref at all, so the payload is a
+  -- bare PlayerRef. Undercity's "then shuffle" is what writes it.
+  Spec.it s "Shuffle" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Shuffle (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"Shuffle\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
   -- CR 608.2g, in the shape rule 310.12b's battles and rule 702's keywords mint
   -- in the engine (Pawl.Engine.Battle, Pawl.Engine.Keyword): both defaulted keys
   -- elided. Wild Evocation is the one card that writes them, and

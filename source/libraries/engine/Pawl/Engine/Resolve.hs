@@ -631,6 +631,8 @@ slotsOf effect = case effect of
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref _) -> playerRefSlots ref
   -- Both halves may name a slot: what is shuffled, and whose library.
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> joinTwo (maybe Map.empty playerRefSlots named) (objectRefSlots ref)
+  -- One half of the arm above: the library, and nothing shuffled into it.
+  Effect.Shuffle ref -> playerRefSlots ref
   -- BOTH are reads: the slot is bound by an earlier effect of the list (CR 400.7).
   Effect.OfferCast (OfferCast.MkOfferCast slot caster _ _) -> joinTwo (oneSlot slot) (playerRefSlots caster)
   -- Both reads: the ref is normally bound earlier in the same list (CR 400.7).
@@ -913,6 +915,7 @@ slotsAreExhaustive effect = case effect of
   Effect.FlipCoin {} -> True
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> True
   Effect.ShuffleIntoLibrary {} -> True
+  Effect.Shuffle {} -> True
   Effect.OfferCast {} -> True
   Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant)
   -- PreventNextDamage's answer for the body, plus the fourth ObjectRef-taking
@@ -1063,6 +1066,7 @@ readsX = any effectReadsX
       Effect.FlipCoin {} -> False
       Effect.TakeExtraTurn {} -> False
       Effect.ShuffleIntoLibrary {} -> False
+      Effect.Shuffle {} -> False
       Effect.OfferCast {} -> False
       Effect.GrantPlayFromExile {} -> False
       -- CR 608.2f's body is an effect list like any other, so an X inside it counts.
@@ -1261,6 +1265,7 @@ boundSlots effect = case effect of
   Effect.AttachTargetToEach {} -> Set.empty
   Effect.TakeExtraTurn {} -> Set.empty
   Effect.ShuffleIntoLibrary {} -> Set.empty
+  Effect.Shuffle {} -> Set.empty
   Effect.OfferCast {} -> Set.empty
   Effect.GrantPlayFromExile {} -> Set.empty
   -- The loop's member slot, plus every name the BODY authors.
@@ -4568,6 +4573,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- APNAP (CR 608.2f), which is what makes the ORDER of the Prompt.Shuffle calls
     -- a fact about the rules rather than about PlayerId's Ord.
     Monad.forM_ (filter (`Set.member` owners) (Game.apnapOrder gs)) Mulligan.shuffleLibrary
+  -- CR 701.24a alone: randomize the named libraries so no player knows their
+  -- order. Nothing moves, so there is no changeZone call and no CR 616.1
+  -- opportunity -- the cards a "then shuffle" follows are still the objects they
+  -- were, with the ids they had.
+  --
+  -- APNAP (CR 608.2f) and once per library, the arm above's two reasons: a
+  -- PlayerRef naming a player twice still shuffles their library once, and the
+  -- ORDER of the Prompt.Shuffle calls is a fact about the rules rather than about
+  -- PlayerId's Ord.
+  Effect.Shuffle ref -> do
+    gs <- State.get
+    let named = Set.fromList (playerRefPlayers legal controller gs ref)
+    Monad.forM_ (filter (`Set.member` named) (Game.apnapOrder gs)) Mulligan.shuffleLibrary
   Effect.OfferCast (OfferCast.MkOfferCast slot caster optionality offer) -> do
     gs <- State.get
     -- CR 608.2g names "a player", and a reference resolving to nobody offers the
