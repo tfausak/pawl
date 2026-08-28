@@ -3591,6 +3591,87 @@ oraclesAttendantsSpec s registry = Spec.describe s "Oracle's Attendants (CR 614.
     Spec.assertEqWith s "omega's 3 stays on the victim" (S.damageOf victim (strike omega 3 aimed)) (Just 3)
     Spec.assertEqWith s "alice was asked which source, and answered alpha" (chosenSourcesIn (answersFor (aimAndChoose victim alpha) g4 activate)) [alpha]
 
+-- CR 614.9 with BOTH halves of the sentence printed on a card, which is what
+-- separates this group from Turn the Tables and Oracle's Attendants above: those
+-- two are resolutions, so the engine bakes their recipient and their destination
+-- as ids. Pariah ({2}{W} Enchantment -- Aura, "Enchant creature / All damage
+-- that would be dealt to you is dealt to enchanted creature instead"; name,
+-- cost, type line and Oracle text checked against api.scryfall.com 2026-08-28,
+-- printed on paper from Urza's Saga onward) is a PERMANENT's static ability, so
+-- there is no resolution to bake anything: "you" is
+-- DamagePattern.whoRecipient and "enchanted creature" is
+-- DamageRewrite.RedirectMatching's Filter.IsHostOfSource, read live at the
+-- damage event.
+--
+-- THREE boards differing in one thing each, because a redirect that fired
+-- unconditionally is indistinguishable from one that reads its condition:
+--
+--   * the recipient is alice (the Aura's controller) -- redirected;
+--   * the recipient is bob -- CR 109.5's "you" is not him, so it lands on him;
+--   * the recipient is an OBJECT, and one alice controls -- a Filter cannot
+--     describe a player, so the pattern's player half must not admit it either.
+--
+-- TWO of alice's creatures, the Oppressive Rays board's trick for the same
+-- reason: the destination is a description, so a board with one creature cannot
+-- tell "the enchanted creature" from "a creature alice controls" from "the first
+-- permanent on the battlefield". Jedit Ojanen (5/5) is the host and survives; the
+-- Goblin Piker (2/1) beside it never takes anything.
+--
+-- Numbers all distinct -- 3 redirected, 4 to bob, 2 to the bystander -- so no two
+-- readings meet on one of them.
+pariahSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+pariahSpec s registry = Spec.describe s "Pariah (CR 614.9)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      board plains jedit pikerPrinting pariah =
+        let base = S.landsInPlay plains 1
+            (host, g1) = S.addCreature jedit S.alice base
+            (bystander, g2) = S.addCreature pikerPrinting S.alice g1
+            (source, g3) = S.addCreature pikerPrinting S.bob g2
+            (aura, g4) = S.addCreature pariah S.alice g3
+         in (host, bystander, source, aura, S.attach aura host g4)
+  Spec.it s "CR 614.9 damage that would be dealt to you is dealt to the enchanted creature instead" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    pariah <- S.printingOf s registry "Pariah"
+    let (host, bystander, source, aura, gs) = board plains jedit pikerPrinting pariah
+        atAlice = settleDamage S.identityAnswer gs [hit source (Recipient.ToPlayer S.alice) 3]
+    Spec.assertEqWith s "alice loses no life" (S.lifeOf S.alice atAlice) (Just 20)
+    -- CR 614.9 is a replacement and not a prevention (CR 615.1a), so the amount
+    -- rides across WHOLE: a prevention would have shown 0 here.
+    Spec.assertEqWith s "the 3 is marked on the enchanted creature instead" (S.damageOf host atAlice) (Just 3)
+    Spec.assertEqWith s "and none of it on the creature beside it" (S.damageOf bystander atAlice) (Just 0)
+    -- The proxy, after the behaviour.
+    Spec.assertEqWith s "setup: the Aura is attached to the host" (Projection.hostOf aura gs) (Just host)
+  -- THE CONTROL on the player half: bob is not CR 109.5's "you", so the same
+  -- source's damage reaches him. A redirect that ignored `whoRecipient` would
+  -- have moved this onto alice's creature too.
+  Spec.it s "CR 109.5 the same Aura moves nothing that was aimed at the opponent" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    pariah <- S.printingOf s registry "Pariah"
+    let (host, bystander, source, _aura, gs) = board plains jedit pikerPrinting pariah
+        aimedAtBob = settleDamage S.identityAnswer gs [hit source (Recipient.ToPlayer S.bob) 4]
+    Spec.assertEqWith s "bob loses the whole 4" (S.lifeOf S.bob aimedAtBob) (Just 16)
+    Spec.assertEqWith s "nothing is marked on the enchanted creature" (S.damageOf host aimedAtBob) (Just 0)
+    Spec.assertEqWith s "nor on the creature beside it" (S.damageOf bystander aimedAtBob) (Just 0)
+  -- THE CONTROL on the object half: CR 120.3a's other kind of recipient. Pariah
+  -- names a player and no object, so damage aimed at a permanent alice controls
+  -- is not its business -- which is what keeps `whoRecipient` from being read as
+  -- "anything of yours".
+  Spec.it s "CR 120.3a damage aimed at a permanent alice controls is not redirected" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    pariah <- S.printingOf s registry "Pariah"
+    let (host, bystander, source, _aura, gs) = board plains jedit pikerPrinting pariah
+        atBystander = settleDamage S.identityAnswer gs [hit source (Recipient.ToCreature bystander) 2]
+    Spec.assertEqWith s "the 2 stays on the creature it was aimed at" (S.damageOf bystander atBystander) (Just 2)
+    Spec.assertEqWith s "and none of it moves onto the enchanted creature" (S.damageOf host atBystander) (Just 0)
+    Spec.assertEqWith s "alice still loses no life either" (S.lifeOf S.alice atBystander) (Just 20)
+
 -- Aim every target slot at one object, and answer CR 601.2b's X with `n`.
 -- FILTERED and not built, aimAndChoose's posture: the recipient comes out of the
 -- set the prompt offered, so a Pool.AnyTarget slot's own tag is what reaches the
@@ -5064,6 +5145,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   samiteMinistrationSpec s registry
   turnTheTablesSpec s registry
   oraclesAttendantsSpec s registry
+  pariahSpec s registry
   lavaBurstSpec s registry
   queensBayPaladinSpec s registry
   cryogenicStasisSpec s registry

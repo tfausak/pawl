@@ -1120,6 +1120,7 @@ applyInertly candidate rewrite event = do
     DamageRewrite.SetAmount _ -> pure ()
     DamageRewrite.Scale _ -> pure ()
     DamageRewrite.Redirect _ -> pure ()
+    DamageRewrite.RedirectMatching _ -> pure ()
   pure (Just event)
 
 -- CR 614.6: apply one chosen effect. Nothing means the event does not happen.
@@ -1497,7 +1498,7 @@ apply batch candidate event =
       EntryRewrite.WithCounters (WithCounters.MkWithCounters counters) -> do
         gs <- State.get
         let viewOf = Projection.viewWithLastKnown oid gs
-            context = Replacement.candidateContext candidate
+            context = Replacement.candidateContext gs candidate
             announcedX = Projection.announcedXOf oid gs
         Replacement.consume (ReplacementCandidate.identity candidate)
         Foldable.for_ (Map.toList counters) $ \(kind, quantity) ->
@@ -2092,6 +2093,22 @@ apply batch candidate event =
         pure . Just $ case Replacement.redirectDestination gs dest of
           Nothing -> event
           Just live -> ProposedEvent.WouldDealDamage de {DamageEvent.target = live}
+      -- CR 614.9 with the destination PRINTED rather than baked -- Pariah's
+      -- "all damage that would be dealt to you is dealt to enchanted creature
+      -- instead". The arm above with `dest` found by description instead of read
+      -- off the row, so the rule's guard, the CR 613.1d re-tag and the
+      -- unchanged-event answer are all the same three lines
+      -- (Replacement.printedDestination).
+      --
+      -- The Filter is read in the CANDIDATE's Context, which is what makes CR
+      -- 303.4b's "enchanted" answerable: the row's source is the Aura, and
+      -- Replacement.candidateContext supplies what it is attached to.
+      DamageRewrite.RedirectMatching filter_ -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        pure . Just $ case Replacement.printedDestination gs (Replacement.candidateContext gs candidate) filter_ of
+          Nothing -> event
+          Just live -> ProposedEvent.WouldDealDamage de {DamageEvent.target = live}
     -- Unreachable: `applies` admits DamageR only against WouldDealDamage.
     (ReplacementEffect.DamageR {}, _) -> pure (Just event)
     -- CR 701.19a / 122.1c: under either arm the DESTRUCTION does not happen, so
@@ -2257,7 +2274,7 @@ apply batch candidate event =
       TurnUpRewrite.WithCounters (WithCounters.MkWithCounters counters) -> do
         gs <- State.get
         let viewOf = Projection.viewWithLastKnown oid gs
-            context = Replacement.candidateContext candidate
+            context = Replacement.candidateContext gs candidate
         Replacement.consume (ReplacementCandidate.identity candidate)
         Foldable.for_ (Map.toList counters) $ \(kind, quantity) ->
           case Quantity.evaluate viewOf context gs oid quantity of
