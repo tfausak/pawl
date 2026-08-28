@@ -569,10 +569,10 @@ setPT base new = case (base, new) of
 --
 -- The (Nothing, _) arm is CR 208.3a's noncreature permanent, whose premise is
 -- the other one: noncreaturePT runs at the END of the fold, so a noncreature's
--- mid-fold power is still its printed one and only a permanent with no printed
--- box reaches here. A CREATURE with no power is rule 208.5's premise instead,
--- and projectDeciding has already substituted its 0 by the time layer 7c runs,
--- so no creature reaches this arm.
+-- mid-fold power is still its printed one and only an object with no printed box
+-- reaches here. A CREATURE with no power is rule 208.5's premise instead, and
+-- projectDeciding's noValueAt has already substituted its 0 by the time layer 7c
+-- runs, so no creature reaches this arm.
 addPT :: Maybe Integer -> Maybe Integer -> Maybe Integer
 addPT base delta = case (base, delta) of
   (Just b, Just d) -> Just (b + d)
