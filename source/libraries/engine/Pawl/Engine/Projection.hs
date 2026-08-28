@@ -1069,7 +1069,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- night (CR 712.13a) and this conjunct is the only thing answering.
       -- Pawl.MeldSpec's "CR 701.27g a melded permanent that entered with its back
       -- face up is still not one" is that board, and dropping the conjunct
-      -- reddens it.
+      -- reddens it. That board melds into a daybound double-faced card, which no
+      -- printed meld pair combines into -- the combined face is card data the
+      -- opcode carries, the same stand-in Game.turnFaceOver's CR 712.4c arm is
+      -- proved by -- so the rule is read where the printings cannot reach it.
       --
       -- The battlefield conjunct is a REGRESSION FENCE rather than a proved
       -- behaviour: every Count that reaches the atom is already scoped to a

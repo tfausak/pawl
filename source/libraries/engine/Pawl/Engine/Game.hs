@@ -710,10 +710,10 @@ turnFaceOver now gs oid objects
 -- turned over. `turnFaceOver` above declines five ways -- an id naming nothing on
 -- the battlefield, no card behind it, CR 701.27c's card that is not double-faced,
 -- CR 701.27d's instant or sorcery face, CR 712.4c's melded permanent -- and
--- Pawl.Engine.Resolve's `turnOver`
--- adds CR 701.27f and CR 702.145b on top. A turn that did not happen is not an
--- event, so both roads read the answer here rather than each keeping its own
--- list, and neither can come to disagree with the write about what turned.
+-- Pawl.Engine.Resolve's `turnOver` adds CR 701.27f and CR 702.145b on top. A
+-- turn that did not happen is not an event, so both roads read the answer here
+-- rather than each keeping its own list, and neither can come to disagree with
+-- the write about what turned.
 --
 -- Object.face is the whole comparison because it is the whole write; an id absent
 -- from both maps compares equal and so is not reported.

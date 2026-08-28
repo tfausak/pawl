@@ -546,8 +546,10 @@ meldedThrough base battlements garrison mountain =
            in (Maybe.listToMaybe (namedTownship after (Game.zoneMembers Zone.Battlefield S.alice after)), after)
         _ -> (Nothing, board)
 
--- The combined back face's name, which is what a melded permanent answers to
--- (CR 712.8g) and what every case above counts a melded permanent by.
+-- The name Hanweir Battlements' combined back face prints, which is what the
+-- permanent its meld pair becomes answers to (CR 712.8g). The cases that drive
+-- the printed ability count by it; the opcode-level ones carry whatever card
+-- stands in for the combined face and count by that name instead.
 townshipName :: CardName.CardName
 townshipName = CardName.MkCardName (Text.pack "Hanweir, the Writhing Township")
 
