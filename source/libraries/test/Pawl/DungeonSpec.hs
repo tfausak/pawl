@@ -451,6 +451,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
   -- dungeon card in the command zone, they choose a dungeon card they own from
   -- outside the game with the indicated quality."
   --
+  -- data/cards/undercity.json is the DUNGEON face alone. The printing's other
+  -- face, The Initiative, is a reminder rather than a source: CR 726.2 makes the
+  -- three initiative abilities inherent, with no source, so transcribing them onto
+  -- a face would be wrong as well as unreachable, and rule 726 is #746's. Its
+  -- bottommost room carries no ability at all (#2518). Synthetic Undercity Stair
+  -- is the producer meanwhile, since CR 726.2's inherent ability is the only
+  -- printed "venture into Undercity" there is.
+  --
   -- ONE board, two abilities on it: Synthetic Undercity Stair's "venture into
   -- Undercity" and Secret Door's plain "venture into the dungeon". alice owns
   -- both dungeons either way, so the only difference between the two readings is
@@ -473,8 +481,17 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
     undercity <- S.printingOf s registry "Undercity"
     let (doorId, base) = dungeonBoard island door [lostMine, undercity] 12
         (stairId, gs) = S.addCreature stair S.alice base
+        -- payingFirstDungeon's search arms with its dungeon answer replaced, so
+        -- the two boards differ ONLY in which dungeon the prompt would pick --
+        -- and an implementation that entered Undercity here would run Secret
+        -- Entrance's search and be caught by the hand-size assertion below rather
+        -- than by the name.
+        plainAnswer :: Prompt.Prompt r -> r
+        plainAnswer p = case p of
+          Prompt.ChooseDungeon _ _ candidates -> NonEmpty.last candidates
+          _ -> payingFirstDungeon p
         quality = ventureOnce payingFirstDungeon (ventureAbility stair) stairId gs
-        plain = ventureOnce payingLastDungeon (ventureAbility door) doorId gs
+        plain = ventureOnce plainAnswer (ventureAbility door) doorId gs
     -- CR 309.4c: the room ability of the TOPMOST room of whichever dungeon was
     -- entered, which is the two dungeons' own difference on the board -- Secret
     -- Entrance searches a basic land into its owner's hand, and Cave Entrance only
