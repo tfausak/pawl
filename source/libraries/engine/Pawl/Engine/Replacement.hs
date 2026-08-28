@@ -1823,9 +1823,9 @@ inertPrevention gs candidate event = case (ReplacementCandidate.effect candidate
 -- still report a prevention -- at an amount of 0. The rule is emphatic that such
 -- an effect is still applied and that "any additional effects they have will take
 -- place", and CR 615.5's rider travels on this record. Passed in rather than
--- re-derived here, for the reason Event.loop passes it: `applyInertly` has run
--- between the two, so the board this would ask is no longer the board the
--- classification was made against.
+-- re-derived: this function is handed no board, and the board it would have to
+-- ask is not the one the classification was made against -- `applyInertly` has
+-- run in between.
 --
 -- ZERO is therefore a load-bearing amount, and the two consumers in
 -- Pawl.Engine.Damage read it differently. The CR 615.5 rider queue takes every
@@ -1919,6 +1919,13 @@ printedBy candidate = case candidate of
 --
 -- Ascending by key, so the CR 608.2i record -- and therefore the CR 603.3b order
 -- these triggers are offered in -- is canonical rather than gather-dependent.
+--
+-- A CR 615.12 entry, whose amount is 0, merges harmlessly and is the rule: one
+-- application of one prevention effect to several simultaneous events reports
+-- what it prevented across all of them, which the unpreventable ones added
+-- nothing to. So a batch mixing the two still records CR 615.13's trigger --
+-- some of the damage WAS prevented -- and a batch of only inert ones sums to 0,
+-- which Pawl.Engine.Damage's record then leaves out.
 --
 -- Only the AMOUNTS are summed. CR 615.5's rider is a property of the INSTANCE,
 -- and the key already fixes the instance, so every entry merged here carries the

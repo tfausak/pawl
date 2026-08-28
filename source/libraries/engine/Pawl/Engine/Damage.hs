@@ -1240,8 +1240,9 @@ applyDamage events = do
   -- of the effect". Nothing is inspected here; the rider is an opaque payload
   -- copied from Prevention to the queue.
   --
-  -- The AMOUNT is not filtered on, where the record above filters on nothing
-  -- else: CR 615.12 says an inapplicable prevention is still applied and "any
+  -- Filtered on the RIDER and not on the amount, which is the record above's
+  -- gate exactly reversed: CR 615.12 says an inapplicable prevention is still
+  -- applied and "any
   -- additional effects they have will take place", so an application that
   -- prevented 0 owes its rider just the same. An amount-scaled rider then reads
   -- 0 through Binding.eventAmount and does nothing of its own accord (Test of

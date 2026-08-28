@@ -2242,10 +2242,11 @@ spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
 -- same clause for the rules-MINTED half, CR 122.1c's counter; this is the
 -- AUTHORED half, which travels on the candidate rather than on the rewrite.
 --
--- Every amount-SCALED rider in data/cards/ -- Test of Faith, Stormwild Capridor,
--- Protean Hydra, Inkshield -- is still applied here and still does nothing,
--- because CR 615.5's "amount of damage that was prevented" is 0. That is why
--- none of them could see this clause and this card can.
+-- An amount-SCALED rider is applied to unpreventable damage just the same and
+-- does nothing, CR 615.5's "amount of damage that was prevented" being 0 -- Test
+-- of Faith, Stormwild Capridor, Protean Hydra, Brace for Impact, Divine
+-- Deflection and Inkshield all read the amount that way. That is why none of
+-- them can show this clause and why this card can.
 --
 -- NOT a CR 615.13 trigger, which is the distinction the whole group turns on:
 -- "when damage is prevented this way" triggers only where the application
@@ -2332,7 +2333,7 @@ phantomTigerSpec s registry = Spec.describe s "Phantom Tiger (CR 615.12)" $ do
         (g5, spellId) = S.handOne bolt g4
         after = S.runPure (aimCreature piker) g5 (S.cast S.alice spellId >> Stack.resolveTop >> Engine.settleForPriority)
     Spec.assertEqWith s "the Tiger keeps all four counters, so it is still a 5/4" (S.powerToughnessOf tiger after) (Just (5, 4))
-    Spec.assertEqWith s "four" (countersOn CounterKind.PlusOnePlusOne tiger after) 4
+    Spec.assertEqWith s "all four counters, none of them spent on somebody else's damage" (countersOn CounterKind.PlusOnePlusOne tiger after) 4
     Spec.assertBool s (not (S.onBattlefield piker after)) "and the Piker the Bolt did name is dead"
   -- CR 615.13's control, and the one that fixes WHICH clause the fix implements.
   -- Phyrexian Vindicator prints the same PreventAll over itself, but its extra
@@ -2354,12 +2355,21 @@ phantomTigerSpec s registry = Spec.describe s "Phantom Tiger (CR 615.12)" $ do
            in (horror, strikeAndSettleWith (preferTarget [Recipient.ToPlayer S.bob]) (if withPunk then g3 else g2) [hit attacker (Recipient.ToCreature horror) 4])
         (vindicator, (punkDealt, punkAfter)) = build True
         (controlVindicator, (controlDealt, controlAfter)) = build False
-    -- The gameplay assertion, ahead of the stack proxy: bob's life is where the
-    -- trigger would show, and it does not move.
-    Spec.assertEqWith s "bob takes nothing: nothing was prevented, so nothing was prevented 'this way'" (S.lifeOf S.bob punkAfter) (Just 20)
+    -- The STACK is the observation here, first and deliberately, and it is the
+    -- behavioural one rather than a proxy: a CR 615.13 trigger that fired off an
+    -- inert application reads a prevented amount of 0, so every payload such a
+    -- trigger can print -- the Vindicator's "that much" damage, Selfless Squire's
+    -- "that many" counters -- does nothing at all once it resolves. What a
+    -- spurious trigger DOES do is exist: it goes on the stack, its controller
+    -- owes it a target, and CR 603.3b orders it against everything else the
+    -- boundary gathered. The two life-and-damage assertions behind it are the
+    -- vacuity guards, and the control below is what shows a real prevention
+    -- still fires it and still reaches bob.
+    Spec.assertEqWith s "no trigger was gathered: CR 615.13 wants some of the damage prevented, and none was" (length (GameState.stack punkDealt)) 0
+    Spec.assertEqWith s "so bob takes nothing" (S.lifeOf S.bob punkAfter) (Just 20)
     Spec.assertEqWith s "and the whole 4 is marked on the Vindicator instead" (S.damageOf vindicator punkAfter) (Just 4)
-    Spec.assertEqWith s "no trigger was gathered at all" (length (GameState.stack punkDealt)) 0
-    -- The control: the same 4, the same card, and the trigger does fire.
+    -- THE CONTROL, differing in Spider-Punk alone: the same 4 off the same card,
+    -- and the trigger fires and lands.
     Spec.assertEqWith s "without Spider-Punk the prevented 4 reaches bob" (S.lifeOf S.bob controlAfter) (Just 16)
     Spec.assertEqWith s "CR 615.6: and none of it is marked on the Vindicator" (S.damageOf controlVindicator controlAfter) (Just 0)
     Spec.assertEqWith s "one trigger was gathered" (length (GameState.stack controlDealt)) 1
