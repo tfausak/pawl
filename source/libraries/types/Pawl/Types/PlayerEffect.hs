@@ -35,15 +35,17 @@ data PlayerEffect
     -- constructor.
     CantCastMoreThan Natural.Natural
   | -- | CR 601.3 / Null Chamber: this player can't cast a spell whose name is one
-    -- of the names chosen as this effect's SOURCE entered ("Spells with the
-    -- chosen names can't be cast").
+    -- of the names chosen for this effect's SOURCE ("Spells with the chosen names
+    -- can't be cast"), as it entered (CR 614.1c) or, on the stored carrier, while
+    -- it resolved (CR 608.2c; Conjurer's Ban).
     --
     -- NULLARY, carrying no name, for UnderSourceControl's reason on the entry
     -- side: a card can write a CardName (its own face's, a token definition's)
-    -- but not THIS one, which is not known until CR 614.1c's choice is made --
-    -- the same reason that arm carries no PlayerId. The names come from
+    -- but not THIS one, which is not known until the choice is made -- the same
+    -- reason that arm carries no PlayerId. The names come from
     -- Object.chosenNames on the source instead, which is how
-    -- Modification.AddChosenColor already reads a colour.
+    -- Modification.AddChosenColor already reads a colour, and CR 608.2h is what
+    -- answers once that source has left (Pawl.Engine.PlayerEffect.chosenNamesOf).
     --
     -- The quality is the SPELL's name, which makes this CR 601.3a's shape rather
     -- than CantCastSpells' -- see Pawl.Engine.PlayerEffect.prohibitsCasting for
@@ -52,8 +54,8 @@ data PlayerEffect
     -- before the prohibition is asked.
     CantCastChosenName
   | -- | CR 305.1 / Null Chamber: this player can't PLAY a land whose name is one
-    -- of the names chosen as this effect's source entered ("lands with the
-    -- chosen names can't be played").
+    -- of the names chosen for this effect's source ("lands with the chosen names
+    -- can't be played"), read exactly as CantCastChosenName above reads them.
     --
     -- The sibling of CantCastChosenName above, and deliberately not folded into
     -- it even though one printed sentence carries both: CR 305.1 makes playing a
@@ -61,7 +63,7 @@ data PlayerEffect
     -- and the two prohibitions are read by two different gates
     -- (Pawl.Engine.Action.playableLands, Pawl.Engine.Cast.castable). A card
     -- printing only one half (Nevermore prints only the cast half) declares only
-    -- one arm.
+    -- one arm; Null Chamber and Conjurer's Ban each print both.
     CantPlayLandChosenName
   | -- | CR 613.11 / 601.2f / Thalia: matching spells cost this much more generic
     -- mana to cast.
