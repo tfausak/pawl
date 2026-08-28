@@ -233,8 +233,8 @@ data PlayerEffect
     -- NoMaximumHandSize raises nothing at all, because there is no number left to
     -- raise.
     IncreaseMaximumHandSize Natural.Natural
-  | -- | CR 402.2 / 613.11 / Thought Nibbler, Gnat Miser: this player's maximum
-    -- hand size is REDUCED by this number.
+  | -- | CR 402.2 / 613.11 / Gnat Miser: this player's maximum hand size is
+    -- REDUCED by this number.
     --
     -- A SEPARATE constructor from IncreaseMaximumHandSize rather than that one
     -- carrying a signed delta, and for the reason IncreaseSpellCost and

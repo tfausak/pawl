@@ -2238,8 +2238,9 @@ theTenRingsSpec s registry =
 -- reducing card here is scoped to opponents and CR 514.1 trims the active player
 -- alone -- one hand could not show both halves of that.
 --
--- The two hands are stocked to the same size on purpose: a scope read backwards
--- has to produce a different number rather than the same one from the other seat.
+-- The two hands are stocked to the SAME size on purpose, so the two cleanup runs
+-- differ in nothing but which seat is active and a scope read backwards has to
+-- show up as a different discard rather than as the same one from the other seat.
 adjustedHands :: Printing.Printing -> [Printing.Printing] -> Int -> PlayerId.PlayerId -> GameState.GameState
 adjustedHands plains extra held active =
   let gs0 = (Setup.emptyGame S.bothPlayers) {GameState.activePlayer = active}
