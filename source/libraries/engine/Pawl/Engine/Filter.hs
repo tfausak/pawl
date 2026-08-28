@@ -338,6 +338,18 @@ data View = MkView
     -- False for every candidate with no permanent behind it: a printed face, a
     -- player, an event snapshot. Each says so at its own site.
     faceDown :: Bool,
+    -- | CR 406.3's "exiled face down", which the line above is emphatically not:
+    -- CR 110.5d says the two have no correlation, so this reads
+    -- Object.exiledFaceDown and that one reads Object.facing.
+    --
+    -- Scoped to no zone, unlike `faceDown` above: Object.exiledFaceDown is
+    -- per-incarnation state written only by the move into exile, and CR 400.7
+    -- mints a fresh incarnation on the way out, so the field is False everywhere
+    -- else without a zone test.
+    --
+    -- False for every candidate with no object behind it: a printed face, a
+    -- player, an event snapshot. Each says so at its own site.
+    exiledFaceDown :: Bool,
     -- | CR 701.27g's "transformed permanent": a double-faced permanent on the
     -- battlefield with its back face up. Not a characteristic either (CR
     -- 712.8d/e make which face is up the thing characteristics are read off), so
@@ -568,6 +580,9 @@ playerView pid =
       -- CR 110.5d gives status to PERMANENTS, and CR 109.1 makes a player none of
       -- those either -- the line below's reason, one status category over.
       faceDown = False,
+      -- CR 406.2's exiled card is a CARD, and CR 109.1 makes a player none of
+      -- those either.
+      exiledFaceDown = False,
       -- CR 701.27g asks about a PERMANENT, and CR 109.1 makes a player none.
       transformed = False,
       -- CR 122.1 puts counters on an object OR a player, and a player's are
@@ -1077,6 +1092,9 @@ matches context view predicate = case predicate of
   -- inside the field for Transformed's reason: see the atom's own comment in
   -- Pawl.Types.Filter.
   Filter.IsFaceDown -> faceDown view
+  -- CR 406.3, which is NOT the status one line up: CR 110.5d says the two have
+  -- no correlation, and the fields differ accordingly.
+  Filter.IsExiledFaceDown -> exiledFaceDown view
   -- CR 701.27g, both exclusions inside the field: see the atom's own comment in
   -- Pawl.Types.Filter, and the field below.
   Filter.Transformed -> transformed view
@@ -1231,6 +1249,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsToken -> predicate
   Filter.IsTapped -> predicate
   Filter.IsFaceDown -> predicate
+  Filter.IsExiledFaceDown -> predicate
   Filter.Transformed -> predicate
   Filter.IsRingBearer -> predicate
   Filter.HasDesignation _ -> predicate
@@ -1627,6 +1646,7 @@ bakeBound players predicate = case predicate of
   Filter.IsToken -> predicate
   Filter.IsTapped -> predicate
   Filter.IsFaceDown -> predicate
+  Filter.IsExiledFaceDown -> predicate
   Filter.Transformed -> predicate
   Filter.IsRingBearer -> predicate
   Filter.HasDesignation _ -> predicate
@@ -1718,6 +1738,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsToken -> []
   Filter.IsTapped -> []
   Filter.IsFaceDown -> []
+  Filter.IsExiledFaceDown -> []
   Filter.Transformed -> []
   Filter.IsRingBearer -> []
   Filter.HasDesignation _ -> []
@@ -1822,6 +1843,7 @@ statesAQuality predicate = case predicate of
   Filter.IsToken -> True
   Filter.IsTapped -> True
   Filter.IsFaceDown -> True
+  Filter.IsExiledFaceDown -> True
   Filter.Transformed -> True
   Filter.IsRingBearer -> True
   Filter.HasDesignation _ -> True

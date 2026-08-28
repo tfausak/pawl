@@ -1862,6 +1862,7 @@ stubView table oid =
                 Filter.token = False,
                 Filter.tapped = False,
                 Filter.faceDown = False,
+                Filter.exiledFaceDown = False,
                 -- CR 701.27g: the table registers no face, and this stub stands
                 -- for a card outside the game rather than a permanent.
                 Filter.transformed = False,

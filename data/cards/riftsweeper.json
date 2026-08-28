@@ -50,6 +50,12 @@
                 ],
                 "targetSlots": {
                   "target": {
+                    "filter": {
+                      "type": "Not",
+                      "value": {
+                        "type": "IsExiledFaceDown"
+                      }
+                    },
                     "pool": {
                       "type": "CardsInExile"
                     }
