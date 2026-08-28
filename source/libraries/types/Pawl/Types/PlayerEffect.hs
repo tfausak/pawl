@@ -318,8 +318,10 @@ data PlayerEffect
     --
     -- The filter is CR 601.3b's "a spell with certain qualities", and is the axis
     -- that separates the producers: Vedalken Orrery says "spells" and so matches
-    -- everything (`And []`), while Yeva, Nature's Herald says "green creature
-    -- spells" and would narrow it.
+    -- everything (`And []`), while Sigarda's Aid says "Aura and Equipment spells"
+    -- and narrows it to two subtypes. A QUALIFIED filter is what gives rule
+    -- 601.3b's second sentence something to search, which
+    -- Pawl.Engine.PlayerEffect.choiceCouldApply does.
     --
     -- A PERMISSION, which Pawl.Engine.PlayerEffect folds as a disjunction -- the
     -- same shape the prohibitions take, for the opposite reason. CR 101.2 makes

@@ -3797,19 +3797,19 @@ nextTurnFor pid gs =
       untapped = S.runPure S.identityAnswer (gs {GameState.activePlayer = pid, GameState.phase = untap}) (Engine.runTurnBasedActions untap)
    in untapped {GameState.phase = Phase.PrecombatMain, GameState.priority = Just pid, GameState.passes = 0}
 
--- CR 601.3b / Vedalken Orrery {4} Artifact: "You may cast spells as though they
--- had flash."
+-- CR 601.3b's board, shared by the two groups below it -- Vedalken Orrery's and
+-- Sigarda's Aid's -- since what a permission is read off is the caller's `extra`.
 --
--- One board, built twice. alice holds a Goblin Piker -- a creature card, so CR
--- 302.1 and CR 117.1a's second sentence give it the sorcery-speed window -- and a
+-- One board, built twice. alice holds `hand` -- a creature card, so CR 302.1 and
+-- CR 117.1a's second sentence give it the sorcery-speed window -- and a
 -- Mountain, behind nine untapped Mountains so that mana is never the reason a
 -- cast is unavailable. It is BOB's precombat main phase and the stack is empty,
 -- so alice's own sorcery-speed window is shut. `extra` goes onto the battlefield
--- under alice, and the Orrery is the only thing the two boards ever differ by.
--- Returns the Piker in hand, the ids of `extra` in the order given, and the board.
-orreryBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
-orreryBoard mountain piker extra =
-  let (base, oid) = S.pikerInHand mountain piker 9 Phase.PrecombatMain
+-- under alice, and is the only thing a pair of boards here ever differs by.
+-- Returns the hand card, the ids of `extra` in the order given, and the board.
+flashBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+flashBoard mountain hand extra =
+  let (base, oid) = S.pikerInHand mountain hand 9 Phase.PrecombatMain
       withLand = snd (S.addHandCard mountain S.alice base)
       put (ids, g) printing = let (i, g1) = S.addCreature printing S.alice g in (ids <> [i], g1)
       (extraIds, withExtra) = List.foldl' put ([], withLand) extra
@@ -3822,11 +3822,11 @@ orreryBoard mountain piker extra =
       )
 
 -- The same board back on ALICE's turn, which is the control every refusal below
--- is measured against: it is what says the Piker is affordable, offered and
--- unblocked by anything the Orrery is not responsible for.
-orreryOnOwnTurn :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
-orreryOnOwnTurn mountain piker extra =
-  let (oid, _, board) = orreryBoard mountain piker extra
+-- is measured against: it is what says the card in hand is affordable, offered
+-- and unblocked by anything the permission under test is not responsible for.
+flashOnOwnTurn :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
+flashOnOwnTurn mountain hand extra =
+  let (oid, _, board) = flashBoard mountain hand extra
    in (oid, board {GameState.activePlayer = S.alice})
 
 -- CR 109.5's You scope from the other seat: it is ALICE's turn, BOB holds
@@ -4012,14 +4012,14 @@ vedalkenOrrerySpec s registry =
     Spec.it s "CR 117.1a on alice's own turn the creature spell is castable already" $ do
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
-      let (oid, board) = orreryOnOwnTurn mountain piker []
+      let (oid, board) = flashOnOwnTurn mountain piker []
       Spec.assertBool s (S.castable S.alice oid board) "castable"
       Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
 
     Spec.it s "CR 117.1a on the opponent's turn it is not" $ do
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
-      let (oid, _, board) = orreryBoard mountain piker []
+      let (oid, _, board) = flashBoard mountain piker []
       Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
       Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice board))) "not offered"
 
@@ -4030,7 +4030,7 @@ vedalkenOrrerySpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       orrery <- S.printingOf s registry "Vedalken Orrery"
-      let (oid, _, board) = orreryBoard mountain piker [orrery]
+      let (oid, _, board) = flashBoard mountain piker [orrery]
       Spec.assertBool s (S.castable S.alice oid board) "castable"
       Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
 
@@ -4042,8 +4042,8 @@ vedalkenOrrerySpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       orrery <- S.printingOf s registry "Vedalken Orrery"
-      let (_, _, board) = orreryBoard mountain piker [orrery]
-          (_, _, bare) = orreryBoard mountain piker []
+      let (_, _, board) = flashBoard mountain piker [orrery]
+          (_, _, bare) = flashBoard mountain piker []
           play gs = S.runPure S.castAnswer gs Engine.priorityLoop
           after = play board
       Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
@@ -4057,7 +4057,7 @@ vedalkenOrrerySpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       orrery <- S.printingOf s registry "Vedalken Orrery"
-      let (oid, _, board) = orreryBoard mountain piker [orrery]
+      let (oid, _, board) = flashBoard mountain piker [orrery]
       Spec.assertBool s (not (Cast.instantSpeed oid (S.combinedFace piker) board)) "no flash on the card"
       Spec.assertBool s (PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board) "the permission is the player's"
 
@@ -4067,7 +4067,7 @@ vedalkenOrrerySpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       orrery <- S.printingOf s registry "Vedalken Orrery"
-      let (oid, extras, board) = orreryBoard mountain piker [orrery]
+      let (oid, extras, board) = flashBoard mountain piker [orrery]
           without = board {GameState.battlefield = foldr Set.delete (GameState.battlefield board) extras}
       Spec.assertBool s (S.castable S.alice oid board) "castable with it"
       Spec.assertBool s (not (S.castable S.alice oid without)) "not castable without it"
@@ -4080,8 +4080,8 @@ vedalkenOrrerySpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       orrery <- S.printingOf s registry "Vedalken Orrery"
-      let (_, _, board) = orreryBoard mountain piker [orrery]
-          (_, ownTurn) = orreryOnOwnTurn mountain piker [orrery]
+      let (_, _, board) = flashBoard mountain piker [orrery]
+          (_, ownTurn) = flashOnOwnTurn mountain piker [orrery]
       Spec.assertBool s (any isPlay (Action.legalActions S.alice ownTurn)) "playable on her own turn"
       Spec.assertBool s (not (any isPlay (Action.legalActions S.alice board))) "not on bob's"
 
@@ -4134,7 +4134,7 @@ vedalkenOrrerySpec s registry =
 sigardasAidSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 sigardasAidSpec s registry =
   Spec.describe s "SigardasAid" $ do
-    -- The control, orreryBoard's: without it every refusal below would also be
+    -- The control, flashBoard's: without it every refusal below would also be
     -- true of a board where the Rollicker was unaffordable or unoffered. The
     -- Piker on the battlefield is what bestow would enchant, and it is on every
     -- board here, so the Aid stays the only difference.
@@ -4142,7 +4142,7 @@ sigardasAidSpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       rollicker <- S.printingOf s registry "Nyxborn Rollicker"
-      let (oid, board) = orreryOnOwnTurn mountain rollicker [piker]
+      let (oid, board) = flashOnOwnTurn mountain rollicker [piker]
       Spec.assertBool s (S.castable S.alice oid board) "castable"
       Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
 
@@ -4150,7 +4150,7 @@ sigardasAidSpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       rollicker <- S.printingOf s registry "Nyxborn Rollicker"
-      let (oid, _, board) = orreryBoard mountain rollicker [piker]
+      let (oid, _, board) = flashBoard mountain rollicker [piker]
       Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
       Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice board))) "not offered"
 
@@ -4163,7 +4163,7 @@ sigardasAidSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       rollicker <- S.printingOf s registry "Nyxborn Rollicker"
       aid <- S.printingOf s registry "Sigarda's Aid"
-      let (oid, _, board) = orreryBoard mountain rollicker [piker, aid]
+      let (oid, _, board) = flashBoard mountain rollicker [piker, aid]
       Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
       Spec.assertBool s (S.castable S.alice oid board) "castable"
       Spec.assertBool s (PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board) "the permission reaches it"
@@ -4176,10 +4176,27 @@ sigardasAidSpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       aid <- S.printingOf s registry "Sigarda's Aid"
-      let (oid, _, board) = orreryBoard mountain piker [piker, aid]
+      let (oid, _, board) = flashBoard mountain piker [piker, aid]
       Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice board))) "not offered"
       Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
       Spec.assertBool s (not (PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board)) "the permission does not reach it"
+
+    -- The gameplay half, driven through the priority loop rather than by calling
+    -- Cast.castSpell: S.castAnswer takes whatever Cast action it is OFFERED, so
+    -- the two runs differ in the Aid and in nothing a test wrote by hand. Without
+    -- it alice is offered no cast at all and simply passes.
+    Spec.it s "CR 601.3b the offered cast resolves and the bestow creature enters on the opponent's turn" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+      aid <- S.printingOf s registry "Sigarda's Aid"
+      let (_, _, board) = flashBoard mountain rollicker [piker, aid]
+          (_, _, bare) = flashBoard mountain rollicker [piker]
+          play gs = S.runPure S.castAnswer gs Engine.priorityLoop
+          after = play board
+      Spec.assertEqWith s "the Rollicker is on the battlefield" (S.countOnBattlefieldByName (S.printingName rollicker) S.alice after) 1
+      Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
+      Spec.assertEqWith s "and without the Aid it never left her hand" (S.countOnBattlefieldByName (S.printingName rollicker) S.alice (play bare)) 0
 
     -- CR 702.103b is what the lookahead consults and nothing else: with the
     -- bestow card in hand and NO Aid, the window stays shut, so the choice space
@@ -4188,7 +4205,7 @@ sigardasAidSpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       rollicker <- S.printingOf s registry "Nyxborn Rollicker"
-      let (oid, _, board) = orreryBoard mountain rollicker [piker]
+      let (oid, _, board) = flashBoard mountain rollicker [piker]
       Spec.assertBool s (not (PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board)) "no permission to read"
 
     -- CR 601.2b: the choice is only CONSIDERED. Nothing is stamped by asking, so
@@ -4199,7 +4216,7 @@ sigardasAidSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       rollicker <- S.printingOf s registry "Nyxborn Rollicker"
       aid <- S.printingOf s registry "Sigarda's Aid"
-      let (oid, _, board) = orreryBoard mountain rollicker [piker, aid]
+      let (oid, _, board) = flashBoard mountain rollicker [piker, aid]
           asked = PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board
           view = Projection.viewOfObject oid board
       Spec.assertBool s asked "the permission reaches it"

@@ -1373,8 +1373,8 @@ mayCastAsThoughItHadFlash pid oid gs =
 -- which can be paid.
 --
 -- Read off the PROJECTION's keywords, which is where Cost.costsFor reads the same
--- ability from, so a bestow granted where the card lies (CR 113.6f) offers the
--- choice as much as a printed one does.
+-- ability from and for its CR 613.1 reason: a bestow granted where the card lies
+-- offers rule 702.103a's choice as much as a printed one does.
 --
 -- Not implemented: the other proposal choice CR 202.3e makes visible -- the X
 -- whose announcement fixes the spell's mana value -- so a permission naming a

@@ -3515,7 +3515,7 @@ bestowGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs) 
 -- CR 601.3b / 702.103b: the view this object WOULD have if its controller chose
 -- bestow while proposing it -- an Aura enchantment with enchant creature, off the
 -- same Pawl.Engine.Keyword.bestowModifications bestowGathered above emits. A
--- HYPOTHETICAL, and the only caller is a lookahead:
+-- HYPOTHETICAL, and its caller is a lookahead:
 -- Pawl.Engine.PlayerEffect.choiceCouldApply asks whether a permission naming Aura
 -- spells could come to name this card, exactly as CR 601.3a's twin asks its
 -- question of a mana value the object does not have.
@@ -3527,7 +3527,7 @@ bestowGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs) 
 -- Applied ON TOP of the finished projection rather than inside CR 613's fold,
 -- which is timestamp order rather than a shortcut past it: rule 702.103b's effect
 -- starts "as a spell cast bestowed is put onto the stack", and CR 613.7a gives it
--- the timestamp of the object it is on, which CR 400.7 makes a new and later one
+-- the timestamp of the object it is on, which CR 613.7d makes a new and later one
 -- at that move. So nothing already affecting the card where it lies can outrank
 -- it.
 --
