@@ -248,6 +248,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 import qualified Pawl.Types.Toughness as Toughness
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnUpR as TurnUpR
@@ -1071,6 +1072,33 @@ readsX = any effectReadsX
       Effect.GrantPlayFromExile {} -> False
       -- CR 608.2f's body is an effect list like any other, so an X inside it counts.
       Effect.ForEach (ForEach.MkForEach ref _ body) -> any Quantity.readsX (objectRefQuantities ref) || readsX (Foldable.toList body)
+
+-- CR 603.7: the text an Effect.ArmDelayedTrigger's name resolves to, off the
+-- SOURCE's own card.
+--
+-- The face that is up first, which is what every ordinary arm finds, and then the
+-- card's other faces. That fallback is Ratchet, Field Medic's: "you may convert
+-- Ratchet. When you do, return target artifact card ..." converts the permanent
+-- and arms the reflexive in ONE clause (CR 608.2c's written order), so by the
+-- time the arm runs the face that declared the ability is no longer the one up.
+-- CR 603.7a makes the delayed ability something the RESOLVING ability creates,
+-- and CR 603.7c is the same posture from the other end -- a delayed ability
+-- survives its object changing characteristics -- so which face the permanent
+-- happens to show as the opcode runs is not what says whether the text exists.
+-- Letting a turn earlier in the same resolution blank it would be the wrong
+-- reading of the rule as well as a trigger that could never fire.
+--
+-- Pawl.CardSpec's D4 dataflow lint is per FACE, so a name is declared on the face
+-- that arms it and the fallback cannot pick up somebody else's ability: two faces
+-- reusing one name would have to be two arms as well, and the lint's equality is
+-- what would catch a card writing one.
+declaredDelayedAbility :: ObjectId -> AbilityName -> GameState -> Maybe (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+declaredDelayedAbility source name gs =
+  let onFace = Game.faceOfWithLastKnown source gs >>= (Map.lookup name . Face.delayedAbilities)
+      onCard = do
+        card <- Game.cardOfWithLastKnown source gs
+        Maybe.listToMaybe (Maybe.mapMaybe (Map.lookup name . Face.delayedAbilities) (NonEmpty.toList (Card.Type.faces card)))
+   in onFace <|> onCard
 
 -- CR 603.7: the delayed abilities an effect list ARMS, by name.
 armedAbilities :: [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Set AbilityName
@@ -5447,7 +5475,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- id `source` names. CR 603.7: a rule 702 keyword has no card text to declare
     -- the far end in, so a name a minted ability arms resolves against rule 702's
     -- own roster instead; the two namespaces are kept disjoint by Pawl.CardSpec.
-    case (Game.faceOfWithLastKnown source gs >>= (Map.lookup name . Face.delayedAbilities)) <|> Keyword.mintedDelayedAbility name of
+    case declaredDelayedAbility source name gs <|> Keyword.mintedDelayedAbility name of
       -- For a CARD's name the dataflow lint makes a dangling one a failing test,
       -- and this arm only keeps the executor total. A MINTED name has no such
       -- lint, so a forgotten roster row lands here and does nothing.
