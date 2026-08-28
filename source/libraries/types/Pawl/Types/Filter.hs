@@ -839,7 +839,8 @@ data Filter keyword
     -- may look at it (Pawl.Engine.Target's Pool.CardsInExile arm), and
     -- Riftsweeper's printed qualifier then narrows what remains. A player who
     -- may look at their own foretold card is offered it by rule 406.4 and
-    -- refused it by Riftsweeper's own words.
+    -- refused it by Riftsweeper's own words, which is what Pawl.ExileSpec's
+    -- Augury Raven group proves.
     --
     -- Uncharacteristic, like IsToken and IsTapped: CR 406.3a leaves a face-down
     -- exiled card no characteristics at all, so being face down in exile is not

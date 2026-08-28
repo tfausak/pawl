@@ -881,7 +881,7 @@ playerOf recipient = case recipient of
 -- EVERY exiled card, face up or face down. CR 406.4's per-chooser narrowing is
 -- the caller's, at basePoolGiven's Pool.CardsInExile arm: that rule asks whether
 -- a PLAYER is allowed to look at the card, and this function has no player to
--- ask it of -- which is the same reason the arms below take no scope. Hoisting a
+-- ask it of -- which is the same reason this pool takes no scope. Hoisting a
 -- per-chooser filter in here would answer for whoever the first slot of the
 -- enumeration happened to belong to.
 exileRecipients :: GameState -> Set Recipient

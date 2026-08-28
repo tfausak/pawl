@@ -34,17 +34,21 @@ import Pawl.Types.PlayerId (PlayerId)
 -- owner is the one player it names.
 --
 -- DERIVED rather than stored, and CR 406.3's tail is what makes that exact: the
--- permission "continues until the card leaves the exile zone", and the stamp has
--- the same lifetime -- it is per-incarnation state, so CR 400.7's fresh
--- incarnation on the way out clears it at the same moment the rule ends the
--- permission. A stored per-player relation would answer identically for every
--- board pawl can build, since foretell is the only grant that exists: no card in
--- the pool has hideaway (CR 702.75a's granted "may look at this card in the exile
--- zone"), and Effect.GrantPlayFromExile carries no look permission of its own.
+-- permission runs until the card leaves the exile zone, and the stamp has the
+-- same lifetime -- it is per-incarnation state, so CR 400.7's fresh incarnation
+-- on the way out clears it at the same moment the rule ends the permission. That
+-- rule's OTHER ending -- the card becoming part of a pile of cards that are
+-- shuffled -- has nothing to end, since pawl builds no piles (gap #1480). A stored
+-- per-player relation would answer identically for every board pawl can build,
+-- since foretell is the only grant that exists: no card in the pool has hideaway
+-- (CR 702.75a's granted "may look at this card in the exile zone"), and
+-- Effect.GrantPlayFromExile carries no look permission of its own.
 --
--- Not implemented: a grant that names a player who is not the card's owner ---
--- hideaway's is the printed shape, and no card in `data/cards/` has one
--- (gap #1480).
+-- Not implemented: a grant that names a player who is not the card's owner.
+-- CR 702.75a's hideaway is the printed shape -- "the player who controls the
+-- permanent that exiled this card may look at this card in the exile zone" --
+-- and no card in `data/cards/` has hideaway, which is the same card the gate one
+-- rule over wants (gap #2504).
 mayLookAt :: PlayerId -> ObjectId -> GameState.GameState -> Bool
 mayLookAt pid oid gs = Maybe.fromMaybe False $ do
   obj <- Game.lookupObject oid gs

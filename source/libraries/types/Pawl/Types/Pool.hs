@@ -80,8 +80,8 @@ data Pool
     -- "FACE-UP" is a Filter (Filter.IsExiledFaceDown), and the two questions it
     -- sits beside are different ones. CR 406.4 keeps a face-down exiled card out
     -- of a chooser's candidate set unless that player is allowed to look at it,
-    -- which is the rules core's and is applied to this pool for every card that
-    -- names it; Riftsweeper's printed qualifier then narrows what remains, and
+    -- which the rules core applies to this pool for every card that names it;
+    -- Riftsweeper's printed qualifier then narrows what remains, and
     -- it is not redundant -- the owner of a foretold card MAY look at it, so
     -- rule 406.4 offers it and Riftsweeper's own words refuse it.
     CardsInExile

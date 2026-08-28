@@ -2,17 +2,20 @@
 
 -- Covers: CR 406.3's face-down exile -- Object.exiledFaceDown, the
 -- EntryRiders.exiledFaceDown rider Pawl.Engine.Event.changeZoneEntering reads,
--- Pawl.Engine.Target.exileRecipients' CR 406.4 gate, and
+-- CR 406.4's per-chooser gate on Pawl.Engine.Target's Pool.CardsInExile arm and
+-- the permission Pawl.Engine.Exile.mayLookAt answers it with, and
 -- ObjectRef.EachCardInYourHand as Pawl.Engine.Resolve sweeps it.
 --
--- Gameplay-level, off one producer. Ignorant Bliss {1}{R} Instant -- "Exile all
--- cards from your hand face down. At the beginning of the next end step, return
--- those cards to your hand, then draw a card" -- is the pool's only card that
--- exiles anything face down, and Riftsweeper's "choose target FACE-UP exiled
--- card" is what reads the difference back out.
+-- Gameplay-level, off two producers that exile face down and differ in exactly
+-- the permission. Ignorant Bliss {1}{R} Instant -- "Exile all cards from your
+-- hand face down" -- grants nobody a look, so not even the owner may choose what
+-- it exiled; foretell (CR 702.143a) grants the owner one, so she may. Synthetic
+-- Blind Reclamation's unqualified "target exiled card" is what reads the
+-- difference back out, and Riftsweeper's printed "face-up exiled card" is the
+-- third reading -- a card whose own words refuse what rule 406.4 offers.
 --
--- The two of them share one board, which is the point: exile holds the same
--- three cards either way, and only how two of them got there differs.
+-- Each group shares ONE board across its readings, which is the point: exile
+-- holds the same cards either way, and only how they got there differs.
 module Pawl.ExileSpec where
 
 import qualified Data.Map.Strict as Map
@@ -52,10 +55,16 @@ spec s registry = Spec.describe s "Face-down exile" $ do
     -- hand cards go to exile face down by casting the card, and a THIRD card is
     -- already sitting there face up. A gate that had not been written would offer
     -- all three; a gate that emptied the pool outright would offer none.
-    Spec.it s "CR 406.4 a card exiled face down is a legal target for nobody, while the face-up one still is" $ do
+    --
+    -- Read through the UNQUALIFIED slot, so what refuses the two face-down cards
+    -- is rule 406.4 rather than a card's printed word -- and refuses them to
+    -- ALICE, who owns them and cast the spell that hid them. Ignorant Bliss
+    -- grants no look, and CR 406.3's permission comes only from an instruction
+    -- that gives one; owning the card is not one.
+    Spec.it s "CR 406.4 a card exiled face down is a legal target for nobody, not even its owner, while the face-up one still is" $ do
       board <- castBliss s registry
-      riftsweeper <- S.printingOf s registry "Riftsweeper"
-      case triggerTargetSlot riftsweeper of
+      reclamation <- S.printingOf s registry "Synthetic Blind Reclamation"
+      case S.spellTargetSlot reclamation of
         Just theSlot -> do
           Spec.assertEqWith s "all three cards are in the exile zone" (Set.size (GameState.exile board)) 3
           Spec.assertEqWith
@@ -64,7 +73,7 @@ spec s registry = Spec.describe s "Face-down exile" $ do
             (Target.legalRecipients (Just S.alice) S.noSource theSlot board)
             (Set.fromList (fmap Recipient.ToObject (faceUpExiled board)))
           Spec.assertEqWith s "and that is exactly one card" (length (faceUpExiled board)) 1
-        Nothing -> Spec.assertFailure s "Riftsweeper should print one triggered ability with one target slot"
+        Nothing -> Spec.assertFailure s "Synthetic Blind Reclamation should print one target slot"
     -- The same gate from the other side, on a board differing in ONE thing: the
     -- two cards reach exile FACE UP instead, by the same route every other test
     -- puts a card there. Same printings, same seats, same zone, same count -- so a

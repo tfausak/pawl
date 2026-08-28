@@ -1300,8 +1300,9 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
 
   -- CR 406.3. A bare field read like IsFaceDown above, and a DIFFERENT field:
   -- CR 110.5d says a card exiled face down has no correlation to the face-down
-  -- status of a permanent. The gameplay-level proof is Pawl.TargetSpec's
-  -- face-down exile group.
+  -- status of a permanent. The gameplay-level proof is Pawl.ExileSpec's Augury
+  -- Raven group, where Riftsweeper's printed qualifier refuses a foretold card
+  -- that CR 406.4 offers.
   Spec.describe s "IsExiledFaceDown" $ do
     Spec.it s "matches a view whose card was exiled face down" $ do
       Spec.assertBool s (Filter.matches self (blackCreature {Filter.exiledFaceDown = True}) Filter.Type.IsExiledFaceDown) "exiled face down"

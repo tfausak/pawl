@@ -129,9 +129,9 @@ foretellable pid gs = filter (\oid -> canForetell pid oid gs) (Game.zoneMembers 
 -- CR 702.143a's "that player may look at that card as long as it remains in
 -- exile" is read off this stamp rather than stored beside it, by
 -- Pawl.Engine.Exile.mayLookAt -- so the owner of a foretold card may CHOOSE it
--- out of exile where no other player may (CR 406.4). Pawl.TargetSpec's "CR 406.4
--- the owner of a foretold card may choose it and an opponent may not" is the
--- pair that proves it.
+-- out of exile where no other player may (CR 406.4). Pawl.ExileSpec's "CR 406.4
+-- the owner of a foretold card shuffles it out of exile and an opponent cannot
+-- reach it" is the pair that proves it.
 --
 -- Not implemented: CR 702.143e's ordering of one player's several foretold
 -- cards. It hides nothing, because pawl conceals nothing from an answerer --
