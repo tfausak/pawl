@@ -1810,24 +1810,41 @@ inertPrevention gs candidate event = case (ReplacementCandidate.effect candidate
         Just rewrite
   _ -> Nothing
 
--- CR 615.13: how much of this event the candidate just applied PREVENTED, or
--- Nothing when it prevented nothing.
+-- CR 615.5 / 615.13: the application of a prevention effect that just happened,
+-- carrying how much of the event it prevented and the additional effect it owes.
+-- Nothing means the pair is not a prevention of damage at all.
 --
 -- `before` is the event as it was offered to Event.apply and `after` what came back,
--- so this is the CR 615.6 arithmetic read off the pair: Nothing means the event
+-- so the amount is the CR 615.6 arithmetic read off the pair: Nothing means the event
 -- does not happen at all, which is the whole of it prevented.
+--
+-- `inert` is Event.loop's own `inertPrevention` answer, Just when CR 615.12 made
+-- this application prevent nothing, and it is what makes an UNDIMINISHED event
+-- still report a prevention -- at an amount of 0. The rule is emphatic that such
+-- an effect is still applied and that "any additional effects they have will take
+-- place", and CR 615.5's rider travels on this record. Passed in rather than
+-- re-derived: this function is handed no board, and the board it would have to
+-- ask is not the one the classification was made against -- `applyInertly` has
+-- run in between.
+--
+-- ZERO is therefore a load-bearing amount, and the two consumers in
+-- Pawl.Engine.Damage read it differently. The CR 615.5 rider queue takes every
+-- entry, the rule owing the rider nothing about how much was prevented; CR
+-- 615.13's DamagePrevented record is gated above 0, which is that rule's own
+-- condition -- such an ability triggers each time a prevention effect is applied
+-- "and prevents some or all of that damage".
 --
 -- The wildcard is over (effect, event) PAIRS, where it is the only way to say
 -- "this pair is not a prevention of damage"; the per-constructor obligation this
 -- module carries is discharged by `prevents` above, which the guard delegates to.
-preventionBy :: ReplacementCandidate -> ProposedEvent -> Maybe ProposedEvent -> Maybe Prevention
-preventionBy candidate before after = case (ReplacementCandidate.effect candidate, before) of
+preventionBy :: Maybe DamageRewrite.DamageRewrite -> ReplacementCandidate -> ProposedEvent -> Maybe ProposedEvent -> Maybe Prevention
+preventionBy inert candidate before after = case (ReplacementCandidate.effect candidate, before) of
   (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _), ProposedEvent.WouldDealDamage de)
     | prevents rewrite ->
         let was = DamageEvent.amount de
             -- The event that did not happen prevented all of it (CR 615.6).
             now = maybe 0 DamageEvent.amount (after >>= asDamageEvent)
-         in if was > now
+         in if Maybe.isJust inert || was > now
               then
                 Just
                   Prevention.MkPrevention
@@ -1844,6 +1861,8 @@ preventionBy candidate before after = case (ReplacementCandidate.effect candidat
                       -- prevents nothing (CR 615.1a) -- `prevents` refuses it
                       -- above, so no redirect ever reaches here.
                       Prevention.recipient = DamageEvent.target de,
+                      -- Zero on the CR 615.12 path, which `applyInertly` makes
+                      -- exact: it hands the event back whole, so `now` is `was`.
                       Prevention.amount = was - now,
                       -- CR 615.5's additional effect, carried out of the loop
                       -- so a caller that CAN run effects finds it. Copied, not
@@ -1900,6 +1919,13 @@ printedBy candidate = case candidate of
 --
 -- Ascending by key, so the CR 608.2i record -- and therefore the CR 603.3b order
 -- these triggers are offered in -- is canonical rather than gather-dependent.
+--
+-- A CR 615.12 entry, whose amount is 0, merges harmlessly and is the rule: one
+-- application of one prevention effect to several simultaneous events reports
+-- what it prevented across all of them, which the unpreventable ones added
+-- nothing to. So a batch mixing the two still records CR 615.13's trigger --
+-- some of the damage WAS prevented -- and a batch of only inert ones sums to 0,
+-- which Pawl.Engine.Damage's record then leaves out.
 --
 -- Only the AMOUNTS are summed. CR 615.5's rider is a property of the INSTANCE,
 -- and the key already fixes the instance, so every entry merged here carries the
