@@ -2943,14 +2943,20 @@ resolvePlayerCounters cause pid kind n = do
   outcome <- applyReplacements (ProposedEvent.WouldPutPlayerCounters cause pid kind n)
   pure (outcome >>= Replacement.asPlayerCounters)
 
--- CR 119.3 / 120.4c: settle how much life a player actually loses, and answer
--- with the surviving amount. The one funnel both causes go through --
--- Pawl.Engine.Damage.applyDamage at CR 120.4c's result-processing step, and
--- Pawl.Engine.Resolve's Effect.LoseLife arm -- so a row cannot reach one road and
--- miss the other.
+-- CR 119.3 / 119.4 / 119.5 / 120.4c: settle how much life a player actually
+-- loses, and answer with the settled amount. The one funnel every cause goes
+-- through -- Pawl.Engine.Damage.applyDamage at CR 120.4c's result-processing
+-- step, Pawl.Engine.Resolve's Effect.LoseLife and downward Effect.SetLifeTotal
+-- arms, and payLife above -- so a row cannot reach one road and miss another.
+--
+-- The SETTLED amount may be larger than what came in, not only smaller: a
+-- Pawl.Types.LifeLossRewrite may be a scaling.
+--
+-- Not implemented: CR 701.12c's exchange and CR 119.7's redistribution do not come
+-- through here (#2548).
 --
 -- It does not WRITE the life total, unlike resolveUntap and the counter funnels
--- above: both callers already own that write, and the damage one has to fold its
+-- above: every caller already owns that write, and the damage one has to fold its
 -- answer back into a batch of simultaneous events (CR 510.2) that this module
 -- knows nothing about.
 --

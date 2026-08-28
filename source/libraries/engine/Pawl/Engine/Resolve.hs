@@ -5088,7 +5088,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- Not implemented: CR 701.12c's deferral to CR 119.7-8, under which an
   -- exchange that would raise a player who can't gain life doesn't happen.
-  -- Vacuous: Pawl.Types.PlayerEffect has no such arm to consult.
+  -- Vacuous: Pawl.Types.PlayerEffect has no such arm to consult. Nor does the
+  -- lowered side go through Event.resolveLifeLoss the way SetLifeTotal's does, so
+  -- no replacement reaches it (#2548).
   Effect.ExchangeLifeTotals sides -> do
     gs <- State.get
     let twoSides = case sides of
@@ -5157,7 +5159,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- Not implemented: CR 119.7-8's own restrictions on a player who can't gain or
   -- lose life (vacuous, as for ExchangeLifeTotals), nor CR 810.9f's "not more
-  -- than one member of each team", pawl having no teams (#175).
+  -- than one member of each team", pawl having no teams (#175). A lowered total
+  -- does not go through Event.resolveLifeLoss here either (#2548).
   Effect.RedistributeLifeTotals -> do
     gs <- State.get
     let candidates = Game.stillPlaying gs

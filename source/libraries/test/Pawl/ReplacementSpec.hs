@@ -1587,8 +1587,9 @@ atLife pid n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n})
 -- instead" -- name, cost, type line and Oracle text checked against
 -- api.scryfall.com 2026-08-28).
 --
--- The pool's only life-total replacement, and the card that separates CR 120.4b's
--- damage from CR 120.4c's results. Its own Gatherer rulings state both halves:
+-- The card that separates CR 120.4b's damage from CR 120.4c's results, and the
+-- damage-scoped half of the life-total class -- Bloodletter of Aclazotz below is
+-- the half whose clause names no cause. Its own Gatherer rulings state both halves:
 -- "It reduces your life total to 1, not the damage to 1", and "Worship does not
 -- prevent damage. It causes some damage to be unable to lower your life total. So
 -- any damage rendered useless by Worship was still dealt ... Worship does not

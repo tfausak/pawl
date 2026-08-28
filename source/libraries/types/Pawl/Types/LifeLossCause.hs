@@ -30,7 +30,7 @@ data LifeLossCause
     --
     -- Not implemented: CR 701.12c's exchange and CR 119.7's redistribution move a
     -- life total without proposing a loss of their own, so no replacement reaches
-    -- either (#2551).
+    -- either (#2548).
     ByEffect
   | -- | CR 119.4: the life a PAYMENT costs its payer -- Pawl.Engine.Event.payLife,
     -- reached from a cost component, from CR 107.4f's Phyrexian symbol and from
@@ -45,6 +45,6 @@ data LifeLossCause
     -- Not implemented: no card in data/cards/ narrows a
     -- Pawl.Types.LifeLossPattern to this cause; Ashiok, Wicked Manipulator would
     -- be the producer, and its rewrite (exile that many cards instead) is a shape
-    -- Pawl.Types.LifeLossRewrite has no arm for (gap #2552).
+    -- Pawl.Types.LifeLossRewrite has no arm for (gap #2549).
     ByPayment
   deriving (Bounded, Enum, Eq, Ord, Show)

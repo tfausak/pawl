@@ -1379,10 +1379,10 @@ readsApplier re = case re of
   -- CR 122.1d acts on the permanent becoming untapped and names no player -- CR
   -- 701.19a's answer one event class over, and for its reason.
   ReplacementEffect.UntapR _ -> False
-  -- The floor is the effect's own field and the player is the one the event
-  -- already named, so two rows alike in `effect` cut the same loss to the same
-  -- amount whoever holds them. CR 109.5's "your" is read in `applies` rather
-  -- than in Event.apply, which is CounterR's split exactly.
+  -- The rewrite is the effect's own field and the player is the one the event
+  -- already named, so two rows alike in `effect` resize the same loss the same way
+  -- whoever holds them. CR 109.5's "your" is read in `applies` rather than in
+  -- Event.apply, which is CounterR's split exactly.
   ReplacementEffect.LifeLossR {} -> False
   -- CR 614.10: a skip replaces the step or phase with nothing. The player it is
   -- ABOUT is baked into PhasePattern.whosePhase, on the EFFECT, where this
@@ -2260,9 +2260,10 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.TokenR {} -> Nothing
   ReplacementEffect.TurnUpR {} -> Nothing
   ReplacementEffect.UntapR _ -> Nothing
-  -- CR 614.1a: a floor on a life total is not a supply a batch can run out of --
-  -- it is re-read off the board every application, and once the player is at the
-  -- floor a further loss is cut to nothing rather than exhausting anything.
+  -- CR 614.1a: neither life-total rewrite is a supply a batch can run out of. A
+  -- floor is re-read off the board every application, and once the player is at it
+  -- a further loss is cut to nothing rather than exhausting anything; a scaling is
+  -- arithmetic on whatever amount arrives.
   ReplacementEffect.LifeLossR {} -> Nothing
   ReplacementEffect.PhaseR _ -> Nothing
 
