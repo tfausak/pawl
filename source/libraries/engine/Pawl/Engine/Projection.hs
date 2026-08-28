@@ -1066,7 +1066,8 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- loop runs over a melded permanent like any other entry, and
       -- Pawl.Engine.Event's EntryRewrite.EntersTransformed arm writes Object.face
       -- outright -- so a combined face printing daybound enters back face up at
-      -- night (CR 712.13a) and this conjunct is the only thing answering.
+      -- night (CR 702.145b, ranked by CR 616.1d; not CR 712.13a, which is the
+      -- stack road alone) and this conjunct is the only thing answering.
       -- Pawl.MeldSpec's "CR 701.27g a melded permanent that entered with its back
       -- face up is still not one" is that board, and dropping the conjunct
       -- reddens it. That board melds into a daybound double-faced card, which no

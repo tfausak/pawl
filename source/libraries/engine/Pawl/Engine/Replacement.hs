@@ -1104,8 +1104,8 @@ bucketOfEffect re = case re of
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.UnderSourceControl) -> ReplacementBucket.ControlOnEntry
   -- CR 616.1d, and the only arm that is: "replacement and/or prevention effects
   -- that would cause a card to enter the battlefield with its back face up".
-  -- That is the whole of what CR 712.13a's rewrite does, so it ranks below CR
-  -- 616.1c's copy bucket and above everything else.
+  -- That is the whole of what daybound's rewrite does (CR 702.145b), so it ranks
+  -- below CR 616.1c's copy bucket and above everything else.
   --
   -- The ordering is proved by Pawl.ReplacementSpec's "the back-face bucket
   -- outranks Kismet's, so no order is asked": a daybound creature entering at
@@ -1236,7 +1236,7 @@ readsApplier re = case re of
   -- identical while their controllers are not, and applying one puts the
   -- permanent somewhere applying the other does not.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.UnderSourceControl) -> True
-  -- CR 712.13a / 702.145b: no chooser at all, and no payload -- the rewrite shows
+  -- CR 702.145b: no chooser at all, and no payload -- the rewrite shows
   -- the back face of the card the event already named, and which face that is
   -- comes from the card. Two such rows are the same write twice, Tapped's answer.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.EntersTransformed) -> False

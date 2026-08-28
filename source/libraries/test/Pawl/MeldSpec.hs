@@ -158,7 +158,7 @@ spec s registry = Spec.describe s "Meld" $ do
           "both cards represent it"
           (fmap (Maybe.mapMaybe (\pid -> fmap Printing.card (Game.printingOf pid after)) . Foldable.toList . Game.componentsOf . Object.source) (Game.lookupObject meldedId after))
           (Just [Printing.card battlements, Printing.card garrison])
-        Spec.assertEqWith s "owned by the shared owner (CR 701.42b)" (fmap Object.owner (Game.lookupObject meldedId after)) (Just S.alice)
+        Spec.assertEqWith s "owned by the shared owner of the cards that represent it (CR 110.2)" (fmap Object.owner (Game.lookupObject meldedId after)) (Just S.alice)
         Spec.assertEqWith s "and controlled by the player the effect instructed (CR 110.2a)" (Projection.controllerOf meldedId after) (Just S.alice)
       other -> Spec.assertFailure s ("expected exactly one permanent, got " <> show (length other))
     -- The cards stop being objects: one permanent, not two cards beside it.
@@ -489,9 +489,11 @@ spec s registry = Spec.describe s "Meld" $ do
       other -> Spec.assertFailure s ("expected exactly one permanent, got " <> show (length other))
 
   -- CR 701.27g's second exclusion where nothing else answers: a melded permanent
-  -- that is BACK FACE UP. CR 712.13a via daybound's first static ability ("if it
+  -- that is BACK FACE UP. Daybound's first static ability (CR 702.145b: "if it
   -- is night and this permanent is represented by a double-faced card, it enters
-  -- transformed") is the one entry rewrite that writes Object.face, and CR 616.1
+  -- transformed") is the one entry rewrite that writes Object.face -- CR 616.1d
+  -- ranks it, and it is not CR 712.13a, which governs only a resolving
+  -- double-faced spell. CR 616.1
   -- runs over a melded permanent like any other entry -- so a combined face
   -- printing daybound enters with its back face up, `Game.isFrontFaceUp` answers
   -- False, and the cards representing it are the only thing left excluding it.
@@ -521,7 +523,7 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith s "CR 701.27g the Connoisseur counts the Gargoyle alone" (S.powerToughnessOf connoisseurId turned) (Just (1, 5))
         -- What makes that assertion mean anything: the melded permanent really is
         -- back face up, so the first exclusion has stopped answering for it.
-        Spec.assertEqWith s "CR 712.13a and the melded permanent entered transformed" (fmap Object.face (Game.lookupObject meldedId turned)) (Just (Just (CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge"))))
+        Spec.assertEqWith s "CR 702.145b and the melded permanent entered transformed" (fmap Object.face (Game.lookupObject meldedId turned)) (Just (Just (CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge"))))
         -- The control: an ordinary permanent back face up on the same board is
         -- counted, so the 1 is a tally rather than a floor.
         Spec.assertEqWith s "CR 701.27a the Gargoyle is the one it counts" (Projection.namesOf gargoyleId turned) (Set.singleton (CardName.MkCardName (Text.pack "Stonewing Antagonizer")))

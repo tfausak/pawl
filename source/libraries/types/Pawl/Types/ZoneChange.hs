@@ -13,6 +13,11 @@ import qualified Pawl.Types.Zone as Zone
 -- permanent was or who controlled it -- which is what CR 603.10a's look-back for
 -- leaves-the-battlefield abilities needs.
 --
+-- ONE resulting id, and CR 712.21 is where that stops being the whole answer: a
+-- melded permanent's departure mints one card per component, and `object` names
+-- the first of them. Pawl.Types.Moved's `others` carries the rest, and
+-- Moved.arrivals is the plural read.
+--
 -- The two are the same value in the PROPOSED event Pawl.Engine.Replacement resolves
 -- (Pawl.Types.ProposedEvent.WouldChangeZone): nothing has moved yet, so the
 -- object that will leave is the only one that exists. They diverge only in the

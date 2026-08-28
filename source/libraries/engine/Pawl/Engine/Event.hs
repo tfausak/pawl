@@ -1932,9 +1932,11 @@ apply batch candidate event =
               Just shown | List.elem shown candidates -> reveal RevealCause.Ordinary controller shown
               _ -> enterTapped oid
             pure (Just event)
-      -- CR 712.13a via CR 702.145b's first static ability: "if it is night and
-      -- this permanent is represented by a double-faced card, it enters
-      -- transformed." The one producer CR 616.1d's bucket has.
+      -- CR 702.145b's first static ability: "if it is night and this permanent
+      -- is represented by a double-faced card, it enters transformed." The one
+      -- producer CR 616.1d's bucket has, and CR 616.1d names no origin zone, so
+      -- this arm runs on an entry from any zone -- not CR 712.13a's, which is the
+      -- resolving-spell road alone.
       --
       -- WHICH face is Card.backFace, the same answer CR 712.14a's rider gets in
       -- changeZoneEntering: the card is read, never cased on.
@@ -2930,11 +2932,11 @@ changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest
 -- converted, that card stays in its current zone" -- which is exactly a card
 -- whose layout gives Card.backFace nothing to answer with.
 --
--- CR 712.14a and NOT CR 712.13a, which is a different rule with a different
--- mechanism: an ability causing a double-faced SPELL already on the stack to
--- enter transformed is a replacement effect, CR 616.1d's own bucket, and no
--- rider on a move can express it -- EntryRewrite.EntersTransformed is that one,
--- applied by `apply` above.
+-- CR 712.14a and NOT CR 702.145b's entering-transformed ability, which is a
+-- different mechanism: an ability causing a permanent to enter transformed is a
+-- replacement effect, CR 616.1d's own bucket, and no rider on a move can express
+-- it -- EntryRewrite.EntersTransformed is that one, applied by `apply` above.
+-- (CR 712.13a is neither: it is the resolving double-faced spell's own rule.)
 --
 -- The one door CR 712.14b applies to, and that is what the rule's own wording
 -- picks out: "If a player is INSTRUCTED to put a modal double-faced card onto
@@ -4647,6 +4649,14 @@ meld controller victims resultCard = do
       -- What answers for them AS A GROUP afterwards is Game.componentsOf over the
       -- new permanent's source, the reader CR 202.3c, CR 712.21 and CR 701.27g
       -- share.
+      --
+      -- The fold is SEQUENTIAL, so each card's CR 608.2h snapshot is taken
+      -- against a board the cards before it have already left. That is
+      -- unobservable for the objects rule 701.42a can reach: CR 701.42b admits
+      -- only cards, meldable requires them off the battlefield, and neither half
+      -- of CR 712.5's pairs prints an ability that functions from another zone
+      -- (CR 113.6), so no component's projection reads another. One that did
+      -- would want a single pre-removal board for all of them.
       State.modify' (\g -> Foldable.foldl' forgetObject g (fmap fst melding))
       let mkObj ts =
             Object.MkObject

@@ -106,7 +106,7 @@ data Layout
     -- states again from the permanent's side, and which is what keeps this arm off
     -- Pawl.Engine.Card.turnedOver's permitted pair.
     --
-    -- Not implemented: the meld keyword action itself (CR 701.42a). This is the
-    -- classification alone (#369).
+    -- The keyword action itself (CR 701.42a) is Pawl.Types.Effect's Meld, and
+    -- Pawl.Engine.Event.meld reads this arm to answer CR 701.42b.
     Meld
   deriving (Bounded, Enum, Eq, Ord, Show)

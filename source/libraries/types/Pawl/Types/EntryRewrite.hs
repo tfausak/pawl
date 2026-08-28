@@ -395,19 +395,24 @@ data EntryRewrite effect
     -- paying half is Pawl.Engine.Event.reveal alone and why declining is free.
     -- The declining half is Tapped's write verbatim, PayLifeOrTapped's position.
     RevealOrTapped (Filter.Filter Keyword.Keyword)
-  | -- | CR 712.13a via CR 614.1d: the ability that makes a double-faced spell
-    -- with its FRONT face up on the stack enter the battlefield transformed. CR
-    -- 616.1d ranks it a bucket of its own
+  | -- | CR 702.145b via CR 614.1d: daybound's static ability making a permanent
+    -- enter transformed. CR 616.1d ranks it a bucket of its own
     -- (Pawl.Types.ReplacementBucket.BackFaceOnEntry), which is what distinguishes
     -- it from every other arm here.
+    --
+    -- NOT SCOPED TO THE STACK, and CR 616.1d is why -- it speaks of "a card"
+    -- entering with its back face up, naming no origin zone. CR 712.13a is the
+    -- stack road's own rule and governs a RESOLVING double-faced spell alone; the
+    -- entry rewrite here is collected on every entry, which is what lets
+    -- Pawl.MeldSpec's "CR 701.27g a melded permanent that entered with its back
+    -- face up is still not one" reach it from exile.
     --
     -- A REPLACEMENT and not Pawl.Types.EntryRiders' `transformed`, which is CR
     -- 712.14a: that rule is an instruction an effect carries into a move it is
     -- PERFORMING ("put it onto the battlefield transformed"), while this one
-    -- WATCHES an entry nobody instructed -- a permanent spell resolving under CR
-    -- 608.3, where the only thing to rewrite is the entry itself. Neither can
-    -- express the other, and CR 616.1d exists because only this one competes for
-    -- an order.
+    -- WATCHES an entry nobody instructed, where the only thing to rewrite is the
+    -- entry itself. Neither can express the other, and CR 616.1d exists because
+    -- only this one competes for an order.
     --
     -- NOT WRITTEN BY A CARD, and NULLARY, the position Riot and Unleash take: it
     -- is minted from the finished projection by
