@@ -52,6 +52,7 @@ import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.OfferCast as OfferCast
 import qualified Pawl.Codec.PlayerCounters as PlayerCounters
 import qualified Pawl.Codec.PlayerQuantity as PlayerQuantity
+import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Codec.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Codec.PreventNextDamage as PreventNextDamage
@@ -181,6 +182,7 @@ codec cardCodec abilityCodec =
       Arm.payload "FlipCoin" FlipCoin.codec Effect.FlipCoin (\x -> case x of Effect.FlipCoin y -> Just y; _ -> Nothing),
       Arm.payload "TakeExtraTurn" TakeExtraTurn.codec Effect.TakeExtraTurn (\x -> case x of Effect.TakeExtraTurn y -> Just y; _ -> Nothing),
       Arm.payload "ShuffleIntoLibrary" ShuffleIntoLibrary.codec Effect.ShuffleIntoLibrary (\x -> case x of Effect.ShuffleIntoLibrary y -> Just y; _ -> Nothing),
+      Arm.payload "Shuffle" PlayerRef.codec Effect.Shuffle (\x -> case x of Effect.Shuffle y -> Just y; _ -> Nothing),
       Arm.payload "OfferCast" OfferCast.codec Effect.OfferCast (\x -> case x of Effect.OfferCast y -> Just y; _ -> Nothing),
       Arm.payload "GrantPlayFromExile" GrantPlayFromExile.codec Effect.GrantPlayFromExile (\x -> case x of Effect.GrantPlayFromExile y -> Just y; _ -> Nothing),
       Arm.payload "MakePlotted" ObjectRef.codec Effect.MakePlotted (\x -> case x of Effect.MakePlotted y -> Just y; _ -> Nothing),

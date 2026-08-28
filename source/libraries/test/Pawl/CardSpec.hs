@@ -965,6 +965,7 @@ effectCounts effect = case effect of
   Effect.FlipCoin {} -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
+  Effect.Shuffle {} -> []
   Effect.OfferCast {} -> []
   -- The Duration's Condition, exactly as GainControl's: Victor Mancha, Runaway's
   -- "for as long as you control this creature" is a Count, and dropping it here
@@ -1233,6 +1234,7 @@ effectNestedEffects effect = case effect of
   Effect.RequireAttack {} -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
+  Effect.Shuffle {} -> []
   Effect.OfferCast {} -> []
   Effect.GrantPlayFromExile {} -> []
   Effect.ChangeText {} -> []
@@ -1714,6 +1716,7 @@ effectReplacements effect = case effect of
   Effect.FlipCoin {} -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
+  Effect.Shuffle {} -> []
   Effect.OfferCast {} -> []
   Effect.GrantPlayFromExile {} -> []
   Effect.ChangeText {} -> []
@@ -2469,6 +2472,7 @@ effectMintedFaces effect = case effect of
   Effect.FlipCoin {} -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
+  Effect.Shuffle {} -> []
   Effect.OfferCast {} -> []
   Effect.GrantPlayFromExile {} -> []
   Effect.ChangeText {} -> []
@@ -4222,6 +4226,8 @@ effectFilters effect = case effect of
   Effect.FlipCoin {} -> []
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> sourceHosted (objectRefFilters ref)
+  -- A PlayerRef carries no Filter, exactly as GainPlayerCounters' does not.
+  Effect.Shuffle {} -> []
   Effect.OfferCast {} -> []
   -- Both, as GainControl's arm does: the Duration's Condition carries Victor
   -- Mancha, Runaway's IsSource and ControlledBy, and an empty list here would
@@ -4446,6 +4452,8 @@ effectObjectRefs effect = case effect of
   Effect.FlipCoin {} -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> read_ [ref]
+  -- No ObjectRef at all: the opcode names a library.
+  Effect.Shuffle {} -> []
   Effect.OfferCast {} -> []
   Effect.GrantPlayFromExile grant -> read_ [GrantPlayFromExile.ref grant]
   Effect.ForEach (ForEach.MkForEach ref _ _) -> read_ [ref]

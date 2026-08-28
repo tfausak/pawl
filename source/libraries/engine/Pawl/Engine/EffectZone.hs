@@ -197,6 +197,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.FlipCoin {} -> Nothing
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary {} -> Nothing
+  Effect.Shuffle {} -> Nothing
   Effect.OfferCast {} -> Nothing
   -- CR 113.6m names a zone an ability FUNCTIONS in by moving its own object out
   -- of it. This opcode moves nothing -- it writes a permission onto objects an

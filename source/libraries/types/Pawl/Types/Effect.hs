@@ -39,6 +39,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
@@ -1332,6 +1333,26 @@ data Effect card ability
     -- words derive it instead (Riftsweeper); the libraries shuffled are the UNION
     -- of the two readings, and one named twice is still shuffled once.
     ShuffleIntoLibrary ShuffleIntoLibrary.ShuffleIntoLibrary
+  | -- | CR 701.24a on its own: the libraries the PlayerRef names are randomized,
+    -- and nothing moves. Undercity's "Throne of the Dead Three" ends "then
+    -- shuffle", a sentence about the library the room's own reveal left alone.
+    --
+    -- NOT ShuffleIntoLibrary with an empty or library-pointing ref, which is why
+    -- this is a second arm rather than a Maybe on that one's `ref`. Pointing that
+    -- opcode at cards already in the library would send each through the CR 400.7
+    -- funnel -- a fresh object id, a Moved event and a CR 616.1 replacement
+    -- opportunity apiece -- and a shuffle moves nothing (CR 701.24a). Making the
+    -- field optional would also make `MkShuffleIntoLibrary Nothing Nothing`
+    -- sayable, an instruction naming neither a library nor an object.
+    --
+    -- A PlayerRef and not an ObjectRef, so the library is named the way CR
+    -- 701.24c's first half needs and the way ShuffleIntoLibrary.library already
+    -- does. Mandatory here, that arm's fallback -- deriving the owner off moved
+    -- objects -- having nothing to derive from.
+    --
+    -- Each named library is shuffled ONCE (CR 608.2f) and CR 701.24a makes WHO
+    -- shuffles unobservable, exactly as the arm above.
+    Shuffle PlayerRef.PlayerRef
   | -- | CR 608.2g: offer a player the cast of the object the slot names. CR
     -- 310.12b's "then you may cast it transformed without paying its mana cost"
     -- is the producer, and the CastOffer is that sentence's two riders --
