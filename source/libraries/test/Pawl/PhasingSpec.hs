@@ -35,6 +35,12 @@
 -- announcement, which is CR 702.26h's tie-break. Its convoke is not implemented
 -- (#877), so pawl's copy pays {2}{W}{W} in full -- stricter than printed.
 --
+-- Nyxborn Rollicker joins them for CR 702.103g, whose "phases in unattached"
+-- needs a BESTOWED Aura: it is the one bestow printing in data/cards/, and its
+-- only non-bestow clause is a +1/+1 on the enchanted creature. Goblin Piker is
+-- the host it is cast onto, and the permanent left behind when Clever
+-- Concealment names the Aura alone.
+--
 -- Master Thief joins them for CR 702.26f, whose "for as long as" half needs a
 -- duration (CR 611.2b) tracking a permanent Reality Ripple can then send away:
 -- "gain control of target artifact for as long as you control this creature" is
@@ -46,10 +52,12 @@
 module Pawl.PhasingSpec where
 
 import qualified Control.Monad as Monad
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
@@ -65,10 +73,16 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -878,6 +892,65 @@ departureSpec s registry = Spec.describe s "Departure" $ do
     Spec.assertEqWith s "and it phases in at that untap step" (onBattlefield victim back) True
     Spec.assertEqWith s "with no row left" (Phasing.isPhasedOut victim back) False
 
+-- CR 601.2b's announcement answered by NAMING Nyxborn Rollicker's bestow cost
+-- rather than its printed one, and CR 601.2c's granted enchant slot filtered to
+-- `host`. AuraSpec's `castingFor` in shape and for its reasons: naming the cost
+-- rather than indexing it, and FILTERING the offered set rather than building a
+-- recipient CR 608.2b's re-read would drop.
+--
+-- Duplicated from Pawl.AuraSpec rather than hoisted into Pawl.Support, which
+-- rebuilds every spec in the tree.
+bestowingOn :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+bestowingOn host p = case p of
+  Prompt.ChooseCost _ _ _ candidates ->
+    Maybe.fromMaybe
+      (Cost.firstOffered candidates)
+      (List.find ((== Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)])) . Cost.Type.mana) candidates)
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just host) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
+
+-- The battlefield permanent alice OWNS with this printing's name --
+-- Game.zoneMembers indexes by owner (CR 108.3), which is the right question here
+-- because alice both owns and controls everything on this board. Needed because
+-- CR 400.7 mints a new object as the bestowed spell resolves, so the id the cast
+-- returned names nothing on the battlefield.
+battlefieldNamed :: Printing.Printing -> GameState.GameState -> Maybe ObjectId.ObjectId
+battlefieldNamed printing gs =
+  List.find
+    (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName printing))
+    (Game.zoneMembers Zone.Battlefield S.alice gs)
+
+-- alice's Goblin Piker with a Nyxborn Rollicker CAST BESTOWED onto it, and a
+-- Clever Concealment still in hand. Cast rather than attached by fixture, which
+-- is the one departure from enchantedCrocodile's posture above and is forced:
+-- Object.bestowed is stamped by Pawl.Engine.Cast and by nothing else, so a state
+-- fixture could produce an attached Aura but not a BESTOWED one, and the case
+-- below is entirely about that bit.
+--
+-- Two Mountains and four Plains is EXACTLY bestow {1}{R} plus {2}{W}{W}, which is
+-- rippleBoard's reasoning carried over -- a board that could not pay would leave
+-- a spell in hand and the assertions downstream would pass for the wrong reason,
+-- which is why the case asserts the bestowed setup first. The Plains and
+-- Mountains are lands and Clever Concealment's slot filter is "nonland", so the
+-- Piker and the Rollicker are its whole offer.
+--
+-- Returns the host, the Concealment in hand, and the board after the bestowed
+-- spell has resolved.
+bestowedBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+bestowedBoard plains mountain piker rollicker conceal =
+  let base = S.landsFor mountain S.alice 2 (S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers))
+      (host, withHost) = S.addCreature piker S.alice base
+      (withRollicker, spellId) = S.handOne rollicker withHost
+      (concealId, board) = S.addHandCard conceal S.alice withRollicker
+      cast = S.runPure (bestowingOn host) board (S.cast S.alice spellId)
+   in (host, concealId, S.settleSba (S.runPure (bestowingOn host) cast Stack.resolveTop))
+
 -- CR 702.26i, the DIRECTLY phased-out attachment. Bonesplitter is the fixture and
 -- Reality Ripple is what reaches it: an Equipment is an artifact (CR 301.5), so
 -- rule 702.26i needs no Aura or Equipment carrying the phasing keyword -- which is
@@ -1034,3 +1107,58 @@ attachedSpec s registry = Spec.describe s "Attached" $ do
     Spec.assertEqWith s "still attached while away" (attachedHostOf aura gone) (Just (Recipient.ToPlayer S.bob))
     Spec.assertEqWith s "and phases in still on bob, who is still in the game" (attachedHostOf aura back) (Just (Recipient.ToPlayer S.bob))
     Spec.assertEqWith s "back on the battlefield" (onBattlefield aura back) True
+  -- CR 702.103g: "If a bestowed Aura phases in unattached, it ceases to be
+  -- bestowed." The board the rule needs is narrow, and CR 702.26g is why: an Aura
+  -- on a permanent that phases out is dragged INDIRECTLY and comes back attached
+  -- whatever happened meanwhile, so the only road to "phases in unattached" is a
+  -- DIRECT row (CR 702.26i) whose host left while it was away. Clever
+  -- Concealment's "any number of target nonland permanents you control" is what
+  -- names the Aura alone, exactly as the player-clause case above needs it.
+  --
+  -- Rule 702.103g is reached by composition rather than by a clause of its own:
+  -- Pawl.Engine.Phasing.phaseIn clears Object.attachedTo per CR 702.26i, and the
+  -- next state-based-action pass -- which rule 702.26i's own last sentence sends
+  -- it to -- reaches Pawl.Engine.Sba's CR 702.103f branch, whose condition this
+  -- rule's is a subset of. So nothing here would discriminate rule 702.103g from
+  -- rule 702.103f on its own; what it proves is that the composite holds.
+  --
+  -- The CONTROL is the same board with the host left alive, and it is what
+  -- separates "phasing in unbestowed it" from "it was never bestowed": there the
+  -- Rollicker comes back an Aura still on the Piker, with no P/T of its own.
+  Spec.it s "CR 702.103g a bestowed Aura that phases in unattached is a creature again" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+    conceal <- S.printingOf s registry "Clever Concealment"
+    let (host, spell, attached) = bestowedBoard plains mountain piker rollicker conceal
+    case battlefieldNamed rollicker attached of
+      Nothing -> Spec.assertFailure s "the bestowed Nyxborn Rollicker should be on the battlefield"
+      Just aura -> do
+        let gone = concealAll (Set.singleton aura) spell attached
+            dead = S.runPure S.identityAnswer gone (Event.changeZone host Zone.Graveyard)
+            hostless = S.settleSba (untapStep S.alice dead)
+            kept = S.settleSba (untapStep S.alice gone)
+        -- The premise, first, so nothing below passes for a Rollicker that was
+        -- cast for its printed {R} and so never was an Aura at all.
+        Spec.assertEqWith s "setup: CR 702.103b made it an Aura with no P/T of its own" (S.powerToughnessOf aura attached) Nothing
+        Spec.assertEqWith s "and the Piker it is attached to is pumped to 3/2" (S.powerToughnessOf host attached) (Just (3, 2))
+        Spec.assertEqWith s "it phased out DIRECTLY, its host staying behind" (Phasing.phasedOutStatus aura gone) (Just (PhasedOut.Directly S.alice))
+        Spec.assertEqWith s "and the host then left the battlefield" (Maybe.isJust (Game.lookupObject host dead)) False
+        -- CR 702.103g itself, ahead of every reading that could absorb a mutation
+        -- to it: an Aura that merely came back detached is still an Enchantment
+        -- with no P/T, so the P/T is the bit only "ceases to be bestowed" sets.
+        Spec.assertEqWith s "CR 702.103g: it phases in unattached and is a 1/1 Satyr creature again" (S.powerToughnessOf aura hostless) (Just (1, 1))
+        Spec.assertEqWith
+          s
+          "with its printed card types and subtypes back"
+          (Projection.cardTypesOf aura hostless, Projection.subtypesOf aura hostless)
+          (Set.fromList [CardType.Creature, CardType.Enchantment], Set.singleton Subtype.Satyr)
+        Spec.assertEqWith s "attached to nothing" (attachedHostOf aura hostless) Nothing
+        Spec.assertEqWith s "and on the battlefield rather than buried by CR 704.5m" (onBattlefield aura hostless) True
+        -- The control: the same phase-out with the host left alive. CR 702.26i
+        -- returns it attached, so rule 702.103g never fires and it is still a
+        -- bestowed Aura.
+        Spec.assertEqWith s "control: with its host alive it phases in still attached" (attachedHostOf aura kept) (Just (Recipient.ToCreature host))
+        Spec.assertEqWith s "still bestowed, so still no P/T of its own" (S.powerToughnessOf aura kept) Nothing
+        Spec.assertEqWith s "and the Piker is 3/2 again" (S.powerToughnessOf host kept) (Just (3, 2))

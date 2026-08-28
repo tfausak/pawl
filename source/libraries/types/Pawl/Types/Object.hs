@@ -667,8 +667,9 @@ data Object = MkObject
     -- sorceries alone, so no board mints such a copy; see #2355.
     --
     -- CR 702.103g's phasing in unattached reaches Pawl.Engine.Sba's CR 702.103f
-    -- pass one pass later, since Pawl.Engine.Phasing.phaseIn detaches first;
-    -- see #2358.
+    -- pass one pass later, since Pawl.Engine.Phasing.phaseIn detaches first --
+    -- which is CR 702.26i's own last sentence. Pawl.PhasingSpec's "CR 702.103g a
+    -- bestowed Aura that phases in unattached is a creature again" is the proof.
     bestowed :: Bool,
     -- | CR 601.2b with CR 107.4f: how many of the Phyrexian mana symbols in the
     -- cost of the SPELL that became this permanent its controller announced they
