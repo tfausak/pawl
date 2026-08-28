@@ -397,9 +397,13 @@ data PlayerEffect
     -- questingBeastSpec proves each of the two against the other's control.
     --
     -- Not implemented: Whippoorwill's recipient limb has no site to bake a
-    -- recipient into this pattern (#845). Banefire's "the damage can't be
-    -- prevented" is a different carrier again -- a self-referential clause of
-    -- one resolution, the shape Pawl.Types.Counterability takes (#844).
+    -- recipient into this pattern (#845).
+    --
+    -- Lava Burst's self-referential "that damage can't be prevented" is this
+    -- same arm on the CR 611.2c stored carrier, whose `source` is the resolving
+    -- spell -- so Filter.IsSource in the pattern names the spell itself and
+    -- nothing new is carried. See Pawl.Engine.PlayerEffect.applying, which
+    -- threads that id out.
     --
     -- A DURATION is not carried, and needs nothing new: Skullcrack's
     -- "damage can't be prevented this turn" is this same effect on the CR 611.2c
@@ -417,6 +421,33 @@ data PlayerEffect
     -- approximate. The narrowing rides in the pattern above instead, where CR
     -- 615.12's own subject is.
     DamageCantBePrevented DamagePattern.DamagePattern
+  | -- | CR 614.9 / 613.11 / Lava Burst: damage can't be dealt instead to another
+    -- permanent or player -- the REDIRECTION twin of the arm above.
+    --
+    -- CR 611.1's third clause again, and a separate arm rather than a flag on
+    -- the one above because the two sentences are separable: Spider-Punk,
+    -- Excruciator, Questing Beast and Malignus all say "can't be prevented" and
+    -- nothing about redirection, so a single carrier meaning both would make
+    -- Spider-Punk stop Turn the Tables. Lava Burst pairs the two limbs in one
+    -- sentence and writes both arms.
+    --
+    -- WHICH damage is the same Pawl.Types.DamagePattern, for the same reason and
+    -- read by the same Pawl.Engine.Replacement.matchesDamagePattern: Lava Burst's
+    -- "if Lava Burst would deal damage to a creature" names a SOURCE
+    -- (Filter.IsSource) and a RECIPIENT (`whatRecipient`) at once.
+    --
+    -- The rules CONSEQUENCE differs from the prevention arm's, and CR 614.9 is
+    -- why: CR 615.12 says an inapplicable prevention is "still applied ... any
+    -- additional effects they have will take place", where CR 614.9 states no
+    -- such twin -- its only "the effect does nothing" case is a destination that
+    -- left the battlefield or a player who left the game. So a prohibited
+    -- redirection is not applicable at all and Pawl.Engine.Replacement.applies
+    -- filters it out of CR 616.1's choice, rather than applying it inertly.
+    --
+    -- WHOSE damage is not a question this carrier answers either, exactly as
+    -- above: CR 614.9's subject is a damage event, so PlayerScope.EachPlayer is
+    -- the only scope a card may write and Pawl.CardSpec lints for it.
+    DamageCantBeRedirected DamagePattern.DamagePattern
   | -- | CR 701.23 / 613.11 / Leonin Arbiter: this player can't search libraries.
     --
     -- CR 611.1's third clause again -- searching is something the RULES let a
