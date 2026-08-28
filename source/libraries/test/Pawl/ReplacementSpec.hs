@@ -8331,22 +8331,27 @@ magneticLockdownSpec s registry = Spec.describe s "Synthetic Magnetic Lockdown (
 -- Pawl.Engine.Event's EntryRewrite.WithCounters arm rather than through a
 -- condition. Until this card the pool's two board-counting rewrites were
 -- Tidewalker ("for each Island you control") and Undergrowth Scavenger, whose
--- count folds GRAVEYARDS and so cannot tell the two boards apart at all; no
--- effect in data/cards puts an Island onto the battlefield beside a Tidewalker.
+-- count folds GRAVEYARDS and so cannot tell the two boards apart at all; and
+-- every simultaneous entry data/cards can build is single-typed -- Rise of the
+-- Dark Realms' creature cards, Open the Way's land cards, a Create's tokens,
+-- kicked Rite of Replication's copies of one permanent -- so none of them puts
+-- an Island onto the battlefield beside a Tidewalker. A printing that put a
+-- creature and a land onto the battlefield at once would refute that.
 -- Squad Captain counts CREATURES, which is exactly what Rise of the Dark Realms
--- reanimates, so one card closes the gap (#2431).
+-- reanimates, so one card closes the gap; see #2431.
 --
 -- THE PAIR differs in one thing: where alice's two other creatures are as the
 -- Captain's entry loop runs. Rise of the Dark Realms reanimates the Captain out
 -- of a graveyard holding Jedit Ojanen and a Goblin Piker as one CR 608.2f sweep,
 -- and the sweep accumulates the battlefield as each member arrives -- both are
 -- buried BEFORE the Captain, so both are already sitting there, materialized and
--- unentered, when its rewrite reads. CR 614.12 says the two are not on the
--- battlefield relative to it, so the count is ZERO and the printed 2/2 stays a
--- 2/2. The positive board is the same nine Swamps and the same cast with those
--- two on the battlefield to start with, where the count is TWO and CR 613.4c
--- layer 7d makes it a 4/4. Nothing else alice controls is a creature: the nine
--- Swamps are lands, and the Captain's own row says "other" (Filter.Not
+-- unentered, when its rewrite reads. The CR 614.12 determination the rewrite IS
+-- runs while all three are materialized and none has entered, so the two are not
+-- on the battlefield relative to the Captain: the count is ZERO and the printed
+-- 2/2 stays a 2/2. The positive board is the same nine Swamps and the same cast,
+-- with those two on the battlefield to start with, where the count is TWO and CR
+-- 613.4c's layer 7c makes it a 4/4. Nothing else alice controls is a creature:
+-- the nine Swamps are lands, and the Captain's own row says "other" (Filter.Not
 -- Filter.IsSource), so 0, 2 and 4 stay distinct from any reading that counted the
 -- subject as well.
 squadCaptainSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

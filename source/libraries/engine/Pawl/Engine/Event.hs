@@ -939,8 +939,7 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --      membership rather than about which segment asks. The CLAUSE half is proven
 --      in both segments, one pair per direction each: Pawl.ReplacementSpec's
 --      Frontier Mastodon for the printed one and its Synthetic Magnetic Lockdown
---      for the floating one. The amount half has no board that observes it
---      (#2431).
+--      for the floating one, and the AMOUNT half by its Squad Captain.
 applyReplacementsIn :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
 applyReplacementsIn asOf batch event = do
   (outcome, _, _) <- applyReplacementsFully asOf batch event
@@ -1489,16 +1488,13 @@ apply batch candidate event =
       -- nowhere else.
       --
       -- The AMOUNT is CR 614.12's "how they apply", so it counts over
-      -- Projection.boardAsEntering rather than the live battlefield -- Tidewalker's
-      -- "a time counter for each Island you control" must not count an Island
-      -- arriving in the same batch. The VIEW stays the live one, as
-      -- Projection.replacementsOf's does and for its reason. No board in
-      -- data/cards observes this: reaching it wants a batch that carries both a
-      -- card whose entry rewrite counts the board and something it would count,
-      -- and the pool's two such rewrites count Islands (Tidewalker) and graveyard
-      -- creature cards (Undergrowth Scavenger). A regression fence, then, kept
-      -- because CR 614.12 states it -- mutating it away leaves the suite green
-      -- (#2431).
+      -- Projection.boardAsEntering rather than the live battlefield -- Squad
+      -- Captain's "a +1/+1 counter on it for each other creature you control"
+      -- must not count a creature arriving in the same batch. The VIEW stays the
+      -- live one, as Projection.replacementsOf's does and for its reason.
+      -- Pawl.ReplacementSpec's Squad Captain pair proves it, over a Rise of the
+      -- Dark Realms sweep: mutating this call back to the live board reddens
+      -- "no +1/+1 counter".
       EntryRewrite.WithCounters (WithCounters.MkWithCounters counters) -> do
         gs <- State.get
         let viewOf = Projection.viewWithLastKnown oid gs
