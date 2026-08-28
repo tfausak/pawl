@@ -411,7 +411,7 @@ masterThiefBoard darksteelMyr masterThief =
       (myrId, gs1) = S.addCreature darksteelMyr S.bob gs0
       (thiefId, gs2) = S.addCreature masterThief S.alice gs1
       entered = ZoneChange.MkZoneChange thiefId thiefId Zone.Stack Zone.Battlefield
-      gs3 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project thiefId gs2))] gs2
+      gs3 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project thiefId gs2))] gs2
    in (thiefId, myrId, gs3)
 
 -- The masterThiefBoard shape at three seats, resolved: alice's Master Thief has
@@ -425,7 +425,7 @@ masterThiefThreeWay darksteelMyr masterThief =
   let (myrId, gs1) = S.addCreature darksteelMyr S.bob S.threePlayerGame
       (thiefId, gs2) = S.addCreature masterThief S.alice gs1
       entered = ZoneChange.MkZoneChange thiefId thiefId Zone.Stack Zone.Battlefield
-      gs3 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project thiefId gs2))] gs2
+      gs3 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project thiefId gs2))] gs2
    in (thiefId, myrId, masterThiefResolveAll (masterThiefSettle gs3))
 
 -- Master Thief {2}{U}{U} Creature -- Human Rogue 2/2: "When this creature
@@ -613,7 +613,7 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
         (victim, gs1) = S.addCreature piker S.bob gs0
         (jailer, gs2) = S.addCreature palaceJailer S.alice gs1
         entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
-        gs3 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project jailer gs2))] gs2
+        gs3 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project jailer gs2))] gs2
         afterEtb = monarchResolveAll (monarchSettle gs3)
         -- caster stays monarch across a turn boundary: exile holds.
         heldExiled = monarchSettle afterEtb
@@ -651,7 +651,7 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
     let (victim, gs1) = S.addCreature piker S.bob S.threePlayerGame
         (jailer, gs2) = S.addCreature palaceJailer S.alice gs1
         entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
-        gs3 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project jailer gs2))] gs2
+        gs3 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project jailer gs2))] gs2
         afterEtb = monarchResolveAll (monarchSettle (gs3 {GameState.activePlayer = S.carol}))
         gone = S.departs Departure.Type.Conceded S.alice afterEtb
         settled = monarchSettle gone
@@ -695,7 +695,7 @@ garlandBoard piker garland =
       (bobs, gs2) = S.addCreature piker S.bob gs1
       (entrant, gs3) = S.addCreature garland S.alice gs2
       entered = ZoneChange.MkZoneChange entrant entrant Zone.Stack Zone.Battlefield
-   in (bobs, carols, S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project entrant gs3))] gs3)
+   in (bobs, carols, S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project entrant gs3))] gs3)
 
 -- The condition Garland's duration stores, AS STORED: CR 725.1's designation
 -- read of one PARTICULAR player, baked out of the `thatPlayer` slot the crowning

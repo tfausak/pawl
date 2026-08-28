@@ -109,6 +109,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
+import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Milled as Milled
@@ -1100,12 +1101,30 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- mints a fresh incarnation on the way out, so the object it is True of is
       -- in exile by construction.
       Filter.exiledFaceDown = maybe False Object.exiledFaceDown (Game.lookupObject oid gs),
-      -- CR 701.27g's two conjuncts, and the only site that fills the field. The
+      -- CR 701.27g's three conjuncts, and the only site that fills the field. The
       -- face is read CURRENT -- Game.isFrontFaceUp reads Object.face, never the
       -- Object.turnedOverAt beside it -- which is the rule's first exclusion, a
       -- permanent front face up being untransformed however it got there. The
-      -- second exclusion holds today because no object is represented by more
-      -- than one card; see #369.
+      -- second is that "an object represented by more than one card, such as a
+      -- melded or merged permanent, is never considered a transformed permanent,
+      -- even if it has components that are back face up", which Game.componentsOf
+      -- answers for a melded permanent and will answer for a merged one (#874).
+      --
+      -- That conjunct is LOAD-BEARING, and the first exclusion does not stand in
+      -- for it. A melded permanent is stamped Object.face = Nothing
+      -- (Pawl.Engine.Event.meld) and Game.turnFaceOver refuses to turn it over (CR
+      -- 712.4c), but neither is the only writer of that field: CR 616.1's entry
+      -- loop runs over a melded permanent like any other entry, and
+      -- Pawl.Engine.Event's EntryRewrite.EntersTransformed arm writes Object.face
+      -- outright -- so a combined face printing daybound enters back face up at
+      -- night (CR 702.145b, ranked by CR 616.1d; not CR 712.13a, which is the
+      -- stack road alone) and this conjunct is the only thing answering.
+      -- Pawl.MeldSpec's "CR 701.27g a melded permanent that entered with its back
+      -- face up is still not one" is that board, and dropping the conjunct
+      -- reddens it. That board melds into a daybound double-faced card, which no
+      -- printed meld pair combines into -- the combined face is card data the
+      -- opcode carries, the same stand-in Game.turnFaceOver's CR 712.4c arm is
+      -- proved by -- so the rule is read where the printings cannot reach it.
       --
       -- The battlefield conjunct is a REGRESSION FENCE rather than a proved
       -- behaviour: every Count that reaches the atom is already scoped to a
@@ -1113,7 +1132,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- wording, and the object it excludes -- a double-faced spell on the stack
       -- with its back face up (CR 712.11a) -- is reachable, so the conjunct
       -- stays.
-      Filter.transformed = Set.member oid (GameState.battlefield gs) && not (Game.isFrontFaceUp oid gs),
+      Filter.transformed =
+        Set.member oid (GameState.battlefield gs)
+          && not (Game.isFrontFaceUp oid gs)
+          && maybe True (Seq.null . Game.componentsOf . Object.source) (Game.lookupObject oid gs),
       Filter.counters = counters,
       -- CR 701.54b: a designation rather than a characteristic. Nothing for an id
       -- naming no object -- a designation dies with the permanent (CR 400.7).
@@ -1292,10 +1314,16 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             PC.keywords = Map.fromSet (const 1) (Face.keywords face),
             PC.colors = printedColorsOf face,
             -- CR 202.3, derived here so the rest of the fold reads a number.
-            -- Game.manaCostFaceOf rather than `face`: CR 712.8e reads a transformed
+            -- Game.manaCostFacesOf rather than `face`: CR 712.8e reads a transformed
             -- permanent's mana value off its FRONT face's cost, and CR 708.2a's
-            -- face-down face has no mana cost (so CR 202.3a's 0).
-            PC.manaValue = fmap Quantity.manaValueOf (Game.manaCostFaceOf oid gs),
+            -- face-down face has no mana cost (so CR 202.3a's 0). SUMMED because CR
+            -- 202.3c gives a melded permanent "the combined mana cost of the front
+            -- faces of each card that represents it"; every other object answers
+            -- with one face, whose sum is itself. No face at all is an object with
+            -- no card behind it, which is Nothing rather than CR 202.3a's 0 (#674).
+            PC.manaValue = case Game.manaCostFacesOf oid gs of
+              faces | Seq.null faces -> Nothing
+              faces -> Just (sum (fmap Quantity.manaValueOf faces)),
             -- Quantity.evaluate, not Quantity.determine: CR 208.2a's "use 0
             -- instead" belongs to a CDA, so a printed star with none behind it is
             -- Nothing. A star given its value by CR 208.2b reports Nothing off the
@@ -2087,6 +2115,10 @@ rewriteEffect pairs effect = case effect of
   Effect.DoesNotUntapNext ref -> Effect.DoesNotUntapNext (rewriteObjectRef pairs ref)
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
   Effect.Convert ref -> Effect.Convert (rewriteObjectRef pairs ref)
+  -- CR 612.2a through the combined back face as well as the ref, Effect.Create's
+  -- reason one opcode over: the face is card data the ability carries, and its
+  -- words are the ability's words.
+  Effect.Meld (Meld.MkMeld ref card) -> Effect.Meld (Meld.MkMeld (rewriteObjectRef pairs ref) (rewriteCard pairs card))
   Effect.PhaseOut ref -> Effect.PhaseOut (rewriteObjectRef pairs ref)
   Effect.AddPhases _ -> effect
   Effect.EndTurn -> effect
@@ -2186,6 +2218,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong n f) -> ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong n (Filter.rewrite pairs f))
   ObjectRef.RandomCardInHand _ -> ref
   ObjectRef.AnyNumberMatching f -> ObjectRef.AnyNumberMatching (Filter.rewrite pairs f)
+  ObjectRef.ChosenPermanent f -> ObjectRef.ChosenPermanent (Filter.rewrite pairs f)
 
 -- CR 612.1/612.2a through the CARD an Effect.Create or an Effect.CreateEmblem
 -- defines its token or emblem with: the type line, the name, and the rules text.

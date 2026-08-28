@@ -64,9 +64,6 @@ data Layout
     -- than an order, so Pawl.Types.Card.faces' printed order is what stands in
     -- for them, and CR 712.8a/712.8d is what makes the front face the one
     -- Pawl.Engine.Card.combined answers with.
-    --
-    -- The last kind of double-faced card CR 712.1 lists has no constructor here:
-    -- meld cards (CR 712.4, #369).
     Transforming
   | -- | CR 712.3: a MODAL double-faced card -- "Modal double-faced cards have a
     -- Magic card face on each side. These faces are usually independent from one
@@ -87,4 +84,29 @@ data Layout
     -- modal spells everywhere else in pawl (Pawl.Types.Modal, Pawl.Engine.Modal,
     -- Face.spell's modes) and the two have nothing to do with each other.
     ModalDoubleFaced
+  | -- | CR 712.4: "Meld cards have a Magic card face on one side and half of an
+    -- oversized card face on the other." A COMPONENT card of a meld pair -- CR
+    -- 712.4a's "one card in each meld pair has an ability that exiles both that
+    -- object and its counterpart and melds them", and its counterpart -- and
+    -- never the combined back face, which is that rule's "resulting permanent"
+    -- rather than a printing.
+    --
+    -- ONE face, where the two double-faced arms above carry two, and CR 712.4b is
+    -- why nothing is lost: a meld card's half of the oversized face "fails to
+    -- determine its characteristics" anywhere but on a melded permanent, so there
+    -- is nothing for pawl to store and no reader that could ask for it. Where the
+    -- combined face DOES live is the ability that melds, which is where the
+    -- printed text names it.
+    --
+    -- Two rules need the classification, and they are the whole of what this
+    -- constructor buys over Normal. CR 701.42b: "Tokens, cards that aren't meld
+    -- cards, or meld cards that don't form a meld pair can't be melded." CR
+    -- 712.4c: "Unlike other double-faced cards, meld cards cannot be transformed
+    -- or converted. Any instructions to do so are ignored" -- which CR 712.9
+    -- states again from the permanent's side, and which is what keeps this arm off
+    -- Pawl.Engine.Card.turnedOver's permitted pair.
+    --
+    -- The keyword action itself (CR 701.42a) is Pawl.Types.Effect's Meld, and
+    -- Pawl.Engine.Event.meld reads this arm to answer CR 701.42b.
+    Meld
   deriving (Bounded, Enum, Eq, Ord, Show)

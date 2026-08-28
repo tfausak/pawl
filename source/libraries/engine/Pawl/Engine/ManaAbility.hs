@@ -40,6 +40,7 @@ import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaAddition as ManaAddition
+import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
@@ -227,6 +228,8 @@ manaProduced effect = case effect of
   Effect.DoesNotUntapNext _ -> Nothing
   Effect.Transform _ -> Nothing
   Effect.Convert _ -> Nothing
+  -- CR 701.42a puts cards onto the battlefield; it adds no mana.
+  Effect.Meld {} -> Nothing
   Effect.PhaseOut _ -> Nothing
   Effect.AddPhases _ -> Nothing
   Effect.EndTurn -> Nothing
@@ -314,39 +317,11 @@ movesLibraryCard effect = case effect of
   -- library: arriving in one, being named as leaving one (CR 113.6m's origin),
   -- or being referred to by position in one.
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone _ _ origin _) ->
-    zone == Zone.Library || origin == Just Zone.Library || case ref of
-      ObjectRef.TopOfLibrary {} -> True
-      -- TRUE for the arm above's reason: the cards are named by their POSITION in
-      -- a library, whatever ends the walk that finds them.
-      ObjectRef.TopOfLibraryUntil {} -> True
-      ObjectRef.InSlot _ -> False
-      ObjectRef.EachMatching _ -> False
-      ObjectRef.EachCardInGraveyard {} -> False
-      ObjectRef.EachCardInYourHand -> False
-      ObjectRef.EachCardInHand {} -> False
-      ObjectRef.EachCardExiledWithSource {} -> False
-      ObjectRef.EachSpell _ -> False
-      ObjectRef.EachOnStack _ -> False
-      ObjectRef.EachPlayer -> False
-      ObjectRef.EachOpponent -> False
-      ObjectRef.ChosenPlayer -> False
-      ObjectRef.ChosenCardInGraveyard {} -> False
-      ObjectRef.ChosenCardInHand {} -> False
-      -- TRUE, and the second arm that answers so: a group a look or a reveal
-      -- bound is still in the LIBRARY it was shown from (CR 701.20b), so
-      -- Commune with the Gods' move takes a card out of one while naming
-      -- neither the zone nor a position in it. CR 605.1a asks what the effect
-      -- MAY do rather than where one board's group happens to sit, and a group
-      -- bound by a mill -- already in a graveyard -- cannot make the answer No.
-      ObjectRef.ChosenCardFromAmong {} -> True
-      -- TRUE for the arm above's reason, unchanged by taking every match
-      -- instead of one: the group a look or a reveal bound is still in the
-      -- library it was shown from (CR 701.20b).
-      ObjectRef.EachCardFromAmong {} -> True
-      ObjectRef.RandomCardInHand _ -> False
-      -- The battlefield, the arm this one offers a subset of: EachMatching's
-      -- answer, unchanged by a chooser standing between the sweep and the set.
-      ObjectRef.AnyNumberMatching _ -> False
+    zone == Zone.Library || origin == Just Zone.Library || refReachesLibrary ref
+  -- CR 701.42a's destination is the battlefield, so the "to" half is never a
+  -- library; the "from" half is wherever the named cards are, which is the same
+  -- question the ref asks above.
+  Effect.Meld (Meld.MkMeld ref _) -> refReachesLibrary ref
   Effect.AddMana _ -> False
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> False
   Effect.Fight {} -> False
@@ -470,3 +445,46 @@ movesLibraryCard effect = case effect of
   -- Descended into for `manaProduced`'s reason: rule 608.2f's body runs as part
   -- of THIS effect.
   Effect.ForEach (ForEach.MkForEach _ _ body) -> any movesLibraryCard body
+
+-- Which zone an ObjectRef reaches, asked of libraries alone: does the ref name
+-- cards that may be IN one? movesLibraryCard's shared half, since CR 605.1a's
+-- fourth clause is about the cards an effect moves and two opcodes name theirs
+-- the same way -- Effect.MoveToZone, whose own zones answer for the destination,
+-- and Effect.Meld, whose destination is fixed at the battlefield.
+refReachesLibrary :: ObjectRef.ObjectRef -> Bool
+refReachesLibrary ref = case ref of
+  ObjectRef.TopOfLibrary {} -> True
+  -- TRUE for the arm above's reason: the cards are named by their POSITION in
+  -- a library, whatever ends the walk that finds them.
+  ObjectRef.TopOfLibraryUntil {} -> True
+  ObjectRef.InSlot _ -> False
+  ObjectRef.EachMatching _ -> False
+  ObjectRef.EachCardInGraveyard {} -> False
+  ObjectRef.EachCardInYourHand -> False
+  ObjectRef.EachCardInHand {} -> False
+  ObjectRef.EachCardExiledWithSource {} -> False
+  ObjectRef.EachSpell _ -> False
+  ObjectRef.EachOnStack _ -> False
+  ObjectRef.EachPlayer -> False
+  ObjectRef.EachOpponent -> False
+  ObjectRef.ChosenPlayer -> False
+  ObjectRef.ChosenCardInGraveyard {} -> False
+  ObjectRef.ChosenCardInHand {} -> False
+  -- TRUE, and the second arm that answers so: a group a look or a reveal
+  -- bound is still in the LIBRARY it was shown from (CR 701.20b), so
+  -- Commune with the Gods' move takes a card out of one while naming
+  -- neither the zone nor a position in it. CR 605.1a asks what the effect
+  -- MAY do rather than where one board's group happens to sit, and a group
+  -- bound by a mill -- already in a graveyard -- cannot make the answer No.
+  ObjectRef.ChosenCardFromAmong {} -> True
+  -- TRUE for the arm above's reason, unchanged by taking every match
+  -- instead of one: the group a look or a reveal bound is still in the
+  -- library it was shown from (CR 701.20b).
+  ObjectRef.EachCardFromAmong {} -> True
+  ObjectRef.RandomCardInHand _ -> False
+  -- The battlefield, the arm this one offers a subset of: EachMatching's
+  -- answer, unchanged by a chooser standing between the sweep and the set.
+  ObjectRef.AnyNumberMatching _ -> False
+  -- The battlefield again, the arm above's answer: taking one match instead
+  -- of a subset changes nothing about which zone the ref reaches.
+  ObjectRef.ChosenPermanent _ -> False

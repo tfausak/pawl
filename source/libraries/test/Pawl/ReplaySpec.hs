@@ -1251,6 +1251,23 @@ combatReplaySpec s =
           Spec.assertEqWith s "returning the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
           Spec.assertEqWith s "a graveyard answer does not satisfy it" (Replay.decode p (Response.ChoseCardInGraveyard a)) Nothing
           Spec.assertEqWith s "and a short transcript takes the head" (Replay.defaultAnswer p) a
+        -- CR 608.2d out of the battlefield: which permanent the resolving
+        -- controller named for an effect wanting exactly one is a decision, so it
+        -- has to survive a transcript like any other. Discriminating against
+        -- ChoseCardInGraveyard and ChoseAttachment, the two ObjectId-shaped
+        -- responses nearest it: a transcript replaying as either would name a
+        -- card in a graveyard or a host to attach to instead.
+        Spec.it s "ChoosePermanent round-trips and does not decode as another ObjectId answer" $ do
+          let a = ObjectId.MkObjectId 7
+              b = ObjectId.MkObjectId 9
+              p = Prompt.ChoosePermanent decider S.alice oid (a NonEmpty.:| [b])
+          Spec.assertEqWith s "returning the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          Spec.assertEqWith s "returning the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+          Spec.assertEqWith s "a graveyard answer does not satisfy it" (Replay.decode p (Response.ChoseCardInGraveyard a)) Nothing
+          Spec.assertEqWith s "an attachment answer does not satisfy it" (Replay.decode p (Response.ChoseAttachment a)) Nothing
+          -- CR 608.2d: every offered permanent was pre-filtered by the engine, so
+          -- the head is legal whatever the transcript ran out saying.
+          Spec.assertEqWith s "and a short transcript takes the head" (Replay.defaultAnswer p) a
         -- CR 508.1b: what each attacking creature was announced as attacking is
         -- a decision, so it has to survive a transcript like any other -- and
         -- both arms of AttackTarget have to survive it, since a transcript that

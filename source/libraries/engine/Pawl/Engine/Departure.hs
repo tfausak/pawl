@@ -453,6 +453,10 @@ nonCardStackObjectsCease pid gs =
         Nothing -> False
         Just obj -> case Object.source obj of
           Source.OfCard _ -> False
+          -- CR 108.2: represented by cards, so CR 800.4a's "objects on the
+          -- stack not represented by cards" does not reach it. It is never on the
+          -- stack anyway (CR 701.42a).
+          Source.OfMeld _ -> False
           Source.OfToken _ -> True
           Source.OfAbility _ -> True
           Source.OfTrigger _ -> True

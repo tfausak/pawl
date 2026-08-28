@@ -19,6 +19,7 @@
 -- CARD is being plotted.
 module Pawl.Engine.Plot where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -129,10 +130,11 @@ plot pid oid = do
         -- Dropped, Pawl.Engine.Foretell's reason exactly: the card is exiled and
         -- the later cast pays its own cost.
         Payment.Paid _ -> do
+          -- One stamp per arrival: the funnel answers with more than one only
+          -- for a melded permanent leaving the battlefield (CR 712.21), and this
+          -- special action exiles a card from a hand.
           exiled <- Event.changeZoneReturning oid Zone.Exile
-          case exiled of
-            Nothing -> pure ()
-            Just newId -> State.modify' (becomePlotted newId)
+          Monad.forM_ exiled (State.modify' . becomePlotted)
 
 -- "It becomes a plotted card" -- the stamp and the event together, which is the
 -- WHOLE of what becoming plotted is.

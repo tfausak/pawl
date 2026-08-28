@@ -10,6 +10,7 @@ module Pawl.DamageSpec where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -1464,16 +1465,16 @@ worldRuleSpec s registry =
       let (first, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
           (inHand, g1) = S.runPureWith S.identityAnswer g0 (Engine.settleForPriority >> Event.changeZoneReturning first Zone.Hand)
           (plane, g2) = S.addCreature livingPlane S.alice g1
-      case inHand of
-        Nothing -> Spec.assertFailure s "the Crossroads should have reached alice's hand"
-        Just held -> do
+      case Foldable.toList inHand of
+        [] -> Spec.assertFailure s "the Crossroads should have reached alice's hand"
+        held : _ -> do
           -- The Living Plane is stamped on this settle, before the Crossroads is
           -- back on the battlefield to be stamped after it.
           let (back, g3) = S.runPureWith S.identityAnswer g2 (Engine.settleForPriority >> Event.changeZoneReturning held Zone.Battlefield)
               after = S.runPure S.identityAnswer g3 Engine.settleForPriority
-          case back of
-            Nothing -> Spec.assertFailure s "the Crossroads should have returned to the battlefield"
-            Just again -> do
+          case Foldable.toList back of
+            [] -> Spec.assertFailure s "the Crossroads should have returned to the battlefield"
+            again : _ -> do
               Spec.assertBool s (inPlay again after) "the returned Crossroads became world last, so it survives"
               Spec.assertBool s (not (inPlay plane after)) "the Living Plane is buried"
 

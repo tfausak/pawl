@@ -211,8 +211,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     -- and a graveyard -> exile move does not, whatever its snapshot says.
     let gs0 = Setup.emptyGame S.bothPlayers
         creatureSnapshot = S.emptyCharacteristics {PC.cardTypes = Set.singleton CardType.Creature}
-        died = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange S.noSource S.noSource Zone.Battlefield Zone.Graveyard) creatureSnapshot)
-        exiled = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange S.noSource S.noSource Zone.Graveyard Zone.Exile) creatureSnapshot)
+        died = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange S.noSource S.noSource Zone.Battlefield Zone.Graveyard) creatureSnapshot)
+        exiled = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange S.noSource S.noSource Zone.Graveyard Zone.Exile) creatureSnapshot)
         gs = S.withEvents [died, exiled] gs0
         count =
           Count.Type.MkCount

@@ -128,7 +128,7 @@ monarchSpec s registry =
           marchesa <- S.printingOf s registry "Queen Marchesa"
           let (oid, gs0) = S.addCreature marchesa S.alice (Setup.emptyGame S.threePlayers)
               entered = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-              crowned = resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project oid gs0))] gs0))
+              crowned = resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project oid gs0))] gs0))
           Spec.assertEqWith s "alice is the monarch" (GameState.monarch crowned) (Just S.alice)
           noToken (resolveAll (settle (beginUpkeep crowned)))
 

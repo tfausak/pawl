@@ -125,6 +125,7 @@ encode p answer = case p of
   Prompt.ChooseExilesFromGraveyard {} -> Response.ChoseExilesFromGraveyard answer
   Prompt.ChooseAnyNumberToSacrifice {} -> Response.ChoseSacrifices answer
   Prompt.ChooseAnyNumberOfPermanents {} -> Response.ChoseAnyNumberOfPermanents answer
+  Prompt.ChoosePermanent {} -> Response.ChosePermanent answer
   Prompt.ChooseTapsForTotalPower {} -> Response.ChoseTaps answer
   Prompt.ChooseTaps {} -> Response.ChoseTaps answer
   Prompt.ChooseAttachment {} -> Response.ChoseAttachment answer
@@ -380,6 +381,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseAnyNumberOfPermanents {} -> case response of
     Response.ChoseAnyNumberOfPermanents ids -> Just ids
+    _ -> Nothing
+  Prompt.ChoosePermanent {} -> case response of
+    Response.ChosePermanent oid -> Just oid
     _ -> Nothing
   Prompt.ChooseTapsForTotalPower {} -> case response of
     Response.ChoseTaps ids -> Just ids
@@ -746,6 +750,10 @@ defaultAnswer p = case p of
   -- subset here, so no answer can be illegal. A deterministic fallback, not a
   -- recommendation.
   Prompt.ChooseAnyNumberOfPermanents _ _ _ candidates -> Set.fromList candidates
+  -- CR 608.2d: the head of the offer, ChooseCardInGraveyard's fallback. Every
+  -- candidate was pre-filtered by the engine, so the head is a legal answer. A
+  -- deterministic fallback, not a recommendation.
+  Prompt.ChoosePermanent _ _ _ candidates -> NonEmpty.head candidates
   -- CR 702.122a: every candidate, the arm above's maximal subset. Legal whenever
   -- the cost is payable at all, save for a board where some candidate has
   -- NEGATIVE power and dragging it in drops the total back under the threshold

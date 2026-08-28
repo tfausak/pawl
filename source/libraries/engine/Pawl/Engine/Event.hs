@@ -127,10 +127,12 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
@@ -154,6 +156,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import Pawl.Types.Prevention (Prevention)
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.ProposedEvent (ProposedEvent)
@@ -486,7 +489,7 @@ writeUntappedIn = Map.adjust (\o -> o {Object.tapped = TapState.Untapped})
 -- The zone change an event describes, if it is one.
 movedOf :: GameEvent -> Maybe ZoneChange
 movedOf event = case event of
-  GameEvent.Moved (Moved.MkMoved zc _) -> Just zc
+  GameEvent.Moved (Moved.MkMoved zc _ _) -> Just zc
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.DamagePrevented {} -> Nothing
   GameEvent.StepBegan {} -> Nothing
@@ -1937,9 +1940,11 @@ apply batch candidate event =
               Just shown | List.elem shown candidates -> reveal RevealCause.Ordinary controller shown
               _ -> enterTapped oid
             pure (Just event)
-      -- CR 712.13a via CR 702.145b's first static ability: "if it is night and
-      -- this permanent is represented by a double-faced card, it enters
-      -- transformed." The one producer CR 616.1d's bucket has.
+      -- CR 702.145b's first static ability: "if it is night and this permanent
+      -- is represented by a double-faced card, it enters transformed." The one
+      -- producer CR 616.1d's bucket has, and CR 616.1d names no origin zone, so
+      -- this arm runs on an entry from any zone -- not CR 712.13a's, which is the
+      -- resolving-spell road alone.
       --
       -- WHICH face is Card.backFace, the same answer CR 712.14a's rider gets in
       -- changeZoneEntering: the card is read, never cased on.
@@ -2323,10 +2328,10 @@ apply batch candidate event =
     -- Unreachable: `applies` admits TurnUpR only against WouldTurnFaceUp.
     (ReplacementEffect.TurnUpR {}, _) -> pure (Just event)
 
--- CR 707.2 / 202.3b: the copiable values a copy takes off the object it copies.
--- Projection.copiableCharacteristics answers all but one of them; the exception
--- is a mana value, and only when the copied object is a nonmodal double-faced
--- permanent with its back face up.
+-- CR 707.2 / 202.3b / 202.3c: the copiable values a copy takes off the object it
+-- copies. Projection.copiableCharacteristics answers all but one of them; the
+-- exception is a mana value, and only when the copied object is a nonmodal
+-- double-faced permanent with its back face up, or a melded permanent.
 --
 -- CR 202.3b's two sentences disagree about that permanent on purpose. Its first
 -- calculates the object's OWN mana value "as though it had the mana cost of its
@@ -2359,7 +2364,16 @@ copiedSnapshot src gs =
       backFace = case (Game.lookupObject src gs, Game.cardOf src gs) of
         (Just obj, Just card) -> Card.showsBackFace card (Object.face obj)
         _ -> False
-   in if backFace then snapshot {PC.manaValue = Just 0} else snapshot
+      -- CR 202.3c's second sentence, the melded twin of CR 202.3b's: "if a
+      -- permanent is a copy of a melded permanent (even if that copy is
+      -- represented by two other meld cards), the mana value of the copy is 0"
+      -- (CR 712.8g again). Same shape as backFace above and for the same reason
+      -- -- the copied object's own mana value is the sum CR 202.3c gives it
+      -- (Game.manaCostFacesOf), and nothing left in the snapshot says the number
+      -- came off two front faces -- so the override is made here, where the
+      -- COPIED object is still in hand, rather than in the projection.
+      melded = maybe False (not . Seq.null . Game.componentsOf . Object.source) (Game.lookupObject src gs)
+   in if backFace || melded then snapshot {PC.manaValue = Just 0} else snapshot
 
 -- CR 608.2h: `copiedSnapshot` for an object that may already be gone -- the
 -- record filed as it ceased, which is the same value this function would have
@@ -2908,8 +2922,16 @@ beginsPhase selector pid = do
 -- object with a fresh id is created in the destination, carrying owner and
 -- source forward and resetting per-incarnation state. No-op if the id is unknown.
 -- The Game () wrapper the ~30 existing callers use; changeZoneReturning below
--- carries the same body but hands back the freshly-minted incarnation id, which
+-- carries the same body but hands back the freshly-minted incarnation ids, which
 -- Resolve's ExileUntilMonarch arm registers for its return sweep.
+--
+-- IDS and not one id: CR 712.21 puts a melded permanent's two cards into the
+-- destination as one departure and two arrivals, so every returning door below
+-- answers with a SEQUENCE -- empty for a move that did not happen, one element
+-- for every object but a melded permanent leaving the battlefield, one per
+-- component for that. Widening rather than special-casing is what makes CR
+-- 712.21c reachable: an effect that finds what the permanent became finds both
+-- cards, where a single-id answer would silently drop the second.
 changeZone :: ObjectId -> Zone -> Game ()
 changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest)
 
@@ -2934,11 +2956,11 @@ changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest
 -- converted, that card stays in its current zone" -- which is exactly a card
 -- whose layout gives Card.backFace nothing to answer with.
 --
--- CR 712.14a and NOT CR 712.13a, which is a different rule with a different
--- mechanism: an ability causing a double-faced SPELL already on the stack to
--- enter transformed is a replacement effect, CR 616.1d's own bucket, and no
--- rider on a move can express it -- EntryRewrite.EntersTransformed is that one,
--- applied by `apply` above.
+-- CR 712.14a and NOT CR 702.145b's entering-transformed ability, which is a
+-- different mechanism: an ability causing a permanent to enter transformed is a
+-- replacement effect, CR 616.1d's own bucket, and no rider on a move can express
+-- it -- EntryRewrite.EntersTransformed is that one, applied by `apply` above.
+-- (CR 712.13a is neither: it is the resolving double-faced spell's own rule.)
 --
 -- The one door CR 712.14b applies to, and that is what the rule's own wording
 -- picks out: "If a player is INSTRUCTED to put a modal double-faced card onto
@@ -2949,13 +2971,13 @@ changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest
 -- 712.13, Pawl.Engine.Stack) and a land PLAYED (CR 712.12, Pawl.Engine.Engine)
 -- both reach the battlefield without any instruction to put them there.
 --
--- Nothing, the same answer a CR 616.1 replacement that cancelled the move gives,
--- so every caller already handles it: "the card stays in its current zone" and
--- "nothing entered" are the same fact. Asked BEFORE the funnel, because CR
+-- The empty answer, the same one a CR 616.1 replacement that cancelled the move
+-- gives, so every caller already handles it: "the card stays in its current
+-- zone" and "nothing entered" are the same fact. Asked BEFORE the funnel, because CR
 -- 712.14b is not a replacement effect -- there is no event for CR 616.1 to
 -- choose among, and running the entry loop first would fire CR 614.1c's
 -- as-enters abilities for a card that never enters.
-changeZoneEntering :: ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders Natural -> Maybe PlayerId -> Game (Maybe ObjectId)
+changeZoneEntering :: ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders Natural -> Maybe PlayerId -> Game (Seq.Seq ObjectId)
 changeZoneEntering = changeZoneEnteringIn Nothing Set.empty
 
 -- changeZoneEntering for ONE MEMBER of a CR 608.2f batch: `asOf` and `batch` are
@@ -2963,7 +2985,7 @@ changeZoneEntering = changeZoneEnteringIn Nothing Set.empty
 -- only caller that supplies either. A separate door rather than two more
 -- parameters on changeZoneEntering, changeZoneInBatch's shape one door over: the
 -- lone moves have no batch to name.
-changeZoneEnteringIn :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders Natural -> Maybe PlayerId -> Game (Maybe ObjectId)
+changeZoneEnteringIn :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders Natural -> Maybe PlayerId -> Game (Seq.Seq ObjectId)
 changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
   gs <- State.get
   let mCard = Game.cardOf oid gs
@@ -3014,7 +3036,7 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
       -- Gardener writes CR 708.3's plain putting, which opens nothing.
       facing = if onto then maybe Facing.FaceUp Facing.FaceDown (EntryRiders.faceDown riders) else Facing.FaceUp
   if refused
-    then pure Nothing
+    then pure Seq.empty
     else changeZoneAttaching asOf batch oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under' shown facing (EntryRiders.exiledFaceDown riders) CarryOver.NotCarried
 
 -- changeZoneReturning for a move that carries ONE NAMED HALF of the card into
@@ -3047,7 +3069,7 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
 -- CR 616.1 redirect to another zone drops the face instead of carrying it there.
 -- See the `face` note in changeZoneAttaching's mkObj, and Pawl.CastSpec's "a cast
 -- redirected off the stack keeps both halves" for the case that proves it.
-changeZoneShowing :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
+changeZoneShowing :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Seq.Seq ObjectId)
 changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.FaceUp False CarryOver.NotCarried
 
 -- changeZoneShowing for a move that puts the object into its destination FACE
@@ -3073,7 +3095,7 @@ changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing Set.empt
 -- is called, and the substitution that empties the name reads it (faceOf) rather
 -- than being stored. Turning the permanent face up is what makes it observable
 -- again (CR 708.8).
-changeZoneFaceDown :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
+changeZoneFaceDown :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Seq.Seq ObjectId)
 changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown (Facing.faceDown FaceDownReason.Morphed) False CarryOver.NotCarried
 
 -- CR 601.2a's move: the card goes onto the stack and "that player becomes its
@@ -3092,7 +3114,7 @@ changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing Set.emp
 -- A CR 616.1 redirect that lands the move in any zone but the stack or the
 -- battlefield drops the stamp, exactly as it drops the face, because CR 109.4
 -- gives an object there no controller to record.
-changeZoneCasting :: PlayerId -> ObjectId -> Zone -> Maybe CardName.CardName -> Facing.Facing -> Game (Maybe ObjectId)
+changeZoneCasting :: PlayerId -> ObjectId -> Zone -> Maybe CardName.CardName -> Facing.Facing -> Game (Seq.Seq ObjectId)
 changeZoneCasting caster oid requestedDest shown facing = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just caster) shown facing False CarryOver.NotCarried
 
 -- changeZone for one member of a batch of moves CR 608.2f or CR 704.3 processes
@@ -3113,18 +3135,20 @@ changeZoneCasting caster oid requestedDest shown facing = changeZoneAttaching No
 changeZoneInBatch :: GameState -> ObjectId -> Zone -> Game ()
 changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneInBatchReturning asOf oid requestedDest)
 
--- changeZoneInBatch, answering with the destination incarnation's id -- what
--- changeZoneReturning is to changeZone, and the same answer: Just the CR 400.7
--- id, Nothing when the move was cancelled or the id named no object. The destroy
+-- changeZoneInBatch, answering with the destination incarnations' ids -- what
+-- changeZoneReturning is to changeZone, and the same answer: the CR 400.7 ids,
+-- empty when the move was cancelled or the id named no object. The destroy
 -- funnel is the one caller, for CR 701.8b's "put into a graveyard this way".
-changeZoneInBatchReturning :: GameState -> ObjectId -> Zone -> Game (Maybe ObjectId)
+changeZoneInBatchReturning :: GameState -> ObjectId -> Zone -> Game (Seq.Seq ObjectId)
 changeZoneInBatchReturning asOf oid requestedDest = changeZoneAttaching (Just asOf) Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried
 
--- changeZoneReturning's body, returning the destination incarnation's id: Just
--- newId on a completed move (CR 400.7 minted a fresh id), Nothing when the id is
--- unknown or the CR 616.1 replacement loop cancelled the move (`resolved ==
--- Nothing`). changeZoneReturning itself is the `seed = Nothing` case below.
-changeZoneReturning :: ObjectId -> Zone -> Game (Maybe ObjectId)
+-- changeZoneReturning's body, returning the destination incarnations' ids: one
+-- fresh id per arrival on a completed move (CR 400.7), which is one for every
+-- object but a melded permanent leaving the battlefield and one per component for
+-- that (CR 712.21); empty when the id is unknown or the CR 616.1 replacement loop
+-- cancelled the move (`resolved == Nothing`). changeZoneReturning itself is the
+-- `seed = Nothing` case below.
+changeZoneReturning :: ObjectId -> Zone -> Game (Seq.Seq ObjectId)
 changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried
 
 -- changeZoneReturning with an attachment seed. Per CR 303.4 attachment is a
@@ -3171,15 +3195,15 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oi
 -- one drops it for free, and a redirect INTO one from a move that named no
 -- position carries the default -- which is the right answer, since nothing said
 -- top.
-changeZoneAttaching :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> CarryOver.CarryOver -> Game (Maybe ObjectId)
+changeZoneAttaching :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> CarryOver.CarryOver -> Game (Seq.Seq ObjectId)
 changeZoneAttaching asOf batch oid requestedDest position seed tapped entering under shown facing concealed carrying = do
   gs <- State.get
   case Game.lookupObject oid gs of
-    Nothing -> pure Nothing
+    Nothing -> pure Seq.empty
     -- CR 111.8: "A token that has left the battlefield can't move to another
     -- zone or come back onto the battlefield. If such a token would change
-    -- zones, it remains in its current zone instead." Nothing is this funnel's
-    -- word for a move that did not happen -- the object is never touched, so it
+    -- zones, it remains in its current zone instead." The empty answer is this
+    -- funnel's word for a move that did not happen -- the object is never touched, so it
     -- is still in the zone it was in, which is what the rule asks for.
     --
     -- Only a WITHIN-ONE-RESOLUTION window reaches this: CR 704.5d removes such a
@@ -3197,7 +3221,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
     -- -- they rewrite the destination -- and that loop leaves the board alone on
     -- this path (see resolveZoneChange, which restricts it to ZoneChangeR
     -- candidates, so the one state-writing arm is out of reach).
-    Just obj | Game.tokenHasLeftTheBattlefield obj -> pure Nothing
+    Just obj | Game.tokenHasLeftTheBattlefield obj -> pure Seq.empty
     Just obj -> do
       let pid = Object.owner obj
           fromZone = Object.zone obj
@@ -3261,7 +3285,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
         -- change outright, where the entry PROHIBITION one case down is a CR
         -- 101.2 "can't" rather than a rule 614 replacement -- but Maybe is what
         -- "the event does not happen" means on this path.
-        Nothing -> pure Nothing
+        Nothing -> pure Seq.empty
         -- CR 101.2 with CR 400.4a: an effect in force states this object can't
         -- enter the battlefield, and CR 101.2 makes that "can't" beat whatever
         -- allowed or directed the entry. CR 400.4a is the rulebook's own answer
@@ -3299,7 +3323,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
         -- the library, never the stack.
         Just settled
           | ZoneChange.to settled == Zone.Battlefield && EntryRestriction.prohibited oid fromZone gs ->
-              pure Nothing
+              pure Seq.empty
         Just settled -> do
           let dest = ZoneChange.to settled
               -- CR 110.2a: "If an effect instructs a player to put an object onto
@@ -3628,7 +3652,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                 pure (fmap Just (chosen >>= \h -> Attach.attachmentFor oid (Recipient.ToObject h) gs))
               else pure (Just seed)
           case settledSeed of
-            Nothing -> pure Nothing
+            Nothing -> pure Seq.empty
             Just entrySeed -> do
               State.modify' $ \g ->
                 let g1 = Game.removeFromZones pid oid g
@@ -3658,7 +3682,63 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                         -- it reads that binding or the printed face and stops.
                         GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj) (Object.chosenNames obj)) (GameState.lastKnown g1)
                       }
-              newId <- placeObject pid (mkObj entrySeed) dest position
+              -- CR 712.21: "If a melded permanent leaves the battlefield, one
+              -- permanent leaves the battlefield and two cards are put into the
+              -- appropriate zone." So the leave is one event and the arrival is
+              -- one CR 400.7 incarnation PER COMPONENT, each an ordinary card
+              -- object naming its own printing.
+              --
+              -- Read through Game.componentsOf, a classifier over Source and
+              -- never a case on Source.OfMeld: CR 730.3 restates this rule for a
+              -- merged permanent, so mutate (#874) extends that one function
+              -- rather than this branch.
+              --
+              -- The rule's own scope, both halves of it: FROM the battlefield
+              -- ("if a melded permanent leaves the battlefield") and NOT back
+              -- onto it ("two cards are put into the appropriate zone"). The
+              -- origin conjunct is the rule's condition and the destination
+              -- conjunct is what keeps the CR 616.1 entry loop, the CR 122.6a
+              -- entering counters and CR 709.5d's designations below reading one
+              -- arrival, since none of them can be reached on the split path.
+              --
+              -- The origin conjunct is not redundant with the destination one
+              -- today only because nothing can hold Source.OfMeld outside the
+              -- battlefield -- Event.meld places the melded permanent there and
+              -- this split is the one road off it. That is an invariant no type
+              -- enforces, so the rule's own condition is written out rather than
+              -- rested on.
+              --
+              -- Each component goes through the same `mkObj`, so CR 400.7's
+              -- forgetting (Object.newIncarnation) is what the two cards arrive
+              -- with; only Object.source differs, since the cards represent
+              -- themselves again and not the permanent they were.
+              --
+              -- CR 712.21d needs nothing here: the CR 616.1 replacement loop
+              -- ran ONCE above, against the melded permanent, so a replacement
+              -- one player chose settles the destination for both cards --
+              -- "applying one of those replacement effects to one of the two
+              -- cards affects both cards". Leyline of the Void, the rule's own
+              -- Example, is the pool's producer, and its ZoneChangeR names a
+              -- destination and an owner rather than card-ness, so it applies to
+              -- the melded permanent and both cards follow it to exile.
+              --
+              -- Not implemented: CR 712.21a's arrangement of the two cards in a
+              -- graveyard or library by their owner (#2507), and CR 712.21b's
+              -- relative timestamp order on exile (#2508) -- they arrive in the
+              -- order Game.componentsOf names, which is the order they melded
+              -- in.
+              let components = if fromZone /= Zone.Battlefield || dest == Zone.Battlefield then Seq.empty else Game.componentsOf (Object.source obj)
+                  (leading, trailing) = case Seq.viewl components of
+                    Seq.EmptyL -> (Nothing, Seq.empty)
+                    c Seq.:< cs -> (Just c, cs)
+                  asComponent mComponent ts = case mComponent of
+                    Nothing -> mkObj entrySeed ts
+                    Just component -> (mkObj entrySeed ts) {Object.source = Source.OfCard component}
+              newId <- placeObject pid (asComponent leading) dest position
+              trailingIds <- Monad.forM trailing (\component -> placeObject pid (asComponent (Just component)) dest position)
+              -- `newId` heads the answer, so a caller that can only act on one
+              -- object acts on the first card the meld recorded.
+              let arrivals = newId Seq.<| trailingIds
               -- CR 400.7a, and BEFORE the entry loop below rather than after this
               -- funnel returns: CR 614.12 decides an entry row against "continuous
               -- effects that already exist and would apply to the permanent", so a
@@ -3773,10 +3853,47 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- otherwise file this same card against whatever effect was
               -- running; its insertWith keeps the entry already present, which is
               -- what makes this write the one that stands.
+              --
+              -- Every arrival is linked, not just the first: CR 712.21c gives an
+              -- effect that finds what a melded permanent becomes both cards, and
+              -- CR 607.2b's link is exactly such a finding.
               Monad.forM_ (if dest == Zone.Exile then exiledBy else Nothing) $ \linked ->
-                State.modify' (\g -> g {GameState.exiledWith = Map.insert newId linked (GameState.exiledWith g)})
-              State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange oid newId fromZone dest) snapshot)))
-              pure (Just newId)
+                Monad.forM_ arrivals $ \arrival ->
+                  State.modify' (\g -> g {GameState.exiledWith = Map.insert arrival linked (GameState.exiledWith g)})
+              -- ONE event for the whole move, which is CR 712.21's first clause:
+              -- one permanent leaves the battlefield. `newId` is the first
+              -- arrival, so a trigger reading the destination end of this event
+              -- finds one of the two cards.
+              --
+              -- CR 712.21e's first half comes out of that: an effect that needs
+              -- the number of OBJECTS that changed zones folds this log one
+              -- event at a time (Pawl.Engine.Count.snapshotView), so a melded
+              -- permanent counts as one.
+              --
+              -- The OTHER arrivals ride along in Moved.others rather than in
+              -- events of their own, which is CR 712.21c: "if an effect can find
+              -- the new object that a melded permanent becomes as it leaves the
+              -- battlefield, it finds both cards." eventBindings reads them
+              -- through Moved.arrivals and binds CR 400.7e's `became` slot as a
+              -- group, so a trigger's payload acts on each card. Empty for every
+              -- move but this one.
+              --
+              -- Not implemented: CR 712.21's own Example makes an ability that
+              -- triggers "whenever a card is put into a graveyard from anywhere"
+              -- trigger TWICE, and CR 712.21e's second half counts a melded
+              -- permanent as two CARDS that changed zones. Both need one event
+              -- per arrival, which the rule's own first clause forbids for the
+              -- departure -- a "whenever a creature dies" ability must see
+              -- exactly one (#2509).
+              State.modify'
+                . recordEvent
+                . GameEvent.Moved
+                $ Moved.MkMoved
+                  { Moved.change = ZoneChange.MkZoneChange oid newId fromZone dest,
+                    Moved.characteristics = snapshot,
+                    Moved.others = trailingIds
+                  }
+              pure arrivals
 
 -- CR 400.7a: effects that change a permanent spell's characteristics or
 -- controller keep applying to the permanent it becomes. CR 400.7 mints a fresh
@@ -3987,7 +4104,7 @@ destroy regenerability oids = Monad.void (destroyIn Nothing DestructionCause.ByE
 --
 -- A second door rather than a return type on `destroy`, the changeZoneReturning
 -- posture: only the Destroy opcode's bound slots use the answer.
-destroyReturning :: Regenerability.Regenerability -> [ObjectId] -> Game [(ObjectId, Maybe ObjectId)]
+destroyReturning :: Regenerability.Regenerability -> [ObjectId] -> Game [(ObjectId, Seq.Seq ObjectId)]
 destroyReturning = destroyIn Nothing DestructionCause.ByEffect
 
 -- destroy for a batch that is one PART of a larger simultaneous event, whose board
@@ -4036,7 +4153,7 @@ destroyInBatch asOf cause regenerability oids = Monad.void (destroyIn (Just asOf
 -- against one board, not a sequence -- so the bracket adds no claim they do not.
 -- Day of Judgment's deaths are the case it decides, and CR 603.10a's own Example
 -- is why they must not be a sequence.
-destroyIn :: Maybe GameState -> DestructionCause.DestructionCause -> Regenerability.Regenerability -> [ObjectId] -> Game [(ObjectId, Maybe ObjectId)]
+destroyIn :: Maybe GameState -> DestructionCause.DestructionCause -> Regenerability.Regenerability -> [ObjectId] -> Game [(ObjectId, Seq.Seq ObjectId)]
 destroyIn asOf cause regenerability oids = simultaneously $ do
   live <- State.get
   let gs = Maybe.fromMaybe live asOf
@@ -4157,9 +4274,9 @@ counterOne source controller oid = do
       Just Counterability.CantBeCountered -> pure False
       _ -> do
         moved <- changeZoneReturning oid Zone.Graveyard
-        case moved of
-          Nothing -> pure False
-          Just _ -> do
+        if Seq.null moved
+          then pure False
+          else do
             State.modify'
               . recordEvent
               $ GameEvent.SpellCountered
@@ -4505,7 +4622,213 @@ recordTokenEntry :: ObjectId -> Game ()
 recordTokenEntry newId = do
   placed <- State.get
   let snapshot = Projection.project newId placed
-  State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange newId newId Zone.Battlefield Zone.Battlefield) snapshot)))
+  State.modify' (recordEvent (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange newId newId Zone.Battlefield Zone.Battlefield) snapshot)))
+
+-- CR 701.42a: meld these cards -- "put them onto the battlefield with their back
+-- faces up and combined. The resulting permanent is a single object represented by
+-- two cards". Answers the id the melded permanent arrived under, or Nothing where
+-- CR 701.42b refuses, which by CR 701.42c leaves every card in the zone it is in.
+--
+-- Here rather than beside Pawl.Engine.Resolve's opcode arm for placeObject's and
+-- runEntry's sake: this is a battlefield ENTRY, so it mints an object, writes a
+-- zone index and runs CR 616.1's entry loop, and those three are this module's
+-- and are reached from nowhere else. createTokens is the model throughout -- a
+-- permanent that no single prior incarnation maps onto -- and the differences are
+-- the two rules meld has and CR 111.2 does not: the result is interned from the
+-- COMBINED BACK FACE the ability carried (CR 712.8g), and the cards that were
+-- melded stop being objects.
+--
+-- The EXILE is not here and is not the caller's either: rule 701.42a is only the
+-- putting-onto-the-battlefield, and Hanweir Battlements' "exile them, then meld
+-- them" is an ordinary earlier instruction. That separation is what makes CR
+-- 701.42c's Graf Rats example come out right with no rollback -- a refusal below
+-- does nothing at all, so the cards stay wherever that instruction left them.
+--
+-- CR 712.14c ("those cards enter the battlefield as a single permanent with their
+-- back faces up") is why runEntry runs: the entry replacement loop of rule 616.1
+-- and the enters-the-battlefield trigger scan must both see one permanent enter.
+-- The back faces are up by construction -- CR 712.4b leaves a meld card's own half
+-- of the oversized face meaningless alone, so pawl prints neither half's back and
+-- the interned result IS the combined face, face up on its only face.
+meld :: PlayerId -> [ObjectId] -> Card -> Game (Maybe ObjectId)
+meld controller victims resultCard = do
+  gs <- State.get
+  case meldable victims gs of
+    -- CR 701.42b/701.42c. Nothing is written, so nothing moves.
+    Nothing -> pure Nothing
+    Just (owner, origin, melding) -> do
+      -- CR 712.8g: the melded permanent "has only the characteristics of the
+      -- combined back face", which Game.cardOfSource answers by resolving
+      -- MeldSource.result -- so the face is interned exactly as createTokens
+      -- interns a token's card, and every characteristic read past here is the
+      -- ordinary one.
+      resultId <- State.state (Game.intern (Printing.MkPrinting resultCard))
+      -- CR 701.42a's "single object": the melded cards stop being objects BEFORE
+      -- the entry loop, so no projection, replacement or trigger scan inside it
+      -- can find two cards where one permanent is entering. Each one's CR 608.2h
+      -- record is filed as it ceases, exactly as changeZoneAttaching's write does
+      -- for every other zone change -- rule 608.2h scopes its look-back by "the
+      -- public zone it was expected to be in" rather than by the battlefield, and
+      -- exile is such a zone (CR 400.1, CR 406.3). The melding ability's own
+      -- source is one of these cards, so without the record a clause of the very
+      -- resolution that melded them could no longer say what its source was.
+      -- What answers for them AS A GROUP afterwards is Game.componentsOf over the
+      -- new permanent's source, the reader CR 202.3c, CR 712.21 and CR 701.27g
+      -- share.
+      --
+      -- The fold is SEQUENTIAL, so each card's CR 608.2h snapshot is taken
+      -- against a board the cards before it have already left. That is
+      -- unobservable for the objects rule 701.42a can reach: CR 701.42b admits
+      -- only cards, meldable requires them off the battlefield, and neither half
+      -- of CR 712.5's pairs prints an ability that functions from another zone
+      -- (CR 113.6), so no component's projection reads another. One that did
+      -- would want a single pre-removal board for all of them.
+      State.modify' (\g -> Foldable.foldl' forgetObject g (fmap fst melding))
+      let mkObj ts =
+            Object.MkObject
+              { -- CR 110.2, sentence 1: a permanent's owner is the owner of the
+                -- card that represents it, which for a melded permanent is the
+                -- one owner all of them share -- `meldable` checked that, since
+                -- CR 701.42b's pair has no other reading of "its owner".
+                Object.owner = owner,
+                -- CR 110.2a: "if an effect instructs a player to put an object
+                -- onto the battlefield, that object enters the battlefield under
+                -- that player's control", so the resolving controller is stamped
+                -- rather than the owner defaulted to. The two coincide for the
+                -- pool's only meld pair, whose ability requires the activating
+                -- player to own and control both halves.
+                Object.enteredUnder = Just controller,
+                Object.source = Source.OfMeld (MeldSource.MkMeldSource {MeldSource.result = resultId, MeldSource.components = fmap snd melding}),
+                Object.zone = Zone.Battlefield,
+                -- CR 110.5b: nothing in rule 701.42 says otherwise.
+                Object.tapped = TapState.Untapped,
+                -- CR 712.14c's "back faces up", which for the interned combined
+                -- face is its only face; Object.face = Nothing is that face.
+                Object.facing = Facing.FaceUp,
+                Object.exiledFaceDown = False,
+                Object.damage = 0,
+                -- CR 302.6 through CR 400.7: a permanent that has just entered is
+                -- a new object nobody has controlled for any time.
+                Object.sickness = Sickness.Sick,
+                Object.bindings = Map.empty,
+                Object.counters = Map.empty,
+                Object.counterTimestamps = Map.empty,
+                Object.attachedTo = Nothing,
+                Object.chosenColor = Nothing,
+                Object.chosenSubtype = Nothing,
+                Object.chosenNames = Set.empty,
+                Object.chosenPlayer = Nothing,
+                Object.timestamp = ts,
+                Object.face = Nothing,
+                Object.turnedOverAt = Nothing,
+                Object.worldSince = Nothing,
+                Object.playableFromExile = Nothing,
+                Object.plotted = Nothing,
+                Object.foretold = Nothing,
+                Object.ringBearerFor = Nothing,
+                Object.protector = Nothing,
+                Object.ventureRoom = Nothing,
+                Object.classLevel = Nothing,
+                Object.unlockedHalves = Set.empty,
+                Object.designations = Set.empty,
+                Object.kicked = False,
+                Object.bestowed = False,
+                Object.phyrexianLifePaid = 0,
+                Object.manaSpent = Mana.MkMana [],
+                Object.announcedX = Nothing,
+                Object.detainedUntil = Set.empty,
+                Object.goadedBy = Set.empty,
+                Object.doesNotUntapNext = False,
+                Object.exertedBy = Set.empty
+              }
+      newId <- placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue
+      -- CR 712.14c / CR 616.1: ONE permanent enters, so ONE entry loop, with no
+      -- simultaneously-entering sibling to exclude. createTokens' order exactly:
+      -- the object is materialized first, because CR 614.12 asks for the
+      -- characteristics it would have on the battlefield.
+      runEntry Set.empty newId
+      -- CR 603.6a's enters-the-battlefield triggers scan this, and it is recorded
+      -- after the entry loop so the snapshot describes a settled permanent --
+      -- recordTokenEntry's reasons, one zone over. `from` is where the cards were,
+      -- so an "enters from exile" read sees the truth of rule 701.42a.
+      --
+      -- Not implemented: a ZoneChange names ONE departing incarnation and ONE
+      -- origin where a meld has one of each PER CARD, so a meld whose cards sit in
+      -- different zones reports the first card's zone, and only the first card's
+      -- id is named as having departed (#2492).
+      placed <- State.get
+      let snapshot = Projection.project newId placed
+      State.modify' (recordEvent (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange (fst (NonEmpty.head melding)) newId origin Zone.Battlefield) snapshot)))
+      pure (Just newId)
+
+-- CR 701.42b: "only two cards belonging to the same meld pair can be melded.
+-- Tokens, cards that aren't meld cards, or meld cards that don't form a meld pair
+-- can't be melded." What can be read off the board is: every named object is a
+-- CARD (CR 108.2, so Source.OfCard and not a token, a copy or an ability), each
+-- such card's layout is Meld (CR 712.4), each is somewhere a card can be PUT ONTO
+-- the battlefield from, and they share an owner. Answers that owner, the zone the
+-- cards are in, and each card's id paired with its printing, in the order the
+-- objects were named -- the ids so that the caller's CR 608.2h records and its
+-- CR 400.7 event name real departing incarnations rather than re-deriving them,
+-- and the pairing so the two cannot fall out of step.
+--
+-- The BATTLEFIELD conjunct is rule 701.42a's own verb: "put them ONTO the
+-- battlefield", which an object already there cannot be. It is not a candidate
+-- filter dressed up -- a permanent admitted here would be deleted by the caller
+-- with no CR 400.7 zone change and so none of CR 603.6c's leave-the-battlefield
+-- triggers, which is a worse answer than rule 701.42c's "they stay in their
+-- current zone". CR 712.4a's ability exiles both halves first, so no card in the
+-- pool reaches this arm.
+--
+-- Not implemented: rule 701.42b's PAIR membership. Nothing in a card file says
+-- which meld card is whose counterpart -- the melding ability names its
+-- counterpart by name and carries the combined face, so the pairing is the
+-- ability's rather than the engine's, and an ability naming a meld card that is
+-- not its counterpart would be melded here (gap #2497).
+--
+-- Two or more, from rule 701.42a's "the two cards in a meld pair": one object is
+-- not a meld, and a melding ability whose counterpart is gone by resolution
+-- refuses here. Not EXACTLY two -- MeldSource and Game.componentsOf both quantify
+-- over "each card that represents it" and nothing downstream fixes the number --
+-- and the difference is unobservable, CR 712.5's meld pairs being pairs.
+meldable :: [ObjectId] -> GameState -> Maybe (PlayerId, Zone, NonEmpty.NonEmpty (ObjectId, PrintingId.PrintingId))
+meldable victims gs = do
+  (first, rest) <- case victims of
+    a : b : cs -> Just (a, b : cs)
+    _ -> Nothing
+  firstObj <- Game.lookupObject first gs
+  let owner = Object.owner firstObj
+      origin = Object.zone firstObj
+      printingOf oid = do
+        obj <- Game.lookupObject oid gs
+        case Object.source obj of
+          Source.OfCard pid | Object.owner obj == owner && Object.zone obj /= Zone.Battlefield -> do
+            card <- Game.cardOfPrinting pid gs
+            if Card.Type.layout card == Layout.Meld then Just (oid, pid) else Nothing
+          _ -> Nothing
+  traverse printingOf (first NonEmpty.:| rest) >>= \melding -> Just (owner, origin, melding)
+
+-- Stop being an object at all, the CR 701.42a half of melding that
+-- Game.removeFromZones alone does not do: the id leaves its zone AND the object
+-- table, so nothing can look it up afterwards. Unknown ids are left alone.
+--
+-- CR 608.2h's record is filed in the same write, from the same pre-removal board,
+-- for changeZoneAttaching's reason: this is the last moment the object's
+-- information is known, and the id it is filed under is the id an ability on the
+-- stack still carries as its source (CR 113.7). Every field is read exactly as
+-- that funnel reads them, off `obj` rather than off any incarnation, since nothing
+-- survives this write to read them from.
+forgetObject :: GameState -> ObjectId -> GameState
+forgetObject gs oid = case Game.lookupObject oid gs of
+  Nothing -> gs
+  Just obj ->
+    let snapshot = Projection.project oid gs
+        lastController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
+        cleared = Game.removeFromZones (Object.owner obj) oid gs
+     in cleared
+          { GameState.objects = Map.delete oid (GameState.objects cleared),
+            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj) (Object.chosenNames obj)) (GameState.lastKnown cleared)
+          }
 
 -- CR 121.1, one card at a time per CR 121.2. An empty library records the failed
 -- draw, which CR 704.5b makes a loss at the next state-based-action check. Shared
@@ -4540,9 +4863,14 @@ drawCardReturning pid = do
       pure Nothing
     top : _ -> do
       moved <- changeZoneReturning top Zone.Hand
-      case moved of
-        Nothing -> pure Nothing
-        Just drawn -> do
+      -- ONE card, which is what a draw is (CR 121.1) -- the funnel answers with
+      -- more than one arrival only for a melded permanent leaving the
+      -- battlefield (CR 712.21), and this move starts in a library. CR 712.21a
+      -- puts a melded permanent into a library as TWO CARDS, each of which is
+      -- drawn on its own.
+      case Seq.viewl moved of
+        Seq.EmptyL -> pure Nothing
+        drawn Seq.:< _ -> do
           nth <- State.state $ \g ->
             let tally = Map.insertWith (+) pid 1 (GameState.drawsThisTurn g)
              in (Map.findWithDefault 1 pid tally, g {GameState.drawsThisTurn = tally})
@@ -4613,12 +4941,13 @@ discard cause pid oid = Monad.void (discardReturning cause pid oid)
 -- by the time anything reads the slot, so binding it would name an object no
 -- reader of the destination zone can find. Nothing for a move that did not
 -- complete -- an unknown id, or a CR 616.1 loop the player cancelled.
-discardReturning :: DiscardCause.DiscardCause -> PlayerId -> ObjectId -> Game (Maybe ObjectId)
+discardReturning :: DiscardCause.DiscardCause -> PlayerId -> ObjectId -> Game (Seq.Seq ObjectId)
 discardReturning cause pid oid = do
   moved <- changeZoneReturning oid Zone.Graveyard
-  case moved of
-    Nothing -> pure ()
-    Just newId -> State.modify' (recordEvent (GameEvent.Discarded (Discarded.MkDiscarded pid newId cause)))
+  -- One record per arrival: a card discarded is a card, so this loop runs once
+  -- for every move the funnel makes. A melded permanent is never in a hand, so
+  -- the sequence never holds two here.
+  Monad.forM_ moved $ \newId -> State.modify' (recordEvent (GameEvent.Discarded (Discarded.MkDiscarded pid newId cause)))
   pure moved
 
 -- The single reveal funnel (CR 701.20a): `pid` shows `oid` to all players, which
@@ -4810,7 +5139,7 @@ matchesTriggerGiven :: Map.Map SlotName.SlotName Binding -> GameState -> ObjectI
 matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 603.6a: the bearer's own object entered the battlefield.
   TriggerCondition.SelfEnters -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _) -> ZoneChange.object zc == bearer && ZoneChange.to zc == Zone.Battlefield
+    GameEvent.Moved (Moved.MkMoved zc _ _) -> ZoneChange.object zc == bearer && ZoneChange.to zc == Zone.Battlefield
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
@@ -4862,7 +5191,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- "another"), and its controller is the perspective CR 109.5 gives "you" in
   -- "a creature YOU CONTROL enters".
   TriggerCondition.PermanentEnters f -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _)
+    GameEvent.Moved (Moved.MkMoved zc _ _)
       | ZoneChange.to zc == Zone.Battlefield ->
           -- Deliberately NOT the snapshot the Moved event carries: that is the
           -- object as it last existed in the zone it LEFT, and reading it here
@@ -6940,7 +7269,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- `from` is the half that does the work: the same card discarded out of a hand
   -- or dying off the battlefield reaches the same graveyard and must not trigger.
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _) ->
       ZoneChange.object zc == bearer
         && ZoneChange.from zc == Zone.Library
         && ZoneChange.to zc == Zone.Graveyard
@@ -7001,7 +7330,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- what makes the graveyard the one zone the scan has to find the bearer in,
   -- however far away the card started.
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _) ->
       ZoneChange.object zc == bearer
         && ZoneChange.to zc == Zone.Graveyard
     GameEvent.DamageDealt _ -> False
@@ -7060,7 +7389,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- abilities look back in time, so the bearer offered here is the permanent as it
   -- was immediately before the event, never the CR 400.7 incarnation.
   TriggerCondition.SelfDies -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _) ->
       ZoneChange.departed zc == bearer
         && ZoneChange.from zc == Zone.Battlefield
         && ZoneChange.to zc == Zone.Graveyard
@@ -7130,7 +7459,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- Nothing is a permanent that is gone AND filed no last known information, about
   -- which no Filter can honestly answer.
   TriggerCondition.PermanentDies f -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _)
+    GameEvent.Moved (Moved.MkMoved zc _ _)
       | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
           let deceased = ZoneChange.departed zc
            in case Projection.viewWithLastKnown deceased gs deceased of
@@ -7216,7 +7545,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- The live read is kept ahead of it for the Equipment-shaped case, where
   -- CR 704.5n leaves the bearer standing.
   TriggerCondition.AttachedCreatureDies -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _)
+    GameEvent.Moved (Moved.MkMoved zc _ _)
       | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
           let hostOfBearer = case Game.lookupObject bearer gs of
                 Just obj -> Object.attachedTo obj
@@ -7355,7 +7684,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- SelfDies deliberately does NOT take the same arm: CR 700.4 makes "dies" a
   -- move to a graveyard, and leaving the game reaches no zone at all.
   TriggerCondition.SelfLeavesTheBattlefield -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _) ->
       ZoneChange.departed zc == bearer
         && ZoneChange.from zc == Zone.Battlefield
         && ZoneChange.to zc /= Zone.Battlefield
@@ -7419,7 +7748,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           Nothing -> False
           Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
      in case event of
-          GameEvent.Moved (Moved.MkMoved zc _)
+          GameEvent.Moved (Moved.MkMoved zc _ _)
             | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
                 admits (ZoneChange.departed zc)
           GameEvent.Moved {} -> False
@@ -7482,7 +7811,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- targeted "regardless of whether or not that object is still a creature", so a
   -- creature that was turned into a Treasure and then destroyed still fires this.
   TriggerCondition.HauntedCreatureDies -> case event of
-    GameEvent.Moved (Moved.MkMoved zc _) ->
+    GameEvent.Moved (Moved.MkMoved zc _ _) ->
       ZoneChange.from zc == Zone.Battlefield
         && ZoneChange.to zc == Zone.Graveyard
         && Map.lookup bearer (GameState.haunting gs) == Just (ZoneChange.departed zc)
@@ -9933,8 +10262,8 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- CR 400.7e's public-zone proviso holds by construction here, matchesTrigger's
   -- SelfDies arm having required `to == Graveyard`; the arm below is where it
   -- becomes a real test.
-  (TriggerCondition.SelfDies, GameEvent.Moved (Moved.MkMoved zc _)) ->
-    Binding.setBecame (ZoneChange.object zc) Map.empty
+  (TriggerCondition.SelfDies, GameEvent.Moved m) ->
+    setBecameArrivals m Map.empty
   -- The same rule and the same field, watched by a BYSTANDER: Promise of
   -- Tomorrow's "whenever a creature you control dies, exile IT". What differs
   -- from the arm above is only which object CR 113.7a's source is -- there the
@@ -9954,8 +10283,8 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- PermanentDies arm has already required the battlefield-to-graveyard pair, and
   -- CR 400.2 lists the graveyard among the public zones. That is what makes
   -- eventBindingSlots' unconditional promise for this condition honest.
-  (TriggerCondition.PermanentDies _, GameEvent.Moved (Moved.MkMoved zc _)) ->
-    Binding.setBecame (ZoneChange.object zc) Map.empty
+  (TriggerCondition.PermanentDies _, GameEvent.Moved m) ->
+    setBecameArrivals m Map.empty
   -- The same rule, with its proviso doing real work for the first time: CR 603.6c's
   -- wider condition accepts ANY destination, and CR 400.2 makes two of them hidden.
   --
@@ -9966,16 +10295,16 @@ eventBindings bearerBecame cond event = case (cond, event) of
   --
   -- Classified by the ZONE, never by whether the card is currently visible -- CR
   -- 400.2 draws exactly that distinction.
-  (TriggerCondition.SelfLeavesTheBattlefield, GameEvent.Moved (Moved.MkMoved zc _))
-    | not (Game.isHiddenZone (ZoneChange.to zc)) ->
-        Binding.setBecame (ZoneChange.object zc) Map.empty
+  (TriggerCondition.SelfLeavesTheBattlefield, GameEvent.Moved m)
+    | not (Game.isHiddenZone (ZoneChange.to (Moved.change m))) ->
+        setBecameArrivals m Map.empty
   -- The bystander reading of that same arm, guarded the same way and for the same
   -- rule. Its OTHER event binds nothing and has no arm: CR 603.6c's
   -- leaving-the-game form reaches no zone at all, so there is no arriving
   -- incarnation for CR 400.7e to rescue.
-  (TriggerCondition.PermanentLeavesTheBattlefield _, GameEvent.Moved (Moved.MkMoved zc _))
-    | not (Game.isHiddenZone (ZoneChange.to zc)) ->
-        Binding.setBecame (ZoneChange.object zc) Map.empty
+  (TriggerCondition.PermanentLeavesTheBattlefield _, GameEvent.Moved m)
+    | not (Game.isHiddenZone (ZoneChange.to (Moved.change m))) ->
+        setBecameArrivals m Map.empty
   -- CR 400.7e again, read in the ENTRY direction: the object that moved is the
   -- entrant, and what it became is the permanent now on the battlefield --
   -- ZoneChange.object, the field the SelfDies arm reads for the same reason.
@@ -9995,7 +10324,7 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- RECEIVE what the payload does is the payload's question (CR 120.1a for
   -- damage), and a binding that existed only for creatures would make the slot's
   -- presence depend on the entrant, which eventBindingSlots cannot express.
-  (TriggerCondition.PermanentEnters _, GameEvent.Moved (Moved.MkMoved zc _)) ->
+  (TriggerCondition.PermanentEnters _, GameEvent.Moved (Moved.MkMoved zc _ _)) ->
     Binding.setBecame (ZoneChange.object zc) Map.empty
   -- CR 708.7's "that creature": the permanent that was turned face up, which Pine
   -- Walker untaps. The bearer is a bystander here -- CR 113.7a's source slot names
@@ -10349,6 +10678,46 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- is nothing an arm could read. What such an ability knows comes from CR
   -- 603.7c's captured environment instead.
   _ -> Map.empty
+
+-- CR 400.7e's `became` slot, in the plural CR 712.21c asks for: "if an effect
+-- can find the new object that a melded permanent becomes as it leaves the
+-- battlefield, it finds both cards... If that effect causes actions to be taken
+-- upon those cards, the same actions are taken upon each of them."
+--
+-- ONE arrival is bound exactly as it always was -- Binding.toObject, a recipient
+-- -- so every ordinary move produces the byte-identical binding it did before
+-- this rule landed, and none of the pool's eight readers of the slot can tell
+-- the difference. TWO OR MORE are bound as a GROUP (Binding.toObjects), which is
+-- the shape Pawl.Types.Binding documents for "every object one instruction
+-- produced or acted on" and which Pawl.Engine.Resolve.objectRefObjects reads
+-- ahead of the recipient path for ObjectRef.InSlot.
+--
+-- The shape is conditional because the two readers are: an ObjectRef reads
+-- either, while a bare SlotName (Effect.MoveCounters' `to`, Effect.ExileHaunting's
+-- `card`, Pawl.Engine.Resolve's legalOne) reads only the recipient. Every
+-- condition that can carry a split is a battlefield DEPARTURE -- CR 712.21's own
+-- scope -- and the pool's three readers under those (Promise of Tomorrow, Yedora
+-- Grave Gardener and Endless Cockroaches, all under SelfDies or PermanentDies)
+-- spend the slot as an ObjectRef, so the group reaches every one of them.
+--
+-- Two bare-SlotName readers exist and neither is reachable. Agent's Toolkit and
+-- Unstable Shapeshifter hang on PermanentEnters, which cannot split. Rule
+-- 702.55a's haunt ability (Pawl.Engine.Keyword) hands Binding.became to
+-- Effect.ExileHaunting under SelfDies, which CAN split -- but haunt is granted by
+-- no card and printed on neither half of the pool's one meld pair, so no board
+-- reaches it (#2509). Screams from Within is NOT among these: its `became` comes
+-- from AttachedCreatureDies, which binds the AURA's own incarnation
+-- (`bearerBecame`) rather than the event's arrivals, and no Aura is a meld
+-- component.
+--
+-- Not implemented: a group and a recipient at once, which would let a bare
+-- SlotName reader see the first card while an ObjectRef reader saw both.
+-- Pawl.Types.Binding's `objects` states the invariant that no slot carries both
+-- (#2509).
+setBecameArrivals :: Moved.Moved -> Map.Map SlotName.SlotName Binding -> Map.Map SlotName.SlotName Binding
+setBecameArrivals m = case Moved.arrivals m of
+  only Seq.:<| Seq.Empty -> Binding.setBecame only
+  every -> Binding.setBecameGroup every
 
 -- Which slots eventBindings above can stamp for a condition, as a set. A
 -- CLASSIFICATION of a rule 603 trigger condition -- the sibling of
@@ -11418,7 +11787,7 @@ eventTriggers events gs =
       -- that was standing on the battlefield when the event happened and so take
       -- only the ones CR 113.6m leaves functioning there.
       departedFrom pick event = case event of
-        GameEvent.Moved (Moved.MkMoved zc _)
+        GameEvent.Moved (Moved.MkMoved zc _ _)
           | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
               case Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs) of
                 Nothing -> Map.empty
@@ -11504,7 +11873,7 @@ eventTriggers events gs =
         Map.fromList
           ( Maybe.mapMaybe
               ( ( \event -> case event of
-                    GameEvent.Moved (Moved.MkMoved zc _)
+                    GameEvent.Moved (Moved.MkMoved zc _ _)
                       | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
                           Just (ZoneChange.departed zc, ZoneChange.object zc)
                     _ -> Nothing

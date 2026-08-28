@@ -131,6 +131,16 @@ data ObjectRef
     -- refers only to cards in the exile zone that were put there as a result of
     -- an instruction to exile them in the first ability."
     --
+    -- TWO READINGS, and the second is not rule 607.2a's. That rule wants an
+    -- ability printed on the object that exiles and a SECOND ability printed on
+    -- it that refers back, which is Hoarding Dragon. Hanweir Battlements' "exile
+    -- them, then meld them into Hanweir, the Writhing Township" is ONE ability
+    -- referring back to what its own earlier instruction exiled -- CR 400.7j
+    -- ("other parts of that effect can find that object") read in CR 608.2c's
+    -- written order. The relation GameState.exiledWith stores is the same for
+    -- both -- an instruction in an ability of this object put this card in exile
+    -- -- so the arm answers both wordings, and only the citation differs.
+    --
     -- NO PLAYER: exile is a public zone (CR 400.2) and the set is defined by
     -- which object exiled the card, not by whose it is.
     --
@@ -588,4 +598,44 @@ data ObjectRef
     -- cannot ask. Today Pawl.Engine.Resolve's turnPermanentsOver is the one
     -- that asks, reached by Effect.Transform and Effect.Convert alike.
     AnyNumberMatching (Filter.Filter Keyword.Keyword)
+  | -- | EXACTLY ONE of the permanents on the battlefield matching the Filter,
+    -- chosen as the effect runs -- the Garrison in Hanweir Battlements' "If you
+    -- both own and control this land and a creature named Hanweir Garrison, exile
+    -- them, then meld them into Hanweir, the Writhing Township" (CR 701.42a).
+    --
+    -- The arm above's singular, and its Filter position exactly: the same zone,
+    -- the same sweep, the same shared candidate function, so a card cannot find
+    -- the sweep and the offer disagreeing about what matches. Every relative
+    -- word the printed sentence uses is a conjunct of that Filter, as it is
+    -- there -- for Hanweir Battlements OWNERSHIP AND CONTROL together, since it
+    -- prints "you both own and control" and a Garrison you control but do not own
+    -- is not one the ability may name. CR 109.5 answers "you" against the
+    -- ability's controller, which for an activated ability is the player who
+    -- activated it. The RESOLVING CONTROLLER chooses, by CR 608.2c, so there is
+    -- no Pawl.Types.Chooser beside the Filter.
+    --
+    -- NOT A TARGET (CR 115.10a): the printed sentence does not say "target", so
+    -- CR 115.1 declares nothing at announcement, nothing narrows the offered set
+    -- for the player, and shroud, hexproof and "becomes the target" triggers must
+    -- not observe the choice. CR 608.2b has nothing to re-validate.
+    --
+    -- EXACTLY ONE, which is the whole of what parts this arm from the one above
+    -- and is why it is NOT asked at a single candidate: CR 608.2d lets the player
+    -- announce only a legal option, so with one candidate there is one legal
+    -- announcement and no decision in the prompt at all -- the posture
+    -- Pawl.Types.Prompt.ChooseAttachment and ChooseSacrifices already take, and
+    -- not an elision, since eliding needs indistinguishable OPTIONS and here
+    -- there is one option. At zero candidates the instruction is impossible and
+    -- CR 101.3 ignores it, CR 609.3 leaving the rest of the effect to do as much
+    -- as it can.
+    --
+    -- MANDATORY: no arm of this type declines, so a card printing "you may"
+    -- around such a choice writes the may as the enclosing effect, never here.
+    --
+    -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
+    -- read, so objectRefObjects answers nothing for it -- ChosenCardInGraveyard's
+    -- note above says why, and the same lint rejects it under an opcode that
+    -- cannot ask. Today Pawl.Types.Effect.MoveToZone's gather is the one that
+    -- asks, which is Hanweir Battlements' exile.
+    ChosenPermanent (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

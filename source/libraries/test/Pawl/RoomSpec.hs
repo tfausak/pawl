@@ -303,8 +303,8 @@ spec s registry = Spec.describe s "Room" $ do
         Spec.assertEqWith
           s
           "the locked door's MANA COST is subtracted"
-          (fmap Quantity.manaValueOf (Game.manaCostFaceOf permId after))
-          (Just 2)
+          (sum (fmap Quantity.manaValueOf (Game.manaCostFacesOf permId after)))
+          2
         Spec.assertEqWith
           s
           "the locked door's RULES TEXT is subtracted"
@@ -358,8 +358,8 @@ spec s registry = Spec.describe s "Room" $ do
         Spec.assertEqWith
           s
           "both mana costs"
-          (fmap Quantity.manaValueOf (Game.manaCostFaceOf permId opened))
-          (Just 7)
+          (sum (fmap Quantity.manaValueOf (Game.manaCostFacesOf permId opened)))
+          7
         Spec.assertEqWith s "five more lands are tapped" (S.tappedCount S.alice opened - S.tappedCount S.alice after) 5
         Spec.assertEqWith s "the static ability works now" (PlayerEffect.maximumHandSize S.alice opened) Nothing
         Spec.assertEqWith
@@ -424,8 +424,8 @@ spec s registry = Spec.describe s "Room" $ do
         Spec.assertEqWith
           s
           "and its MANA COST with it"
-          (fmap Quantity.manaValueOf (Game.manaCostFaceOf permId locked))
-          (Just 2)
+          (sum (fmap Quantity.manaValueOf (Game.manaCostFacesOf permId locked)))
+          2
         Spec.assertEqWith
           s
           "and its RULES TEXT: the static ability is gone"

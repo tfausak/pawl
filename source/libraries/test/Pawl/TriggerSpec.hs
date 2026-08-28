@@ -150,7 +150,7 @@ logSpec s registry =
           expected = Projection.project piker gs
           after = S.runPure S.identityAnswer gs (Event.changeZone piker Zone.Graveyard)
       case S.eventsOf after of
-        GameEvent.Moved (Moved.MkMoved _ snapshot) : _ -> Spec.assertEqWith s "snapshot from the origin zone" snapshot expected
+        GameEvent.Moved (Moved.MkMoved _ snapshot _) : _ -> Spec.assertEqWith s "snapshot from the origin zone" snapshot expected
         _ -> Spec.assertFailure s "expected exactly one Moved event"
     -- CR 704.5h's window is "since the last SBA check": the check CONSUMES by
     -- bumping a watermark, and the record survives.
@@ -187,7 +187,7 @@ logSpec s registry =
       restInPeace <- S.printingOf s registry "Rest in Peace"
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
-          gs1 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project ripId gs0))] gs0
+          gs1 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project ripId gs0))] gs0
           ending = gs1 {GameState.remaining = Seq.empty}
           after = snd (Engine.runGamePure S.identityAnswer ending Engine.advance)
           isTrigger oid = case Game.lookupObject oid after of
@@ -251,13 +251,13 @@ scanSpec s registry =
       let (_, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           (pikerId, gs1) = S.addCreature piker S.bob gs0
           entered = ZoneChange.MkZoneChange pikerId pikerId Zone.Stack Zone.Battlefield
-          gs2 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project pikerId gs1))] gs1
+          gs2 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project pikerId gs1))] gs1
       Spec.assertEqWith s "no trigger" (length (gathered gs2)) 0
     Spec.it s "CR 603.6a a SelfEnters trigger still fires on its own entry" $ do
       restInPeace <- S.printingOf s registry "Rest in Peace"
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
-          gs1 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project ripId gs0))] gs0
+          gs1 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project ripId gs0))] gs0
       case gathered gs1 of
         [pt] -> do
           Spec.assertEqWith s "source is RiP" (PendingTrigger.source pt) (TriggerSource.OfObject ripId)
@@ -267,11 +267,11 @@ scanSpec s registry =
       restInPeace <- S.printingOf s registry "Rest in Peace"
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           toGrave = ZoneChange.MkZoneChange ripId ripId Zone.Battlefield Zone.Graveyard
-          gs1 = S.withEvents [GameEvent.Moved (Moved.MkMoved toGrave (Projection.project ripId gs0))] gs0
+          gs1 = S.withEvents [GameEvent.Moved (Moved.moved toGrave (Projection.project ripId gs0))] gs0
       Spec.assertEqWith s "no triggers" (length (gathered gs1)) 0
     Spec.it s "SelfEnters matches only a battlefield destination" $ do
       let bearer = ObjectId.MkObjectId 1
-          movedTo zone = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange bearer bearer Zone.Stack zone) S.emptyCharacteristics)
+          movedTo zone = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange bearer bearer Zone.Stack zone) S.emptyCharacteristics)
       Spec.assertBool s (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Battlefield)) "enters battlefield matches"
       Spec.assertBool s (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Graveyard))) "enters graveyard does not"
     -- CR 508.3a plus Aurelia, the Warleader's "for the first time each turn".
@@ -308,8 +308,8 @@ scanSpec s registry =
           entered2 = ZoneChange.MkZoneChange rip2 rip2 Zone.Stack Zone.Battlefield
           gs2 =
             S.withEvents
-              [ GameEvent.Moved (Moved.MkMoved entered1 (Projection.project rip1 gs1)),
-                GameEvent.Moved (Moved.MkMoved entered2 (Projection.project rip2 gs1))
+              [ GameEvent.Moved (Moved.moved entered1 (Projection.project rip1 gs1)),
+                GameEvent.Moved (Moved.moved entered2 (Projection.project rip2 gs1))
               ]
               gs1
           triggers = gathered gs2
@@ -438,7 +438,7 @@ sacrificeSpec s registry =
       restInPeace <- S.printingOf s registry "Rest in Peace"
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
-          gs1 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project ripId gs0))] gs0
+          gs1 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project ripId gs0))] gs0
           placed = snd (Engine.runGamePure S.identityAnswer gs1 Engine.placePendingTriggers)
           bindingsOn oid = maybe Map.empty Object.bindings (Game.lookupObject oid placed)
           selfOf oid = Map.lookup Binding.triggerSource (Binding.targetsOf (bindingsOn oid))
@@ -1872,7 +1872,7 @@ monarchOrderingSpec s registry =
             (_, gs2) = S.addLibraryCard piker S.alice gs1
             (jailer, gs3) = S.addCreature palaceJailer S.alice gs2
             entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
-         in beginEndStep (resolveAll (S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project jailer gs3))] gs3))
+         in beginEndStep (resolveAll (S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project jailer gs3))] gs3))
       -- Records every ordering payload's SOURCES, in order, answering
       -- canonically. The sources are what this group is about (CR 725.2's
       -- absent one beside a borne one); Pawl.KeywordTriggerSpec's battleCrySpec
@@ -1989,7 +1989,7 @@ interveningSpec s registry =
       withZombie sarcomancy =
         let (sarcId, gs0) = S.addCreature sarcomancy S.alice (Setup.emptyGame S.bothPlayers)
             entered = ZoneChange.MkZoneChange sarcId sarcId Zone.Stack Zone.Battlefield
-            gs1 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project sarcId gs0))] gs0
+            gs1 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project sarcId gs0))] gs0
          in (sarcId, resolveAll (settle gs1))
    in Spec.describe s "InterveningIf" $ do
         Spec.it s "CR 603.6a the enters trigger makes a 2/2 black Zombie token" $ do
@@ -2060,7 +2060,7 @@ enchantedHostTriggerSpec s registry =
         let (rayId, gs1) = S.addCreature ray S.alice gs0
             attached = S.attach rayId host gs1
             entered = ZoneChange.MkZoneChange rayId rayId Zone.Stack Zone.Battlefield
-         in S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project rayId attached))] attached
+         in S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project rayId attached))] attached
    in Spec.describe s "EnchantedHostTrigger" $ do
         Spec.it s "CR 603.4 the clause holds on a RED host, so the trigger taps it" $ do
           ray <- S.printingOf s registry "Ray of Frost"
@@ -2174,7 +2174,7 @@ permanentEntersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry 
 permanentEntersSpec s registry =
   let anyCreature = Filter.Type.HasCardType CardType.Creature
       anotherCreature = Filter.Type.And [anyCreature, Filter.Type.Not Filter.Type.IsSource]
-      enters oid = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield) S.emptyCharacteristics)
+      enters oid = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield) S.emptyCharacteristics)
       sourcesOf gs = fmap PendingTrigger.source (gathered gs)
    in Spec.describe s "PermanentEnters" $ do
         -- The gameplay-level proof, cast to resolution: alice's second Soul
@@ -2246,7 +2246,7 @@ permanentEntersSpec s registry =
           plains <- S.printingOf s registry "Plains"
           let (_, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
               (landId, gs1) = S.addCreature plains S.alice gs0
-              gs2 = S.withEvents [GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange landId landId Zone.Stack Zone.Battlefield) (Projection.project landId gs1))] gs1
+              gs2 = S.withEvents [GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange landId landId Zone.Stack Zone.Battlefield) (Projection.project landId gs1))] gs1
           Spec.assertEqWith s "no trigger" (sourcesOf gs2) []
         -- The destination half: CR 603.6a is an ENTERS-THE-BATTLEFIELD
         -- ability, so a creature card moving to a graveyard is not it.
@@ -2255,7 +2255,7 @@ permanentEntersSpec s registry =
           piker <- S.printingOf s registry "Goblin Piker"
           let (warden, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
               (pikerId, gs1) = S.addCreature piker S.bob gs0
-              toGrave = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange pikerId pikerId Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
+              toGrave = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange pikerId pikerId Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
           Spec.assertBool s (not (Event.matchesTrigger gs1 warden S.alice (TriggerCondition.PermanentEnters anotherCreature) toGrave)) "a graveyard-bound move does not match"
         -- CR 603.6a: "EACH TIME an event puts one or more permanents onto the
         -- battlefield" -- one bearer, two entering creatures, two triggers. A
@@ -2269,8 +2269,8 @@ permanentEntersSpec s registry =
               (second, gs2) = S.addCreature piker S.bob gs1
               gs3 =
                 S.withEvents
-                  [ GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange first first Zone.Stack Zone.Battlefield) (Projection.project first gs2)),
-                    GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange second second Zone.Stack Zone.Battlefield) (Projection.project second gs2))
+                  [ GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange first first Zone.Stack Zone.Battlefield) (Projection.project first gs2)),
+                    GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange second second Zone.Stack Zone.Battlefield) (Projection.project second gs2))
                   ]
                   gs2
           Spec.assertEqWith s "twice, both from the one Warden" (sourcesOf gs3) (replicate 2 (TriggerSource.OfObject warden))

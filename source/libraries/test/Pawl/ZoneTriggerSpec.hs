@@ -859,7 +859,7 @@ serraAvatarSpec s registry =
         -- what makes the False side mean something.
         Spec.it s "CR 603.6 only a GRAVEYARD destination matches: exile does not" $ do
           (creature, gs) <- cardIn S.addCreature
-          let moveTo to = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange creature creature Zone.Battlefield to) S.emptyCharacteristics)
+          let moveTo to = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange creature creature Zone.Battlefield to) S.emptyCharacteristics)
               matches = Event.matchesTrigger gs creature S.alice TriggerCondition.SelfPutIntoGraveyardFromAnywhere
           Spec.assertBool s (matches (moveTo Zone.Graveyard)) "a graveyard-bound move matches"
           Spec.assertBool s (not (matches (moveTo Zone.Exile))) "an exile-bound move does not"
@@ -1262,7 +1262,7 @@ permanentsDieSpec s registry =
         List.nub
           ( Maybe.mapMaybe
               ( \logged -> case LoggedEvent.event logged of
-                  GameEvent.Moved (Moved.MkMoved zc _)
+                  GameEvent.Moved (Moved.MkMoved zc _ _)
                     | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard -> Just (LoggedEvent.group logged)
                   _ -> Nothing
               )
@@ -1712,7 +1712,7 @@ leavesBattlefieldSpec s registry =
         Spec.it s "CR 400.2 eventBindings binds became for every PUBLIC destination and for no hidden one" $ do
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
-              leftFor to = Event.eventBindings Nothing TriggerCondition.SelfLeavesTheBattlefield (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield to) S.emptyCharacteristics))
+              leftFor to = Event.eventBindings Nothing TriggerCondition.SelfLeavesTheBattlefield (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield to) S.emptyCharacteristics))
               bound = Map.singleton Binding.became (Binding.toObject arrived)
           Spec.assertEqWith s "a graveyard is public" (leftFor Zone.Graveyard) bound
           Spec.assertEqWith s "exile is public" (leftFor Zone.Exile) bound
@@ -1728,8 +1728,8 @@ leavesBattlefieldSpec s registry =
         -- such a token, which is exactly why the guard needs a test of its own.
         Spec.it s "CR 603.6c a battlefield-to-battlefield pseudo-move is not a departure" $ do
           let token = ObjectId.MkObjectId 1
-              entry = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange token token Zone.Battlefield Zone.Battlefield) S.emptyCharacteristics)
-              gone = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange token (ObjectId.MkObjectId 2) Zone.Battlefield Zone.Exile) S.emptyCharacteristics)
+              entry = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange token token Zone.Battlefield Zone.Battlefield) S.emptyCharacteristics)
+              gone = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange token (ObjectId.MkObjectId 2) Zone.Battlefield Zone.Exile) S.emptyCharacteristics)
               matches = Event.matchesTrigger (Setup.emptyGame S.bothPlayers) token S.alice TriggerCondition.SelfLeavesTheBattlefield
           Spec.assertBool s (not (matches entry)) "a token's own entry is not a departure"
           Spec.assertBool s (matches gone) "but the same token being exiled is"
@@ -1779,7 +1779,7 @@ representativeEvents :: TriggerCondition.TriggerCondition -> NonEmpty.NonEmpty G
 representativeEvents cond =
   let departed = ObjectId.MkObjectId 1
       arrived = ObjectId.MkObjectId 2
-      moved from to = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived from to) S.emptyCharacteristics)
+      moved from to = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived from to) S.emptyCharacteristics)
       combatDamage =
         GameEvent.DamageDealt
           (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat)
@@ -2070,7 +2070,7 @@ representativeEvents cond =
         -- admits. Whether the departed permanent is the bearer's host does not
         -- matter here: eventBindings claims nothing either way, and the floor is
         -- what this pins.
-        TriggerCondition.AttachedCreatureDies -> one (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics))
+        TriggerCondition.AttachedCreatureDies -> one (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics))
         -- CR 701.26a's own event, and the only one this condition admits. Whether
         -- the tapped permanent is the bearer's host does not matter here for the
         -- AttachedCreatureDies arm's reason: eventBindings claims nothing either
@@ -2493,14 +2493,14 @@ becameSlotSpec s registry =
         Spec.it s "CR 400.7e eventBindings binds the ARRIVING id, not the departed one" $ do
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
-              died = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
+              died = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
           Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings Nothing TriggerCondition.SelfDies died) (Map.singleton Binding.became (Binding.toObject arrived))
         -- A condition that is not a look-back gets no such slot: Narcomoeba's
         -- bearer IS the arriving card, so binding it again would be a second
         -- name for the same object.
         Spec.it s "CR 113.6k a library-to-graveyard trigger binds nothing" $ do
           let oid = ObjectId.MkObjectId 1
-              milled = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange oid oid Zone.Library Zone.Graveyard) S.emptyCharacteristics)
+              milled = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange oid oid Zone.Library Zone.Graveyard) S.emptyCharacteristics)
           Spec.assertEqWith s "no became slot" (Event.eventBindings Nothing TriggerCondition.SelfPutIntoGraveyardFromLibrary milled) Map.empty
         -- CR 400.7f's arm, the one place the slot comes from something other than
         -- the event: the BEARER's own arrival, which eventTriggers computes off
@@ -2512,7 +2512,7 @@ becameSlotSpec s registry =
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
               bearerArrived = ObjectId.MkObjectId 3
-              hostDied = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
+              hostDied = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
           Spec.assertEqWith
             s
             "became names the Aura's incarnation, not the host's"
@@ -2636,7 +2636,7 @@ promiseOfTomorrowSpec s registry =
         Spec.it s "CR 400.7e eventBindings binds the ARRIVING id for PermanentDies too" $ do
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
-              died = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
+              died = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
           Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings Nothing (TriggerCondition.PermanentDies (Filter.Type.HasCardType CardType.Creature)) died) (Map.singleton Binding.became (Binding.toObject arrived))
 
 -- CR 607.2a's linked pair read from the SECOND ability, which is the half
@@ -3932,8 +3932,8 @@ hauntSpec s registry =
         [oid] ->
           let (mNew, moved) = S.runPureWith S.identityAnswer gs (Event.changeZoneReturning oid Zone.Graveyard)
               link = Map.lookup oid (GameState.haunting gs)
-           in case (mNew, link) of
-                (Just newId, Just hauntedId) -> moved {GameState.haunting = Map.insert newId hauntedId (Map.delete oid (GameState.haunting moved))}
+           in case (Foldable.toList mNew, link) of
+                (newId : _, Just hauntedId) -> moved {GameState.haunting = Map.insert newId hauntedId (Map.delete oid (GameState.haunting moved))}
                 _ -> moved
         _ -> gs
       lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
@@ -4061,7 +4061,7 @@ strippedTriggerSpec s registry =
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       entering oid gs =
         let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-         in resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project oid gs))] gs))
+         in resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project oid gs))] gs))
    in Spec.describe s "CR 305.7 strips a triggered ability" $ do
         Spec.it s "CR 603.6a Radiant Fountain's entry trigger gains its controller 2 life" $ do
           radiantFountain <- S.printingOf s registry "Radiant Fountain"
@@ -4415,7 +4415,7 @@ aetherFlashSpec s registry =
         Spec.it s "CR 400.7e eventBindings binds the ENTRANT under became" $ do
           let castCard = ObjectId.MkObjectId 1
               entered = ObjectId.MkObjectId 2
-              entry = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange castCard entered Zone.Stack Zone.Battlefield) S.emptyCharacteristics)
+              entry = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange castCard entered Zone.Stack Zone.Battlefield) S.emptyCharacteristics)
           Spec.assertEqWith s "became names the permanent that entered" (Event.eventBindings Nothing (TriggerCondition.PermanentEnters (Filter.Type.HasCardType CardType.Creature)) entry) (Map.singleton Binding.became (Binding.toObject entered))
         -- CR 603.6a's "EACH TIME an event puts one or more permanents onto
         -- the battlefield" met with a per-entrant payload: Dragon Fodder

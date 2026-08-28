@@ -29,6 +29,7 @@ import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaAddition as ManaAddition
+import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
@@ -794,6 +795,18 @@ data Effect card ability
     -- "transforms into" trigger, CR 702.145b's daybound restriction and CR
     -- 701.28f's prohibition are one code path with one event.
     Convert ObjectRef.ObjectRef
+  | -- | CR 701.42a: meld the cards the payload's ObjectRef names -- put them onto
+    -- the battlefield with their back faces up and combined, as one permanent
+    -- represented by all of them.
+    --
+    -- Transform's neighbour and not a wider version of it: rule 701.27a turns ONE
+    -- object over in place, where this puts SEVERAL cards onto the battlefield as
+    -- ONE new object (CR 712.14c). CR 712.4c is the rule that keeps the two from
+    -- ever meeting on the same permanent.
+    --
+    -- The EXILE is not part of this opcode; see 'Pawl.Types.Meld.Meld', which
+    -- carries the whole of what this arm means.
+    Meld (Meld.Meld card)
   | -- | CR 702.26b: the permanents the ObjectRef names phase out.
     --
     -- NOT a zone change, which is CR 702.26d in as many words, so this does not

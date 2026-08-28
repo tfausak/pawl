@@ -230,6 +230,12 @@ mayPlayers = SlotName.MkSlotName (Text.pack "thoseWhoMay")
 -- 400.7e withholds this slot when the destination is hidden (CR 400.2), so the
 -- wider leaves-the-battlefield condition binds it for a death and not for a
 -- bounce, and no card may read it under that condition yet (#505).
+--
+-- ONE object usually, SEVERAL for a melded permanent leaving the battlefield:
+-- CR 712.21c makes an effect that finds what it became find both cards. The
+-- shape follows -- a recipient for one (setBecame), a group for several
+-- (setBecameGroup) -- and Pawl.Engine.Event.setBecameArrivals is where the
+-- choice is made and justified.
 became :: SlotName
 became = SlotName.MkSlotName (Text.pack "became")
 
@@ -609,6 +615,13 @@ setTriggerPlayer pid = Map.insert triggerPlayer (toPlayer pid)
 -- Bind an object under the reserved became slot (CR 400.7e).
 setBecame :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setBecame oid = Map.insert became (toObject oid)
+
+-- setBecame for CR 712.21c's plural: the SEVERAL cards a melded permanent became
+-- as it left the battlefield, bound as a group so an ObjectRef.InSlot reader acts
+-- on each of them. Pawl.Engine.Event.setBecameArrivals is the one caller and says
+-- why the shape differs from setBecame's.
+setBecameGroup :: Seq ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setBecameGroup oids = Map.insert became (toObjects oids)
 
 -- Bind an object under the reserved castSpell slot (CR 601.2i).
 setCastSpell :: ObjectId -> Map SlotName Binding -> Map SlotName Binding

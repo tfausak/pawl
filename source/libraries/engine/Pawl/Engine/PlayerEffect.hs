@@ -980,13 +980,15 @@ choiceCouldEscape src criterion oid gs =
 -- rather than tested, because a cost printing the symbol twice moves the mana
 -- value in steps of two as X climbs, and a step of two never changes its parity.
 --
--- The MANA COST FACE (CR 202.3b), which is the face the mana value itself is read
--- from, so the count and the base it steps from come off the same face.
+-- The MANA COST FACES (CR 202.3b), which are the faces the mana value itself is
+-- read from, so the count and the base it steps from come off the same faces --
+-- all of them, since CR 202.3c reads a melded permanent's cost off two cards and
+-- an {X} on either would move the sum.
 variablesIn :: ObjectId -> GameState -> Integer
 variablesIn oid gs =
   let symbolsOf face = foldMap ManaCost.unwrap (Face.manaCost face)
       variable symbol = symbol == ManaSymbol.Variable
-   in toInteger (length (filter variable (foldMap symbolsOf (Game.manaCostFaceOf oid gs))))
+   in toInteger (length (filter variable (foldMap symbolsOf (Game.manaCostFacesOf oid gs))))
 
 -- CR 613.11 / 601.2f: the cost increases, the cost reductions and the additional
 -- non-mana components that apply to `pid` CASTING `oid`.

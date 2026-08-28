@@ -830,7 +830,7 @@ entersWithTrigger :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameSta
 entersWithTrigger printing pid gs0 =
   let (oid, gs1) = addCreature printing pid gs0
       entered = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-   in (oid, withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project oid gs1))] gs1)
+   in (oid, withEvents [GameEvent.Moved (Moved.moved entered (Projection.project oid gs1))] gs1)
 
 -- One more card of a printing in pid's hand, APPENDED (contrast handOne, which
 -- replaces the hand and sets up the phase for a cast).

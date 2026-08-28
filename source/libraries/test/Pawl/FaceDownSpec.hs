@@ -115,6 +115,7 @@
 -- rule's two turn-face-up procedures apart.
 module Pawl.FaceDownSpec where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -1714,7 +1715,9 @@ putOntoBattlefield :: Maybe FaceDownState.FaceDownState -> ObjectId.ObjectId -> 
 putOntoBattlefield faceDown oid gs =
   let riders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = faceDown}
       (entered, moved) = Engine.runGamePure S.identityAnswer gs (Event.changeZoneEntering oid Zone.Battlefield LibraryPosition.defaultValue riders (Just S.alice))
-   in (S.runPure S.identityAnswer moved Engine.priorityLoop, entered)
+   in -- At most ONE arrival: the funnel answers with several only for a melded
+      -- permanent leaving the battlefield (CR 712.21), and this move enters one.
+      (S.runPure S.identityAnswer moved Engine.priorityLoop, Maybe.listToMaybe (Foldable.toList entered))
 
 -- A resolved face-down permanent of a morph printing on a board of `n` lands,
 -- three of which CR 702.37a's {3} has tapped. Nothing if the cast did not land.
@@ -2071,7 +2074,7 @@ enterFaceDown printing pid gs =
   let (oid, g1) = S.addLibraryCard printing pid gs
       riders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Just (FaceDownState.defaultFor FaceDownReason.Manifested)}
       (entered, moved) = Engine.runGamePure S.identityAnswer g1 (Event.changeZoneEntering oid Zone.Battlefield LibraryPosition.defaultValue riders (Just pid))
-   in (S.settleSba moved, entered)
+   in (S.settleSba moved, Maybe.listToMaybe (Foldable.toList entered))
 
 -- THE BOARD Break Open's target slot is discriminated on, returned as (the
 -- board, the spell, bob's face-down permanent, bob's FACE-UP creature, alice's

@@ -74,6 +74,7 @@ import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modification as Modification
@@ -1118,6 +1119,26 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           /= toJson (Effect.Transform (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
       )
       "Convert and Transform of the same slot encode differently"
+  -- CR 701.42a. The slot Hanweir Battlements' own exile bound, plus the combined
+  -- back face inline -- through the card codec, which here writes a bare name.
+  -- Pawl.Codec.Effect is Arm.tagged, so a missing arm compiles with no round-trip
+  -- test at all (#2262): this case is what catches one.
+  Spec.it s "Meld" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Meld (Meld.MkMeld (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "melding"))) (Text.pack "Hanweir, the Writhing Township")))
+      " {\"type\":\"Meld\",\"value\":{\"objects\":{\"type\":\"InSlot\",\"value\":\"melding\"},\"result\":\"Hanweir, the Writhing Township\"}} "
+    -- The combined face reaches the wire only through the SUPPLIED card codec,
+    -- CreateEmblem's case one payload over: two different `card` types encode
+    -- alike through a constant codec, which a leak straight to the constructor
+    -- would fail.
+    Spec.assertEqWith
+      s
+      "the result payload comes from the argument, not the card"
+      (Codec.encode (Effect.codec (constCodec sentinel) abilityCodec) (Effect.Meld (Meld.MkMeld (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "melding"))) (Text.pack "a wholly different card type"))))
+      (Codec.encode (Effect.codec (constCodec sentinel) abilityCodec) (Effect.Meld (Meld.MkMeld (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "melding"))) (0 :: Int))))
   -- CR 702.26b. Both ObjectRef arms, since the pool prints one of each: Reality
   -- Ripple's "target artifact, creature, or land phases out" is the slot, and
   -- Teferi's Protection's "all permanents you control phase out" is the filter. It
