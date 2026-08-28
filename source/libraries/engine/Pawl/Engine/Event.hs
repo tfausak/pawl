@@ -2178,6 +2178,10 @@ apply batch candidate event =
     -- Saturating at zero covers a player already at or below the floor, whom CR
     -- 704.5a has not yet swept: they lose nothing at all.
     --
+    -- The proposed amount is not read, and cannot be needed: Replacement.breaches
+    -- has already refused every event this arm would not shrink, so the answer is
+    -- strictly smaller than what came in and no application can grow a loss.
+    --
     -- No arm here touches the DAMAGE. By CR 120.4b it has already been dealt, and
     -- Pawl.Engine.Damage.applyDamage still gains a lifelink source's controller
     -- every point of it -- "any damage rendered useless by Worship was still

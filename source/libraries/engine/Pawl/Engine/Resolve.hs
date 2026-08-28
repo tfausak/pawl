@@ -5057,8 +5057,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- reach this road, which is Worship's own ruling ("Worship does not
               -- prevent loss of life, so loss of life bypasses Worship") and what
               -- Pawl.ReplacementSpec's Worship group proves on a board where the
-              -- same player at the same life dies to a Mind Rot's worth of loss
-              -- and survives the damage.
+              -- same player at the same life survives 3 damage and dies to
+              -- Stronghold Discipline's 3.
               settled <- Event.resolveLifeLoss LifeLossCause.ByEffect pid (Integer.toNaturalSaturating n)
               changeLife pid (negate (toInteger settled))
         _ -> pure ()
