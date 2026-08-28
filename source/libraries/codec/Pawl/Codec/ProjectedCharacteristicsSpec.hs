@@ -59,7 +59,10 @@ testCharacteristics =
       PC.replacementEffects = [],
       PC.triggeredAbilities = [FaceSpec.minimalTriggeredAbility],
       PC.enchant = [TargetSlot.required Pool.Creatures Nothing],
-      PC.subtypeWordChanges = [ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Spirit Subtype.Elf]
+      PC.subtypeWordChanges = [ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Spirit Subtype.Elf],
+      -- A different keyword from `keywords` above, so a codec arm reading the
+      -- wrong field would not round trip to the same JSON.
+      PC.textChangedKeywords = Map.singleton Keyword.Trample 1
     }
 
 testCharacteristicsJson :: String
@@ -72,7 +75,8 @@ testCharacteristicsJson =
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"enchant\":[{\"pool\":{\"type\":\"Creatures\"}}],"
-    <> "\"subtypeWordChanges\":[{\"from\":{\"type\":\"Spirit\"},\"to\":{\"type\":\"Elf\"}}]}"
+    <> "\"subtypeWordChanges\":[{\"from\":{\"type\":\"Spirit\"},\"to\":{\"type\":\"Elf\"}}],"
+    <> "\"textChangedKeywords\":[{\"key\":{\"type\":\"Trample\"},\"value\":1}]}"
 
 -- | Every field but the two required ones at its default.
 minimalCharacteristics :: PC.ProjectedCharacteristics
@@ -96,7 +100,8 @@ minimalCharacteristics =
       PC.replacementEffects = [],
       PC.triggeredAbilities = [],
       PC.enchant = [],
-      PC.subtypeWordChanges = []
+      PC.subtypeWordChanges = [],
+      PC.textChangedKeywords = Map.empty
     }
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()

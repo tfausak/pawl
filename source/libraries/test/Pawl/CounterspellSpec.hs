@@ -1601,6 +1601,72 @@ ministrantChain s registry swap = do
       after = S.runPure S.identityAnswer settled Stack.resolveTop
   pure (ministrantId, evolved, S.tokensOf after, after)
 
+-- CR 612.3's half of the same mint: alice controls `host`, optionally resolves an
+-- Artificial Evolution at it, then resolves an Afterlife Insurance ({1}{W/B}
+-- Instant -- "Creatures you control gain afterlife 1 until end of turn. Draw a
+-- card.", checked against Scryfall) and Murders the host. Returns the host's id,
+-- the state while it lived, the tokens and the final state.
+--
+-- The Insurance is cast AFTER the Evolution, but the order is not what settles
+-- this: CR 613.1c/613.1f put the text change in layer 3 and the grant in layer 6
+-- whichever timestamp is older, so the granted afterlife always arrives after the
+-- swap has run.
+--
+-- Six Swamps and an Island, which is one Swamp more than the chain spends: the
+-- Evolution's {U} is the Island's, and {1}{W/B} plus {1}{B}{B} is five.
+insuredChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m (ObjectId.ObjectId, GameState.GameState, [ObjectId.ObjectId], GameState.GameState)
+insuredChain s registry hostName swap = do
+  swamp <- S.printingOf s registry "Swamp"
+  island <- S.printingOf s registry "Island"
+  host <- S.printingOf s registry hostName
+  murder <- S.printingOf s registry "Murder"
+  insurance <- S.printingOf s registry "Afterlife Insurance"
+  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+  let g1 = snd (S.addCreature island S.alice (S.landsInPlay swamp 6))
+      (hostId, g2) = S.addCreature host S.alice g1
+      (evolutionId, g3) = S.addHandCard artificialEvolution S.alice g2
+      (insuranceId, g4) = S.addHandCard insurance S.alice g3
+      (murderId, g5) = S.addHandCard murder S.alice g4
+      -- The Insurance draws, so alice needs a library: CR 104.3c would otherwise
+      -- lose her the game at the next state-based check, before the trigger.
+      g6 = snd (S.addLibraryCard swamp S.alice g5)
+      evolved = case swap of
+        Nothing -> g6
+        Just (from, to) ->
+          S.runPure (evolveAt hostId from to) g6 $ do
+            S.cast S.alice evolutionId
+            Stack.resolveTop
+      -- The identity answerer suffices for the Insurance: its EachMatching ref
+      -- targets nothing, so there is no slot for a hand-built recipient to miss.
+      insured =
+        S.runPure S.identityAnswer evolved $ do
+          S.cast S.alice insuranceId
+          Stack.resolveTop
+      -- Named for ministrantChain's reason: Murder's Pool.Creatures slot wants a
+      -- Recipient.ToCreature where evolveAt answers with a Recipient.ToObject.
+      killed =
+        S.runPure (aimAtCreature hostId) insured $
+          do
+            S.cast S.alice murderId
+            Stack.resolveTop
+      settled = S.runPure S.identityAnswer killed Engine.settleForPriority
+      -- CR 702.135b: a host holding a printed instance AND a granted one puts two
+      -- triggers on the stack, so resolving the top once is not enough.
+      drain gs = if null (GameState.stack gs) then gs else S.runPure S.identityAnswer gs Stack.resolveTop
+      after = List.foldl' (\gs _ -> drain gs) settled [1 :: Int .. 4]
+  pure (hostId, insured, S.tokensOf after, after)
+
+-- The subtype lists of `tokens`, sorted, so one assertion carries both the
+-- multiset and the count -- an empty token list cannot satisfy it the way a
+-- mapM_ over the same assertion would.
+tokenSubtypes :: [ObjectId.ObjectId] -> GameState.GameState -> [[Subtype.Subtype]]
+tokenSubtypes tokens gs = List.sort (fmap (\oid -> Set.toList (Projection.subtypesOf oid gs)) tokens)
+
+-- The same for CR 111.4's names, which rewriteTokenName reaches by a different
+-- path than the subtype above.
+tokenNames :: [ObjectId.ObjectId] -> GameState.GameState -> [[CardName.CardName]]
+tokenNames tokens gs = List.sort (fmap (\oid -> Set.toList (Projection.namesOf oid gs)) tokens)
+
 -- CR 612.2 reaching the ObjectRef INSIDE an effect: alice controls Agent Phil
 -- Coulson ({1}{W} Legendary Creature -- Human Spy Hero 2/2, "Vigilance / {T}:
 -- Put a +1/+1 counter on each other Hero you control", checked against
@@ -1791,6 +1857,46 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     -- word and not the mint.
     mapM_ (\oid -> Spec.assertEqWith s "still 1/1" (Projection.powerOf oid after, Projection.toughnessOf oid after) (Just (1 :: Integer), Just (1 :: Integer))) tokens
     mapM_ (\oid -> Spec.assertBool s (Projection.hasKeyword Keyword.Flying oid after) "and still flying") tokens
+
+  -- CR 612.3's boundary on the same mint: "any abilities that are granted to an
+  -- object can't be modified by text-changing effects that affect that object".
+  -- Afterlife Insurance grants afterlife 1 at CR 613.1f layer 6, after the
+  -- Evolution's layer-3 swap, so rule 702.135a's Spirit survives.
+  --
+  -- The control first, so the pair below cannot pass on a chain that granted
+  -- nothing. A Goblin Piker prints neither afterlife nor Spirit, so every token
+  -- here comes from the grant.
+  Spec.it s "CR 702.135a a Goblin Piker insured but unevolved leaves a Spirit Token" $ do
+    (pikerId, alive, tokens, after) <- insuredChain s registry "Goblin Piker" Nothing
+    Spec.assertEqWith s "one Creature -- Spirit" (tokenSubtypes tokens after) [[Subtype.Spirit]]
+    Spec.assertEqWith s "named Spirit Token" (tokenNames tokens after) [[CardName.MkCardName (Text.pack "Spirit Token")]]
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Afterlife 1) pikerId alive) "the grant reached the Piker"
+    Spec.assertEqWith s "Goblin Warrior while it lived" (Projection.subtypesOf pikerId alive) (Set.fromList [Subtype.Goblin, Subtype.Warrior])
+
+  -- And the point. The swap reaches the Piker's projection -- its subtypeWordChanges
+  -- carry the pair -- and reaches nothing rule 702.135a mints for a keyword the
+  -- Insurance granted afterwards.
+  Spec.it s "CR 612.3 an evolved Goblin Piker's GRANTED afterlife still mints a Spirit Token" $ do
+    (pikerId, alive, tokens, after) <- insuredChain s registry "Goblin Piker" (Just (Subtype.Spirit, Subtype.Elf))
+    Spec.assertEqWith s "one Creature -- Spirit" (tokenSubtypes tokens after) [[Subtype.Spirit]]
+    Spec.assertEqWith s "named Spirit Token" (tokenNames tokens after) [[CardName.MkCardName (Text.pack "Spirit Token")]]
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Afterlife 1) pikerId alive) "the grant reached the Piker"
+    -- The Piker prints no Spirit, so its own type line is untouched either way:
+    -- what the Evolution had to reach was rule 702.135a's word alone.
+    Spec.assertEqWith s "Goblin Warrior still, while it lived" (Projection.subtypesOf pikerId alive) (Set.fromList [Subtype.Goblin, Subtype.Warrior])
+
+  -- CR 702.135b -- "if a permanent has multiple instances of afterlife, each
+  -- triggers separately" -- is what makes this per INSTANCE and not per object. A
+  -- Ministrant of Obligation holding its printed afterlife 2 and the Insurance's
+  -- granted afterlife 1 mints two Elves off the printed instance and one Spirit
+  -- off the granted one. "Never rewrite a minted ability" would give three
+  -- Spirits, and today's rewrite-everything gives three Elves.
+  Spec.it s "CR 702.135b an evolved Ministrant plus a granted afterlife leaves two Elves and a Spirit" $ do
+    (ministrantId, alive, tokens, after) <- insuredChain s registry "Ministrant of Obligation" (Just (Subtype.Spirit, Subtype.Elf))
+    Spec.assertEqWith s "two Elves and a Spirit" (tokenSubtypes tokens after) [[Subtype.Elf], [Subtype.Elf], [Subtype.Spirit]]
+    Spec.assertEqWith s "named for their own subtypes" (tokenNames tokens after) [[CardName.MkCardName (Text.pack "Elf Token")], [CardName.MkCardName (Text.pack "Elf Token")], [CardName.MkCardName (Text.pack "Spirit Token")]]
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Afterlife 1) ministrantId alive) "the granted instance"
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Afterlife 2) ministrantId alive) "beside the printed one"
 
   -- CR 612.2a's fourth carrier, and the one that forces the walk to be
   -- unconditional: an EMBLEM. CR 114.3 leaves it "no characteristics other than
