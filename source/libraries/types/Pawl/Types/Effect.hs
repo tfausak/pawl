@@ -1245,9 +1245,9 @@ data Effect card ability
     -- the dungeon", and Just for the variant "venture into [quality]", which
     -- narrows CR 701.49a's choice to the dungeon cards that player owns carrying
     -- the indicated quality. A Subtype rather than a Filter because CR 205.3p is
-    -- what a quality IS -- a dungeon type, the only subtype a dungeon card has --
-    -- and a Filter would be a second way to ask a question CR 205.3p has already
-    -- answered.
+    -- what a quality IS -- a dungeon type, which is that rule's name for the
+    -- subtype a dungeon card carries -- and a Filter would be a second way to ask
+    -- a question CR 205.3p has already answered.
     --
     -- CR 701.49d's second sentence needs no payload of its own: a player who
     -- already owns a dungeon card in the command zone follows CR 701.49b-c, and

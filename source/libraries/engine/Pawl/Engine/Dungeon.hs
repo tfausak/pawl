@@ -213,8 +213,9 @@ enterable quality gs printingId = case fmap Card.frontFace (Game.cardOfPrinting 
 -- CR 309.2a's "they choose a dungeon card they own from outside the game" is the
 -- prompt. FILTERED, NOT TRUSTED, `advance`'s and Ring.tempt's posture: an answer
 -- naming a printing this player does not own falls back to the first offered,
--- since entering is mandatory. Raised only for two or more, one owned dungeon
--- leaving nothing to ask.
+-- since entering is mandatory. Raised only for two or more, one `enterable`
+-- dungeon leaving nothing to ask -- which is how CR 701.49d normally costs a
+-- prompt rather than adding one.
 --
 -- Ascending by interned id, so both the single-dungeon shortcut and a transcript
 -- are deterministic -- `advance`'s ordering for its arrows.

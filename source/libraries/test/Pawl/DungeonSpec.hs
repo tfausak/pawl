@@ -481,11 +481,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
     undercity <- S.printingOf s registry "Undercity"
     let (doorId, base) = dungeonBoard island door [lostMine, undercity] 12
         (stairId, gs) = S.addCreature stair S.alice base
-        -- payingFirstDungeon's search arms with its dungeon answer replaced, so
-        -- the two boards differ ONLY in which dungeon the prompt would pick --
-        -- and an implementation that entered Undercity here would run Secret
-        -- Entrance's search and be caught by the hand-size assertion below rather
-        -- than by the name.
+        -- payingFirstDungeon's search arms with its dungeon answer replaced. The
+        -- search arms are carried over deliberately: an implementation that
+        -- entered Undercity here would then run Secret Entrance's search, so the
+        -- hand-size assertion below catches it rather than only the name.
         plainAnswer :: Prompt.Prompt r -> r
         plainAnswer p = case p of
           Prompt.ChooseDungeon _ _ candidates -> NonEmpty.last candidates
