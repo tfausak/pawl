@@ -3820,6 +3820,7 @@ filterReads f = case f of
   -- CR 202.3 reads the printed mana cost, which no Modification writes.
   Filter.Type.ManaValueAtMost _ -> Set.empty
   Filter.Type.ManaValueIsEven -> Set.empty
+  Filter.Type.ManaValueAtMostAmount -> Set.empty
   Filter.Type.And fs -> foldMap filterReads fs
   Filter.Type.Or fs -> foldMap filterReads fs
   Filter.Type.Not g -> filterReads g

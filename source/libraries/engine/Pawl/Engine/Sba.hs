@@ -406,9 +406,14 @@ fallsOff pcs gs oid = case Map.lookup oid pcs of
 -- keep in step. So the fast arm is matched on the PAIR, not on the slot alone --
 -- it reduces Pool.Creatures' candidate list specifically, and a recipient of any
 -- other shape falls through rather than being read as an object id it is not.
+--
+-- The slot's `amount` is matched as Nothing for the Filter's reason: a slot
+-- naming CR 202.3's computed bound is one whose Filter reads it, and this arm is
+-- the no-Filter shape. Nothing prints such an enchant ability, so the arm is
+-- matched rather than widened.
 stillLegalEnchant :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> TargetSlot.TargetSlot -> Recipient.Recipient -> Bool
 stillLegalEnchant pcs gs source slot recipient = case (slot, recipient) of
-  (TargetSlot.MkTargetSlot Pool.Creatures Nothing count, Recipient.ToCreature target) | count == TargetCount.one ->
+  (TargetSlot.MkTargetSlot Pool.Creatures Nothing count Nothing, Recipient.ToCreature target) | count == TargetCount.one ->
     case Map.lookup target pcs of
       Nothing -> False
       Just pc ->

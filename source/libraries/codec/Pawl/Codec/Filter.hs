@@ -56,6 +56,7 @@ codec keywordCodec =
       Arm.nullary "ControlledByRecipient" Filter.ControlledByRecipient,
       Arm.payload "ManaValueAtMost" Common.integer Filter.ManaValueAtMost (\x -> case x of Filter.ManaValueAtMost y -> Just y; _ -> Nothing),
       Arm.nullary "ManaValueIsEven" Filter.ManaValueIsEven,
+      Arm.nullary "ManaValueAtMostAmount" Filter.ManaValueAtMostAmount,
       Arm.payload "ControlledBy" PlayerRelation.codec Filter.ControlledBy (\x -> case x of Filter.ControlledBy y -> Just y; _ -> Nothing),
       Arm.payload "OwnedBy" PlayerRelation.codec Filter.OwnedBy (\x -> case x of Filter.OwnedBy y -> Just y; _ -> Nothing),
       Arm.payload "IsPlayer" PlayerRelation.codec Filter.IsPlayer (\x -> case x of Filter.IsPlayer y -> Just y; _ -> Nothing),

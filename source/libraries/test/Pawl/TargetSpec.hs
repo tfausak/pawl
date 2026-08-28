@@ -61,6 +61,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural.Type
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -83,9 +84,11 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -1781,6 +1784,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- {T} illegal otherwise, and it is itself a third counterless creature the
   -- filter must keep out.
   razorfinSpec s registry
+  -- CR 202.3's bound read off the BOARD rather than off the card, which no Filter
+  -- could state before Pawl.Types.TargetSlot grew its `amount` (#2538).
+  celestineSpec s registry
 
 razorfinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 razorfinSpec s registry = Spec.describe s "HasCountersOfAnyKind (CR 122.1)" $ do
@@ -1891,3 +1897,77 @@ aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtCreature oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just oid) . Recipient.objectOf) sets
   _ -> S.identityAnswer p
+
+-- alice's graveyard holds a Goblin Piker (mana value 2), a Russet Wolves (mana
+-- value 4) and a Lightning Bolt (mana value 1), with `gained` life gained this
+-- turn planted in the CR 608.2i log Game.lifeGainedThisTurn folds.
+--
+-- Three DISTINCT mana values, and the Bolt is the one UNDER every bound the cases
+-- use: it is kept out by the And's other conjunct alone, so a filter that had
+-- stopped narrowing by card type would show up here rather than pass.
+celestineGraveyard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Natural.Type.Natural -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+celestineGraveyard piker wolves bolt gained =
+  let (pikerId, g1) = S.addGraveyardCard piker S.alice (Setup.emptyGame S.bothPlayers)
+      (wolvesId, g2) = S.addGraveyardCard wolves S.alice g1
+      (boltId, g3) = S.addGraveyardCard bolt S.alice g2
+   in (pikerId, wolvesId, boltId, S.withEvents [GameEvent.LifeGained (LifeChange.MkLifeChange S.alice gained)] g3)
+
+-- Celestine, the Living Saint ({4}{W} Legendary Creature -- Human Warrior 3/4,
+-- Oracle text verified against Scryfall): "Flying, lifelink / Healing Tears -- At
+-- the beginning of your end step, return target creature card with mana value X
+-- or less from your graveyard to the battlefield, where X is the amount of life
+-- you gained this turn."
+--
+-- THE card the computed mana-value bound was waiting for. CR 601.2c chooses the
+-- target and CR 608.2b re-reads it, both through
+-- Pawl.Engine.Target.admittedGiven, which is the one site that fills
+-- Filter.Context.slotAmount -- off the slot's own Quantity.LifeGainedThisTurn.
+--
+-- The bound is NOT a printed literal, and the two cases below are what say so: a
+-- card out of range on one board is in range on another that differs only in how
+-- much life was gained, and a board with no gain at all admits nothing.
+celestineSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+celestineSpec s registry = Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ do
+  -- THE PROVING CASE, and the MOVING-BOUND control in one: the same graveyard
+  -- judged at two life totals. At 2 the Wolves are out of range; at 4 they are in
+  -- it, with nothing else about the board changed.
+  Spec.it s "CR 202.3 / 601.2c the bound moves with the board, not with the card" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    celestine <- S.printingOf s registry "Celestine, the Living Saint"
+    case triggerTargetSlot celestine of
+      Nothing -> Spec.assertFailure s "Celestine should declare one triggered ability with one target slot"
+      Just theSlot -> do
+        let (pikerId, wolvesId, boltId, atTwo) = celestineGraveyard piker wolves bolt 2
+            (_, _, _, atFour) = celestineGraveyard piker wolves bolt 4
+            legal = Target.legalRecipients (Just S.alice) S.noSource theSlot
+        Spec.assertEqWith s "the fixture planted 2 life gained" (Game.lifeGainedThisTurn atTwo S.alice) 2
+        Spec.assertEqWith s "and 4 on the other board" (Game.lifeGainedThisTurn atFour S.alice) 4
+        Spec.assertBool s (Set.member (Recipient.ToObject pikerId) (legal atTwo)) "mana value 2 is within a bound of 2"
+        Spec.assertBool s (not (Set.member (Recipient.ToObject wolvesId) (legal atTwo))) "mana value 4 is not"
+        Spec.assertBool s (Set.member (Recipient.ToObject wolvesId) (legal atFour)) "and at 4 gained it is -- the bound moved"
+        Spec.assertBool s (not (Set.member (Recipient.ToObject boltId) (legal atFour))) "the instant card under every bound is still out (the And narrows by card type)"
+        Spec.assertEqWith s "so the wider board offers both creature cards and nothing else" (legal atFour) (Set.fromList [Recipient.ToObject pikerId, Recipient.ToObject wolvesId])
+  -- THE ZERO control, built as the same board differing in exactly one thing: no
+  -- life gained, so nothing in a graveyard of mana values 1, 2 and 4 is in range.
+  -- Without it a bound the engine simply ignored would pass the case above.
+  Spec.it s "CR 202.3 with no life gained this turn the slot admits nothing" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    celestine <- S.printingOf s registry "Celestine, the Living Saint"
+    case triggerTargetSlot celestine of
+      Nothing -> Spec.assertFailure s "Celestine should declare one triggered ability with one target slot"
+      Just theSlot -> do
+        let (pikerId, wolvesId, _, atZero) = celestineGraveyard piker wolves bolt 0
+        Spec.assertEqWith s "the fixture planted no life gained" (Game.lifeGainedThisTurn atZero S.alice) 0
+        Spec.assertEqWith s "and the slot admits nothing at all" (Target.legalRecipients (Just S.alice) S.noSource theSlot atZero) Set.empty
+        -- The same two cards ARE offered once the bound reaches them, so the empty
+        -- set above is the bound talking and not an empty graveyard.
+        let (_, _, _, atFour) = celestineGraveyard piker wolves bolt 4
+        Spec.assertEqWith
+          s
+          "while the same graveyard at 4 gained offers both"
+          (Target.legalRecipients (Just S.alice) S.noSource theSlot atFour)
+          (Set.fromList [Recipient.ToObject pikerId, Recipient.ToObject wolvesId])
