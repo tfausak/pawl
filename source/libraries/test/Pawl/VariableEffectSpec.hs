@@ -2,7 +2,9 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Pawl.Engine.Resolve over the effects whose size or recipients a player picks:
--- amass, blight (CR 701.68), support, bolster, and the variable target counts.
+-- amass, blight (CR 701.68), support, bolster, and the variable target counts --
+-- plus the swept counter placement, which picks nothing but is read by blight's
+-- own CR 603.2c batch watchers and so is proved beside them.
 -- The machinery is Pawl.ResolveSpec.
 module Pawl.VariableEffectSpec where
 
@@ -771,10 +773,10 @@ blightSimultaneitySpec s registry =
         -- one card the first batch drew and a per-seat reading gives four.
         --
         -- What this cannot separate is per-group from per-SCAN: the two batches are
-        -- two resolutions and so two CR 117.5 scans. Nothing in data/cards puts
-        -- -1/-1 counters in two groups inside ONE scan; Pawl.ZoneTriggerSpec's "CR
-        -- 704.3 two death groups in one trigger scan are two trigger events" is
-        -- what tells those two readings apart, on the death side.
+        -- two resolutions and so two CR 117.5 scans. sweptCountersSpec's "CR 608.2c
+        -- two clauses of one resolution are two trigger events" is what tells those
+        -- two readings apart on the counter side, its Synthetic Twofold Wilting
+        -- putting -1/-1 counters in two groups inside one scan.
         --
         -- S.entersWithTrigger REWRITES the log, so the group count below reads the
         -- second batch alone rather than both.
@@ -900,6 +902,140 @@ perCreatureCountersSpec s registry =
           Spec.assertEqWith s "the Tools took ONE charge counter for the two counters that landed together" (S.counterOf charge toolsId after) 1
           Spec.assertEqWith s "the Wall took both -1/-1 counters" (minusCountersOn wallId after) (Just 2)
           Spec.assertEqWith s "in one placement, so one event group" (length (placementGroups after)) 1
+
+-- CR 608.2f over the OTHER road a batch of counters is placed by: one written
+-- Effect.PutCounters instruction whose ObjectRef sweeps a set, where
+-- blightSimultaneitySpec above reads rule 101.4's several seats. "An action taken
+-- on multiple objects is processed simultaneously", so one instruction is one
+-- event however many permanents it touched, and CR 603.2c's batch condition is
+-- again the only thing that can tell that from one event per permanent.
+--
+--   * Soul Snuffers {2}{B}{B} 3/3 Creature -- Elemental Shaman
+--     (data/cards/soul-snuffers.json): "When this creature enters, put a -1/-1
+--     counter on each creature." The whole card, and a 3/3, so it survives the
+--     counter it puts on itself.
+--
+--   * Synthetic Twofold Wilting {2}{B} Sorcery
+--     (data/cards/synthetic-twofold-wilting.json): "Put a -1/-1 counter on each
+--     Goblin. Then put a -1/-1 counter on each Zombie." The control's card.
+--
+-- (Soul Snuffers' name, cost, type line, P/T and oracle text checked against
+-- Scryfall.)
+--
+-- WHY THE CONTROL'S CARD IS SYNTHETIC, in three queries. The control needs TWO
+-- counter-placing instructions in ONE resolution -- two casts would be told apart
+-- by the CR 117.5 scan boundary alone and so would prove nothing about the
+-- group. Scryfall oracle:/put a -1\/-1 counter on [^.]*\.[^.]*put a -1\/-1
+-- counter on/, 2026-08-28, matches no printing; oracle:/put a \+1\/\+1 counter on
+-- [^.(]*\.[^.(]*put a \+1\/\+1 counter on/, same date, matches three printings, of
+-- which Tempt with Glory and Moment of Glory really do place twice in one
+-- resolution (Shelinda, Yevon Acolyte's two are exclusive branches), so the shape
+-- is printed for +1/+1 counters -- but oracle:/counters are put on one or more/,
+-- same date, matches one
+-- printing that could watch them, Cloaked Cadet, and its "This ability triggers
+-- only once each turn" (TriggerLimit.OncePerTurn) caps it at one trigger whatever
+-- the arity. A printing refuting the synthetic is one whose two clauses each place
+-- counters of a kind some printed batch condition watches with no per-turn limit.
+--
+-- The SWEEPER needs no synthetic, which is why Soul Snuffers is the proving
+-- board's card: Scryfall oracle:/put a -1\/-1 counter on each creature/, same
+-- date, matches eight printings.
+sweptCountersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sweptCountersSpec s registry =
+  let charge = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "charge"))
+      -- The distinct EventGroups the log's -1/-1 placements carry,
+      -- blightSimultaneitySpec's copy: the precondition each case rests on,
+      -- asserted rather than assumed.
+      placementGroups gs =
+        List.nub
+          ( Maybe.mapMaybe
+              ( \logged -> case LoggedEvent.event logged of
+                  GameEvent.CountersPut change
+                    | CounterChange.kind change == CounterKind.MinusOneMinusOne -> Just (LoggedEvent.group logged)
+                  _ -> Nothing
+              )
+              (Foldable.toList (GameState.events gs))
+          )
+      -- Settle and resolve until the stack is empty, blightSimultaneitySpec's
+      -- copy: the placements happen as one thing resolves, and the watchers' own
+      -- triggers only reach the stack at the CR 117.5 scan after it.
+      resolveEverything gs =
+        let settled = S.runPure S.identityAnswer gs Engine.settleForPriority
+         in if null (GameState.stack settled)
+              then settled
+              else resolveEverything (S.runPure S.identityAnswer settled Stack.resolveTop)
+   in Spec.describe s "SweptCounters" $ do
+        -- The proving case. Soul Snuffers enters and its one instruction puts a
+        -- -1/-1 counter on FIVE creatures -- three Walls of alice's, one of bob's,
+        -- and itself -- and alice's Census draws ONE card. 5 is the
+        -- once-per-permanent reading and 0 is silence.
+        --
+        -- Both watchers stand on the same board, which is what keeps "one event"
+        -- from collapsing into "one trigger": the Tools' per-creature wording fires
+        -- five times off the same batch (perCreatureCountersSpec's rule), so the
+        -- Census's 1 is the batch SCOPE and not a sweep that only ever fired once.
+        --
+        -- A Wall of Stone is an 0/8 and the Snuffers a 3/3, so nothing is near CR
+        -- 704.5f and every creature is still standing when the counters are read.
+        -- Six Swamps in alice's library, so the once-per-permanent reading could
+        -- draw its five without CR 104.3c deciding the case for it.
+        --
+        -- bob's Wall is in the sweep because the printed instruction says "each
+        -- creature", and the Census's own filter names no controller either.
+        Spec.it s "CR 608.2f a sweep of five creatures is one event, so the Census draws one card" $ do
+          census <- S.printingOf s registry "Synthetic Wilting Census"
+          tools <- S.printingOf s registry "Wickersmith's Tools"
+          snuffers <- S.printingOf s registry "Soul Snuffers"
+          wall <- S.printingOf s registry "Wall of Stone"
+          swamp <- S.printingOf s registry "Swamp"
+          let stocked = foldr (\_ g -> snd (S.addLibraryCard swamp S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. 6 :: Int]
+              (_, withCensus) = S.addCreature census S.alice stocked
+              (toolsId, withTools) = S.addCreature tools S.alice withCensus
+              (aliceWalls, withAlice) = List.foldl' (\(acc, g) _ -> let (oid, g') = S.addCreature wall S.alice g in (acc <> [oid], g')) ([], withTools) [1 .. 3 :: Int]
+              (bobWall, withBob) = S.addCreature wall S.bob withAlice
+              (snuffersId, entered) = S.entersWithTrigger snuffers S.alice withBob
+              board = snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority)
+              after = resolveEverything board
+          Spec.assertEqWith s "alice drew one card for the whole sweep" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "the Tools fired once per creature off that same batch" (S.counterOf charge toolsId after) 5
+          Spec.assertEqWith s "all five creatures took a -1/-1 counter" (fmap (\oid -> minusCountersOn oid after) (aliceWalls <> [bobWall, snuffersId])) [Just 1, Just 1, Just 1, Just 1, Just 1]
+          Spec.assertEqWith s "and the five placements were one event group" (length (placementGroups after)) 1
+          Spec.assertEqWith s "alice held nothing before" (S.handSize S.alice board) 0
+        -- The control the case above needs, and the one thing it cannot say: a
+        -- bracket drawn around the whole RESOLUTION rather than around one
+        -- instruction's fold would pass it too. CR 608.2c makes each written
+        -- instruction its own action, so the Wilting's two clauses are two events
+        -- and alice draws TWO cards, where the resolution-wide bracket draws 1.
+        --
+        -- One creature per clause, which is the point -- the case above already
+        -- proves a sweep of several fires once, so this one only has to be two
+        -- sweeps -- and both sit inside ONE CR 117.5 scan, where two casts would
+        -- have been told apart by the scan boundary alone. It is the once-per-
+        -- permanent reading this board cannot see, two recipients giving 2 either
+        -- way; that is the case above's question and not this one's.
+        --
+        -- A Goblin Chariot is a 2/2 and Legions of Lim-Dul a 2/3, so both are still
+        -- standing when the counters are read, and neither carries the other's
+        -- subtype: one clause, one creature.
+        Spec.it s "CR 608.2c two clauses of one resolution are two trigger events" $ do
+          census <- S.printingOf s registry "Synthetic Wilting Census"
+          chariot <- S.printingOf s registry "Goblin Chariot"
+          legions <- S.printingOf s registry "Legions of Lim-Dûl"
+          wilting <- S.printingOf s registry "Synthetic Twofold Wilting"
+          swamp <- S.printingOf s registry "Swamp"
+          let stocked = foldr (\_ g -> snd (S.addLibraryCard swamp S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. 4 :: Int]
+              (_, withCensus) = S.addCreature census S.alice stocked
+              (goblin, withGoblin) = S.addCreature chariot S.alice withCensus
+              (zombie, withZombie) = S.addCreature legions S.alice withGoblin
+              withLands = List.foldl' (\g _ -> snd (S.addCreature swamp S.alice g)) withZombie [1 .. 3 :: Int]
+              (withSpell, spell) = S.handOne wilting withLands
+              afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
+              resolved = S.runPure S.identityAnswer afterCast Stack.resolveTop
+              after = resolveEverything resolved
+          Spec.assertEqWith s "alice drew one card for each clause" (S.handSize S.alice after) 2
+          Spec.assertEqWith s "the Goblin and the Zombie each took a counter" (fmap (\oid -> minusCountersOn oid after) [goblin, zombie]) [Just 1, Just 1]
+          Spec.assertEqWith s "in two event groups, both inside one scan" (length (placementGroups resolved)) 2
+          Spec.assertEqWith s "her hand was empty once the Wilting was cast" (S.handSize S.alice resolved) 0
 
 -- CR 701.68 blight as a COST (CostComponent.Blight), which is the position most of
 -- the pool prints it in and the one CR 701.68b's "they can't choose to blight"
@@ -1768,6 +1904,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   blightPlayerSpec s registry
   blightSimultaneitySpec s registry
   perCreatureCountersSpec s registry
+  sweptCountersSpec s registry
   blightCostSpec s registry
   soulfireEruptionSpec s registry
   payAnyEnergySpec s registry
