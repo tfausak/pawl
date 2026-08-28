@@ -12,9 +12,11 @@
 -- objects have (Hand of the Praetors), and CR 208.5's 0 for a creature left
 -- with no value for its power or toughness (Ashaya, Soul of the Wild under
 -- Blood Moon) -- read off the finished fold, off the MID-FOLD view a same-layer
--- count gets (Synthetic Withering Comparison), and off the fold's own
+-- count gets (Synthetic Withering Comparison), off the fold's own
 -- accumulator, where CR 613.4c's modification has to have the substituted 0 to
--- add to (Glorious Anthem) --, plus
+-- add to (Glorious Anthem), and off the running board's picture of ANOTHER
+-- object, where the count reads the modification the anthem made there (both
+-- cards on one board) --, plus
 -- CR 109.5's static-ability perspective on a player-scoped
 -- count (Empyrial Armor on an opponent's creature) and CR 613.4c's NEGATIVE
 -- layer-7c modification of an announced value (Toxic Deluge's -X/-X, CR 107.1b),
@@ -617,6 +619,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   ashayaBloodMoonSpec s registry
   witheringComparisonSpec s registry
   gloriousAnthemAshayaSpec s registry
+  witheringAnthemSpec s registry
   empyrialArmorSpec s registry
   aspectOfWolfSpec s registry
   malignusSpec s registry
@@ -850,6 +853,84 @@ anthemAshayaBoard s registry = do
       (pikerId, g2) = S.addCreature piker S.alice g1
       (_, g3) = S.addCreature anthem S.alice g2
       (gs, bloodMoonId) = S.handOne bloodMoon g3
+  pure (bloodMoonId, ashayaId, pikerId, gs)
+
+-- The two units above composed: CR 613.4c's anthem and a same-layer count that
+-- reads the creature the anthem pumps. The count is taken MID-FOLD, off the
+-- running board's picture of the OTHER objects, so it exercises
+-- projectDeciding's `snapshot` rather than the `seeded` accumulator the case
+-- above proves.
+--
+-- witheringBoard's cards minus the Hill Giant, plus Glorious Anthem. Dropping
+-- the Giant is what makes the board discriminate: Ashaya has to BE the maximum
+-- the count reads, since with the Giant present its 3 dominates whatever Ashaya
+-- is read as and both readings agree.
+--
+-- CR 305.7 strips Ashaya's characteristic-defining ability, CR 208.5 makes her
+-- power 0, and CR 613.4c's anthem adds 1 -- on the count's picture of her as
+-- much as on her own, since rule 613 gives the two no different state. She is
+-- the only Mountain creature alice controls, so Synthetic Withering Comparison
+-- writes -1/-1, bob's Piker is a 1/0, and CR 704.5f buries it. Reading her as
+-- "no value" through layer 7c discards the anthem there and substitutes 0 only
+-- on the way out, which writes -0/-0 and leaves the Piker standing at 2/1 --
+-- the board difference this case exists to falsify.
+--
+-- CR 613.8a clause (b) is what orders the two: applying the anthem changes what
+-- the comparison does to the Piker, so the anthem goes first and the comparison
+-- reads her pumped power.
+witheringAnthemSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+witheringAnthemSpec s registry = Spec.describe s "CR 208.5 mid-fold under an anthem" $ do
+  -- The fixture's live half. Alice's four lands (three Mountains and Ashaya
+  -- herself, a Forest by her own second sentence) make her a 4/4, and the anthem
+  -- adds 1. No creature alice controls is a Mountain yet, so the count folds
+  -- over nothing and bob's Piker keeps its printed 2/1 -- the anthem is alice's,
+  -- so it never reaches him.
+  Spec.it s "CR 604.3 before Blood Moon the count folds over no Mountain creature" $ do
+    (_, ashayaId, pikerId, gs) <- witheringAnthemBoard s registry
+    Spec.assertEqWith s "four lands plus the anthem" (S.powerToughnessOf ashayaId gs) (Just (5, 5))
+    Spec.assertEqWith s "bob's Piker is untouched by alice's anthem" (S.powerToughnessOf pikerId gs) (Just (2, 1))
+  -- THE PROVING CASE, at gameplay level: the Piker is buried, which it is only
+  -- if the count read the anthem's +1/+1 on a creature CR 208.5 had answered 0
+  -- for.
+  Spec.it s "CR 208.5/613.4c the count reads the anthem on the stripped creature" $ do
+    (bloodMoonId, ashayaId, _, gs) <- witheringAnthemBoard s registry
+    let settled = S.runPure S.identityAnswer gs (S.cast S.alice bloodMoonId >> Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith s "CR 704.5f bob's Piker was buried by the -1/-1" (S.countOnBattlefieldByName pikerName S.bob settled) 0
+    Spec.assertEqWith s "and it is in its owner's graveyard" (namedInGraveyardOf S.bob pikerName settled) 1
+    Spec.assertEqWith s "CR 208.5 plus CR 613.4c leave Ashaya a 1/1, still standing" (S.powerToughnessOf ashayaId settled) (Just (1, 1))
+    Spec.assertEqWith s "the enchantment resolved" (GameState.stack settled) []
+  -- The magnitude itself, read before the state-based check removes the Piker:
+  -- CR 613.4c wrote -1/-1, not merely "something lethal". Ashaya's own 1/1 here
+  -- is what the count had to agree with.
+  Spec.it s "CR 613.4c the modification is Ashaya's pumped power, not her stripped one" $ do
+    (bloodMoonId, ashayaId, pikerId, gs) <- witheringAnthemBoard s registry
+    let resolved = S.runPure S.identityAnswer gs (S.cast S.alice bloodMoonId >> Stack.resolveTop)
+    Spec.assertEqWith s "bob's Piker took -1/-1" (S.powerToughnessOf pikerId resolved) (Just (1, 0))
+    Spec.assertEqWith s "CR 208.5 plus the anthem make Ashaya a 1/1" (S.powerToughnessOf ashayaId resolved) (Just (1, 1))
+
+-- alice, with three untapped Mountains, Ashaya, Glorious Anthem and Synthetic
+-- Withering Comparison on the battlefield, and Blood Moon in hand; bob with a
+-- Goblin Piker (2/1, vanilla). No Hill Giant, unlike witheringBoard: see
+-- witheringAnthemSpec.
+--
+-- Returns Blood Moon, Ashaya, bob's Piker and the board.
+witheringAnthemBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+witheringAnthemBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  piker <- S.printingOf s registry "Goblin Piker"
+  ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+  bloodMoon <- S.printingOf s registry "Blood Moon"
+  anthem <- S.printingOf s registry "Glorious Anthem"
+  comparison <- S.printingOf s registry "Synthetic Withering Comparison"
+  let (ashayaId, g1) = S.addCreature ashaya S.alice (S.landsInPlay mountain 3)
+      (_, g2) = S.addCreature anthem S.alice g1
+      (_, g3) = S.addCreature comparison S.alice g2
+      (pikerId, g4) = S.addCreature piker S.bob g3
+      (gs, bloodMoonId) = S.handOne bloodMoon g4
   pure (bloodMoonId, ashayaId, pikerId, gs)
 
 pikerName :: CardName.CardName
