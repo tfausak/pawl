@@ -643,9 +643,10 @@ charnelTallySpec s registry =
 isDeath :: ZoneChange.ZoneChange -> Bool
 isDeath zc = ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard
 
--- CR 608.2i's look-back with a GREATEST over it: the first card whose fold reads
--- a per-member quantity off an event's CR 608.2h snapshot rather than off a live
--- object. GAMEPLAY LEVEL for the Aetherflux group's reason.
+-- CR 608.2i's look-back with a GREATEST over it: a fold whose per-member
+-- quantity is read off an event's CR 608.2h snapshot rather than off a live
+-- object, over the SpellCast shape where the group above takes the Moved one.
+-- GAMEPLAY LEVEL for the Aetherflux group's reason.
 --
 -- Rootha, Mastering the Moment, {2}{U}{R} Legendary Creature -- Orc Sorcerer 3/4:
 -- "At the beginning of combat on your turn, if you've cast an instant or sorcery
