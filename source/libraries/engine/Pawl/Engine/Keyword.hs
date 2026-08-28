@@ -1040,9 +1040,10 @@ bestowCosts keywords =
 -- Pawl.Engine.Card.castableFaces put on the table (CR 712.11d).
 --
 -- A LIST for flashbackCosts' reason: rule 702.162a states no limit, and CR 601.2b
--- makes two of them a choice rather than a sum. Offered from EVERY zone the card
--- can be cast from, bestowCosts' half of rule 702.103a, which is this rule's
--- first sentence too.
+-- makes two of them a choice rather than a sum. Read from EVERY zone the card can
+-- be cast from, which is bestowCosts' posture and rule 702.162a's own first
+-- sentence -- "a static ability that functions in any zone from which the spell
+-- may be cast".
 --
 -- A wildcard rather than an exhaustive case, flashbackCosts' reason.
 moreThanMeetsTheEyeCosts :: Set Keyword -> [Cost Keyword]

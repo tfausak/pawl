@@ -183,8 +183,10 @@ data Keyword
     -- TWO consequences from one value, both read by name rather than minted:
     -- Pawl.Engine.Card.castableFaces offers the back face for a card printing this
     -- (CR 712.11d), and Pawl.Engine.Cost.candidateCostsFor prices that offer at
-    -- this cost. CR 601.2b's alternative-cost rules then apply unchanged, which is
-    -- rule 702.162a's own last sentence.
+    -- this cost. CR 601.2b's alternative-cost rules then apply unchanged, which
+    -- rule 702.162a says itself: "casting a spell using its More Than Meets the
+    -- Eye ability follows the rules for paying alternative costs (see 601.2b and
+    -- 601.2f-h)".
     --
     -- Read off the FRONT face, which is where every printing states it and what CR
     -- 712.11d is written about: "if an ability of a double-faced card's front face

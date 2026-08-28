@@ -454,12 +454,12 @@ castableFaces card = case Card.layout card of
   -- the printed cost and casting converted are two different casts of one card,
   -- so they are two actions and the player picks (Pawl.Engine.Cast.castableSpells
   -- gates each on its own, CR 712.11c). Pawl.Engine.Cost.candidateCostsFor is
-  -- where the second one is priced at rule 702.162a's cost, and
-  -- Pawl.Engine.Card.enteringFace carries the chosen face onto the battlefield.
+  -- where the second one is priced at rule 702.162a's cost, and `enteringFace`
+  -- below carries the chosen face onto the battlefield (CR 712.13).
   --
   -- Read off the front face's PRINTED keywords, which is CR 712.11d's own scope
   -- and the posture Pawl.Engine.Cast.castableSpells takes for rule 702.37a's morph
-  -- ability. A more than meets the eye ability GRANTED to a card in a hand is not
+  -- ability. A more than meets the eye ability GRANTED to a card in a zone is not
   -- expanded here (gap #1859).
   --
   -- The other roads to a back face still do not come through this list. An effect
@@ -781,8 +781,8 @@ enteringFace card shown = case Card.layout card of
   -- Both of that rule's wordings reach it: "transformed", which CR 310.12b's
   -- defeated Siege reaches (Pawl.BattleSpec's "she may then cast it TRANSFORMED
   -- and FREE" is the proof), and "converted", which CR 702.162a's more than meets
-  -- the eye reaches (Pawl.TransformSpec's "CR 702.162a / 712.11a it arrives with
-  -- its back face up" is the proof).
+  -- the eye reaches (Pawl.TransformSpec's "CR 702.162a / 712.11a Ratchet cast
+  -- converted costs {1}{W} and arrives with its back face up" is the proof).
   Layout.Transforming -> shown
   -- The arm CR 712.13 is written for in this pool: CR 712.11b let the caster
   -- choose either face, so the face that was up on the stack is genuinely a

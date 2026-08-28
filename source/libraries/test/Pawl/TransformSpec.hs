@@ -1174,10 +1174,12 @@ ratchetReadings oid gs =
 
 -- alice's Ratchet with its BACK face up, which is the only board its printed
 -- convert trigger functions on. Written onto Object.face directly rather than
--- played out, because the two printed roads to a back-face-up Ratchet are the
--- ones this unit does not implement: CR 712.11a's cast "converted" (more than
--- meets the eye, which moreThanMeetsTheEyeSpec below now casts out of a hand)
--- and the front face's own optional convert (#2522).
+-- played out, which keeps these cases about CR 701.28a and nothing else: one of
+-- the two printed roads to a back-face-up Ratchet now exists -- CR 712.11a's cast
+-- "converted", which moreThanMeetsTheEyeSpec below plays out of a hand -- and
+-- routing the fixture through it would make every case here also a case about
+-- casting. The other road, the front face's own optional convert, is still absent
+-- (#2522).
 --
 -- Object.turnedOverAt is deliberately left unset. CR 701.27f -- which CR 701.28e
 -- restates for convert -- ignores an instruction from an ability of a permanent

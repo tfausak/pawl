@@ -243,14 +243,14 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
                     (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.MoreThanMeetsTheEye cost)) (withAdditional cost))
                     (Keyword.moreThanMeetsTheEyeCosts (Face.keywords (Card.frontFace card)))
                 else []
-            -- `converted` REPLACES the zone's own list rather than joining it,
-            -- which is CR 118.9b's shape and CR 310.12b's: the back face is a
-            -- candidate at all only because rule 702.162a's permission put it
-            -- there, so that permission's cost is the only route to casting it. CR
-            -- 712.11's default is the FRONT face, and no rule offers a nonmodal
-            -- back face for its own printed cost. Empty for every other face and
-            -- for every card without the ability, so each zone arm below is
-            -- reached exactly as it was.
+            -- `converted` REPLACES the zone's own list rather than joining it:
+            -- the back face is a candidate at all only because rule 702.162a's
+            -- permission put it there, so that permission's cost is the only route
+            -- to casting it. CR 712.11 makes the FRONT face the default and CR
+            -- 712.11a names the converted cast as the way to a back face; no rule
+            -- offers a nonmodal back face for its own printed cost. Empty for every
+            -- other face and for every card without the ability, so each zone arm
+            -- below is reached exactly as it was.
             --
             -- Unobservable in this pool either way: no nonmodal back face prints a
             -- mana cost, so the candidate this drops would have been CR 118.6's
