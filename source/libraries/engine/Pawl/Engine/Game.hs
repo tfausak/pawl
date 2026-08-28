@@ -652,7 +652,7 @@ faceOfWithLastKnown oid gs = case fmap Object.facing (lookupObject oid gs) of
 -- gate because that rule turns a permanent over from a STATIC ability rather than
 -- from an ability on the stack.
 --
--- Three ways nothing happens, and none is an error:
+-- Four ways nothing happens, and none is an error:
 --
 --   * the id names nothing on the BATTLEFIELD. CR 701.27a transforms a
 --     PERMANENT, which CR 110.1 makes an object on the battlefield.
@@ -693,6 +693,13 @@ turnFaceOver now gs oid objects
       -- this is the one writer every road reaches: Pawl.Engine.Daytime's CR
       -- 702.145c/f sweep comes straight here, and a melded permanent whose
       -- combined face printed nightbound would otherwise turn over that way.
+      --
+      -- OVER-DETERMINED on every board Magic can reach: no printed meld pair
+      -- combines into a double-faced card, so Card.turnedOver would decline the
+      -- one-faced combined face anyway. What separates the two readings is
+      -- Pawl.MeldSpec's "CR 712.4c a melded permanent refuses the turn its own
+      -- card would allow", which melds into a double-faced card -- card data the
+      -- opcode carries -- so that this guard is the only thing refusing.
       (Just object, _) | not (Seq.null (componentsOf (Object.source object))) -> objects
       (Just object, Just card) -> case Card.turnedOver (Object.face object) card of
         Nothing -> objects
@@ -700,9 +707,10 @@ turnFaceOver now gs oid objects
       _ -> objects
 
 -- CR 701.27a over a swept set, from the other side: which of these ids ACTUALLY
--- turned over. `turnFaceOver` above declines four ways -- an id naming nothing on
+-- turned over. `turnFaceOver` above declines five ways -- an id naming nothing on
 -- the battlefield, no card behind it, CR 701.27c's card that is not double-faced,
--- CR 701.27d's instant or sorcery face -- and Pawl.Engine.Resolve's `turnOver`
+-- CR 701.27d's instant or sorcery face, CR 712.4c's melded permanent -- and
+-- Pawl.Engine.Resolve's `turnOver`
 -- adds CR 701.27f and CR 702.145b on top. A turn that did not happen is not an
 -- event, so both roads read the answer here rather than each keeping its own
 -- list, and neither can come to disagree with the write about what turned.

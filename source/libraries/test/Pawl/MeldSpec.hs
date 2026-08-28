@@ -35,6 +35,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
@@ -482,6 +483,45 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith s "CR 701.27a an ordinary Thraben Gargoyle turns over" (Projection.namesOf loneId (transforming [loneId] alone)) (Set.singleton (CardName.MkCardName (Text.pack "Stonewing Antagonizer")))
       other -> Spec.assertFailure s ("expected exactly one permanent, got " <> show (length other))
 
+  -- CR 701.27g's second exclusion where nothing else answers: a melded permanent
+  -- that is BACK FACE UP. CR 712.13a via daybound's first static ability ("if it
+  -- is night and this permanent is represented by a double-faced card, it enters
+  -- transformed") is the one entry rewrite that writes Object.face, and CR 616.1
+  -- runs over a melded permanent like any other entry -- so a combined face
+  -- printing daybound enters with its back face up, `Game.isFrontFaceUp` answers
+  -- False, and the cards representing it are the only thing left excluding it.
+  -- That is the rule's own "even if it has components that are back face up",
+  -- reached from the other side.
+  --
+  -- The combined face is Tovolar, Dire Overlord // Tovolar, the Midnight Scourge,
+  -- the same stand-in liberty the CR 712.4c case takes: no printed meld pair
+  -- combines into a daybound double-faced card, and the opcode carries the
+  -- combined face as card data. The Thraben Gargoyle beside it is turned over by
+  -- an ordinary instruction and IS a transformed permanent, so the Connoisseur's
+  -- power separates a tally that counts the melded permanent (2) from the rule's
+  -- answer (1).
+  Spec.it s "CR 701.27g a melded permanent that entered with its back face up is still not one" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
+    connoisseur <- S.printingOf s registry "Mutagen Connoisseur"
+    gargoyle <- S.printingOf s registry "Thraben Gargoyle"
+    let (connoisseurId, withConnoisseur) = S.addCreature connoisseur S.alice (Setup.emptyGame S.bothPlayers)
+        (gargoyleId, withGargoyle) = S.addCreature gargoyle S.alice withConnoisseur
+        night = withGargoyle {GameState.daytime = Just Daytime.Night}
+        (_, _, after) = meldedOn night battlements garrison tovolar
+    case filter (\oid -> oid /= connoisseurId && oid /= gargoyleId) (Set.toList (GameState.battlefield after)) of
+      [meldedId] -> do
+        let turned = transforming [gargoyleId] after
+        Spec.assertEqWith s "CR 701.27g the Connoisseur counts the Gargoyle alone" (S.powerToughnessOf connoisseurId turned) (Just (1, 5))
+        -- What makes that assertion mean anything: the melded permanent really is
+        -- back face up, so the first exclusion has stopped answering for it.
+        Spec.assertEqWith s "CR 712.13a and the melded permanent entered transformed" (fmap Object.face (Game.lookupObject meldedId turned)) (Just (Just (CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge"))))
+        -- The control: an ordinary permanent back face up on the same board is
+        -- counted, so the 1 is a tally rather than a floor.
+        Spec.assertEqWith s "CR 701.27a the Gargoyle is the one it counts" (Projection.namesOf gargoyleId turned) (Set.singleton (CardName.MkCardName (Text.pack "Stonewing Antagonizer")))
+      other -> Spec.assertFailure s ("expected exactly one melded permanent, got " <> show (length other))
+
 -- CR 701.27a as ONE instruction over the named permanents (CR 608.2f), through
 -- the opcode a card's "transform target permanent" reaches: the slot the effect
 -- reads is the one such a card's target would have bound.
@@ -507,7 +547,7 @@ meldedThrough base battlements garrison mountain =
         _ -> (Nothing, board)
 
 -- The combined back face's name, which is what a melded permanent answers to
--- (CR 712.8g) and the one thing the three gameplay cases above count.
+-- (CR 712.8g) and what every case above counts a melded permanent by.
 townshipName :: CardName.CardName
 townshipName = CardName.MkCardName (Text.pack "Hanweir, the Writhing Township")
 

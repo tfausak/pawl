@@ -1059,14 +1059,17 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- even if it has components that are back face up", which Game.componentsOf
       -- answers for a melded permanent and will answer for a merged one (#874).
       --
-      -- That conjunct is a REGRESSION FENCE rather than a proved behaviour, and
-      -- dropping it leaves the suite green: a melded permanent is stamped
-      -- Object.face = Nothing (Pawl.Engine.Event.meld), so it is front face up
-      -- already, and CR 712.4c keeps it that way -- Game.turnFaceOver refuses to
-      -- turn it. The rule states the exclusion for a reason pawl cannot yet
-      -- reach: components that are themselves back face up. Pawl.MeldSpec's
-      -- "CR 701.27g a melded permanent is not a transformed permanent" is the
-      -- board that reaches the atom at all.
+      -- That conjunct is LOAD-BEARING, and the first exclusion does not stand in
+      -- for it. A melded permanent is stamped Object.face = Nothing
+      -- (Pawl.Engine.Event.meld) and Game.turnFaceOver refuses to turn it over (CR
+      -- 712.4c), but neither is the only writer of that field: CR 616.1's entry
+      -- loop runs over a melded permanent like any other entry, and
+      -- Pawl.Engine.Event's EntryRewrite.EntersTransformed arm writes Object.face
+      -- outright -- so a combined face printing daybound enters back face up at
+      -- night (CR 712.13a) and this conjunct is the only thing answering.
+      -- Pawl.MeldSpec's "CR 701.27g a melded permanent that entered with its back
+      -- face up is still not one" is that board, and dropping the conjunct
+      -- reddens it.
       --
       -- The battlefield conjunct is a REGRESSION FENCE rather than a proved
       -- behaviour: every Count that reaches the atom is already scoped to a
