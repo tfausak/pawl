@@ -571,6 +571,7 @@ slotsOf effect = case effect of
   Effect.MakePlotted ref -> objectRefSlots ref
   Effect.DoesNotUntapNext ref -> objectRefSlots ref
   Effect.Transform ref -> objectRefSlots ref
+  Effect.Convert ref -> objectRefSlots ref
   Effect.PhaseOut ref -> objectRefSlots ref
   Effect.AddPhases _ -> Map.empty
   Effect.EndTurn -> Map.empty
@@ -829,6 +830,7 @@ slotsAreExhaustive effect = case effect of
   Effect.MakePlotted _ -> True
   Effect.DoesNotUntapNext _ -> True
   Effect.Transform _ -> True
+  Effect.Convert _ -> True
   Effect.PhaseOut _ -> True
   Effect.AddPhases _ -> True
   Effect.EndTurn -> True
@@ -992,6 +994,7 @@ readsX = any effectReadsX
       Effect.MakePlotted _ -> False
       Effect.DoesNotUntapNext _ -> False
       Effect.Transform _ -> False
+      Effect.Convert _ -> False
       Effect.PhaseOut _ -> False
       Effect.AddPhases _ -> False
       Effect.EndTurn -> False
@@ -1193,6 +1196,7 @@ boundSlots effect = case effect of
   Effect.MakePlotted _ -> Set.empty
   Effect.DoesNotUntapNext _ -> Set.empty
   Effect.Transform _ -> Set.empty
+  Effect.Convert _ -> Set.empty
   Effect.PhaseOut _ -> Set.empty
   Effect.AddPhases _ -> Set.empty
   Effect.EndTurn -> Set.empty
@@ -1952,6 +1956,79 @@ resolveAbilityWith runSubgame abilId srcId ability = do
 resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
 resolveAbility = resolveAbilityWith noSubgame
 
+-- CR 701.27a and CR 701.28a: turn each named permanent over. ONE function for
+-- both opcodes, which is CR 701.28a said as code -- "this follows rules
+-- 701.27a-f, 712.9-10, and 712.18", so a convert cannot pick up a gate a
+-- transform lacks, nor miss one it has.
+turnPermanentsOver ::
+  Map.Map SlotName (Set Recipient) ->
+  ObjectId ->
+  PlayerId ->
+  ObjectId ->
+  ObjectRef.ObjectRef ->
+  Game ()
+turnPermanentsOver legal resolving controller source ref = do
+  -- WHICH permanents turn over, gathered BEFORE the turn: the one ref here that
+  -- is a CR 608.2d question rather than a read has to be answered in the Game
+  -- monad, and every other is objectRefObjects' pure sweep.
+  victims <- case ref of
+    -- CR 608.2d: "any number of Human Werewolves you control" is a choice made
+    -- while the effect is applied, so it is asked HERE. The candidates are
+    -- EachMatching's sweep of the same Filter, read live off the pre-turn board
+    -- (CR 608.2c) -- which for Tovolar is a board CR 702.145c has already turned
+    -- him over on, so his own back face is no longer a Human Werewolf to offer.
+    --
+    -- ONE ask, of the resolving controller (CR 608.2c). Skipped at no candidate,
+    -- where the empty set is the only answer (CR 101.3, CR 609.3), and asked at
+    -- ONE, unlike the counted choices: "any number" leaves two distinguishable
+    -- answers there.
+    --
+    -- FILTERED, not trusted (#222): an answer naming a permanent that was never
+    -- offered would otherwise turn it over. Filtering rather than taking the
+    -- answer also keeps CR 608.2f's APNAP order, which the candidate list
+    -- already carries and a Set does not.
+    ObjectRef.AnyNumberMatching filter_ -> do
+      gs <- State.get
+      let candidates = battlefieldMatching legal resolving controller source gs filter_
+      if null candidates
+        then pure []
+        else do
+          answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates)
+          pure (filter (`Set.member` answer) candidates)
+    _ -> do
+      gs <- State.get
+      pure (objectRefObjects legal resolving controller source gs ref)
+  State.modify' $ \gs ->
+    -- CR 701.27a: turn each victim over -- one assignment to Object.face, which
+    -- is all a turn IS here, every characteristic read already resolving
+    -- through Game.faceOf. The victims were enumerated ONCE above (CR 608.2f),
+    -- ahead of this write so no member of the batch is judged against a board a
+    -- sibling has already turned over on. WHICH face is
+    -- Pawl.Engine.Card.turnedOver's answer, off the card's layout, which
+    -- withholds a turn from a permanent that is not double-faced (CR 701.27c)
+    -- or whose other face is an instant or sorcery (CR 701.27d).
+    --
+    -- CR 701.27b: turning over is its own game action, so it records its own
+    -- event -- Event.recordTransformed, over the victims that ACTUALLY turned
+    -- rather than the ones this instruction named, since the four ways a turn
+    -- is withheld leave nothing for CR 603.2 to fire on.
+    --
+    -- AFTER the fold, and the order is load-bearing: Pawl.Engine.Card gives a
+    -- transforming permanent only the SHOWN face's abilities, so a trigger
+    -- printed on the face just turned to is among recordEvent's candidates only
+    -- because the write has already happened. Pawl.TransformSpec's CR 701.27e
+    -- group is what proves it.
+    --
+    -- ONE fresh timestamp for the whole instruction (CR 701.27f), minted even
+    -- when nothing turns over, and ONE whole-board projection, CR 702.145b's
+    -- restriction being read off the layer fold.
+    let (now, g1) = Game.freshTimestamp gs
+        pcs = Projection.projectAll g1
+        turned = foldr (turnOver pcs resolving now g1) (GameState.objects g1) victims
+     in Event.recordTransformed
+          (Game.facesTurned (GameState.objects g1) turned victims)
+          g1 {GameState.objects = turned}
+
 -- CR 701.27a over ONE object: turn it over, or leave the map as it was. The turn
 -- itself is Game.turnFaceOver, shared with Pawl.Engine.Daytime's CR 702.145c/f
 -- sweep. What this adds is the two gates that belong to an instruction rather
@@ -2169,8 +2246,8 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.EachMatching filter_ -> battlefieldMatching legal resolving controller source gs filter_
   -- A CR 608.2d question, so this pure sweep answers nothing for it: the
   -- candidates are battlefieldMatching's, but WHICH of them the instruction names
-  -- is the chooser's, and only the Effect.Transform arm reaches the Game monad to
-  -- ask. Under any other opcode this empty answer is an inert card-data error,
+  -- is the chooser's, and only turnPermanentsOver -- the body Effect.Transform and
+  -- Effect.Convert share -- reaches the Game monad to ask. Under any other opcode this empty answer is an inert card-data error,
   -- which Pawl.CardSpec's inertChoosers rejects at load time --
   -- ChosenCardInGraveyard's note below is the shape.
   ObjectRef.AnyNumberMatching _ -> []
@@ -2483,7 +2560,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardFromAmong {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- No recipients: only the Reveal arm can ask the interpreter.
   ObjectRef.RandomCardInHand _ -> []
-  -- No recipients: only the Effect.Transform gather can ask the chooser.
+  -- No recipients: only turnPermanentsOver's gather can ask the chooser.
   ObjectRef.AnyNumberMatching _ -> []
 
 -- CR 608.2f's order for the per-object loop: APNAP first, reading a player
@@ -6391,67 +6468,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             { GameState.objects =
                 foldr (Map.adjust mark) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)
             }
-  Effect.Transform ref -> do
-    -- WHICH permanents turn over, gathered BEFORE the turn: the one ref here that
-    -- is a CR 608.2d question rather than a read has to be answered in the Game
-    -- monad, and every other is objectRefObjects' pure sweep.
-    victims <- case ref of
-      -- CR 608.2d: "any number of Human Werewolves you control" is a choice made
-      -- while the effect is applied, so it is asked HERE. The candidates are
-      -- EachMatching's sweep of the same Filter, read live off the pre-turn board
-      -- (CR 608.2c) -- which for Tovolar is a board CR 702.145c has already turned
-      -- him over on, so his own back face is no longer a Human Werewolf to offer.
-      --
-      -- ONE ask, of the resolving controller (CR 608.2c). Skipped at no candidate,
-      -- where the empty set is the only answer (CR 101.3, CR 609.3), and asked at
-      -- ONE, unlike the counted choices: "any number" leaves two distinguishable
-      -- answers there.
-      --
-      -- FILTERED, not trusted (#222): an answer naming a permanent that was never
-      -- offered would otherwise turn it over. Filtering rather than taking the
-      -- answer also keeps CR 608.2f's APNAP order, which the candidate list
-      -- already carries and a Set does not.
-      ObjectRef.AnyNumberMatching filter_ -> do
-        gs <- State.get
-        let candidates = battlefieldMatching legal resolving controller source gs filter_
-        if null candidates
-          then pure []
-          else do
-            answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates)
-            pure (filter (`Set.member` answer) candidates)
-      _ -> do
-        gs <- State.get
-        pure (objectRefObjects legal resolving controller source gs ref)
-    State.modify' $ \gs ->
-      -- CR 701.27a: turn each victim over -- one assignment to Object.face, which
-      -- is all a turn IS here, every characteristic read already resolving
-      -- through Game.faceOf. The victims were enumerated ONCE above (CR 608.2f),
-      -- ahead of this write so no member of the batch is judged against a board a
-      -- sibling has already turned over on. WHICH face is
-      -- Pawl.Engine.Card.turnedOver's answer, off the card's layout, which
-      -- withholds a turn from a permanent that is not double-faced (CR 701.27c)
-      -- or whose other face is an instant or sorcery (CR 701.27d).
-      --
-      -- CR 701.27b: turning over is its own game action, so it records its own
-      -- event -- Event.recordTransformed, over the victims that ACTUALLY turned
-      -- rather than the ones this instruction named, since the four ways a turn
-      -- is withheld leave nothing for CR 603.2 to fire on.
-      --
-      -- AFTER the fold, and the order is load-bearing: Pawl.Engine.Card gives a
-      -- transforming permanent only the SHOWN face's abilities, so a trigger
-      -- printed on the face just turned to is among recordEvent's candidates only
-      -- because the write has already happened. Pawl.TransformSpec's CR 701.27e
-      -- group is what proves it.
-      --
-      -- ONE fresh timestamp for the whole instruction (CR 701.27f), minted even
-      -- when nothing turns over, and ONE whole-board projection, CR 702.145b's
-      -- restriction being read off the layer fold.
-      let (now, g1) = Game.freshTimestamp gs
-          pcs = Projection.projectAll g1
-          turned = foldr (turnOver pcs resolving now g1) (GameState.objects g1) victims
-       in Event.recordTransformed
-            (Game.facesTurned (GameState.objects g1) turned victims)
-            g1 {GameState.objects = turned}
+  Effect.Transform ref -> turnPermanentsOver legal resolving controller source ref
+  -- CR 701.28a routes a convert through rules 701.27a-f unchanged, so it is the
+  -- SAME call and not a similar one. The two opcodes stay distinct in the card
+  -- data (Pawl.Types.Effect.Convert) and identical in behaviour here.
+  Effect.Convert ref -> turnPermanentsOver legal resolving controller source ref
   Effect.PhaseOut ref ->
     State.modify' $ \gs ->
       -- CR 702.26b: each named permanent phases out; the victims are enumerated
