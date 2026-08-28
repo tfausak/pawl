@@ -1547,7 +1547,7 @@ throughCombatStart answer gs =
 --
 -- Hakbal is the pool's only producer: no other printing instructs more than one
 -- permanent to explore at once (Scryfall `oracle:/each .{0,40}explores/`,
--- 2026-08-27, Hakbal alone). Jadelight Spelunker's "explores X times" is ONE
+-- 2026-08-28, Hakbal alone). Jadelight Spelunker's "explores X times" is ONE
 -- permanent exploring repeatedly, which rule 701.44d does not reach.
 --
 -- What these cases prove is the SECOND key: the order is asked of a player

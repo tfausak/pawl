@@ -2655,8 +2655,9 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- reaches the Game monad can ask the chooser.
   ObjectRef.ChosenPermanent _ -> []
 
--- CR 608.2f's order for the per-object loop: APNAP first, reading a player
--- recipient as that seat and an object as its controller's. Imposed here rather
+-- The order for a per-object batch -- CR 608.2f's, and CR 701.44d's, which say
+-- the same thing about the PRIMARY key: APNAP first, reading a player recipient
+-- as that seat and an object as its controller's. Imposed here rather
 -- than in objectRefRecipients, whose InSlot arm answers in Recipient (set)
 -- order; this loop is the first reader that takes recipients one at a time.
 --
@@ -2697,6 +2698,8 @@ forEachOrder resolving chooserFor recipients = do
 -- controller (CR 110.2) -- and CR 608.2h's last known information for an object
 -- the board no longer holds, which is reachable rather than defensive (CR
 -- 400.7): Effect.ForEach walks the permanents a destruction already removed.
+-- CR 701.44c asks for the same read by name, and reading it here is what keeps
+-- this and exploreOne agreeing about whose a departed permanent is.
 -- Nothing only where neither answer exists; each caller says what it does with
 -- that.
 recipientSeat :: GameState -> Recipient -> Maybe PlayerId
