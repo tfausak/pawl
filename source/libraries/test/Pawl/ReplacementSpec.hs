@@ -1818,7 +1818,8 @@ bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 
 -- event and runs a different action, which is what CR 614.6 describes and what no
 -- other printing in data/cards/ asks of this event class.
 --
--- Its own rulings fix all three readings this group asserts: "Ashiok, Wicked
+-- Its own rulings fix all three readings this group asserts, and are quoted as
+-- printed, misnamed card and all: "Ashiok, Wicked
 -- Nightmare's first ability isn't optional. You can't choose to pay life instead
 -- of exiling cards from the top of your library ... and you can't split the
 -- payment between life and cards"; "If you would pay life while you control
@@ -1838,7 +1839,12 @@ bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 
 ashiokSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ashiokSpec s registry = Spec.describe s "Ashiok, Wicked Manipulator (CR 119.4 / 614.6)" $ do
   -- Every number distinct: three cards in the library, two paid for, one left,
-  -- and a life total that does not move at all.
+  -- and a life total that does not move at all. The SURVIVOR is named rather than
+  -- counted, which is what makes "from the TOP" an assertion rather than a
+  -- coincidence -- Pawl.Support.addLibraryCard prepends, so `bottom` goes in first
+  -- and is the only card two exiles off the top can leave behind. The exiled cards
+  -- are counted instead of named, because CR 400.7 gives each a new id as it
+  -- arrives and the library ids they had are gone.
   Spec.it s "CR 614.6 a payment is replaced: the cards are exiled and no life is lost" $ do
     swamp <- S.printingOf s registry "Swamp"
     greed <- S.printingOf s registry "Greed"
@@ -1846,12 +1852,14 @@ ashiokSpec s registry = Spec.describe s "Ashiok, Wicked Manipulator (CR 119.4 / 
     piker <- S.printingOf s registry "Goblin Piker"
     let (_, g1) = S.addCreature ashiok S.alice S.threePlayerGame
         (alicesGreed, g2) = S.addCreature greed S.alice g1
-        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) g2 [1 .. (3 :: Int)]
-        ready = S.landsFor swamp S.alice 1 stocked
+        (bottom, g3) = S.addLibraryCard piker S.alice g2
+        (_, g4) = S.addLibraryCard piker S.alice g3
+        (_, g5) = S.addLibraryCard piker S.alice g4
+        ready = S.landsFor swamp S.alice 1 g5
         after = S.runPure S.identityAnswer ready (Activate.activateAbility S.alice alicesGreed (theAbility greed))
     Spec.assertEqWith s "CR 614.6 the loss never happens, so alice is still at 20" (S.lifeOf S.alice after) (Just 20)
     Spec.assertEqWith s "and the 2 life she would have paid is 2 cards exiled instead" (length (Game.zoneMembers Zone.Exile S.alice after)) 2
-    Spec.assertEqWith s "off the TOP: 3 - 2 = 1 card left in her library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+    Spec.assertEqWith s "leaving the ONE card that was under them, by identity" (Game.zoneMembers Zone.Library S.alice after) [bottom]
   -- CR 119.4's applicability clause read against the EVENT's amount rather than
   -- against a printed constant: the same board, the same payment, one card fewer
   -- in the library. Its ruling: "you'll just pay life as normal."
@@ -1869,9 +1877,11 @@ ashiokSpec s registry = Spec.describe s "Ashiok, Wicked Manipulator (CR 119.4 / 
     Spec.assertEqWith s "and nothing is exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
     Spec.assertEqWith s "her one card is still in her library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
   -- CR 120.4c, the cause control: LifeLossPattern's whichCause names ByPayment, so
-  -- a loss that is not a payment must not reach this row at all. Damage on the
-  -- board that WOULD have exiled, so the two readings differ in exactly one thing
-  -- -- what takes alice's life.
+  -- a loss that is not a payment must not reach this row at all. The library is
+  -- stocked to 3 and the damage is 3, so the clause the case above turns on is
+  -- SATISFIED here and the cause is the only thing left to stop the row. Worship's
+  -- ruling states the same split from the other side: "loss of life bypasses
+  -- Worship."
   Spec.it s "CR 120.4c damage is not a payment, so the row does not see it" $ do
     ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
     piker <- S.printingOf s registry "Goblin Piker"
