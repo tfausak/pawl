@@ -244,7 +244,7 @@ spec s registry = Spec.describe s "Meld" $ do
   -- Not implemented: the printed "exile them" is ONE instruction over both
   -- permanents (CR 608.2f), where the card file writes two Pawl.Types.Effect's
   -- MoveToZone effects and the meld reads what they exiled rather than a slot
-  -- (#2498). Nothing in the pool tells the two batches from one.
+  -- (#2498).
   Spec.it s "CR 701.42a the melding ability exiles the pair and puts one permanent onto the battlefield" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
     garrison <- S.printingOf s registry "Hanweir Garrison"

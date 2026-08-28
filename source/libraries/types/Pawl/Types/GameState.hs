@@ -626,6 +626,11 @@ data GameState = MkGameState
     -- the replacement effect that did. Read only by
     -- ObjectRef.EachCardExiledWithSource.
     --
+    -- The RELATION rather than either rule: "an instruction in an ability of this
+    -- object put this card in exile" also answers a back-reference INSIDE one
+    -- ability (CR 400.7j, in CR 608.2c's written order), which rule 607.2's
+    -- linked abilities do not cover. That arm's haddock names the printing.
+    --
     -- Board state rather than a field on the exiled Object, for `haunting`'s
     -- reason one field up: it is a relation between two ids that outlives neither.
     -- The VALUE is what forces it -- Hoarding Dragon's second ability is a dies

@@ -2233,6 +2233,12 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- two abilities of one OBJECT and for a dies trigger the two ids differ. Read
   -- off GameState.exile directly because CR 400.1 makes exile one SHARED zone --
   -- no player to ask, and no APNAP sort, so ascending id and thus arrival order.
+  --
+  -- The SAME read answers a second wording that rule 607.2a does not cover: one
+  -- ability referring back to what its own earlier instruction exiled, which is
+  -- CR 400.7j in CR 608.2c's written order rather than a link between two printed
+  -- abilities. Hanweir Battlements' "exile them, then meld them into Hanweir, the
+  -- Writhing Township" is that printing, and this is the ref its Meld reads.
   ObjectRef.EachCardExiledWithSource mFilter ->
     let context = effectContext controller source legal (slotGroups resolving gs)
         stated oid = case mFilter of

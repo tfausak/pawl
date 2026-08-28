@@ -131,6 +131,16 @@ data ObjectRef
     -- refers only to cards in the exile zone that were put there as a result of
     -- an instruction to exile them in the first ability."
     --
+    -- TWO READINGS, and the second is not rule 607.2a's. That rule wants an
+    -- ability printed on the object that exiles and a SECOND ability printed on
+    -- it that refers back, which is Hoarding Dragon. Hanweir Battlements' "exile
+    -- them, then meld them into Hanweir, the Writhing Township" is ONE ability
+    -- referring back to what its own earlier instruction exiled -- CR 400.7j
+    -- ("other parts of that effect can find that object") read in CR 608.2c's
+    -- written order. The relation GameState.exiledWith stores is the same for
+    -- both -- an instruction in an ability of this object put this card in exile
+    -- -- so the arm answers both wordings, and only the citation differs.
+    --
     -- NO PLAYER: exile is a public zone (CR 400.2) and the set is defined by
     -- which object exiled the card, not by whose it is.
     --
