@@ -599,36 +599,46 @@ applies gs event candidate =
         (ReplacementEffect.LifeLossR {}, _) -> False
         (ReplacementEffect.PhaseR _, _) -> False
 
--- Does the REWRITE itself admit this loss, over and above the pattern matching
--- whose it is and what caused it? `admits` and `unspent` above, for the
--- life-total class.
+-- CR 614.1a: would this rewrite actually change the loss? `admits` and `unspent`
+-- above, for the life-total class. A row this answers False for never reaches CR
+-- 616.1's choice, is never spent under CR 614.5, and prompts nobody.
 --
 -- CR 120.4d's own Worship example is where the CR states that posture out loud,
--- and it states it as APPLICABILITY rather than as a rewrite that changes
--- nothing: "Worship's effect sees that the damage event would not reduce the
--- player's life total to less than 1, so Worship's effect is not applied."
+-- and it states it as APPLICABILITY rather than as a rewrite that changes nothing:
+-- "Worship's effect sees that the damage event would not reduce the player's life
+-- total to less than 1, so Worship's effect is not applied."
 --
 -- `you` is CR 109.5's, the APPLYING row's controller, which is a different seat
 -- from `pid` for any pattern but LifeLossPattern's Yours. Nothing where the row
 -- has no controller: an ability whose "you" names nobody states no condition it
 -- can meet.
 --
--- The proposed amount is here rather than in the printed CR 604.2 condition a
--- Pawl.Types.PrintedReplacement carries because no Pawl.Types.Condition can see
--- it: a condition is asked of the BOARD, and "at least THAT MANY" is asked of
--- the event.
+-- An arm may read the PROPOSED AMOUNT here rather than in the printed CR 604.2
+-- condition a Pawl.Types.PrintedReplacement carries, because no
+-- Pawl.Types.Condition can see it: a condition is asked of the BOARD, and "at
+-- least that many" is asked of the event.
 breaches :: GameState -> Maybe PlayerId -> LifeLossRewrite.LifeLossRewrite -> PlayerId -> Natural -> Bool
 breaches gs you rewrite pid n = case rewrite of
-  -- CR 120.4d, read off the LIVE board rather than off the event, because the
-  -- event carries only the loss and the rule's threshold is on the resulting
-  -- TOTAL. A player already at or below the floor answers True -- the loss would
-  -- still take them lower -- and the rewrite then cuts it to nothing.
+  -- Read off the LIVE board rather than off the event, because the event carries
+  -- only the loss and the rule's threshold is on the resulting TOTAL. A player
+  -- already at or below the floor answers True -- the loss would still take them
+  -- lower -- and the rewrite then cuts it to nothing.
   --
   -- A player id nothing is filed under answers False: no total to compare, so
   -- nothing to replace.
   LifeLossRewrite.LeaveAtLeast floor_ -> case Map.lookup pid (GameState.players gs) of
     Nothing -> False
     Just player -> Player.life player - toInteger n < toInteger floor_
+  -- The board is not consulted: a scaling's whole applicability is arithmetic on
+  -- the proposed amount, and rule 119.6's own death check is a state-based action
+  -- rather than a bound this may not cross.
+  --
+  -- `Scaled (Multiply 1)` and `Scaled (AddMore 0)` resize nothing and are refused
+  -- here. That is the Worship example's posture carried over rather than a rule of
+  -- its own -- the CR states applicability only for the floor case -- and no
+  -- printing in data/cards/ scales a life loss by an identity, so the refusal is a
+  -- fence rather than a proved behaviour.
+  LifeLossRewrite.Scaled scaling -> scale scaling n /= n
   -- Ashiok, Wicked Manipulator's "while your library has at least that many cards
   -- in it". Its own ruling states the other side: "If you would pay life while
   -- you control Ashiok and your library does not have at least that many cards in
@@ -1398,15 +1408,16 @@ readsApplier re = case re of
   -- CR 122.1d acts on the permanent becoming untapped and names no player -- CR
   -- 701.19a's answer one event class over, and for its reason.
   ReplacementEffect.UntapR _ -> False
-  -- The floor is the effect's own field and the player is the one the event
-  -- already named, so two rows alike in `effect` cut the same loss to the same
-  -- amount whoever holds them. CR 109.5's "your" is read in `applies` rather
-  -- than in Event.apply, which is CounterR's split exactly.
+  -- The rewrite is the effect's own field and the player is the one the event
+  -- already named, so two rows alike in `effect` resize the same loss the same way
+  -- whoever holds them. CR 109.5's "your" is read in `applies` rather than in
+  -- Event.apply, which is CounterR's split exactly.
   --
   -- The inner sum is cased, TurnUpR's discipline above for its reason: a rewrite
   -- that DOES read the applier has to be decided here rather than inheriting this
   -- answer, and nothing else in this module would break its build.
   ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR _ (LifeLossRewrite.LeaveAtLeast _)) -> False
+  ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR _ (LifeLossRewrite.Scaled _)) -> False
   -- CR 616.1 / 109.5: the exile comes off the CANDIDATE's own controller's
   -- library, so two rows alike in `effect` and unlike in `you` empty different
   -- libraries -- and `breaches` asks that same seat's count, so one may apply
@@ -2290,9 +2301,10 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.TokenR {} -> Nothing
   ReplacementEffect.TurnUpR {} -> Nothing
   ReplacementEffect.UntapR _ -> Nothing
-  -- CR 614.1a: a floor on a life total is not a supply a batch can run out of --
-  -- it is re-read off the board every application, and once the player is at the
-  -- floor a further loss is cut to nothing rather than exhausting anything.
+  -- CR 614.1a: neither resizing life-total rewrite is a supply a batch can run out
+  -- of. A floor is re-read off the board every application, and once the player is
+  -- at it a further loss is cut to nothing rather than exhausting anything; a
+  -- scaling is arithmetic on whatever amount arrives.
   --
   -- A LIBRARY is a supply, and a batch could in principle empty one -- but this
   -- classification is only ever asked of a CR 510.2 damage batch (`contested`

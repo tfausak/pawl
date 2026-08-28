@@ -151,7 +151,10 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       codec
       (ReplacementEffect.UntapR UntapRewrite.RemoveStunCounter)
       " {\"type\":\"UntapR\",\"value\":{\"type\":\"RemoveStunCounter\"}} "
-  -- CR 614.1a / 120.4c: Worship, LifeLossR's sole producer.
+  -- CR 614.1a / 120.4c: Worship, the damage-scoped LifeLossR producer. The other
+  -- shape -- an open cause and a scaled rewrite -- is Bloodletter of Aclazotz,
+  -- whose halves round-trip in Pawl.Codec.LifeLossPatternSpec and
+  -- Pawl.Codec.LifeLossRewriteSpec.
   Spec.it s "LifeLossR (Worship)" $
     Common.assertCodec
       s

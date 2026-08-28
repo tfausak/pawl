@@ -932,7 +932,7 @@ spinesplitterSpec s registry =
               atBobTwice = atEnd (hit spine (Recipient.ToPlayer S.bob) 5 (hit spine (Recipient.ToPlayer S.bob) 3 base))
               atAlice = atEnd (hit spine (Recipient.ToPlayer S.alice) 7 base)
               atBobsSentry = atEnd (hit spine (Recipient.ToCreature bobsSentry) 1 base)
-              bobPaid = atEnd (Event.payLife S.bob 6 base)
+              bobPaid = atEnd (S.runPure S.identityAnswer base (Event.payLife S.bob 6))
           Spec.assertEqWith s "CR 702.19: the printed trample is there" (Map.member Keyword.Type.Trample (Projection.keywordsOf spine base)) True
           Spec.assertEqWith s "nobody was dealt damage, so no counter" (countersOn spine quiet) 0
           Spec.assertEqWith s "one opponent was, so one" (countersOn spine atBob) 1

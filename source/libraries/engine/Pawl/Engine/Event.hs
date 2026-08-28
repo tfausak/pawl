@@ -381,20 +381,33 @@ canPayLife pid n gs =
     Nothing -> False
     Just player -> Player.life player >= toInteger n
 
--- CR 119.4: the payment is subtracted from the player's life total. A direct
--- subtraction, and the CR 704.5a state-based action that may follow is the
--- existing one in Pawl.Engine.Sba -- paying to exactly 0 is a legal payment, not
--- a barred one.
-payLife :: PlayerId -> Natural -> GameState -> GameState
-payLife pid n gs =
-  -- CR 119.4's own last clause, "in other words, the player loses that much
-  -- life", is why the payment is recorded as a life loss like any other. CR
-  -- 119.4b's always-payable 0 loses nothing and so records nothing.
-  (if n == 0 then id else recordEvent (GameEvent.LifeLost (LifeChange.MkLifeChange pid n)))
-    gs
-      { GameState.players =
-          Map.adjust (\p -> p {Player.life = Player.life p - toInteger n}) pid (GameState.players gs)
-      }
+-- CR 119.4: the payment is subtracted from the player's life total. The CR 704.5a
+-- state-based action that may follow is the existing one in Pawl.Engine.Sba --
+-- paying to exactly 0 is a legal payment, not a barred one.
+--
+-- CR 119.4's own last clause, "in other words, the player loses that much life",
+-- is why this goes through resolveLifeLoss, CR 614.1's funnel for the class, and
+-- carries LifeLossCause.ByPayment: a replacement that watches life loss reaches a
+-- payment, and one scoped to damage does not. What is SUBTRACTED is the settled
+-- loss, which a row may have grown or shrunk; what the cost charged is unchanged
+-- and is `canPayLife`'s business, not this function's.
+--
+-- Monadic, unlike the pure writes beside it, because applying a replacement can
+-- ask a player a CR 616.1 question. All three callers -- the mana-and-life
+-- settlement and the CostComponent.PayLife arm in Pawl.Engine.Cost, and the CR
+-- 614.1c pay-or-enter-tapped rewrite above -- already run in Game.
+--
+-- CR 119.4b's always-payable 0 loses nothing: resolveLifeLoss declines a zero
+-- itself, so it records nothing and writes nothing.
+payLife :: PlayerId -> Natural -> Game ()
+payLife pid n = do
+  settled <- resolveLifeLoss LifeLossCause.ByPayment pid n
+  Monad.when (settled /= 0) . State.modify' $ \gs ->
+    recordEvent (GameEvent.LifeLost (LifeChange.MkLifeChange pid settled)) $
+      gs
+        { GameState.players =
+            Map.adjust (\p -> p {Player.life = Player.life p - toInteger settled}) pid (GameState.players gs)
+        }
 
 -- CR 110.5b: stamp the tapped status onto an entering permanent, the write shared
 -- by EntryRewrite.Tapped (CR 614.1d), by the declining half of both
@@ -1888,7 +1901,7 @@ apply batch candidate event =
                 then Game.choose (Prompt.ChoosePayLifeOnEntry (Decide.deciderFor controller gs) controller oid n)
                 else pure OptionalDecision.Declines
             case answer of
-              OptionalDecision.Exercises -> State.modify' (payLife controller n)
+              OptionalDecision.Exercises -> payLife controller n
               OptionalDecision.Declines -> enterTapped oid
             pure (Just event)
       -- CR 614.1c with CR 701.20a: "As this land enters, you may reveal a Kithkin
@@ -2165,34 +2178,42 @@ apply batch candidate event =
         pure Nothing
     -- Unreachable: `applies` admits UntapR only against WouldUntap.
     (ReplacementEffect.UntapR _, _) -> pure (Just event)
-    -- CR 614.1a / 120.4c: what a life-total row does to the loss.
+    -- CR 614.1a: the RESIZING arms leave the event standing at a rewritten loss,
+    -- which is what makes them composable: CR 616.2's next iteration re-collects
+    -- against the rewritten loss, and a second row can act on it again. The last
+    -- arm cancels instead, and is the exception the two above are read against.
     --
-    -- No arm here touches the DAMAGE. By CR 120.4b it has already been dealt, and
-    -- Pawl.Engine.Damage.applyDamage still gains a lifelink source's controller
-    -- every point of it -- "any damage rendered useless by Worship was still
-    -- dealt".
+    -- No arm here touches the DAMAGE, on the CR 120.4c road. By CR 120.4b it has
+    -- already been dealt, and Pawl.Engine.Damage.applyDamage still gains a
+    -- lifelink source's controller every point of it -- "any damage rendered
+    -- useless by Worship was still dealt".
     (ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR _ rewrite), ProposedEvent.WouldLoseLife cause pid n) -> case rewrite of
-      -- Worship's "reduces it to 1 instead". The event survives at a SMALLER LOSS
-      -- rather than being cancelled, which is what makes the rewrite composable:
-      -- CR 616.2's next iteration re-collects against the shrunken loss, and a
-      -- second row with a higher floor can cut it again.
-      --
-      -- The rewrite names the resulting TOTAL and this arm converts it into the
-      -- event's currency, reading the player's life LIVE. That is the whole reason
-      -- the field is a floor rather than an amount -- Worship's own ruling insists
-      -- on it: "It reduces your life total to 1, not the damage to 1."
+      -- CR 120.4c: Worship's "reduces it to 1 instead". The rewrite names the
+      -- resulting TOTAL and this arm converts it into the event's currency,
+      -- reading the player's life LIVE. That is the whole reason the field is a
+      -- floor rather than an amount -- Worship's own ruling insists on it: "It
+      -- reduces your life total to 1, not the damage to 1."
       --
       -- Saturating at zero covers a player already at or below the floor, whom CR
       -- 704.5a has not yet swept: they lose nothing at all.
       --
       -- The proposed amount is not read, and cannot be needed: Replacement.breaches
-      -- has already refused every event this arm would not shrink, so the answer is
-      -- strictly smaller than what came in and no application can grow a loss.
+      -- has already refused every event this arm would not shrink.
       LifeLossRewrite.LeaveAtLeast floor_ -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
         let life = maybe 0 Player.life (Map.lookup pid (GameState.players gs))
         pure (Just (ProposedEvent.WouldLoseLife cause pid (Integer.toNaturalSaturating (life - toInteger floor_))))
+      -- CR 614.1a: Bloodletter of Aclazotz' "they lose twice that much life
+      -- instead". The proposed amount IS the whole input here, where the arm above
+      -- reads the board: a scaling is stated on the loss and not on the total.
+      --
+      -- Pawl.Engine.Replacement.scale is the shared arithmetic, the one CounterR
+      -- uses -- a resized life loss and a resized counter placement differ in what
+      -- they resize, not in how.
+      LifeLossRewrite.Scaled scaling -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        pure (Just (ProposedEvent.WouldLoseLife cause pid (Replacement.scale scaling n)))
       -- CR 614.6 with CR 119.4: Ashiok, Wicked Manipulator's "exile that many
       -- cards from the top of your library instead". THE ONE ARM THAT CANCELS:
       -- rule 614.6's "if an event is replaced, it never happens", so no life is
@@ -2953,14 +2974,20 @@ resolvePlayerCounters cause pid kind n = do
   outcome <- applyReplacements (ProposedEvent.WouldPutPlayerCounters cause pid kind n)
   pure (outcome >>= Replacement.asPlayerCounters)
 
--- CR 119.3 / 120.4c: settle how much life a player actually loses, and answer
--- with the surviving amount. The one funnel both causes go through --
--- Pawl.Engine.Damage.applyDamage at CR 120.4c's result-processing step, and
--- Pawl.Engine.Resolve's Effect.LoseLife arm -- so a row cannot reach one road and
--- miss the other.
+-- CR 119.3 / 119.4 / 119.5 / 120.4c: settle how much life a player actually
+-- loses, and answer with the settled amount. The one funnel every cause goes
+-- through -- Pawl.Engine.Damage.applyDamage at CR 120.4c's result-processing
+-- step, Pawl.Engine.Resolve's Effect.LoseLife and downward Effect.SetLifeTotal
+-- arms, and payLife above -- so a row cannot reach one road and miss another.
+--
+-- The SETTLED amount may be larger than what came in, not only smaller: a
+-- Pawl.Types.LifeLossRewrite may be a scaling.
+--
+-- Not implemented: CR 701.12c's exchange and CR 119.7's redistribution do not come
+-- through here (#2544).
 --
 -- It does not WRITE the life total, unlike resolveUntap and the counter funnels
--- above: both callers already own that write, and the damage one has to fold its
+-- above: every caller already owns that write, and the damage one has to fold its
 -- answer back into a batch of simultaneous events (CR 510.2) that this module
 -- knows nothing about.
 --

@@ -1,6 +1,7 @@
 module Pawl.Types.LifeLossRewrite where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Scaling as Scaling
 
 -- | CR 614.1a: how a replacement rewrites a would-lose-life event.
 --
@@ -21,6 +22,19 @@ data LifeLossRewrite
     -- Carrying the number rather than fixing it at 1, because the number is
     -- printed on the card and reading it costs nothing.
     LeaveAtLeast Natural.Natural
+  | -- | Bloodletter of Aclazotz' "they lose twice that much life instead": the
+    -- loss is resized, and the resized amount is what the player's total moves
+    -- by.
+    --
+    -- Pawl.Types.Scaling rather than a bare multiplier, because that type is
+    -- already the vocabulary for "twice that many \/ that many plus one \/ that
+    -- many minus one" on the counter side (Pawl.Types.CounterR's) and a
+    -- life-total clause resizes by the same arithmetic. Nothing about scaling a
+    -- number is specific to counters.
+    --
+    -- Unlike LeaveAtLeast, this can GROW the loss, so no caller may assume a
+    -- rewrite only shrinks one.
+    Scaled Scaling.Scaling
   | -- | Ashiok, Wicked Manipulator's "exile that many cards from the top of your
     -- library instead": CR 614.6's other shape, where the loss does not happen at
     -- all and a different action takes its place. Every arm above rewrites the
