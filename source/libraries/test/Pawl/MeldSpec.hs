@@ -152,6 +152,30 @@ spec s registry = Spec.describe s "Meld" $ do
     Spec.assertEqWith s "nothing is left in exile" (Game.zoneMembers Zone.Exile S.alice after) []
     Spec.assertEqWith s "the Battlements' own id is gone" (fmap Object.owner (Game.lookupObject bId after)) Nothing
     Spec.assertEqWith s "and the Garrison's" (fmap Object.owner (Game.lookupObject gId after)) Nothing
+    -- CR 608.2h: each card ceased in a public zone it was expected to be in, so
+    -- what it WAS is still answerable under the id it had. The melding ability's
+    -- own source is one of these two, so a later clause of that same resolution
+    -- reads through this.
+    Spec.assertEqWith s "CR 608.2h the Battlements' last known card survives its id" (Game.cardOfWithLastKnown bId after) (Just (Printing.card battlements))
+    Spec.assertEqWith s "and the Garrison's" (Game.cardOfWithLastKnown gId after) (Just (Printing.card garrison))
+  -- CR 701.42a's verb: "put them ONTO the battlefield", which a permanent already
+  -- there cannot be. The board differs from the positive case in ONE thing -- the
+  -- Battlements is on the battlefield rather than in exile -- and the refusal is
+  -- rule 701.42c's, so the Garrison is left in exile and the Battlements is left
+  -- alone rather than deleted with no zone change (CR 603.6c).
+  Spec.it s "CR 701.42a a card already on the battlefield cannot be put onto it, so nothing melds" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base = Setup.emptyGame S.bothPlayers
+        (bId, g1) = S.addCreature battlements S.alice base
+        (gId, g2) = S.addExiledCard garrison S.alice g1
+        slot = SlotName.MkSlotName (Text.pack "melding")
+        bound = Map.singleton slot (Set.fromList [Recipient.ToObject bId, Recipient.ToObject gId])
+        effect = Effect.Meld (Meld.MkMeld (ObjectRef.InSlot slot) (Printing.card piker))
+        after = S.runPure S.identityAnswer g2 (Resolve.applyEffect S.noSource S.noSource S.alice bound Map.empty effect)
+    Spec.assertEqWith s "the Garrison is still in exile" (Game.zoneMembers Zone.Exile S.alice after) [gId]
+    Spec.assertEqWith s "the Battlements is still the only permanent" (Set.toList (GameState.battlefield after)) [bId]
   -- CR 701.42b: "tokens, cards that aren't meld cards, or meld cards that don't
   -- form a meld pair can't be melded", and CR 701.42c: "if an effect instructs a
   -- player to meld objects that can't be melded, they stay in their current zone"

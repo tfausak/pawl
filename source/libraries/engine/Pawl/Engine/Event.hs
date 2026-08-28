@@ -4516,7 +4516,7 @@ meld controller victims resultCard = do
   case meldable victims gs of
     -- CR 701.42b/701.42c. Nothing is written, so nothing moves.
     Nothing -> pure Nothing
-    Just (owner, origin, components) -> do
+    Just (owner, origin, melding) -> do
       -- CR 712.8g: the melded permanent "has only the characteristics of the
       -- combined back face", which Game.cardOfSource answers by resolving
       -- MeldSource.result -- so the face is interned exactly as createTokens
@@ -4525,13 +4525,17 @@ meld controller victims resultCard = do
       resultId <- State.state (Game.intern (Printing.MkPrinting resultCard))
       -- CR 701.42a's "single object": the melded cards stop being objects BEFORE
       -- the entry loop, so no projection, replacement or trigger scan inside it
-      -- can find two cards where one permanent is entering. Their ids are dropped
-      -- outright rather than filed under GameState.lastKnown: CR 608.2h's
-      -- look-back exists for what left the BATTLEFIELD, and these cards were not
-      -- on it. What answers for them afterwards is Game.componentsOf over the new
-      -- permanent's source, which is the reader CR 202.3c, CR 712.21 and CR
-      -- 701.27g share.
-      State.modify' (\g -> foldl forgetObject g victims)
+      -- can find two cards where one permanent is entering. Each one's CR 608.2h
+      -- record is filed as it ceases, exactly as changeZoneAttaching's write does
+      -- for every other zone change -- rule 608.2h scopes its look-back by "the
+      -- public zone it was expected to be in" rather than by the battlefield, and
+      -- exile is such a zone (CR 400.1, CR 406.3). The melding ability's own
+      -- source is one of these cards, so without the record a clause of the very
+      -- resolution that melded them could no longer say what its source was.
+      -- What answers for them AS A GROUP afterwards is Game.componentsOf over the
+      -- new permanent's source, the reader CR 202.3c, CR 712.21 and CR 701.27g
+      -- share.
+      State.modify' (\g -> Foldable.foldl' forgetObject g (fmap fst melding))
       let mkObj ts =
             Object.MkObject
               { -- CR 110.2, sentence 1: a permanent's owner is the owner of the
@@ -4546,7 +4550,7 @@ meld controller victims resultCard = do
                 -- pool's only meld pair, whose ability requires the activating
                 -- player to own and control both halves.
                 Object.enteredUnder = Just controller,
-                Object.source = Source.OfMeld (MeldSource.MkMeldSource {MeldSource.result = resultId, MeldSource.components = components}),
+                Object.source = Source.OfMeld (MeldSource.MkMeldSource {MeldSource.result = resultId, MeldSource.components = fmap snd melding}),
                 Object.zone = Zone.Battlefield,
                 -- CR 110.5b: nothing in rule 701.42 says otherwise.
                 Object.tapped = TapState.Untapped,
@@ -4606,55 +4610,77 @@ meld controller victims resultCard = do
       -- id is named as having departed (#2492).
       placed <- State.get
       let snapshot = Projection.project newId placed
-          departed = case victims of
-            first : _ -> first
-            [] -> newId
-      State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed newId origin Zone.Battlefield) snapshot)))
+      State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange (fst (NonEmpty.head melding)) newId origin Zone.Battlefield) snapshot)))
       pure (Just newId)
 
 -- CR 701.42b: "only two cards belonging to the same meld pair can be melded.
 -- Tokens, cards that aren't meld cards, or meld cards that don't form a meld pair
 -- can't be melded." What can be read off the board is: every named object is a
 -- CARD (CR 108.2, so Source.OfCard and not a token, a copy or an ability), each
--- such card's layout is Meld (CR 712.4), and they share an owner. Answers that
--- owner, the zone the cards are in, and their printings in the order they were
--- named.
+-- such card's layout is Meld (CR 712.4), each is somewhere a card can be PUT ONTO
+-- the battlefield from, and they share an owner. Answers that owner, the zone the
+-- cards are in, and each card's id paired with its printing, in the order the
+-- objects were named -- the ids so that the caller's CR 608.2h records and its
+-- CR 400.7 event name real departing incarnations rather than re-deriving them,
+-- and the pairing so the two cannot fall out of step.
 --
--- WHICH pair a meld card belongs to is not read, and cannot be: the pairing lives
--- in the ability's own text, which names both halves and the combined face, so a
--- card file that named the wrong counterpart would be the error rather than a
--- board state this could catch.
+-- The BATTLEFIELD conjunct is rule 701.42a's own verb: "put them ONTO the
+-- battlefield", which an object already there cannot be. It is not a candidate
+-- filter dressed up -- a permanent admitted here would be deleted by the caller
+-- with no CR 400.7 zone change and so none of CR 603.6c's leave-the-battlefield
+-- triggers, which is a worse answer than rule 701.42c's "they stay in their
+-- current zone". CR 712.4a's ability exiles both halves first, so no card in the
+-- pool reaches this arm.
+--
+-- Not implemented: rule 701.42b's PAIR membership. Nothing in a card file says
+-- which meld card is whose counterpart -- the melding ability names its
+-- counterpart by name and carries the combined face, so the pairing is the
+-- ability's rather than the engine's, and an ability naming a meld card that is
+-- not its counterpart would be melded here (gap #2497).
 --
 -- Two or more, from rule 701.42a's "the two cards in a meld pair": one object is
 -- not a meld, and a melding ability whose counterpart is gone by resolution
 -- refuses here. Not EXACTLY two -- MeldSource and Game.componentsOf both quantify
 -- over "each card that represents it" and nothing downstream fixes the number --
 -- and the difference is unobservable, CR 712.5's meld pairs being pairs.
-meldable :: [ObjectId] -> GameState -> Maybe (PlayerId, Zone, NonEmpty.NonEmpty PrintingId.PrintingId)
+meldable :: [ObjectId] -> GameState -> Maybe (PlayerId, Zone, NonEmpty.NonEmpty (ObjectId, PrintingId.PrintingId))
 meldable victims gs = do
-  objects <- traverse (`Game.lookupObject` gs) victims
-  (first, rest) <- case objects of
+  (first, rest) <- case victims of
     a : b : cs -> Just (a, b : cs)
     _ -> Nothing
-  let owner = Object.owner first
-      origin = Object.zone first
-      printingOf obj = case Object.source obj of
-        Source.OfCard pid | Object.owner obj == owner -> do
-          card <- Game.cardOfPrinting pid gs
-          if Card.Type.layout card == Layout.Meld then Just pid else Nothing
-        _ -> Nothing
-  components <- traverse printingOf (first NonEmpty.:| rest)
-  pure (owner, origin, components)
+  firstObj <- Game.lookupObject first gs
+  let owner = Object.owner firstObj
+      origin = Object.zone firstObj
+      printingOf oid = do
+        obj <- Game.lookupObject oid gs
+        case Object.source obj of
+          Source.OfCard pid | Object.owner obj == owner && Object.zone obj /= Zone.Battlefield -> do
+            card <- Game.cardOfPrinting pid gs
+            if Card.Type.layout card == Layout.Meld then Just (oid, pid) else Nothing
+          _ -> Nothing
+  traverse printingOf (first NonEmpty.:| rest) >>= \melding -> Just (owner, origin, melding)
 
 -- Stop being an object at all, the CR 701.42a half of melding that
 -- Game.removeFromZones alone does not do: the id leaves its zone AND the object
 -- table, so nothing can look it up afterwards. Unknown ids are left alone.
+--
+-- CR 608.2h's record is filed in the same write, from the same pre-removal board,
+-- for changeZoneAttaching's reason: this is the last moment the object's
+-- information is known, and the id it is filed under is the id an ability on the
+-- stack still carries as its source (CR 113.7). The six fields are read exactly as
+-- that funnel reads them, off `obj` rather than off any incarnation, since nothing
+-- survives this write to read them from.
 forgetObject :: GameState -> ObjectId -> GameState
 forgetObject gs oid = case Game.lookupObject oid gs of
   Nothing -> gs
   Just obj ->
-    let cleared = Game.removeFromZones (Object.owner obj) oid gs
-     in cleared {GameState.objects = Map.delete oid (GameState.objects cleared)}
+    let snapshot = Projection.project oid gs
+        lastController = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
+        cleared = Game.removeFromZones (Object.owner obj) oid gs
+     in cleared
+          { GameState.objects = Map.delete oid (GameState.objects cleared),
+            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj)) (GameState.lastKnown cleared)
+          }
 
 -- CR 121.1, one card at a time per CR 121.2. An empty library records the failed
 -- draw, which CR 704.5b makes a loss at the next state-based-action check. Shared
