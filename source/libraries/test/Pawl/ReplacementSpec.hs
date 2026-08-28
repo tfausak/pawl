@@ -5170,6 +5170,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   dustAnimusSpec s registry
   frontierMastodonSpec s registry
   magneticLockdownSpec s registry
+  squadCaptainSpec s registry
   printlifterSpec s registry
   shieldCounterSpec s registry
   warLeechSpec s registry
@@ -8316,6 +8317,74 @@ magneticLockdownSpec s registry = Spec.describe s "Synthetic Magnetic Lockdown (
         Spec.assertEqWith s "the Bauble entered tapped" (fmap Object.tapped (Game.lookupObject oid after)) (Just TapState.Tapped)
         Spec.assertEqWith s "setup: alice controlled three artifacts as it entered" (controlledNamed splitterName S.alice after) 3
       _ -> Spec.assertFailure s "the Bauble did not reach the battlefield"
+
+-- Squad Captain {4}{W} Creature -- Human Soldier 2/2, whole text: "Vigilance
+-- (Attacking doesn't cause this creature to tap.) / This creature enters with a
+-- +1/+1 counter on it for each other creature you control." (oracle checked on
+-- Scryfall 2026-08-28)
+--
+-- The AMOUNT half of the board question frontierMastodonSpec and
+-- magneticLockdownSpec above ask of a CLAUSE: CR 614.12's "how they apply", where
+-- what a rewrite reads is not whether a row applies but how many counters it
+-- places. Same board, same rule, same exclusion --
+-- Pawl.Engine.Projection.boardAsEntering -- reached through
+-- Pawl.Engine.Event's EntryRewrite.WithCounters arm rather than through a
+-- condition. Until this card the pool's two board-counting rewrites were
+-- Tidewalker ("for each Island you control") and Undergrowth Scavenger, whose
+-- count folds GRAVEYARDS and so cannot tell the two boards apart at all; no
+-- effect in data/cards puts an Island onto the battlefield beside a Tidewalker.
+-- Squad Captain counts CREATURES, which is exactly what Rise of the Dark Realms
+-- reanimates, so one card closes the gap (#2431).
+--
+-- THE PAIR differs in one thing: where alice's two other creatures are as the
+-- Captain's entry loop runs. Rise of the Dark Realms reanimates the Captain out
+-- of a graveyard holding Jedit Ojanen and a Goblin Piker as one CR 608.2f sweep,
+-- and the sweep accumulates the battlefield as each member arrives -- both are
+-- buried BEFORE the Captain, so both are already sitting there, materialized and
+-- unentered, when its rewrite reads. CR 614.12 says the two are not on the
+-- battlefield relative to it, so the count is ZERO and the printed 2/2 stays a
+-- 2/2. The positive board is the same nine Swamps and the same cast with those
+-- two on the battlefield to start with, where the count is TWO and CR 613.4c
+-- layer 7d makes it a 4/4. Nothing else alice controls is a creature: the nine
+-- Swamps are lands, and the Captain's own row says "other" (Filter.Not
+-- Filter.IsSource), so 0, 2 and 4 stay distinct from any reading that counted the
+-- subject as well.
+squadCaptainSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+squadCaptainSpec s registry = Spec.describe s "Squad Captain (CR 614.12)" $ do
+  let captainName = CardName.MkCardName (Text.pack "Squad Captain")
+      -- alice's nine Swamps for the {7}{B}{B}, Rise of the Dark Realms in hand,
+      -- the Captain in her graveyard, and the other two creatures wherever
+      -- `buried` says. Buried before the Captain so the sweep has already put
+      -- them onto the battlefield when its own entry loop runs; that ordering is
+      -- what the negative rests on.
+      reanimated buried = do
+        swamp <- S.printingOf s registry "Swamp"
+        rise <- S.printingOf s registry "Rise of the Dark Realms"
+        captain <- S.printingOf s registry "Squad Captain"
+        ojanen <- S.printingOf s registry "Jedit Ojanen"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let lands = List.foldl' (\g _ -> snd (S.addCreature swamp S.alice g)) S.threePlayerGame [1 .. (9 :: Int)]
+            place printing g = if buried then snd (S.addGraveyardCard printing S.alice g) else snd (S.addCreature printing S.alice g)
+            withOthers = place piker (place ojanen lands)
+            (_, withCaptain) = S.addGraveyardCard captain S.alice withOthers
+            (ready, held) = S.handOne rise withCaptain
+            after = S.runPure S.identityAnswer ready (S.cast S.alice held >> Stack.resolveTop)
+        pure (newestNamed captainName after, after)
+  Spec.it s "CR 614.12 the two creatures reanimated in the same sweep are not on the battlefield yet, so its own count is zero" $ do
+    (found, after) <- reanimated True
+    case found of
+      Just oid -> do
+        Spec.assertEqWith s "no +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 0
+        Spec.assertEqWith s "so it is the printed 2/2" (S.powerToughnessOf oid after) (Just (2, 2))
+        Spec.assertEqWith s "and both were reanimated beside it" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jedit Ojanen")) S.alice after, S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) (1, 1)
+      _ -> Spec.assertFailure s "the Captain did not reach the battlefield"
+  Spec.it s "CR 614.12 the same two already on the battlefield do count, so it enters with two counters" $ do
+    (found, after) <- reanimated False
+    case found of
+      Just oid -> do
+        Spec.assertEqWith s "two +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne oid after) 2
+        Spec.assertEqWith s "so the printed 2/2 is a 4/4" (S.powerToughnessOf oid after) (Just (4, 4))
+      _ -> Spec.assertFailure s "the Captain did not reach the battlefield"
 
 -- CR 122.6 with CR 107.3c: an entry rider whose COUNT is not a number. Printlifter
 -- Ooze -- {1}{G} 2/2 Creature -- Ooze with deathtouch and disguise {3}{G} --
