@@ -2310,7 +2310,8 @@ battlefieldMatching legal resolving controller source gs filter_ =
 -- ORDER, for the arms folding over CR 400.1's per-player zones: APNAP (CR
 -- 608.2f), then ascending ObjectId. The arms over a SHARED zone keep that zone's
 -- own order (CR 101.4). `forEachOrder` is where CR 608.2f's secondary sentence
--- opens, and it asks rather than reading this order.
+-- and CR 701.44d's per-seat choice open, and both ask rather than reading this
+-- order.
 objectRefObjects :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [ObjectId]
 objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.InSlot slot -> case slotGroup slot resolving gs of
@@ -2654,28 +2655,41 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- reaches the Game monad can ask the chooser.
   ObjectRef.ChosenPermanent _ -> []
 
--- CR 608.2f's order for the per-object loop: APNAP first, reading a player
--- recipient as that seat and an object as its controller's. Imposed here rather
+-- The order for a per-object batch -- CR 608.2f's, and CR 701.44d's, which say
+-- the same thing about the PRIMARY key: APNAP first, reading a player recipient
+-- as that seat and an object as its controller's. Imposed here rather
 -- than in objectRefRecipients, whose InSlot arm answers in Recipient (set)
 -- order; this loop is the first reader that takes recipients one at a time.
 --
--- The second key is CR 608.2f's secondary sentence and belongs to the RESOLVING
--- CONTROLLER, so each seat's group is handed to them as a Prompt.OrderForEach.
--- Asked once per group, in APNAP order of the groups; a group of one is not
--- asked. Game.permute keeps the engine's order for a non-permutation answer.
+-- The second key is a CHOICE, and which player makes it is the caller's, via
+-- `chooserFor`: it is handed the group's own seat and answers who is asked, or
+-- Nothing for nobody. CR 608.2f's secondary sentence gives it to the RESOLVING
+-- CONTROLLER (`const (Just controller)`); CR 701.44d gives it to the player who
+-- controls the permanents themselves (`id`), which is the only difference
+-- between the two rules' orderings and the reason this takes a function.
+--
+-- Each seat's group is handed to its chooser as a Prompt.OrderForEach. Asked
+-- once per group, in APNAP order of the groups; a group of one is not asked.
+-- Game.permute keeps the engine's order for a non-permutation answer.
+--
+-- The GROUPING is what CR 701.44d's repeat clause describes as well: the first
+-- APNAP seat holding any of the permanents keeps being first while it holds one,
+-- so a whole seat's instructions run before the next seat's rather than
+-- interleaving.
 --
 -- A recipient the board no longer holds has no controller and sorts last, which
 -- is reachable rather than defensive (CR 400.7); two such share that bucket.
-forEachOrder :: ObjectId -> PlayerId -> [Recipient] -> Game [Recipient]
-forEachOrder resolving controller recipients = do
+forEachOrder :: ObjectId -> (Maybe PlayerId -> Maybe PlayerId) -> [Recipient] -> Game [Recipient]
+forEachOrder resolving chooserFor recipients = do
   gs <- State.get
   let order = Game.apnapOrder gs
       last_ = length order
-      seat recipient = maybe last_ (\pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)) (recipientSeat gs recipient)
-      groups = List.groupBy (\a b -> seat a == seat b) (List.sortOn (\recipient -> (seat recipient, recipient)) recipients)
+      seatOf = recipientSeat gs
+      rank recipient = maybe last_ (\pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)) (seatOf recipient)
+      groups = List.groupBy (\a b -> rank a == rank b) (List.sortOn (\recipient -> (rank recipient, recipient)) recipients)
       pick group = case group of
-        _ : _ : _ -> do
-          answer <- Game.choose (Prompt.OrderForEach (Decide.deciderFor controller gs) controller resolving group)
+        first_ : _ : _ | Just chooser <- chooserFor (seatOf first_) -> do
+          answer <- Game.choose (Prompt.OrderForEach (Decide.deciderFor chooser gs) chooser resolving group)
           pure (Game.permute group answer)
         _ -> pure group
   fmap concat (traverse pick groups)
@@ -2684,6 +2698,8 @@ forEachOrder resolving controller recipients = do
 -- controller (CR 110.2) -- and CR 608.2h's last known information for an object
 -- the board no longer holds, which is reachable rather than defensive (CR
 -- 400.7): Effect.ForEach walks the permanents a destruction already removed.
+-- CR 701.44c asks for the same read by name, and reading it here is what keeps
+-- this and exploreOne agreeing about whose a departed permanent is.
 -- Nothing only where neither answer exists; each caller says what it does with
 -- that.
 recipientSeat :: GameState -> Recipient -> Maybe PlayerId
@@ -2723,7 +2739,9 @@ slotOne slot resolving gs = do
 --   1. IS THERE ANYTHING TO OFFER -- the slot's id (CR 400.7) may no longer
 --      resolve to an object (CR 603.7c).
 --   2. WHICH FACE: CR 712.11a for the `transformed` rider, otherwise
---      Card.castableFaces (CR 709.3, CR 712.11b, CR 715.3).
+--      Card.castableFaces (CR 709.3, CR 712.11b, CR 715.3), less the face CR
+--      702.162a's alternative cost is the only road to when this offer states an
+--      alternative cost of its own (CR 118.9a).
 --   3. WHAT IT COSTS (CR 118.9): `withoutPayingManaCost` or a stated
 --      `payingInstead` (CR 702.94a); otherwise CR 601.2b's own candidates.
 --   4. MAY IT BE CAST AT ALL -- Cast.castableWhenOffered, asked BEFORE the
@@ -2743,11 +2761,23 @@ slotOne slot resolving gs = do
 offerCast :: ObjectId -> PlayerId -> SlotName -> CastObligation.CastObligation -> CastOffer.CastOffer -> Game ()
 offerCast resolving caster slot optionality offer = do
   gs <- State.get
-  let -- CR 712.11a for the transformed rider; CR 709.3, CR 712.11b and CR 715.3
+  let -- Whether this offer states CR 118.9's alternative cost, in either of the
+      -- two wordings `applied` below reads. NOT `transformed`, which is CR
+      -- 712.11a's rider about which face goes on the stack and says nothing about
+      -- payment.
+      alternative = CastOffer.withoutPayingManaCost offer || Maybe.isJust (CastOffer.payingInstead offer)
+      -- CR 712.11a for the transformed rider; CR 709.3, CR 712.11b and CR 715.3
       -- otherwise, via Card.castableFaces. Nothing for a card with no back face
       -- (CR 712.14a): an offer that cannot be made is not made.
+      --
+      -- Less Card.convertedFace under an alternative, which is CR 118.9a: a spell
+      -- takes one alternative cost, and that face is on the list only because CR
+      -- 702.162a's alternative cost put it there, so an offer spending the
+      -- spell's one alternative on something else cannot also reach it. CR
+      -- 712.11's default -- the front face -- is then the whole answer.
       faces card
         | CastOffer.transformed offer = fmap pure (Card.backFace card)
+        | alternative = Just (filter (\face -> fmap Face.name (Card.convertedFace card) /= Just (Face.name face)) (Card.castableFaces card))
         | otherwise = Just (Card.castableFaces card)
       -- One proposal per half, gated on its own (CR 709.3a, CR 712.11c), which
       -- is why the whole tuple is built per face rather than once per card.
@@ -4675,7 +4705,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- so the body can neither shorten the batch nor add to it. Recipients rather
     -- than objects, since rule 608.2f is about "players and/or objects" and
     -- Soulfire Eruption's targets are both.
-    members <- forEachOrder resolving controller (objectRefRecipients legal resolving controller source gs0 ref)
+    members <- forEachOrder resolving (const (Just controller)) (objectRefRecipients legal resolving controller source gs0 ref)
     let -- The slots the BODY defines, computed off the instruction rather than the
         -- board: a body effect binds into the resolving object's live bindings and
         -- the next body effect must see it. Restricted to those names so a target
@@ -4922,9 +4952,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Explore ref -> do
     gs <- State.get
     -- CR 608.2c: the set is swept as this instruction is reached; an illegal slot
-    -- (CR 608.2b) or a player recipient answers with nobody. CR 701.44d's APNAP
-    -- half is objectRefObjects' order; its second key is the engine's (#1345).
-    Monad.mapM_ exploreOne (objectRefObjects legal resolving controller source gs ref)
+    -- (CR 608.2b) or a player recipient answers with nobody -- Recipient.objectOf
+    -- drops the latter, which is why the sweep can be the RECIPIENT one and still
+    -- reach only permanents.
+    --
+    -- CR 701.44d's order, through forEachOrder: APNAP across seats, then that
+    -- seat's OWN choice within it -- `id`, not the resolving controller CR 608.2f
+    -- names one rule up. The seat comes from recipientSeat, which reads
+    -- Projection.controllerWithLastKnown, so it agrees with exploreOne about a
+    -- permanent that has left (CR 701.44c).
+    ordered <- forEachOrder resolving id (objectRefRecipients legal resolving controller source gs ref)
+    Monad.mapM_ exploreOne (Maybe.mapMaybe Recipient.objectOf ordered)
   -- The card names the set, so CR 701.9b's default choice does not arise and
   -- nobody is prompted. Swept ONCE as this instruction is reached (CR 608.2c) and
   -- then fixed (CR 608.2f), and buried through the same funnel the counted branch

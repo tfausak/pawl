@@ -38,6 +38,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
@@ -1460,6 +1461,179 @@ explorePromptSpec s registry = Spec.describe s "ExplorePrompt" $ do
     (spell, _, board) <- exploreBoard s registry []
     Spec.assertEqWith s "not asked" (asks spell board) 0
 
+-- Hakbal of the Surging Soul {2}{G}{U} Legendary Creature -- Merfolk Scout 3/3,
+-- "At the beginning of combat on your turn, each Merfolk creature you control
+-- explores", on the battlefield under alice with the board sitting in her
+-- beginning of combat step -- not yet run, since Engine.runStep is what writes
+-- the CR 603.2b StepBegan record the trigger matches.
+--
+-- alice also controls a Merfolk Spy and a Merfolk Seer when `crowded`, a
+-- Darksteel Myr that is no Merfolk either way, and bob controls a Merfolk Spy of
+-- his own: the batch is "each Merfolk creature YOU control", so the Myr proves
+-- the subtype half and bob's Spy the control half. The three Merfolk are added
+-- Hakbal, Spy, Seer, so the engine's canonical order within alice's group --
+-- ascending ObjectId -- is that order and a non-identity answer is visibly not
+-- it.
+--
+-- alice's library is stocked NONLAND, LAND, NONLAND: whoever explores second
+-- reveals the Mountain, which CR 701.44a's first sentence sends to hand with no
+-- counter, while the first and third grow and bin. Exactly one of the three
+-- Merfolk therefore ends bare, and WHICH one is the order CR 701.44d asked for.
+-- The Forest beneath is never reached and keeps the library non-empty.
+--
+-- Hakbal's second printed ability ("whenever Hakbal attacks, you may put a land
+-- card from your hand onto the battlefield. If you don't, draw a card") is absent
+-- from its card file, which leaves pawl's Hakbal stricter than printed (#2553).
+-- Nothing here attacks, so it is inert.
+hakbalBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Bool ->
+  m (ObjectId.ObjectId, Maybe ObjectId.ObjectId, Maybe ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+hakbalBoard s registry crowded = do
+  hakbal <- S.printingOf s registry "Hakbal of the Surging Soul"
+  spy <- S.printingOf s registry "Merfolk Spy"
+  seer <- S.printingOf s registry "Merfolk Seer"
+  myr <- S.printingOf s registry "Darksteel Myr"
+  printings <- mapM (S.printingOf s registry) ["Goblin Piker", "Mountain", "Bird Maiden", "Forest"]
+  let (hakbalId, withHakbal) = S.addCreature hakbal S.alice (Setup.emptyGame S.bothPlayers)
+      (others, withOthers) =
+        if crowded
+          then
+            let (spyId, one) = S.addCreature spy S.alice withHakbal
+                (seerId, two) = S.addCreature seer S.alice one
+             in ((Just spyId, Just seerId), two)
+          else ((Nothing, Nothing), withHakbal)
+      (myrId, withMyr) = S.addCreature myr S.alice withOthers
+      (_, withBob) = S.addCreature spy S.bob withMyr
+      -- addLibraryCard puts its card ON TOP, so the deepest is stocked first.
+      deal gs printing = snd (S.addLibraryCard printing S.alice gs)
+      stocked = List.foldl' deal withBob (reverse printings)
+  pure
+    ( hakbalId,
+      fst others,
+      snd others,
+      myrId,
+      stocked
+        { GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
+
+-- Answers CR 701.44d's order with `order` VERBATIM and always bins the revealed
+-- card. Pinned rather than searched for a legal permutation: an answerer that
+-- looked for one would find the engine's own again after a mutation, and these
+-- cases would stay green over a choice that had stopped being made.
+exploreOrdering :: [Natural] -> Prompt.Prompt r -> r
+exploreOrdering order p = case p of
+  Prompt.OrderForEach {} -> order
+  Prompt.ChooseExplore {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+-- Run the beginning of combat step and then the stack it put a trigger on.
+throughCombatStart ::
+  (forall r. Prompt.Prompt r -> r) ->
+  GameState.GameState ->
+  GameState.GameState
+throughCombatStart answer gs =
+  S.runPure answer (S.runPure answer gs Engine.runStep) Engine.priorityLoop
+
+-- CR 701.44d: "if multiple permanents are instructed to explore at the same
+-- time, the first player in APNAP order who controls ... one or more of those
+-- permanents chooses one of them and it explores. Then this process is repeated
+-- for each remaining instruction to explore."
+--
+-- Hakbal is the pool's only producer: no other printing instructs more than one
+-- permanent to explore at once (Scryfall `oracle:/each .{0,40}explores/`,
+-- 2026-08-28, Hakbal alone). Jadelight Spelunker's "explores X times" is ONE
+-- permanent exploring repeatedly, which rule 701.44d does not reach.
+--
+-- What these cases prove is the SECOND key: the order is asked of a player
+-- rather than read off ascending ObjectId. The rule's other two halves are
+-- regression fences here rather than proofs, because no card can discriminate
+-- them: every printed explore instruction names permanents "you control", so the
+-- batch is always the resolving controller's own seat, which makes CR 701.44d's
+-- chooser (that seat) and CR 608.2f's (the resolving controller) the same player
+-- on every reachable board, and leaves the APNAP grouping across seats with one
+-- group to order.
+exploreOrderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+exploreOrderSpec s registry = Spec.describe s "ExploreOrder" $ do
+  -- The engine's canonical order, answered as itself. The pair below is the same
+  -- board with the ANSWER as the only difference.
+  Spec.it s "CR 701.44d the Merfolk chosen second meets the land and stays bare" $ do
+    (hakbalId, spyId, seerId, myrId, board) <- hakbalBoard s registry True
+    let after = throughCombatStart (exploreOrdering [0, 1, 2]) board
+    Spec.assertEqWith
+      s
+      "Hakbal first and the Seer third grew; the Spy went second, revealed the Mountain and grew nothing"
+      (plusOnePlusOnesOn (Just hakbalId) after, plusOnePlusOnesOn spyId after, plusOnePlusOnesOn seerId after)
+      (1, 0, 1)
+    Spec.assertEqWith s "the Mountain the second explore revealed is in hand" (zoneNames Zone.Hand after) ["Mountain"]
+    Spec.assertEqWith s "the two nonland cards were binned, in the order they were revealed" (zoneNames Zone.Graveyard after) ["Goblin Piker", "Bird Maiden"]
+    Spec.assertEqWith s "all three cards were revealed, top down" (revealedNames after) ["Goblin Piker", "Mountain", "Bird Maiden"]
+    Spec.assertEqWith s "the Forest beneath them was never reached" (zoneNames Zone.Library after) ["Forest"]
+    -- The batch is "each MERFOLK creature you control", so the Myr is no part of
+    -- it however the order came out.
+    Spec.assertEqWith s "the Darksteel Myr is no Merfolk and stayed bare" (plusOnePlusOnesOn (Just myrId) after) 0
+  -- One thing changed from the case above: the answer. Hakbal goes second now,
+  -- so Hakbal is the one that meets the Mountain.
+  Spec.it s "CR 701.44d a different answer puts a different Merfolk in front of the land" $ do
+    (hakbalId, spyId, seerId, myrId, board) <- hakbalBoard s registry True
+    let after = throughCombatStart (exploreOrdering [1, 0, 2]) board
+    Spec.assertEqWith
+      s
+      "the Spy went first and grew; Hakbal went second and stayed bare"
+      (plusOnePlusOnesOn (Just hakbalId) after, plusOnePlusOnesOn spyId after, plusOnePlusOnesOn seerId after)
+      (0, 1, 1)
+    Spec.assertEqWith s "the same three cards moved the same way" (zoneNames Zone.Hand after, zoneNames Zone.Graveyard after) (["Mountain"], ["Goblin Piker", "Bird Maiden"])
+    Spec.assertEqWith s "the Darksteel Myr is no Merfolk and stayed bare" (plusOnePlusOnesOn (Just myrId) after) 0
+  -- The third seat of the same triple, so no reading of the answer can put the
+  -- Mountain in front of a fixed creature and pass all three.
+  Spec.it s "CR 701.44d and again with the Seer second" $ do
+    (hakbalId, spyId, seerId, _, board) <- hakbalBoard s registry True
+    let after = throughCombatStart (exploreOrdering [0, 2, 1]) board
+    Spec.assertEqWith
+      s
+      "the Seer went second and stayed bare; Hakbal and the Spy grew"
+      (plusOnePlusOnesOn (Just hakbalId) after, plusOnePlusOnesOn spyId after, plusOnePlusOnesOn seerId after)
+      (1, 1, 0)
+  -- CR 701.44d's own "one of them": one permanent is one order, so there is
+  -- nothing to ask. The board differs from the cases above in exactly one thing
+  -- -- whether the Spy and the Seer are on the battlefield.
+  Spec.it s "CR 701.44d a lone exploring Merfolk raises no order question" $ do
+    (hakbalId, _, _, myrId, board) <- hakbalBoard s registry False
+    let asked = orderPrompts board
+        after = throughCombatStart (exploreOrdering [0]) board
+    Spec.assertEqWith s "not asked" asked []
+    Spec.assertEqWith s "Hakbal explored anyway: the Piker grew it and was binned" (plusOnePlusOnesOn (Just hakbalId) after, zoneNames Zone.Graveyard after) (1, ["Goblin Piker"])
+    Spec.assertEqWith s "and the Mountain the second explore would have taken is still on top" (zoneNames Zone.Library after) ["Mountain", "Bird Maiden", "Forest"]
+    Spec.assertEqWith s "the Darksteel Myr is no Merfolk and stayed bare" (plusOnePlusOnesOn (Just myrId) after) 0
+  -- ONE question for the three, not one per permanent: CR 701.44d's repeat
+  -- clause keeps the first APNAP seat first while it holds any of them, so a
+  -- seat's whole group is ordered at once.
+  --
+  -- Whom it is asked of is a REGRESSION FENCE and not a proof: alice controls the
+  -- permanents and alice controls the resolving ability, so this board cannot
+  -- tell CR 701.44d's chooser from CR 608.2f's, and no printing can.
+  Spec.it s "CR 701.44d one order question for the seat, asked of that seat" $ do
+    (_, _, _, _, board) <- hakbalBoard s registry True
+    Spec.assertEqWith s "asked once, of alice, over all three of her Merfolk" (orderPrompts board) [(S.alice, 3)]
+
+-- Who was asked CR 701.44d's order, and over how many permanents, in the order
+-- the questions came. Threaded through State rather than answered purely,
+-- since two groups would otherwise be indistinguishable to the answerer.
+orderPrompts :: GameState.GameState -> [(PlayerId.PlayerId, Int)]
+orderPrompts gs =
+  let recording :: Prompt.Prompt r -> State.State [(PlayerId.PlayerId, Int)] r
+      recording p = case p of
+        Prompt.OrderForEach _ pid _ group -> do
+          State.modify (<> [(pid, length group)])
+          pure (S.identityAnswer p)
+        _ -> pure (S.identityAnswer p)
+   in State.execState (Engine.runGame recording gs (Engine.runStep >> Engine.priorityLoop)) []
+
 -- Into the Wilds on the battlefield under alice's control, over a library
 -- stocked from the top down. Two seats and no other permanent: the card reads
 -- only its controller's own library, so nothing here needs telling apart.
@@ -2434,6 +2608,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   fatesealSpec s registry
   exploreSpec s registry
   explorePromptSpec s registry
+  exploreOrderSpec s registry
   lookAtSpec s registry
   lookAtPromptSpec s registry
   playerSacrificesSpec s registry
