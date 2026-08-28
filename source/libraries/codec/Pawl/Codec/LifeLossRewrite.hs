@@ -8,5 +8,6 @@ import qualified Pawl.Types.LifeLossRewrite as LifeLossRewrite
 codec :: Codec.Codec LifeLossRewrite.LifeLossRewrite
 codec =
   Arm.tagged
-    [ Arm.payload "LeaveAtLeast" Common.natural LifeLossRewrite.LeaveAtLeast (\(LifeLossRewrite.LeaveAtLeast y) -> Just y)
+    [ Arm.payload "LeaveAtLeast" Common.natural LifeLossRewrite.LeaveAtLeast (\x -> case x of LifeLossRewrite.LeaveAtLeast y -> Just y; _ -> Nothing),
+      Arm.nullary "ExileFromTopOfYourLibrary" LifeLossRewrite.ExileFromTopOfYourLibrary
     ]

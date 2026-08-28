@@ -7,7 +7,7 @@ import qualified Numeric.Natural as Natural
 -- A type rather than a bare payload-free arm on Pawl.Types.ReplacementEffect for
 -- Pawl.Types.UntapRewrite's reason: a replacement effect is classified by the
 -- event class it intercepts AND the rewrite shape it applies.
-newtype LifeLossRewrite
+data LifeLossRewrite
   = -- | Worship's "reduces it to 1 instead": the loss is cut back to whatever
     -- leaves the player at this total, and to nothing at all if they are already
     -- at or below it.
@@ -21,4 +21,20 @@ newtype LifeLossRewrite
     -- Carrying the number rather than fixing it at 1, because the number is
     -- printed on the card and reading it costs nothing.
     LeaveAtLeast Natural.Natural
+  | -- | Ashiok, Wicked Manipulator's "exile that many cards from the top of your
+    -- library instead": CR 614.6's other shape, where the loss does not happen at
+    -- all and a different action takes its place. Every arm above rewrites the
+    -- event's AMOUNT and leaves a life loss standing; this one removes the event.
+    --
+    -- Payload-free, because rule 614.6's substituted action is fixed by the
+    -- printed clause down to its count: the number of cards is the proposed
+    -- amount, and the library is CR 109.5's "your". Nothing about it is a number
+    -- a second printing could state differently -- and if one ever does, the
+    -- field goes here rather than a second constructor.
+    --
+    -- Its applicability -- "while your library has at least that many cards in
+    -- it" -- lives in Pawl.Engine.Replacement.breaches, because the threshold is
+    -- stated against the PROPOSED AMOUNT and no Pawl.Types.Condition on the
+    -- printed ability can see that.
+    ExileFromTopOfYourLibrary
   deriving (Eq, Ord, Show)

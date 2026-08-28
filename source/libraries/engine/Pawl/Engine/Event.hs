@@ -2165,33 +2165,65 @@ apply batch candidate event =
         pure Nothing
     -- Unreachable: `applies` admits UntapR only against WouldUntap.
     (ReplacementEffect.UntapR _, _) -> pure (Just event)
-    -- CR 614.1a / 120.4c: Worship's "reduces it to 1 instead". The event survives
-    -- at a SMALLER LOSS rather than being cancelled, which is what makes the
-    -- rewrite composable: CR 616.2's next iteration re-collects against the
-    -- shrunken loss, and a second row with a higher floor can cut it again.
-    --
-    -- The rewrite names the resulting TOTAL and this arm converts it into the
-    -- event's currency, reading the player's life LIVE. That is the whole reason
-    -- the field is a floor rather than an amount -- Worship's own ruling insists
-    -- on it: "It reduces your life total to 1, not the damage to 1."
-    --
-    -- Saturating at zero covers a player already at or below the floor, whom CR
-    -- 704.5a has not yet swept: they lose nothing at all.
-    --
-    -- The proposed amount is not read, and cannot be needed: Replacement.breaches
-    -- has already refused every event this arm would not shrink, so the answer is
-    -- strictly smaller than what came in and no application can grow a loss.
+    -- CR 614.1a / 120.4c: what a life-total row does to the loss.
     --
     -- No arm here touches the DAMAGE. By CR 120.4b it has already been dealt, and
     -- Pawl.Engine.Damage.applyDamage still gains a lifelink source's controller
     -- every point of it -- "any damage rendered useless by Worship was still
     -- dealt".
-    (ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR _ rewrite), ProposedEvent.WouldLoseLife cause pid _) -> case rewrite of
+    (ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR _ rewrite), ProposedEvent.WouldLoseLife cause pid n) -> case rewrite of
+      -- Worship's "reduces it to 1 instead". The event survives at a SMALLER LOSS
+      -- rather than being cancelled, which is what makes the rewrite composable:
+      -- CR 616.2's next iteration re-collects against the shrunken loss, and a
+      -- second row with a higher floor can cut it again.
+      --
+      -- The rewrite names the resulting TOTAL and this arm converts it into the
+      -- event's currency, reading the player's life LIVE. That is the whole reason
+      -- the field is a floor rather than an amount -- Worship's own ruling insists
+      -- on it: "It reduces your life total to 1, not the damage to 1."
+      --
+      -- Saturating at zero covers a player already at or below the floor, whom CR
+      -- 704.5a has not yet swept: they lose nothing at all.
+      --
+      -- The proposed amount is not read, and cannot be needed: Replacement.breaches
+      -- has already refused every event this arm would not shrink, so the answer is
+      -- strictly smaller than what came in and no application can grow a loss.
       LifeLossRewrite.LeaveAtLeast floor_ -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
         let life = maybe 0 Player.life (Map.lookup pid (GameState.players gs))
         pure (Just (ProposedEvent.WouldLoseLife cause pid (Integer.toNaturalSaturating (life - toInteger floor_))))
+      -- CR 614.6 with CR 119.4: Ashiok, Wicked Manipulator's "exile that many
+      -- cards from the top of your library instead". THE ONE ARM THAT CANCELS:
+      -- rule 614.6's "if an event is replaced, it never happens", so no life is
+      -- lost, no CR 119.4 subtraction is made and no GameEvent.LifeLost is
+      -- recorded -- Nothing, not a loss rewritten to nothing. What the payment
+      -- COST is unchanged: `canPayLife` still refuses an amount the payer's life
+      -- total cannot cover, which is the card's own ruling ("Ashiok's first
+      -- ability doesn't allow you to attempt to pay an amount of life greater
+      -- than your current life total").
+      --
+      -- The cards come off CR 109.5's "your" library -- the CANDIDATE's
+      -- controller, not the player losing the life, which is why
+      -- Replacement.readsApplier answers True for this rewrite alone.
+      --
+      -- The ids are snapshotted from the pre-move board and then moved one at a
+      -- time, `drawCardReturning`'s shape: Game.zoneMembers is top-first, so
+      -- `take` off the front is the top `n`, and each move is CR 400.7's funnel
+      -- with every replacement of its own. Replacement.breaches has already
+      -- refused a library too short, so the take is never partial when it starts
+      -- -- and if an intervening move shortened it, exiling what is left is CR
+      -- 614.6's own "instructions that can't be carried out ... simply ignored".
+      LifeLossRewrite.ExileFromTopOfYourLibrary -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case ReplacementCandidate.controller candidate of
+          -- Unreachable: Replacement.breaches refuses a row whose "you" names
+          -- nobody, there being no library its clause could measure.
+          Nothing -> pure (Just event)
+          Just you -> do
+            Monad.mapM_ (`changeZone` Zone.Exile) (take (Natural.toIntSaturating n) (Game.zoneMembers Zone.Library you gs))
+            pure Nothing
     -- Unreachable: `applies` admits LifeLossR only against WouldLoseLife.
     (ReplacementEffect.LifeLossR {}, _) -> pure (Just event)
     -- CR 122.6/614.1: Hardened Scales/Doubling Season scale a counter placement.

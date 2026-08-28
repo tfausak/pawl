@@ -1687,6 +1687,86 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
     Spec.assertEqWith s "alice loses the whole 3, floor and all: 2 - 3 = -1" (S.lifeOf S.alice after) (Just (-1))
     Spec.assertEqWith s "and bob, controlling no creature, loses nothing" (S.lifeOf S.bob after) (Just 20)
 
+-- CR 614.6 with CR 119.4: Ashiok, Wicked Manipulator ({3}{B}{B} Legendary
+-- Planeswalker -- Ashiok, loyalty 5, "If you would pay life while your library
+-- has at least that many cards in it, exile that many cards from the top of your
+-- library instead." -- name, cost, type line, loyalty and Oracle text checked
+-- against api.scryfall.com 2026-08-28).
+--
+-- The one life-total row that CANCELS. Worship's and every other floor shrinks the
+-- loss and leaves a life loss standing; this removes the event and runs a
+-- different action, which is what CR 614.6 describes and what no other printing
+-- in data/cards/ asks of this event class.
+--
+-- Its own rulings fix all three readings this group asserts: "Ashiok, Wicked
+-- Nightmare's first ability isn't optional. You can't choose to pay life instead
+-- of exiling cards from the top of your library ... and you can't split the
+-- payment between life and cards"; "If you would pay life while you control
+-- Ashiok and your library does not have at least that many cards in it, you'll
+-- just pay life as normal"; "Ashiok's first ability doesn't allow you to attempt
+-- to pay an amount of life greater than your current life total."
+--
+-- Not implemented: the three loyalty abilities, none of whose effects pawl has --
+-- a look-at-two-and-split, a token minted with an exile-conditioned trigger, and
+-- an exile-from-the-top counted by mana value in exile (#2551). pawl's card is
+-- STRICTER than printed: it can do nothing its printing cannot.
+--
+-- Greed ({3}{B} Enchantment, "{B}, Pay 2 life: Draw a card" -- checked the same
+-- day) is the payer, ReplacementSpec's Bloodletter group's choice for the same
+-- reason: it charges CR 119.4's payment as a COST, which is the road this row
+-- watches, and the mana half of that cost is one Swamp.
+ashiokSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ashiokSpec s registry = Spec.describe s "Ashiok, Wicked Manipulator (CR 119.4 / 614.6)" $ do
+  -- Every number distinct: three cards in the library, two paid for, one left,
+  -- and a life total that does not move at all.
+  Spec.it s "CR 614.6 a payment is replaced: the cards are exiled and no life is lost" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    greed <- S.printingOf s registry "Greed"
+    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g1) = S.addCreature ashiok S.alice S.threePlayerGame
+        (alicesGreed, g2) = S.addCreature greed S.alice g1
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) g2 [1 .. (3 :: Int)]
+        ready = S.landsFor swamp S.alice 1 stocked
+        after = S.runPure S.identityAnswer ready (Activate.activateAbility S.alice alicesGreed (theAbility greed))
+    Spec.assertEqWith s "CR 614.6 the loss never happens, so alice is still at 20" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "and the 2 life she would have paid is 2 cards exiled instead" (length (Game.zoneMembers Zone.Exile S.alice after)) 2
+    Spec.assertEqWith s "off the TOP: 3 - 2 = 1 card left in her library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+  -- CR 119.4's applicability clause read against the EVENT's amount rather than
+  -- against a printed constant: the same board, the same payment, one card fewer
+  -- in the library. Its ruling: "you'll just pay life as normal."
+  Spec.it s "CR 119.4 a library shorter than the payment leaves the payment alone" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    greed <- S.printingOf s registry "Greed"
+    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g1) = S.addCreature ashiok S.alice S.threePlayerGame
+        (alicesGreed, g2) = S.addCreature greed S.alice g1
+        (_, g3) = S.addLibraryCard piker S.alice g2
+        ready = S.landsFor swamp S.alice 1 g3
+        after = S.runPure S.identityAnswer ready (Activate.activateAbility S.alice alicesGreed (theAbility greed))
+    Spec.assertEqWith s "CR 119.4 one card cannot cover a payment of 2, so alice pays: 20 - 2 = 18" (S.lifeOf S.alice after) (Just 18)
+    Spec.assertEqWith s "and nothing is exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+    Spec.assertEqWith s "her one card is still in her library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+  -- CR 120.4c, the cause control: LifeLossPattern's whichCause names ByPayment, so
+  -- a loss that is not a payment must not reach this row at all. Damage on the
+  -- board that WOULD have exiled, so the two readings differ in exactly one thing
+  -- -- what takes alice's life.
+  Spec.it s "CR 120.4c damage is not a payment, so the row does not see it" $ do
+    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g1) = S.addCreature ashiok S.alice S.threePlayerGame
+        (bobsPiker, g2) = S.addCreature piker S.bob g1
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) g2 [1 .. (3 :: Int)]
+        after =
+          S.runPure
+            S.identityAnswer
+            stocked
+            (Damage.applyDamage [DamageEvent.MkDamageEvent bobsPiker (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing DamageKind.Noncombat])
+    Spec.assertEqWith s "CR 120.4c alice loses the damage as life: 20 - 3 = 17" (S.lifeOf S.alice after) (Just 17)
+    Spec.assertEqWith s "and her library, long enough to have covered it, is untouched" (length (Game.zoneMembers Zone.Library S.alice after)) 3
+    Spec.assertEqWith s "with nothing exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+
 -- Cast Divine Deflection for `x`, aiming CR 615.5's rider at a player. The target
 -- is FILTERED out of the offered set rather than built, so an aim the card's pool
 -- excludes leaves the slot empty instead of quietly becoming a legal one.
@@ -5242,6 +5322,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
   worshipSpec s registry
+  ashiokSpec s registry
   divineDeflectionSpec s registry
   braceForImpactSpec s registry
   inkshieldSpec s registry

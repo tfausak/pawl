@@ -7,9 +7,11 @@ import qualified Pawl.Types.LifeLossCause as LifeLossCause
 -- life total, and what CAUSED the loss.
 --
 -- Worship is Yours ("your life total") and ByDamage ("damage that would reduce
--- it"). Nothing in the pool narrows by how much life would be lost: the
--- threshold every such clause states is about the RESULTING TOTAL, which is
--- Pawl.Types.LifeLossRewrite's number rather than a pattern field.
+-- it"). No field here is about HOW MUCH life would be lost, and no printing needs
+-- one: Worship's threshold is on the RESULTING TOTAL, which is
+-- Pawl.Types.LifeLossRewrite's number, and Ashiok, Wicked Manipulator's is on the
+-- amount against a zone count, which Pawl.Engine.Replacement.breaches asks per
+-- rewrite. Both are questions a pattern shared by every rewrite cannot phrase.
 data LifeLossPattern = MkLifeLossPattern
   { -- | CR 109.5's relation, read against the effect source's controller.
     whose :: ControllerRelation.ControllerRelation,
