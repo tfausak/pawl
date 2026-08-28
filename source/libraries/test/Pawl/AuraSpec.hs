@@ -2595,9 +2595,9 @@ cloudformBoard island piker cloudform =
 -- with one collapses it, and then nothing separates "the granted enchant slot was
 -- consulted" from "the host was hardcoded".
 --
--- Not implemented: CR 702.103c's copies (#2355), CR 702.103d's castability
--- (#2356) and CR 702.103e's illegal target on resolution (#2357), each with an
--- elision comment at the site it belongs to.
+-- Not implemented: CR 702.103d's castability (#2356), with an elision comment at
+-- the site it belongs to. CR 702.103c's copies hold by construction but no board
+-- in the pool mints one; see #2355.
 bestowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 bestowSpec s registry = Spec.describe s "Bestow" $ do
   -- THE discriminating pair the issue asks for: the spell's own card types and
@@ -2742,6 +2742,57 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
       (fmap (\oid -> Object.attachedTo =<< Game.lookupObject oid pass3) (rollickerOn rollicker pass3))
       (Just Nothing)
     Spec.assertEqWith s "and alice's graveyard holds the host alone" (length (Game.zoneMembers Zone.Graveyard S.alice pass3)) 1
+  -- CR 702.103e / 608.3b: the host dies while the bestowed spell is still on the
+  -- stack. The spell ceases to be bestowed and resolves as an ordinary creature
+  -- spell (CR 608.3a) instead of being countered by CR 608.2b.
+  --
+  -- The other half of the discrimination lives in the "CR 608.2b: an Aura spell
+  -- whose target left is countered on resolution" case above: an Aura that was
+  -- never bestowed still goes to the graveyard, so a fix that dropped the fizzle
+  -- wholesale reddens there rather than passing here.
+  --
+  -- Card types, subtypes and P/T are all read, because "it is on the
+  -- battlefield" alone does not separate this from a reading that stopped
+  -- countering the spell without ending CR 702.103b's effect: that one leaves an
+  -- Enchantment Aura with no P/T of its own, exactly as the CR 702.103f case
+  -- above reads it while its host is alive. The attachment is read because CR
+  -- 608.3a enters the permanent attached to nothing.
+  Spec.it s "CR 702.103e / 608.3b: a bestowed spell whose host died resolves as a 1/1 Satyr rather than being countered" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+    let base = S.landsInPlay mountain 4
+        (_, gs1) = S.addCreature piker S.alice base
+        (host, gs2) = S.addCreature mammoth S.alice gs1
+        (board, spellId) = S.handOne rollicker gs2
+        onStack = S.runPure (bestowing host) board (S.cast S.alice spellId)
+        -- War Mammoth is a 3/3 and the spell has NOT resolved, so nothing has
+        -- pumped it yet: three damage is lethal (CR 704.5g).
+        killed = S.settleSba (S.markDamage host 3 onStack)
+        after = S.settleSba (S.runPure (bestowing host) killed Stack.resolveTop)
+    -- THE gameplay-level assertion, first: the Rollicker is a creature on the
+    -- battlefield. Under CR 608.2b's fizzle it is in the graveyard and this is
+    -- Nothing.
+    Spec.assertEqWith
+      s
+      "CR 702.103e / 608.3a: the Rollicker entered the battlefield as a 1/1 Satyr creature"
+      (fmap (\oid -> (Projection.cardTypesOf oid after, Projection.subtypesOf oid after, S.powerToughnessOf oid after)) (rollickerOn rollicker after))
+      (Just (Set.fromList [CardType.Creature, CardType.Enchantment], Set.singleton Subtype.Satyr, Just (1, 1)))
+    Spec.assertEqWith
+      s
+      "CR 608.3a: and attached to nothing, the enchant slot having ended with the bestowing"
+      (fmap (\oid -> Object.attachedTo =<< Game.lookupObject oid after) (rollickerOn rollicker after))
+      (Just Nothing)
+    -- The board really was the bestowed one, and the host really was gone before
+    -- resolution: neither can change under a fix to the resolution step.
+    Spec.assertEqWith
+      s
+      "control: the spell was cast bestowed, so CR 702.103b made it an Aura on the stack"
+      (fmap (\oid -> Projection.subtypesOf oid killed) (topOfStack killed))
+      (Just (Set.singleton Subtype.Aura))
+    Spec.assertEqWith s "control: the host died while the spell was still on the stack" (Game.lookupObject host killed) Nothing
+    Spec.assertEqWith s "and alice's graveyard holds the host alone" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
 
 -- The spell CR 601.2a put on the stack -- the incarnation every assertion above
 -- reads, since CR 400.7 makes it a different object from the card in the hand.
