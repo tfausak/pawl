@@ -3486,9 +3486,10 @@ aimPlayerWithX n pid p = case p of
 -- leaves the stack, so the id Filter.IsSource holds matches nothing once Lava
 -- Burst is in the graveyard.
 --
--- FOUR cases, and each of the first three is paired on ONE board with a control
--- differing in a single thing -- the source, or the recipient's kind -- so
--- neither can pass on an engine that suppressed the whole class.
+-- THREE cases, one per limb of the clause. The first and the last each carry a
+-- control on their OWN board differing in the SOURCE alone, and the middle one
+-- is itself the control for the RECIPIENT limb -- so none can pass on an engine
+-- that suppressed the whole class of preventions or redirections.
 lavaBurstSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 lavaBurstSpec s registry = Spec.describe s "Lava Burst (CR 615.12, CR 614.9)" $ do
   let hit src recipient n =
@@ -3530,7 +3531,8 @@ lavaBurstSpec s registry = Spec.describe s "Lava Burst (CR 615.12, CR 614.9)" $ 
   -- The RECIPIENT limb, which is the other half of Lava Burst's condition: the
   -- clause says "if Lava Burst would deal damage to A CREATURE", so its own
   -- damage dealt to a PLAYER is preventable like anybody's. Same card, same
-  -- shield, same X -- only the recipient's kind differs.
+  -- shield amount and same X as the case above; what differs is the KIND of
+  -- recipient both are aimed at.
   Spec.it s "CR 615.12 the same shield still prevents Lava Burst's 3 dealt to a player" $ do
     mountain <- S.printingOf s registry "Mountain"
     plains <- S.printingOf s registry "Plains"

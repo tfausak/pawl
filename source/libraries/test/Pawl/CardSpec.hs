@@ -3489,6 +3489,9 @@ playerEffectFilters playerEffect = case playerEffect of
 -- an effect applies TO, and a damage event between two creatures applies to no
 -- player at all.
 --
+-- Asked of CR 614.9's redirection twin too, and for the identical reason: its
+-- subject is a damage event as well, so its narrowings ride in the same pattern.
+--
 -- Exhaustive rather than a wildcard, this file's discipline for a sum: a second
 -- player effect whose reading depends on its scope must break this build.
 unpreventableScopeOffends :: AffectedPlayers.AffectedPlayers SlotName.SlotName -> PlayerEffect.PlayerEffect -> Bool
@@ -3532,8 +3535,9 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
   PlayerEffect.CantGetCounters _ -> False
 
--- The OTHER half of the same carrier, now that CR 615.12's narrowing rides in a
--- DamagePattern: does this card author a field of that pattern the engine bakes?
+-- The OTHER half of the same carrier -- and of CR 614.9's twin beside it, whose
+-- narrowing rides in the same type -- now that the narrowing is a DamagePattern:
+-- does this card author a field of that pattern the engine bakes?
 --
 -- `whichRecipient` and `whichSource` are the two, and for engineOnlyOffends'
 -- reason -- a card cannot name an ObjectId or a PlayerId. Whippoorwill's "damage
@@ -6674,8 +6678,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let patterns = concatMap (overFaces (fmap snd . cardPlayerScopes) . Printing.card) ps
         offenders = filter (anyFace (any (unpreventablePatternOffends . snd) . cardPlayerScopes) . Printing.card) ps
     -- The non-vacuity guard, and the guard that the AUTHORABLE axes really are
-    -- authored: Spider-Punk narrows nothing and Excruciator names TheSource, so
-    -- the sweep has both a permissive and a narrowed pattern to look at.
+    -- authored: Spider-Punk narrows nothing and Excruciator writes
+    -- Filter.IsSource, so the sweep has both a permissive and a narrowed pattern
+    -- to look at.
     Spec.assertBool s (any isUnpreventable patterns) "the pool has a card printing unpreventable damage"
     Spec.assertBool s (elem (PlayerEffect.DamageCantBePrevented anyDamage) patterns) "Spider-Punk's pattern narrows nothing"
     Spec.assertBool s (elem (PlayerEffect.DamageCantBePrevented anyDamage {DamagePattern.whatSource = Filter.Type.IsSource}) patterns) "Excruciator's names its own source"
