@@ -118,10 +118,12 @@ representatives pcs gs candidates =
 -- prohibition covers.
 --
 -- GameState.enteringCounters, GameState.detachedBindings and
--- GameState.broughtIn are listed below for the same reason and never observed:
--- the first is empty outside an entry loop, and the other two are CR 729's
--- subgame bookkeeping. Requiring them empty is the direction that cannot make a
--- player's choice, which is why they are here rather than in the account above.
+-- GameState.broughtIn are listed below because each holds ObjectIds, and NOT
+-- because any board reaches this with one of them non-empty: the first is empty
+-- outside an entry loop, and the other two are CR 729's subgame bookkeeping.
+-- They are in the list rather than in the account above because requiring a
+-- field empty is the direction that cannot make a player's choice, so an
+-- unreachable row is the cheap side to be wrong on.
 quiet :: GameState -> Bool
 quiet gs =
   null (GameState.continuousEffects gs)

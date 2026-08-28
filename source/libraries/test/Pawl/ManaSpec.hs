@@ -4470,8 +4470,8 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
   -- against one means asking every effect whether it names one of them, over an
   -- Affected that may be a Filter rather than a set of ids (#1969). Here the
   -- effect sits on the Bonesplitter, which is attached to nothing, so the three
-  -- Elves still agree
-  -- field for field and projection for projection -- and are still asked about.
+  -- Elves still agree field for field and projection for projection -- and are
+  -- still asked about.
   Spec.it s "CR 601.2g a stored continuous effect anywhere retires the elision" $ do
     elf <- S.printingOf s registry "Llanowar Elves"
     splitter <- S.printingOf s registry "Bonesplitter"
@@ -4483,7 +4483,7 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
     Spec.assertBool s paid "the {G} was paid"
     Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
 
-  -- GameState.haunting (CR 702.55b) is one of the four id-keyed relations
+  -- GameState.haunting (CR 702.55b) is one of the id-keyed relations
   -- Pawl.Engine.Interchangeable.namedByRelation SEARCHES rather than requires
   -- empty. Here the row names bob's Piker, so it says nothing about any Elf and
   -- the three are still one option -- where the board-wide gate would have
