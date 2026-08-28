@@ -2763,7 +2763,8 @@ shriek printing shriekerId oid board = case Face.activatedAbilities (S.combinedF
   ability : _ -> S.settleSba (S.runPure (revealing oid) board (Activate.activateAbility S.alice shriekerId ability >> Stack.resolveTop))
   [] -> board
 
--- CR 601.2c aimed at the face-down permanent, and CR 603.5's "may" exercised --
+-- CR 602.2b's targeting, which applies CR 601.2c, aimed at the face-down
+-- permanent; and CR 608.2d's announcement, taking the printed "may". Those are
 -- the two answers the Shrieker's ability asks for. Declining the "may" is the
 -- other legal answer and would leave every case's board indistinguishable from a
 -- condition that answered False, which is why it is taken rather than passed on.
