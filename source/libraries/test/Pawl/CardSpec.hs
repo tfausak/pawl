@@ -1576,6 +1576,7 @@ replacementEntryEffects replacement = case replacement of
   ReplacementEffect.TokenR {} -> []
   ReplacementEffect.TurnUpR {} -> []
   ReplacementEffect.UntapR _ -> []
+  ReplacementEffect.LifeLossR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 615.5: the additional effect a replacement PRINTS -- DamageR's riders, and
@@ -1596,6 +1597,7 @@ replacementEffectRiders replacement = case replacement of
   ReplacementEffect.TokenR {} -> []
   ReplacementEffect.TurnUpR {} -> []
   ReplacementEffect.UntapR _ -> []
+  ReplacementEffect.LifeLossR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- Every ReplacementEffect one effect authors: the one an Effect.Replace installs
@@ -1761,6 +1763,7 @@ phasePatternOffends replacement = case replacement of
   ReplacementEffect.TokenR {} -> False
   ReplacementEffect.TurnUpR {} -> False
   ReplacementEffect.UntapR _ -> False
+  ReplacementEffect.LifeLossR {} -> False
 
 -- Every replacement shape the codec accepts and no card may author, for
 -- phasePatternOffends' reason and one more. A card cannot name an ObjectId or a
@@ -1798,6 +1801,9 @@ engineOnlyOffends replacement = case replacement of
   ReplacementEffect.ZoneChangeR {} -> False
   ReplacementEffect.EntryR {} -> False
   ReplacementEffect.TokenR {} -> False
+  -- Worship prints this arm whole -- CR 109.5's relation and the printed floor
+  -- name nothing an engine has to bake -- so nothing here is engine-only.
+  ReplacementEffect.LifeLossR {} -> False
   ReplacementEffect.TurnUpR {} -> False
 
 -- Is this damage rewrite one the ENGINE mints and no card may print? Three of
@@ -1859,6 +1865,7 @@ turnUpRequiringOffends replacement = case replacement of
   ReplacementEffect.DestructionR _ -> False
   ReplacementEffect.TokenR {} -> False
   ReplacementEffect.UntapR _ -> False
+  ReplacementEffect.LifeLossR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- isPhaseR's twin: did the sweep above have anything to look at? A wildcard for
@@ -1886,6 +1893,7 @@ riderWithoutPreventionOffends replacement = case replacement of
   ReplacementEffect.TokenR {} -> False
   ReplacementEffect.TurnUpR {} -> False
   ReplacementEffect.UntapR _ -> False
+  ReplacementEffect.LifeLossR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- CR 615.1a: does this rewrite use the word "prevent"? engineMintedDamage's
@@ -3795,6 +3803,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.TokenR {} -> []
   ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern _ turnUpRewrite) -> turnUpPattern : turnUpRewriteFilters turnUpRewrite
   ReplacementEffect.UntapR _ -> []
+  ReplacementEffect.LifeLossR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 614.9's printed destination, the one Filter a damage REWRITE carries.

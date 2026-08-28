@@ -1572,6 +1572,120 @@ decoratedGriffinSpec s registry = Spec.describe s "Decorated Griffin (CR 510.2)"
     Spec.assertEqWith s "and the shield is spent to 0 and dropped (CR 615.7)" (shieldsLeft after) []
     Spec.assertEqWith s "where the unshielded board takes all 5" (S.lifeOf S.alice control) (Just 15)
 
+-- CR 307.1: hand a player their own precombat main phase, so a sorcery they hold
+-- is castable. `bobAttacks` above for the combat half.
+inMainPhase :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+inMainPhase pid gs = gs {GameState.activePlayer = pid, GameState.phase = Phase.PrecombatMain}
+
+-- Put one player at an exact life total, so a board can be built where the very
+-- next event would carry them past Worship's floor.
+atLife :: PlayerId.PlayerId -> Integer -> GameState.GameState -> GameState.GameState
+atLife pid n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) pid (GameState.players gs)}
+
+-- CR 614.1a / 120.4c: Worship ({3}{W} Enchantment, "If you control a creature,
+-- damage that would reduce your life total to less than 1 reduces it to 1
+-- instead" -- name, cost, type line and Oracle text checked against
+-- api.scryfall.com 2026-08-28).
+--
+-- The pool's only life-total replacement, and the card that separates CR 120.4b's
+-- damage from CR 120.4c's results. Its own Gatherer rulings state both halves:
+-- "It reduces your life total to 1, not the damage to 1", and "Worship does not
+-- prevent damage. It causes some damage to be unable to lower your life total. So
+-- any damage rendered useless by Worship was still dealt ... Worship does not
+-- prevent loss of life, so loss of life bypasses Worship." Serra the Benevolent's
+-- emblem prints the same clause word for word and is the worse producer: an
+-- emblem needs a resolution to mint it, where the enchantment is a permanent a
+-- fixture can place.
+--
+-- REAL COMBAT with a LIFELINK attacker, because that is the board on which the
+-- two readings of the rule differ. An implementation that shrank the DAMAGE
+-- instead of the life loss would leave alice at 1 just the same and gain bob 1
+-- rather than 3; the lifelink total is what tells them apart, and CR 120.3f is
+-- what makes it observable ("in addition to the damage's other results").
+--
+-- Every number is distinct -- alice at 2 or 5, a 3/4 attacker, a floor of 1, a
+-- 4-life drain -- so no two readings of the rule land on the same total.
+worshipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
+  Spec.it s "CR 614.1a the life total stops at 1, and the damage is dealt in full anyway" $ do
+    plains <- S.printingOf s registry "Plains"
+    worship <- S.printingOf s registry "Worship"
+    piker <- S.printingOf s registry "Goblin Piker"
+    celestine <- S.printingOf s registry "Celestine, the Living Saint"
+    let base = S.landsInPlay plains 2
+        (_, g1) = S.addCreature worship S.alice base
+        (_, g2) = S.addCreature piker S.alice g1
+        (_, g3) = S.addCreature celestine S.bob g2
+        after = S.runCombat attackNoBlock (bobAttacks (atLife S.alice 2 g3))
+    Spec.assertEqWith s "CR 614.1a alice stops at 1 rather than the -1 the damage would give" (S.lifeOf S.alice after) (Just 1)
+    Spec.assertEqWith s "CR 120.3f the whole 3 was still dealt, so lifelink gains bob 3 and not 1" (S.lifeOf S.bob after) (Just 23)
+    Spec.assertEqWith s "CR 120.4b the damage event itself is undiminished" (fmap DamageEvent.amount (S.damageEventsOf after)) [3]
+  -- CR 120.4d's own Worship example, in its second reading: "Worship's effect sees
+  -- that the damage event would not reduce the player's life total to less than 1,
+  -- so Worship's effect is not applied."
+  Spec.it s "CR 120.4d damage that does not reach the floor is left alone" $ do
+    plains <- S.printingOf s registry "Plains"
+    worship <- S.printingOf s registry "Worship"
+    piker <- S.printingOf s registry "Goblin Piker"
+    celestine <- S.printingOf s registry "Celestine, the Living Saint"
+    let base = S.landsInPlay plains 2
+        (_, g1) = S.addCreature worship S.alice base
+        (_, g2) = S.addCreature piker S.alice g1
+        (_, g3) = S.addCreature celestine S.bob g2
+        after = S.runCombat attackNoBlock (bobAttacks (atLife S.alice 5 g3))
+    Spec.assertEqWith s "the 3 lands whole: 5 - 3 = 2, not clamped to anything" (S.lifeOf S.alice after) (Just 2)
+  -- The CONTROL is the same board with alice's creature taken away, so the only
+  -- difference is the printed clause.
+  Spec.it s "CR 604.2 with no creature the printed clause is false and the whole 3 lands" $ do
+    plains <- S.printingOf s registry "Plains"
+    worship <- S.printingOf s registry "Worship"
+    celestine <- S.printingOf s registry "Celestine, the Living Saint"
+    let base = S.landsInPlay plains 2
+        (_, g1) = S.addCreature worship S.alice base
+        (_, g2) = S.addCreature celestine S.bob g1
+        after = S.runCombat attackNoBlock (bobAttacks (atLife S.alice 2 g2))
+    Spec.assertEqWith s "alice controls no creature, so she takes all 3 and ends at -1" (S.lifeOf S.alice after) (Just (-1))
+  -- CR 510.2's simultaneity, and CR 120.4d's first Worship example scaled down:
+  -- two attackers, each of whom alone would carry alice past the floor. Reading
+  -- each proposal against the PRE-BATCH life would cut both to a loss of 1 and
+  -- leave her at 0, dead to CR 704.5a.
+  Spec.it s "CR 510.2 two simultaneous hits still leave exactly 1" $ do
+    plains <- S.printingOf s registry "Plains"
+    worship <- S.printingOf s registry "Worship"
+    piker <- S.printingOf s registry "Goblin Piker"
+    celestine <- S.printingOf s registry "Celestine, the Living Saint"
+    -- A 2/1 lifelink Child of Night rather than a second Celestine: CR 704.5j
+    -- would bury one of two legends before either could attack, and the two
+    -- amounts differ anyway, which no single number could tell apart.
+    child <- S.printingOf s registry "Child of Night"
+    let base = S.landsInPlay plains 2
+        (_, g1) = S.addCreature worship S.alice base
+        (_, g2) = S.addCreature piker S.alice g1
+        (_, g3) = S.addCreature celestine S.bob g2
+        (_, g4) = S.addCreature child S.bob g3
+        after = S.runCombat attackNoBlock (bobAttacks (atLife S.alice 2 g4))
+    Spec.assertEqWith s "alice is at 1, not at the 0 a pre-batch reading would give" (S.lifeOf S.alice after) (Just 1)
+    Spec.assertEqWith s "CR 702.15e each lifelink source gained its own amount, 3 and 2" (S.lifeOf S.bob after) (Just 25)
+  -- Worship's own ruling: "Worship does not prevent loss of life, so loss of life
+  -- bypasses Worship." Zof Consumption ({4}{B}{B} Sorcery, "Each opponent loses 4
+  -- life and you gain 4 life") is the road CR 119.3 owns, against the same board
+  -- at the same life that survives 3 damage above.
+  Spec.it s "CR 119.3 life loss from an effect bypasses the clause" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    worship <- S.printingOf s registry "Worship"
+    piker <- S.printingOf s registry "Goblin Piker"
+    discipline <- S.printingOf s registry "Stronghold Discipline"
+    let base = S.landsInPlay swamp 4
+        (_, g1) = S.addCreature worship S.alice base
+        (_, g2) = S.addCreature piker S.alice g1
+        (_, g3) = S.addCreature piker S.alice g2
+        (_, g4) = S.addCreature piker S.alice g3
+        (held, g5) = S.addHandCard discipline S.alice g4
+        ready = inMainPhase S.alice (atLife S.alice 2 g5)
+        after = S.runPure S.identityAnswer ready (S.cast S.alice held Monad.>> Stack.resolveTop)
+    Spec.assertEqWith s "alice loses the whole 3, floor and all: 2 - 3 = -1" (S.lifeOf S.alice after) (Just (-1))
+    Spec.assertEqWith s "and bob, controlling no creature, loses nothing" (S.lifeOf S.bob after) (Just 20)
+
 -- Cast Divine Deflection for `x`, aiming CR 615.5's rider at a player. The target
 -- is FILTERED out of the offered set rather than built, so an aim the card's pool
 -- excludes leaves the slot empty instead of quietly becoming a legal one.
@@ -5126,6 +5240,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   scarecrowSpec s registry
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
+  worshipSpec s registry
   divineDeflectionSpec s registry
   braceForImpactSpec s registry
   inkshieldSpec s registry

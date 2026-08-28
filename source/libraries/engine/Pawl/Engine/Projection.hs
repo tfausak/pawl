@@ -2378,6 +2378,9 @@ rewriteReplacementEffect pairs effect = case effect of
   -- replacement is the same shape one event class over.
   ReplacementEffect.DestructionR _ -> effect
   ReplacementEffect.UntapR _ -> effect
+  -- CR 614.1a / 120.4c: a LifeLossPattern is one CR 109.5 relation and one cause,
+  -- and the rewrite is a number. No printed word, so nothing to swap.
+  ReplacementEffect.LifeLossR {} -> effect
   ReplacementEffect.CounterR r ->
     ReplacementEffect.CounterR
       r

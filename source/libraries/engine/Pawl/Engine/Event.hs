@@ -130,6 +130,9 @@ import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.LifeLossCause as LifeLossCause
+import qualified Pawl.Types.LifeLossR as LifeLossR
+import qualified Pawl.Types.LifeLossRewrite as LifeLossRewrite
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.MeldSource as MeldSource
@@ -2162,6 +2165,31 @@ apply batch candidate event =
         pure Nothing
     -- Unreachable: `applies` admits UntapR only against WouldUntap.
     (ReplacementEffect.UntapR _, _) -> pure (Just event)
+    -- CR 614.1a / 120.4c: Worship's "reduces it to 1 instead". The event survives
+    -- at a SMALLER LOSS rather than being cancelled, which is what makes the
+    -- rewrite composable: CR 616.2's next iteration re-collects against the
+    -- shrunken loss, and a second row with a higher floor can cut it again.
+    --
+    -- The rewrite names the resulting TOTAL and this arm converts it into the
+    -- event's currency, reading the player's life LIVE. That is the whole reason
+    -- the field is a floor rather than an amount -- Worship's own ruling insists
+    -- on it: "It reduces your life total to 1, not the damage to 1."
+    --
+    -- Saturating at zero covers a player already at or below the floor, whom CR
+    -- 704.5a has not yet swept: they lose nothing at all.
+    --
+    -- No arm here touches the DAMAGE. By CR 120.4b it has already been dealt, and
+    -- Pawl.Engine.Damage.applyDamage still gains a lifelink source's controller
+    -- every point of it -- "any damage rendered useless by Worship was still
+    -- dealt".
+    (ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR _ rewrite), ProposedEvent.WouldLoseLife cause pid _) -> case rewrite of
+      LifeLossRewrite.LeaveAtLeast floor_ -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        let life = maybe 0 Player.life (Map.lookup pid (GameState.players gs))
+        pure (Just (ProposedEvent.WouldLoseLife cause pid (Integer.toNaturalSaturating (life - toInteger floor_))))
+    -- Unreachable: `applies` admits LifeLossR only against WouldLoseLife.
+    (ReplacementEffect.LifeLossR {}, _) -> pure (Just event)
     -- CR 122.6/614.1: Hardened Scales/Doubling Season scale a counter placement.
     (ReplacementEffect.CounterR (CounterR.MkCounterR _ scaling), ProposedEvent.WouldPutCounters cause oid kind n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
@@ -2888,6 +2916,27 @@ resolvePlayerCounters :: CounterCause.CounterCause -> PlayerId -> PlayerCounterK
 resolvePlayerCounters cause pid kind n = do
   outcome <- applyReplacements (ProposedEvent.WouldPutPlayerCounters cause pid kind n)
   pure (outcome >>= Replacement.asPlayerCounters)
+
+-- CR 119.3 / 120.4c: settle how much life a player actually loses, and answer
+-- with the surviving amount. The one funnel both causes go through --
+-- Pawl.Engine.Damage.applyDamage at CR 120.4c's result-processing step, and
+-- Pawl.Engine.Resolve's Effect.LoseLife arm -- so a row cannot reach one road and
+-- miss the other.
+--
+-- It does not WRITE the life total, unlike resolveUntap and the counter funnels
+-- above: both callers already own that write, and the damage one has to fold its
+-- answer back into a batch of simultaneous events (CR 510.2) that this module
+-- knows nothing about.
+--
+-- Zero proposes nothing, which is CR 119.9's posture on the gain side taken for
+-- the loss: no life loss event, so no row is spent on one.
+resolveLifeLoss :: LifeLossCause.LifeLossCause -> PlayerId -> Natural -> Game Natural
+resolveLifeLoss cause pid n =
+  if n == 0
+    then pure 0
+    else do
+      outcome <- applyReplacements (ProposedEvent.WouldLoseLife cause pid n)
+      pure (maybe 0 snd (outcome >>= Replacement.asLifeLoss))
 
 -- CR 111.1: settle a proposed token creation. Nothing means none are created.
 resolveTokens :: PlayerId -> Card -> Natural -> Game (Maybe (PlayerId, Card, Natural))
