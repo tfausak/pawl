@@ -405,6 +405,8 @@ library codec
     Pawl.Codec.FloatingCandidateSpec
     Pawl.Codec.ForEach
     Pawl.Codec.ForEachSpec
+    Pawl.Codec.FromOutsideTheGame
+    Pawl.Codec.FromOutsideTheGameSpec
     Pawl.Codec.GameEvent
     Pawl.Codec.GameEventSpec
     Pawl.Codec.GameState
@@ -1431,6 +1433,7 @@ library types
     Pawl.Types.FlipCoin
     Pawl.Types.FloatingCandidate
     Pawl.Types.ForEach
+    Pawl.Types.FromOutsideTheGame
     Pawl.Types.Game
     Pawl.Types.GameEvent
     Pawl.Types.GameState

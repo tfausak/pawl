@@ -5,7 +5,7 @@
 -- game), the two fields that carry it -- Pawl.Types.Deck's sideboard (CR 103.2a)
 -- and Pawl.Types.Player's outsideTheGame -- Pawl.Engine.Setup.createDeck's copy
 -- between them, and Pawl.Engine.Resolve's two arms:
--- Effect.RevealFromOutsideTheGame and Effect.ExileThisSpell (CR 608.2n). Also
+-- Effect.FromOutsideTheGame and Effect.ExileThisSpell (CR 608.2n). Also
 -- CR 729.4's second place a card can be outside the game: the main game as a
 -- subgame sees it, which is Pawl.Engine.Setup's subgameStateFrom and
 -- applyCrossings with Pawl.Engine.Engine.playSubgame between them.
@@ -20,9 +20,8 @@
 -- main-game creatures, then Burning Wish reaching the resolving Shahrazad itself
 -- (CR 729.5).
 --
--- Not implemented: the cycle's instant, Cunning Wish, and Ring of Ma'ruf are not
--- in data/cards/, so nothing here casts a wish at instant speed and nothing
--- reaches outside the game through a draw replacement (#2470).
+-- Not implemented: Ring of Ma'ruf is not in data/cards/, so nothing here reaches
+-- outside the game through a draw replacement (#2470).
 module Pawl.OutsideTheGameSpec where
 
 import qualified Data.Foldable as Foldable
@@ -45,6 +44,7 @@ import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LifeChange as LifeChange
@@ -63,8 +63,8 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
--- alice, two Mountains untapped, Burning Wish in hand, and the given multiset of
--- printings outside the game.
+-- alice, four untapped lands of one printing, one wish in hand, and the given
+-- multiset of printings outside the game.
 --
 -- The pool is written onto the player directly, Pawl.DungeonSpec's posture for
 -- Player.dungeons: what CR 103.2a's road from a Deck does is the last case below,
@@ -204,6 +204,77 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
     -- what the answer above names.
     Spec.assertEqWith s "the card she named is the one in her hand" (printingsIn Zone.Hand S.alice resolved) [psychicMiasma]
     Spec.assertEqWith s "and the other card is still outside the game" (Map.size (poolOf S.alice resolved)) 1
+  -- CR 601.3a / 307.1: Cunning Wish ({2}{U} instant, "You may reveal an instant
+  -- card you own from outside the game and put it into your hand. Exile Cunning
+  -- Wish.") is the cycle's instant, so it is the one wish that reaches outside
+  -- the game with another spell already on the stack.
+  --
+  -- A PAIR of castability readings off ONE board, differing only in which wish is
+  -- asked about: both are in the same hand, both are payable from the same eight
+  -- untapped lands, and the spell on the stack is the same spell. The type line is
+  -- the only difference left, which is what CR 307.1 turns on.
+  Spec.it s "CR 307.1 with a spell on the stack the cycle's instant is castable and its sorcery is not" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    cunning <- S.printingOf s registry "Cunning Wish"
+    burning <- S.printingOf s registry "Burning Wish"
+    cancel <- S.printingOf s registry "Cancel"
+    signInBlood <- S.printingOf s registry "Sign in Blood"
+    let (board, occupantId) = wishBoard mountain burning [(cancel, 1), (signInBlood, 1)]
+        withIslands = S.landsFor island S.alice 4 board
+        (cunningId, withCunning) = S.addHandCard cunning S.alice withIslands
+        (burningId, ready) = S.addHandCard burning S.alice withCunning
+        -- The occupant is a Burning Wish cast at sorcery speed onto an EMPTY
+        -- stack, which is what makes the stack non-empty for the two readings
+        -- below without introducing a card the pool does not already hold.
+        held = snd (Engine.runGamePure exercising ready (S.cast S.alice occupantId))
+    Spec.assertEqWith s "the stack holds the spell cast first" (length (Game.zoneMembers Zone.Stack S.alice held)) 1
+    Spec.assertEqWith s "CR 307.1: the sorcery in hand cannot be cast into that window" (S.castable S.alice burningId held) False
+    Spec.assertEqWith s "CR 601.3a: the instant can" (S.castable S.alice cunningId held) True
+    -- Driven, not merely gated: the wish is actually cast in that window, and what
+    -- arrives is the INSTANT its filter names rather than the sorcery sitting
+    -- beside it in the pool -- which the wish underneath then takes in its turn.
+    let stacked = snd (Engine.runGamePure exercising held (S.cast S.alice cunningId))
+        once = snd (Engine.runGamePure exercising stacked Stack.resolveTop)
+        after = snd (Engine.runGamePure exercising once Stack.resolveTop)
+    Spec.assertEqWith s "both wishes are on the stack at once" (length (Game.zoneMembers Zone.Stack S.alice stacked)) 2
+    Spec.assertEqWith s "CR 400.11c: Cunning Wish resolves first and takes the instant" (List.sort (printingsIn Zone.Hand S.alice once)) (List.sort [burning, cancel])
+    Spec.assertEqWith s "and the sorcery wish underneath then takes the sorcery" (List.sort (printingsIn Zone.Hand S.alice after)) (List.sort [burning, cancel, signInBlood])
+    Spec.assertEqWith s "CR 608.2n: both cast wishes exiled themselves" (List.sort (printingsIn Zone.Exile S.alice after)) (List.sort [burning, cunning])
+  -- CR 701.20a is a keyword action of its own, and a card that does not print it
+  -- shows nobody anything. Death Wish ({1}{B}{B} sorcery, "You may put a card you
+  -- own from outside the game into your hand. You lose half your life, rounded up.
+  -- Exile Death Wish.") is the producer: no reveal, and no stated quality either,
+  -- so its filter is the empty And that admits everything.
+  --
+  -- A PAIR of boards differing in ONE thing, the wish. Same lands, same pool, same
+  -- card arriving in hand -- so the Revealed entry is the only reading that moves.
+  Spec.it s "CR 701.20a Death Wish brings the card in without revealing it, where Burning Wish reveals" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    swamp <- S.printingOf s registry "Swamp"
+    death <- S.printingOf s registry "Death Wish"
+    burning <- S.printingOf s registry "Burning Wish"
+    signInBlood <- S.printingOf s registry "Sign in Blood"
+    let boardFor wish =
+          let (base, wishId) = wishBoard mountain wish [(signInBlood, 1)]
+           in (S.landsFor swamp S.alice 4 base, wishId)
+        (deathBoard, deathId) = boardFor death
+        (burningBoard, burningId) = boardFor burning
+        afterDeath = resolveWish exercising deathId deathBoard
+        afterBurning = resolveWish exercising burningId burningBoard
+        isRevealed e = case e of
+          GameEvent.Revealed _ -> True
+          _ -> False
+    -- THE BEHAVIOUR first. The card is in hand either way, so an assertion that
+    -- it arrived cannot absorb the reveal reading below.
+    Spec.assertEqWith s "CR 400.11c: Death Wish's empty filter admits the sorcery, which reaches her hand" (printingsIn Zone.Hand S.alice afterDeath) [signInBlood]
+    Spec.assertEqWith s "CR 701.20a: and nothing was revealed" (eventIndex isRevealed afterDeath) Nothing
+    Spec.assertEqWith s "where Burning Wish brings in the same card" (printingsIn Zone.Hand S.alice afterBurning) [signInBlood]
+    Spec.assertEqWith s "and does reveal it" (Maybe.isJust (eventIndex isRevealed afterBurning)) True
+    -- The rest of Death Wish's sentence, which is what tells a resolution apart
+    -- from a fizzle: CR 118.3, half of twenty rounded up.
+    Spec.assertEqWith s "she lost half her life, rounded up" (S.lifeOf S.alice afterDeath) (Just 10)
+    Spec.assertEqWith s "and Burning Wish cost her none" (S.lifeOf S.alice afterBurning) (Just 20)
   -- CR 103.2a: the sideboard is set aside before the game, which is the one path
   -- every case above skips by writing Player.outsideTheGame directly.
   Spec.it s "CR 103.2a a deck's sideboard is recorded on its player and minted into no zone" $ do
@@ -228,14 +299,14 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
   -- GameState.outsideObjects (CR 729.4, "all objects in the main game ... are
   -- considered outside the subgame"), and a wish cast IN the subgame can reach
   -- it just as it reaches the sideboard pool. Called at the unit level --
-  -- `OutsideTheGame.reveal` directly -- rather than through a printed wish,
+  -- `OutsideTheGame.bringInto` directly -- rather than through a printed wish,
   -- since Living Wish's own casting is not this unit's concern.
   Spec.it s "CR 729.4/729.4a a wish cast in a subgame reaches a main-game creature" $ do
     bear <- S.printingOf s registry "Prodigal Sorcerer"
     let (bearId, parent) = S.addCreature bear S.alice (Setup.emptyGame S.bothPlayers)
         sub = Setup.subgameStateFrom S.alice parent
         predicate = Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Land]
-        after = snd (Engine.runGamePure S.identityAnswer sub (OutsideTheGame.reveal predicate bearId S.alice))
+        after = snd (Engine.runGamePure S.identityAnswer sub (OutsideTheGame.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) bearId S.alice))
     Spec.assertEqWith s "CR 729.4/400.11c: the main-game creature arrives in her subgame hand" (printingsIn Zone.Hand S.alice after) [bear]
     Spec.assertEqWith s "CR 729.4a: the crossing is recorded for the outer frame to apply" (Foldable.toList (GameState.broughtIn after)) [bearId]
     Spec.assertEqWith s "and it is no longer offered" (Map.member bearId (GameState.outsideObjects after)) False
@@ -258,7 +329,7 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
         answer p = case p of
           Prompt.ChooseFromOutsideTheGame _ _ candidates -> Maybe.fromMaybe (NonEmpty.head candidates) (List.find isPool (NonEmpty.toList candidates))
           _ -> S.identityAnswer p
-        after = snd (Engine.runGamePure answer sub (OutsideTheGame.reveal predicate bearId S.alice))
+        after = snd (Engine.runGamePure answer sub (OutsideTheGame.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) bearId S.alice))
     Spec.assertEqWith s "the pool and the main game were both on offer" (length offered) 2
     Spec.assertEqWith s "the pool card is what arrived" (printingsIn Zone.Hand S.alice after) [dragon]
     Spec.assertEqWith s "the main-game creature is untouched: the answer did not take it" (Map.member bearId (GameState.outsideObjects after)) True
@@ -271,7 +342,7 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
     let (bobsBearId, parent) = S.addCreature bear S.bob (Setup.emptyGame S.bothPlayers)
         sub = Setup.subgameStateFrom S.alice parent
         predicate = Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Land]
-        after = snd (Engine.runGamePure S.identityAnswer sub (OutsideTheGame.reveal predicate bobsBearId S.alice))
+        after = snd (Engine.runGamePure S.identityAnswer sub (OutsideTheGame.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) bobsBearId S.alice))
     Spec.assertEqWith s "alice's hand stays empty: bob's creature is not hers to reach" (printingsIn Zone.Hand S.alice after) []
     Spec.assertEqWith s "and bob's card is untouched" (Map.member bobsBearId (GameState.outsideObjects after)) True
   -- CR 729.4 / 729.4a / 729.5, the whole road at gameplay level and the case #152

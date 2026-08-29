@@ -39,6 +39,7 @@ import qualified Pawl.Codec.Fight as Fight
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.FlipCoin as FlipCoin
 import qualified Pawl.Codec.ForEach as ForEach
+import qualified Pawl.Codec.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Codec.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.LookAt as LookAt
@@ -92,7 +93,7 @@ codec cardCodec abilityCodec =
       Arm.nullary "ExileAllGraveyards" Effect.ExileAllGraveyards,
       Arm.nullary "Proliferate" Effect.Proliferate,
       Arm.payload "ChooseCardName" (Filter.codec Keyword.codec) Effect.ChooseCardName (\x -> case x of Effect.ChooseCardName y -> Just y; _ -> Nothing),
-      Arm.payload "RevealFromOutsideTheGame" (Filter.codec Keyword.codec) Effect.RevealFromOutsideTheGame (\x -> case x of Effect.RevealFromOutsideTheGame y -> Just y; _ -> Nothing),
+      Arm.payload "FromOutsideTheGame" FromOutsideTheGame.codec Effect.FromOutsideTheGame (\x -> case x of Effect.FromOutsideTheGame y -> Just y; _ -> Nothing),
       Arm.nullary "ExileThisSpell" Effect.ExileThisSpell,
       Arm.payload "Bolster" Quantity.codec Effect.Bolster (\x -> case x of Effect.Bolster y -> Just y; _ -> Nothing),
       Arm.payload "Amass" Amass.codec Effect.Amass (\x -> case x of Effect.Amass y -> Just y; _ -> Nothing),
