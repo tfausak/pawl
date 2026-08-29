@@ -26,6 +26,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LookAt as LookAt
@@ -296,44 +297,37 @@ data Effect card ability
     -- Not implemented: rule 701.20a keeps a revealed card revealed "for as long
     -- as necessary", which pawl has nowhere to store (#1408).
     Reveal Reveal.Reveal
-  | -- | CR 400.11c: the resolving controller reveals a card they own from OUTSIDE
-    -- THE GAME matching the Filter and puts it into their hand -- Burning Wish's
-    -- whole sentence. The pool is Pawl.Types.Player's outsideTheGame, and CR
-    -- 400.11c is what makes an opcode necessary rather than an ObjectRef: cards
-    -- outside the game "can\'t be affected by spells or abilities, EXCEPT ...
-    -- spells and abilities that allow those cards to be brought into the game",
-    -- so nothing that names objects can reach them and no ObjectRef could.
+  | -- | CR 400.11c: the resolving controller puts a card they own from OUTSIDE
+    -- THE GAME into their hand, showing it first where the card prints CR
+    -- 701.20a\'s reveal -- Burning Wish\'s whole sentence, and Death Wish\'s
+    -- without the reveal.
+    --
+    -- An opcode rather than an ObjectRef, and CR 400.11c is why: cards outside
+    -- the game "can\'t be affected by spells or abilities, EXCEPT ... spells and
+    -- abilities that allow those cards to be brought into the game", so nothing
+    -- that names objects can reach them.
     --
     -- The Filter is evaluated against the PRINTED FACE
-    -- (Pawl.Engine.Projection.viewOfCard) rather than an object\'s CR 613
-    -- projection, there being no object: CR 400.11 makes outside the game not a
-    -- zone, so there is nowhere for one to sit. CR 604.3 is why that view is still
-    -- the right one -- a characteristic-defining ability is the only thing that
-    -- functions out there, and viewOfCard reads it.
-    --
-    -- A bare Filter and no payload record, ChooseCardName\'s shape: the sentence
-    -- has one variable. What the other axes would be, each with a printed card
-    -- behind it and none in data/cards: a destination other than the hand
-    -- (Spawnsire of Ulamog\'s battlefield), a count other than one (Spawnsire
-    -- again, "any number") and a reveal the card does not print (Ring of Ma\'ruf).
-    -- Not implemented: any of the three (gap #2449).
+    -- (Pawl.Engine.Projection.viewOfCard): CR 400.11 makes outside the game not a
+    -- zone, so no object exists to project, and CR 604.3 makes a
+    -- characteristic-defining ability the only thing that functions out there.
     --
     -- No optionality field: Burning Wish\'s "You may" is the CLAUSE\'s printed may
     -- (CR 608.2d), which Pawl.Engine.Resolve.exercises already asks ahead of the
     -- instruction.
     --
     -- No chooser ref either, and CR 108.3b is why this is exact rather than an
-    -- approximation: no card outside the game is ownerless, and every rule that
-    -- reaches out there asks for the acting player\'s OWN cards (CR 309.2a, CR
-    -- 701.23j, CR 701.48a, CR 702.139a). A card letting one player reach another\'s
-    -- sideboard is not a card that exists.
+    -- approximation: every rule that reaches out there asks for the acting
+    -- player\'s OWN cards (CR 309.2a, CR 701.23j, CR 701.48a, CR 702.139a).
     --
-    -- The reveal is CR 701.20a\'s and rides HERE rather than in a Reveal opcode
-    -- beside it, SearchDestination.RevealThenHand\'s reason: the card prints one
-    -- instruction. Not implemented: the reveal happens as the card ARRIVES IN THE
-    -- HAND rather than before the move as printed, GameEvent.Revealed being keyed
-    -- on an ObjectId and outside the game having none to key it on (#2450).
-    RevealFromOutsideTheGame (Filter.Filter Keyword.Keyword)
+    -- Not implemented: a destination other than the hand, and a count other than
+    -- one -- the two axes Pawl.Types.FromOutsideTheGame does not carry
+    -- (gap #2449).
+    --
+    -- Not implemented: where the reveal is printed it happens as the card ARRIVES
+    -- IN THE HAND rather than before the move, GameEvent.Revealed being keyed on
+    -- an ObjectId and outside the game having none to key it on (#2450).
+    FromOutsideTheGame FromOutsideTheGame.FromOutsideTheGame
   | -- | CR 608.2n: THIS SPELL goes to exile as this instruction runs, rather than
     -- to its owner\'s graveyard as the final part of its resolution -- Burning
     -- Wish\'s "Exile Burning Wish".

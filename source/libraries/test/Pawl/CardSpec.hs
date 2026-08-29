@@ -150,6 +150,7 @@ import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -833,7 +834,7 @@ effectCounts effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.ChooseCardName _ -> []
-  Effect.RevealFromOutsideTheGame _ -> []
+  Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
   -- Bolster's N is a Quantity like the Search's above, so its Counts are
   -- reachable from here.
@@ -1153,7 +1154,7 @@ effectNestedEffects effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.ChooseCardName _ -> []
-  Effect.RevealFromOutsideTheGame _ -> []
+  Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
@@ -1636,7 +1637,7 @@ effectReplacements effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.ChooseCardName _ -> []
-  Effect.RevealFromOutsideTheGame _ -> []
+  Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
   Effect.Bolster _ -> []
   Effect.Amass _ -> []
@@ -2396,7 +2397,7 @@ effectMintedFaces effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.ChooseCardName _ -> []
-  Effect.RevealFromOutsideTheGame _ -> []
+  Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
   Effect.Bolster _ -> []
   -- The Army token is Pawl.Engine.Amass.armyToken's, minted from the rulebook
@@ -4092,7 +4093,7 @@ effectFilters effect = case effect of
   -- CR 400.11c's filter, UNFRAMED for ChooseCardName's reason turned around: it
   -- is matched against a PRINTED FACE (Pawl.Engine.Projection.viewOfCard) rather
   -- than against an object any of the framings' evaluators project.
-  Effect.RevealFromOutsideTheGame predicate -> unframed [predicate]
+  Effect.FromOutsideTheGame payload -> unframed [FromOutsideTheGame.filter payload]
   Effect.ExileThisSpell -> []
   -- Only the count's Filters: rule 701.39a describes the candidate pool, so no
   -- Filter on the card names it.
@@ -4373,7 +4374,7 @@ effectObjectRefs effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.ChooseCardName {} -> []
-  Effect.RevealFromOutsideTheGame {} -> []
+  Effect.FromOutsideTheGame {} -> []
   Effect.ExileThisSpell -> []
   Effect.Bolster {} -> []
   Effect.Amass {} -> []

@@ -1,0 +1,102 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Death Wish",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "FromOutsideTheGame",
+                    "value": {
+                      "filter": {
+                        "type": "And",
+                        "value": []
+                      },
+                      "reveal": false
+                    }
+                  }
+                ],
+                "optionality": {
+                  "type": "Optional"
+                }
+              },
+              {
+                "effects": [
+                  {
+                    "type": "LoseLife",
+                    "value": {
+                      "player": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "quantity": {
+                        "type": "Halved",
+                        "value": {
+                          "quantity": {
+                            "type": "LifeTotal",
+                            "value": {
+                              "type": "Relative",
+                              "value": {
+                                "type": "You"
+                              }
+                            }
+                          },
+                          "rounding": {
+                            "type": "Up"
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "effects": [
+                  {
+                    "type": "ExileThisSpell"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

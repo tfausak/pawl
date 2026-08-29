@@ -172,6 +172,7 @@ import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.FlipCoinSpec
 import qualified Pawl.Codec.FloatingCandidateSpec
 import qualified Pawl.Codec.ForEachSpec
+import qualified Pawl.Codec.FromOutsideTheGameSpec
 import qualified Pawl.Codec.GameEventSpec
 import qualified Pawl.Codec.GrantPlayFromExileSpec
 import qualified Pawl.Codec.GrantedAbilitySpec
@@ -707,6 +708,7 @@ spec s registry = do
   Pawl.Codec.FlipCoinSpec.spec s
   Pawl.Codec.FloatingCandidateSpec.spec s
   Pawl.Codec.ForEachSpec.spec s
+  Pawl.Codec.FromOutsideTheGameSpec.spec s
   Pawl.Codec.GameEventSpec.spec s
   Pawl.Codec.GrantPlayFromExileSpec.spec s
   Pawl.Codec.GrantedAbilitySpec.spec s

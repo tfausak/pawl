@@ -90,6 +90,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -2025,7 +2026,7 @@ rewriteEffect pairs effect = case effect of
   -- same way. A REGRESSION FENCE rather than a proven behaviour -- no card in
   -- data/cards changes a word this filter names, so both readings leave the same
   -- board and mutating this line reddens nothing.
-  Effect.RevealFromOutsideTheGame predicate -> Effect.RevealFromOutsideTheGame (Filter.rewrite pairs predicate)
+  Effect.FromOutsideTheGame (FromOutsideTheGame.MkFromOutsideTheGame predicate reveal) -> Effect.FromOutsideTheGame (FromOutsideTheGame.MkFromOutsideTheGame (Filter.rewrite pairs predicate) reveal)
   Effect.ExileThisSpell -> effect
   Effect.Bolster quantity -> Effect.Bolster (rewriteQuantity pairs quantity)
   -- CR 612.1 / 612.2a: amass's subtype is a printed word of CR 205.3m's family,
@@ -2052,7 +2053,7 @@ rewriteEffect pairs effect = case effect of
   -- this rewrites: a type line is CR 205's, not CR 201.4a's changeable text.
   --
   -- A REGRESSION FENCE rather than a proven behaviour, the shape
-  -- RevealFromOutsideTheGame above records: the two filters this opcode carries in
+  -- FromOutsideTheGame above records: the two filters this opcode carries in
   -- data/cards name a keyword family (Backslide, Weaver of Lies) and the source,
   -- neither of which rule 612 changes, so both readings leave the same board and
   -- mutating this line reddens nothing.

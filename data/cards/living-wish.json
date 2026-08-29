@@ -24,23 +24,26 @@
               {
                 "effects": [
                   {
-                    "type": "RevealFromOutsideTheGame",
+                    "type": "FromOutsideTheGame",
                     "value": {
-                      "type": "Or",
-                      "value": [
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Creature"
+                      "filter": {
+                        "type": "Or",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Creature"
+                            }
+                          },
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Land"
+                            }
                           }
-                        },
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Land"
-                          }
-                        }
-                      ]
+                        ]
+                      },
+                      "reveal": true
                     }
                   }
                 ],
