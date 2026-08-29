@@ -4653,6 +4653,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- The batch's own board, read after CR 401.4's arrangement asks (which
           -- move nothing) and before any member does.
           before <- State.get
+          -- CR 701.40e's own three conditions, read off that same board; the
+          -- `arrived` bind below is where the rule is applied and where the case
+          -- for reading a rider here is written out.
+          let manifested = fmap FaceDownState.reason (EntryRiders.faceDown entry) == Just FaceDownReason.Manifested
+              fromOwnLibrary target = case Game.lookupObject target before of
+                Just obj -> Object.zone obj == Zone.Library && Object.owner obj == controller
+                Nothing -> False
+              oneAtATime =
+                zone == Zone.Battlefield
+                  && manifested
+                  && length arrivals > 1
+                  && all (fromOwnLibrary . fst) arrivals
           -- CR 608.2h: the counts the riders carry, settled ONCE off that same
           -- board and before the fold, so no member of the batch can see how many
           -- counters an earlier member arrived with (CR 608.2f).
@@ -4693,7 +4705,31 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- Around the FOLD alone. The gathers above ask CR 608.2d choices and CR
           -- 401.4 arrangements, which move nothing and record nothing; a bracket
           -- reaching over them would only widen what the group means.
-          arrived <- fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mBlocked frozen before) (Set.empty, []) arrivals))
+          --
+          -- CR 701.40e is the one exception the rules write to that reading: "if
+          -- an effect instructs a player to manifest multiple cards from their
+          -- library, those cards are manifested one at a time." Then the opcode
+          -- is not one action taken on several objects but several actions, so
+          -- each card gets its own event -- its own board, its own frozen riders,
+          -- and no sibling to exclude, which is what lets the second card's CR
+          -- 614.12 determination count the first one (Pawl.FaceDownSpec's
+          -- Ethereal Ambush under Synthetic Encircling Net).
+          --
+          -- The gate reads the RIDER (CR 708.2's manifest reason), the
+          -- destination and where the cards are, never the effect's identity:
+          -- CR 701.40's keyword action is what a face-down battlefield arrival
+          -- out of a library IS. Both of the rule's own restrictions are in it --
+          -- MULTIPLE, so a single card takes the ordinary path, and THEIR
+          -- LIBRARY, which CR 108.3 makes the owner's, so a manifest out of
+          -- another player's library or out of exile (Ghastly Conscription) stays
+          -- one event.
+          arrived <-
+            if oneAtATime
+              then fmap concat . Monad.forM arrivals $ \arrival -> do
+                now <- State.get
+                let riders = freezeRiders (effectViewOf source legal now) (chooseContext now) now resolving source entry
+                fmap (reverse . snd) (Event.simultaneously (moveOne mBlocked riders now (Set.empty, []) arrival))
+              else fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mBlocked frozen before) (Set.empty, []) arrivals))
           Monad.mapM_ (\slot -> bindArrivals slot (concatMap Foldable.toList arrived)) mSlot
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries. Two
   -- steps: CR 400.7's move through the same changeZone funnel every destination

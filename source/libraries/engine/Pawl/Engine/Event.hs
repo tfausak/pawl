@@ -911,6 +911,11 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 -- sweep to find, and one that has arrived is. Either way a later member's entry
 -- loop would otherwise find its siblings already sitting on the battlefield.
 --
+-- Where the CR says the cards are NOT simultaneous the set is empty again and a
+-- sibling is a plain battlefield permanent, which is the whole of what CR
+-- 701.40e's one-at-a-time manifest buys: Pawl.Engine.Resolve hands each such card
+-- its own event rather than one accumulating fold.
+--
 -- A simultaneously-entering sibling can reach a later member's entry loop through
 -- four channels; only the first needs this explicit exclusion:
 --   1. Copy targets -- excluded by `batch`. Two boards observe it, one per
