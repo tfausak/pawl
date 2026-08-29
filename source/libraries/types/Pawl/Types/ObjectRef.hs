@@ -336,8 +336,8 @@ data ObjectRef
     -- taken from its head (CR 121.1) and both carry a Quantity, and they differ
     -- only in what that Quantity counts -- cards there, MATCHES here.
     --
-    -- NOT the filtered sweep of a library the arms above still lack, and the
-    -- difference is the one #1309 turned on. A sweep would have to read
+    -- NOT the filtered sweep of a library the arms above still lack (gap #2416),
+    -- and that is the difference. A sweep would have to read
     -- every card in a hidden zone (CR 400.2) and report which ones matched; this
     -- walks the pile from the top and stops, so which cards it names is a
     -- POSITION question that a Filter only terminates. Every card the walk names
@@ -595,8 +595,10 @@ data ObjectRef
     -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
     -- read, so objectRefObjects answers nothing for it -- ChosenCardInGraveyard's
     -- note above says why, and the same lint rejects it under an opcode that
-    -- cannot ask. Today Pawl.Engine.Resolve's turnPermanentsOver is the one
-    -- that asks, reached by Effect.Transform and Effect.Convert alike.
+    -- cannot ask. Two gathers ask: Pawl.Engine.Resolve's turnPermanentsOver,
+    -- reached by Effect.Transform and Effect.Convert alike, and its
+    -- Effect.MoveToZone gather -- Glorious Protector's "you may exile any number
+    -- of non-Angel creatures you control".
     AnyNumberMatching (Filter.Filter Keyword.Keyword)
   | -- | EXACTLY ONE of the permanents on the battlefield matching the Filter,
     -- chosen as the effect runs -- the Garrison in Hanweir Battlements' "If you

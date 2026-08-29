@@ -2344,10 +2344,11 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.EachMatching filter_ -> battlefieldMatching legal resolving controller source gs filter_
   -- A CR 608.2d question, so this pure sweep answers nothing for it: the
   -- candidates are battlefieldMatching's, but WHICH of them the instruction names
-  -- is the chooser's, and only turnPermanentsOver -- the body Effect.Transform and
-  -- Effect.Convert share -- reaches the Game monad to ask. Under any other opcode this empty answer is an inert card-data error,
-  -- which Pawl.CardSpec's inertChoosers rejects at load time --
-  -- ChosenCardInGraveyard's note below is the shape.
+  -- is the chooser's, and two gathers reach the Game monad to ask --
+  -- turnPermanentsOver, the body Effect.Transform and Effect.Convert share, and
+  -- the Effect.MoveToZone gather. Under any other opcode this empty answer is an
+  -- inert card-data error, which Pawl.CardSpec's inertChoosers rejects at load
+  -- time -- ChosenCardInGraveyard's note below is the shape.
   ObjectRef.AnyNumberMatching _ -> []
   -- The arm above's answer, for its reason: a CR 608.2d question, so this pure
   -- sweep answers nothing for it. The Effect.MoveToZone gather is the one arm
@@ -2670,7 +2671,8 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardFromAmong {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- No recipients: only the Reveal arm can ask the interpreter.
   ObjectRef.RandomCardInHand _ -> []
-  -- No recipients: only turnPermanentsOver's gather can ask the chooser.
+  -- No recipients: the answer needs the chooser asked, and only
+  -- turnPermanentsOver's gather and the Effect.MoveToZone gather can ask.
   ObjectRef.AnyNumberMatching _ -> []
   -- No recipients: the arm above's answer, for its reason -- only a gather that
   -- reaches the Game monad can ask the chooser.
@@ -4631,11 +4633,28 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- under this opcode names no object; the count and that rule's other
             -- exception need a design call (#1733).
             ObjectRef.RandomCardInHand _ -> pure []
-            -- Not implemented: a chosen subset of permanents moved somewhere.
-            -- Nothing gathers it here, so a card writing the ref under this
-            -- opcode names no object; the destination and CR 400.7's funnel
-            -- need a producer first (gap #2418).
-            ObjectRef.AnyNumberMatching _ -> pure []
+            -- CR 608.2d: Glorious Protector's "any number of non-Angel creatures
+            -- you control", announced while the effect is applied and so asked
+            -- HERE rather than read by objectRefObjects. turnPermanentsOver asks
+            -- the same question for CR 701.27a's turn, and this gather owes it the
+            -- same posture: candidates are battlefieldMatching's sweep of the same
+            -- Filter, read off the pre-move board (CR 608.2c) so the sweep and the
+            -- offer cannot disagree, ONE ask of the resolving controller, skipped
+            -- at no candidate where the empty set is the only answer (CR 101.3, CR
+            -- 609.3), and asked at ONE, where "any number" still leaves two
+            -- distinguishable answers.
+            --
+            -- FILTERED, not trusted (#222), the sibling arms' reason: an answer
+            -- naming a permanent that was never offered would otherwise be moved.
+            -- Filtering rather than taking the answer also keeps CR 608.2f's APNAP
+            -- order, which the candidate list carries and a Set does not.
+            ObjectRef.AnyNumberMatching filter_ -> do
+              gs <- State.get
+              case battlefieldMatching legal resolving controller source gs filter_ of
+                [] -> pure []
+                candidates -> do
+                  answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates)
+                  pure (filter (`Set.member` answer) candidates)
             -- CR 608.2d's singular of the arm above: "a creature named Hanweir
             -- Garrison" in Hanweir Battlements' "exile them, then meld them",
             -- announced while the effect is applied. The candidates are
