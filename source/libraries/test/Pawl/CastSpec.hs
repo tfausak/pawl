@@ -1744,6 +1744,44 @@ grantedFlashbackSpec s registry = Spec.describe s "GrantedFlashback" $ do
         resolved = S.runPure S.identityAnswer cast Stack.resolveTop
     Spec.assertEqWith s "CR 400.7g: the flashed-back Bolt did not return to the graveyard" (Game.zoneMembers Zone.Graveyard S.alice resolved) []
     Spec.assertEqWith s "CR 400.7g: it was exiled" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 1
+  -- CR 107.3a / 601.2b: the {X} the grant copies is a COST's {X}, announced as
+  -- the spell is cast. CR 107.3g -- "{X} in the mana cost of a card in any zone
+  -- other than the stack is treated as 0" -- settles the card's mana VALUE where
+  -- it lies (CR 202.3e), not the alternative cost paid at CR 601.2f, by which
+  -- point CR 601.2a has put the spell on the stack. Snapcaster Mage's ruling
+  -- states the same: "If you cast an instant or sorcery with {X} in its mana cost
+  -- this way, you still choose the value of X as part of casting the spell and
+  -- pay that cost."
+  --
+  -- Lier, Disciple of the Drowned {3}{U}{U} is the granter and Blaze {X}{R}
+  -- Sorcery ("Blaze deals X damage to any target") the receiver, so the flashback
+  -- cost is {X}{R} and X is free. Six Mountains, X announced at 4: an arm that
+  -- dropped the {X}, or fixed it at zero, would price the cast at {R}, raise no
+  -- CR 601.2b announcement at all, tap one Mountain and leave bob at 20.
+  Spec.it s "CR 107.3a a granted flashback {X}{R} announces X rather than treating it as 0" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    blaze <- S.printingOf s registry "Blaze"
+    lier <- S.printingOf s registry "Lier, Disciple of the Drowned"
+    let (inGraveyard, board) = inGraveyardWith mountain blaze 6
+        (_, granted) = S.addCreature lier S.alice board
+        after = S.runPure (answerXOf 4) granted (do S.cast S.alice inGraveyard; Stack.resolveTop)
+    -- The gameplay assertion, and it ahead of every proxy: Blaze deals the
+    -- announced X, so 16 is the announcement having survived into the resolution.
+    Spec.assertEqWith s "bob took the 4 that was announced" (S.lifeOf S.bob after) (Just 16)
+    -- {4}{R} is five Mountains; the sixth is what makes 4 a value the board could
+    -- have refused, so the announcement is not the only value on offer.
+    Spec.assertEqWith s "five Mountains paid the {4}{R}" (S.tappedCount S.alice after) 5
+    -- CR 702.34a's second static ability, which says the cast really was a
+    -- flashback cast rather than some other permission.
+    Spec.assertEqWith s "the flashed-back Blaze did not return to the graveyard" (Game.zoneMembers Zone.Graveyard S.alice after) []
+    Spec.assertEqWith s "it was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
+    -- The cost itself, read where the grant built it: one candidate, and it
+    -- carries CR 107.4's {X} verbatim off Blaze's mana cost.
+    Spec.assertEqWith
+      s
+      "the granted flashback cost is {X}{R}"
+      (fmap Cost.Type.mana (Cost.costsFor (S.printingName blaze) inGraveyard granted))
+      [Just (ManaCost.MkManaCost [ManaSymbol.Variable, theRed])]
 
 -- CR 702.34a's OTHER conditional, the one on its second static ability: "IF THE
 -- FLASHBACK COST WAS PAID, exile this card instead of putting it anywhere else
