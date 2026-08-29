@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
@@ -2989,6 +2990,124 @@ gloriousProtectorSpec s registry =
                     (controlledNames S.alice after)
                     (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
 
+-- ObjectRef.EachCardInYourLibrary under Effect.MoveToZone: CR 400.12's
+-- whole-zone instruction over CR 400.1's other hidden per-player zone, where
+-- Ignorant Bliss' EachCardInYourHand takes the first.
+--
+-- Leveler {5} Artifact Creature -- Juggernaut 10/10 is the producer: "when this
+-- creature enters, exile all cards from your library". One ability, one clause,
+-- no shuffle and no reveal, so the sweep is the whole of what it does.
+--
+-- NOT A SEARCH, which is the rules question the arm rests on. CR 701.23a's
+-- search FINDS a card matching a description; Leveler states no description and
+-- offers no choice, so CR 701.23b's "isn't required to find" has nothing to
+-- reach and CR 701.23f's search triggers do not fire. Nor does anything shuffle:
+-- CR 701.24 gives a merely-swept library no shuffle. The third leg below reads
+-- the recorded responses for exactly those two, since a board cannot otherwise
+-- tell "swept" from "searched and found everything".
+--
+-- The board makes each reading of the sweep distinguishable: alice's library
+-- holds THREE distinct cards, so "all of them", "one of them" and "none of them"
+-- are three different exiles; bob's library holds two more, so "your library"
+-- and "each library" differ; and a Plains sits in alice's hand, so the other
+-- hidden zone would show if the arm reached the wrong one. CR 704.5b is the
+-- consequence Leveler is printed for, and the last pair below is the same draw
+-- on two boards differing only in whether the Leveler was cast.
+levelerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+levelerSpec s registry =
+  let named = CardName.MkCardName . Text.pack
+      sortedNames zone pid gs = List.sort (namesIn zone pid gs)
+      -- alice: five Plains to pay {5}, a three-card library, a Plains in hand and
+      -- the Leveler in hand. bob: a two-card library and nothing else, so the
+      -- only trigger any leg places is the Leveler's.
+      board leveler plains piker maiden sentry giant angel =
+        let g0 = S.landsFor plains S.alice 5 (Setup.emptyGame S.bothPlayers)
+            (_, g1) = S.addLibraryCard piker S.alice g0
+            (_, g2) = S.addLibraryCard maiden S.alice g1
+            (_, g3) = S.addLibraryCard sentry S.alice g2
+            (_, g4) = S.addLibraryCard giant S.bob g3
+            (_, g5) = S.addLibraryCard angel S.bob g4
+            -- handOne REPLACES alice's hand, so the Plains that proves the sweep
+            -- found the library rather than the other hidden zone goes in after.
+            (g6, spell) = S.handOne leveler g5
+            (_, g7) = S.addHandCard plains S.alice g6
+         in (g7, spell)
+      -- Cast the Leveler and run the priority loop out, so its enters trigger is
+      -- placed and resolved.
+      cast (withSpell, spell) =
+        let afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
+         in S.runPure S.identityAnswer afterCast Engine.priorityLoop
+      printings = do
+        leveler <- S.printingOf s registry "Leveler"
+        plains <- S.printingOf s registry "Plains"
+        piker <- S.printingOf s registry "Goblin Piker"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        sentry <- S.printingOf s registry "Ogre Sentry"
+        giant <- S.printingOf s registry "Hill Giant"
+        angel <- S.printingOf s registry "Angel of Finality"
+        pure (board leveler plains piker maiden sentry giant angel)
+   in Spec.describe s "Leveler" $ do
+        -- The headline, gameplay-level first: every card that was in alice's
+        -- library is in exile, and her library is empty.
+        Spec.it s "CR 400.12 the whole of the controller's library is exiled" $ do
+          staged <- printings
+          let after = cast staged
+          Spec.assertEqWith
+            s
+            "all three cards that were in alice's library are in exile"
+            (sortedNames Zone.Exile S.alice after)
+            (List.sort (fmap (Just . named) ["Bird Maiden", "Goblin Piker", "Ogre Sentry"]))
+          Spec.assertEqWith s "and her library is empty" (sortedNames Zone.Library S.alice after) []
+          Spec.assertEqWith s "the Plains in her hand is untouched, so the sweep found the library and not the other hidden zone" (sortedNames Zone.Hand S.alice after) [Just (named "Plains")]
+        -- CR 109.5's "you" is one seat: bob's library is not swept and his exile
+        -- stays empty, which is what parts "your library" from "each library".
+        Spec.it s "CR 109.5 no other player's library is touched" $ do
+          staged <- printings
+          let after = cast staged
+          Spec.assertEqWith
+            s
+            "bob's library still holds both his cards"
+            (sortedNames Zone.Library S.bob after)
+            (List.sort (fmap (Just . named) ["Angel of Finality", "Hill Giant"]))
+          Spec.assertEqWith s "and nothing of his is in exile" (sortedNames Zone.Exile S.bob after) []
+        -- CR 701.23 and CR 701.24, read off the recorded responses: the sweep asks
+        -- nobody to find anything and shuffles nothing. A board cannot show this,
+        -- because a search that found every card would leave the same exile.
+        Spec.it s "CR 701.23a a sweep is not a search, and CR 701.24 shuffles nothing" $ do
+          staged <- printings
+          let (withSpell, spell) = staged
+              ((_, afterCast), castResponses) = Replay.record S.identityAnswer withSpell (S.cast S.alice spell)
+              ((_, after), loopResponses) = Replay.record S.identityAnswer afterCast Engine.priorityLoop
+              responses = castResponses <> loopResponses
+              searched r = case r of
+                Response.Searched _ -> True
+                Response.ChoseSearchZones _ -> True
+                _ -> False
+              shuffled r = case r of
+                Response.Shuffled _ -> True
+                _ -> False
+          Spec.assertBool s (not (any searched responses)) "no search was put to a player"
+          Spec.assertBool s (not (any shuffled responses)) "and no library was shuffled"
+          -- Anti-vacuity: the sweep really did run under the same answerer, so
+          -- the two negatives above are about a resolved Leveler.
+          Spec.assertEqWith s "and the sweep still happened" (sortedNames Zone.Library S.alice after) []
+        -- The paired boards, differing in exactly one thing: whether the Leveler
+        -- was cast. CR 704.5b then takes alice out on the same draw that leaves
+        -- her playing on the board where her library survived.
+        Spec.it s "CR 704.5b drawing from the swept library loses the game" $ do
+          staged <- printings
+          let emptied = cast staged
+              intact = fst staged
+              drawn gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (Event.drawCard S.alice)) Sba.checkStateBasedActions
+          Spec.assertEqWith s "she is still playing the moment the sweep finishes" (statusOf S.alice emptied) (Just Status.Playing)
+          Spec.assertEqWith s "and drawing from the emptied library loses her the game" (statusOf S.alice (drawn emptied)) (Just (Status.Departed Departure.Type.Lost))
+          Spec.assertEqWith s "where the same draw on the board she never cast it on leaves her playing" (statusOf S.alice (drawn intact)) (Just Status.Playing)
+          Spec.assertEqWith
+            s
+            "which is the anti-vacuity: that board's library is the one the sweep would have taken"
+            (sortedNames Zone.Library S.alice intact)
+            (List.sort (fmap (Just . named) ["Bird Maiden", "Goblin Piker", "Ogre Sentry"]))
+
 -- Trumpet Blast ({2}{R} instant, "Attacking creatures get +2/+0 until end of
 -- turn") is the pool's first card whose CONTINUOUS effect names a filter-selected
 -- set rather than a target. Day of Judgment's EachMatching feeds a ONE-SHOT, so
@@ -4099,6 +4218,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   skullwinderSpec s registry
   elvishPiperSpec s registry
   gloriousProtectorSpec s registry
+  levelerSpec s registry
   trumpetBlastSpec s registry
   auraThiefSpec s registry
   baneOfProgressSpec s registry

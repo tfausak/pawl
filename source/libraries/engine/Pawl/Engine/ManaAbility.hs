@@ -464,6 +464,10 @@ refReachesLibrary ref = case ref of
   -- TRUE for the arm above's reason: the cards are named by their POSITION in
   -- a library, whatever ends the walk that finds them.
   ObjectRef.TopOfLibraryUntil {} -> True
+  -- TRUE, the only sweeping arm that is: CR 605.1a's fourth clause asks
+  -- whether the effect moves a card to or from a LIBRARY, and this one names
+  -- every card in the resolving controller's.
+  ObjectRef.EachCardInYourLibrary -> True
   ObjectRef.InSlot _ -> False
   ObjectRef.EachMatching _ -> False
   ObjectRef.EachCardInGraveyard {} -> False

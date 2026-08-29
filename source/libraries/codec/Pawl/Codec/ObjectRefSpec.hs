@@ -131,6 +131,15 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (GraveyardScope.Scoped PlayerScope.You) Nothing))
       " {\"type\":\"EachCardInHand\",\"value\":{\"hands\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}}}} "
+  -- Nullary like EachCardInYourHand above, and for its rule: CR 400.2 makes a
+  -- library hidden too, so this arm names only the resolving controller's own
+  -- and carries neither a player nor a filter.
+  Spec.it s "EachCardInYourLibrary" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      ObjectRef.EachCardInYourLibrary
+      " {\"type\":\"EachCardInYourLibrary\"} "
   -- No player, for a rule: CR 607.2a's set is defined by which object exiled the
   -- card. The bare tag is the whole linked set, which is what three of the four
   -- printings that read one take.
@@ -317,7 +326,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   Spec.it s "every arm carries a distinct tag" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, the linked exile sweep, the stack's spells, the whole stack, the player sweep, the opponent sweep, the chosen player, a library's top cards, a walk of a library, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a chosen subset of the battlefield and one chosen permanent all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, your own library sweep, the linked exile sweep, the stack's spells, the whole stack, the player sweep, the opponent sweep, the chosen player, a library's top cards, a walk of a library, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a chosen subset of the battlefield and one chosen permanent all encode differently"
       ( length
           ( List.nub
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
@@ -325,6 +334,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard (GraveyardScope.Scoped PlayerScope.EachPlayer) (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec ObjectRef.EachCardInYourHand,
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (GraveyardScope.Scoped PlayerScope.You) Nothing)),
+                Codec.encode ObjectRef.codec ObjectRef.EachCardInYourLibrary,
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardExiledWithSource Nothing),
                 Codec.encode ObjectRef.codec (ObjectRef.EachSpell (Filter.Not Filter.IsSource)),
                 Codec.encode ObjectRef.codec (ObjectRef.EachOnStack (Filter.Not Filter.IsSource)),
@@ -343,7 +353,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
               ]
           )
       )
-      20
+      21
   -- A tag the decoder does not know is an error rather than a silent slot. The
   -- tag has to be one no arm will ever claim -- @EachOpponent@ stood here until
   -- that became a real arm, and the case then failed rather than going quiet,

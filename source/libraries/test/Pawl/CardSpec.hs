@@ -3124,6 +3124,9 @@ objectRefFilters ref = case ref of
   -- so its reveal half -- the whole hand -- lints nothing, exactly as the linked
   -- exile arm below does for the printings that take all of their set.
   ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand _ f) -> Foldable.toList f
+  -- Leveler's "all cards from your library" holds none, for Ignorant Bliss'
+  -- reason: the printing takes the whole zone and states no characteristic.
+  ObjectRef.EachCardInYourLibrary -> []
   -- Hoarding Dragon's "the exiled card" usually holds none: CR 607.2a's set is
   -- named by which object exiled the cards rather than by their characteristics.
   -- Karn Liberated's "all non-Aura permanent cards exiled with Karn" is the one
@@ -4331,6 +4334,7 @@ chooserRef ref = case ref of
   ObjectRef.EachCardInGraveyard {} -> False
   ObjectRef.EachCardInYourHand -> False
   ObjectRef.EachCardInHand {} -> False
+  ObjectRef.EachCardInYourLibrary -> False
   ObjectRef.EachCardExiledWithSource {} -> False
   ObjectRef.EachSpell {} -> False
   ObjectRef.EachOnStack {} -> False
@@ -6451,6 +6455,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.EachCardInGraveyard {} -> False
           ObjectRef.EachCardInYourHand -> False
           ObjectRef.EachCardInHand {} -> False
+          ObjectRef.EachCardInYourLibrary -> False
           -- CR 607.3 is what makes this one plural even where the card's own
           -- words are singular: an ability referring to "the exiled card" whose
           -- linked ability exiled several performs its action on each of them.
