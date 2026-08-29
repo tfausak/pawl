@@ -817,12 +817,12 @@ resolveZoneChange asOf zc = do
 --
 -- Not implemented: a place in CR 616.1's ordering, where CR 616.1e leaves the
 -- affected player free to pick among the applicable effects and this offer instead
--- always goes last (#2266). Unobservable while no ZoneChangeR in data/cards/ matches a
--- hand or a library -- every row there names a `whenDestination` of the graveyard,
--- the stack or the battlefield
--- -- so no second candidate can be applicable to the same event; a printed redirect
--- naming a hand or a library as the destination it watches (Wheel of Sun and Moon
--- is the shape) would refute that.
+-- always goes last (#2266). Unobservable while no ZoneChangeR in data/cards/
+-- matches a hand or a library -- every row there names a `whenDestination` of
+-- the graveyard, the stack or the battlefield -- so no second candidate can be
+-- applicable to the same event; a printed redirect naming a hand or a library as
+-- the destination it watches (Wheel of Sun and Moon is the shape) would refute
+-- that.
 --
 -- No case on effect identity: the question is a proposed event's destination ZONE
 -- and whether its subject is a commander.
@@ -4049,7 +4049,8 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
 -- Called INSIDE changeZoneAttaching, before the CR 614.1c entry loop and only
 -- where the settled destination is the battlefield, and Pawl.Types.CarryOver is
 -- how the move says whether CR 400.7's exception is the one it is making. Scoped
--- to Pawl.Engine.Stack's two permanent-spell branches. Not implemented: CR 400.7b's static-ability ability grants (CR
+-- to Pawl.Engine.Stack's two permanent-spell branches. Not implemented: CR
+-- 400.7b's static-ability ability grants (CR
 -- 611.3d), which this carrier cannot reach at all -- a static grant is derived
 -- on every projection rather than stored, so there is no row here to re-key
 -- (#2425). CR 400.7i is unimplemented too, on a carrier this one never sees --

@@ -9667,7 +9667,10 @@ tidewalkerChain s registry hack = do
 --
 -- THE PRODUCER IS SYNTHETIC, and the search that says so: Scryfall's oracle text
 -- for a replacement of a cast permanent spell's battlefield entry
--- (`o:"would enter" o:instead`, 2026-08-29) returns thirteen cards and not one
+-- (`o:"would enter" o:instead (o:exile or o:graveyard or o:hand or o:library or
+-- o:"the stack")`, 2026-08-29; the older template `o:"would enter the
+-- battlefield"` returns one card, and `o:"would be put onto the battlefield"`
+-- and `o:"permanent spell would"` none) returns thirteen cards and not one
 -- of them can be this board. Containment Priest, Hallowed Moonlight, Mistcaller
 -- and Primeval Spawn all exclude a creature that WAS cast; Don't Blink reaches a
 -- cast permanent spell but shuffles it into a library, where no characteristic
