@@ -145,7 +145,9 @@ asZoneChange event = case event of
 --
 --   1. STATIC abilities (Projection.replacementsAffecting): battlefield
 --      permanents ascending by id, then the command zone's emblems, whose
---      abilities CR 113.6p leaves functioning there; each object's own effects
+--      abilities CR 113.6p leaves functioning there, then the rows a card STATES
+--      it functions from elsewhere with (CR 113.6b) -- the stack, then the
+--      graveyards, then the hands, then the libraries; each object's own effects
 --      in printed order. Read from `sources`, which for a CR 608.2f batch is the
 --      board the batch began in rather than the live one (see
 --      Event.applyReplacementsIn).

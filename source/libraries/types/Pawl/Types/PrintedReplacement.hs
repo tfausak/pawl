@@ -1,8 +1,10 @@
 module Pawl.Types.PrintedReplacement where
 
+import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Zone as Zone
 
 -- | CR 604.2: one replacement effect a permanent's static ability creates, plus
 -- the "as long as" clause gating it. Pawl.Types.Face lists these; the floating
@@ -29,8 +31,8 @@ data PrintedReplacement effect = MkPrintedReplacement
     -- Pawl.Engine.Projection.replacementsAffecting's walk, and this narrows what
     -- that walk gathers further.
     --
-    -- No zone is stated HERE, unlike Pawl.Types.StaticAbility.functionsFrom, so
-    -- the walk decides the second limb's scope rather than the row (#2462).
+    -- The second limb's SCOPE is `functionsFrom` below, which this clause is
+    -- asked on top of exactly as it is on the battlefield.
     --
     -- Asked when the event would happen, never latched: CR 604.1 makes a static
     -- ability "simply true", so there is no moment at which the clause is checked
@@ -47,6 +49,23 @@ data PrintedReplacement effect = MkPrintedReplacement
     -- controller, this one reads it live off the battlefield.
     condition :: Maybe Condition.Condition,
     effect :: ReplacementEffect.ReplacementEffect effect,
+    -- | CR 113.6b: the zones this row STATES its ability functions in -- Nexus of
+    -- Fate's "would be put into a graveyard from anywhere" -- and empty for a row
+    -- that states none, which is every other producer in the pool.
+    --
+    -- Structural rather than a Condition, for the reason
+    -- Pawl.Types.StaticAbility.functionsFrom is: CR 113.6 decides which zone's
+    -- walk gathers a row at all, BEFORE CR 604.2's clause is asked of anything, so
+    -- a zone written as a condition could narrow a gather but never widen one.
+    -- Empty leaves CR 113.6's own defaults standing -- the battlefield for a
+    -- permanent, the command zone for an emblem (CR 113.6p / 114.4) -- and CR
+    -- 113.6b's "only" is why a stated set REPLACES those defaults rather than
+    -- adding to them.
+    --
+    -- The reader is Pawl.Engine.Projection.replacementsAffecting, which asks the
+    -- set with its default folded in on the battlefield and in the command zone,
+    -- and asks the bare set in the four zones no default reaches.
+    functionsFrom :: Set.Set Zone.Zone,
     -- | The name another clause of the SAME card uses to refer to the static
     -- ability this replacement effect comes from, or Nothing for one nothing
     -- refers to, which is nearly all of them.
