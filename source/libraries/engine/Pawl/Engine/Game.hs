@@ -165,10 +165,12 @@ printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
 -- out-of-range index -- leaves the canonical order standing rather than dropping
 -- or duplicating an entry.
 --
--- Beside 'choose' because it is what an ORDERING prompt's answer is applied
--- through, and both such prompts want it from modules that cannot see each
--- other: CR 603.3b's trigger order (Pawl.Engine.Engine) and CR 401.4's library
--- arrangement (Pawl.Engine.Resolve).
+-- Beside 'choose' because it is what every ORDERING prompt's answer is applied
+-- through, and those prompts want it from modules that cannot see each other:
+-- CR 603.3b's trigger order (Pawl.Engine.Engine), CR 401.4's library arrangement
+-- and CR 701.44d's per-seat "for each" groups (Pawl.Engine.Resolve), CR 601.2h's
+-- cost components and the combat tolls beside them (Pawl.Engine.Cost), and the
+-- arrangement of a melded permanent's component cards (Pawl.Engine.Event).
 permute :: [a] -> [Natural] -> [a]
 permute xs order =
   let canonical :: [Natural]
