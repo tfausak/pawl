@@ -1653,6 +1653,7 @@ oneMountainState mountain ph =
           GameState.spellsCastLastTurn = 0,
           GameState.castsLastTurn = mempty,
           GameState.exiledUntilMonarch = Map.empty,
+          GameState.movedUntilSourceLeaves = Map.empty,
           GameState.haunting = Map.empty,
           GameState.exiledWith = Map.empty,
           GameState.exilePiles = Map.empty,

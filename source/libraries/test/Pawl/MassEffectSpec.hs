@@ -2832,8 +2832,14 @@ attackerIds = Map.keys . Combat.Type.attackers . GameState.combat
 -- Glorious Protector {2}{W}{W} Creature -- Angel Cleric 3/4 (flash, flying,
 -- foretell {2}{W}) is the producer: "when this creature enters, you may exile any
 -- number of non-Angel creatures you control until this creature leaves the
--- battlefield". The return half is the pair Savior of Ollenbock already proves
--- (Pawl.KeywordTriggerSpec), so what is new here is only the gather.
+-- battlefield".
+--
+-- TWO things are new here. The gather is one. The other is CR 610.3's duration:
+-- the printed "until" makes this one one-shot effect with an end, so the exile is
+-- declined outright once the Protector has gone (CR 610.3b) and the return is a
+-- one-shot effect rather than an ability anybody can respond to. NOT the printed
+-- pair Savior of Ollenbock has (Pawl.KeywordTriggerSpec) -- that card really does
+-- print a second triggered ability, and its Oracle text says so.
 --
 -- The board makes every conjunct of the ref's Filter load-bearing, and each is a
 -- different way a wrong gather would over-reach: three non-Angel creatures alice
@@ -2908,10 +2914,19 @@ gloriousProtectorSpec s registry =
         pure (board protector plains piker maiden sentry angel giant)
       -- The Bird Maiden on alice's battlefield, which is the one permanent every
       -- leg below names or declines to name.
-      maidenId gs =
+      maidenId = permanentNamed "Bird Maiden"
+      permanentNamed name gs =
         List.find
-          (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (named "Bird Maiden"))
+          (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (named name))
           (Set.toList (GameState.battlefield gs))
+      -- Cast the Protector and stop with its enters trigger ON THE STACK: the
+      -- spell resolves, then one settle places the trigger (CR 603.3b) and
+      -- nothing resolves it. That is the window CR 610.3b is about.
+      triggerOnStack :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState, ObjectId.ObjectId) -> GameState.GameState
+      triggerOnStack answer (withSpell, spell) =
+        let afterCast = S.runPure answer withSpell (S.cast S.alice spell)
+            entered = S.runPure answer afterCast Stack.resolveTop
+         in S.runPure answer entered Engine.settleForPriority
    in Spec.describe s "GloriousProtector" $ do
         -- The headline: the ONE creature the chooser named leaves, and the two it
         -- passed over stay. Those two are what part "the chosen subset" from
@@ -2965,10 +2980,10 @@ gloriousProtectorSpec s registry =
             "and every creature alice controls is still hers"
             (controlledNames S.alice after)
             (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Glorious Protector", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
-        -- The whole card: "until this creature leaves the battlefield" is the
-        -- SelfLeavesTheBattlefield half, and what it returns is what the gather
-        -- exiled -- so the subset the chooser named is the subset that comes back.
-        Spec.it s "CR 607.2a the departure returns exactly the subset that was exiled" $ do
+        -- The whole card: what CR 610.3's second one-shot effect returns is what
+        -- the gather exiled, so the subset the chooser named is the subset that
+        -- comes back.
+        Spec.it s "CR 610.3 the departure returns exactly the subset that was exiled" $ do
           staged <- printings
           case maidenId (fst staged) of
             Nothing -> Spec.assertFailure s "fixture should give alice a Bird Maiden"
@@ -2989,6 +3004,48 @@ gloriousProtectorSpec s registry =
                     "and the Bird Maiden is back on alice's battlefield"
                     (controlledNames S.alice after)
                     (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
+        -- CR 610.3b: kill the Protector while its own enters trigger is still on
+        -- the stack, and NOTHING is exiled -- the card's ruling states it in those
+        -- words. The answerer is the accepting one, which names every candidate, so
+        -- an engine that exiled would exile three creatures here rather than none.
+        Spec.it s "CR 610.3b a source that has left before its trigger resolves exiles nothing" $ do
+          staged <- printings
+          let onStack = triggerOnStack accepting staged
+          case permanentNamed "Glorious Protector" onStack of
+            Nothing -> Spec.assertFailure s "the Protector should have entered"
+            Just oid -> do
+              Spec.assertEqWith s "the enters trigger is on the stack and has not resolved" (length (GameState.stack onStack)) 1
+              let killed = S.runPure accepting onStack (Event.destroy Regenerability.Regenerable [oid])
+                  after = S.runPure accepting killed Engine.priorityLoop
+              Spec.assertEqWith s "nothing is exiled" (exiledNames after) []
+              Spec.assertEqWith
+                s
+                "and every creature alice controlled is still hers, the Protector aside"
+                (controlledNames S.alice after)
+                (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
+        -- CR 610.3: the return is a one-shot effect created immediately after the
+        -- departure, so ONE settle brings the creature back and puts nothing on the
+        -- stack. Written as a second triggered ability it would be an object on the
+        -- stack instead, with the creature still in exile through a round of
+        -- priority -- which is the divergence this case exists to hold shut (#2626).
+        Spec.it s "CR 610.3 the return uses no stack: one settle brings the creature back" $ do
+          staged <- printings
+          case maidenId (fst staged) of
+            Nothing -> Spec.assertFailure s "fixture should give alice a Bird Maiden"
+            Just maiden -> do
+              let exiled = cast (namingExactly (Set.singleton maiden)) staged
+              case permanentNamed "Glorious Protector" exiled of
+                Nothing -> Spec.assertFailure s "the Protector should be on the battlefield"
+                Just oid -> do
+                  Spec.assertEqWith s "the Bird Maiden is in exile to begin with" (exiledNames exiled) [Just (named "Bird Maiden")]
+                  let killed = S.runPure S.identityAnswer exiled (Event.destroy Regenerability.Regenerable [oid])
+                      settled = S.runPure S.identityAnswer killed Engine.settleForPriority
+                  Spec.assertEqWith
+                    s
+                    "one settle has the Bird Maiden back on alice's battlefield"
+                    (controlledNames S.alice settled)
+                    (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
+                  Spec.assertEqWith s "and nothing was put on the stack to do it" (length (GameState.stack settled)) 0
 
 -- ObjectRef.EachCardInYourLibrary under Effect.MoveToZone: CR 400.12's
 -- whole-zone instruction over CR 400.1's other hidden per-player zone, where

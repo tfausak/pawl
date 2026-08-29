@@ -62,7 +62,7 @@ zoneFunctionedFrom effect = case effect of
   -- answer Nothing however the card file states the origin -- the same inert
   -- card-data error the note above describes for a move of somebody else's
   -- permanent.
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ origin _) -> case ref of
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ origin _ _) -> case ref of
     ObjectRef.InSlot slot -> if slot == Binding.triggerSource then origin else Nothing
     ObjectRef.EachMatching _ -> Nothing
     ObjectRef.EachCardInGraveyard {} -> Nothing

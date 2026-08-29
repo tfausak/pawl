@@ -860,7 +860,7 @@ effectCounts effect = case effect of
   -- Resolve.objectRefQuantities is what recovers it, so a second ObjectRef arm
   -- gaining a Quantity answers there rather than here -- and that function is
   -- also where the four opcodes that route their ref are named.
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> refCounts ref
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _ _) -> refCounts ref
   Effect.Draw (Draw.MkDraw _ quantity _) -> quantityCounts quantity
   Effect.Mill (Mill.MkMill _ quantity _ _) -> quantityCounts quantity
   Effect.Reveal (Reveal.MkReveal ref _) -> refCounts ref
@@ -4150,7 +4150,7 @@ effectFilters effect = case effect of
   -- -- a keys-only sweep would leave the counts unlinted. Swept for the reason
   -- canHostSubjects sweeps the same shape -- the lint is about the positions a
   -- card author can write, not about which of them the pool has used.
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> sourceHosted (objectRefFilters ref) <> unframed (riderFilters riders)
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _ _) -> sourceHosted (objectRefFilters ref) <> unframed (riderFilters riders)
   Effect.Draw (Draw.MkDraw _ quantity _) -> unframed (quantityFilters quantity)
   -- The tally's Filter is a position a card author writes, so the lint reaches
   -- it: rule 728.1's "nonland card" is one of these.
@@ -4419,7 +4419,7 @@ effectObjectRefs effect = case effect of
   Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> read_ [ref]
   Effect.Sacrifice {} -> []
   -- THE gather that asks, and the one that elides the random arm (#1733).
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> [(AsksMoveGather, ref)]
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _ _) -> [(AsksMoveGather, ref)]
   Effect.Draw {} -> []
   Effect.Mill {} -> []
   -- CR 701.20a's reveal, the other asking arm.
@@ -5489,7 +5489,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "the body's move is swept"
-      [zone | Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone _ _ _ _) <- cardResolutionEffects (S.combinedFace soulfireEruption)]
+      [zone | Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone _ _ _ _ _) <- cardResolutionEffects (S.combinedFace soulfireEruption)]
       [Zone.Exile]
   -- ONE sweep over the whole reserved set, replacing the five per-name
   -- cases this grew out of. Those five each filtered on
@@ -5952,7 +5952,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches a reserved event slot the condition never binds" $ do
     roaches <- S.printingOf s registry "Endless Cockroaches"
     let -- Endless Cockroaches' own payload: "return it to its owner's hand".
-        returnIt = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
+        returnIt = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue Nothing)
         -- Rule 702.70a's shape, as a targetless read of "that player".
         thatPlayerDraws = Effect.Draw (Draw.MkDraw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1) Nothing)
     Spec.assertBool
@@ -6087,7 +6087,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         youDiscards = Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard Binding.you (Quantity.Type.Literal 1) Nothing))
         -- Endless Cockroaches' payload (CR 400.7e) and rule 702.70a's, the two
         -- event slots, neither of which an activation has an event to bind.
-        returnIt = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
+        returnIt = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue Nothing)
         thatPlayerDraws = Effect.Draw (Draw.MkDraw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1) Nothing)
         -- CR 113.7's source slot, which every activation DOES bind.
         tapSelf = Effect.Tap (ObjectRef.InSlot Binding.triggerSource)
@@ -6164,7 +6164,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         ownDeclared = modalActivated [lintMode [tap creature] [creature], lintMode [tap victim] [victim]]
         -- Mode 0 MINTS `exiled` at a MoveToZone's destination; mode 1 reads it.
         -- The two never resolve together, so mode 1's read is dangling.
-        exileIt = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot creature) Zone.Exile EntryRiders.defaultValue (Just exiled) Nothing LibraryPlacement.defaultValue)
+        exileIt = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot creature) Zone.Exile EntryRiders.defaultValue (Just exiled) Nothing LibraryPlacement.defaultValue Nothing)
         crossMinted = modalActivated [lintMode [exileIt] [creature], lintMode [tap exiled] []]
         ownMinted = modalActivated [lintMode [exileIt, tap exiled] [creature], lintMode [tap victim] [victim]]
     Spec.assertBool s (activatedAbilityOffends crossDeclared) "a mode reading a slot only another mode declares is rejected"
@@ -6175,7 +6175,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- CR 400.7e's `became` is bound by the condition for the whole ability, so a
     -- SECOND mode reading it is accepted, and a mode reading it under a
     -- condition that never binds it is rejected however late the mode sits.
-    let returnBecame = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
+    let returnBecame = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue Nothing)
         secondModeReads condition = modalTrigger condition [lintMode [] [], lintMode [returnBecame] []]
     Spec.assertBool
       s
@@ -6413,7 +6413,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           Effect.Create (Create.MkCreate _ _ riders _ _) -> EntryRiders.transformed riders
           _ -> False
         moves effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> EntryRiders.transformed riders
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> EntryRiders.transformed riders
           _ -> False
         offenders = filter (anyFace (any creates . cardResolutionEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: with no transformed rider in the pool at
@@ -6541,7 +6541,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- binding a singular reader cannot see; the destruction's two are group
         -- bindings unconditionally, so they are plural at any size of sweep.
         boundPlurally effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
+          Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _ _) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
           Effect.LookAt (LookAt.MkLookAt ref slot) | not (movesAtMostOne ref) -> [slot]
           Effect.Reveal (Reveal.MkReveal ref mSlot) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
           -- CR 701.17c's slot, whose plurality is the mill's DEPTH rather than an
@@ -6578,7 +6578,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               (Set.fromList (concatMap readSingly effects))
         offenders = filter (anyFace (clashes . cardResolutionEffects) . Printing.card) ps
         binds effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _) -> Maybe.isJust mSlot && not (movesAtMostOne ref)
+          Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _ _) -> Maybe.isJust mSlot && not (movesAtMostOne ref)
           _ -> False
         exiledSlot = SlotName.MkSlotName (Text.pack "exiled")
     -- Half the rejected shape is in the pool: Act on Impulse binds a group. The
@@ -6592,7 +6592,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool
       s
       ( clashes
-          [ Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Zone.Exile EntryRiders.defaultValue (Just exiledSlot) Nothing LibraryPlacement.defaultValue),
+          [ Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Zone.Exile EntryRiders.defaultValue (Just exiledSlot) Nothing LibraryPlacement.defaultValue Nothing),
             Effect.OfferCast (OfferCast.MkOfferCast exiledSlot (PlayerRef.Relative PlayerRelation.You) CastObligation.Optional CastOffer.defaultValue)
           ]
       )
@@ -6606,10 +6606,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no MoveToZone leaves the end to an owner off a library" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone _ _ _ LibraryPlacement.OwnerChooses) -> zone /= Zone.Library
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone _ _ _ LibraryPlacement.OwnerChooses _) -> zone /= Zone.Library
           _ -> False
         asks effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ _ _ LibraryPlacement.OwnerChooses) -> True
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ _ _ LibraryPlacement.OwnerChooses _) -> True
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: with no owner-chosen end in the pool this
@@ -6657,7 +6657,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         atRandom = ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.You)
         anyNumber = ObjectRef.AnyNumberMatching anyCard
         onePermanent = ObjectRef.ChosenPermanent anyCard
-        moves ref = Effect.MoveToZone (MoveToZone.MkMoveToZone ref Zone.Battlefield EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
+        moves ref = Effect.MoveToZone (MoveToZone.MkMoveToZone ref Zone.Battlefield EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue Nothing)
         reveals ref = Effect.Reveal (Reveal.MkReveal ref Nothing)
         inert :: [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> [Bool]
         inert = fmap (not . null . inertChoosers)
@@ -6749,11 +6749,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no effect exiles face down anywhere but exile" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _) -> EntryRiders.exiledFaceDown riders && zone /= Zone.Exile
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _ _) -> EntryRiders.exiledFaceDown riders && zone /= Zone.Exile
           Effect.Create (Create.MkCreate _ _ riders _ _) -> EntryRiders.exiledFaceDown riders
           _ -> False
         hides effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> EntryRiders.exiledFaceDown riders
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> EntryRiders.exiledFaceDown riders
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: with no face-down exile in the pool at all
@@ -6775,13 +6775,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no effect enters blocking anywhere but the battlefield" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _) -> Maybe.isJust (EntryRiders.blocking riders) && zone /= Zone.Battlefield
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _ _) -> Maybe.isJust (EntryRiders.blocking riders) && zone /= Zone.Battlefield
           _ -> False
         creates effect = case effect of
           Effect.Create (Create.MkCreate _ _ riders _ _) -> Maybe.isJust (EntryRiders.blocking riders)
           _ -> False
         moves effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> Maybe.isJust (EntryRiders.blocking riders)
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> Maybe.isJust (EntryRiders.blocking riders)
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     -- Guards against a vacuous sweep, one per road, since a lint asserting an
@@ -6801,11 +6801,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no effect enters face down anywhere but the battlefield" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _) -> Maybe.isJust (EntryRiders.faceDown riders) && zone /= Zone.Battlefield
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _ _) -> Maybe.isJust (EntryRiders.faceDown riders) && zone /= Zone.Battlefield
           Effect.Create (Create.MkCreate _ _ riders _ _) -> Maybe.isJust (EntryRiders.faceDown riders)
           _ -> False
         entersFaceDown effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> Maybe.isJust (EntryRiders.faceDown riders)
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> Maybe.isJust (EntryRiders.faceDown riders)
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: with no face-down entry in the pool at all

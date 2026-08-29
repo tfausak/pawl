@@ -234,6 +234,7 @@ import qualified Pawl.Codec.MonarchWatchSpec
 import qualified Pawl.Codec.MorphSpec
 import qualified Pawl.Codec.MorphVariantSpec
 import qualified Pawl.Codec.MoveCountersSpec
+import qualified Pawl.Codec.MoveDurationSpec
 import qualified Pawl.Codec.MoveToZoneSpec
 import qualified Pawl.Codec.MovedBetweenSpec
 import qualified Pawl.Codec.MovedKindsSpec
@@ -302,6 +303,7 @@ import qualified Pawl.Codec.RequireAttackSpec
 import qualified Pawl.Codec.RequireBlockSpec
 import qualified Pawl.Codec.RestartSignalSpec
 import qualified Pawl.Codec.ResultSpec
+import qualified Pawl.Codec.ReturnWatchSpec
 import qualified Pawl.Codec.RevealCauseSpec
 import qualified Pawl.Codec.RevealSpec
 import qualified Pawl.Codec.RevealedSpec
@@ -770,6 +772,7 @@ spec s registry = do
   Pawl.Codec.MonarchWatchSpec.spec s
   Pawl.Codec.MorphSpec.spec s
   Pawl.Codec.MorphVariantSpec.spec s
+  Pawl.Codec.MoveDurationSpec.spec s
   Pawl.Codec.MoveToZoneSpec.spec s
   Pawl.Codec.MovedBetweenSpec.spec s
   Pawl.Codec.MovedSpec.spec s
@@ -840,6 +843,7 @@ spec s registry = do
   Pawl.Codec.RequireBlockSpec.spec s
   Pawl.Codec.RestartSignalSpec.spec s
   Pawl.Codec.ResultSpec.spec s
+  Pawl.Codec.ReturnWatchSpec.spec s
   Pawl.Codec.RevealCauseSpec.spec s
   Pawl.Codec.RevealSpec.spec s
   Pawl.Codec.RevealedSpec.spec s

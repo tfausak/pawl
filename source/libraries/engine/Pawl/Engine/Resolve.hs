@@ -38,6 +38,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
+import qualified Pawl.Engine.MoveDuration as MoveDuration
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.OutsideTheGame as OutsideTheGame
 import qualified Pawl.Engine.Phasing as Phasing
@@ -176,6 +177,7 @@ import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.MoveCounters as MoveCounters
+import qualified Pawl.Types.MoveDuration as MoveDuration.Type
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.Object as Object
@@ -228,6 +230,7 @@ import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.RollDie as RollDie
@@ -497,7 +500,7 @@ slotsOf effect = case effect of
   Effect.TurnFaceUp slot -> oneSlot slot
   Effect.RemoveFromCombat ref -> objectRefSlots ref
   Effect.BecomesBlocked slot -> oneSlot slot
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> joinSlots [objectRefSlots ref, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _ _) -> joinSlots [objectRefSlots ref, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
   -- CR 121.1's bound slot is a DEFINITION, not a read: see boundSlots below.
   Effect.Draw (Draw.MkDraw ref quantity _) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- The tally's slot and CR 701.17c's are DEFINITIONS, not reads: see boundSlots
@@ -826,7 +829,7 @@ slotsAreExhaustive effect = case effect of
   Effect.BecomesBlocked _ -> True
   -- Three of the four whose ref may nest a Quantity; ForEach is the fourth. The
   -- entry rider nests one too, CR 122.6's count per kind.
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref <> riderQuantities riders)
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _ _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref <> riderQuantities riders)
   Effect.Draw (Draw.MkDraw _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.Reveal (Reveal.MkReveal ref _) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref)
@@ -1004,7 +1007,7 @@ readsX = any effectReadsX
       -- Commune with Lava's X sits inside the ObjectRef rather than beside it, so
       -- these three -- and ForEach below -- go through objectRefQuantities. The
       -- entry rider is the other nested position, CR 122.6's count per kind.
-      Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> any Quantity.readsX (objectRefQuantities ref <> riderQuantities riders)
+      Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _ _) -> any Quantity.readsX (objectRefQuantities ref <> riderQuantities riders)
       Effect.Draw (Draw.MkDraw _ quantity _) -> Quantity.readsX quantity
       Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.readsX quantity
       Effect.Reveal (Reveal.MkReveal ref _) -> any Quantity.readsX (objectRefQuantities ref)
@@ -1170,7 +1173,7 @@ mayDefinedSlots mode
 boundSlots :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Set SlotName
 boundSlots effect = case effect of
   -- CR 400.7: the incarnation minted at the destination.
-  Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ mSlot _ _) -> foldMap Set.singleton mSlot
+  Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ mSlot _ _ _) -> foldMap Set.singleton mSlot
   -- The tokens this Create minted, for CR 603.7c's delayed trigger to name.
   Effect.Create (Create.MkCreate _ _ _ mSlot _) -> foldMap Set.singleton mSlot
   Effect.CreateCopy {} -> Set.empty
@@ -4417,7 +4420,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Just target -> Combat.becomeBlocked target gs
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> gs
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone entry mSlot _ placement) ->
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone entry mSlot _ placement duration) ->
     -- ONE object through CR 400.7's funnel, shared by the two arms below.
     let -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative
         -- (CR 400.3). The riders (CR 110.5b), the library position (CR 401.2) and
@@ -4476,6 +4479,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- read ONCE ahead of this fold (see mBlocked below), so CR 608.2f's
             -- single event cannot see it move between members.
             Monad.forM_ mBlocked (Combat.putOntoBattlefieldBlocking newId)
+            -- CR 610.3: a move with a duration is only half of a pair, so the
+            -- incarnation that arrived is registered against the source whose
+            -- leaving the battlefield ends it, and against the zone it came from
+            -- (rule 610.3's "its previous zone"). Pawl.Engine.MoveDuration is where
+            -- the second one-shot effect that reads this happens; nothing a card
+            -- prints performs it. Per ARRIVAL, which is CR 712.21c: a melded
+            -- permanent leaves as two cards and both come back.
+            let watched = do
+                  Monad.guard (duration == Just MoveDuration.Type.UntilSourceLeavesTheBattlefield)
+                  fmap Object.zone (Game.lookupObject target before)
+            Monad.forM_ watched $ \from ->
+              State.modify' (\g -> g {GameState.movedUntilSourceLeaves = Map.insert newId (ReturnWatch.MkReturnWatch {ReturnWatch.source = source, ReturnWatch.zone = from}) (GameState.movedUntilSourceLeaves g)})
           pure (foldr Set.insert sofar mNew, mNew : acc)
         -- The context a CHOICE's candidates are filtered in, off the board the
         -- choice is being made on: the resolution's own slots ride along, so a
@@ -4493,299 +4508,313 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           [only] -> State.modify' (bindSlot resolving slot only)
           _ -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList arrived))
      in do
-          -- WHICH objects move, gathered first and moved second, so the CR 401.2
-          -- and CR 401.4 questions between the two steps are asked of the whole
-          -- batch.
-          targets <- case ref of
-            -- NOT routed through objectRefObjects: that function reads `slotGroup`
-            -- then `chosen`, never `slotOne`, and slotOne is what lets a slot an
-            -- EARLIER EFFECT OF THIS SAME RESOLUTION bound name its object here.
-            -- A declared target is read out of `chosen` behind CR 608.2b's
-            -- re-validation; a slot `chosen` does not mention was never targeted
-            -- and is read live. Membership rather than preference keeps a target
-            -- from losing its re-validation to a binding sharing its name.
-            -- A slot bound to a GROUP names every member, a slot bound to one
-            -- names that one, and a TARGETED slot names EVERY still-legal
-            -- recipient -- not one, which is the SlotArity.Many objectRefSlots
-            -- declares; legalOne declines a slot naming several. An empty list is
-            -- an unbound slot, every target gone illegal, or CR 115.6's zero
-            -- targets chosen. fromAmongMembers is where those three and their
-            -- rules live, shared with the two "from among them" refs so they
-            -- cannot read the slot differently.
-            ObjectRef.InSlot slot -> fromAmongMembers legal resolving chosen slot
-            -- Swept ONCE from the PRE-MOVE state (CR 608.2c, CR 608.2f), in APNAP
-            -- order, then moved one at a time, each judged against the board the
-            -- batch began on and against the siblings that have already arrived
-            -- (see moveOne). CR 400.3 files a hand arrival under Object.owner.
-            ObjectRef.EachMatching _ -> do
-              gs <- State.get
-              pure (objectRefObjects legal resolving controller source gs ref)
-            -- Swept once from the PRE-MOVE state (CR 608.2c, CR 608.2f). "Under
-            -- your control" needs nothing here: CR 110.2a hands a battlefield
-            -- arrival to the player the effect instructed.
-            ObjectRef.EachCardInGraveyard {} -> do
-              gs <- State.get
-              pure (objectRefObjects legal resolving controller source gs ref)
-            -- Swept once from the PRE-MOVE state (CR 608.2c, CR 608.2f). A
-            -- resolving spell is on the stack (CR 608.1), not in the hand.
-            ObjectRef.EachCardInYourHand -> do
-              gs <- State.get
-              pure (objectRefObjects legal resolving controller source gs ref)
-            -- Swept once from the PRE-MOVE state (CR 608.2c, CR 608.2f), the arm
-            -- above's answer over the wider scope.
-            ObjectRef.EachCardInHand {} -> do
-              gs <- State.get
-              pure (objectRefObjects legal resolving controller source gs ref)
-            -- Swept once from the PRE-MOVE state (CR 608.2c, CR 608.2f), the two
-            -- arms above's answer over CR 400.1's other hidden per-player zone.
-            -- A resolving spell is on the stack (CR 608.1), not in the library,
-            -- so Paradigm Shift does not sweep itself.
-            ObjectRef.EachCardInYourLibrary -> do
-              gs <- State.get
-              pure (objectRefObjects legal resolving controller source gs ref)
-            -- CR 607.2a, swept once from the PRE-MOVE state (CR 608.2c, CR
-            -- 608.2f). CR 400.3 files a hand arrival under Object.owner.
-            ObjectRef.EachCardExiledWithSource {} -> do
-              gs <- State.get
-              pure (objectRefObjects legal resolving controller source gs ref)
-            ObjectRef.EachSpell _ -> do
-              gs <- State.get
-              pure (objectRefObjects legal resolving controller source gs ref)
-            ObjectRef.EachOnStack _ -> do
-              gs <- State.get
-              pure (objectRefObjects legal resolving controller source gs ref)
-            ObjectRef.EachPlayer -> pure []
-            ObjectRef.EachOpponent -> pure []
-            ObjectRef.ChosenPlayer -> pure []
-            -- Read from the pre-move state like the sweeps above: the whole batch
-            -- comes off one look at each library (CR 608.2c, CR 608.2f).
-            ObjectRef.TopOfLibrary {} -> do
-              gs <- State.get
-              pure (objectRefObjects legal resolving controller source gs ref)
-            -- The walked prefix, read from the PRE-MOVE state for the arm above's
-            -- reason: the whole batch comes off one walk of each library (CR
-            -- 608.2c, CR 608.2f).
-            ObjectRef.TopOfLibraryUntil {} -> do
-              gs <- State.get
-              pure (objectRefObjects legal resolving controller source gs ref)
-            -- One card per chooser, and the only ref whose gather asks a question
-            -- rather than reading the board, which is why it is answered here in
-            -- the Game monad. Candidates come from the pre-move state (CR 608.2c),
-            -- so an earlier effect of this resolution -- Port of Karfell's own mill
-            -- -- has already put its cards in the graveyard.
-            --
-            -- WHO is asked is the ref's Chooser: the resolving controller (CR
-            -- 608.2d), or each player the scope names, asked about their own
-            -- graveyard alone. The asks run in APNAP order and all before any card
-            -- moves (CR 608.2e, CR 101.4). Elided at one candidate and skipped at
-            -- none (CR 101.3, CR 609.3), per player under EachInScope. Filtered,
-            -- not trusted: an answer naming a card never offered falls back to the
-            -- first candidate.
-            ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser scope filter_) -> do
-              gs <- State.get
-              let ask asked candidates = case candidates of
-                    [] -> pure []
-                    [only] -> pure [only]
-                    first : second : more -> do
-                      let offered = first NonEmpty.:| (second : more)
-                      answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor asked gs) asked source offered)
-                      pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
-              case chooser of
-                Chooser.TheController -> ask controller (graveyardCards (chooseContext gs) controller gs scope filter_)
-                Chooser.EachInScope ->
-                  fmap concat . Monad.mapM (\pid -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)) $
-                    graveyardPlayers controller gs scope
-                -- ONE chooser, read out of the slot a ChooseOpponent bound,
-                -- choosing out of their own graveyard. Through playerRefPlayers so
-                -- the slot is read as every other is (CR 608.2b): an unfilled,
-                -- illegal, non-player or many-valued slot names nobody, and nobody
-                -- asked is nothing moved (CR 101.3). Intersected with the scope, so
-                -- a chooser the scope does not name is offered nothing.
-                Chooser.BoundInSlot slot ->
-                  case playerRefPlayers legal controller gs (PlayerRef.InSlot slot) of
-                    [pid] | List.elem pid (graveyardPlayers controller gs scope) -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)
-                    _ -> pure []
-            -- The arm above over the hidden zone CR 400.2 makes a hand: what it
-            -- says about when the candidates are read (CR 608.2c), about the asks
-            -- running in APNAP order (CR 608.2e, CR 101.4) and about the answer
-            -- being filtered rather than trusted holds unchanged.
-            --
-            -- What the hidden zone changes is WHO may be asked: CR 402.3 gives a
-            -- hand's cards to its owner alone, so each seat is offered its OWN hand
-            -- and no other. Narrowing the offer by filter is the card's own words
-            -- saying which cards were ever legal answers (CR 608.2d). Elided at one
-            -- card and skipped at none (CR 101.3, CR 609.3).
-            ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player filter_) -> do
-              gs <- State.get
-              let ask asked candidates = case candidates of
-                    [] -> pure []
-                    [only] -> pure [only]
-                    first : second : more -> do
-                      let offered = first NonEmpty.:| (second : more)
-                      answer <- Game.choose (Prompt.ChooseCardInHand (Decide.deciderFor asked gs) asked source offered)
-                      pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
-              fmap concat . Monad.mapM (\pid -> ask pid (handCardsOf (chooseContext gs) gs pid filter_)) $
-                handChoosers legal controller gs player
-            -- The printed "from among them", a CR 608.2d choice, asked by
-            -- chooseCardFromAmong -- which is where the rule lives, this opcode
-            -- and CR 701.20a's reveal being the two that ask it. The candidates
-            -- come off the pre-move state (CR 608.2c) through the same
-            -- slotBoundObjects the InSlot gather reads, so the choice and "the
-            -- rest" cannot see different groups.
-            --
-            -- ONE card: what the group has left over is not named here at all.
-            -- "The rest" is the same slot read by ObjectRef.InSlot in a LATER
-            -- clause, which finds the chosen card gone -- CR 400.7 minted a new
-            -- object for it on the way to its new zone, and the id the group still
-            -- holds resolves to nothing, so moveOne passes over it.
-            ObjectRef.ChosenCardFromAmong from -> chooseCardFromAmong resolving source controller legal chosen from
-            -- Mulch's "all land cards revealed this way", the arm above's plural.
-            -- NOT routed through objectRefObjects, for the InSlot arm's reason:
-            -- the members come off slotBoundObjects, which reads the single
-            -- binding an earlier effect of this resolution left as well as the
-            -- group. The same read chooseCardFromAmong makes, off the pre-move
-            -- state (CR 608.2c), so the matched half and "the rest" -- a LATER
-            -- clause naming the same slot with InSlot, which finds these cards
-            -- gone (CR 400.7) -- cannot see different groups.
-            ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong slot filter_) -> do
-              members <- fromAmongMembers legal resolving chosen slot
-              gs <- State.get
-              pure (matchingFromAmong legal resolving controller source gs filter_ members)
-            -- Not implemented: a card moved at random out of a hand, CR 701.9b's
-            -- random discard. Nothing moves it here, so a card writing the ref
-            -- under this opcode names no object; the count and that rule's other
-            -- exception need a design call (#1733).
-            ObjectRef.RandomCardInHand _ -> pure []
-            -- CR 608.2d: Glorious Protector's "any number of non-Angel creatures
-            -- you control", announced while the effect is applied and so asked
-            -- HERE rather than read by objectRefObjects. turnPermanentsOver asks
-            -- the same question for CR 701.27a's turn, and this gather owes it the
-            -- same posture: candidates are battlefieldMatching's sweep of the same
-            -- Filter, read off the pre-move board (CR 608.2c) so the sweep and the
-            -- offer cannot disagree, ONE ask of the resolving controller, skipped
-            -- at no candidate where the empty set is the only answer (CR 101.3, CR
-            -- 609.3), and asked at ONE, where "any number" still leaves two
-            -- distinguishable answers.
-            --
-            -- FILTERED, not trusted (#222), the sibling arms' reason: an answer
-            -- naming a permanent that was never offered would otherwise be moved.
-            -- Filtering rather than taking the answer also keeps CR 608.2f's APNAP
-            -- order, which the candidate list carries and a Set does not.
-            ObjectRef.AnyNumberMatching filter_ -> do
-              gs <- State.get
-              case battlefieldMatching legal resolving controller source gs filter_ of
-                [] -> pure []
-                candidates -> do
-                  answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates)
-                  pure (filter (`Set.member` answer) candidates)
-            -- CR 608.2d's singular of the arm above: "a creature named Hanweir
-            -- Garrison" in Hanweir Battlements' "exile them, then meld them",
-            -- announced while the effect is applied. The candidates are
-            -- EachMatching's sweep of the same Filter, read live off the pre-move
-            -- board (CR 608.2c), so the sweep and the offer cannot disagree about
-            -- what matches.
-            --
-            -- Asked only at TWO or more candidates, which is the whole of what
-            -- parts this from the arm above: CR 608.2d admits only a legal
-            -- option, so one candidate leaves one legal announcement and no
-            -- decision to put to anybody, and none makes the instruction
-            -- impossible -- CR 101.3 ignores that part and CR 609.3 leaves the
-            -- rest of the effect to do as much as it can.
-            -- Pawl.Types.Prompt.ChoosePermanent is where that posture is written.
-            --
-            -- FILTERED, not trusted (#222), the hand arm's reason: an answer
-            -- naming a permanent that was never offered would otherwise be moved.
-            ObjectRef.ChosenPermanent filter_ -> do
-              gs <- State.get
-              case battlefieldMatching legal resolving controller source gs filter_ of
-                [] -> pure []
-                [only] -> pure [only]
-                first : second : more -> do
-                  let offered = first NonEmpty.:| (second : more)
-                  answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
-                  pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
-          arrivals <- settleArrivals zone placement targets
-          -- The batch's own board, read after CR 401.4's arrangement asks (which
-          -- move nothing) and before any member does.
-          before <- State.get
-          -- CR 701.40e's own three conditions, read off that same board; the
-          -- `arrived` bind below is where the rule is applied and where the case
-          -- for reading a rider here is written out.
-          let manifested = fmap FaceDownState.reason (EntryRiders.faceDown entry) == Just FaceDownReason.Manifested
-              fromOwnLibrary target = case Game.lookupObject target before of
-                Just obj -> Object.zone obj == Zone.Library && Object.owner obj == controller
-                Nothing -> False
-              oneAtATime =
-                zone == Zone.Battlefield
-                  && manifested
-                  && length arrivals > 1
-                  && all (fromOwnLibrary . fst) arrivals
-          -- CR 608.2h: the counts the riders carry, settled ONCE off that same
-          -- board and before the fold, so no member of the batch can see how many
-          -- counters an earlier member arrived with (CR 608.2f).
-          let frozen = freezeRiders (effectViewOf source legal before) (chooseContext before) before resolving source entry
-          -- CR 509.4's parenthetical: the attacking creature the effect
-          -- SPECIFIED, named by slot. Read ONCE, ahead of the fold and off the
-          -- same pre-move board the riders' counts were settled on, so CR 608.2f's
-          -- single event cannot see it move; through fromAmongMembers, the reader
-          -- every "the object this slot names" site shares, so a targeted slot
-          -- and one a trigger bound (Aetherplasm's "that creature") read the same
-          -- way.
+          -- CR 610.3b: the source has already left the battlefield since this
+          -- ability triggered, so the object doesn't move. CR 610.3a says the
+          -- same of a spell or activated ability put onto the stack, and one
+          -- test answers both -- CR 400.7 makes the source one incarnation, so
+          -- "has it left" is the same question whichever rule asks it. Glorious
+          -- Protector's ruling is the printed statement of it: if it leaves the
+          -- battlefield before its triggered ability resolves, no creatures are
+          -- exiled.
           --
-          -- Exactly one object or nothing: CR 509.4 names ONE attacking creature,
-          -- and no printing names several. Nothing here is Combat's own no-op
-          -- case anyway.
-          mBlocked <- case EntryRiders.blocking entry of
-            Nothing -> pure Nothing
-            Just slot -> do
-              named <- fromAmongMembers legal resolving chosen slot
-              pure $ case named of
-                [attacker] -> Just attacker
-                _ -> Nothing
-          -- ONE event, which is what Event.simultaneously stamps on everything the
-          -- fold records: CR 608.2f processes an action taken on multiple objects
-          -- simultaneously, and one opcode is one such action however many objects
-          -- the ref swept. The fold's own comments already rest on that sentence --
-          -- `before` and the frozen riders are there because no member may observe
-          -- another -- so the bracket adds no claim they do not, and CR 603.2c's
-          -- batch conditions are what a board can finally read it with.
-          --
-          -- The per-member CR 616.1 loop inside Event.changeZoneEnteringIn is no
-          -- argument for N groups: Event.destroyIn runs exactly such a loop inside
-          -- one bracket, and Pawl.Engine.Sba's CR 704.3 pass nests deeper still.
-          -- CR 616.1g is where the rules say events nest at all -- a replacement
-          -- may apply to "an event contained within the first event" -- so a
-          -- replacement opportunity per member is not a second event.
-          --
-          -- Around the FOLD alone. The gathers above ask CR 608.2d choices and CR
-          -- 401.4 arrangements, which move nothing and record nothing; a bracket
-          -- reaching over them would only widen what the group means.
-          --
-          -- CR 701.40e is the one exception the rules write to that reading: "if
-          -- an effect instructs a player to manifest multiple cards from their
-          -- library, those cards are manifested one at a time." Then the opcode
-          -- is not one action taken on several objects but several actions, so
-          -- each card gets its own event -- its own board, its own frozen riders,
-          -- and no sibling to exclude, which is what lets the second card's CR
-          -- 614.12 determination count the first one (Pawl.FaceDownSpec's
-          -- Ethereal Ambush under Synthetic Encircling Net).
-          --
-          -- The gate reads the RIDER (CR 708.2's manifest reason), the
-          -- destination and where the cards are, never the effect's identity:
-          -- CR 701.40's keyword action is what a face-down battlefield arrival
-          -- out of a library IS. Both of the rule's own restrictions are in it --
-          -- MULTIPLE, so a single card takes the ordinary path, and THEIR
-          -- LIBRARY, which CR 108.3 makes the owner's, so a manifest out of
-          -- another player's library or out of exile (Ghastly Conscription) stays
-          -- one event.
-          arrived <-
-            if oneAtATime
-              then fmap concat . Monad.forM arrivals $ \arrival -> do
-                now <- State.get
-                let riders = freezeRiders (effectViewOf source legal now) (chooseContext now) now resolving source entry
-                fmap (reverse . snd) (Event.simultaneously (moveOne mBlocked riders now (Set.empty, []) arrival))
-              else fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mBlocked frozen before) (Set.empty, []) arrivals))
-          Monad.mapM_ (\slot -> bindArrivals slot (concatMap Foldable.toList arrived)) mSlot
+          -- Ahead of the GATHER, so the CR 608.2d choice is not put to anybody
+          -- either: with nothing able to move, that question has no board behind
+          -- it.
+          declined <- State.gets (\gs -> duration == Just MoveDuration.Type.UntilSourceLeavesTheBattlefield && MoveDuration.hasLeftTheBattlefield source gs)
+          Monad.unless declined $ do
+            -- WHICH objects move, gathered first and moved second, so the CR 401.2
+            -- and CR 401.4 questions between the two steps are asked of the whole
+            -- batch.
+            targets <- case ref of
+              -- NOT routed through objectRefObjects: that function reads `slotGroup`
+              -- then `chosen`, never `slotOne`, and slotOne is what lets a slot an
+              -- EARLIER EFFECT OF THIS SAME RESOLUTION bound name its object here.
+              -- A declared target is read out of `chosen` behind CR 608.2b's
+              -- re-validation; a slot `chosen` does not mention was never targeted
+              -- and is read live. Membership rather than preference keeps a target
+              -- from losing its re-validation to a binding sharing its name.
+              -- A slot bound to a GROUP names every member, a slot bound to one
+              -- names that one, and a TARGETED slot names EVERY still-legal
+              -- recipient -- not one, which is the SlotArity.Many objectRefSlots
+              -- declares; legalOne declines a slot naming several. An empty list is
+              -- an unbound slot, every target gone illegal, or CR 115.6's zero
+              -- targets chosen. fromAmongMembers is where those three and their
+              -- rules live, shared with the two "from among them" refs so they
+              -- cannot read the slot differently.
+              ObjectRef.InSlot slot -> fromAmongMembers legal resolving chosen slot
+              -- Swept ONCE from the PRE-MOVE state (CR 608.2c, CR 608.2f), in APNAP
+              -- order, then moved one at a time, each judged against the board the
+              -- batch began on and against the siblings that have already arrived
+              -- (see moveOne). CR 400.3 files a hand arrival under Object.owner.
+              ObjectRef.EachMatching _ -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              -- Swept once from the PRE-MOVE state (CR 608.2c, CR 608.2f). "Under
+              -- your control" needs nothing here: CR 110.2a hands a battlefield
+              -- arrival to the player the effect instructed.
+              ObjectRef.EachCardInGraveyard {} -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              -- Swept once from the PRE-MOVE state (CR 608.2c, CR 608.2f). A
+              -- resolving spell is on the stack (CR 608.1), not in the hand.
+              ObjectRef.EachCardInYourHand -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              -- Swept once from the PRE-MOVE state (CR 608.2c, CR 608.2f), the arm
+              -- above's answer over the wider scope.
+              ObjectRef.EachCardInHand {} -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              -- Swept once from the PRE-MOVE state (CR 608.2c, CR 608.2f), the two
+              -- arms above's answer over CR 400.1's other hidden per-player zone.
+              -- A resolving spell is on the stack (CR 608.1), not in the library,
+              -- so Paradigm Shift does not sweep itself.
+              ObjectRef.EachCardInYourLibrary -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              -- CR 607.2a, swept once from the PRE-MOVE state (CR 608.2c, CR
+              -- 608.2f). CR 400.3 files a hand arrival under Object.owner.
+              ObjectRef.EachCardExiledWithSource {} -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              ObjectRef.EachSpell _ -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              ObjectRef.EachOnStack _ -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              ObjectRef.EachPlayer -> pure []
+              ObjectRef.EachOpponent -> pure []
+              ObjectRef.ChosenPlayer -> pure []
+              -- Read from the pre-move state like the sweeps above: the whole batch
+              -- comes off one look at each library (CR 608.2c, CR 608.2f).
+              ObjectRef.TopOfLibrary {} -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              -- The walked prefix, read from the PRE-MOVE state for the arm above's
+              -- reason: the whole batch comes off one walk of each library (CR
+              -- 608.2c, CR 608.2f).
+              ObjectRef.TopOfLibraryUntil {} -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              -- One card per chooser, and the only ref whose gather asks a question
+              -- rather than reading the board, which is why it is answered here in
+              -- the Game monad. Candidates come from the pre-move state (CR 608.2c),
+              -- so an earlier effect of this resolution -- Port of Karfell's own mill
+              -- -- has already put its cards in the graveyard.
+              --
+              -- WHO is asked is the ref's Chooser: the resolving controller (CR
+              -- 608.2d), or each player the scope names, asked about their own
+              -- graveyard alone. The asks run in APNAP order and all before any card
+              -- moves (CR 608.2e, CR 101.4). Elided at one candidate and skipped at
+              -- none (CR 101.3, CR 609.3), per player under EachInScope. Filtered,
+              -- not trusted: an answer naming a card never offered falls back to the
+              -- first candidate.
+              ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser scope filter_) -> do
+                gs <- State.get
+                let ask asked candidates = case candidates of
+                      [] -> pure []
+                      [only] -> pure [only]
+                      first : second : more -> do
+                        let offered = first NonEmpty.:| (second : more)
+                        answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor asked gs) asked source offered)
+                        pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+                case chooser of
+                  Chooser.TheController -> ask controller (graveyardCards (chooseContext gs) controller gs scope filter_)
+                  Chooser.EachInScope ->
+                    fmap concat . Monad.mapM (\pid -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)) $
+                      graveyardPlayers controller gs scope
+                  -- ONE chooser, read out of the slot a ChooseOpponent bound,
+                  -- choosing out of their own graveyard. Through playerRefPlayers so
+                  -- the slot is read as every other is (CR 608.2b): an unfilled,
+                  -- illegal, non-player or many-valued slot names nobody, and nobody
+                  -- asked is nothing moved (CR 101.3). Intersected with the scope, so
+                  -- a chooser the scope does not name is offered nothing.
+                  Chooser.BoundInSlot slot ->
+                    case playerRefPlayers legal controller gs (PlayerRef.InSlot slot) of
+                      [pid] | List.elem pid (graveyardPlayers controller gs scope) -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)
+                      _ -> pure []
+              -- The arm above over the hidden zone CR 400.2 makes a hand: what it
+              -- says about when the candidates are read (CR 608.2c), about the asks
+              -- running in APNAP order (CR 608.2e, CR 101.4) and about the answer
+              -- being filtered rather than trusted holds unchanged.
+              --
+              -- What the hidden zone changes is WHO may be asked: CR 402.3 gives a
+              -- hand's cards to its owner alone, so each seat is offered its OWN hand
+              -- and no other. Narrowing the offer by filter is the card's own words
+              -- saying which cards were ever legal answers (CR 608.2d). Elided at one
+              -- card and skipped at none (CR 101.3, CR 609.3).
+              ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player filter_) -> do
+                gs <- State.get
+                let ask asked candidates = case candidates of
+                      [] -> pure []
+                      [only] -> pure [only]
+                      first : second : more -> do
+                        let offered = first NonEmpty.:| (second : more)
+                        answer <- Game.choose (Prompt.ChooseCardInHand (Decide.deciderFor asked gs) asked source offered)
+                        pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+                fmap concat . Monad.mapM (\pid -> ask pid (handCardsOf (chooseContext gs) gs pid filter_)) $
+                  handChoosers legal controller gs player
+              -- The printed "from among them", a CR 608.2d choice, asked by
+              -- chooseCardFromAmong -- which is where the rule lives, this opcode
+              -- and CR 701.20a's reveal being the two that ask it. The candidates
+              -- come off the pre-move state (CR 608.2c) through the same
+              -- slotBoundObjects the InSlot gather reads, so the choice and "the
+              -- rest" cannot see different groups.
+              --
+              -- ONE card: what the group has left over is not named here at all.
+              -- "The rest" is the same slot read by ObjectRef.InSlot in a LATER
+              -- clause, which finds the chosen card gone -- CR 400.7 minted a new
+              -- object for it on the way to its new zone, and the id the group still
+              -- holds resolves to nothing, so moveOne passes over it.
+              ObjectRef.ChosenCardFromAmong from -> chooseCardFromAmong resolving source controller legal chosen from
+              -- Mulch's "all land cards revealed this way", the arm above's plural.
+              -- NOT routed through objectRefObjects, for the InSlot arm's reason:
+              -- the members come off slotBoundObjects, which reads the single
+              -- binding an earlier effect of this resolution left as well as the
+              -- group. The same read chooseCardFromAmong makes, off the pre-move
+              -- state (CR 608.2c), so the matched half and "the rest" -- a LATER
+              -- clause naming the same slot with InSlot, which finds these cards
+              -- gone (CR 400.7) -- cannot see different groups.
+              ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong slot filter_) -> do
+                members <- fromAmongMembers legal resolving chosen slot
+                gs <- State.get
+                pure (matchingFromAmong legal resolving controller source gs filter_ members)
+              -- Not implemented: a card moved at random out of a hand, CR 701.9b's
+              -- random discard. Nothing moves it here, so a card writing the ref
+              -- under this opcode names no object; the count and that rule's other
+              -- exception need a design call (#1733).
+              ObjectRef.RandomCardInHand _ -> pure []
+              -- CR 608.2d: Glorious Protector's "any number of non-Angel creatures
+              -- you control", announced while the effect is applied and so asked
+              -- HERE rather than read by objectRefObjects. turnPermanentsOver asks
+              -- the same question for CR 701.27a's turn, and this gather owes it the
+              -- same posture: candidates are battlefieldMatching's sweep of the same
+              -- Filter, read off the pre-move board (CR 608.2c) so the sweep and the
+              -- offer cannot disagree, ONE ask of the resolving controller, skipped
+              -- at no candidate where the empty set is the only answer (CR 101.3, CR
+              -- 609.3), and asked at ONE, where "any number" still leaves two
+              -- distinguishable answers.
+              --
+              -- FILTERED, not trusted (#222), the sibling arms' reason: an answer
+              -- naming a permanent that was never offered would otherwise be moved.
+              -- Filtering rather than taking the answer also keeps CR 608.2f's APNAP
+              -- order, which the candidate list carries and a Set does not.
+              ObjectRef.AnyNumberMatching filter_ -> do
+                gs <- State.get
+                case battlefieldMatching legal resolving controller source gs filter_ of
+                  [] -> pure []
+                  candidates -> do
+                    answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates)
+                    pure (filter (`Set.member` answer) candidates)
+              -- CR 608.2d's singular of the arm above: "a creature named Hanweir
+              -- Garrison" in Hanweir Battlements' "exile them, then meld them",
+              -- announced while the effect is applied. The candidates are
+              -- EachMatching's sweep of the same Filter, read live off the pre-move
+              -- board (CR 608.2c), so the sweep and the offer cannot disagree about
+              -- what matches.
+              --
+              -- Asked only at TWO or more candidates, which is the whole of what
+              -- parts this from the arm above: CR 608.2d admits only a legal
+              -- option, so one candidate leaves one legal announcement and no
+              -- decision to put to anybody, and none makes the instruction
+              -- impossible -- CR 101.3 ignores that part and CR 609.3 leaves the
+              -- rest of the effect to do as much as it can.
+              -- Pawl.Types.Prompt.ChoosePermanent is where that posture is written.
+              --
+              -- FILTERED, not trusted (#222), the hand arm's reason: an answer
+              -- naming a permanent that was never offered would otherwise be moved.
+              ObjectRef.ChosenPermanent filter_ -> do
+                gs <- State.get
+                case battlefieldMatching legal resolving controller source gs filter_ of
+                  [] -> pure []
+                  [only] -> pure [only]
+                  first : second : more -> do
+                    let offered = first NonEmpty.:| (second : more)
+                    answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
+                    pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+            arrivals <- settleArrivals zone placement targets
+            -- The batch's own board, read after CR 401.4's arrangement asks (which
+            -- move nothing) and before any member does.
+            before <- State.get
+            -- CR 701.40e's own three conditions, read off that same board; the
+            -- `arrived` bind below is where the rule is applied and where the case
+            -- for reading a rider here is written out.
+            let manifested = fmap FaceDownState.reason (EntryRiders.faceDown entry) == Just FaceDownReason.Manifested
+                fromOwnLibrary target = case Game.lookupObject target before of
+                  Just obj -> Object.zone obj == Zone.Library && Object.owner obj == controller
+                  Nothing -> False
+                oneAtATime =
+                  zone == Zone.Battlefield
+                    && manifested
+                    && length arrivals > 1
+                    && all (fromOwnLibrary . fst) arrivals
+            -- CR 608.2h: the counts the riders carry, settled ONCE off that same
+            -- board and before the fold, so no member of the batch can see how many
+            -- counters an earlier member arrived with (CR 608.2f).
+            let frozen = freezeRiders (effectViewOf source legal before) (chooseContext before) before resolving source entry
+            -- CR 509.4's parenthetical: the attacking creature the effect
+            -- SPECIFIED, named by slot. Read ONCE, ahead of the fold and off the
+            -- same pre-move board the riders' counts were settled on, so CR 608.2f's
+            -- single event cannot see it move; through fromAmongMembers, the reader
+            -- every "the object this slot names" site shares, so a targeted slot
+            -- and one a trigger bound (Aetherplasm's "that creature") read the same
+            -- way.
+            --
+            -- Exactly one object or nothing: CR 509.4 names ONE attacking creature,
+            -- and no printing names several. Nothing here is Combat's own no-op
+            -- case anyway.
+            mBlocked <- case EntryRiders.blocking entry of
+              Nothing -> pure Nothing
+              Just slot -> do
+                named <- fromAmongMembers legal resolving chosen slot
+                pure $ case named of
+                  [attacker] -> Just attacker
+                  _ -> Nothing
+            -- ONE event, which is what Event.simultaneously stamps on everything the
+            -- fold records: CR 608.2f processes an action taken on multiple objects
+            -- simultaneously, and one opcode is one such action however many objects
+            -- the ref swept. The fold's own comments already rest on that sentence --
+            -- `before` and the frozen riders are there because no member may observe
+            -- another -- so the bracket adds no claim they do not, and CR 603.2c's
+            -- batch conditions are what a board can finally read it with.
+            --
+            -- The per-member CR 616.1 loop inside Event.changeZoneEnteringIn is no
+            -- argument for N groups: Event.destroyIn runs exactly such a loop inside
+            -- one bracket, and Pawl.Engine.Sba's CR 704.3 pass nests deeper still.
+            -- CR 616.1g is where the rules say events nest at all -- a replacement
+            -- may apply to "an event contained within the first event" -- so a
+            -- replacement opportunity per member is not a second event.
+            --
+            -- Around the FOLD alone. The gathers above ask CR 608.2d choices and CR
+            -- 401.4 arrangements, which move nothing and record nothing; a bracket
+            -- reaching over them would only widen what the group means.
+            --
+            -- CR 701.40e is the one exception the rules write to that reading: "if
+            -- an effect instructs a player to manifest multiple cards from their
+            -- library, those cards are manifested one at a time." Then the opcode
+            -- is not one action taken on several objects but several actions, so
+            -- each card gets its own event -- its own board, its own frozen riders,
+            -- and no sibling to exclude, which is what lets the second card's CR
+            -- 614.12 determination count the first one (Pawl.FaceDownSpec's
+            -- Ethereal Ambush under Synthetic Encircling Net).
+            --
+            -- The gate reads the RIDER (CR 708.2's manifest reason), the
+            -- destination and where the cards are, never the effect's identity:
+            -- CR 701.40's keyword action is what a face-down battlefield arrival
+            -- out of a library IS. Both of the rule's own restrictions are in it --
+            -- MULTIPLE, so a single card takes the ordinary path, and THEIR
+            -- LIBRARY, which CR 108.3 makes the owner's, so a manifest out of
+            -- another player's library or out of exile (Ghastly Conscription) stays
+            -- one event.
+            arrived <-
+              if oneAtATime
+                then fmap concat . Monad.forM arrivals $ \arrival -> do
+                  now <- State.get
+                  let riders = freezeRiders (effectViewOf source legal now) (chooseContext now) now resolving source entry
+                  fmap (reverse . snd) (Event.simultaneously (moveOne mBlocked riders now (Set.empty, []) arrival))
+                else fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mBlocked frozen before) (Set.empty, []) arrivals))
+            Monad.mapM_ (\slot -> bindArrivals slot (concatMap Foldable.toList arrived)) mSlot
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries. Two
   -- steps: CR 400.7's move through the same changeZone funnel every destination
   -- uses, so a library-entry replacement gets its CR 616.1 opportunity (CR 400.3
