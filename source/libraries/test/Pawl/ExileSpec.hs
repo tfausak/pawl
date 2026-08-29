@@ -252,9 +252,11 @@ offerTo pid slot gs = Target.piledOffer (Just pid) gs (Target.legalRecipients (J
 timestampOf :: ObjectId.ObjectId -> GameState.GameState -> Timestamp.Timestamp
 timestampOf oid gs = maybe (Timestamp.MkTimestamp 0) Object.timestamp (Game.lookupObject oid gs)
 
--- castBliss' board, plus the {1}{U} and the copy of the instant alice needs to
--- cast it, cast with the PILE chosen. Returns the card the draw named and the
--- other card of the same pile, with the spell still on the stack.
+-- castBliss' board with distinct card names and the {1}{U} alice needs for a copy
+-- of the instant, cast with the PILE chosen. Every name is its own card, so the
+-- two cards of the pile can be told apart in the zone each ends up in. Returns
+-- the name of the card the draw named and of the other card of the same pile,
+-- with the spell still on the stack.
 pileBoard ::
   (Monad m) =>
   Spec.Spec m n ->

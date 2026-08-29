@@ -28,10 +28,11 @@ data Recipient
     -- does not care about creature-ness, so it does not reuse ToCreature.
     ToObject ObjectId.ObjectId
   | -- | CR 406.4's pile of face-down exiled cards, offered to a chooser who may
-    -- not look at what is in it. The one arm that names no object and no player:
-    -- it exists to be OFFERED, and Pawl.Engine.Target.drawFromPiles replaces it
-    -- with the ToObject the rule's random draw named before any target is
-    -- recorded, so nothing downstream of CR 601.2c ever sees one.
+    -- not look at what is in it. It exists to be OFFERED:
+    -- Pawl.Engine.Target.drawFromPiles replaces it with the card the rule's
+    -- random draw named before any target is recorded, so nothing downstream of
+    -- CR 601.2c ever sees one -- which is why every arm written for it elsewhere
+    -- is unreachable.
     ToPile Pile.Pile
   deriving (Eq, Ord, Show)
 

@@ -8,8 +8,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- whole point of the rule is that a chooser picks the pile without picking a
 -- card in it; Pawl.Engine.Exile.pileOf is where a card is sorted into one.
 data Pile
-  = -- | CR 702.143e: a foretold card is kept differentiable from every other
-    -- face-down card its owner owns, so it is a pile of its own, named by the
+  = -- | CR 702.143e: a foretold card is a pile of its own, named by the
     -- timestamp its exile stamped on it (CR 613.7d).
     OfForetold Timestamp.Timestamp
   | -- | Every other face-down exiled card this player owns.

@@ -538,8 +538,9 @@ targetable pcs perspective source sourceView gs recipient =
         Recipient.ToPlaneswalker oid -> restrictedObject oid
         Recipient.ToBattle oid -> restrictedObject oid
         Recipient.ToObject oid -> restrictedObject oid
-        -- Unreachable, for the reason `keep` above gives. Rule 702's targeting
-        -- restrictions are about permanents, and a pile holds cards in exile.
+        -- Unreachable, for the reason `keep` above gives: no pool holds a pile.
+        -- Unrestricted rather than excluded, which is the answer rule 702 gives
+        -- every candidate that is not a permanent.
         Recipient.ToPile _ -> True
 
 -- CR 702.11b / CR 702.11d's "your opponents": is `perspective` -- CR 109.5's
