@@ -45,6 +45,7 @@ codec =
       Arm.payload "EachCardInGraveyard" EachCardInGraveyard.codec ObjectRef.EachCardInGraveyard (\x -> case x of ObjectRef.EachCardInGraveyard y -> Just y; _ -> Nothing),
       Arm.nullary "EachCardInYourHand" ObjectRef.EachCardInYourHand,
       Arm.payload "EachCardInHand" EachCardInHand.codec ObjectRef.EachCardInHand (\x -> case x of ObjectRef.EachCardInHand y -> Just y; _ -> Nothing),
+      Arm.nullary "EachCardInYourLibrary" ObjectRef.EachCardInYourLibrary,
       Arm.optionalPayload "EachCardExiledWithSource" filterCodec ObjectRef.EachCardExiledWithSource (\x -> case x of ObjectRef.EachCardExiledWithSource y -> Just y; _ -> Nothing),
       Arm.payload "EachSpell" filterCodec ObjectRef.EachSpell (\x -> case x of ObjectRef.EachSpell y -> Just y; _ -> Nothing),
       Arm.payload "EachOnStack" filterCodec ObjectRef.EachOnStack (\x -> case x of ObjectRef.EachOnStack y -> Just y; _ -> Nothing),
