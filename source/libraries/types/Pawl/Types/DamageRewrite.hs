@@ -80,8 +80,8 @@ data DamageRewrite
     -- all but 1 of that damage".
     --
     -- A FLOOR on what survives, and thereby the opposite of PreventNext's
-    -- ceiling on what is stopped: the rule's static shields are "not used up"
-    -- and apply separately to each event, so nothing is written back and
+    -- ceiling on what is stopped: the rule's shield "will apply separately to
+    -- damage from other applicable events", so nothing is written back and
     -- Pawl.Engine.Replacement.contestedResource gives it no supply.
     --
     -- Not SetAmount with the same number, which is what makes this its own arm:

@@ -1785,7 +1785,9 @@ spentInertly rewrite = case rewrite of
   DamageRewrite.PreventRemovingShieldCounter -> True
   DamageRewrite.PreventNext _ -> False
   -- CR 615.10's static shield has no stored amount at all, and no additional
-  -- effect of its own; Fog's answer for Fog's reason.
+  -- effect of its own, so there is nothing for CR 615.12's middle clause to run
+  -- and nothing for its last clause to protect. `contestedResource` gives it no
+  -- supply either, so it never reaches `hitsOf`.
   DamageRewrite.PreventAllBut _ -> False
   -- Fog has no resource to spend at all, so this could answer either way;
   -- `contestedResource` gives it no supply and it never reaches `hitsOf`.

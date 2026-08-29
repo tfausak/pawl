@@ -2505,16 +2505,19 @@ stormwildCapridorSpec s registry = Spec.describe s "Stormwild Capridor (CR 615.5
 -- assertions read.
 --
 -- The rewrite is a FLOOR on what survives rather than a ceiling on what is
--- stopped, and every case below is a pair of boards differing in one thing:
+-- stopped, and each case below moves exactly one thing off one board:
 --
---   * the recipient, across the printed clause's three narrowings -- "another"
+--   * the RECIPIENT, across the printed clause's three narrowings -- "another"
 --     (the Altisaur's own damage lands whole), "Dinosaur" (the Goblin Piker's
 --     does), and "you control" (bob's Dinosaur's does);
 --   * the AMOUNT, an event already at the floor passing through untouched;
---   * CR 615.12's "can't be prevented", which is what proves the rewrite is a
---     PREVENTION effect (CR 615.1a) rather than an instead-amount that happens
---     to shrink the event: an instead-amount would still cut the Excruciator's
---     damage to 1, where a prevention prevents none of it.
+--   * the BATCH SIZE, CR 615.10's last sentence -- two simultaneous events each
+--     keep their own 1, and nobody is asked which the shield covers;
+--   * the SOURCE, over CR 615.12's "can't be prevented", which is what proves
+--     the rewrite is a PREVENTION effect (CR 615.1a) rather than an
+--     instead-amount that happens to shrink the event: an instead-amount would
+--     still cut the Excruciator's 3 to 1, where a prevention prevents none of
+--     it.
 --
 -- Numbers all distinct: the floor is 1, the ordinary hit is 5, the unpreventable
 -- one is 3, and the shielded Dinosaur is a 4/4. Damage is settled through
