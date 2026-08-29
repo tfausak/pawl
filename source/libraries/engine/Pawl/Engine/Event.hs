@@ -3865,7 +3865,8 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               newId <- placeObject pid (asComponent leading) dest position
               trailingIds <- Monad.forM trailing (\component -> placeObject pid (asComponent (Just component)) dest position)
               -- `newId` heads the answer, so a caller that can only act on one
-              -- object acts on the first card the meld recorded.
+              -- object acts on the first card the arrangement named -- the first
+              -- the meld recorded, where nobody was asked for one.
               let arrivals = newId Seq.<| trailingIds
               -- CR 400.7a, and BEFORE the entry loop below rather than after this
               -- funnel returns: CR 614.12 decides an entry row against "continuous

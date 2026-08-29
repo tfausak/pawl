@@ -961,7 +961,13 @@ data Prompt r where
   -- two. Every arrangement is reachable either way, which is what the rule asks.
   --
   -- The printings and not the arrivals: the cards have no ids until they are
-  -- placed, and placing them is what this orders.
+  -- placed, and placing them is what this orders. That is also why this is not
+  -- ArrangeLibraryArrivals above, which CR 401.4 asks over ids a resolution
+  -- has already minted -- and the two never both fire, since the split places
+  -- through Pawl.Engine.Event.placeObject rather than through the CR 401.4 batch
+  -- Pawl.Engine.Resolve gathers. Nothing diverges either way: CR 401.4 gives a
+  -- library's arrangement to the same owner, and CR 712.21a is what extends it
+  -- to a graveyard.
   --
   -- CR 730.3a says the same sentence for a merged permanent (#874), so the
   -- prompt is named for the components a leaving permanent splits into rather
