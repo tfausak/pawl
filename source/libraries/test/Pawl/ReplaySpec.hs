@@ -518,7 +518,7 @@ combatReplaySpec s =
             "an OrderCostComponents transcript entry does not answer an OrderCombatTolls"
             (Replay.decode p (Replay.encode (Prompt.OrderCostComponents decider S.alice oid orderComponents) answer))
             Nothing
-        Spec.it s "defaultAnswer keeps the battlefield order the charges were gathered in" $
+        Spec.it s "defaultAnswer keeps the order the charges were gathered in" $
           Spec.assertEqWith
             s
             "identity permutation"

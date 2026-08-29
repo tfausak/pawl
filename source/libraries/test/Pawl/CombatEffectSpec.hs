@@ -3266,7 +3266,7 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
         dragonFirst = S.runPure (ordering [0, 1]) board (Combat.declareAttackers S.alice)
     Spec.assertEqWith s "the payer's order: both were declared" (S.attackerDeclarationsOf warriorFirst) mine
     Spec.assertEqWith s "and the Arbor paid both charges" (stillThere [tree] warriorFirst) 0
-    Spec.assertEqWith s "the battlefield order: nothing was declared" (S.attackerDeclarationsOf dragonFirst) []
+    Spec.assertEqWith s "the gathered order: nothing was declared" (S.attackerDeclarationsOf dragonFirst) []
     Spec.assertEqWith s "and CR 508.1j gave the Arbor back" (stillThere [tree] dragonFirst) 1
     Spec.assertBool s (allUntapped [tree] dragonFirst) "the Warrior's tap was rewound with it"
 

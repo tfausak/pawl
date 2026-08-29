@@ -935,9 +935,9 @@ data Prompt r where
   OrderCostComponents :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [CostComponent.CostComponent Keyword.Keyword] -> Prompt [Natural.Natural]
   -- | CR 508.1j / 509.1f: the costs of a combat toll are paid "in any order",
   -- and the order is the payer's. The [ObjectId] is the taxing permanents in
-  -- the engine's battlefield order, one entry per charge
-  -- (Pawl.Engine.AttackCost.totalCost, Pawl.Engine.BlockCost.totalCost); the
-  -- answer is a permutation of their indices, first-named paid first.
+  -- the order the charges were gathered (Pawl.Engine.AttackCost.totalCost,
+  -- Pawl.Engine.BlockCost.totalCost), one entry per charge; the answer is a
+  -- permutation of their indices, first-named paid first.
   --
   -- The tags and not the components, unlike OrderCostComponents above: each
   -- charge is the price one permanent's text states, so the permanent names it,
