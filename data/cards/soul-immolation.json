@@ -83,38 +83,31 @@
                         "type": "InSlot",
                         "value": "X"
                       },
-                      "ref": {
-                        "type": "EachOpponent"
-                      }
-                    }
-                  },
-                  {
-                    "type": "DealDamage",
-                    "value": {
-                      "quantity": {
-                        "type": "InSlot",
-                        "value": "X"
-                      },
-                      "ref": {
-                        "type": "EachMatching",
-                        "value": {
-                          "type": "And",
-                          "value": [
-                            {
-                              "type": "HasCardType",
-                              "value": {
-                                "type": "Creature"
+                      "refs": [
+                        {
+                          "type": "EachOpponent"
+                        },
+                        {
+                          "type": "EachMatching",
+                          "value": {
+                            "type": "And",
+                            "value": [
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Creature"
+                                }
+                              },
+                              {
+                                "type": "ControlledBy",
+                                "value": {
+                                  "type": "Opponent"
+                                }
                               }
-                            },
-                            {
-                              "type": "ControlledBy",
-                              "value": {
-                                "type": "Opponent"
-                              }
-                            }
-                          ]
+                            ]
+                          }
                         }
-                      }
+                      ]
                     }
                   }
                 ]

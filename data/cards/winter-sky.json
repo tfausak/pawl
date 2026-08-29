@@ -52,15 +52,17 @@
                         "type": "Literal",
                         "value": 1
                       },
-                      "ref": {
-                        "type": "EachMatching",
-                        "value": {
-                          "type": "HasCardType",
+                      "refs": [
+                        {
+                          "type": "EachMatching",
                           "value": {
-                            "type": "Creature"
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Creature"
+                            }
                           }
                         }
-                      }
+                      ]
                     }
                   },
                   {
@@ -70,9 +72,11 @@
                         "type": "Literal",
                         "value": 1
                       },
-                      "ref": {
-                        "type": "EachPlayer"
-                      }
+                      "refs": [
+                        {
+                          "type": "EachPlayer"
+                        }
+                      ]
                     }
                   }
                 ]

@@ -15,7 +15,7 @@ import qualified Pawl.Types.DealDamage as DealDamage
 -- written by Pawl.Codec.Effect's DealDamage arm.
 codec :: Codec.Codec DealDamage.DealDamage
 codec = Fields.object $ do
-  ref <- Fields.required "ref" ObjectRef.codec DealDamage.ref
+  refs <- Fields.required "refs" (Common.seq ObjectRef.codec) DealDamage.refs
   quantity <- Fields.required "quantity" Quantity.codec DealDamage.quantity
   dealer <- Fields.defaulted "dealer" Nothing (Common.maybe SlotName.codec) DealDamage.dealer
   -- Defaulted to Nothing, so every card that deals damage without saying where
@@ -24,7 +24,7 @@ codec = Fields.object $ do
   excess <- Fields.defaulted "excess" Nothing (Common.maybe ExcessDestination.codec) DealDamage.excess
   pure
     DealDamage.MkDealDamage
-      { DealDamage.ref = ref,
+      { DealDamage.refs = refs,
         DealDamage.quantity = quantity,
         DealDamage.dealer = dealer,
         DealDamage.excess = excess

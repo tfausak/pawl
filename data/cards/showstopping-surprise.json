@@ -49,27 +49,29 @@
                           "slot": "target"
                         }
                       },
-                      "ref": {
-                        "type": "EachMatching",
-                        "value": {
-                          "type": "And",
-                          "value": [
-                            {
-                              "type": "HasCardType",
-                              "value": {
-                                "type": "Creature"
+                      "refs": [
+                        {
+                          "type": "EachMatching",
+                          "value": {
+                            "type": "And",
+                            "value": [
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Creature"
+                                }
+                              },
+                              {
+                                "type": "Not",
+                                "value": {
+                                  "type": "IsBound",
+                                  "value": "target"
+                                }
                               }
-                            },
-                            {
-                              "type": "Not",
-                              "value": {
-                                "type": "IsBound",
-                                "value": "target"
-                              }
-                            }
-                          ]
+                            ]
+                          }
                         }
-                      }
+                      ]
                     }
                   }
                 ]

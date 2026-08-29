@@ -4054,7 +4054,7 @@ effectFilters effect = case effect of
   -- AttachTarget's; CR 303.4d only moves whose choice it is.
   Effect.AttachTargetToEach (AttachTarget.MkAttachTarget _ f) -> [(AttachDestination, f)]
   -- The dealer is a SlotName and carries no Filter.
-  Effect.DealDamage (DealDamage.MkDealDamage ref quantity _ _) -> sourceHosted (objectRefFilters ref) <> unframed (quantityFilters quantity)
+  Effect.DealDamage (DealDamage.MkDealDamage refs quantity _ _) -> sourceHosted (concatMap objectRefFilters refs) <> unframed (quantityFilters quantity)
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     unframed (durationFilters duration <> modificationFilters modification) <> sourceHosted (objectRefFilters ref)
   Effect.ChangeText {} -> []
@@ -4356,7 +4356,7 @@ effectObjectRefs effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
-  Effect.DealDamage (DealDamage.MkDealDamage ref _ _ _) -> read_ [ref]
+  Effect.DealDamage (DealDamage.MkDealDamage refs _ _ _) -> read_ (Foldable.toList refs)
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> read_ [ref]
   Effect.ChangeText {} -> []
   Effect.AddMana {} -> []
@@ -5242,7 +5242,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       )
       stems
   Spec.it s "the lint itself catches a dangling reference" $
-    let bad = Map.keysSet (Resolve.slotsOf (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost"))) (Quantity.Type.Literal 3) Nothing Nothing)))
+    let bad = Map.keysSet (Resolve.slotsOf (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost")))) (Quantity.Type.Literal 3) Nothing Nothing)))
      in Spec.assertBool s (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSlot.TargetSlot)) "misauthored card detected"
   -- CR 120.2b's dealer is a slot READ like any other, so the same lint has to
   -- reach it. The effect below references no other slot, so the answer is the
@@ -5252,7 +5252,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
      in Spec.assertEqWith
           s
           "the dealer slot is read"
-          (Map.keysSet (Resolve.slotsOf (Effect.DealDamage (DealDamage.MkDealDamage ObjectRef.EachPlayer (Quantity.Type.Literal 3) (Just ghost) Nothing))))
+          (Map.keysSet (Resolve.slotsOf (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton ObjectRef.EachPlayer) (Quantity.Type.Literal 3) (Just ghost) Nothing))))
           (Set.singleton ghost)
   -- The SPELL half of CR 601.2b's contract: what a card's own modes read is
   -- announced against the card's own cost -- mana cost, additional costs and

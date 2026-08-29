@@ -445,9 +445,9 @@ exchangeSidesSlots sides = case sides of
 slotsOf :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Map.Map SlotName SlotArity
 slotsOf effect = case effect of
   -- The dealer is a read like any other (CR 120.2b), and one object (CR 120.1).
-  Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer _) ->
+  Effect.DealDamage (DealDamage.MkDealDamage refs quantity dealer _) ->
     joinTwo
-      (joinTwo (objectRefSlots ref) (quantitySlots quantity))
+      (joinTwo (joinSlots (fmap objectRefSlots (Foldable.toList refs))) (quantitySlots quantity))
       (maybe Map.empty oneSlot dealer)
   -- BOTH fighters: CR 701.14a reads each one's power against the other, so a
   -- slot named by only one half would still look dangling.
@@ -3528,14 +3528,19 @@ chooseNewTargetsFor controller copyId = do
 -- gone before a later effect of the same list runs.
 applyOneEffect :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
 applyOneEffect runSubgame resolving source controller legal chosen effect = case effect of
-  Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer excess) -> do
+  Effect.DealDamage (DealDamage.MkDealDamage refs quantity dealer excess) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
-        -- CR 120.1a: damage only to a battle, creature, or planeswalker, so both
-        -- arms of the ObjectRef go through Damage.damageRecipient and neither is
-        -- trusted. A player recipient survives untouched (CR 115.4, CR 120.3a).
-        recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs ref)
+        -- CR 120.1a: damage only to a battle, creature, or planeswalker, so every
+        -- object an ObjectRef names goes through Damage.damageRecipient and none
+        -- is trusted. A player recipient survives untouched (CR 115.4, CR 120.3a).
+        -- ONE recipient list from EVERY description the instruction names, so a
+        -- sentence naming objects and players at once -- Molten Disaster's "each
+        -- creature without flying and each player" -- reaches applyDamage as a
+        -- single CR 608.2f batch rather than one per description. Every amount
+        -- below is still read against the same pre-effect `gs`.
+        recipients = concatMap (Maybe.mapMaybe (Damage.damageRecipient gs) . objectRefRecipients legal resolving controller source gs) refs
         -- WHO DEALS IT (CR 120.1): `source` is CR 113.7's default, and a `dealer`
         -- slot is CR 120.2b's exception. Resolved here and carried on the
         -- DamageEvent, so every later reader of "what dealt this" sees the
