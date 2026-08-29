@@ -1999,7 +1999,7 @@ rewriteEffect pairs effect = case effect of
   -- CR 612.1 through BOTH halves of every clause: the recipient's ref, and the
   -- clause's own amount, whose Count may name a creature type -- Goblin War
   -- Strike's "damage equal to the number of Goblins you control". CR 120.2b's
-  -- dealer is a slot name and CR 120.4's excess rider a destination; neither is a
+  -- dealer is a slot name and CR 120.4a's excess rider a destination; neither is a
   -- word rule 612 can swap.
   Effect.DealDamage (DealDamage.MkDealDamage parts dealer excess) -> Effect.DealDamage (DealDamage.MkDealDamage (fmap (rewriteDamagePart pairs) parts) dealer excess)
   -- Two SlotNames and nothing else: no word a swap could reach.
@@ -2127,8 +2127,9 @@ rewriteEffect pairs effect = case effect of
   -- printed keyword through the swap, PutCounters' case above (#1840).
   Effect.MoveCounters (MoveCounters.MkMoveCounters from kind quantity slot to) ->
     Effect.MoveCounters (MoveCounters.MkMoveCounters from kind (rewriteQuantity pairs quantity) slot to)
-  -- CR 107.14's player counter kinds are a closed list with no subtype word in
-  -- it, so only the count descends.
+  -- A player counter kind is a closed list (CR 122.1f, CR 122.1i, CR 107.14, and
+  -- CR 122.1's bare first sentence) with no subtype word in it, so only the count
+  -- descends.
   Effect.GainPlayerCounters x -> Effect.GainPlayerCounters x {PlayerCounters.quantity = rewriteQuantity pairs (PlayerCounters.quantity x)}
   Effect.RemovePlayerCounters x -> Effect.RemovePlayerCounters x {PlayerCounters.quantity = rewriteQuantity pairs (PlayerCounters.quantity x)}
   Effect.PayAnyEnergy _ -> effect
