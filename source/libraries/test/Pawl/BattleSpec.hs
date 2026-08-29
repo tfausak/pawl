@@ -608,6 +608,7 @@ filterSpec s registry = Spec.describe s "Filter" $ do
               S.runPure (graftAnswer song destination) declared $ do
                 S.cast S.alice spell
                 Stack.resolveTop
+                Engine.settleForPriority
             landed = onto battle
             elsewhere = onto spare
             fires = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (snareAnswer battle carolSnare ability piker)
@@ -629,6 +630,68 @@ filterSpec s registry = Spec.describe s "Filter" $ do
           (Map.lookup piker (Combat.Type.attackers (GameState.combat landed)))
           (Just (AttackTarget.OfBattle battle))
       _ -> Spec.assertFailure s "fixture should have one ability, one Piker, two Bonesplitters, a Song and carol's Snare"
+  -- The same clause read as the EVENT rule 506.4 makes it: a battle that stops
+  -- being a battle stays removed from combat even once it is a battle again.
+  -- Pawl.Types.Combat's attackingNothing is the record that remembers it, and
+  -- this is the battle half of the pair Pawl.CombatEffectSpec drives for a
+  -- planeswalker -- the sibling arm of the same atom, so that neither is fixed
+  -- alone.
+  --
+  -- TWO Aura Grafts, so the Song travels twice and both legs END with the Siege
+  -- a battle carol protects on the battlefield: only the route differs. Each
+  -- Graft settles before the next (CR 117.5), which is where rule 506.4's
+  -- sampler runs.
+  Spec.it s "CR 506.4 a battle that stops being a battle and becomes one again stays removed from combat, so the Snare still cannot name the attacker" $ do
+    snare <- S.printingOf s registry snareName
+    (gs0, battle, mine, _, hers) <-
+      battleCombatOf s registry S.carol S.carol ["Goblin Piker", "Island", "Island", "Island", "Island", "Bonesplitter", "Bonesplitter", "Song of the Dryads"] [] ["Plains", snareName]
+    graft <- S.printingOf s registry "Aura Graft"
+    case (Face.activatedAbilities (S.combinedFace snare), mine, hers) of
+      ([ability], [piker, _, _, _, _, host, spare, song], [_, carolSnare]) -> do
+        let (first, gs1) = S.addHandCard graft S.alice (S.attachTo song (Recipient.ToObject host) gs0)
+            (second, gs2) = S.addHandCard graft S.alice gs1
+            queued =
+              gs2
+                { GameState.remaining =
+                    Seq.fromList
+                      [ Phase.Combat CombatStep.DeclareBlockers,
+                        Phase.Combat CombatStep.CombatDamage,
+                        Phase.Combat CombatStep.EndOfCombat,
+                        Phase.PostcombatMain
+                      ]
+                }
+            declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackTheBattle battle) queued
+            onto spell destination gs =
+              S.runPure (graftAnswer song destination) gs $ do
+                S.cast S.alice spell
+                Stack.resolveTop
+                Engine.settleForPriority
+            -- Song goes to the Siege and then off it; against the leg where it
+            -- never goes near the Siege at all.
+            stopped = onto first battle declared
+            untouched = onto first spare declared
+            thereAndBack = onto second spare stopped
+            neverBattle = onto second host untouched
+            fires = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (snareAnswer battle carolSnare ability piker)
+        -- GAMEPLAY FIRST, and both boards read identically to anything asking
+        -- about the board NOW.
+        Spec.assertBool s (S.onBattlefield piker (fires thereAndBack)) "CR 506.4: the Siege left combat when it stopped being a battle, and becoming one again does not put it back, so carol's Snare cannot name the Piker"
+        Spec.assertBool s (S.onBattlefield carolSnare (fires thereAndBack)) "and her Snare is unsacrificed: the ability was never activatable"
+        Spec.assertBool s (not (S.onBattlefield piker (fires neverBattle))) "control: with the Song never on the Siege, the same Snare exiles the attacker"
+        Spec.assertBool s (not (S.onBattlefield carolSnare (fires neverBattle))) "control: there it paid its own sacrifice, so the activation really happened"
+        -- The pair really is one board differing in one thing.
+        Spec.assertEqWith s "CR 613.1d: it stopped being a battle midway on one leg only" (fmap (Battle.isBattle . Projection.project battle) [stopped, untouched]) [False, True]
+        Spec.assertEqWith s "and it is a battle again on BOTH, so no live read can tell the legs apart" (fmap (Battle.isBattle . Projection.project battle) [thereAndBack, neverBattle]) [True, True]
+        Spec.assertEqWith s "CR 310.9g: carol protects it on both" (fmap (protectorOf battle) [thereAndBack, neverBattle]) [Just S.carol, Just S.carol]
+        Spec.assertEqWith s "CR 506.4: nor did it leave the battlefield" (fmap (Set.member battle . GameState.battlefield) [thereAndBack, neverBattle]) [True, True]
+        Spec.assertEqWith s "CR 506.4c: the Piker is attacking nothing on one leg only" (fmap (Set.member piker . Combat.Type.attackingNothing . GameState.combat) [thereAndBack, neverBattle]) [True, False]
+        Spec.assertEqWith
+          s
+          "CR 506.4c: and it is still an attacking creature, its entry still naming the Siege"
+          (fmap (Map.lookup piker . Combat.Type.attackers . GameState.combat) [thereAndBack, neverBattle])
+          [Just (AttackTarget.OfBattle battle), Just (AttackTarget.OfBattle battle)]
+        Spec.assertEqWith s "CR 701.3a: the Song ends on a Bonesplitter on both legs" (fmap (Projection.hostOf song) [thereAndBack, neverBattle]) [Just spare, Just host]
+      _ -> Spec.assertFailure s "fixture should have one ability, one Piker, four Islands, two Bonesplitters, a Song and carol's Snare"
 
 -- Choose `aura` for Aura Graft's one target slot and `destination` for the host
 -- CR 701.3a then moves it to. FILTERED rather than replaced, for snareAnswer's

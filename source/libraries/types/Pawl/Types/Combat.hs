@@ -187,6 +187,32 @@ data Combat = MkCombat
     -- re-arms it, which is what CR 506.7c's "any of them" wants from a CR 500.8
     -- second combat phase.
     blockersDeclared :: Bool,
+    -- | CR 506.4c: the attacking creatures that are "not attacking any player,
+    -- planeswalker, or battle" -- the ones whose CR 508.1b target has been
+    -- removed from combat while they went on attacking. Keyed by the ATTACKER
+    -- and not by the departed permanent, which is what CR 506.4c's own wording
+    -- asks for: a planeswalker that stops being attacked by one creature can
+    -- still be attacked by another put onto the battlefield attacking it (CR
+    -- 508.4, which CR 506.3c bars only once the permanent has left the
+    -- battlefield or stopped being one), so the fact belongs to the attack
+    -- rather than to the target.
+    --
+    -- Stored, not re-derived, and that is the whole point. CR 506.4 lists
+    -- EVENTS -- "its controller or protector changes", "it phases out" -- so a
+    -- control change undone later in the same combat leaves the permanent
+    -- removed, while asking whether it is attackable NOW puts it back. Nothing
+    -- else in the game state remembers that it happened: `attackers` keeps the
+    -- entry on CR 506.4c's orders, and the departed permanent's own
+    -- characteristics have returned to what they were.
+    --
+    -- Written by Pawl.Engine.Combat.noteAttackingNothing, which the CR 117.5
+    -- sampler answering rule 506.4's other derived clauses runs, and pruned by
+    -- Pawl.Engine.Game.removeFromCombat when the attacker itself leaves combat.
+    -- Read by Pawl.Engine.Damage.combatRecipient and by
+    -- Pawl.Engine.Projection.viewOfCharacteristics, alongside the live
+    -- derivation each already makes: the record is what makes the answer stick
+    -- between samples, the derivation is what answers within one.
+    attackingNothing :: Set.Set ObjectId.ObjectId,
     -- | CR 506.2/506.2a: the one player being attacked this combat phase. Chosen
     -- as a turn-based action immediately after the beginning of combat step
     -- begins (CR 703.4h, CR 507.1).
