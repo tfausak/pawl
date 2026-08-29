@@ -490,8 +490,9 @@ data Filter keyword
     -- answers CR 508.5 and therefore folds all three together -- is the wrong
     -- function to answer this with.
     --
-    -- Not implemented: "attacking a planeswalker you control" and "attacking a
-    -- battle you protect", the other two of that list (#2445).
+    -- The second of that list is IsAttackingPlaneswalker below.
+    --
+    -- Not implemented: "attacking a battle you protect", the third (#2616).
     --
     -- Carries a PlayerRelation rather than being a nullary IsAttackingYou,
     -- because the pool wants the other direction too -- Roar of Resistance's
@@ -505,6 +506,34 @@ data Filter keyword
     -- attacking creature but "is not attacking any player", which is the Nothing
     -- Pawl.Engine.Projection already answers by keeping only AttackTarget.OfPlayer.
     IsAttackingPlayer PlayerRelation.PlayerRelation
+  | -- | CR 508.1b: the candidate is an attacking creature AND the CONTROLLER of
+    -- the planeswalker it is attacking stands in this relation to the perspective
+    -- (CR 109.5's "you"). Soul Snare's "target creature that's attacking you or a
+    -- planeswalker you control" is @Or [IsAttackingPlayer You,
+    -- IsAttackingPlaneswalker You]@.
+    --
+    -- The second subject of CR 509.1a's and CR 802.4a's three-way list, which the
+    -- atom above answers the first of. DEFENDER-RELATIVE through the
+    -- planeswalker's CONTROLLER (CR 306.6) and never its owner: Pawl.CombatEffectSpec's
+    -- "CR 508.1b whole card: Soul Snare reaches a creature attacking a
+    -- planeswalker you CONTROL" attacks a Confiscated planeswalker, so the two
+    -- readings name different seats.
+    --
+    -- Carries a PlayerRelation for IsAttackingPlayer's reason, and the pool wants
+    -- both directions here too -- Roar of Resistance's "planeswalkers they
+    -- control" is @IsAttackingPlaneswalker Opponent@.
+    --
+    -- NOT a nested Filter over the planeswalker, though CR 306.6 would allow one:
+    -- every printed template writes the subject as "a planeswalker you control"
+    -- or "planeswalkers they control", so the relation is the whole question, and
+    -- a nest would owe Pawl.Engine.Filter.boundSlots a descent to match.
+    --
+    -- PRESENT TENSE for IsAttackingPlayer's reason, and CR 506.4 makes it False
+    -- one step sooner than that atom: a change of the attacked planeswalker's
+    -- controller removes the planeswalker from combat, so CR 506.4c leaves the
+    -- creature attacking nothing rather than attacking a planeswalker someone
+    -- else now controls.
+    IsAttackingPlaneswalker PlayerRelation.PlayerRelation
   | -- | CR 508.3b / 508.1b: the candidate WAS DECLARED ATTACKED this COMBAT
     -- PHASE -- one or more creatures were declared as attackers attacking it.
     -- DeclaredAttackerThisCombat's mirror: that atom asks whether the candidate

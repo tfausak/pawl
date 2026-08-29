@@ -143,6 +143,17 @@ data View = MkView
     -- apart from "a planeswalker they control", so this field is CR 508.1b's
     -- player and never CR 508.5's defending player (Pawl.Engine.Defender).
     attackingPlayer :: Maybe PlayerId.PlayerId,
+    -- CR 508.1b / 306.6: WHO CONTROLS the planeswalker this candidate is
+    -- attacking? The same map's value as `attackingPlayer` above, read off its
+    -- other arm and then followed to a controller -- so the two fields are
+    -- disjoint by construction and each is CR 509.1a's own subject rather than CR
+    -- 508.5's defending player.
+    --
+    -- The CONTROLLER and never the owner: CR 306.6 makes a planeswalker
+    -- attackable through the player who controls it, and CR 613.1b lets layer 2
+    -- move that. Nothing for every candidate `attacking` is False for, and for an
+    -- attacking creature whose AttackTarget is a player or a battle.
+    attackingPlaneswalkerController :: Maybe PlayerId.PlayerId,
     -- CR 508.3b: was this candidate DECLARED ATTACKED this COMBAT PHASE? Read
     -- from GameState.combat like `attacking`, off Combat.declaredAttacked -- the
     -- half of the record `declaredAttackerThisCombat` below reads the other half
@@ -536,6 +547,8 @@ playerView pid =
       -- CR 506.3 again: a player attacks nothing, so there is no player it is
       -- attacking either.
       attackingPlayer = Nothing,
+      -- CR 506.3 a third time: a player attacks no planeswalker either.
+      attackingPlaneswalkerController = Nothing,
       -- CR 508.3b lets a PLAYER be declared attacked, so unlike the field above
       -- this one asks a question a player candidate really can answer -- just not
       -- from here, this view being built from a PlayerId alone and holding no
@@ -1063,6 +1076,17 @@ matches context view predicate = case predicate of
   Filter.IsAttackingPlayer relation -> case (attackingPlayer view, perspective context) of
     (Just a, Just p) -> PlayerRelation.holds relation p a
     _ -> False
+  -- CR 508.1b / 306.6: the atom above one arm of AttackTarget over, and the same
+  -- posture in every respect -- the relation is answered against the perspective
+  -- here, and either half being unreadable is vacuously False.
+  --
+  -- The seat compared is the planeswalker's CONTROLLER, which
+  -- Pawl.Engine.Projection fills through Projection.controllerOf: reading its
+  -- OWNER instead would answer a different player for a planeswalker a Confiscate
+  -- has moved, which Pawl.CombatEffectSpec's Soul Snare pair is the board for.
+  Filter.IsAttackingPlaneswalker relation -> case (attackingPlaneswalkerController view, perspective context) of
+    (Just c, Just p) -> PlayerRelation.holds relation p c
+    _ -> False
   -- CR 509.1g: the same live read IsAttacking is, off the other map. Never the
   -- question Pawl.Engine.Combat.isBlocked asks: CR 509.1h keeps an attacker
   -- blocked after every creature blocking it has gone, so this can be False for
@@ -1290,6 +1314,7 @@ rewrite pairs predicate = case predicate of
   Filter.CardsInGraveyardAtLeast _ -> predicate
   Filter.IsAttacking -> predicate
   Filter.IsAttackingPlayer _ -> predicate
+  Filter.IsAttackingPlaneswalker _ -> predicate
   Filter.IsBlocking -> predicate
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
@@ -1698,6 +1723,7 @@ bakeBound players predicate = case predicate of
   Filter.CardsInGraveyardAtLeast _ -> predicate
   Filter.IsAttacking -> predicate
   Filter.IsAttackingPlayer _ -> predicate
+  Filter.IsAttackingPlaneswalker _ -> predicate
   Filter.IsBlocking -> predicate
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
@@ -1808,6 +1834,7 @@ manaValueThresholds predicate = case predicate of
   Filter.CardsInGraveyardAtLeast _ -> []
   Filter.IsAttacking -> []
   Filter.IsAttackingPlayer _ -> []
+  Filter.IsAttackingPlaneswalker _ -> []
   Filter.IsBlocking -> []
   Filter.IsBlocked -> []
   Filter.AttackedThisTurn -> []
@@ -1920,6 +1947,7 @@ statesAQuality predicate = case predicate of
   Filter.CardsInGraveyardAtLeast _ -> True
   Filter.IsAttacking -> True
   Filter.IsAttackingPlayer _ -> True
+  Filter.IsAttackingPlaneswalker _ -> True
   Filter.IsBlocking -> True
   Filter.IsBlocked -> True
   Filter.AttackedThisTurn -> True
