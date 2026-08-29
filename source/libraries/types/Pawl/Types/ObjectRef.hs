@@ -336,8 +336,8 @@ data ObjectRef
     -- taken from its head (CR 121.1) and both carry a Quantity, and they differ
     -- only in what that Quantity counts -- cards there, MATCHES here.
     --
-    -- NOT the filtered sweep of a library the arms above still lack, and the
-    -- difference is the one #1309 turned on. A sweep would have to read
+    -- NOT the filtered sweep of a library the arms above still lack (gap #2416),
+    -- and that is the difference. A sweep would have to read
     -- every card in a hidden zone (CR 400.2) and report which ones matched; this
     -- walks the pile from the top and stops, so which cards it names is a
     -- POSITION question that a Filter only terminates. Every card the walk names

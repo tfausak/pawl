@@ -2671,7 +2671,8 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardFromAmong {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- No recipients: only the Reveal arm can ask the interpreter.
   ObjectRef.RandomCardInHand _ -> []
-  -- No recipients: only turnPermanentsOver's gather can ask the chooser.
+  -- No recipients: the answer needs the chooser asked, and only
+  -- turnPermanentsOver's gather and the Effect.MoveToZone gather can ask.
   ObjectRef.AnyNumberMatching _ -> []
   -- No recipients: the arm above's answer, for its reason -- only a gather that
   -- reaches the Game monad can ask the chooser.
