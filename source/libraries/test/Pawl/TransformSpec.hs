@@ -67,6 +67,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
@@ -87,6 +88,7 @@ import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Daytime as Daytime
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -248,6 +250,7 @@ spec s registry = Spec.describe s "Transform" $ do
   gainLifeConvertSpec s registry
   moreThanMeetsTheEyeSpec s registry
   spellsCastLastTurnSpec s registry
+  restampSpec s registry
   -- CR 712.8d: "While a double-faced permanent has its front face up, it has
   -- only the characteristics of its front face." Nothing has turned this one
   -- over, so CR 712.8a's front face is what Pawl.Engine.Card.combined answers
@@ -1623,3 +1626,101 @@ gainLifeConvertSpec s registry = Spec.describe s "GainLifeConvert" $ do
     -- The other half of the pair: the same board, the same seat, the same one
     -- white mana, a spell that gains life -- and the question IS asked.
     Spec.assertEqWith s "while the life-gaining instant on that same board asks it" gainsAsked 1
+
+-- CR 613.7g: "a double-faced permanent receives a new timestamp each time it
+-- transforms or converts". Rule 712.18 says the permanent is not a new object,
+-- which settles the id and not the stamp.
+--
+-- WHAT READS THE STAMP. CR 701.60c's suspected grant is the rulebook's rather
+-- than a card's, and Pawl.Engine.Projection.designationGathered gives it the
+-- PERMANENT's own timestamp (CR 613.7a), so it is the one layer-6 effect on this
+-- board whose order against an ability removal a transform can move. CR 701.60b
+-- makes the designation neither an ability nor part of the copiable values, so it
+-- rides through the turning-over untouched and only its ORDER changes.
+--
+-- Daybreak Ranger // Nightfall Predator is the permanent: its front face is a
+-- Human, which is what Moonmist's "transform all Humans" reaches, and of the
+-- Transform opcodes in `data/cards/` Moonmist's is the only one whose ObjectRef
+-- is not `InSlot "self"` -- the only one, that is, that can turn a permanent over
+-- without being an ability OF it. That matters here because the removal this case
+-- needs has already taken the permanent's own abilities away.
+--
+-- Humility is the REMOVER, and it has to be a removal that spares SUBTYPES:
+-- Pawl.FaceDownSpec's sibling pair uses Turn to Frog, whose "becomes a blue Frog"
+-- would leave Moonmist nothing named Human to reach. Humility's "all creatures
+-- lose all abilities" is layer 6 like the grant, timestamped when it entered (CR
+-- 613.7a), and it enters AFTER the suspect, so before the transform the grant is
+-- the older effect and is wiped.
+--
+-- THE PAIR IS TWO MOMENTS OF ONE BOARD rather than two boards: the suspect loses
+-- rule 701.60c's ability to a Humility younger than it, and gets it back when the
+-- transform restamps it past that Humility. Nothing else differs, so the flip is
+-- the stamp's doing alone. Pawl.CombatSpec's SuspectedAbilityRemoval group is
+-- where the "before" reading is proved on its own.
+--
+-- The second Goblin Piker is the anti-vacuity leg: it stands beside the suspect,
+-- was never suspected, and is no Human for Moonmist to turn over, so a board on
+-- which nothing can block fails at it rather than passing.
+restampSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+restampSpec s registry = Spec.describe s "Timestamps (CR 613.7g)" $ do
+  Spec.it s "CR 613.7g transforming restamps the permanent past a removal that had wiped its grant" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    ranger <- S.printingOf s registry "Daybreak Ranger"
+    humility <- S.printingOf s registry "Humility"
+    moonmist <- S.printingOf s registry "Moonmist"
+    forest <- S.printingOf s registry "Forest"
+    let (before, suspect, other, attacker) = suspectedRangerBoard piker ranger humility forest
+        after = moonmisting moonmist before
+    -- THE BEFORE moment, and the fixture's own control: Humility entered after the
+    -- suspect, so CR 613.1f wipes the grant and both halves of rule 701.60c go.
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Menace suspect before)) "CR 613.1f before: the removal is younger than the suspect, so the menace half is gone"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton suspect (Set.singleton attacker)) before) "CR 613.1f before: and the can't-block half with it"
+    -- THE assertion, gameplay level and ahead of every reading of the projection:
+    -- the transform restamped the suspect past Humility, so rule 701.60c's "this
+    -- creature can't block" applies again.
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton suspect (Set.singleton attacker)) after)) "CR 613.7g the permanent it transformed is stamped after the removal, so it can't block again"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Menace suspect after) "CR 613.7g and the menace half is back with it"
+    Spec.assertEqWith s "CR 701.27a Moonmist turned the Human over, so the back face is up" (Projection.namesOf suspect after) (Set.singleton nightfallName)
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton attacker)) after) "while the Goblin Piker beside it, suspected of nothing, blocks"
+
+nightfallName :: CardName.CardName
+nightfallName = CardName.MkCardName (Text.pack "Nightfall Predator")
+
+-- alice attacks with one Goblin Piker into bob's suspected Daybreak Ranger, a
+-- second Piker beside it, two Forests to pay for the Moonmist and a Humility
+-- younger than all of them. Returns the board with attackers declared, the
+-- suspect, the Piker beside it and alice's attacker.
+suspectedRangerBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+suspectedRangerBoard piker ranger humility forest =
+  let (gs0, mine, _) = S.combatBoardOf [piker] []
+      (suspect, gs1) = S.addCreature ranger S.bob gs0
+      (other, gs2) = S.addCreature piker S.bob gs1
+      gs3 = List.foldl' (\g p -> snd (S.addCreature p S.bob g)) gs2 [forest, forest]
+      gs4 = S.withHumility humility (suspecting suspect gs3)
+      declared = S.runPure S.aggressiveAnswer gs4 (Combat.declareAttackers S.alice)
+      attacker = case mine of
+        a : _ -> a
+        [] -> S.noSource
+   in (declared, suspect, other, attacker)
+
+-- CR 701.60b's designation, written straight onto the permanent -- a FIXTURE.
+-- The road that sets it is Reasonable Doubt's, and Pawl.CombatSpec's
+-- SuspectedAbilityRemoval group proves it; what this file needs is only that the
+-- designation outlives a transform and carries the permanent's own timestamp into
+-- layer 6.
+suspecting :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+suspecting oid gs =
+  gs
+    { GameState.objects =
+        Map.adjust (\o -> o {Object.designations = Set.insert Designation.Suspected (Object.designations o)}) oid (GameState.objects gs)
+    }
+
+-- bob casts one Moonmist, it resolves, and the board settles. CAST rather than
+-- put straight onto the stack: Moonmist's text is a MODE, and a spell placed by
+-- hand carries no chosen mode for the resolution to run, so its transform would
+-- never happen. bob is the caster, since it is his creature the case is about;
+-- the two Forests behind it are his.
+moonmisting :: Printing.Printing -> GameState.GameState -> GameState.GameState
+moonmisting moonmist gs =
+  let (oid, withCard) = S.addHandCard moonmist S.bob gs
+   in S.runPure S.identityAnswer withCard (S.cast S.bob oid >> Stack.resolveTop >> Engine.settleForPriority)
