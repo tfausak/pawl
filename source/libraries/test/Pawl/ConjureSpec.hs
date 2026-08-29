@@ -28,8 +28,8 @@ import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Zone as Zone
 
 -- Pawl.CounterspellSpec's bitterblossomChain, which is the shape both cases
--- want: record CR 500.1's step beginning, settle the trigger onto the stack,
--- then run the priority loop so it resolves.
+-- want: record the step's beginning, settle the trigger onto the stack, then run
+-- the priority loop so it resolves.
 upkeepOf :: GameState.GameState -> GameState.GameState
 upkeepOf gs =
   let upkeep = Phase.Beginning BeginningStep.Upkeep

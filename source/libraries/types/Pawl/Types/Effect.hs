@@ -521,8 +521,8 @@ data Effect card ability
     -- and put it into a zone -- Emporium Thopterist's "conjure a card named
     -- Ornithopter into your hand".
     --
-    -- DIGITAL-ONLY, so there is no rule to cite: docs/rules.txt contains no
-    -- \"conjure\". What the CR settles is what the result is not -- CR 111.1's
+    -- DIGITAL-ONLY, so there is no rule to cite: docs/rules.txt does not contain
+    -- the word. What the CR settles is what the result is not -- CR 111.1's
     -- token is created by an effect and is not a card, where a conjured card is
     -- one, so it is castable, shufflable and drawable, and Pawl.Types.Source's
     -- OfCard is what backs it.
