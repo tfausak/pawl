@@ -534,6 +534,8 @@ library codec
     Pawl.Codec.Moved
     Pawl.Codec.MovedBetween
     Pawl.Codec.MovedBetweenSpec
+    Pawl.Codec.MovedKinds
+    Pawl.Codec.MovedKindsSpec
     Pawl.Codec.MovedSpec
     Pawl.Codec.MoveToZone
     Pawl.Codec.MoveToZoneSpec
@@ -1508,6 +1510,7 @@ library types
     Pawl.Types.MoveCounters
     Pawl.Types.Moved
     Pawl.Types.MovedBetween
+    Pawl.Types.MovedKinds
     Pawl.Types.MoveToZone
     Pawl.Types.MulliganDecision
     Pawl.Types.MulliganOffer

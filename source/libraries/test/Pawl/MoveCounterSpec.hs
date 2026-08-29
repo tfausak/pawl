@@ -33,6 +33,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -54,6 +55,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   moveCounterSpec s registry
   namedKindSpec s registry
   batchSpec s registry
+  everyKindSpec s registry
 
 -- Which counter the answerer takes, and whether it takes the printed "may" at
 -- all. Pinned by POSITION in the offered list rather than by naming a kind, so
@@ -481,8 +483,9 @@ namedKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of a named
 -- The third line is this group's subject, and the card is why the count exists:
 -- "all +1/+1 counters" is a whole tally crossing in one batch, where both cards
 -- above move exactly one. Its two target slots have DISJOINT pools -- a land you
--- control and a creature -- so it needs no distinctness between them, which no
--- target slot can express (#2460).
+-- control and a creature -- so it needs no distinctness between them; the group
+-- below is the card that does, and Pawl.TargetSpec's Fall of the Hammer case is
+-- where a slot excluding a sibling's object is proven.
 pantherName :: CardName.CardName
 pantherName = CardName.MkCardName (Text.pack "Black Panther, Wakandan King")
 
@@ -590,3 +593,113 @@ batchSpec s registry = Spec.describe s "CR 122.5 moving a whole tally of counter
             Spec.assertEqWith s "and drew the one card the rider names" (S.handSize S.alice after) (S.handSize S.alice before + 1)
           Nothing -> Spec.assertFailure s "expected Black Panther to offer exactly its one printed activated ability"
       Nothing -> Spec.assertFailure s "the Mountain did not reach the battlefield"
+
+-- Fate Transfer {1}{U/B} Instant (Shadowmoor; name, cost, type line and oracle
+-- text checked against Scryfall 2026-08-29), data/cards/fate-transfer.json:
+--
+--   Move all counters from target creature onto another target creature.
+--
+-- This group's subject, and the card is why "every kind" exists: the sentence
+-- names no kind and asks NOTHING, where Agent's Toolkit names none and asks --
+-- so it is not that card's count raised, it is the kind question deleted. Its
+-- "another target creature" is Filter.Not (Filter.IsBound "from"), the shape
+-- Pawl.TargetSpec proves on Fall of the Hammer.
+--
+-- Both permanents are Wall of Stone, whose 0/8 body survives a -1/-1 counter on
+-- either side of the move; a 2/1 would be buried by CR 704.5f before the
+-- assertion ran.
+transferFrom, transferTo :: SlotName.SlotName
+transferFrom = SlotName.MkSlotName (Text.pack "from")
+transferTo = SlotName.MkSlotName (Text.pack "to")
+
+-- CR 601.2c's whole announcement for Fate Transfer: `giver` in the `from` slot
+-- and `taker` in the `to` slot. Both pools are Pool.Creatures, so one predicate
+-- over both slots could not tell them apart and the slot NAME is what settles
+-- which. FILTERS the offered set rather than building a recipient, so CR 608.2b's
+-- re-read at resolution still finds what was named -- Pawl.TargetSpec's
+-- aimingHammer posture.
+aimingTransfer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimingTransfer giver taker p = case p of
+  Prompt.ChooseTargets _ _ _ asked ->
+    Map.mapWithKey
+      ( \slot (_, offered) ->
+          let wanted = if slot == transferFrom then giver else taker
+           in Set.filter ((==) (Just wanted) . Recipient.objectOf) offered
+      )
+      asked
+  _ -> S.identityAnswer p
+
+-- The three kinds these boards use, read off one object: CR 122.1a's +1/+1 and
+-- -1/-1 counters and CR 122.1c's shield counter. Three, not pairOn's two,
+-- because a move of every kind and a move of one kind are only different boards
+-- where the object bears more than one kind.
+tripleOn :: ObjectId.ObjectId -> GameState.GameState -> (Natural, Natural, Natural)
+tripleOn oid gs =
+  ( S.counterOf CounterKind.PlusOnePlusOne oid gs,
+    S.counterOf CounterKind.Shield oid gs,
+    S.counterOf CounterKind.MinusOneMinusOne oid gs
+  )
+
+everyKindSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+everyKindSpec s registry = Spec.describe s "CR 122.5 moving every kind of counter" $ do
+  let -- alice: two Islands and a Swamp, so either half of CR 107.4e's {U/B} is
+      -- payable off the board and the answer to the hybrid announcement cannot
+      -- decide a case; Fate Transfer in her hand; her own Wall of Stone as the
+      -- second object and bob's as the first, which keeps the two slots apart by
+      -- controller as well as by identity. `counters` is what a case puts on the
+      -- first object and `extras` seats a further printing by name; between them
+      -- they are the ONLY difference between the boards below.
+      board extras counters = do
+        island <- S.printingOf s registry "Island"
+        swamp <- S.printingOf s registry "Swamp"
+        wall <- S.printingOf s registry "Wall of Stone"
+        fateTransfer <- S.printingOf s registry "Fate Transfer"
+        seats <- mapM (\(name, pid) -> fmap (\p -> (p, pid)) (S.printingOf s registry name)) extras
+        let lands = S.landsFor swamp S.alice 1 (S.landsInPlay island 2)
+            (giverId, g1) = S.addCreature wall S.bob lands
+            (takerId, g2) = S.addCreature wall S.alice g1
+            seated = foldl (\gs (p, pid) -> snd (S.addCreature p pid gs)) g2 seats
+            (staged, spellId) = S.handOne fateTransfer seated
+        pure (giverId, takerId, spellId, counters giverId staged)
+      -- Cast and resolve, the whole spell.
+      transfer (giverId, takerId, spellId, staged) =
+        S.runPure (aimingTransfer giverId takerId) staged (S.cast S.alice spellId >> Stack.resolveTop)
+  -- THE CASE THIS UNIT EXISTS FOR. TWO kinds in different counts, so "the whole
+  -- tally of every kind" is a different board from "the whole tally of one kind"
+  -- and from "one counter", and both ends are read: a fix that put without taking
+  -- leaves the first object where it was.
+  Spec.it s "every kind on the first creature crosses at once, whole tally and all" $ do
+    built <- board [] (\oid -> S.addCounter CounterKind.Shield 2 oid . S.addCounter CounterKind.PlusOnePlusOne 3 oid)
+    let (giverId, takerId, _, before) = built
+    Spec.assertEqWith s "bob's wall bears three +1/+1 counters and two shield counters" (tripleOn giverId before) (3, 2, 0)
+    Spec.assertEqWith s "and alice's bears none of any kind" (tripleOn takerId before) (0, 0, 0)
+    let after = transfer built
+    -- THE GAMEPLAY-LEVEL ASSERTIONS: both kinds arrived, in the counts they
+    -- left in, and neither stayed behind.
+    Spec.assertEqWith s "alice's wall has both kinds, three of one and two of the other" (tripleOn takerId after) (3, 2, 0)
+    Spec.assertEqWith s "and bob's is down every counter it had" (tripleOn giverId after) (0, 0, 0)
+  -- CR 122.5's THIRD impossibility read against "all counters" -- "the second
+  -- object can't have counters put onto it" -- which is asked PER KIND: alice's
+  -- Melira, Sylvok Outcast refuses -1/-1 counters on her creatures and says
+  -- nothing about shield counters, so one kind crosses and the other does not.
+  -- A whole-sentence reading of the rule's atomicity would move nothing at all.
+  Spec.it s "CR 122.5 a kind the second creature refuses stays behind, and the rest still crosses" $ do
+    let stock oid = S.addCounter CounterKind.MinusOneMinusOne 1 oid . S.addCounter CounterKind.Shield 2 oid
+    built <- board [("Melira, Sylvok Outcast", S.alice)] stock
+    let (giverId, takerId, _, before) = built
+    Spec.assertEqWith s "bob's wall bears two shield counters and one -1/-1 counter" (tripleOn giverId before) (0, 2, 1)
+    let after = transfer built
+    Spec.assertEqWith s "the shield counters crossed and the -1/-1 counter did not" (tripleOn takerId after) (0, 2, 0)
+    Spec.assertEqWith s "and bob's wall kept the one counter alice's creature could not take" (tripleOn giverId after) (0, 0, 1)
+  -- The same board differing in exactly ONE permanent: without Melira there is no
+  -- prohibition, and the -1/-1 counter crosses with the rest. Without this pair
+  -- the case above would pass on a move that dropped every -1/-1 counter for
+  -- reasons of its own.
+  Spec.it s "and with no prohibition on the board the same -1/-1 counter crosses" $ do
+    let stock oid = S.addCounter CounterKind.MinusOneMinusOne 1 oid . S.addCounter CounterKind.Shield 2 oid
+    built <- board [] stock
+    let (giverId, takerId, _, before) = built
+    Spec.assertEqWith s "bob's wall bears two shield counters and one -1/-1 counter" (tripleOn giverId before) (0, 2, 1)
+    let after = transfer built
+    Spec.assertEqWith s "every kind crossed, the -1/-1 counter included" (tripleOn takerId after) (0, 2, 1)
+    Spec.assertEqWith s "and bob's wall is left with nothing" (tripleOn giverId after) (0, 0, 0)

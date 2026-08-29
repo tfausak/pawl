@@ -177,6 +177,7 @@ import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveToZone as MoveToZone
+import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.ObjectRef (ObjectRef)
@@ -569,7 +570,7 @@ slotsOf effect = case effect of
   -- Wakandan King's "all +1/+1 counters" is a Quantity.AgainstSlot aimed at the
   -- `from` slot -- so it joins in here rather than being left to look dangling.
   -- The bound slot is a DEFINITION, not a read: see boundSlots below.
-  Effect.MoveCounters (MoveCounters.MkMoveCounters from _ quantity _ to) -> insertOne from (insertOne to (quantitySlots quantity))
+  Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds _ to) -> insertOne from (insertOne to (foldMap quantitySlots (MovedKinds.quantityOf kinds)))
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- The SlotName is a DEFINITION, not a read; it belongs to boundSlots below.
@@ -863,7 +864,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Counter {} -> True
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
-  Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
+  Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> all Quantity.slotsAreExhaustive (MovedKinds.quantityOf kinds)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.PayAnyEnergy _ -> True
@@ -1030,7 +1031,7 @@ readsX = any effectReadsX
       Effect.Counter {} -> False
       Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
       Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.readsX quantity
-      Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ quantity _ _) -> Quantity.readsX quantity
+      Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> any Quantity.readsX (MovedKinds.quantityOf kinds)
       Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
       Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
       -- CR 107.14's amount is asked for as the spell resolves, never CR
@@ -1262,7 +1263,7 @@ boundSlots effect = case effect of
   Effect.PutCounters {} -> Set.empty
   Effect.RemoveCounters {} -> Set.empty
   -- How many counters CR 122.5 ACTUALLY moved, for a "that much life".
-  Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ _ mSlot _) -> foldMap Set.singleton mSlot
+  Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ mSlot _) -> foldMap Set.singleton mSlot
   Effect.GainPlayerCounters {} -> Set.empty
   Effect.RemovePlayerCounters {} -> Set.empty
   -- CR 107.14: how much {E} the payer paid, for a later effect of the same
@@ -6455,14 +6456,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
           Just n -> Monad.when (n > 0) (Event.removeCounters target kind (Integer.toNaturalSaturating n))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
-  Effect.MoveCounters (MoveCounters.MkMoveCounters fromSlot named quantity mSlot toSlot) -> do
-    -- CR 122.5: move counters off one permanent and onto a second. WHICH kind
-    -- is the card's call when it names one (Explorer's Cache's "move a +1/+1
-    -- counter") and the player's when it does not (Agent's Toolkit's "move a
-    -- counter"), which is what `named` holds. ATOMIC -- "if either of these
-    -- actions isn't possible, it's not possible to move a counter, and no counter
-    -- is removed from or put onto anything" -- so every impossibility the rule
-    -- names is checked BEFORE either half runs, and this arm is not a
+  Effect.MoveCounters (MoveCounters.MkMoveCounters fromSlot kinds mSlot toSlot) -> do
+    -- CR 122.5: move counters off one permanent and onto a second. WHICH kinds
+    -- cross is the card's call when it names one (Explorer's Cache's "move a
+    -- +1/+1 counter"), the player's when it names none (Agent's Toolkit's "move a
+    -- counter"), and neither's when the card takes them all (Fate Transfer's
+    -- "move all counters"), which is what `kinds` holds. ATOMIC -- "if either of
+    -- these actions isn't possible, it's not possible to move a counter, and no
+    -- counter is removed from or put onto anything" -- so every impossibility the
+    -- rule names is checked BEFORE either half runs, and this arm is not a
     -- RemoveCounters followed by a PutCounters however much its tail looks like
     -- one.
     --
@@ -6479,15 +6481,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- still take a +1/+1 one. A kind the destination refuses is not a kind this
     -- move could choose, and rule 122.5's atomicity is why it is dropped from the
     -- candidates rather than chosen and then half-performed -- "no counter is
-    -- removed from or put onto anything".
+    -- removed from or put onto anything". Under "all counters" that is per kind
+    -- too: the refused kind stays where it is and every other kind still crosses,
+    -- since each kind is its own pair of actions and the rule's all-or-nothing is
+    -- stated about one counter, not about the sentence that moved it.
     --
     -- The two halves go through Event.removeCounters and Event.putCounters, so the
     -- move records both crossings -- a CR 122.7 "when the Nth counter is put on"
     -- trigger sees the arrival, and rule 122.5's own reading is that a move IS
     -- those two actions. ONE call to each per kind and not one pair per counter,
     -- which is CR 614.16's own unit ("one or more counters") and the call
-    -- Pawl.Types.PutCounters already made; Pawl.Types.MoveCounters' `quantity`
-    -- carries the argument.
+    -- Pawl.Types.PutCounters already made; Pawl.Types.MovedKinds carries the
+    -- argument.
     gs <- State.get
     let objectAt slot = legalOne slot legal >>= Recipient.objectOf
         viewOf = effectViewOf source legal gs
@@ -6496,7 +6501,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Wakandan King's "all +1/+1 counters", written as the count of that kind
         -- on the object the `from` slot names. Zero for CR 107.2's undeterminable
         -- count and CR 107.1b's negative one alike, freezeRiders' posture.
-        asked = case Quantity.evaluateFor viewOf context gs resolving source quantity of
+        askedFor quantity = case Quantity.evaluateFor viewOf context gs resolving source quantity of
           Just n | n > 0 -> Integer.toNaturalSaturating n
           _ -> 0
     moved <- case (objectAt fromSlot, objectAt toSlot) of
@@ -6511,9 +6516,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- permanent on each side (Agent's Toolkit binds the artifact itself and
           -- the creature that entered; Explorer's Cache binds the artifact and a
           -- targeted creature; Black Panther, Wakandan King binds a targeted land
-          -- and a targeted creature). A slot bound as the ability triggered may
-          -- name an object CR 400.7 has since moved, and a targeted one may have
-          -- become illegal, which is CR 608.2b's re-read in legalOne above.
+          -- and a targeted creature; Fate Transfer binds two targeted creatures).
+          -- A slot bound as the ability triggered may name an object CR 400.7 has
+          -- since moved, and a targeted one may have become illegal, which is CR
+          -- 608.2b's re-read in legalOne above.
           --
           -- The `from` half answers CR 702.26b as much as CR 400.7, and both are
           -- proven boards. Pawl.Engine.Phasing spells "treated as though it does
@@ -6527,16 +6533,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Set.member to (GameState.battlefield gs) ->
             -- "... if the first object doesn't have the appropriate kind of
             -- counter on it". Which kinds are appropriate is the one place the
-            -- two spellings part, and rule 122.5's clause reads differently under
-            -- each.
+            -- three spellings part, and rule 122.5's clause reads differently
+            -- under each.
             --
             -- `onFrom` drops the kinds rule 122.5's THIRD impossibility rules out
-            -- as well as the ones the first object does not have, so both
+            -- as well as the ones the first object does not have, so all three
             -- spellings answer it in one place: a kind the destination refuses is
-            -- not appropriate for this move, whether the card named it or the
-            -- player would have. Rule 122.5's atomicity is why it is dropped here
-            -- rather than half-performed -- "no counter is removed from or put
-            -- onto anything".
+            -- not appropriate for this move, whether the card named it, the
+            -- player would have, or the card took every kind. Rule 122.5's
+            -- atomicity is why it is dropped here rather than half-performed --
+            -- "no counter is removed from or put onto anything".
             let onFrom =
                   Map.filterWithKey
                     (\kind n -> n > 0 && not (CounterRestriction.prohibited to kind gs))
@@ -6549,18 +6555,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- and not a proven behaviour: every producer's count is the tally
                 -- of that kind on the very object the removal reads, so nothing in
                 -- the corpus can make the two differ, and a mutation removing the
-                -- clamp leaves the suite green.
+                -- clamp leaves the suite green. It also subsumes rule 122.5's
+                -- second impossibility, a kind the first object does not have at
+                -- all: `onFrom` answers zero and nothing crosses.
                 --
                 -- ANSWERS how many counters made the whole journey, which is
                 -- neither half on its own: Event.putCounters reports what landed
                 -- after CR 614.16, and a row that GREW the placement added
                 -- counters that never came off the first object, so they were not
                 -- moved. The minimum is the pair's overlap.
-                --
-                -- Not implemented: a move naming no kind takes its whole count out
-                -- of the ONE kind chosen below, so "all counters" and a count
-                -- spread over several kinds are both unwritable (gap #2465).
-                move kind =
+                move kind asked =
                   let taken = min asked (Map.findWithDefault 0 kind onFrom)
                    in if taken == 0
                         then pure 0
@@ -6568,37 +6572,48 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                           Event.removeCounters from kind taken
                           landed <- Event.putCounters (CounterCause.ByEffect controller) to kind taken
                           pure (min taken landed)
-             in -- A count of zero moves nothing and ASKS nothing: the prompt below
-                -- picks which kind crosses, and no kind crossing makes that a
-                -- question whose answer cannot matter. A REGRESSION FENCE, not a
-                -- proven behaviour -- the prompt is reachable only where the card
-                -- names no kind, and the one such producer's count is a literal
-                -- one, so a mutation dropping this guard leaves the suite green.
-                if asked == 0
-                  then pure 0
-                  else case named of
-                    -- The card named the kind, so the appropriate kind is that one
-                    -- and NOTHING is asked: a prompt offering the single option the
-                    -- card already settled would be the engine putting a decision
-                    -- where the rules leave none.
-                    Just wanted -> if Map.member wanted onFrom then move wanted else pure 0
-                    -- No kind named: the kinds actually on it ARE the candidates, so
-                    -- an object bearing none -- or bearing only kinds the
-                    -- destination refuses -- leaves nothing to move and nothing to
-                    -- ask. Ascending (Map.keys), so a transcript is deterministic.
-                    Nothing -> case Map.keys onFrom of
-                      [] -> pure 0
-                      first : rest -> do
-                        kind <- case rest of
-                          -- One kind on the object leaves nothing to decide.
-                          [] -> pure first
-                          second : more -> do
-                            let offered = first NonEmpty.:| (second : more)
-                            answer <- Game.choose (Prompt.ChooseMovedCounter (Decide.deciderFor controller gs) controller from to offered)
-                            -- FILTERED, NOT TRUSTED: an answer naming a kind that is
-                            -- not on the object is dropped for the first one offered.
-                            pure (if Foldable.elem answer offered then answer else first)
-                        move kind
+             in case kinds of
+                  -- "Move all counters": every kind the first object has, the whole
+                  -- tally of each, with nothing asked and nothing to name. Ascending
+                  -- (Map.toList), so a transcript is deterministic, and SUMMED,
+                  -- since "moved this way" counts counters and not kinds.
+                  MovedKinds.Every -> fmap sum (mapM (uncurry move) (Map.toList onFrom))
+                  -- The card named the kind, so the appropriate kind is that one
+                  -- and NOTHING is asked: a prompt offering the single option the
+                  -- card already settled would be the engine putting a decision
+                  -- where the rules leave none.
+                  MovedKinds.Named wanted quantity -> move wanted (askedFor quantity)
+                  -- No kind named: the kinds actually on it ARE the candidates, so
+                  -- an object bearing none -- or bearing only kinds the
+                  -- destination refuses -- leaves nothing to move and nothing to
+                  -- ask. Ascending (Map.keys), so a transcript is deterministic.
+                  --
+                  -- Not implemented: the whole count comes out of the ONE kind
+                  -- picked, so a move of two counters of different kinds is
+                  -- unwritable (gap #2607).
+                  MovedKinds.Chosen quantity ->
+                    -- A count of zero moves nothing and ASKS nothing: the prompt
+                    -- below picks which kind crosses, and no kind crossing makes
+                    -- that a question whose answer cannot matter. A REGRESSION
+                    -- FENCE, not a proven behaviour -- the one producer that names
+                    -- no kind and asks has a literal count of one, so a mutation
+                    -- dropping this guard leaves the suite green.
+                    let asked = askedFor quantity
+                     in if asked == 0
+                          then pure 0
+                          else case Map.keys onFrom of
+                            [] -> pure 0
+                            first : rest -> do
+                              kind <- case rest of
+                                -- One kind on the object leaves nothing to decide.
+                                [] -> pure first
+                                second : more -> do
+                                  let offered = first NonEmpty.:| (second : more)
+                                  answer <- Game.choose (Prompt.ChooseMovedCounter (Decide.deciderFor controller gs) controller from to offered)
+                                  -- FILTERED, NOT TRUSTED: an answer naming a kind that is
+                                  -- not on the object is dropped for the first one offered.
+                                  pure (if Foldable.elem answer offered then answer else first)
+                              move kind asked
       -- Either side unresolvable: an illegal slot at resolution (CR 608.2b), a
       -- player recipient, or rule 122.5's impossibilities above. Nothing moves.
       _ -> pure 0

@@ -85,6 +85,7 @@ import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveToZone as MoveToZone
+import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Onset as Onset
@@ -969,7 +970,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.MoveCounters (MoveCounters.MkMoveCounters (SlotName.MkSlotName (Text.pack "self")) Nothing (Quantity.Literal 1) Nothing (SlotName.MkSlotName (Text.pack "became"))))
+      (Effect.MoveCounters (MoveCounters.MkMoveCounters (SlotName.MkSlotName (Text.pack "self")) (MovedKinds.Chosen (Quantity.Literal 1)) Nothing (SlotName.MkSlotName (Text.pack "became"))))
       " {\"type\":\"MoveCounters\",\"value\":{\"from\":\"self\",\"to\":\"became\"}} "
   -- CR 122: PutCounters' mirror, and a distinct tag -- a signed amount under one
   -- tag would make the two indistinguishable in a card file.

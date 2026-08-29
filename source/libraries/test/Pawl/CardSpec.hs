@@ -186,6 +186,7 @@ import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveToZone as MoveToZone
+import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
@@ -918,7 +919,7 @@ effectCounts effect = case effect of
   Effect.BecomesBlocked _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
-  Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ quantity _ _) -> quantityCounts quantity
+  Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> foldMap quantityCounts (MovedKinds.quantityOf kinds)
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> quantityCounts quantity
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
@@ -4201,7 +4202,7 @@ effectFilters effect = case effect of
   -- escape the lint.
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity ref) -> unframed (quantityFilters quantity) <> sourceHosted (objectRefFilters ref)
   -- The count only: both slots are bare SlotNames, which carry no Filter.
-  Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ quantity _ _) -> unframed (quantityFilters quantity)
+  Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> unframed (foldMap quantityFilters (MovedKinds.quantityOf kinds))
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> unframed (quantityFilters quantity)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
