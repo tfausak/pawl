@@ -163,6 +163,11 @@ attackableBattles defender gs =
 -- attacking a planeswalker that is gone" from "was never attacking anything"
 -- (Thrasta, Tempest's Roar).
 --
+-- Not implemented: a controller that changes and changes BACK mid-combat, which
+-- rule 506.4 removes from combat for good and this derived read re-attacks.
+-- Projection.viewOfCharacteristics' attackingPlaneswalkerController reads the same
+-- way, so the two agree (#2627).
+--
 -- Not implemented: CR 508.3b's planeswalker and battle subjects. The event that
 -- would carry them is there -- GameEvent.BecameAttacked names the permanent --
 -- and no trigger condition asks; Pawl.Types.TriggerCondition's
@@ -988,7 +993,8 @@ combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.ele
 -- battlefield is a separate clause of CR 506.4, in Pawl.Engine.Departure and
 -- Pawl.Engine.Damage. Creatures only, which is what `combatants` gathers -- an
 -- ATTACKED planeswalker or battle is answered at stillAttacked and
--- stillAttackedBattle, CR 506.4d falls out of that split (Pawl.CombatSpec's
+-- stillAttackedBattle, and again at Projection.viewOfCharacteristics' two
+-- attacking-target fields, CR 506.4d falls out of that split (Pawl.CombatSpec's
 -- CreaturePlaneswalkerInCombat is the proof), and the phases-out clause is
 -- Pawl.Engine.Phasing.phaseOut's. Not implemented: CR 506.4e and the
 -- becomes-a-battle clause (#981).

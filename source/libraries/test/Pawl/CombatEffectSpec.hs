@@ -2847,6 +2847,184 @@ soulSnareSpec s registry = Spec.describe s "SoulSnare" $ do
         -- reason a battlefield guard rather than a missing lookup is what closes it.
         Spec.assertEqWith s "CR 702.26d: he is still in GameState.objects under bob" (Projection.controllerOf jaceId gone) (Just S.bob)
       _ -> Spec.assertFailure s "fixture should give alice a Piker and bob a Jace, a Bonesplitter and a Soul Snare"
+  -- CR 506.4's two remaining planeswalker clauses -- "if its controller ...
+  -- changes" and "if it's a planeswalker that's being attacked and stops being a
+  -- planeswalker" -- which unlike the phase-out above leave the object on the
+  -- battlefield under the same id, so the membership guard cannot see either.
+  --
+  -- ONE spell reaches both at instant speed, after the declaration: Aura Graft
+  -- {1}{U} -- Instant, "Gain control of target Aura that's attached to a
+  -- permanent. Attach it to another permanent it can enchant." (oracle text
+  -- checked against Scryfall, 2026-08-29). The Aura it moves is what picks the
+  -- clause: a Confiscate ("You control enchanted permanent") moves the CONTROLLER
+  -- and leaves the card type alone; a Song of the Dryads ("Enchanted permanent is
+  -- a colorless Forest land") moves the CARD TYPE and leaves the controller alone.
+  -- So each leg isolates one conjunct of the guard, and neither is a sorcery-speed
+  -- effect applied before combat -- #2617's mistake, which is why its Confiscate
+  -- pair could not see this.
+  Spec.it s "CR 506.4 a planeswalker whose CONTROLLER changes stops being attacked, so the new controller's Soul Snare cannot name the attacker" $ do
+    (board, ability, ids) <- graftBoard s registry "Confiscate"
+    case (ability, ids) of
+      (Just snareAbility, MkGraftIds {graftPiker = pikerId, graftAliceSnare = aliceSnare, graftJace = jaceId, graftBobSnare = bobSnare, graftSpare = spare, graftAura = aura, graftSpell = graft}) -> do
+        let declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) attackThePlaneswalker board
+            -- The PAIR, differing in exactly one thing: which permanent alice's
+            -- one Aura Graft moves bob's Confiscate onto. Same spell and the same
+            -- lands paying for it on both legs, and each Snare has its own seat's
+            -- Plains, so no leg can fail for want of mana.
+            stolen = graftOnto aura jaceId graft declared
+            elsewhere = graftOnto aura spare graft declared
+            aliceFires = runToEndOfCombatWith (soulSnareAnswer aliceSnare snareAbility pikerId)
+            bobFires = runToEndOfCombatWith (soulSnareAnswer bobSnare snareAbility pikerId)
+        -- GAMEPLAY FIRST. alice now controls Jace, so an engine reading his
+        -- controller anyway hands alice's Snare a creature "attacking a
+        -- planeswalker you control" and lets her exile her own attacker.
+        --
+        -- No board can give ALICE's Snare a positive leg, and that is the rule
+        -- rather than a hole in the fixture: CR 506.2 admits only the DEFENDING
+        -- player's planeswalkers into a declaration, so a seat this atom answers
+        -- for is never a seat that just took the planeswalker. What proves her
+        -- Snare is funded and offerable is the mutation: dropping the controller
+        -- conjunct makes exactly this leg exile the Piker.
+        Spec.assertBool s (S.onBattlefield pikerId (aliceFires stolen)) "CR 506.4: Jace left combat with bob's control of him, so alice's Snare cannot name the Piker"
+        Spec.assertBool s (S.onBattlefield aliceSnare (aliceFires stolen)) "and alice's Snare is unsacrificed: the ability was never activatable"
+        -- The control, on the leg where the Confiscate went to the spare
+        -- Bonesplitter: Jace is bob's and still attacked, so the same Snare card
+        -- with the same {W} does exile the Piker.
+        Spec.assertBool s (not (S.onBattlefield pikerId (bobFires elsewhere))) "control: with the Confiscate moved to the Bonesplitter instead, bob's Snare exiles the attacker"
+        Spec.assertBool s (not (S.onBattlefield bobSnare (bobFires elsewhere))) "control: there it paid its own sacrifice, so the activation really happened"
+        -- bob's own Snare on the stolen leg. False under BOTH readings, so it
+        -- proves nothing about the guard -- it is here because CR 506.4c says the
+        -- Piker keeps attacking, and no seat may reach it.
+        Spec.assertBool s (S.onBattlefield pikerId (bobFires stolen)) "CR 506.4c: nor can bob's, the Piker attacking nothing at all"
+        -- Anti-vacuity: the declaration named Jace, the Graft resolved and moved
+        -- the Aura, and the clause under test is the CONTROLLER one alone.
+        Spec.assertEqWith
+          s
+          "setup: the Piker was announced at Jace and not at bob"
+          (Map.lookup pikerId (Combat.Type.attackers (GameState.combat declared)))
+          (Just (AttackTarget.OfPlaneswalker jaceId))
+        Spec.assertEqWith s "CR 613.1b: alice controls Jace on one leg and bob on the other" (fmap (Projection.controllerOf jaceId) [stolen, elsewhere]) [Just S.alice, Just S.bob]
+        Spec.assertBool s (Set.member jaceId (GameState.battlefield stolen)) "CR 506.4: he never left the battlefield, so the phase-out guard above cannot be what answers"
+        Spec.assertBool s (Projection.isPlaneswalkerOf jaceId stolen) "nor did he stop being a planeswalker: the Confiscate writes layer 2 only"
+        Spec.assertEqWith
+          s
+          "CR 506.4c: the Piker is still an attacking creature, its entry still naming Jace"
+          (Map.lookup pikerId (Combat.Type.attackers (GameState.combat stolen)))
+          (Just (AttackTarget.OfPlaneswalker jaceId))
+      _ -> Spec.assertFailure s "fixture should give alice a Piker and a Snare and bob a Jace, a Snare and two Bonesplitters"
+  Spec.it s "CR 506.4 a planeswalker that stops being a planeswalker stops being attacked, so Soul Snare cannot name the attacker" $ do
+    (board, ability, ids) <- graftBoard s registry "Song of the Dryads"
+    case (ability, ids) of
+      (Just snareAbility, MkGraftIds {graftPiker = pikerId, graftJace = jaceId, graftBobSnare = bobSnare, graftSpare = spare, graftAura = aura, graftSpell = graft}) -> do
+        let declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) attackThePlaneswalker board
+            -- The same pair, one Aura over: the Song of the Dryads lands on Jace
+            -- or on the spare Bonesplitter.
+            enchanted = graftOnto aura jaceId graft declared
+            elsewhere = graftOnto aura spare graft declared
+            bobFires = runToEndOfCombatWith (soulSnareAnswer bobSnare snareAbility pikerId)
+        -- GAMEPLAY FIRST, and here the OBSERVER is bob throughout: the Song moves
+        -- no control, so an engine that asks only who controls the attacked
+        -- permanent answers bob on both legs and exiles the Piker on both.
+        Spec.assertBool s (S.onBattlefield pikerId (bobFires enchanted)) "CR 506.4: a colorless Forest land is not a planeswalker, so bob's Snare cannot name the Piker"
+        Spec.assertBool s (S.onBattlefield bobSnare (bobFires enchanted)) "and bob's Snare is unsacrificed: the ability was never activatable"
+        Spec.assertBool s (not (S.onBattlefield pikerId (bobFires elsewhere))) "control: with the Song moved to the Bonesplitter instead, the same Snare exiles the attacker"
+        Spec.assertBool s (not (S.onBattlefield bobSnare (bobFires elsewhere))) "control: there it paid its own sacrifice, so the activation really happened"
+        -- Anti-vacuity, and the isolation: CR 613.1d's layer 4 moved, layer 2 did
+        -- not, and the object never left the battlefield.
+        Spec.assertEqWith s "CR 613.1d: Jace is no longer a planeswalker on one leg only" (fmap (Projection.isPlaneswalkerOf jaceId) [enchanted, elsewhere]) [False, True]
+        Spec.assertEqWith s "CR 613.1b: bob controls him on both, so the controller clause is not what answers" (fmap (Projection.controllerOf jaceId) [enchanted, elsewhere]) [Just S.bob, Just S.bob]
+        Spec.assertBool s (Set.member jaceId (GameState.battlefield enchanted)) "CR 506.4: nor did he leave the battlefield"
+        Spec.assertEqWith
+          s
+          "CR 506.4c: the Piker is still an attacking creature, its entry still naming Jace"
+          (Map.lookup pikerId (Combat.Type.attackers (GameState.combat enchanted)))
+          (Just (AttackTarget.OfPlaneswalker jaceId))
+      _ -> Spec.assertFailure s "fixture should give alice a Piker and a Snare and bob a Jace, a Snare and two Bonesplitters"
+
+-- The ids graftBoard hands back. A record rather than a tuple, and BUILT AND READ
+-- by field name rather than by position: every field is an ObjectId, so a
+-- positional site would take a reordering silently.
+data GraftIds = MkGraftIds
+  { graftPiker :: ObjectId.ObjectId,
+    graftAliceSnare :: ObjectId.ObjectId,
+    graftJace :: ObjectId.ObjectId,
+    graftBobSnare :: ObjectId.ObjectId,
+    graftSpare :: ObjectId.ObjectId,
+    graftAura :: ObjectId.ObjectId,
+    graftSpell :: ObjectId.ObjectId
+  }
+
+-- One board for both CR 506.4 cases above, differing only in which Aura is
+-- already on the battlefield.
+--
+-- alice is active with one Goblin Piker and one Soul Snare; bob defends with a
+-- Jace Beleren, a Soul Snare and TWO Bonesplitters. The named Aura is bob's and
+-- starts attached to the first Bonesplitter, so Aura Graft always MOVES it (CR
+-- 701.3b keeps the current host out of Attach.hostsFor) and the second Bonesplitter
+-- is the destination the control leg uses.
+--
+-- Every element is load-bearing. The two Snares are the same printing and each
+-- seat holds Plains of its own, so the two differ only in who holds one. Loyalty 5 against a
+-- 2/1 keeps CR 704.5i from burying Jace mid-combat, which would answer through the
+-- battlefield guard instead. alice's lands cover {1}{U} and {W} together, so the
+-- Graft and her own activation cannot compete for mana.
+--
+-- Positioned at the declare attackers step with bob already the defending player,
+-- which is combatBoardOf's shape: the engine's own step builds the combat record.
+graftBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  String ->
+  m (GameState.GameState, Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)), GraftIds)
+graftBoard s registry auraName = do
+  piker <- S.printingOf s registry "Goblin Piker"
+  plains <- S.printingOf s registry "Plains"
+  island <- S.printingOf s registry "Island"
+  jace <- S.printingOf s registry "Jace Beleren"
+  bonesplitter <- S.printingOf s registry "Bonesplitter"
+  snare <- S.printingOf s registry "Soul Snare"
+  graft <- S.printingOf s registry "Aura Graft"
+  aura <- S.printingOf s registry auraName
+  let (gs0, ours, theirs) = S.combatBoardOf [piker, snare] [jace, snare, bonesplitter, bonesplitter]
+  case (ours, theirs) of
+    ([pikerId, aliceSnare], [jaceId, bobSnare, host, spare]) -> do
+      let gs1 = S.landsFor plains S.bob 3 (S.landsFor plains S.alice 2 (S.landsFor island S.alice 3 gs0))
+          (auraId, gs2) = S.addCreature aura S.bob gs1
+          gs3 = S.addCounter CounterKind.Loyalty 5 jaceId (S.attachTo auraId (Recipient.ToObject host) gs2)
+          (spell, gs4) = S.addHandCard graft S.alice gs3
+      pure
+        ( gs4,
+          soulSnareAbility snare,
+          MkGraftIds
+            { graftPiker = pikerId,
+              graftAliceSnare = aliceSnare,
+              graftJace = jaceId,
+              graftBobSnare = bobSnare,
+              graftSpare = spare,
+              graftAura = auraId,
+              graftSpell = spell
+            }
+        )
+    _ -> Spec.assertFailure s "fixture should give alice a Piker and a Snare and bob a Jace, a Snare and two Bonesplitters"
+
+-- alice casts Aura Graft naming `aura` and moves it onto `host`, and resolves it.
+--
+-- Both choices are FILTERED rather than replaced, for soulSnareAnswer's reason: a
+-- leg whose slot or whose Attach.hostsFor list does not admit the id takes the
+-- fallback instead of quietly succeeding, and each case's per-leg assertions on
+-- Jace's controller and card type are what catch that.
+graftOnto :: ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+graftOnto aura host spell gs =
+  S.runPure (graftAnswer aura host) gs $ do
+    S.cast S.alice spell
+    Stack.resolveTop
+
+graftAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+graftAnswer aura host p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just aura) . Recipient.objectOf) legal) sets
+  Prompt.ChooseAttachment _ _ _ offered -> if List.elem host (NonEmpty.toList offered) then host else NonEmpty.head offered
+  _ -> S.aggressiveAnswer p
 
 -- CR 508.4 / CR 508.3a / CR 508.8, through the one card in the pool that puts a
 -- creature onto the battlefield attacking WITHOUT anything having been declared.
