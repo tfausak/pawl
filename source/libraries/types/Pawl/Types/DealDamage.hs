@@ -1,13 +1,26 @@
 module Pawl.Types.DealDamage where
 
+import qualified Data.Sequence as Seq
 import qualified Pawl.Types.ExcessDestination as ExcessDestination
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 
--- | CR 120.1: deal this much damage to the objects or players the ObjectRef names.
+-- | CR 120.1: deal this much damage to the objects or players the ObjectRefs name.
 data DealDamage = MkDealDamage
-  { ref :: ObjectRef.ObjectRef,
+  { -- | WHICH RECIPIENTS, as one or more descriptions whose sets are dealt to
+    -- TOGETHER. Several rather than one because a printed sentence may name
+    -- objects and players at once and CR 608.2f makes that one action: Molten
+    -- Disaster's "each creature without flying and each player" is two
+    -- descriptions -- no single ObjectRef arm spans both sides -- and one damage
+    -- event batch, which is what a CR 615.7 shield covering a player and their
+    -- permanents can tell apart (Pawl.ReplacementSpec's Molten Disaster case).
+    --
+    -- Nothing here deduplicates, so two descriptions naming one recipient would
+    -- deal it two events. The two cards in data/cards/ that write more than one
+    -- -- Molten Disaster and Soul Immolation -- name disjoint sets; a sentence
+    -- whose halves overlap would be the card that refutes this.
+    refs :: Seq.Seq ObjectRef.ObjectRef,
     -- | HOW MUCH, read once per recipient rather than once for the set: Acidic
     -- Soil's "each player equal to the number of lands they control" is a
     -- different number per seat. Still one CR 608.2f batch -- see
@@ -34,7 +47,7 @@ data DealDamage = MkDealDamage
     -- ObjectId Pawl.Engine.Resolve hands it, so naming a different object here
     -- redirects every one of them at once.
     --
-    -- A SlotName rather than an ObjectRef, where `ref` above is the wider type:
+    -- A SlotName rather than an ObjectRef, where `refs` above is the wider type:
     -- a damage event has exactly ONE source (CR 120.1), and every dealer in the
     -- pool is a single object named before the effect runs -- CR 115.10a's
     -- distinction, which is exactly the InSlot arm's. A swept SET of dealers

@@ -243,10 +243,10 @@ data ObjectRef
     -- Not a target (CR 115.10a) and swept when the effect executes, the two
     -- properties EachMatching above has.
     --
-    -- Not implemented, recorded here because the card's JSON cannot carry a
-    -- comment: a sentence naming creatures AND players ("each creature without
-    -- flying and each player") has to be written as two DealDamage
-    -- instructions, so its one CR 608.2f batch becomes two (#1285).
+    -- A sentence naming creatures AND players ("each creature without flying and
+    -- each player") is ONE DealDamage listing this arm beside an EachMatching,
+    -- which CR 608.2f deals as a single batch; Pawl.ReplacementSpec's Molten
+    -- Disaster case proves it.
     EachPlayer
   | -- | Every OPPONENT of the resolving controller -- Soul Immolation's "each
     -- opponent". EachPlayer's set narrowed by CR 102.1's relation, and here for
@@ -268,10 +268,9 @@ data ObjectRef
     -- Not a target (CR 115.10a) and swept when the effect executes, the two
     -- properties EachMatching above has.
     --
-    -- Not implemented, recorded here because the card's JSON cannot carry a
-    -- comment: a sentence naming opponents AND their permanents ("each opponent
-    -- and each creature they control", Soul Immolation) has to be written as two
-    -- DealDamage instructions, so its one CR 608.2f batch becomes two (#1285).
+    -- A sentence naming opponents AND their permanents ("each opponent and each
+    -- creature they control", Soul Immolation) is ONE DealDamage listing this arm
+    -- beside an EachMatching, the shape EachPlayer above describes.
     EachOpponent
   | -- | The player this effect's SOURCE chose as it entered the battlefield --
     -- Stuffy Doll's "it deals that much damage to the chosen player". EachPlayer's

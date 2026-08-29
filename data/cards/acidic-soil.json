@@ -59,9 +59,11 @@
                           }
                         }
                       },
-                      "ref": {
-                        "type": "EachPlayer"
-                      }
+                      "refs": [
+                        {
+                          "type": "EachPlayer"
+                        }
+                      ]
                     }
                   }
                 ]

@@ -24,10 +24,12 @@
                             "type": "Literal",
                             "value": 1
                           },
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "self"
-                          }
+                          "refs": [
+                            {
+                              "type": "InSlot",
+                              "value": "self"
+                            }
+                          ]
                         }
                       }
                     ]
@@ -91,9 +93,11 @@
                             "type": "InSlot",
                             "value": "thatMuch"
                           },
-                          "ref": {
-                            "type": "ChosenPlayer"
-                          }
+                          "refs": [
+                            {
+                              "type": "ChosenPlayer"
+                            }
+                          ]
                         }
                       }
                     ]

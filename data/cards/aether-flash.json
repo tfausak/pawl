@@ -50,10 +50,12 @@
                             "type": "Literal",
                             "value": 2
                           },
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "became"
-                          }
+                          "refs": [
+                            {
+                              "type": "InSlot",
+                              "value": "became"
+                            }
+                          ]
                         }
                       }
                     ]

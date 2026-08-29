@@ -48,10 +48,12 @@
                             "type": "Literal",
                             "value": 3
                           },
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "damage"
-                          }
+                          "refs": [
+                            {
+                              "type": "InSlot",
+                              "value": "damage"
+                            }
+                          ]
                         }
                       }
                     ]

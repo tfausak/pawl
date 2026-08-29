@@ -613,7 +613,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     -- dropped later, on the payment path (#1673).
     let named = ManaAddition.MkManaAddition (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) ManaProduction.AnyColor ManaRetention.Ordinary Nothing Nothing
     Spec.assertEqWith s "a named recipient does not disqualify" (ManaAbility.manaProduced (Effect.AddMana named)) (Just named)
-    Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1) Nothing Nothing))) Nothing
+    Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x")))) (Quantity.Literal 1) Nothing Nothing))) Nothing
   Spec.it s "CR 612.1 a text change reaches a Filter carried by an effect" $ do
     -- Boil ("Destroy all Islands") is the first card whose effect selects by
     -- a BASIC LAND TYPE, so it is the first that can tell whether CR 612.1's

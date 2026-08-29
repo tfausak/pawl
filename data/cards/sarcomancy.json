@@ -137,10 +137,12 @@
                             "type": "Literal",
                             "value": 1
                           },
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "you"
-                          }
+                          "refs": [
+                            {
+                              "type": "InSlot",
+                              "value": "you"
+                            }
+                          ]
                         }
                       }
                     ]

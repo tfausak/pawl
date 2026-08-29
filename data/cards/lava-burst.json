@@ -85,10 +85,12 @@
                         "type": "InSlot",
                         "value": "X"
                       },
-                      "ref": {
-                        "type": "InSlot",
-                        "value": "target"
-                      }
+                      "refs": [
+                        {
+                          "type": "InSlot",
+                          "value": "target"
+                        }
+                      ]
                     }
                   }
                 ]
