@@ -42,7 +42,9 @@
 -- And CR 509.1a's third subject, "a battle they protect", which is a filter atom
 -- (Filter.IsAttackingBattle) rather than a rule of combat: filterSpec below, whose
 -- producer is the one SYNTHETIC card this file uses, Synthetic Bulwark Snare. That
--- group's own comment records the Scryfall queries behind calling it synthetic.
+-- group's own comment records the Scryfall queries behind calling it synthetic. It
+-- also holds CR 506.4's stops-being-a-battle clause, read through that same atom,
+-- which Aura Graft and Song of the Dryads reach at instant speed.
 --
 -- Lightning Bolt ({R} Instant, "deals 3 damage to any target") and Firebolt ({R}
 -- Sorcery, "deals 2 damage to any target") are the pool's two plainest CR 115.4

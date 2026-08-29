@@ -2865,11 +2865,12 @@ soulSnareSpec s registry = Spec.describe s "SoulSnare" $ do
   Spec.it s "CR 506.4 a planeswalker whose CONTROLLER changes stops being attacked, so the new controller's Soul Snare cannot name the attacker" $ do
     (board, ability, ids) <- graftBoard s registry "Confiscate"
     case (ability, ids) of
-      (Just snareAbility, MkGraftIds pikerId aliceSnare jaceId bobSnare spare aura graft) -> do
+      (Just snareAbility, MkGraftIds {graftPiker = pikerId, graftAliceSnare = aliceSnare, graftJace = jaceId, graftBobSnare = bobSnare, graftSpare = spare, graftAura = aura, graftSpell = graft}) -> do
         let declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) attackThePlaneswalker board
             -- The PAIR, differing in exactly one thing: which permanent alice's
-            -- one Aura Graft moves bob's Confiscate onto. Same spell, same lands,
-            -- same answerers -- so a leg failing for want of mana fails on both.
+            -- one Aura Graft moves bob's Confiscate onto. Same spell and the same
+            -- lands paying for it on both legs, and each Snare has its own seat's
+            -- Plains, so no leg can fail for want of mana.
             stolen = graftOnto aura jaceId graft declared
             elsewhere = graftOnto aura spare graft declared
             aliceFires = runToEndOfCombatWith (soulSnareAnswer aliceSnare snareAbility pikerId)
@@ -2914,7 +2915,7 @@ soulSnareSpec s registry = Spec.describe s "SoulSnare" $ do
   Spec.it s "CR 506.4 a planeswalker that stops being a planeswalker stops being attacked, so Soul Snare cannot name the attacker" $ do
     (board, ability, ids) <- graftBoard s registry "Song of the Dryads"
     case (ability, ids) of
-      (Just snareAbility, MkGraftIds pikerId _ jaceId bobSnare spare aura graft) -> do
+      (Just snareAbility, MkGraftIds {graftPiker = pikerId, graftJace = jaceId, graftBobSnare = bobSnare, graftSpare = spare, graftAura = aura, graftSpell = graft}) -> do
         let declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) attackThePlaneswalker board
             -- The same pair, one Aura over: the Song of the Dryads lands on Jace
             -- or on the spare Bonesplitter.
@@ -2940,8 +2941,9 @@ soulSnareSpec s registry = Spec.describe s "SoulSnare" $ do
           (Just (AttackTarget.OfPlaneswalker jaceId))
       _ -> Spec.assertFailure s "fixture should give alice a Piker and a Snare and bob a Jace, a Snare and two Bonesplitters"
 
--- The ids graftBoard hands back, named rather than positional so a reader of the
--- two cases above can tell the two Bonesplitters and the two Snares apart.
+-- The ids graftBoard hands back. A record rather than a tuple, and BUILT AND READ
+-- by field name rather than by position: every field is an ObjectId, so a
+-- positional site would take a reordering silently.
 data GraftIds = MkGraftIds
   { graftPiker :: ObjectId.ObjectId,
     graftAliceSnare :: ObjectId.ObjectId,
@@ -2991,15 +2993,27 @@ graftBoard s registry auraName = do
           (auraId, gs2) = S.addCreature aura S.bob gs1
           gs3 = S.addCounter CounterKind.Loyalty 5 jaceId (S.attachTo auraId (Recipient.ToObject host) gs2)
           (spell, gs4) = S.addHandCard graft S.alice gs3
-      pure (gs4, soulSnareAbility snare, MkGraftIds pikerId aliceSnare jaceId bobSnare spare auraId spell)
+      pure
+        ( gs4,
+          soulSnareAbility snare,
+          MkGraftIds
+            { graftPiker = pikerId,
+              graftAliceSnare = aliceSnare,
+              graftJace = jaceId,
+              graftBobSnare = bobSnare,
+              graftSpare = spare,
+              graftAura = auraId,
+              graftSpell = spell
+            }
+        )
     _ -> Spec.assertFailure s "fixture should give alice a Piker and a Snare and bob a Jace, a Snare and two Bonesplitters"
 
 -- alice casts Aura Graft naming `aura` and moves it onto `host`, and resolves it.
 --
 -- Both choices are FILTERED rather than replaced, for soulSnareAnswer's reason: a
 -- leg whose slot or whose Attach.hostsFor list does not admit the id takes the
--- fallback instead of quietly succeeding, and the assertions on where the Aura
--- landed are what catch that.
+-- fallback instead of quietly succeeding, and each case's per-leg assertions on
+-- Jace's controller and card type are what catch that.
 graftOnto :: ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 graftOnto aura host spell gs =
   S.runPure (graftAnswer aura host) gs $ do
