@@ -190,6 +190,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Attach _ -> Nothing
   Effect.AttachTarget {} -> Nothing
   Effect.AttachTargetToEach {} -> Nothing
+  Effect.AttachBound {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
   Effect.ChooseOpponent _ -> Nothing
   Effect.ChooseOpponentAtRandom _ -> Nothing
