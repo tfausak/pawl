@@ -4030,8 +4030,10 @@ filterReads f = case f of
   -- Reads nothing: CR 712.8d/e make which face is up the thing characteristics
   -- are read OFF rather than one of them, so no Modification writes Object.face.
   Filter.Type.Transformed -> Set.empty
-  -- CR 109.3 / 613.1f: the aspect LoseAllAbilities writes, Aspect having no
-  -- finer grain than "the abilities".
+  -- CR 109.3 / 613.1f: the aspect GainAbility, LoseNamedAbility and
+  -- LoseAllAbilities write, Aspect having no finer grain than "the abilities".
+  -- Pawl.ProjectionSpec's "CR 613.8a a granted activated ability puts the
+  -- creature into the Ascent's set" proves this row load-bearing.
   --
   -- Not implemented: what an ability's OWN CR 604.2 gate reads, which
   -- abilitiesFromCharacteristics runs through Condition.holds and which a
@@ -4084,9 +4086,16 @@ modificationWrites m = case m of
   -- leaves the suite green.
   Modification.GainEnchant _ -> Set.singleton Keywords
   -- Writes ProjectedCharacteristics.activatedAbilities or .triggeredAbilities,
-  -- neither of which any Filter atom reads. LoseAllAbilities declares Keywords
-  -- because it also empties the map.
-  Modification.GainAbility _ -> Set.empty
+  -- which Aspect has no finer grain for than Keywords -- the same answer
+  -- LoseNamedAbility gives below, this being the same write in the other
+  -- direction. Filter.HasNonManaActivatedAbility is the atom that reads the
+  -- first list, through abilitiesFromCharacteristics; the triggered half is
+  -- over-declared, which is the safe direction, since this is only a SCREEN and
+  -- changesAt confirms the dependency by re-asking the set.
+  --
+  -- Pawl.ProjectionSpec's "CR 613.8a a granted activated ability puts the
+  -- creature into the Ascent's set" proves it.
+  Modification.GainAbility _ -> Set.singleton Keywords
   Modification.LoseAllAbilities -> Set.singleton Keywords
   -- Writes ProjectedCharacteristics.activatedAbilities, which Aspect has no finer
   -- grain for than Keywords -- Filter.HasNonManaActivatedAbility, the atom that
