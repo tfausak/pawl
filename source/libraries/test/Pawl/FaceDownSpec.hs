@@ -126,6 +126,7 @@ import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.FaceDown as FaceDown
@@ -148,6 +149,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
@@ -188,6 +190,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   turnFaceUpSpec s registry
   turnUpAttachSpec s registry
   turnFaceDownSpec s registry
+  restampSpec s registry
   listedSpec s registry
   manifestSpec s registry
   manifestDreadSpec s registry
@@ -568,6 +571,157 @@ aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtCreature oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
   _ -> S.identityAnswer p
+
+-- CR 613.7f: "a permanent receives a new timestamp each time it turns face up or
+-- face down". Both directions, one board shape.
+--
+-- WHAT READS THE STAMP while a permanent is face down. CR 708.2a has taken the
+-- card's abilities away, so the permanent generates no continuous effect of its
+-- own -- but CR 701.60c's grant is the rulebook's rather than the card's, and
+-- Pawl.Engine.Projection.designationGathered stamps it with the PERMANENT's own
+-- timestamp (CR 613.7a). CR 701.60b says outright that suspected is "neither an
+-- ability nor part of the permanent's copiable values", so CR 708.2's substitution
+-- leaves it alone and the grant outlives the turning-over. That grant is therefore
+-- the one layer-6 effect on this board whose order against Turn to Frog's removal
+-- a turning-over can move.
+--
+-- THE PAIR IS TWO MOMENTS OF ONE BOARD rather than two boards: the suspect loses
+-- rule 701.60c's ability to a removal stamped after it entered, and gets it back
+-- when a turning-over restamps it after that removal. Nothing else differs, so the
+-- flip is the stamp's doing alone.
+--
+-- Ixidron {3}{U}{U} Creature - Illusion */* is the FACE-DOWN card: "as this
+-- creature enters, turn all other nontoken creatures face down", so its victims
+-- need no morph ability. That much rules Backslide and Weaver of Lies out, since
+-- both name "creatures with morph abilities" and the removal this case needs
+-- between the entry and the turning-over would have taken the morph ability away
+-- and left them no legal target; Cyber Conversion's bare "target creature" would
+-- serve. Ixidron is preferred over it because it is also the pool's only
+-- turn-face-down instruction naming a CLASS of permanents rather than a slot, so
+-- this pair is where ObjectRef.EachMatching is driven at all. Its second line,
+-- "power and toughness each equal to the number of face-down creatures on the
+-- battlefield", is what keeps it alive
+-- through the CR 704.5f pass that follows: three other creatures go face down, so
+-- it settles a 3/3.
+--
+-- Ainok Tracker is the FACE-UP card: turning a permanent face up needs a
+-- procedure, and CR 702.37e's asks about the card's morph cost rather than a
+-- projected one -- which is what lets the Tracker be turned face up while Turn to
+-- Frog is removing its abilities.
+--
+-- Turn to Frog {1}{U} ("until end of turn, target creature loses all abilities and
+-- becomes a blue Frog with base power and toughness 1/1") is the REMOVER, and a
+-- spell rather than Humility for two reasons: CR 613.7b stamps it as it resolves,
+-- so its timestamp sits between the suspect's entry and the turning-over by
+-- construction, and a static removal on the battlefield would have taken Ixidron's
+-- own as-enters ability away before it could sweep.
+--
+-- The second Piker is the anti-vacuity leg, as Pawl.CombatSpec's group has it: it
+-- stands beside the suspect and was never suspected, so a board on which nothing
+-- can block fails at it rather than passing.
+restampSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+restampSpec s registry = Spec.describe s "Timestamps (CR 613.7f)" $ do
+  Spec.it s "CR 613.7f turning face down restamps the permanent after a removal that had wiped its grant" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    island <- S.printingOf s registry "Island"
+    frog <- S.printingOf s registry "Turn to Frog"
+    ixidron <- S.printingOf s registry "Ixidron"
+    let (board, suspect, other, attacker) = suspectedBoard piker piker [island, island]
+        frogged = frogging frog suspect board
+        (after, entered) = entering ixidron frogged
+    -- THE BEFORE moment, and the fixture's own control: Turn to Frog resolved
+    -- later than the suspect entered, so CR 613.1f wipes the grant and both halves
+    -- of rule 701.60c are gone.
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Menace suspect frogged)) "CR 613.1f before: the removal is younger than the suspect, so the menace half is gone"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton suspect (Set.singleton attacker)) frogged) "CR 613.1f before: and the can't-block half with it"
+    -- THE assertion, gameplay level and ahead of every reading of the projection:
+    -- the sweep restamped the suspect after the removal, so rule 701.60c's
+    -- "this creature can't block" applies again.
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton suspect (Set.singleton attacker)) after)) "CR 613.7f the permanent it turned face down is stamped after the removal, so it can't block again"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Menace suspect after) "CR 613.7f and the menace half is back with it"
+    -- Ixidron's own two lines, which no other case in the file reaches: the sweep
+    -- names a CLASS of permanents rather than a slot, so the assertion is the whole
+    -- set -- every other creature and not Ixidron itself ("all OTHER nontoken
+    -- creatures"), and no land, though bob's are permanents on the same
+    -- battlefield. Its */* is what carries it through the CR 704.5f pass that
+    -- follows the sweep: three face-down creatures make it a 3/3.
+    Spec.assertEqWith s "CR 708.2a the sweep turned over every other creature and left Ixidron face up" (faceDownIds after) (Set.fromList [suspect, other, attacker])
+    Spec.assertEqWith s "Ixidron is a 3/3, one for each creature its own sweep turned face down" (fmap (\oid -> S.powerToughnessOf oid after) entered) (Just (Just (3, 3)))
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton attacker)) after) "while the unsuspected Piker beside it blocks"
+
+  Spec.it s "CR 613.7f turning face up restamps the permanent after a removal that had wiped its grant" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    frog <- S.printingOf s registry "Turn to Frog"
+    ixidron <- S.printingOf s registry "Ixidron"
+    let (board, suspect, other, attacker) = suspectedBoard piker ainok [island, mountain, mountain, mountain, mountain, mountain, mountain, mountain]
+        (hidden, _) = entering ixidron board
+        frogged = frogging frog suspect hidden
+        after = S.runPure S.identityAnswer frogged (FaceDown.turnFaceUp S.bob TurnUpProcedure.Morph suspect >> Engine.settleForPriority)
+    -- THE BEFORE moment: the Tracker is face down, and Turn to Frog resolved after
+    -- the sweep restamped it, so the removal is the younger effect this time and
+    -- the grant is gone again.
+    Spec.assertEqWith s "CR 708.2a the sweep turned the Tracker face down" (fmap Object.facing (Game.lookupObject suspect hidden)) (Just (Facing.faceDown FaceDownReason.TurnedFaceDown))
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton suspect (Set.singleton attacker)) frogged) "CR 613.1f before: the removal is younger than the face-down stamp, so it can block"
+    Spec.assertEqWith s "CR 702.37e the procedure is open to bob, and the removal has not taken it away" (FaceDown.turnableFaceUp S.bob frogged) [(suspect, TurnUpProcedure.Morph)]
+    -- THE assertion, gameplay level and first: CR 702.37e's procedure turned it
+    -- face up and CR 613.7f stamped it again, past the removal.
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton suspect (Set.singleton attacker)) after)) "CR 613.7f the permanent it turned face up is stamped after the removal, so it can't block again"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Menace suspect after) "CR 613.7f and the menace half is back with it"
+    Spec.assertEqWith s "CR 702.37e the morph cost was paid and the Tracker is face up" (fmap Object.facing (Game.lookupObject suspect after)) (Just Facing.FaceUp)
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton attacker)) after) "while the unsuspected Piker beside it blocks"
+
+-- alice attacks with one Goblin Piker into bob's suspect, a second Piker beside it
+-- and `lands`. Returns the board with attackers declared, the suspect, the Piker
+-- beside it and alice's attacker.
+--
+-- `suspected` is the printing the designation lands on: a Goblin Piker for the
+-- face-down case, an Ainok Tracker for the face-up one, which needs a permanent CR
+-- 702.37e's procedure can reach.
+suspectedBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+suspectedBoard piker suspected lands =
+  let (gs0, mine, _) = S.combatBoardOf [piker] []
+      (suspect, gs1) = S.addCreature suspected S.bob gs0
+      (other, gs2) = S.addCreature piker S.bob gs1
+      gs3 = List.foldl' (\g p -> snd (S.addCreature p S.bob g)) gs2 lands
+      declared = S.runPure S.aggressiveAnswer (suspecting suspect gs3) (Combat.declareAttackers S.alice)
+      attacker = case mine of
+        a : _ -> a
+        [] -> S.noSource
+   in (declared, suspect, other, attacker)
+
+-- CR 701.60b's designation, written straight onto the permanent -- a FIXTURE, the
+-- posture `tap` above takes. The road that sets it is Reasonable Doubt's and
+-- Pawl.CombatSpec's SuspectedAbilityRemoval group proves it; what this file needs
+-- is only that a designation outlives a turning-over and carries the permanent's
+-- own timestamp into layer 6.
+suspecting :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+suspecting oid gs =
+  gs
+    { GameState.objects =
+        Map.adjust (\o -> o {Object.designations = Set.insert Designation.Suspected (Object.designations o)}) oid (GameState.objects gs)
+    }
+
+-- Cast Turn to Frog at `victim` and let it resolve, so CR 613.7b stamps its
+-- removal at that moment. bob casts it, since it is his creature the case is
+-- about and his lands the board carries.
+frogging :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+frogging frog victim gs =
+  let (oid, withCard) = S.addHandCard frog S.bob gs
+   in S.runPure (aimAtCreature victim) withCard (S.cast S.bob oid >> Stack.resolveTop >> Engine.settleForPriority)
+
+-- Resolve a permanent spell of alice's off the stack, then settle. PUT rather than
+-- cast, because nothing here is about paying for Ixidron; the settle is what
+-- matters, since CR 614.1c's effects are queued as the permanent enters and
+-- Pawl.Engine.Resolve.runEntryEffects drains them at the start of the next one
+-- (#1639).
+entering :: Printing.Printing -> GameState.GameState -> (GameState.GameState, Maybe ObjectId.ObjectId)
+entering printing gs =
+  let (_, onStack) = S.spellOnStack printing S.alice gs
+      after = S.runPure S.identityAnswer onStack (Stack.resolveTop >> Engine.settleForPriority)
+   in (after, enteredOne gs after)
 
 -- CR 708.2a's "no name", which a set says by being EMPTY: a face-down object
 -- has no name for CR 709.4a's membership test to find, rather than one that
