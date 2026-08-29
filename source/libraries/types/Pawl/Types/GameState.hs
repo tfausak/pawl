@@ -698,9 +698,9 @@ data GameState = MkGameState
     -- the same value for both, and Pawl.Engine.Exile.pileOf is what reads it.
     --
     -- Drawn from GameState.nextTimestamp, which is a supply of distinct values
-    -- before it is an ordering, rather than a counter of its own: one monotone
-    -- source is what keeps a pile stamp from ever colliding with the CR 613.7d
-    -- stamp Pile.OfForetold names its own pile by.
+    -- before it is an ordering, rather than from a counter of its own: a name
+    -- needs nothing but distinctness, and a second supply would be a second field
+    -- for every sweep and every codec to keep.
     --
     -- Board state rather than a field on the exiled Object, for `exiledWith`'s
     -- reason one field up: CR 400.7 would strip it from an object that moved

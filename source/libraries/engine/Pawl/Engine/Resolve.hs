@@ -3349,21 +3349,27 @@ recordExiledWith source before gs =
 -- were exiled", so every card that arrived in exile FACE DOWN while one effect
 -- ran shares one stamp, and the next effect's arrivals get another.
 --
--- That window is the rule's two criteria at once and is why the stamp is taken
--- here rather than in Pawl.Engine.Event's zone-change funnel: the funnel moves one
--- card, so a stamp minted there would put every card in a pile of its own -- and a
--- pile of one is a card the chooser has effectively named, which is the direction
--- rule 406.4 exists to forbid. One EXECUTION of one instruction is "when", and its
--- being that instruction is "how".
+-- That window is the rule's two criteria at once, and is why the stamp is taken
+-- here rather than in Pawl.Engine.Event's zone-change funnel: the funnel moves
+-- one card, so a stamp minted there would put every card in a pile of its own --
+-- and a pile of one is a card the chooser has effectively named, which is the
+-- direction rule 406.4 exists to forbid. One EXECUTION of one instruction is
+-- "when", and its being that instruction is "how".
 --
--- A difference over GameState.exile and not a case over the opcode, recordExiledWith's
--- road above and for its reason: the rules core stays off effect identity.
+-- A difference over GameState.exile and not a case over the opcode,
+-- recordExiledWith's road above and for its reason: the rules core stays off
+-- effect identity.
 --
 -- Only cards NOT already stamped, which is what makes a nested application's
 -- filing stand -- applyEffectWith recurses, so the innermost window is the one
 -- that ran the instruction, and the outer one must not re-pile what it saw
 -- arrive. That gate is also what keeps the timestamp supply still: no stamp is
 -- drawn by an effect that exiled nothing face down.
+--
+-- The nesting half of it is a regression fence rather than proven behaviour: no
+-- card in `data/cards/` exiles face down from inside another effect, so dropping
+-- the gate leaves the suite green. The supply half is proved by every board that
+-- exiles nothing face down.
 --
 -- Then RESTRICTED to what is still in exile, recordExiledWith's sweep: CR 400.7
 -- gives a card that left a new id, so the old key can never be named again.

@@ -95,17 +95,18 @@ mayChoose perspective oid gs = case perspective of
 -- which of them to draw out of.
 --
 -- The FORETOLD arm wins where both would answer, since CR 702.143e is the
--- stronger separation: an effect that foretells a card (CR 702.143d) files a pile
--- stamp for it like any other exile, and rule 702.143e still wants that card in a
--- pile of its own.
+-- stronger separation: a card an effect exiled face down carries a pile stamp
+-- already, and rule 702.143d can then make that card foretold where it sits, at
+-- which point rule 702.143e wants it differentiable from the pile it was in.
 --
--- A card in exile face down with NO stamp falls back to a pile of its own. There
--- is no such card: every face-down exile the pool can reach carries
--- EntryRiders.exiledFaceDown, which only an effect sets (Pawl.Engine.Foretell's
--- is the other writer, and its cards take the arm above), and every effect runs
--- inside recordExilePile's window. So the fallback is unreachable rather than a
--- second reading of the rule -- and it is the CONSERVATIVE unreachable answer
--- only in the sense that it never merges two piles the rule keeps apart.
+-- A card in exile face down with NO stamp falls back to a pile of its own, and no
+-- such card exists: every face-down exile pawl can reach carries
+-- EntryRiders.exiledFaceDown, which only an effect sets (Pawl.Engine.Foretell is
+-- the other writer, and its cards take the arm above), and every effect runs
+-- inside recordExilePile's window. That fallback is unreachable rather than a
+-- second reading of the rule, and it is the direction to be careful about rather
+-- than the safe one -- a pile of one is a card the chooser has effectively named
+-- -- which is why the writer's window is the thing to keep total.
 pileOf :: ObjectId -> GameState.GameState -> Maybe Pile.Pile
 pileOf oid gs = do
   obj <- Game.lookupObject oid gs

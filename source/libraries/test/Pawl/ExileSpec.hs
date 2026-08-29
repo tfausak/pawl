@@ -8,6 +8,10 @@
 -- offers instead, and the draw drawFromPiles takes out of it -- and
 -- ObjectRef.EachCardInYourHand as Pawl.Engine.Resolve sweeps it.
 --
+-- CR 406.4's separate piles are read off the same Ignorant Bliss: one casting
+-- makes one pile of what it hid, two castings make two, and which pile a chooser
+-- names is which card the draw can hand them.
+--
 -- Gameplay-level, off two producers that exile face down and differ in exactly
 -- the permission. Ignorant Bliss {1}{R} Instant -- "Exile all cards from your
 -- hand face down" -- grants nobody a look, so not even the owner may choose what
