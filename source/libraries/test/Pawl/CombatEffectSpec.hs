@@ -3234,6 +3234,41 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     Spec.assertEqWith s "nothing was declared" (S.attackerDeclarationsOf after) []
     Spec.assertEqWith s "and nothing is attacking" (Combat.Type.attackers (GameState.combat after)) Map.empty
     Spec.assertBool s (allUntapped mine after) "CR 508.1f's tapping was undone too"
+  Spec.it s "CR 508.1j the payer orders the two taxing permanents: Hollow Warrior before Exalted Dragon" $ do
+    -- CR 508.1j's "in any order" read across TAXING PERMANENTS rather than across
+    -- one permanent's parts: an Exalted Dragon ("sacrifice a land") and a Hollow
+    -- Warrior ("tap an untapped creature you control") attacking together owe two
+    -- charges, and the payer says which is paid first.
+    --
+    -- Dryad Arbor is the whole board: alice's ONLY land and, once CR 508.1f has
+    -- tapped the two attackers, her only untapped creature. So each charge has
+    -- exactly one candidate and neither component prompts -- what the payer picks
+    -- is nothing but the order, and no answer to a later prompt can repair it.
+    --
+    -- Warrior first taps the Arbor and the Dragon then sacrifices it, a land being
+    -- no less a land for being tapped. Dragon first sacrifices it and leaves the
+    -- Warrior nothing untapped to tap, so CR 508.1j's "partial payments are not
+    -- allowed" rewinds the whole declaration.
+    dragon <- S.printingOf s registry "Exalted Dragon"
+    warrior <- S.printingOf s registry "Hollow Warrior"
+    arbor <- S.printingOf s registry "Dryad Arbor"
+    let (gs, mine, _) = S.combatBoardOf [dragon, warrior] []
+        (tree, board) = S.addCreature arbor S.alice gs
+        -- Declares the two taxed creatures and leaves the Arbor home; the Arbor
+        -- is a legal attacker too, and one that attacked would be tapped and so
+        -- out of the Warrior's reach.
+        ordering :: [Natural] -> Prompt.Prompt r -> r
+        ordering order p = case p of
+          Prompt.DeclareAttackers {} -> mine
+          Prompt.OrderCombatTolls {} -> order
+          _ -> S.identityAnswer p
+        warriorFirst = S.runPure (ordering [1, 0]) board (Combat.declareAttackers S.alice)
+        dragonFirst = S.runPure (ordering [0, 1]) board (Combat.declareAttackers S.alice)
+    Spec.assertEqWith s "the payer's order: both were declared" (S.attackerDeclarationsOf warriorFirst) mine
+    Spec.assertEqWith s "and the Arbor paid both charges" (stillThere [tree] warriorFirst) 0
+    Spec.assertEqWith s "the gathered order: nothing was declared" (S.attackerDeclarationsOf dragonFirst) []
+    Spec.assertEqWith s "and CR 508.1j gave the Arbor back" (stillThere [tree] dragonFirst) 1
+    Spec.assertBool s (allUntapped [tree] dragonFirst) "the Warrior's tap was rewound with it"
 
 -- Declares every candidate the FIRST time CR 508.1a is asked and the first
 -- candidate alone the second, counting the asks in its state. Stateful because a
