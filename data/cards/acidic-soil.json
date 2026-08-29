@@ -26,42 +26,44 @@
                   {
                     "type": "DealDamage",
                     "value": {
-                      "quantity": {
-                        "type": "Count",
-                        "value": {
-                          "aggregation": {
-                            "type": "Members"
-                          },
-                          "filter": {
-                            "type": "And",
-                            "value": [
-                              {
-                                "type": "HasCardType",
-                                "value": {
-                                  "type": "Land"
-                                }
-                              },
-                              {
-                                "type": "ControlledByRecipient"
-                              }
-                            ]
-                          },
-                          "scope": {
-                            "type": "InZone",
+                      "parts": [
+                        {
+                          "quantity": {
+                            "type": "Count",
                             "value": {
-                              "player": {
-                                "type": "EachPlayer"
+                              "aggregation": {
+                                "type": "Members"
                               },
-                              "zone": {
-                                "type": "Battlefield"
+                              "filter": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "HasCardType",
+                                    "value": {
+                                      "type": "Land"
+                                    }
+                                  },
+                                  {
+                                    "type": "ControlledByRecipient"
+                                  }
+                                ]
+                              },
+                              "scope": {
+                                "type": "InZone",
+                                "value": {
+                                  "player": {
+                                    "type": "EachPlayer"
+                                  },
+                                  "zone": {
+                                    "type": "Battlefield"
+                                  }
+                                }
                               }
                             }
+                          },
+                          "ref": {
+                            "type": "EachPlayer"
                           }
-                        }
-                      },
-                      "refs": [
-                        {
-                          "type": "EachPlayer"
                         }
                       ]
                     }

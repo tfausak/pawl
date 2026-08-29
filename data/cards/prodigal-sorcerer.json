@@ -20,14 +20,16 @@
                       {
                         "type": "DealDamage",
                         "value": {
-                          "quantity": {
-                            "type": "Literal",
-                            "value": 1
-                          },
-                          "refs": [
+                          "parts": [
                             {
-                              "type": "InSlot",
-                              "value": "target"
+                              "quantity": {
+                                "type": "Literal",
+                                "value": 1
+                              },
+                              "ref": {
+                                "type": "InSlot",
+                                "value": "target"
+                              }
                             }
                           ]
                         }

@@ -2,9 +2,8 @@
 
 module Pawl.Codec.DealDamage where
 
+import qualified Pawl.Codec.DamagePart as DamagePart
 import qualified Pawl.Codec.ExcessDestination as ExcessDestination
-import qualified Pawl.Codec.ObjectRef as ObjectRef
-import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -15,8 +14,7 @@ import qualified Pawl.Types.DealDamage as DealDamage
 -- written by Pawl.Codec.Effect's DealDamage arm.
 codec :: Codec.Codec DealDamage.DealDamage
 codec = Fields.object $ do
-  refs <- Fields.required "refs" (Common.seq ObjectRef.codec) DealDamage.refs
-  quantity <- Fields.required "quantity" Quantity.codec DealDamage.quantity
+  parts <- Fields.required "parts" (Common.seq DamagePart.codec) DealDamage.parts
   dealer <- Fields.defaulted "dealer" Nothing (Common.maybe SlotName.codec) DealDamage.dealer
   -- Defaulted to Nothing, so every card that deals damage without saying where
   -- the excess goes -- which is every one of them but Flame Spill -- keeps
@@ -24,8 +22,7 @@ codec = Fields.object $ do
   excess <- Fields.defaulted "excess" Nothing (Common.maybe ExcessDestination.codec) DealDamage.excess
   pure
     DealDamage.MkDealDamage
-      { DealDamage.refs = refs,
-        DealDamage.quantity = quantity,
+      { DealDamage.parts = parts,
         DealDamage.dealer = dealer,
         DealDamage.excess = excess
       }

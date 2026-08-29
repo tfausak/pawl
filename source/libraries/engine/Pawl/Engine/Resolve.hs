@@ -108,6 +108,7 @@ import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageDirection as DamageDirection
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.DamagePart as DamagePart
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
@@ -445,9 +446,9 @@ exchangeSidesSlots sides = case sides of
 slotsOf :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Map.Map SlotName SlotArity
 slotsOf effect = case effect of
   -- The dealer is a read like any other (CR 120.2b), and one object (CR 120.1).
-  Effect.DealDamage (DealDamage.MkDealDamage refs quantity dealer _) ->
+  Effect.DealDamage (DealDamage.MkDealDamage parts dealer _) ->
     joinTwo
-      (joinTwo (joinSlots (fmap objectRefSlots (Foldable.toList refs))) (quantitySlots quantity))
+      (joinSlots (concatMap (\part -> [objectRefSlots (DamagePart.ref part), quantitySlots (DamagePart.quantity part)]) parts))
       (maybe Map.empty oneSlot dealer)
   -- BOTH fighters: CR 701.14a reads each one's power against the other, so a
   -- slot named by only one half would still look dangling.
@@ -787,7 +788,7 @@ filterSlotsOf = Map.fromSet (const SlotArity.One) . Filter.boundSlots
 -- ObjectRef-taking opcodes routed through objectRefQuantities.
 slotsAreExhaustive :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 slotsAreExhaustive effect = case effect of
-  Effect.DealDamage (DealDamage.MkDealDamage _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
+  Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> all (\part -> all Quantity.slotsAreExhaustive (DamagePart.quantity part : objectRefQuantities (DamagePart.ref part))) parts
   Effect.Fight {} -> True
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) ->
     durationSlotsAreExhaustive duration
@@ -966,7 +967,7 @@ readsX :: [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 readsX = any effectReadsX
   where
     effectReadsX effect = case effect of
-      Effect.DealDamage (DealDamage.MkDealDamage _ quantity _ _) -> Quantity.readsX quantity
+      Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> any (\part -> any Quantity.readsX (DamagePart.quantity part : objectRefQuantities (DamagePart.ref part))) parts
       Effect.Fight {} -> False
       -- Untamed Might's "+X/+X" sits inside the Modification, not on the effect.
       Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
@@ -3528,19 +3529,14 @@ chooseNewTargetsFor controller copyId = do
 -- gone before a later effect of the same list runs.
 applyOneEffect :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
 applyOneEffect runSubgame resolving source controller legal chosen effect = case effect of
-  Effect.DealDamage (DealDamage.MkDealDamage refs quantity dealer excess) -> do
+  Effect.DealDamage (DealDamage.MkDealDamage parts dealer excess) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
         -- CR 120.1a: damage only to a battle, creature, or planeswalker, so every
         -- object an ObjectRef names goes through Damage.damageRecipient and none
         -- is trusted. A player recipient survives untouched (CR 115.4, CR 120.3a).
-        -- ONE recipient list from EVERY description the instruction names, so a
-        -- sentence naming objects and players at once -- Molten Disaster's "each
-        -- creature without flying and each player" -- reaches applyDamage as a
-        -- single CR 608.2f batch rather than one per description. Every amount
-        -- below is still read against the same pre-effect `gs`.
-        recipients = concatMap (Maybe.mapMaybe (Damage.damageRecipient gs) . objectRefRecipients legal resolving controller source gs) refs
+        recipientsOf ref = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs ref)
         -- WHO DEALS IT (CR 120.1): `source` is CR 113.7's default, and a `dealer`
         -- slot is CR 120.2b's exception. Resolved here and carried on the
         -- DamageEvent, so every later reader of "what dealt this" sees the
@@ -3553,23 +3549,32 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- No source, no damage: CR 608.2b's illegal dealer, above.
       Nothing -> pure ()
       Just dealt -> do
-        -- HOW MUCH, read ONCE PER RECIPIENT: Acidic Soil's "damage to each
-        -- player equal to the number of lands they control" is one amount per
-        -- seat. Still one action under CR 608.2f, since every read is against
-        -- the same pre-effect state. Both kinds of recipient get it, keyed to
-        -- recipientSeat. An unevaluable amount drops that recipient, and so does
-        -- a zero (CR 120.8).
-        let amountFor recipient = case recipientSeat gs recipient of
+        -- HOW MUCH, read ONCE PER RECIPIENT off the clause that named it: Acidic
+        -- Soil's "damage to each player equal to the number of lands they
+        -- control" is one amount per seat, and Char's "4 damage to any target and
+        -- 2 damage to you" is one amount per clause. Still one action under CR
+        -- 608.2f, since every read is against the same pre-effect state. Both
+        -- kinds of recipient get it, keyed to recipientSeat. An unevaluable
+        -- amount drops that recipient, and so does a zero (CR 120.8).
+        let amountFor quantity recipient = case recipientSeat gs recipient of
               Nothing -> Quantity.evaluateFor viewOf context gs resolving source quantity
               Just pid -> evaluateForRecipient viewOf context gs resolving source pid quantity
+            -- ONE event list from EVERY clause the instruction names, so a
+            -- sentence naming objects and players at once -- Molten Disaster's
+            -- "each creature without flying and each player" -- reaches
+            -- applyDamage as a single CR 608.2f batch rather than one per clause.
             events =
-              Maybe.mapMaybe
-                ( \recipient -> do
-                    n <- amountFor recipient
-                    Monad.guard (n > 0)
-                    pure (Damage.damageEvent gs DamageKind.Noncombat dealt recipient (Integer.toNaturalSaturating n))
+              concatMap
+                ( \part ->
+                    Maybe.mapMaybe
+                      ( \recipient -> do
+                          n <- amountFor (DamagePart.quantity part) recipient
+                          Monad.guard (n > 0)
+                          pure (Damage.damageEvent gs DamageKind.Noncombat dealt recipient (Integer.toNaturalSaturating n))
+                      )
+                      (recipientsOf (DamagePart.ref part))
                 )
-                recipients
+                parts
             -- CR 120.4a, and BEFORE applyDamage's CR 120.4b, against the same
             -- pre-effect state every amount was read against.
             rewritten = Damage.redirectExcess gs excess events

@@ -115,6 +115,7 @@ import qualified Pawl.Codec.CyclingSpec
 import qualified Pawl.Codec.DamageDirectionSpec
 import qualified Pawl.Codec.DamageEventSpec
 import qualified Pawl.Codec.DamageKindSpec
+import qualified Pawl.Codec.DamagePartSpec
 import qualified Pawl.Codec.DamagePatternSpec
 import qualified Pawl.Codec.DamagePreventedSpec
 import qualified Pawl.Codec.DamageRSpec
@@ -647,6 +648,7 @@ spec s registry = do
   Pawl.Codec.DamageDirectionSpec.spec s
   Pawl.Codec.DamageEventSpec.spec s
   Pawl.Codec.DamageKindSpec.spec s
+  Pawl.Codec.DamagePartSpec.spec s
   Pawl.Codec.DamagePatternSpec.spec s
   Pawl.Codec.DamagePreventedSpec.spec s
   Pawl.Codec.DamageRSpec.spec s

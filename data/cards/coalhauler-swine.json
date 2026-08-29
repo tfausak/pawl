@@ -48,13 +48,15 @@
                       {
                         "type": "DealDamage",
                         "value": {
-                          "quantity": {
-                            "type": "InSlot",
-                            "value": "thatMuch"
-                          },
-                          "refs": [
+                          "parts": [
                             {
-                              "type": "EachPlayer"
+                              "quantity": {
+                                "type": "InSlot",
+                                "value": "thatMuch"
+                              },
+                              "ref": {
+                                "type": "EachPlayer"
+                              }
                             }
                           ]
                         }

@@ -62,6 +62,7 @@ import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
+import qualified Pawl.Types.DamagePart as DamagePart
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
@@ -1987,7 +1988,7 @@ rewriteEffect pairs effect = case effect of
   -- subtype word (#2420).
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     Effect.ModifyTarget (ModifyTarget.MkModifyTarget (rewriteDuration pairs duration) (rewriteModification pairs modification) (rewriteObjectRef pairs ref))
-  Effect.DealDamage (DealDamage.MkDealDamage refs quantity dealer excess) -> Effect.DealDamage (DealDamage.MkDealDamage (fmap (rewriteObjectRef pairs) refs) quantity dealer excess)
+  Effect.DealDamage (DealDamage.MkDealDamage parts dealer excess) -> Effect.DealDamage (DealDamage.MkDealDamage (fmap (\part -> part {DamagePart.ref = rewriteObjectRef pairs (DamagePart.ref part)}) parts) dealer excess)
   -- Two SlotNames and nothing else: no word a swap could reach.
   Effect.Fight _ -> effect
   -- CR 612.1: a text-changer's own restriction clause is text like any other.

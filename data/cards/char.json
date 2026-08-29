@@ -26,29 +26,26 @@
                   {
                     "type": "DealDamage",
                     "value": {
-                      "quantity": {
-                        "type": "Literal",
-                        "value": 4
-                      },
-                      "refs": [
+                      "parts": [
                         {
-                          "type": "InSlot",
-                          "value": "target"
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "type": "DealDamage",
-                    "value": {
-                      "quantity": {
-                        "type": "Literal",
-                        "value": 2
-                      },
-                      "refs": [
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 4
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
+                        },
                         {
-                          "type": "InSlot",
-                          "value": "you"
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 2
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "you"
+                          }
                         }
                       ]
                     }

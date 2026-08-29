@@ -40,35 +40,37 @@
                     "type": "DealDamage",
                     "value": {
                       "dealer": "target",
-                      "quantity": {
-                        "type": "AgainstSlot",
-                        "value": {
-                          "quantity": {
-                            "type": "Power"
-                          },
-                          "slot": "target"
-                        }
-                      },
-                      "refs": [
+                      "parts": [
                         {
-                          "type": "EachMatching",
-                          "value": {
-                            "type": "And",
-                            "value": [
-                              {
-                                "type": "HasCardType",
-                                "value": {
-                                  "type": "Creature"
-                                }
+                          "quantity": {
+                            "type": "AgainstSlot",
+                            "value": {
+                              "quantity": {
+                                "type": "Power"
                               },
-                              {
-                                "type": "Not",
-                                "value": {
-                                  "type": "IsBound",
-                                  "value": "target"
+                              "slot": "target"
+                            }
+                          },
+                          "ref": {
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Creature"
+                                  }
+                                },
+                                {
+                                  "type": "Not",
+                                  "value": {
+                                    "type": "IsBound",
+                                    "value": "target"
+                                  }
                                 }
-                              }
-                            ]
+                              ]
+                            }
                           }
                         }
                       ]

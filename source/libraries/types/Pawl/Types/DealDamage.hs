@@ -1,32 +1,26 @@
 module Pawl.Types.DealDamage where
 
 import qualified Data.Sequence as Seq
+import qualified Pawl.Types.DamagePart as DamagePart
 import qualified Pawl.Types.ExcessDestination as ExcessDestination
-import qualified Pawl.Types.ObjectRef as ObjectRef
-import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 
--- | CR 120.1: deal this much damage to the objects or players the ObjectRefs name.
+-- | CR 120.1: deal damage to the objects and players its clauses name.
 data DealDamage = MkDealDamage
-  { -- | WHICH RECIPIENTS, as one or more descriptions whose sets are dealt to
-    -- TOGETHER. Several rather than one because a printed sentence may name
-    -- objects and players at once and CR 608.2f makes that one action: Molten
-    -- Disaster's "each creature without flying and each player" is two
-    -- descriptions -- no single ObjectRef arm spans both sides -- and one damage
-    -- event batch, which is what a CR 615.7 shield covering a player and their
-    -- permanents can tell apart (Pawl.ReplacementSpec's Molten Disaster case).
+  { -- | THE SENTENCE'S CLAUSES (Pawl.Types.DamagePart), dealt TOGETHER: CR
+    -- 608.2f makes one instruction over several recipient descriptions a single
+    -- action. Molten Disaster's "each creature without flying and each player" is
+    -- two clauses sharing an amount -- no single ObjectRef arm spans both sides
+    -- -- and Char's "4 damage to any target and 2 damage to you" is two clauses
+    -- whose amounts differ; Pawl.ReplacementSpec's Molten Disaster and Char cases
+    -- prove each is one batch, which is what a CR 615.7 shield covering a player
+    -- and their permanents can tell apart.
     --
-    -- Nothing here deduplicates, so two descriptions naming one recipient would
-    -- deal it two events. The two cards in data/cards/ that write more than one
-    -- -- Molten Disaster and Soul Immolation -- name disjoint sets; a sentence
-    -- whose halves overlap would be the card that refutes this.
-    refs :: Seq.Seq ObjectRef.ObjectRef,
-    -- | HOW MUCH, read once per recipient rather than once for the set: Acidic
-    -- Soil's "each player equal to the number of lands they control" is a
-    -- different number per seat. Still one CR 608.2f batch -- see
-    -- Pawl.Engine.Resolve's arm, which reads every recipient's amount off the
-    -- same pre-effect state.
-    quantity :: Quantity.Quantity,
+    -- Nothing here deduplicates or sums: two clauses naming one recipient deal
+    -- it two events, which Char aimed at its own caster does. Whether the rules
+    -- make that one event of the total is unsettled (#2586); CR 615.7 cannot
+    -- tell the readings apart, counting amounts rather than events.
+    parts :: Seq.Seq DamagePart.DamagePart,
     -- | WHICH OBJECT DEALS IT -- CR 120.1's "an object that deals damage is the
     -- source of that damage", which CR 120.2b lets a spell or ability name for
     -- itself: "the spell or ability will specify which object deals that
@@ -47,11 +41,11 @@ data DealDamage = MkDealDamage
     -- ObjectId Pawl.Engine.Resolve hands it, so naming a different object here
     -- redirects every one of them at once.
     --
-    -- A SlotName rather than an ObjectRef, where `refs` above is the wider type:
-    -- a damage event has exactly ONE source (CR 120.1), and every dealer in the
-    -- pool is a single object named before the effect runs -- CR 115.10a's
-    -- distinction, which is exactly the InSlot arm's. A swept SET of dealers
-    -- would be a different sentence and no card in the pool writes one.
+    -- A SlotName rather than an ObjectRef, where a clause's ref above is the
+    -- wider type: a damage event has exactly ONE source (CR 120.1), and every
+    -- dealer in the pool is a single object named before the effect runs -- CR
+    -- 115.10a's distinction, which is exactly the InSlot arm's. A swept SET of
+    -- dealers would be a different sentence and no card in the pool writes one.
     --
     -- An empty slot deals nothing. The dealer of a printed card is a TARGET, so
     -- one that has become illegal (CR 608.2b) leaves the instruction with no

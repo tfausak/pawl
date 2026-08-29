@@ -55,6 +55,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterName as CounterName
+import qualified Pawl.Types.DamagePart as DamagePart
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
@@ -523,7 +524,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
               ActivatedAbility.modal =
                 singleModeAbility
-                  [Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x")))) (Quantity.Literal 1) Nothing Nothing)]
+                  [Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (DamagePart.MkDamagePart (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1))) Nothing Nothing)]
                   (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSlot.required Pool.AnyTarget Nothing)),
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing,

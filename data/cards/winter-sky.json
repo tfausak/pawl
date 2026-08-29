@@ -48,33 +48,30 @@
                   {
                     "type": "DealDamage",
                     "value": {
-                      "quantity": {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      "refs": [
+                      "parts": [
                         {
-                          "type": "EachMatching",
-                          "value": {
-                            "type": "HasCardType",
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "ref": {
+                            "type": "EachMatching",
                             "value": {
-                              "type": "Creature"
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
                             }
                           }
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "type": "DealDamage",
-                    "value": {
-                      "quantity": {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      "refs": [
+                        },
                         {
-                          "type": "EachPlayer"
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "ref": {
+                            "type": "EachPlayer"
+                          }
                         }
                       ]
                     }

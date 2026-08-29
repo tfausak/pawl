@@ -72,19 +72,21 @@
                         {
                           "type": "DealDamage",
                           "value": {
-                            "quantity": {
-                              "type": "AgainstSlot",
-                              "value": {
-                                "quantity": {
-                                  "type": "ManaValue"
-                                },
-                                "slot": "exiled"
-                              }
-                            },
-                            "refs": [
+                            "parts": [
                               {
-                                "type": "InSlot",
-                                "value": "victim"
+                                "quantity": {
+                                  "type": "AgainstSlot",
+                                  "value": {
+                                    "quantity": {
+                                      "type": "ManaValue"
+                                    },
+                                    "slot": "exiled"
+                                  }
+                                },
+                                "ref": {
+                                  "type": "InSlot",
+                                  "value": "victim"
+                                }
                               }
                             ]
                           }

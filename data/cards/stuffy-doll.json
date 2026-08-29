@@ -20,14 +20,16 @@
                       {
                         "type": "DealDamage",
                         "value": {
-                          "quantity": {
-                            "type": "Literal",
-                            "value": 1
-                          },
-                          "refs": [
+                          "parts": [
                             {
-                              "type": "InSlot",
-                              "value": "self"
+                              "quantity": {
+                                "type": "Literal",
+                                "value": 1
+                              },
+                              "ref": {
+                                "type": "InSlot",
+                                "value": "self"
+                              }
                             }
                           ]
                         }
@@ -89,13 +91,15 @@
                       {
                         "type": "DealDamage",
                         "value": {
-                          "quantity": {
-                            "type": "InSlot",
-                            "value": "thatMuch"
-                          },
-                          "refs": [
+                          "parts": [
                             {
-                              "type": "ChosenPlayer"
+                              "quantity": {
+                                "type": "InSlot",
+                                "value": "thatMuch"
+                              },
+                              "ref": {
+                                "type": "ChosenPlayer"
+                              }
                             }
                           ]
                         }

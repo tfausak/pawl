@@ -23,13 +23,15 @@
                       {
                         "type": "DealDamage",
                         "value": {
-                          "quantity": {
-                            "type": "Power"
-                          },
-                          "refs": [
+                          "parts": [
                             {
-                              "type": "InSlot",
-                              "value": "target"
+                              "quantity": {
+                                "type": "Power"
+                              },
+                              "ref": {
+                                "type": "InSlot",
+                                "value": "target"
+                              }
                             }
                           ]
                         }
