@@ -153,6 +153,18 @@ data View = MkView
     -- `attacking` is False for, and for an attacking creature whose AttackTarget
     -- is a player or a battle.
     attackingPlaneswalkerController :: Maybe PlayerId.PlayerId,
+    -- CR 310.9d: WHO PROTECTS the battle this candidate is attacking? The same
+    -- map's third arm, followed to the battle's protector -- so this and the two
+    -- fields above are disjoint by construction and each is one of CR 509.1a's
+    -- three subjects rather than CR 508.5's defending player.
+    --
+    -- The PROTECTOR, which CR 310.9d substitutes for the defending player while
+    -- the battle is attacked, and never the battle's controller: CR 310.12a puts
+    -- a Siege's protector among its controller's opponents, so the two seats
+    -- differ on every Siege. Nothing for every candidate `attacking` is False
+    -- for, for an attacking creature whose AttackTarget is a player or a
+    -- planeswalker, and for a battle mid-repair with no designation (CR 310.11).
+    attackingBattleProtector :: Maybe PlayerId.PlayerId,
     -- CR 508.3b: was this candidate DECLARED ATTACKED this COMBAT PHASE? Read
     -- from GameState.combat like `attacking`, off Combat.declaredAttacked -- the
     -- half of the record `declaredAttackerThisCombat` below reads the other half
@@ -548,6 +560,8 @@ playerView pid =
       attackingPlayer = Nothing,
       -- CR 506.3 a third time: a player attacks no planeswalker either.
       attackingPlaneswalkerController = Nothing,
+      -- CR 506.3 a fourth time: nor any battle.
+      attackingBattleProtector = Nothing,
       -- CR 508.3b lets a PLAYER be declared attacked, so unlike the field above
       -- this one asks a question a player candidate really can answer -- just not
       -- from here, this view being built from a PlayerId alone and holding no
@@ -1086,6 +1100,14 @@ matches context view predicate = case predicate of
   Filter.IsAttackingPlaneswalker relation -> case (attackingPlaneswalkerController view, perspective context) of
     (Just c, Just p) -> PlayerRelation.holds relation p c
     _ -> False
+  -- CR 310.9d: the last arm of AttackTarget, and the same posture again. The seat
+  -- compared is the battle's PROTECTOR, which Pawl.Engine.Projection fills through
+  -- Battle.protectorOf: reading the battle's CONTROLLER instead would answer a
+  -- different player for every Siege (CR 310.12a), which Pawl.BattleSpec's
+  -- Synthetic Bulwark Snare trio is the board for.
+  Filter.IsAttackingBattle relation -> case (attackingBattleProtector view, perspective context) of
+    (Just protector, Just p) -> PlayerRelation.holds relation p protector
+    _ -> False
   -- CR 509.1g: the same live read IsAttacking is, off the other map. Never the
   -- question Pawl.Engine.Combat.isBlocked asks: CR 509.1h keeps an attacker
   -- blocked after every creature blocking it has gone, so this can be False for
@@ -1314,6 +1336,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsAttacking -> predicate
   Filter.IsAttackingPlayer _ -> predicate
   Filter.IsAttackingPlaneswalker _ -> predicate
+  Filter.IsAttackingBattle _ -> predicate
   Filter.IsBlocking -> predicate
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
@@ -1723,6 +1746,7 @@ bakeBound players predicate = case predicate of
   Filter.IsAttacking -> predicate
   Filter.IsAttackingPlayer _ -> predicate
   Filter.IsAttackingPlaneswalker _ -> predicate
+  Filter.IsAttackingBattle _ -> predicate
   Filter.IsBlocking -> predicate
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
@@ -1834,6 +1858,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsAttacking -> []
   Filter.IsAttackingPlayer _ -> []
   Filter.IsAttackingPlaneswalker _ -> []
+  Filter.IsAttackingBattle _ -> []
   Filter.IsBlocking -> []
   Filter.IsBlocked -> []
   Filter.AttackedThisTurn -> []
@@ -1947,6 +1972,7 @@ statesAQuality predicate = case predicate of
   Filter.IsAttacking -> True
   Filter.IsAttackingPlayer _ -> True
   Filter.IsAttackingPlaneswalker _ -> True
+  Filter.IsAttackingBattle _ -> True
   Filter.IsBlocking -> True
   Filter.IsBlocked -> True
   Filter.AttackedThisTurn -> True

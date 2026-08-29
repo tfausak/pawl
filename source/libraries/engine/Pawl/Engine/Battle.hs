@@ -17,9 +17,11 @@
 -- needs as an argument, so a caller that has already projected does not pay for a
 -- second one. NOT Saga's reason -- rule 714's module is imported BY Projection,
 -- which calls Saga.entryReplacementsOf, so a dependency the other way really would
--- be a cycle there. Nothing in Projection calls this module: CR 310.4b's clause in
--- intrinsicReplacementsOf tests `Set.member CardType.Battle` inline, exactly as CR
--- 306.5b's planeswalker clause beside it tests its own card type.
+-- be a cycle there. Projection imports THIS module, for `protectorOf` alone:
+-- Filter.attackingBattleProtector is CR 310.9d's seat and this is where the
+-- designation is read. CR 310.4b's clause in intrinsicReplacementsOf still tests
+-- `Set.member CardType.Battle` inline, exactly as CR 306.5b's planeswalker clause
+-- beside it tests its own card type.
 --
 -- What a protector is FOR lives in Pawl.Engine.Combat, not here: CR 310.5's
 -- attackable battle (Combat.attackableBattles), CR 310.9b's "any attacking player

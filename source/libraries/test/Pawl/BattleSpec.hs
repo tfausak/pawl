@@ -19,10 +19,10 @@
 -- where a card reaches them: Pawl.Types.Defense, CounterKind.Defense,
 -- Event.designateProtector, Object.protector and AttackTarget.OfBattle.
 --
--- Invasion of Dominaria // Serra Faithkeeper is the whole card pool for this file,
--- and is the only battle in `data/cards`. {2}{W} Battle -- Siege, defense 5, "When
--- this Siege enters, you gain 4 life and draw a card", transforming into a 4/4
--- Angel with flying and vigilance.
+-- Invasion of Dominaria // Serra Faithkeeper is the battle every case here is
+-- built on, and is the only battle in `data/cards`. {2}{W} Battle -- Siege,
+-- defense 5, "When this Siege enters, you gain 4 life and draw a card",
+-- transforming into a 4/4 Angel with flying and vigilance.
 --
 -- It is deliberately not Invasion of Kaladesh. That card's front face is simpler
 -- still, but its BACK face is a Legendary Artifact -- Vehicle with a
@@ -38,6 +38,11 @@
 -- counters, CR 115.4's "any target" admitting one, CR 310.12b's intrinsic Siege
 -- ability, and CR 310.7 / 704.5v's and CR 310.8 / 704.5w's state-based actions.
 -- Those are damageSpec and defeatSpec below.
+--
+-- And CR 509.1a's third subject, "a battle they protect", which is a filter atom
+-- (Filter.IsAttackingBattle) rather than a rule of combat: filterSpec below, whose
+-- producer is the one SYNTHETIC card this file uses, Synthetic Bulwark Snare. That
+-- group's own comment records the Scryfall queries behind calling it synthetic.
 --
 -- Lightning Bolt ({R} Instant, "deals 3 damage to any target") and Firebolt ({R}
 -- Sorcery, "deals 2 damage to any target") are the pool's two plainest CR 115.4
@@ -58,6 +63,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Battle as Battle
@@ -73,7 +79,10 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as A
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -81,8 +90,10 @@ import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -107,6 +118,7 @@ spec s registry = Spec.describe s "Battle" $ do
   candidateSpec s registry
   repairSpec s registry
   attackSpec s registry
+  filterSpec s registry
   damageSpec s registry
   defeatSpec s registry
 
@@ -491,6 +503,117 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         checked = S.runPure S.identityAnswer gone Sba.checkStateBasedActions
     Spec.assertBool s (not (Battle.isBeingAttacked battle gone)) "nothing is attacking it"
     Spec.assertEqWith s "bob protects it now" (protectorOf battle checked) (Just S.bob)
+
+-- CR 509.1a's and CR 802.4a's THIRD subject -- "a battle they protect" -- through
+-- the filter atom that asks it, Filter.IsAttackingBattle. Rule 310 rather than
+-- rule 508, because CR 310.9d is the whole content of the atom: the seat it
+-- compares is the battle's PROTECTOR and not its controller.
+--
+-- The producer is SYNTHETIC, and no printing is being passed over. Scryfall
+-- o:"battle you protect" and o:"battles you protect", both with include:extras,
+-- returned nothing on 2026-08-29, and the four cards o:/attacking [a-z ]*battle/
+-- finds -- Rampaging Geoderm, Thrashing Frontliner, War Historian and
+-- War-Trained Slasher -- all ask about the battle alone with no protector in the
+-- sentence, and all as trigger or static conditions rather than as a filter over
+-- candidates. A printing writing this subject would refute that.
+--
+-- Synthetic Bulwark Snare is Soul Snare with CR 509.1a's third subject in place of
+-- its second: {W} Enchantment, "{W}, Sacrifice this enchantment: Exile target
+-- creature that's attacking you or a battle you protect."
+filterSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+filterSpec s registry = Spec.describe s "Filter" $ do
+  Spec.it s "CR 310.9d whole card: Synthetic Bulwark Snare reaches a creature attacking a battle you PROTECT" $ do
+    -- THREE Snares off ONE board, differing in exactly one thing: which seat fires
+    -- one. alice controls the Siege and attacks it with a Goblin Piker (CR
+    -- 310.9b's "notably"), carol protects it, bob is neither -- so the protector
+    -- and the controller are different players and neither is the other's
+    -- fallback. Each seat holds one Plains and one Snare, so the three legs cannot
+    -- differ in mana.
+    snare <- S.printingOf s registry snareName
+    (gs, battle, mine, theirs, hers) <-
+      battleCombatOf s registry S.carol S.carol ["Plains", "Goblin Piker", snareName] ["Plains", snareName] ["Plains", snareName]
+    case (Face.activatedAbilities (S.combinedFace snare), mine, theirs, hers) of
+      ([ability], [alicePlains, piker, aliceSnare], [bobPlains, bobSnare], [carolPlains, carolSnare]) -> do
+        let leg holder = runToEndOfCombat (snareAnswer battle holder ability piker) gs
+            protected = leg carolSnare
+            bystander = leg bobSnare
+            controlled = leg aliceSnare
+        -- GAMEPLAY FIRST, on the quantity the readings differ on: CR 310.6's
+        -- defense counters. The Piker is a 2/1 and the Siege prints defense 5, so
+        -- "the attacker was exiled" and "it connected" are 5 and 3.
+        Spec.assertEqWith s "CR 310.6: carol's Snare exiled the attacker, so the Siege's defense is untouched" (S.counterOf CounterKind.Defense battle protected) 5
+        Spec.assertEqWith s "protector: bob's Snare cannot name it, so the Piker's 2 comes off the Siege" (S.counterOf CounterKind.Defense battle bystander) 3
+        Spec.assertEqWith s "CR 310.9d: nor can alice's, though she CONTROLS the Siege" (S.counterOf CounterKind.Defense battle controlled) 3
+        Spec.assertBool s (not (S.onBattlefield piker protected)) "the Piker was exiled"
+        Spec.assertBool s (S.onBattlefield piker bystander) "protector: on bob's leg it is untouched"
+        Spec.assertBool s (S.onBattlefield piker controlled) "controller: on alice's leg too"
+        Spec.assertBool s (not (S.onBattlefield carolSnare protected)) "carol's Snare paid its own sacrifice, so the ability really was activated"
+        Spec.assertBool s (S.onBattlefield bobSnare bystander) "protector: bob's Snare is unsacrificed, so his was never activated"
+        Spec.assertBool s (S.onBattlefield aliceSnare controlled) "controller: alice's is unsacrificed too"
+        -- The negative legs failed on the FILTER and not for want of {W}: each
+        -- seat's Plains is still untapped, while carol's paid.
+        Spec.assertEqWith s "carol tapped her Plains for the activation" (fmap Object.tapped (Game.lookupObject carolPlains protected)) (Just TapState.Tapped)
+        Spec.assertEqWith s "bob never spent his" (fmap Object.tapped (Game.lookupObject bobPlains bystander)) (Just TapState.Untapped)
+        Spec.assertEqWith s "nor alice hers" (fmap Object.tapped (Game.lookupObject alicePlains controlled)) (Just TapState.Untapped)
+        -- Anti-vacuity, read on a leg where nothing was exiled: the Piker IS
+        -- attacking, and what it attacks is the Siege rather than a player.
+        Spec.assertEqWith
+          s
+          "CR 508.1b: the Piker really was announced at the Siege"
+          (Map.lookup piker (Combat.Type.attackers (GameState.combat bystander)))
+          (Just (AttackTarget.OfBattle battle))
+        -- The two seats the trio tells apart, and the reason they differ: CR
+        -- 310.12a puts a Siege's protector among its controller's opponents.
+        Spec.assertEqWith s "CR 310.9a: carol protects the Siege" (protectorOf battle bystander) (Just S.carol)
+        Spec.assertEqWith s "CR 310.12a: alice controls it, and is the player attacking it" (Projection.controllerOf battle bystander) (Just S.alice)
+      _ -> Spec.assertFailure s "fixture should have one ability, one Piker and three Snares"
+
+snareName :: String
+snareName = "Synthetic Bulwark Snare"
+
+-- Announce the attack at the battle, then fire `snare` at `victim` the first time
+-- the ability is offered -- which is once, since the activation sacrifices the
+-- enchantment, so a pure answerer needs no counter to stay honest.
+--
+-- The target set is FILTERED rather than replaced, so a leg whose slot does not
+-- admit the victim takes no target at all instead of quietly succeeding on a
+-- hand-built recipient -- and on such a leg the activation is never offered at
+-- all, CR 602.2b / 601.2c's target choice being part of what makes an ability
+-- activatable.
+snareAnswer ::
+  ObjectId.ObjectId ->
+  ObjectId.ObjectId ->
+  ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) ->
+  ObjectId.ObjectId ->
+  Prompt.Prompt r ->
+  r
+snareAnswer battle snare ability victim p = case p of
+  Prompt.ChooseAction _ _ actions
+    | elem (A.Activate snare ability) actions -> A.Activate snare ability
+    | otherwise -> A.Pass
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, rs) -> Set.filter (== Recipient.ToCreature victim) rs) sets
+  _ -> attackTheBattle battle p
+
+-- battleCombat's board wound forward to the END of combat under `answer`, so a
+-- card can act in the declare attackers step's priority round and CR 510 can then
+-- deal the damage. battleCombat parks the state in the declare attackers step with
+-- no later phases queued, so the walk needs them; the postcombat main phase is
+-- there only as a terminator, S.runToStep stopping on the end of combat step
+-- before running it (CR 511.3 keeps the creature attacking for the whole of it).
+runToEndOfCombat :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+runToEndOfCombat answer gs =
+  S.runToStep
+    (Phase.Combat CombatStep.EndOfCombat)
+    answer
+    gs
+      { GameState.remaining =
+          Seq.fromList
+            [ Phase.Combat CombatStep.DeclareBlockers,
+              Phase.Combat CombatStep.CombatDamage,
+              Phase.Combat CombatStep.EndOfCombat,
+              Phase.PostcombatMain
+            ]
+      }
 
 -- CR 310.6 / CR 120.3h: damage dealt to a battle removes that many defense
 -- counters, and CR 115.4 is what lets a damage spell name one.

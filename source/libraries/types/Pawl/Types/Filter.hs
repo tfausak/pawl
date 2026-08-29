@@ -490,9 +490,8 @@ data Filter keyword
     -- answers CR 508.5 and therefore folds all three together -- is the wrong
     -- function to answer this with.
     --
-    -- The second of that list is IsAttackingPlaneswalker below.
-    --
-    -- Not implemented: "attacking a battle you protect", the third (#2616).
+    -- The second of that list is IsAttackingPlaneswalker below, the third
+    -- IsAttackingBattle after it.
     --
     -- Carries a PlayerRelation rather than being a nullary IsAttackingYou,
     -- because the pool wants the other direction too -- Roar of Resistance's
@@ -517,6 +516,17 @@ data Filter keyword
     -- attacking a planeswalker you CONTROL" proves off a Confiscated planeswalker,
     -- the two readings naming different seats there.
     IsAttackingPlaneswalker PlayerRelation.PlayerRelation
+  | -- | CR 508.1b: the candidate is an attacking creature AND the PROTECTOR of
+    -- the battle it is attacking stands in this relation to the perspective (CR
+    -- 109.5's "you"), the third subject of CR 509.1a's and CR 802.4a's list.
+    --
+    -- CR 310.9d's PROTECTOR and never the battle's controller, which CR 310.12a
+    -- makes different players for every Siege, and which
+    -- Pawl.BattleSpec's "CR 310.9d whole card: Synthetic Bulwark Snare reaches a
+    -- creature attacking a battle you PROTECT" proves: the Siege's controller is
+    -- the attacking player there, so a controller-reading engine answers the
+    -- three seats the other way round.
+    IsAttackingBattle PlayerRelation.PlayerRelation
   | -- | CR 508.3b / 508.1b: the candidate WAS DECLARED ATTACKED this COMBAT
     -- PHASE -- one or more creatures were declared as attackers attacking it.
     -- DeclaredAttackerThisCombat's mirror: that atom asks whether the candidate
