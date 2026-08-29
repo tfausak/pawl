@@ -1990,10 +1990,10 @@ rewritePlayerEffect pairs effect = case effect of
 rewriteEffect :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 rewriteEffect pairs effect = case effect of
   -- CR 612.1 / 612.3 through rewriteModification, whose other arms Tidal Warrior
-  -- proves and whose GRANT arm Presence of Gond proves. What no pooled card
-  -- proves is the two together -- a text change reaching a quoted ability a
-  -- RESOLUTION granted -- since the one card that grants on resolution quotes no
-  -- subtype word (#2420).
+  -- proves and whose GRANT arm Presence of Gond proves. The two together -- a
+  -- text change reaching a quoted ability a RESOLUTION granted -- is proved by
+  -- Pawl.CounterspellSpec's evolved Clavileño, whose granted dies trigger mints a
+  -- Vampire Elf Token where the printed word says Demon.
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     Effect.ModifyTarget (ModifyTarget.MkModifyTarget (rewriteDuration pairs duration) (rewriteModification pairs modification) (rewriteObjectRef pairs ref))
   -- CR 612.1 through BOTH halves of every clause: the recipient's ref, and the
