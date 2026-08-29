@@ -61,8 +61,11 @@
             "targetSlots": {
               "artifact": {
                 "count": {
-                  "least": 0,
-                  "most": 1
+                  "type": "Printed",
+                  "value": {
+                    "least": 0,
+                    "most": 1
+                  }
                 },
                 "filter": {
                   "type": "HasCardType",
@@ -76,8 +79,11 @@
               },
               "creature": {
                 "count": {
-                  "least": 0,
-                  "most": 1
+                  "type": "Printed",
+                  "value": {
+                    "least": 0,
+                    "most": 1
+                  }
                 },
                 "pool": {
                   "type": "Creatures"

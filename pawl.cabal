@@ -704,6 +704,8 @@ library codec
     Pawl.Codec.SicknessSpec
     Pawl.Codec.SkipNextPhase
     Pawl.Codec.SkipNextPhaseSpec
+    Pawl.Codec.SlotCount
+    Pawl.Codec.SlotCountSpec
     Pawl.Codec.SlotName
     Pawl.Codec.SlotNameSpec
     Pawl.Codec.Source
@@ -1604,6 +1606,7 @@ library types
     Pawl.Types.Sickness
     Pawl.Types.SkipNextPhase
     Pawl.Types.SlotArity
+    Pawl.Types.SlotCount
     Pawl.Types.SlotName
     Pawl.Types.Source
     Pawl.Types.SpecialAction

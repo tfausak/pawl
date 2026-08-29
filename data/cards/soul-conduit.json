@@ -35,8 +35,11 @@
                 "targetSlots": {
                   "players": {
                     "count": {
-                      "least": 2,
-                      "most": 2
+                      "type": "Printed",
+                      "value": {
+                        "least": 2,
+                        "most": 2
+                      }
                     },
                     "pool": {
                       "type": "Players"

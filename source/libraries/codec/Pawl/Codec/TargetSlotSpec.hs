@@ -60,13 +60,21 @@ spec s = Spec.describe s "Pawl.Codec.TargetSlot" $ do
       s
       TargetSlot.codec
       (TargetSlot.upTo 1 Pool.Creatures Nothing)
-      " {\"pool\":{\"type\":\"Creatures\"},\"count\":{\"least\":0,\"most\":1}} "
+      " {\"pool\":{\"type\":\"Creatures\"},\"count\":{\"type\":\"Printed\",\"value\":{\"least\":0,\"most\":1}}} "
   Spec.it s "an up-to-two spec" $
     Common.assertCodec
       s
       TargetSlot.codec
       (TargetSlot.upTo 2 Pool.Creatures Nothing)
-      " {\"pool\":{\"type\":\"Creatures\"},\"count\":{\"least\":0,\"most\":2}} "
+      " {\"pool\":{\"type\":\"Creatures\"},\"count\":{\"type\":\"Printed\",\"value\":{\"least\":0,\"most\":2}}} "
+  -- CR 601.2c's variable number of targets: the count is the X announced at CR
+  -- 601.2b rather than anything printed (Rot-Curse Rakshasa).
+  Spec.it s "a spec counting the announced X" $
+    Common.assertCodec
+      s
+      TargetSlot.codec
+      (TargetSlot.announcedX Pool.Creatures Nothing)
+      " {\"pool\":{\"type\":\"Creatures\"},\"count\":{\"type\":\"AnnouncedX\"}} "
   -- The slot-keyed map is a JSON OBJECT keyed by the slot name (#1303). The two
   -- entries are inserted in DESCENDING slot-name order, so a trip that emitted
   -- the map's incidental traversal order rather than Map.toAscList fails this

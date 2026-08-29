@@ -5,6 +5,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.SlotCount as SlotCount
 import qualified Pawl.Types.TargetCount as TargetCount
 
 -- | What a target slot may hold: a closed Pool of candidate recipients (CR 115),
@@ -29,8 +30,8 @@ import qualified Pawl.Types.TargetCount as TargetCount
 -- judged whole.
 --
 -- HOW MANY the slot takes is the `count` field (CR 601.2c), which covers CR
--- 115.6's "up to one", every larger count, and "any number of target ..." with
--- one range -- the last by naming no maximum. On the slot and not
+-- 115.6's "up to one", every larger count, "any number of target ..." -- that
+-- one by naming no maximum -- and CR 601.2b's announced X. On the slot and not
 -- on the mode, because a card makes the call per slot -- Explosive Entry's
 -- artifact and creature slots are separately optional.
 --
@@ -38,7 +39,7 @@ import qualified Pawl.Types.TargetCount as TargetCount
 data TargetSlot = MkTargetSlot
   { pool :: Pool.Pool,
     filter :: Maybe (Filter.Filter Keyword.Keyword),
-    count :: TargetCount.TargetCount,
+    count :: SlotCount.SlotCount,
     -- | CR 202.3 / 601.2c: the COMPUTED number this slot's Filter compares a
     -- candidate's mana value against -- Celestine, the Living Saint's "creature
     -- card with mana value X or less ... where X is the amount of life you gained
@@ -76,17 +77,22 @@ data TargetSlot = MkTargetSlot
 -- almost every slot in the engine and the corpus is one, so writing the count out
 -- at each would bury the handful that are not.
 required :: Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
-required p f = MkTargetSlot p f TargetCount.one Nothing
+required p f = MkTargetSlot p f (SlotCount.Printed TargetCount.one) Nothing
 
 -- CR 115.6 / 601.2c's "up to N targets": a slot the caster may fill any number of
 -- times up to N, the empty answer included.
 upTo :: Natural.Natural -> Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
-upTo n p f = MkTargetSlot p f (TargetCount.upTo n) Nothing
+upTo n p f = MkTargetSlot p f (SlotCount.Printed (TargetCount.upTo n)) Nothing
 
 -- CR 601.2c's "any number of target ...": the same slot with no printed ceiling,
 -- so the board's candidates are the only bound.
 anyNumber :: Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
-anyNumber p f = MkTargetSlot p f TargetCount.anyNumber Nothing
+anyNumber p f = MkTargetSlot p f (SlotCount.Printed TargetCount.anyNumber) Nothing
+
+-- CR 601.2c with CR 601.2b: a slot taking exactly the X the caster announced
+-- ("each of X target creatures", Rot-Curse Rakshasa).
+announcedX :: Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
+announcedX p f = MkTargetSlot p f SlotCount.AnnouncedX Nothing
 
 -- CR 601.2c: the same slot with the computed bound its Filter compares against --
 -- see `amount` above. Separate from the three builders so that the slots that

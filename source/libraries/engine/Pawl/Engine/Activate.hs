@@ -743,8 +743,8 @@ activateAbility pid srcId ability = do
           -- the player who CAST a spell announced, and no rule asks the same of
           -- an activation cost.
           (announcedCost, _) <- Cost.announce (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
-          chosen <- Target.chooseTargets decider pid abilId slots sets
-          if not (Target.selectionLegal (Just pid) srcId slots sets chosen gs)
+          chosen <- Target.chooseTargets decider pid abilId (Maybe.fromMaybe 0 mAmount) slots sets
+          if not (Target.selectionLegal (Just pid) srcId (Maybe.fromMaybe 0 mAmount) slots sets chosen gs)
             then State.put before -- reject: the whole activation is a no-op
             else do
               -- CR 113.7: bind the source permanent under the reserved self slot, so

@@ -4,17 +4,21 @@
       "activatedAbilities": [
         {
           "cost": {
+            "components": [
+              {
+                "type": "ExileThisFromGraveyard"
+              }
+            ],
             "mana": [
               {
-                "type": "Generic",
-                "value": 4
+                "type": "Variable"
               },
               {
                 "type": "OfType",
                 "value": {
                   "type": "Colored",
                   "value": {
-                    "type": "Green"
+                    "type": "Black"
                   }
                 }
               },
@@ -23,7 +27,7 @@
                 "value": {
                   "type": "Colored",
                   "value": {
-                    "type": "White"
+                    "type": "Black"
                   }
                 }
               }
@@ -39,7 +43,10 @@
                         "type": "PutCounters",
                         "value": {
                           "kind": {
-                            "type": "PlusOnePlusOne"
+                            "type": "Keyword",
+                            "value": {
+                              "type": "Decayed"
+                            }
                           },
                           "quantity": {
                             "type": "Literal",
@@ -57,17 +64,7 @@
                 "targetSlots": {
                   "creatures": {
                     "count": {
-                      "type": "Printed",
-                      "value": {
-                        "least": 0,
-                        "most": 2
-                      }
-                    },
-                    "filter": {
-                      "type": "Not",
-                      "value": {
-                        "type": "IsSource"
-                      }
+                      "type": "AnnouncedX"
                     },
                     "pool": {
                       "type": "Creatures"
@@ -76,7 +73,20 @@
                 }
               }
             ]
-          }
+          },
+          "restrictions": [
+            {
+              "type": "SorcerySpeed"
+            }
+          ]
+        }
+      ],
+      "keywords": [
+        {
+          "type": "Trample"
+        },
+        {
+          "type": "Decayed"
         }
       ],
       "manaCost": [
@@ -89,39 +99,24 @@
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Green"
-            }
-          }
-        },
-        {
-          "type": "OfType",
-          "value": {
-            "type": "Colored",
-            "value": {
-              "type": "White"
+              "type": "Black"
             }
           }
         }
       ],
-      "name": "Joraga Auxiliary",
+      "name": "Rot-Curse Rakshasa",
       "power": {
         "type": "Literal",
-        "value": 2
+        "value": 5
       },
       "toughness": {
         "type": "Literal",
-        "value": 3
+        "value": 5
       },
       "typeLine": {
         "subtypes": [
           {
-            "type": "Ally"
-          },
-          {
-            "type": "Elf"
-          },
-          {
-            "type": "Soldier"
+            "type": "Demon"
           }
         ],
         "types": [
