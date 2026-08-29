@@ -22,6 +22,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
@@ -643,6 +644,49 @@ spec s registry = Spec.describe s "Meld" $ do
           -- different cards, and the meld recorded them in this order.
           Spec.assertEqWith s "setup: the components are the Garrison then the Battlements" [nameOf firstPid, nameOf secondPid] [Just (S.nameOf (Printing.card garrison)), Just (S.nameOf (Printing.card battlements))]
         other -> Spec.assertFailure s ("expected two components, got " <> show (length other))
+  -- CR 712.21a: "if a melded permanent is put into its owner's graveyard or
+  -- library, that player may arrange the two cards in any order. If it's put
+  -- into its owner's library, that player doesn't reveal the order."
+  --
+  -- Griptide -- "put target creature on top of its owner's library" -- is the
+  -- pool's producer for that destination, and a DRAW is what makes the
+  -- arrangement observable without revealing it: the rule keeps the order
+  -- secret, but the card alice draws next is the one she put on top.
+  --
+  -- TWO BOARDS DIFFERING IN EXACTLY ONE THING, which is what makes the pair
+  -- discriminating: the same meld, the same Griptide, the same draw, and only
+  -- the permutation alice answers with changes. An engine that never asked
+  -- would draw the same card both times.
+  --
+  -- Pawl.Engine.Game.insertIntoZone PREPENDS a LibraryPosition.Top arrival, so
+  -- the card put down SECOND is the one on top -- which is why the identity
+  -- answer, the order the pair melded in, draws the Battlements.
+  Spec.it s "CR 712.21a the owner arranges the two cards her melded permanent becomes on top of her library" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    griptide <- S.printingOf s registry "Griptide"
+    let (mMelded, base) = meldedThrough (Setup.emptyGame S.bothPlayers) battlements garrison mountain
+        (griptideId, withSpell) = S.addHandCard griptide S.alice base
+        board = S.landsFor island S.alice 4 withSpell
+    case mMelded of
+      Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
+      Just meldedId -> do
+        let bounced order = S.runPure (arranging meldedId order) board (do S.cast S.alice griptideId; Stack.resolveTop)
+            drawn order = S.runPure (arranging meldedId order) (bounced order) (Event.drawCard S.alice)
+            handNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Hand S.alice gs)
+        Spec.assertEqWith s "CR 712.21a the melded order puts the Garrison down first, so alice draws the Battlements" (handNames (drawn [0, 1])) [S.printingName battlements]
+        Spec.assertEqWith s "CR 712.21a and the arrangement alice chose instead puts the Garrison on top" (handNames (drawn [1, 0])) [S.printingName garrison]
+        -- The proxies behind those, kept AFTER them: both cards really did reach
+        -- alice's library, her hand was empty for the draw to fill, and the
+        -- melded permanent really left the battlefield -- so the names above are
+        -- the arrangement's work and not a Griptide that fizzled.
+        Spec.assertEqWith s "CR 712.21 two cards are put into alice's library" (List.sort (libraryNames (bounced [0, 1]))) (List.sort [S.printingName battlements, S.printingName garrison])
+        Spec.assertEqWith s "and the same two whichever arrangement she chose" (List.sort (libraryNames (bounced [1, 0]))) (List.sort [S.printingName battlements, S.printingName garrison])
+        Spec.assertEqWith s "setup: alice's hand was empty once the Griptide had been cast" (handNames (bounced [0, 1])) []
+        Spec.assertEqWith s "setup: the melded permanent left the battlefield" (Game.lookupObject meldedId (bounced [0, 1])) Nothing
+        Spec.assertEqWith s "setup: alice's library was empty before it went there" (libraryNames board) []
 
 -- CR 701.27a as ONE instruction over the named permanents (CR 608.2f), through
 -- the opcode a card's "transform target permanent" reaches: the slot the effect
@@ -723,6 +767,21 @@ choosing wanted p = case p of
   Prompt.ChoosePermanent _ _ _ candidates
     | List.elem wanted (NonEmpty.toList candidates) -> wanted
   _ -> S.identityAnswer p
+
+-- CR 712.21a's arrangement pinned by INDEX, over a board whose Griptide aims at
+-- the melded permanent by identity. The permutation is the one thing a caller
+-- varies; every other prompt -- the target, the mana -- is answered the same way
+-- for both, so the two runs differ in the arrangement alone.
+arranging :: ObjectId.ObjectId -> [Natural.Natural] -> Prompt.Prompt r -> r
+arranging victim order p = case p of
+  Prompt.ChooseTargets _ _ _ offered -> S.preferring (\r -> Recipient.objectOf r == Just victim) offered
+  Prompt.OrderComponentCards {} -> order
+  _ -> S.identityAnswer p
+
+-- graveyardNames' library twin, ordered TOP FIRST as Pawl.Engine.Game.zoneMembers
+-- answers it -- which is the order CR 712.21a's arrangement decides.
+libraryNames :: GameState.GameState -> [CardName.CardName]
+libraryNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Library S.alice gs)
 
 -- Accepts CR 903.9a's offer; everything else is the identity answerer. The
 -- default LEAVES the commander where it is, so the CR 903.9a case has to say so.

@@ -3847,22 +3847,26 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- destination and an owner rather than card-ness, so it applies to
               -- the melded permanent and both cards follow it to exile.
               --
-              -- Not implemented: CR 712.21a's arrangement of the two cards in a
-              -- graveyard or library by their owner (#2507), and CR 712.21b's
-              -- relative timestamp order on exile (#2508) -- they arrive in the
-              -- order Game.componentsOf names, which is the order they melded
-              -- in.
+              -- Not implemented: CR 712.21b's relative timestamp order on exile,
+              -- which is the EXILING player's and not the owner's -- the two
+              -- cards are stamped in the order arrangeComponents leaves them,
+              -- which on that path is the order they melded in (#2508).
               let components = if fromZone /= Zone.Battlefield || dest == Zone.Battlefield then Seq.empty else Game.componentsOf (Object.source obj)
-                  (leading, trailing) = case Seq.viewl components of
-                    Seq.EmptyL -> (Nothing, Seq.empty)
-                    c Seq.:< cs -> (Just c, cs)
                   asComponent mComponent ts = case mComponent of
                     Nothing -> mkObj entrySeed ts
                     Just component -> (mkObj entrySeed ts) {Object.source = Source.OfCard component}
+              -- CR 712.21a, asked BEFORE the first placeObject: the arrangement is
+              -- the order the cards are put down in, so nothing can be placed
+              -- until it is settled.
+              arranged <- arrangeComponents pid dest components
+              let (leading, trailing) = case Seq.viewl arranged of
+                    Seq.EmptyL -> (Nothing, Seq.empty)
+                    c Seq.:< cs -> (Just c, cs)
               newId <- placeObject pid (asComponent leading) dest position
               trailingIds <- Monad.forM trailing (\component -> placeObject pid (asComponent (Just component)) dest position)
               -- `newId` heads the answer, so a caller that can only act on one
-              -- object acts on the first card the meld recorded.
+              -- object acts on the first card the arrangement named -- the first
+              -- the meld recorded, where nobody was asked for one.
               let arrivals = newId Seq.<| trailingIds
               -- CR 400.7a, and BEFORE the entry loop below rather than after this
               -- funnel returns: CR 614.12 decides an entry row against "continuous
@@ -4021,6 +4025,39 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     Moved.others = trailingIds
                   }
               pure arrivals
+
+-- CR 712.21a: "if a melded permanent is put into its owner's graveyard or
+-- library, that player may arrange the two cards in any order." Answers the
+-- components in the order they are to be PUT INTO the zone;
+-- Prompt.OrderComponentCards says how that maps onto which card ends up on top.
+--
+-- The OWNER is asked, which is the rule's "that player": the sentence's subject
+-- is the melded permanent put into ITS OWNER's graveyard or library, and
+-- changeZoneAttaching's `pid` is Object.owner for exactly the reason
+-- Game.insertIntoZone keys those two zones by it (CR 400.3).
+--
+-- Read off `dest` and never off the source's identity: the two named zones are
+-- the rule's own condition, and CR 730.3a restates the whole sentence for a
+-- merged permanent (#874), which reaches this through the same Seq.
+--
+-- Exile is NOT here. CR 712.21b gives that case to the EXILING player and asks
+-- about relative timestamps rather than an arrangement, so it is a different
+-- question of a different player (#2508).
+--
+-- Not asked for fewer than two cards, which is not an elision: with one card
+-- there is one arrangement, and with none there is nothing to arrange.
+--
+-- FILTERED, NOT TRUSTED: Game.permute keeps the melded order for an answer that
+-- is not a permutation of the offered indices.
+arrangeComponents :: PlayerId -> Zone -> Seq.Seq PrintingId.PrintingId -> Game (Seq.Seq PrintingId.PrintingId)
+arrangeComponents pid dest components =
+  if Seq.length components < 2 || (dest /= Zone.Graveyard && dest /= Zone.Library)
+    then pure components
+    else do
+      gs <- State.get
+      let offered = Foldable.toList components
+      answer <- Game.choose (Prompt.OrderComponentCards (Decide.deciderFor pid gs) pid dest offered)
+      pure (Seq.fromList (Game.permute offered answer))
 
 -- CR 400.7a: effects that change a permanent spell's characteristics or
 -- controller keep applying to the permanent it becomes. CR 400.7 mints a fresh

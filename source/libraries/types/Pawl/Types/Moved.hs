@@ -29,8 +29,9 @@ data Moved = MkMoved
     -- which Pawl.Engine.Event.eventBindings reads through `arrivals`.
     --
     -- A Seq and not a Set: the order is the one the cards arrived in, which is
-    -- the order they melded in (CR 712.21a's arrangement is not implemented,
-    -- #2507).
+    -- CR 712.21a's arrangement where the owner was asked for one
+    -- (Pawl.Engine.Event.arrangeComponents) and the order they melded in
+    -- otherwise.
     others :: Seq.Seq ObjectId.ObjectId
   }
   deriving (Eq, Ord, Show)
