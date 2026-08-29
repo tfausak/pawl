@@ -165,6 +165,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.ExileTopFromGraveyard (Filter.HasCardType CardType.Creature))
       " {\"type\":\"ExileTopFromGraveyard\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+  -- CR 118.12's hand-to-battlefield cost: a bare criterion, one card.
+  Spec.it s "PutCardFromHandOntoBattlefield" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.PutCardFromHandOntoBattlefield (Filter.HasCardType CardType.Land))
+      " {\"type\":\"PutCardFromHandOntoBattlefield\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}} "
   -- CR 701.17a as a cost: a bare count, the cards coming off the top with
   -- nothing to choose.
   Spec.it s "MillCards" $

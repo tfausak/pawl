@@ -1573,17 +1573,19 @@ rewriteKeyword pairs keyword = case keyword of
 rewriteCost :: [(Subtype.Subtype, Subtype.Subtype)] -> Cost.Cost Keyword.Type.Keyword -> Cost.Cost Keyword.Type.Keyword
 rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (Cost.components cost)}
 
--- rewriteCost's per-component half. Six components carry a Filter and are the
--- six that descend; the rest name a number, or the object the cost is on, and
+-- rewriteCost's per-component half. The components that carry a Filter are the
+-- ones that descend; the rest name a number, or the object the cost is on, and
 -- CR 612.2 finds no word in them to swap.
 --
--- Of the six, only Sacrifice has a producer: Dark Heart of the Wood on an
+-- Of those, only Sacrifice has a producer: Dark Heart of the Wood on an
 -- activation cost, and Lithophage on the cost a trigger offers as it resolves
 -- (CR 118.12). The TapForTotalPower, TapPermanents, DiscardCards,
--- ExileCardsFromGraveyard and ExileTopFromGraveyard arms are a regression fence:
--- no printing pairs any of them with a basic land type, so no test can falsify
--- them. Magmatic Insight's "a land card" comes closest and is still not one --
--- CR 612.2 swaps a SUBTYPE word, and the land CARD TYPE is not one.
+-- ExileCardsFromGraveyard, ExileTopFromGraveyard and
+-- PutCardFromHandOntoBattlefield arms are a regression fence: no printing pairs
+-- any of them with a basic land type, so no test can falsify them. Magmatic
+-- Insight's "discard a land card" and Hakbal of the Surging Soul's "a land card
+-- from your hand" come closest and are still not one -- CR 612.2 swaps a SUBTYPE
+-- word, and the land CARD TYPE is not one.
 rewriteComponent :: [(Subtype.Subtype, Subtype.Subtype)] -> CostComponent.CostComponent Keyword.Type.Keyword -> CostComponent.CostComponent Keyword.Type.Keyword
 rewriteComponent pairs component = case component of
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) -> CostComponent.Sacrifice (Sacrifice.MkSacrifice n (rewrite pairs criterion))
@@ -1592,6 +1594,7 @@ rewriteComponent pairs component = case component of
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) -> CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n (rewrite pairs criterion))
   CostComponent.ExileTopFromGraveyard criterion -> CostComponent.ExileTopFromGraveyard (rewrite pairs criterion)
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) -> CostComponent.DiscardCards (DiscardCards.MkDiscardCards n (rewrite pairs criterion))
+  CostComponent.PutCardFromHandOntoBattlefield criterion -> CostComponent.PutCardFromHandOntoBattlefield (rewrite pairs criterion)
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component
   CostComponent.SacrificeThis -> component

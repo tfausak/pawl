@@ -8,6 +8,7 @@ module Pawl.CounterspellSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -16,6 +17,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -1205,6 +1207,143 @@ fortressKinGuardSpec s registry = Spec.describe s "FortressKinGuard" $ do
     Spec.assertEqWith s "and the Spirit was created anyway" (length (S.tokensOf after)) 1
     Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
 
+-- CR 118.12 over a cost that moves a CARD rather than spending a resource:
+-- Hakbal of the Surging Soul's "whenever Hakbal attacks, you may put a land card
+-- from your hand onto the battlefield. If you don't, draw a card"
+-- (CostComponent.PutCardFromHandOntoBattlefield, under PayBranch.IfNotPaid).
+-- Merfolk Seer's shape one component over, and the three cases are that group's
+-- three: paid, declined, and unpayable.
+--
+-- alice's hand is a Mountain, a Forest and a Goblin Piker. TWO lands, so the
+-- payment is a real choice and the engine has to raise Prompt.ChooseCardInHand
+-- rather than short-circuiting at one candidate; the Piker is the criterion's
+-- own control, since a filter that admitted it would put a creature onto the
+-- battlefield. The answerer names the MOUNTAIN, which is NOT the head of the
+-- offered list -- Replay's own fallback for this prompt is the head, so an
+-- implementation that dropped the answer would put the Forest there -- and the
+-- Forest left behind is what makes "the land she chose" an assertion rather than
+-- "a land".
+--
+-- Her library is a Bird Maiden over a Darksteel Myr, given deepest first since
+-- both builders PREPEND: distinct from everything in hand, so "she drew" names a
+-- card rather than counting one, and two deep so no case decks her (CR 104.3c).
+--
+-- Everything is asserted by NAME rather than by an id the fixture held: CR 400.7
+-- mints a new object for the land on its way to the battlefield and for the card
+-- on its way out of the library.
+--
+-- THE COMPETING READING these cases rule out is that the draw is unconditional
+-- and the land merely offered beside it. The first case has alice NOT draw --
+-- her library is untouched -- where the second and third do.
+hakbalAttacking :: Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> GameState.GameState
+hakbalAttacking hakbal inHand inLibrary =
+  let (base, _, _) = S.combatBoardOf [hakbal] []
+      withHand = List.foldl' (\g p -> snd (S.addHandCard p S.alice g)) base inHand
+      withLibrary = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) withHand inLibrary
+   in -- Declared under aggressiveAnswer, which attacks with everything; the
+      -- settle is what puts the CR 508.2b attack trigger onto the stack, so a
+      -- case can resolve it under its own interpreter.
+      S.runPure S.aggressiveAnswer withLibrary (Combat.declareAttackers S.alice >> Engine.settleForPriority)
+
+-- paysFor, plus a pinned answer to the card the payment offers: `which` when it
+-- was offered, and the head otherwise -- the liar pattern, so a case that reads
+-- back `which` is reading the engine's own offer rather than the fallback.
+paysWith :: PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+paysWith who which p = case p of
+  Prompt.ChooseCardInHand (Decider.MkDecider d) player _ candidates
+    | d == who && player == who && List.elem which (NonEmpty.toList candidates) ->
+        which
+  _ -> paysFor who p
+
+-- The hand-card answers in a transcript, in order.
+handCardResponses :: [Response.Response] -> [Response.Response]
+handCardResponses = filter isHandCardResponse
+
+isHandCardResponse :: Response.Response -> Bool
+isHandCardResponse response = case response of
+  Response.ChoseCardInHand _ -> True
+  _ -> False
+
+hakbalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hakbalSpec s registry = Spec.describe s "Hakbal" $ do
+  Spec.it s "CR 118.12 putting the land from hand onto the battlefield draws nothing" $ do
+    hakbal <- S.printingOf s registry "Hakbal of the Surging Soul"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    myr <- S.printingOf s registry "Darksteel Myr"
+    let attacking = hakbalAttacking hakbal [mountain, forest, piker] [myr, maiden]
+        -- Both builders PREPEND, so her hand reads Piker, Forest, Mountain and
+        -- the offered lands are Forest then Mountain. The Mountain is the LAST,
+        -- which is what makes it not the fallback.
+        mountainId = case reverse (Game.zoneMembers Zone.Hand S.alice attacking) of
+          last_ : _ -> last_
+          [] -> ObjectId.MkObjectId 0
+        ((_, after), transcript) = Replay.record (paysWith S.alice mountainId) attacking Stack.resolveTop
+    -- The two controls: Hakbal really attacked, and its trigger really reached
+    -- the stack. Without them the assertions below would be about nothing.
+    Spec.assertEqWith s "Hakbal was declared as an attacker" (length (S.attackerDeclarationsOf attacking)) 1
+    Spec.assertEqWith s "and the attack trigger reached the stack" (length (GameState.stack attacking)) 1
+    -- The gameplay assertion, ahead of every proxy: the land she NAMED is on the
+    -- battlefield and the other one is not.
+    Spec.assertEqWith
+      s
+      "the Mountain she chose is on the battlefield, and the Forest is not"
+      (length (byNameOnBattlefield "Mountain" after), length (byNameOnBattlefield "Forest" after))
+      (1, 0)
+    -- CR 118.12's other half: the draw belongs to the branch she did NOT take.
+    Spec.assertEqWith s "and no card was drawn: her library still holds both" (length (Game.zoneMembers Zone.Library S.alice after)) 2
+    Spec.assertEqWith s "her hand is the Piker and the Forest" (namesIn Zone.Hand S.alice after) [Just (S.printingName piker), Just (S.printingName forest)]
+    Spec.assertEqWith s "alice was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+    Spec.assertEqWith s "and named the Mountain, not the Forest the fallback would take" (handCardResponses transcript) [Response.ChoseCardInHand mountainId]
+    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
+  -- The same board, the same trigger, and NOTHING different but the answer.
+  Spec.it s "CR 118.12a declining draws a card and leaves both lands in hand" $ do
+    hakbal <- S.printingOf s registry "Hakbal of the Surging Soul"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    myr <- S.printingOf s registry "Darksteel Myr"
+    let attacking = hakbalAttacking hakbal [mountain, forest, piker] [myr, maiden]
+        ((_, after), transcript) = Replay.record S.identityAnswer attacking Stack.resolveTop
+    -- The gameplay assertion first: the drawn card is NAMED, so this is the top
+    -- of her library arriving and not a count.
+    Spec.assertEqWith
+      s
+      "her hand gained the Bird Maiden off the top"
+      (namesIn Zone.Hand S.alice after)
+      [Just (S.printingName piker), Just (S.printingName forest), Just (S.printingName mountain), Just (S.printingName maiden)]
+    -- alice COULD have paid -- two land cards in hand -- so the refusal is hers
+    -- rather than CR 118.3's, and the land-less battlefield is the branch and
+    -- not the board.
+    Spec.assertEqWith s "alice was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
+    Spec.assertEqWith s "declining never asked WHICH card" (handCardResponses transcript) []
+    Spec.assertEqWith s "nothing joined Hakbal on her battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 1
+    Spec.assertEqWith s "and one card left her library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
+  -- CR 118.3: a hand with no land card cannot pay, so there is one possible
+  -- answer and the prompt is not raised -- proved by the transcript, under the
+  -- interpreter that WOULD have paid. The board differs from the two above in
+  -- exactly one thing: the two lands are gone from her hand.
+  Spec.it s "CR 118.3 a controller holding no land card is not asked, and draws" $ do
+    hakbal <- S.printingOf s registry "Hakbal of the Surging Soul"
+    piker <- S.printingOf s registry "Goblin Piker"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    myr <- S.printingOf s registry "Darksteel Myr"
+    let attacking = hakbalAttacking hakbal [piker] [myr, maiden]
+        ((_, after), transcript) = Replay.record (paysFor S.alice) attacking Stack.resolveTop
+    Spec.assertEqWith
+      s
+      "she drew the Bird Maiden"
+      (namesIn Zone.Hand S.alice after)
+      [Just (S.printingName piker), Just (S.printingName maiden)]
+    Spec.assertEqWith s "alice was never asked to pay" (payResponses transcript) []
+    Spec.assertEqWith s "nor asked which card" (handCardResponses transcript) []
+    Spec.assertEqWith s "nothing joined Hakbal on her battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 1
+    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
+
 -- The board both Magical Hack timing cases start from. alice has a Mountain --
 -- added FIRST, so it holds the lowest object id and identityAnswer's
 -- ChooseTargets (Set.lookupMin over the recipients) aims the Hack at it -- plus
@@ -2305,6 +2444,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   circlingVulturesSpec s registry
   merfolkSeerSpec s registry
   fortressKinGuardSpec s registry
+  hakbalSpec s registry
   magicalHackTimingSpec s registry
   magicalHackDurationSpec s registry
   artificialEvolutionSpec s registry
