@@ -281,7 +281,8 @@ For each opcode the producer needs:
   rather than raising; `Quantity.AgainstSlot` answers unanswered. Neither is
   distinguishable from a rule that does not apply.
 - Read the guardrail and say which applies. `Pawl.CardSpec` fences some fields
-  with a position lint; `slotObjects` and `recipient` carry none.
+  with a position lint; `recipient` carries none, and `slotObjects` carries one
+  only for the wish filter, whose candidates are not objects at all.
 - Where two opcodes must see each other, say whether one builder supplies both.
   `IsBound` sees a slot only where the resolution's map is handed over
   (`Resolve.effectContext`), and reads single and group bindings alike, where

@@ -31,7 +31,9 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.OutsideTheGame as OutsideTheGame
@@ -61,6 +63,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -298,6 +301,39 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
     -- CR 400.11a / 400.11: the sideboard is outside the game, and outside the game
     -- is not a zone -- so setup mints no object for any of it.
     Spec.assertEqWith s "and no object was minted for any of them" (Map.size (GameState.objects after)) 0
+  -- CR 400.11c and CR 115.10a: what the filter CANNOT see. Filter.IsBound asks
+  -- whether the candidate is an object the resolution bound, and a card outside
+  -- the game is never one -- rule 400.11c keeps every spell and ability from
+  -- affecting it, and nothing mints an object for it until `bringInto` does. So
+  -- the bare Filter.contextFor `eligible` builds is honest: handing it the
+  -- resolution's slots could not change an answer here, which is why this
+  -- position is not one of #2141's. Pawl.CardSpec's "CR 400.11c no card asks
+  -- IsBound in a wish's filter" is what keeps a card out of the position.
+  --
+  -- The pair differs in exactly one thing: the same board, the same bound slot,
+  -- and the filter is the atom or the empty And.
+  Spec.it s "CR 400.11c a wish's filter cannot see what the resolution bound" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    wish <- S.printingOf s registry "Burning Wish"
+    signInBlood <- S.printingOf s registry "Sign in Blood"
+    let (board, wishId) = wishBoard mountain wish [(signInBlood, 1)]
+        slot = SlotName.MkSlotName (Text.pack "target")
+        -- The binding a resolution would have made, present on the board before
+        -- either filter runs. It names the wish's own object because WHICH object
+        -- it names cannot matter: no candidate outside the game is any of them.
+        bind o = o {Object.bindings = Map.insert slot (Binding.toObject wishId) (Object.bindings o)}
+        gs = board {GameState.objects = Map.adjust bind wishId (GameState.objects board)}
+        bringing predicate = snd (Engine.runGamePure exercising gs (OutsideTheGame.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) wishId S.alice))
+        atom = Filter.And [Filter.HasCardType CardType.Sorcery, Filter.IsBound slot]
+    Spec.assertEqWith s "the slot names an object before either filter runs" (fmap Object.bindings (Game.lookupObject wishId gs)) (Just (Map.singleton slot (Binding.toObject wishId)))
+    -- THE BEHAVIOUR: "a sorcery that IS the bound object" admits nothing, so the
+    -- exclusion a card would write -- Not of the same atom -- is vacuously true.
+    Spec.assertEqWith s "the wish brings in nothing" (printingsIn Zone.Hand S.alice (bringing atom)) [wish]
+    Spec.assertEqWith s "where the same wish without the atom brings the sorcery in" (List.sort (printingsIn Zone.Hand S.alice (bringing (Filter.HasCardType CardType.Sorcery)))) (List.sort [wish, signInBlood])
+    -- And the offer itself, one step nearer the atom: the Not is False for a
+    -- candidate with no identity, so the conjunction admits nobody.
+    Spec.assertEqWith s "nothing was even offered" (length (OutsideTheGame.eligible atom wishId S.alice gs)) 0
+    Spec.assertEqWith s "where the sorcery filter offers the one card" (length (OutsideTheGame.eligible (Filter.HasCardType CardType.Sorcery) wishId S.alice gs)) 1
   -- CR 729.4: a subgame's own view of the main game. Alice's creature sits
   -- on the PARENT's battlefield; Setup.subgameStateFrom moves it into
   -- GameState.outsideObjects (CR 729.4, "all objects in the main game ... are
