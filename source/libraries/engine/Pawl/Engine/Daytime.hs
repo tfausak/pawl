@@ -29,6 +29,7 @@
 module Pawl.Engine.Daytime where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -173,9 +174,12 @@ turnDue record = do
   case dueToTurn gs of
     [] -> pure False
     due -> do
+      -- LEFT fold, where this was a right one before CR 613.7g's stamp: the fold
+      -- now hands out timestamps, so it must run the enumeration forwards for the
+      -- relative order to be the enumeration's.
       let (now, g1) = Game.freshTimestamp gs
-          turned = foldr (Game.turnFaceOver now g1) (GameState.objects g1) due
-      State.put (record (Game.facesTurned (GameState.objects g1) turned due) g1 {GameState.objects = turned})
+          g2 = List.foldl' (flip (Game.turnFaceOver now)) g1 due
+      State.put (record (Game.facesTurned (GameState.objects g1) (GameState.objects g2) due) g2)
       pure True
 
 -- | CR 731.1: "it becomes day" / "it becomes night" -- the game gains that

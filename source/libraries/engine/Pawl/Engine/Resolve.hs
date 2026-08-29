@@ -2106,13 +2106,18 @@ turnPermanentsOver legal resolving controller source ref = do
     --
     -- ONE fresh timestamp for the whole instruction (CR 701.27f), minted even
     -- when nothing turns over, and ONE whole-board projection, CR 702.145b's
-    -- restriction being read off the layer fold.
+    -- restriction being read off the layer fold. CR 613.7g's per-permanent stamp
+    -- is a second thing, minted inside Game.turnFaceOver.
+    --
+    -- LEFT fold, where this was a right one before the stamp: the fold now hands
+    -- out timestamps, so it must run the enumeration forwards for the relative
+    -- order to be the enumeration's.
     let (now, g1) = Game.freshTimestamp gs
         pcs = Projection.projectAll g1
-        turned = foldr (turnOver pcs resolving now g1) (GameState.objects g1) victims
+        g2 = List.foldl' (turnOver pcs resolving now g1) g1 victims
      in Event.recordTransformed
-          (Game.facesTurned (GameState.objects g1) turned victims)
-          g1 {GameState.objects = turned}
+          (Game.facesTurned (GameState.objects g1) (GameState.objects g2) victims)
+          g2
 
 -- CR 701.27a over ONE object: turn it over, or leave the map as it was. The turn
 -- itself is Game.turnFaceOver, shared with Pawl.Engine.Daytime's CR 702.145c/f
@@ -2124,11 +2129,16 @@ turnPermanentsOver legal resolving controller source ref = do
 -- `now` is minted ONCE for the whole instruction by the caller, because CR 608.2f
 -- processes a swept set simultaneously and a later CR 701.27f comparison must not
 -- tell two victims apart. `pcs` is hoisted likewise.
-turnOver :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> Timestamp.Timestamp -> GameState -> ObjectId -> Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
-turnOver pcs resolving now gs oid objects
-  | alreadyTurnedFor resolving oid gs = objects
-  | Daytime.restrictsTransform pcs oid = objects
-  | otherwise = Game.turnFaceOver now gs oid objects
+--
+-- TWO boards: `frozen` is the pre-turn one both gates are asked of (CR 608.2f's
+-- simultaneous processing), so no member of the batch is judged against a board a
+-- sibling has already turned over on, while `gs` is the fold's accumulator, which
+-- carries CR 613.7g's stamps as they are handed out.
+turnOver :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> Timestamp.Timestamp -> GameState -> GameState -> ObjectId -> GameState
+turnOver pcs resolving now frozen gs oid
+  | alreadyTurnedFor resolving oid frozen = gs
+  | Daytime.restrictsTransform pcs oid = gs
+  | otherwise = Game.turnFaceOver now oid gs
 
 -- CR 701.27f. True when this resolution must be ignored: the resolving object is
 -- an ability whose SOURCE is the very permanent being turned over (CR 113.7a),

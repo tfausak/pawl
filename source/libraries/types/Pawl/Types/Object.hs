@@ -316,12 +316,10 @@ data Object = MkObject
     --
     -- NOT CR 613.7d's timestamp, and a second field rather than a refresh of that
     -- one: every permanent has a `timestamp` and only one that has transformed has
-    -- this, so the two answer different questions whatever restamps.
-    --
-    -- Not implemented: CR 613.7g's new `timestamp` for a permanent that transforms
-    -- (#2572). Whether transforming moves the entry order is that rule's question
-    -- and not this field's -- CR 613.7f's turnings over already move it, through
-    -- Pawl.Engine.Game.turnFacing.
+    -- this, so the two answer different questions. A transform writes BOTH --
+    -- CR 613.7g refreshes `timestamp` through Pawl.Engine.Game.turnFaceOver -- and
+    -- they take different values, this one being shared across a batch so that CR
+    -- 701.27f cannot tell two simultaneous victims apart.
     --
     -- Per-incarnation state, like `face` above: cleared by newIncarnation,
     -- because CR 400.7 makes the moved object a new one that has never

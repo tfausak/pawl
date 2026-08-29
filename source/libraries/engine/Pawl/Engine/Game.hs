@@ -165,12 +165,16 @@ printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
 -- out-of-range index -- leaves the canonical order standing rather than dropping
 -- or duplicating an entry.
 --
--- Beside 'choose' because it is what every ORDERING prompt's answer is applied
--- through, and those prompts want it from modules that cannot see each other:
--- CR 603.3b's trigger order (Pawl.Engine.Engine), CR 401.4's library arrangement
--- and CR 701.44d's per-seat "for each" groups (Pawl.Engine.Resolve), CR 601.2h's
--- cost components and the combat tolls beside them (Pawl.Engine.Cost), and the
--- arrangement of a melded permanent's component cards (Pawl.Engine.Event).
+-- Beside 'choose' because the ordering prompts answered with INDICES want it from
+-- modules that cannot see each other: CR 603.3b's trigger order
+-- (Pawl.Engine.Engine), CR 401.4's library arrangement and CR 701.44d's per-seat
+-- "for each" groups (Pawl.Engine.Resolve), CR 601.2h's cost components and the
+-- combat tolls beside them (Pawl.Engine.Cost), and the arrangement of a melded
+-- permanent's component cards (Pawl.Engine.Event). Those five, not every ordering
+-- prompt: Prompt.OrderDamage spells this body out inline in
+-- Pawl.Engine.Replacement.askOne, and Prompt.Shuffle -- the sibling branch of the
+-- CR 401.4 site named above -- answers with object ids and goes through
+-- honourShuffle instead.
 permute :: [a] -> [Natural] -> [a]
 permute xs order =
   let canonical :: [Natural]
@@ -699,22 +703,31 @@ turnFacing facing oid gs =
 -- untouched. CR 400.7 is the negative half of the same claim: this is not a zone
 -- change, so nothing mints an incarnation.
 --
--- Not implemented: CR 613.7g's new timestamp for a permanent that transforms or
--- converts (#2572). Rule 712.18 does not settle that one -- turnFacing above
--- restamps without minting an object either, which is CR 613.7f.
+-- The TIMESTAMP is the one thing that does not ride through: CR 613.7g gives a
+-- double-faced permanent a new one each time it transforms or converts. Rule
+-- 712.18 does not deny it -- turnFacing above restamps without minting an object
+-- either, which is CR 613.7f.
+--
+-- TWO stamps, and they answer different questions. Object.turnedOverAt takes
+-- `now`, supplied by the caller so that a caller turning SEVERAL permanents over
+-- at once -- CR 608.2f for one Moonmist, CR 702.145c for one nightfall -- gives
+-- them all the same one, CR 701.27f's comparison against a resolving ability
+-- being unable to tell simultaneous victims apart. Object.timestamp takes a fresh
+-- one PER PERMANENT, because CR 613.7g stamps the permanent rather than the
+-- turning-over and Pawl.Engine.Projection's abilityRemovalAfter rests on two
+-- objects never sharing a timestamp.
+--
+-- Not implemented: CR 613.7m's APNAP order over the permanents one instruction
+-- restamps at once (#2571). They are stamped in the order the caller's fold
+-- enumerated them.
 --
 -- Reads the object's OWN card (cardOf), never a projected one, which is the
 -- footing Object.face is stored on: CR 712.9's first Example turns on a Clone
 -- being a one-faced card whatever it copied, and that is the same read.
---
--- `now` is supplied by the caller rather than minted here, because a caller that
--- turns SEVERAL permanents over does so simultaneously -- CR 608.2f for one
--- Moonmist, CR 702.145c for one nightfall -- and a later CR 701.27f comparison
--- must not be able to tell them apart.
-turnFaceOver :: Timestamp.Timestamp -> GameState -> ObjectId -> Map.Map ObjectId Object -> Map.Map ObjectId Object
-turnFaceOver now gs oid objects
-  | not (Set.member oid (GameState.battlefield gs)) = objects
-  | otherwise = case (Map.lookup oid objects, cardOf oid gs) of
+turnFaceOver :: Timestamp.Timestamp -> ObjectId -> GameState -> GameState
+turnFaceOver now oid gs
+  | not (Set.member oid (GameState.battlefield gs)) = gs
+  | otherwise = case (lookupObject oid gs, cardOf oid gs) of
       -- CR 712.4c: "Unlike other double-faced cards, meld cards cannot be
       -- transformed or converted. Any instructions to do so are ignored", and CR
       -- 712.9 says it from the permanent's side. Asked of the OBJECT here, where
@@ -737,11 +750,13 @@ turnFaceOver now gs oid objects
       -- Pawl.MeldSpec's "CR 712.4c a melded permanent refuses the turn its own
       -- card would allow", which melds into a double-faced card -- card data the
       -- opcode carries -- so that this guard is the only thing refusing.
-      (Just object, _) | not (Seq.null (componentsOf (Object.source object))) -> objects
+      (Just object, _) | not (Seq.null (componentsOf (Object.source object))) -> gs
       (Just object, Just card) -> case Card.turnedOver (Object.face object) card of
-        Nothing -> objects
-        Just name -> Map.insert oid object {Object.face = Just name, Object.turnedOverAt = Just now} objects
-      _ -> objects
+        Nothing -> gs
+        Just name ->
+          let (ts, stamped) = freshTimestamp gs
+           in stamped {GameState.objects = Map.insert oid object {Object.face = Just name, Object.turnedOverAt = Just now, Object.timestamp = ts} (GameState.objects stamped)}
+      _ -> gs
 
 -- CR 701.27a over a swept set, from the other side: which of these ids ACTUALLY
 -- turned over. `turnFaceOver` above declines five ways -- an id naming nothing on
