@@ -8,6 +8,7 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.CopySpell as CopySpell
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.Create as Create
@@ -516,6 +517,20 @@ data Effect card ability
     -- CR 614.16 multiplied the count asks which of them "it" names, while any
     -- other quantity binds every token. See Resolve.namesEveryToken.
     Create (Create.Create card)
+  | -- | Alchemy's conjure keyword action: create a card that was in nobody's deck
+    -- and put it into a zone -- Emporium Thopterist's "conjure a card named
+    -- Ornithopter into your hand".
+    --
+    -- DIGITAL-ONLY, so there is no rule to cite: docs/rules.txt contains no
+    -- \"conjure\". What the CR settles is what the result is not -- CR 111.1's
+    -- token is created by an effect and is not a card, where a conjured card is
+    -- one, so it is castable, shufflable and drawable, and Pawl.Types.Source's
+    -- OfCard is what backs it.
+    --
+    -- Create's neighbour and not a case of it: that opcode mints CR 111's tokens
+    -- onto the battlefield, and the two agree on nothing after that. See
+    -- Pawl.Types.Conjure for why the card is carried inline rather than named.
+    Conjure (Conjure.Conjure card)
   | -- | CR 707.1 / 111.3: create this many tokens that are copies of each object
     -- the ObjectRef names (Cackling Counterpart, Rite of Replication). Create's
     -- sibling and not a case of it: the token's text is DERIVED from a permanent's

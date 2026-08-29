@@ -707,6 +707,97 @@ placeObject pid mkObj dest position = do
   State.put (Game.insertIntoZone dest position pid newId gs3)
   pure newId
 
+-- Mint a CARD -- an object backed by Source.OfCard -- straight into a zone,
+-- with no zone change, because it was in no zone to leave.
+--
+-- Two roads reach it and they are not the same rule. CR 400.11c's wish brings in
+-- a card the player already owned outside the game, which rule 400.11 says is
+-- not a zone; Alchemy's conjure creates a card that was in nobody's deck, which
+-- no rule of the CR covers at all. Both end at Object.MkObject's field list, and
+-- sharing it is what keeps the two from drifting -- a field added to Object is
+-- answered once here rather than twice.
+--
+-- Not routed through Event.changeZone for that shared reason: a zone change
+-- would announce a departure from a zone the card was never in.
+--
+-- `position` is CR 401.2's end for a LIBRARY destination and inert elsewhere,
+-- placeObject's own note; Game.insertIntoZone is the only reader.
+--
+-- Sickness.Sick rather than Settled: nothing here puts the card onto the
+-- battlefield, and CR 302.6's summoning sickness is settled by the entry that
+-- eventually does.
+mintCard :: PlayerId -> PrintingId.PrintingId -> Zone -> LibraryPosition.LibraryPosition -> GameState.GameState -> (ObjectId, GameState.GameState)
+mintCard pid printingId dest position gs =
+  let (oid, gs1) = Game.freshObjectId gs
+      (ts, gs2) = Game.freshTimestamp gs1
+      obj =
+        Object.MkObject
+          { Object.owner = pid,
+            Object.enteredUnder = Nothing,
+            Object.source = Source.OfCard printingId,
+            Object.zone = dest,
+            Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
+            Object.exiledFaceDown = False,
+            Object.damage = 0,
+            Object.sickness = Sickness.Sick,
+            Object.bindings = Map.empty,
+            Object.counters = Map.empty,
+            Object.counterTimestamps = Map.empty,
+            Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
+            Object.chosenPlayer = Nothing,
+            Object.timestamp = ts,
+            Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
+            Object.worldSince = Nothing,
+            Object.playableFromExile = Nothing,
+            Object.plotted = Nothing,
+            Object.foretold = Nothing,
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing,
+            Object.ventureRoom = Nothing,
+            Object.classLevel = Nothing,
+            Object.unlockedHalves = Set.empty,
+            Object.designations = Set.empty,
+            Object.kicked = False,
+            Object.bestowed = False,
+            Object.phyrexianLifePaid = 0,
+            Object.manaSpent = Mana.MkMana [],
+            Object.announcedX = Nothing,
+            Object.detainedUntil = Set.empty,
+            Object.goadedBy = Set.empty,
+            Object.doesNotUntapNext = False,
+            Object.exertedBy = Set.empty
+          }
+   in ( oid,
+        Game.insertIntoZone
+          dest
+          position
+          pid
+          oid
+          gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2)}
+      )
+
+-- Alchemy's conjure keyword action: create the given card out of nothing and put
+-- it into the conjuring player's zone.
+--
+-- DIGITAL-ONLY, so there is no rule to cite -- docs/rules.txt has no "conjure".
+-- What the CR settles is what this is NOT: CR 111.1's token is not a card, where
+-- a conjured object is one, so this interns a Printing and mints Source.OfCard
+-- rather than Source.OfToken, and the result is castable and shufflable like any
+-- other card.
+--
+-- Here rather than in Pawl.Engine.Resolve, createEmblem's placement: the mint is
+-- what the two roads into mintCard share, and an opcode arm is not the place to
+-- decide what an object minted from a card looks like.
+conjure :: PlayerId -> Card -> Zone -> LibraryPosition.LibraryPosition -> Game ObjectId
+conjure pid card dest position = do
+  printingId <- State.state (Game.intern (Printing.MkPrinting card))
+  State.state (mintCard pid printingId dest position)
+
 -- CR 114.2: a player gets an emblem with the given abilities, put into the
 -- command zone and both owned and controlled by them. CR 613.7a: its entry
 -- timestamp is what the projection reads when ordering the continuous effect of

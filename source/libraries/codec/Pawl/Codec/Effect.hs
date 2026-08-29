@@ -21,6 +21,7 @@ import qualified Pawl.Codec.AttachTarget as AttachTarget
 import qualified Pawl.Codec.BecomeCopy as BecomeCopy
 import qualified Pawl.Codec.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Codec.ChangeText as ChangeText
+import qualified Pawl.Codec.Conjure as Conjure
 import qualified Pawl.Codec.CopySpell as CopySpell
 import qualified Pawl.Codec.Counter as Counter
 import qualified Pawl.Codec.Create as Create
@@ -130,6 +131,7 @@ codec cardCodec abilityCodec =
       Arm.payload "IncreaseSpeed" PlayerQuantity.codec Effect.IncreaseSpeed (\x -> case x of Effect.IncreaseSpeed y -> Just y; _ -> Nothing),
       Arm.payload "DecreaseSpeed" SpeedDecrease.codec Effect.DecreaseSpeed (\x -> case x of Effect.DecreaseSpeed y -> Just y; _ -> Nothing),
       Arm.payload "Create" createCodec Effect.Create (\x -> case x of Effect.Create y -> Just y; _ -> Nothing),
+      Arm.payload "Conjure" conjureCodec Effect.Conjure (\x -> case x of Effect.Conjure y -> Just y; _ -> Nothing),
       Arm.payload "CreateCopy" CreateCopy.codec Effect.CreateCopy (\x -> case x of Effect.CreateCopy y -> Just y; _ -> Nothing),
       Arm.payload "CopySpell" CopySpell.codec Effect.CopySpell (\x -> case x of Effect.CopySpell y -> Just y; _ -> Nothing),
       Arm.payload "BecomeCopy" BecomeCopy.codec Effect.BecomeCopy (\x -> case x of Effect.BecomeCopy y -> Just y; _ -> Nothing),
@@ -193,6 +195,7 @@ codec cardCodec abilityCodec =
     ]
   where
     createCodec = Create.codec cardCodec
+    conjureCodec = Conjure.codec cardCodec
     meldCodec = Meld.codec cardCodec
     replaceCodec = Replace.codec (codec cardCodec abilityCodec)
     preventCodec = PreventNextDamage.codec (codec cardCodec abilityCodec)

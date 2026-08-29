@@ -202,6 +202,7 @@ manaProduced effect = case effect of
   Effect.IncreaseSpeed {} -> Nothing
   Effect.DecreaseSpeed {} -> Nothing
   Effect.Create {} -> Nothing
+  Effect.Conjure {} -> Nothing
   Effect.CreateCopy {} -> Nothing
   Effect.BecomeCopy {} -> Nothing
   Effect.CopySpell {} -> Nothing
@@ -370,6 +371,10 @@ movesLibraryCard effect = case effect of
   -- A token is created rather than moved, and CR 111.1 puts it straight onto the
   -- battlefield.
   Effect.Create {} -> False
+  -- A conjured card is created rather than moved, and no library is on either
+  -- end: Pawl.Types.ConjureDestination reaches only the hand today, and a
+  -- library arm would have to answer True here (#2638).
+  Effect.Conjure {} -> False
   Effect.CreateCopy {} -> False
   -- CR 707.4 says so in as many words: the permanent remains on the
   -- battlefield, so no card moves out of a library or anywhere else.
