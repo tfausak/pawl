@@ -4,19 +4,19 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 1
+          "value": 2
         },
         {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Red"
+              "type": "Blue"
             }
           }
         }
       ],
-      "name": "Burning Wish",
+      "name": "Cunning Wish",
       "spell": {
         "modes": [
           {
@@ -29,7 +29,7 @@
                       "filter": {
                         "type": "HasCardType",
                         "value": {
-                          "type": "Sorcery"
+                          "type": "Instant"
                         }
                       },
                       "reveal": true
@@ -54,7 +54,7 @@
       "typeLine": {
         "types": [
           {
-            "type": "Sorcery"
+            "type": "Instant"
           }
         ]
       }

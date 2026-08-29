@@ -470,7 +470,7 @@ slotsOf effect = case effect of
   Effect.ChooseCardName _ -> Map.empty
   -- No slot: the card comes from outside the game, where CR 400.11c lets nothing
   -- target and so nothing was announced (CR 601.2c).
-  Effect.RevealFromOutsideTheGame _ -> Map.empty
+  Effect.FromOutsideTheGame _ -> Map.empty
   Effect.ExileThisSpell -> Map.empty
   Effect.Bolster quantity -> quantitySlots quantity
   Effect.Amass (Amass.Type.MkAmass quantity _) -> quantitySlots quantity
@@ -801,7 +801,7 @@ slotsAreExhaustive effect = case effect of
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
   Effect.ChooseCardName _ -> True
-  Effect.RevealFromOutsideTheGame _ -> True
+  Effect.FromOutsideTheGame _ -> True
   Effect.ExileThisSpell -> True
   Effect.Bolster quantity -> Quantity.slotsAreExhaustive quantity
   Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.slotsAreExhaustive quantity
@@ -978,7 +978,7 @@ readsX = any effectReadsX
       Effect.Proliferate -> False
       -- No Quantity: rule 201.4 chooses one name and states no count.
       Effect.ChooseCardName _ -> False
-      Effect.RevealFromOutsideTheGame _ -> False
+      Effect.FromOutsideTheGame _ -> False
       Effect.ExileThisSpell -> False
       Effect.Bolster quantity -> Quantity.readsX quantity
       Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.readsX quantity
@@ -1212,7 +1212,7 @@ boundSlots effect = case effect of
   -- Binds nothing: the name goes on the SOURCE (Object.chosenNames) and is read
   -- back off it by Filter.HasChosenName, so no slot carries it.
   Effect.ChooseCardName _ -> Set.empty
-  Effect.RevealFromOutsideTheGame _ -> Set.empty
+  Effect.FromOutsideTheGame _ -> Set.empty
   Effect.ExileThisSpell -> Set.empty
   Effect.Bolster _ -> Set.empty
   Effect.Amass _ -> Set.empty
@@ -6429,7 +6429,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- Pawl.Engine.OutsideTheGame is the whole of it, and this arm asks nothing about
   -- which effect the filter came from.
-  Effect.RevealFromOutsideTheGame predicate -> OutsideTheGame.reveal predicate source controller
+  Effect.FromOutsideTheGame payload -> OutsideTheGame.bringInto payload source controller
   -- CR 608.2n: "Exile Burning Wish" -- the resolving SPELL goes to exile as this
   -- instruction runs rather than to its owner's graveyard when the resolution
   -- ends. finishSpell's move afterwards finds nothing, CR 400.7 having minted a

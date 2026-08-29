@@ -17,6 +17,7 @@
 -- what effect produced it.
 module Pawl.Engine.OutsideTheGame where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -30,6 +31,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
@@ -88,8 +90,10 @@ eligible predicate source pid gs =
         ]
    in fromPool <> fromOuter
 
--- CR 400.11c \/ 701.20a: reveal a card this player owns from outside the game
--- matching the Filter and put it into their hand -- Burning Wish's sentence.
+-- CR 400.11c: put a card this player owns from outside the game matching the
+-- Filter into their hand, showing it first (CR 701.20a) where the payload's
+-- reveal says the card prints one -- Burning Wish's sentence, and Death Wish's
+-- without the reveal.
 --
 -- The card is MINTED here, Pawl.Engine.Dungeon.enter's road: outside the game is
 -- not a zone (CR 400.11), so no object stood for the card and the move into the
@@ -115,11 +119,15 @@ eligible predicate source pid gs =
 -- this returns unit rather than the id: nothing about Burning Wish's sentence
 -- reads the card back.
 --
--- Not implemented: the reveal happens as the card ARRIVES in the hand rather than
--- before the move as the card prints it (#2450).
-reveal :: Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> PlayerId -> Game ()
-reveal predicate source pid = do
+-- Not implemented: where the reveal is printed it happens as the card ARRIVES in
+-- the hand rather than before the move as the card prints it (#2450).
+bringInto :: FromOutsideTheGame.FromOutsideTheGame -> ObjectId -> PlayerId -> Game ()
+bringInto payload source pid = do
   gs0 <- State.get
+  let predicate = FromOutsideTheGame.filter payload
+      -- CR 701.20a is a keyword action of its own, so a card that does not print
+      -- it moves the card and shows nobody anything.
+      showIt oid = Monad.when (FromOutsideTheGame.reveal payload) (Event.reveal RevealCause.Ordinary pid oid)
   case NonEmpty.nonEmpty (eligible predicate source pid gs0) of
     Nothing -> pure ()
     Just offered -> do
@@ -134,14 +142,14 @@ reveal predicate source pid = do
       case chosen of
         OutsideCard.InPool printingId -> do
           oid <- State.state (bringIn pid printingId)
-          Event.reveal RevealCause.Ordinary pid oid
+          showIt oid
         OutsideCard.InAnotherGame outerId -> do
           gs1 <- State.get
           case bringInFrom pid outerId gs1 of
             (Nothing, _) -> pure ()
             (Just oid, gs2) -> do
               State.put gs2
-              Event.reveal RevealCause.Ordinary pid oid
+              showIt oid
 
 -- The object construction and hand-insertion `bringIn` and `bringInFrom` share
 -- -- everything about arriving except what is spent to get there. Split out so
@@ -202,7 +210,7 @@ mint pid printingId gs =
       )
 
 -- CR 400.11b: take one copy of this printing out of the player's pool and mint
--- the card into their hand. Split out from `reveal` above because it is the half
+-- the card into their hand. Split out from `bringInto` above because it is the half
 -- every other road into the game will want -- CR 727.2's restart (#135) and CR
 -- 707.13's copy created outside the game (#888) -- and none of those reveals
 -- anything.

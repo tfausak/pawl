@@ -65,6 +65,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
@@ -1603,16 +1604,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.ChooseCardName (Filter.Not (Filter.HasCardType CardType.Land)))
       " {\"type\":\"ChooseCardName\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}} "
-  -- CR 400.11c: the filter alone, Burning Wish's "a sorcery card". Everything else
-  -- about the sentence is the rule's -- the pool is the resolving controller's own
-  -- (CR 108.3b), the destination their hand, and CR 701.20a's reveal comes with it.
-  Spec.it s "RevealFromOutsideTheGame" $
+  -- CR 400.11c: the filter and CR 701.20a's reveal, Burning Wish's "reveal a
+  -- sorcery card". Everything else about the sentence is the rule's -- the pool is
+  -- the resolving controller's own (CR 108.3b) and the destination their hand.
+  Spec.it s "FromOutsideTheGame" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.RevealFromOutsideTheGame (Filter.HasCardType CardType.Sorcery))
-      " {\"type\":\"RevealFromOutsideTheGame\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Sorcery\"}}} "
+      (Effect.FromOutsideTheGame (FromOutsideTheGame.MkFromOutsideTheGame (Filter.HasCardType CardType.Sorcery) True))
+      " {\"type\":\"FromOutsideTheGame\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Sorcery\"}},\"reveal\":true}} "
   -- CR 608.2n: no payload at all -- the spell exiling itself is the whole of it.
   Spec.it s "ExileThisSpell" $
     Common.assertJsonCodec

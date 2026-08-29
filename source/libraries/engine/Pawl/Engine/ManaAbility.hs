@@ -167,7 +167,7 @@ manaProduced effect = case effect of
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing
   Effect.ChooseCardName _ -> Nothing
-  Effect.RevealFromOutsideTheGame _ -> Nothing
+  Effect.FromOutsideTheGame _ -> Nothing
   Effect.ExileThisSpell -> Nothing
   Effect.Bolster _ -> Nothing
   Effect.Amass _ -> Nothing
@@ -339,7 +339,7 @@ movesLibraryCard effect = case effect of
   -- CR 400.11: the card comes from OUTSIDE THE GAME, which is not a zone at all
   -- and so is not a library. CR 605.1a's fourth clause asks about libraries, and
   -- this effect moves no card to or from one.
-  Effect.RevealFromOutsideTheGame _ -> False
+  Effect.FromOutsideTheGame _ -> False
   -- CR 608.2n: the stack to exile, neither of which is a library.
   Effect.ExileThisSpell -> False
   Effect.Bolster _ -> False
