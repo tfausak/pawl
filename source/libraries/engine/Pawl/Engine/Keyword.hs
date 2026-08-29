@@ -2030,6 +2030,7 @@ ingest =
             Nothing
             Nothing
             LibraryPlacement.defaultValue
+            Nothing
         )
 
 -- CR 702.86a. CR 508.3a is what "attacks" means -- being declared as an attacker
@@ -2731,6 +2732,7 @@ returns kind =
             Nothing
             Nothing
             LibraryPlacement.defaultValue
+            Nothing
         )
 
 -- CR 702.135a: afterlife N, on the same CR 700.4 dies event `returns` watches.
@@ -3009,6 +3011,7 @@ soulshift n =
             Nothing
             Nothing
             LibraryPlacement.defaultValue
+            Nothing
         )
 
 -- The slot rule 702.46a's one target is chosen into, mentorTarget's position.

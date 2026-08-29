@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Ignore as Ignore
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
+import qualified Pawl.Engine.MoveDuration as MoveDuration
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
@@ -936,6 +937,9 @@ performSettle = do
   Resolve.runEntryEffects
   swept <- Expiry.sweepConditional
   returned <- Monarch.returnExiledForMonarch
+  -- CR 610.3's second one-shot effect, beside CR 725's for the same reason: a
+  -- return zone change is not something an Expiry sweep can perform.
+  movedBack <- MoveDuration.returnMoved
   -- CR 702.145c/d/f/g, checked here for CR 704.3's reason and not because they are
   -- state-based actions -- both rules say they are not. Before the SBA pass, since
   -- turning a permanent over changes its power and toughness.
@@ -962,7 +966,7 @@ performSettle = do
   State.modify' Combat.removeChanged
   checkControlContinuity
   Ring.endOnControlChange
-  more <- if swept || returned || dayNight || sampledControl || acted || placed then performSettle else pure False
+  more <- if swept || returned || movedBack || dayNight || sampledControl || acted || placed then performSettle else pure False
   pure (acted || placed || more)
 
 -- CR 104.4b: how many events may happen with no player able to decide anything

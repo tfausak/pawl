@@ -41,6 +41,7 @@ import qualified Pawl.Codec.PrintingId as PrintingId
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Codec.RestartSignal as RestartSignal
 import qualified Pawl.Codec.Result as Result
+import qualified Pawl.Codec.ReturnWatch as ReturnWatch
 import qualified Pawl.Codec.Timestamp as Timestamp
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -126,6 +127,7 @@ codec = Fields.object $ do
   spellsCastLastTurn <- Fields.required "spellsCastLastTurn" Common.natural GameState.spellsCastLastTurn
   castsLastTurn <- Fields.required "castsLastTurn" (Common.naturalMap PlayerId.codec Common.natural) GameState.castsLastTurn
   exiledUntilMonarch <- Fields.required "exiledUntilMonarch" (Common.naturalMap ObjectId.codec MonarchWatch.codec) GameState.exiledUntilMonarch
+  movedUntilSourceLeaves <- Fields.required "movedUntilSourceLeaves" (Common.naturalMap ObjectId.codec ReturnWatch.codec) GameState.movedUntilSourceLeaves
   haunting <- Fields.required "haunting" (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.haunting
   exiledWith <- Fields.required "exiledWith" (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.exiledWith
   exilePiles <- Fields.required "exilePiles" (Common.naturalMap ObjectId.codec Timestamp.codec) GameState.exilePiles
@@ -196,6 +198,7 @@ codec = Fields.object $ do
         GameState.spellsCastLastTurn = spellsCastLastTurn,
         GameState.castsLastTurn = castsLastTurn,
         GameState.exiledUntilMonarch = exiledUntilMonarch,
+        GameState.movedUntilSourceLeaves = movedUntilSourceLeaves,
         GameState.haunting = haunting,
         GameState.exiledWith = exiledWith,
         GameState.exilePiles = exilePiles,

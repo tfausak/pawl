@@ -178,6 +178,7 @@ emptyGame order =
           GameState.spellsCastLastTurn = 0,
           GameState.castsLastTurn = mempty,
           GameState.exiledUntilMonarch = Map.empty,
+          GameState.movedUntilSourceLeaves = Map.empty,
           GameState.haunting = Map.empty,
           GameState.exiledWith = Map.empty,
           GameState.exilePiles = Map.empty,
@@ -534,6 +535,7 @@ restartGame perform exempt starter = do
             GameState.spellsCastLastTurn = 0,
             GameState.castsLastTurn = mempty,
             GameState.exiledUntilMonarch = Map.empty,
+            GameState.movedUntilSourceLeaves = Map.empty,
             GameState.haunting = Map.empty,
             -- Kept for the CR 727.5 exemptions alone, and cleared for every
             -- other card: an exempted card never left exile, so what put it
@@ -718,6 +720,7 @@ subgameStateFrom starter parent =
           GameState.spellsCastLastTurn = 0,
           GameState.castsLastTurn = mempty,
           GameState.exiledUntilMonarch = Map.empty,
+          GameState.movedUntilSourceLeaves = Map.empty,
           GameState.haunting = Map.empty,
           GameState.exiledWith = Map.empty,
           GameState.exilePiles = Map.empty,
@@ -797,7 +800,7 @@ applyCrossings finalSub parent =
       -- The same deletion Departure.objectsLeaveWith performs, dropping the same
       -- carriers keyed on the departing id: its combat entries (CR 506.4 removes
       -- a permanent from combat as it leaves the battlefield), its
-      -- exile-until-monarch entry, CR 702.55b's haunt link, CR 607.2a's
+      -- exile-until-monarch entry, CR 610.3's return watch, CR 702.55b's haunt link, CR 607.2a's
       -- exiled-with link and CR 406.4's pile stamp. See there for why each is
       -- keyed on the KEY and not the value.
       leave g oid = case Map.lookup oid (GameState.objects g) of
@@ -816,6 +819,7 @@ applyCrossings finalSub parent =
                         Combat.Type.struckFirst = fmap (Set.delete oid) (Combat.Type.struckFirst combat)
                       },
                   GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g1),
+                  GameState.movedUntilSourceLeaves = Map.delete oid (GameState.movedUntilSourceLeaves g1),
                   GameState.haunting = Map.delete oid (GameState.haunting g1),
                   GameState.exiledWith = Map.delete oid (GameState.exiledWith g1),
                   GameState.exilePiles = Map.delete oid (GameState.exilePiles g1)

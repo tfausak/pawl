@@ -537,6 +537,8 @@ library codec
     Pawl.Codec.MovedKinds
     Pawl.Codec.MovedKindsSpec
     Pawl.Codec.MovedSpec
+    Pawl.Codec.MoveDuration
+    Pawl.Codec.MoveDurationSpec
     Pawl.Codec.MoveToZone
     Pawl.Codec.MoveToZoneSpec
     Pawl.Codec.Object
@@ -668,6 +670,8 @@ library codec
     Pawl.Codec.RestartSignalSpec
     Pawl.Codec.Result
     Pawl.Codec.ResultSpec
+    Pawl.Codec.ReturnWatch
+    Pawl.Codec.ReturnWatchSpec
     Pawl.Codec.Reveal
     Pawl.Codec.RevealCause
     Pawl.Codec.RevealCauseSpec
@@ -892,6 +896,7 @@ library engine
     Pawl.Engine.ManaRider
     Pawl.Engine.Modal
     Pawl.Engine.Monarch
+    Pawl.Engine.MoveDuration
     Pawl.Engine.Mulligan
     Pawl.Engine.OutsideTheGame
     Pawl.Engine.Phasing
@@ -1511,6 +1516,7 @@ library types
     Pawl.Types.Moved
     Pawl.Types.MovedBetween
     Pawl.Types.MovedKinds
+    Pawl.Types.MoveDuration
     Pawl.Types.MoveToZone
     Pawl.Types.MulliganDecision
     Pawl.Types.MulliganOffer
@@ -1594,6 +1600,7 @@ library types
     Pawl.Types.Response
     Pawl.Types.RestartSignal
     Pawl.Types.Result
+    Pawl.Types.ReturnWatch
     Pawl.Types.Reveal
     Pawl.Types.RevealCause
     Pawl.Types.Revealed

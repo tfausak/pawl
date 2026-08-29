@@ -24,6 +24,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.Timestamp as Timestamp
 
 -- | Whether choosing between these two objects is choosing between options the
@@ -179,6 +180,9 @@ noCombat =
 --     value the player it phased out under.
 --   * GameState.exiledUntilMonarch (CR 725), keyed by the exiled incarnation,
 --     its value the watching player and whether the crown has moved.
+--   * GameState.movedUntilSourceLeaves (CR 610.3), keyed by the object a move
+--     with a duration put in another zone, its value the source whose leaving
+--     the battlefield brings it back plus the zone it came from.
 --   * GameState.haunting (CR 702.55b), keyed by the haunting card in exile, its
 --     value the object that card haunts.
 --   * GameState.exiledWith (CR 607.2), keyed by the exiled card, its value the
@@ -188,7 +192,11 @@ noCombat =
 --
 -- phasedOut and exiledUntilMonarch can never name a CANDIDATE through the one
 -- caller (Pawl.Engine.Cost's mana-source window): both key on an object not on
--- the battlefield, and neither value holds an object at all. They are searched
+-- the battlefield, and neither value holds an object at all. The CR 610.3 watch
+-- is the opposite case on its value side and the reason it is searched rather
+-- than assumed inert: the source it names IS on the battlefield while the watch
+-- stands, so a permanent that owes an exiled card its return is not
+-- interchangeable with one that owes nothing. They are searched
 -- rather than required empty all the same, because "this row is about some other
 -- object" is the honest reading of the rule and requiring emptiness makes an
 -- unrelated phased-out permanent decide a pair it says nothing about.
@@ -210,6 +218,7 @@ namedByRelation :: ObjectId -> GameState -> Bool
 namedByRelation oid gs =
   relates phasedOutNames (GameState.phasedOut gs)
     || relates monarchWatchNames (GameState.exiledUntilMonarch gs)
+    || relates returnWatchNames (GameState.movedUntilSourceLeaves gs)
     || relates Set.singleton (GameState.haunting gs)
     || relates Set.singleton (GameState.exiledWith gs)
     || relates pileNames (GameState.exilePiles gs)
@@ -233,6 +242,13 @@ phasedOutNames row = case row of
 monarchWatchNames :: MonarchWatch.MonarchWatch -> Set.Set ObjectId
 monarchWatchNames watch = case watch of
   MonarchWatch.MkMonarchWatch _controller _due -> Set.empty
+
+-- The object a GameState.movedUntilSourceLeaves row names beyond its key: CR
+-- 610.3's source, whose leaving the battlefield ends the move. Positional for
+-- phasedOutNames' reason.
+returnWatchNames :: ReturnWatch.ReturnWatch -> Set.Set ObjectId
+returnWatchNames watch = case watch of
+  ReturnWatch.MkReturnWatch source _zone -> Set.singleton source
 
 -- The objects a GameState.exilePiles row names beyond its key: none. Its value is
 -- CR 406.4's pile stamp, which names a pile rather than an object. Positional for

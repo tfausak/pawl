@@ -594,7 +594,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   Spec.it s "CR 509.4 slotsOf finds the slot a MoveToZone's blocking rider names" $ do
     let slot = SlotName.MkSlotName (Text.pack "thatAttacker")
         moved = SlotName.MkSlotName (Text.pack "self")
-        move riders = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot moved) Zone.Battlefield riders Nothing Nothing LibraryPlacement.defaultValue)
+        move riders = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot moved) Zone.Battlefield riders Nothing Nothing LibraryPlacement.defaultValue Nothing)
     Spec.assertEqWith s "the rider is a read, beside the ref's own" (Resolve.slotsOf (move EntryRiders.defaultValue {EntryRiders.blocking = Just slot})) (Map.fromList [(moved, SlotArity.Many), (slot, SlotArity.One)])
     Spec.assertEqWith s "and a move stating no attacker names only what it moves" (Resolve.slotsOf (move EntryRiders.defaultValue)) (Map.singleton moved SlotArity.Many)
   Spec.it s "CR 605 manaProduced reads AddMana whole, and nothing else" $ do

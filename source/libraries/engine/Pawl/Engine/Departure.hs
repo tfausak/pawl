@@ -164,6 +164,15 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 --     only runs behind continuesAfterDeparture, so the game began with more than
 --     two players (CR 800.1).
 --
+--   * a GameState.movedUntilSourceLeaves entry whose VALUE names the departing
+--     player's permanent. CR 610.3's duration is not an effect that gives anybody
+--     control either, and the value needs no attention for a second reason: the
+--     source is leaving the game, so it is no longer on the battlefield and
+--     Pawl.Engine.MoveDuration's sweep returns the object at the next settle,
+--     which is what rule 610.3 asks for. Only an entry whose KEY -- the moved
+--     object -- belongs to the departing player is dropped, because that object
+--     is leaving.
+--
 --   * a GameState.haunting entry whose VALUE is the departing player's permanent,
 --     for the same reason and one rule over: CR 702.55b's link is not an effect
 --     that gives anybody control, and rule 702.55b keeps naming the object the
@@ -196,6 +205,7 @@ objectsLeaveWith pid gs =
                       Combat.struckFirst = fmap (Set.delete oid) (Combat.struckFirst combat)
                     },
                 GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g1),
+                GameState.movedUntilSourceLeaves = Map.delete oid (GameState.movedUntilSourceLeaves g1),
                 GameState.haunting = Map.delete oid (GameState.haunting g1),
                 GameState.exiledWith = Map.delete oid (GameState.exiledWith g1),
                 GameState.exilePiles = Map.delete oid (GameState.exilePiles g1)

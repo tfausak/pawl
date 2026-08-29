@@ -76,6 +76,9 @@
                       {
                         "type": "MoveToZone",
                         "value": {
+                          "duration": {
+                            "type": "UntilSourceLeavesTheBattlefield"
+                          },
                           "ref": {
                             "type": "AnyNumberMatching",
                             "value": {
@@ -114,37 +117,6 @@
                     "optionality": {
                       "type": "Optional"
                     }
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "condition": {
-            "type": "SelfLeavesTheBattlefield"
-          },
-          "modal": {
-            "modes": [
-              {
-                "clauses": [
-                  {
-                    "effects": [
-                      {
-                        "type": "MoveToZone",
-                        "value": {
-                          "ref": {
-                            "type": "EachCardExiledWithSource"
-                          },
-                          "riders": {
-                            "underOwner": true
-                          },
-                          "zone": {
-                            "type": "Battlefield"
-                          }
-                        }
-                      }
-                    ]
                   }
                 ]
               }

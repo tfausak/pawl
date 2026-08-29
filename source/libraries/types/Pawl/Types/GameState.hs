@@ -41,6 +41,7 @@ import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Timestamp as Timestamp
 
@@ -632,6 +633,18 @@ data GameState = MkGameState
     -- Expiry sweeps are delete-and-recompute and cannot perform the return zone
     -- change.
     exiledUntilMonarch :: Map.Map ObjectId.ObjectId MonarchWatch.MonarchWatch,
+    -- | CR 610.3: objects moved "until this leaves the battlefield", keyed by the
+    -- incarnation the move minted (CR 400.7) to the watch that ends it -- the
+    -- source whose departure is the specified event, plus the zone the object came
+    -- from. Written by Pawl.Engine.Resolve's MoveToZone arm and swept by
+    -- Pawl.Engine.MoveDuration.returnMoved, the settle-loop counterpart of
+    -- exiledUntilMonarch's sweep one field up and not an Expiry for that field's
+    -- reason.
+    --
+    -- The exile half of CR 607.2a's link (exiledWith, below) does NOT answer this:
+    -- that relation says which ability exiled a card, where this one says the move
+    -- is only half finished. Nothing a card prints returns these objects.
+    movedUntilSourceLeaves :: Map.Map ObjectId.ObjectId ReturnWatch.ReturnWatch,
     -- | CR 702.55b: which object each haunting card haunts, keyed by the exiled
     -- incarnation Effect.ExileHaunting minted and answering with the object that
     -- haunt ability targeted. Read by TriggerCondition.HauntedCreatureDies, which

@@ -300,6 +300,7 @@ siegeDefeat =
             (Just Binding.became)
             Nothing
             LibraryPlacement.defaultValue
+            Nothing
         )
     -- "then you may cast it transformed without paying its mana cost": CR 608.2g's
     -- cast during a resolution, with CR 712.11a's face rider and CR 118.9's
