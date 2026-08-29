@@ -1041,14 +1041,29 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- field already names as the wrong one there. Pawl.CombatEffectSpec's "CR
       -- 506.4c a planeswalker that phases out stops being attacked" pair is the board.
       --
-      -- Membership is all this asks; CR 506.4's whole answer is Combat.stillAttacked,
-      -- and it is not reachable from here. Pawl.Engine.Combat imports this module,
-      -- and inlining its type clause would need Projection.isPlaneswalkerOf, which
-      -- projects -- the re-entry `peers` exists to keep out of this function.
+      -- The two clauses of rule 506.4 that leave the object on the battlefield under
+      -- the same id are the other two conjuncts, and each is its own leg of
+      -- Pawl.CombatEffectSpec's Aura Graft pair:
       --
-      -- Not implemented: rule 506.4's other two clauses that leave the object on the
-      -- battlefield under the same id -- the attacked planeswalker's controller
-      -- changing mid-combat, and its ceasing to be a planeswalker (#2624).
+      -- CONTROLLER, compared against Combat.defender. CR 506.2 admits only the
+      -- defending player's planeswalkers into a declaration, so "its controller
+      -- changes" and "its controller is no longer the defending player" name the same
+      -- planeswalkers -- which is the comparison Combat.stillAttacked makes through
+      -- Combat.attackablePlaneswalkers, and asking it here costs no projection.
+      --
+      -- CARD TYPE, through `peers`, which is what makes rule 506.4's planeswalker
+      -- clause reachable without Projection.isPlaneswalkerOf: that one calls project,
+      -- the re-entry `peers` exists to keep out of this function, while `peers` is
+      -- the caller's own bounded reader -- so a Song of the Dryads in layer 4 is seen
+      -- by every caller whose depth has passed layer 4, and by no caller that has
+      -- not. Only PC.cardTypes is forced, and only for an id in Combat.attackers'
+      -- VALUES: no permanent is ever both, since a declaration wants the attacker
+      -- under the active player and the attacked planeswalker under the defending
+      -- one, so this cannot re-enter itself.
+      --
+      -- Not implemented: a controller that changes and changes BACK mid-combat, which
+      -- rule 506.4 removes from combat for good and this derived read re-attacks.
+      -- Combat.stillAttacked reads the same way, so the two agree (#2627).
       --
       -- controllerOf is the lean fold rather than a projection, which is what
       -- makes it safe here: `viewUpTo` already calls it for the candidate's own
@@ -1056,7 +1071,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- object re-enters nothing that `peers` guards against.
       Filter.attackingPlaneswalkerController = case Map.lookup oid (Combat.attackers (GameState.combat gs)) of
         Just (AttackTarget.OfPlaneswalker pw)
-          | Set.member pw (GameState.battlefield gs) -> controllerOf pw gs
+          | Set.member pw (GameState.battlefield gs),
+            controllerOf pw gs == Combat.defender (GameState.combat gs),
+            any (Set.member CardType.Planeswalker . Filter.cardTypes) (peers pw) ->
+              controllerOf pw gs
         _ -> Nothing,
       -- CR 310.9d: the SAME map's last arm, followed to the attacked battle's
       -- PROTECTOR -- the seat that rule substitutes for the defending player while
@@ -1075,9 +1093,25 @@ viewOfCharacteristics peers oid pc controller counters gs =
       --
       -- Battle.protectorOf is an Object.protector lookup and reads no projection,
       -- so unlike controllerOf above it re-enters nothing at all.
+      --
+      -- The other two conjuncts are rule 506.4's battle clauses, arm for arm with the
+      -- planeswalker field above and with Combat.stillAttackedBattle's own list: the
+      -- PROTECTOR compared against Combat.defender, which CR 310.9d makes the
+      -- defending player while a battle is attacked, and the CARD TYPE through
+      -- `peers`. The type conjunct is load-bearing precisely because CR 310.9g keeps
+      -- the designation when a permanent stops being a battle, so Battle.protectorOf
+      -- goes on answering; Pawl.BattleSpec's "CR 506.4 a battle that stops being a
+      -- battle" pair is the board.
+      --
+      -- The PROTECTOR conjunct is a regression fence rather than a proven behavior:
+      -- mutating it away leaves the suite green, CR 310.9f's change needing an
+      -- effect that moves a designation. Not implemented: any such effect (#853).
       Filter.attackingBattleProtector = case Map.lookup oid (Combat.attackers (GameState.combat gs)) of
         Just (AttackTarget.OfBattle battle)
-          | Set.member battle (GameState.battlefield gs) -> Battle.protectorOf battle gs
+          | Set.member battle (GameState.battlefield gs),
+            Battle.protectorOf battle gs == Combat.defender (GameState.combat gs),
+            any (Set.member CardType.Battle . Filter.cardTypes) (peers battle) ->
+              Battle.protectorOf battle gs
         _ -> Nothing,
       -- CR 509.1g: likewise. Combat.blockers is keyed by ATTACKER, so blocking is
       -- membership in some attacker's set rather than a key lookup.
