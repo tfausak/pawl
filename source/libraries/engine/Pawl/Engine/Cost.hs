@@ -2129,17 +2129,23 @@ payToll pid charges = do
 -- over whole charges rather than parts.
 --
 -- TWO OR MORE charges holding a part that touches an object (`orderSensitive`):
--- a charge that is mana alone is spent from a pool payToll has already pooled,
--- so nothing about it competes with anything.
+-- a charge that is mana alone was spent from the pool payToll already paid, so
+-- nothing about it competes with anything.
 --
 -- And NOT ALL EQUAL by their PARTS, the tags being distinct permanents by
--- construction and so never equal. Two Exalted Dragons owe the same
--- "sacrifice a land" twice, and the payer who orders those two picks the same
--- land from the same offer either way. Sound only while no toll in `data/cards/`
--- prints a part naming the permanent it is on -- Pawl.Types.CostComponent's
--- SacrificeThis and TapThis, which would make two equal lists name two different
--- permanents; the pool's tolls are Exalted Dragon's Sacrifice, Hollow Warrior's
--- TapPermanents and Sphere of Safety's counted mana, and none of them does.
+-- construction and so never equal. Two Exalted Dragons owe the same "sacrifice a
+-- land" twice, and the payer who orders those two picks the same land from the
+-- same offer either way. Sound only while no toll in `data/cards/` prints a part
+-- naming the permanent it is on -- Pawl.Types.CostComponent's SacrificeThis and
+-- TapThis, which would make two equal lists name two different permanents; the
+-- pool's tolls are Exalted Dragon's Sacrifice, Hollow Warrior's TapPermanents
+-- and Sphere of Safety's counted mana, and none of them does.
+--
+-- BOTH conjuncts are FENCES rather than proven behaviour, `orderObservable`'s
+-- admission below: the boards that would tell them apart print two identical
+-- tolls or a mana-only toll beside another, and answering True for those raises
+-- a prompt whose answer changes nothing, so dropping either leaves the suite
+-- green.
 tollOrderObservable :: [(ObjectId, [CostComponent.CostComponent Keyword.Type.Keyword])] -> Bool
 tollOrderObservable charges = case filter (any orderSensitive . snd) charges of
   first : rest@(_ : _) -> not (all (\charge -> snd charge == snd first) rest)
