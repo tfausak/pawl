@@ -2465,6 +2465,7 @@ rewriteDamageRewrite pairs rewrite = case rewrite of
   DamageRewrite.PreventAll -> rewrite
   DamageRewrite.PreventRemovingShieldCounter -> rewrite
   DamageRewrite.PreventNext _ -> rewrite
+  DamageRewrite.PreventAllBut _ -> rewrite
   DamageRewrite.SetAmount _ -> rewrite
   DamageRewrite.Scale _ -> rewrite
 

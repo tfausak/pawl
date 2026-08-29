@@ -406,6 +406,10 @@ unspent :: DamageRewrite.DamageRewrite -> Bool
 unspent rewrite = case rewrite of
   DamageRewrite.PreventNext remaining -> remaining > 0
   DamageRewrite.PreventAll -> True
+  -- CR 615.10's static shield is never used up -- it "will apply separately to
+  -- damage from other applicable events" -- so there is nothing to spend and
+  -- nothing to refuse.
+  DamageRewrite.PreventAllBut _ -> True
   -- CR 122.1c's prevention is spent by the COUNTER going away, not by a number on
   -- the row: Projection.shieldOf mints it only while a counter is there, so a
   -- shield spent to nothing is gone from the gathered list rather than present and
@@ -435,6 +439,7 @@ admitsRecipient src rewrite de = case rewrite of
   DamageRewrite.PreventRemovingShieldCounter -> Recipient.objectOf (DamageEvent.target de) == Just src
   DamageRewrite.PreventAll -> True
   DamageRewrite.PreventNext _ -> True
+  DamageRewrite.PreventAllBut _ -> True
   DamageRewrite.SetAmount _ -> True
   DamageRewrite.Scale _ -> True
   DamageRewrite.Redirect _ -> True
@@ -1747,6 +1752,9 @@ prevents :: DamageRewrite.DamageRewrite -> Bool
 prevents rewrite = case rewrite of
   DamageRewrite.PreventNext _ -> True
   DamageRewrite.PreventAll -> True
+  -- Temple Altisaur says "prevent all but 1 of that damage", so CR 615.1a makes
+  -- this one a prevention too -- which is the whole reason it is not SetAmount.
+  DamageRewrite.PreventAllBut _ -> True
   -- CR 122.1c says "prevent that damage", so CR 615.1a makes this one too.
   DamageRewrite.PreventRemovingShieldCounter -> True
   DamageRewrite.SetAmount _ -> False
@@ -1776,6 +1784,11 @@ spentInertly :: DamageRewrite.DamageRewrite -> Bool
 spentInertly rewrite = case rewrite of
   DamageRewrite.PreventRemovingShieldCounter -> True
   DamageRewrite.PreventNext _ -> False
+  -- CR 615.10's static shield has no stored amount at all, and no additional
+  -- effect of its own, so there is nothing for CR 615.12's middle clause to run
+  -- and nothing for its last clause to protect. `contestedResource` gives it no
+  -- supply either, so it never reaches `hitsOf`.
+  DamageRewrite.PreventAllBut _ -> False
   -- Fog has no resource to spend at all, so this could answer either way;
   -- `contestedResource` gives it no supply and it never reaches `hitsOf`.
   DamageRewrite.PreventAll -> False
@@ -1913,6 +1926,7 @@ redirects rewrite = case rewrite of
   DamageRewrite.RedirectMatching _ -> True
   DamageRewrite.PreventNext _ -> False
   DamageRewrite.PreventAll -> False
+  DamageRewrite.PreventAllBut _ -> False
   DamageRewrite.PreventRemovingShieldCounter -> False
   -- CR 614.1a's two amount rewrites leave the recipient where it was, so neither
   -- deals the damage "instead to another permanent or player".
@@ -2301,6 +2315,11 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
     -- Fog is unlimited for its duration, so there is nothing to allocate: it
     -- prevents every event it admits and the order cannot matter.
     DamageRewrite.PreventAll -> Nothing
+    -- CR 615.10 states the opposite of CR 615.7 for a static shield: it "will
+    -- apply separately to damage from other applicable events that would happen
+    -- at the same time", so a batch cannot exhaust it and there is nothing to
+    -- allocate.
+    DamageRewrite.PreventAllBut _ -> Nothing
     DamageRewrite.SetAmount _ -> Nothing
     DamageRewrite.Scale _ -> Nothing
     DamageRewrite.Redirect _ -> Nothing

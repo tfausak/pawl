@@ -35,6 +35,14 @@ spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
       DamageRewrite.codec
       (DamageRewrite.PreventNext 4)
       " {\"type\":\"PreventNext\",\"value\":4} "
+  -- CR 615.10's static shield, whose Natural is what SURVIVES it -- the one
+  -- Temple Altisaur prints.
+  Spec.it s "PreventAllBut" $
+    Common.assertCodec
+      s
+      DamageRewrite.codec
+      (DamageRewrite.PreventAllBut 1)
+      " {\"type\":\"PreventAllBut\",\"value\":1} "
   -- CR 614.1a: a flat instead-amount.
   Spec.it s "SetAmount" $
     Common.assertCodec
