@@ -16,8 +16,8 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- slot with several recipients, and Ixidron's "all other nontoken creatures" names
 -- no slot at all. ObjectRef.InSlot covers the first and ObjectRef.EachMatching the
 -- second, and the singular "target creature" of Backslide is InSlot with a slot CR
--- 601.2c filled once. Only the InSlot form has a card in data\/cards; the sweep
--- form is waiting on Ixidron, see #2337.
+-- 601.2c filled once. Both forms have a card in data\/cards, the sweep form being
+-- Ixidron itself; Pawl.FaceDownSpec's "CR 613.7f" pair is where it is driven.
 data TurnFaceDown = MkTurnFaceDown
   { ref :: ObjectRef.ObjectRef,
     characteristics :: FaceDownCharacteristics.FaceDownCharacteristics

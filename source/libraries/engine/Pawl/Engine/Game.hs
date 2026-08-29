@@ -647,6 +647,31 @@ faceOfWithLastKnown oid gs = case fmap Object.facing (lookupObject oid gs) of
     card <- cardOfWithLastKnown oid gs
     Just (resolveFaceFor (lookupObject oid gs) card)
 
+-- CR 708.2 / CR 708.8 over ONE object: write which face it is showing, and give
+-- it CR 613.7f's new timestamp -- "a permanent receives a new timestamp each time
+-- it turns face up or face down". The primitive BOTH turning-over roads share,
+-- Pawl.Engine.Resolve's Effect.TurnFaceDown arm and
+-- Pawl.Engine.FaceDown.performTurnFaceUp, so neither can end up with the write
+-- and without the stamp.
+--
+-- ONE object per call and one stamp per call, unlike turnFaceOver above: rule
+-- 613.7f gives the timestamp to the permanent that turned over rather than to the
+-- turning-over, and nothing compares two of these stamps the way CR 701.27f
+-- compares turnFaceOver's.
+--
+-- The STAMP is a permanent's, so it is written only on the battlefield (CR
+-- 110.1); the facing is written wherever the object is. No road reaches a
+-- non-battlefield object today -- both roads named above turn a permanent over --
+-- and the gate is turnFaceOver's own, kept so that a road that later does cannot
+-- silently restamp a face-down card in exile, whose stamp names its
+-- Pawl.Types.Pile.
+turnFacing :: Facing.Facing -> ObjectId -> GameState -> GameState
+turnFacing facing oid gs =
+  let (ts, stamped) = freshTimestamp gs
+      restamps = Set.member oid (GameState.battlefield gs)
+      adjust o = o {Object.facing = facing, Object.timestamp = if restamps then ts else Object.timestamp o}
+   in (if restamps then stamped else gs) {GameState.objects = Map.adjust adjust oid (GameState.objects gs)}
+
 -- CR 701.27a over ONE object: "turn it over so that its other face is up", or
 -- leave the map exactly as it was. The primitive BOTH transform paths share --
 -- Pawl.Engine.Resolve's CR 701.27a opcode, which adds CR 701.27f's already-turned
