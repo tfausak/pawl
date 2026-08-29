@@ -56,10 +56,10 @@ data CounterRestriction = MkCounterRestriction
     -- Solemnity names none ("counters can't be put on ..."); Melira names one
     -- ("can't have -1\/-1 counters put on them").
     --
-    -- Maybe rather than a set, mirroring Pawl.Types.MoveCounters' own kind field:
-    -- both printings name at most one kind, and an empty set would be a second
-    -- spelling of "no prohibition at all". A card naming two kinds prints two
-    -- rows, which is what the list on Pawl.Types.Face is for.
+    -- Maybe rather than a set: both printings name at most one kind, and an
+    -- empty set would be a second spelling of "no prohibition at all". A card
+    -- naming two kinds prints two rows, which is what the list on
+    -- Pawl.Types.Face is for.
     kind :: Maybe (CounterKind.CounterKind Keyword.Keyword)
   }
   deriving (Eq, Ord, Show)

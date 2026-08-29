@@ -21,8 +21,17 @@
                         "type": "MoveCounters",
                         "value": {
                           "from": "self",
-                          "kind": {
-                            "type": "PlusOnePlusOne"
+                          "kinds": {
+                            "type": "Named",
+                            "value": {
+                              "count": {
+                                "type": "Literal",
+                                "value": 1
+                              },
+                              "kind": {
+                                "type": "PlusOnePlusOne"
+                              }
+                            }
                           },
                           "to": "target"
                         }

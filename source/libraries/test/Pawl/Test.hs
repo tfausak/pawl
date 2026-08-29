@@ -236,6 +236,7 @@ import qualified Pawl.Codec.MorphVariantSpec
 import qualified Pawl.Codec.MoveCountersSpec
 import qualified Pawl.Codec.MoveToZoneSpec
 import qualified Pawl.Codec.MovedBetweenSpec
+import qualified Pawl.Codec.MovedKindsSpec
 import qualified Pawl.Codec.MovedSpec
 import qualified Pawl.Codec.ObjectIdSpec
 import qualified Pawl.Codec.ObjectRefSpec
@@ -821,6 +822,7 @@ spec s registry = do
   Pawl.Codec.ProductionTagSpec.spec s
   Pawl.Codec.ProjectedCharacteristicsSpec.spec s
   Pawl.Codec.MoveCountersSpec.spec s
+  Pawl.Codec.MovedKindsSpec.spec s
   Pawl.Codec.PutCountersSpec.spec s
   Pawl.Codec.QuantitySpec.spec s
   Pawl.Codec.RecipientSpec.spec s

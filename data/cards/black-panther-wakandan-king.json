@@ -21,19 +21,24 @@
                         "type": "MoveCounters",
                         "value": {
                           "from": "land",
-                          "kind": {
-                            "type": "PlusOnePlusOne"
-                          },
-                          "quantity": {
-                            "type": "AgainstSlot",
+                          "kinds": {
+                            "type": "Named",
                             "value": {
-                              "quantity": {
-                                "type": "ObjectCounters",
+                              "count": {
+                                "type": "AgainstSlot",
                                 "value": {
-                                  "type": "PlusOnePlusOne"
+                                  "quantity": {
+                                    "type": "ObjectCounters",
+                                    "value": {
+                                      "type": "PlusOnePlusOne"
+                                    }
+                                  },
+                                  "slot": "land"
                                 }
                               },
-                              "slot": "land"
+                              "kind": {
+                                "type": "PlusOnePlusOne"
+                              }
                             }
                           },
                           "slot": "moved",

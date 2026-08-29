@@ -125,6 +125,7 @@ import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveToZone as MoveToZone
+import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -2130,12 +2131,12 @@ rewriteEffect pairs effect = case effect of
   -- printed keyword through the swap, PutCounters' case above (#1840).
   Effect.RemoveCounters x -> Effect.RemoveCounters x {RemoveCounters.quantity = rewriteQuantity pairs (RemoveCounters.quantity x)}
   -- Filter.rewrite renames no slot, so none of the three bare slots is rewritten;
-  -- the count is a Quantity and goes through rewriteQuantity, PutCounters' case
+  -- the count is a Quantity and goes through rewriteMovedKinds, PutCounters' case
   -- above.
   -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
   -- printed keyword through the swap, PutCounters' case above (#1840).
-  Effect.MoveCounters (MoveCounters.MkMoveCounters from kind quantity slot to) ->
-    Effect.MoveCounters (MoveCounters.MkMoveCounters from kind (rewriteQuantity pairs quantity) slot to)
+  Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds slot to) ->
+    Effect.MoveCounters (MoveCounters.MkMoveCounters from (rewriteMovedKinds pairs kinds) slot to)
   -- A player counter kind is a closed list (CR 122.1f, CR 122.1i, CR 107.14, and
   -- CR 122.1's bare first sentence) with no subtype word in it, so only the count
   -- descends.
@@ -2752,6 +2753,15 @@ rewriteDuration pairs duration = case duration of
   -- Cost arm carries a subtype word outside a Filter, and the Filters a cost's
   -- non-mana components hold are matched where the cost is paid.
   Duration.UntilPaid _ -> duration
+
+-- CR 612.1 through the counters a CR 122.5 move carries: the count is the only
+-- place a subtype word can hide, since the kind is a CounterKind and Every names
+-- nothing at all.
+rewriteMovedKinds :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> MovedKinds.MovedKinds -> MovedKinds.MovedKinds
+rewriteMovedKinds pairs kinds = case kinds of
+  MovedKinds.Every -> kinds
+  MovedKinds.Named kind quantity -> MovedKinds.Named kind (rewriteQuantity pairs quantity)
+  MovedKinds.Chosen quantity -> MovedKinds.Chosen (rewriteQuantity pairs quantity)
 
 -- CR 612.1 through a Quantity: a Count's Filter is where the subtype word hides,
 -- and its Aggregation may name a further Quantity. Every remaining arm is a leaf.
