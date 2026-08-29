@@ -32,6 +32,8 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.Conjure as Conjure
+import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.CopySpell as CopySpell
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
@@ -661,6 +663,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Create (Create.MkCreate (Quantity.Literal 1) card plain Nothing (PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "victim")))))
       " {\"type\":\"Create\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":1},\"card\":\"Goblin Piker\",\"creator\":{\"type\":\"ControllerOfBound\",\"value\":\"victim\"}}} "
+  -- Both keys required, so there is one form: Alchemy states the conjured card
+  -- and where it goes in the same sentence.
+  Spec.it s "Conjure" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Conjure (Conjure.MkConjure (Text.pack "Ornithopter") ConjureDestination.Hand))
+      " {\"type\":\"Conjure\",\"value\":{\"card\":\"Ornithopter\",\"destination\":{\"type\":\"Hand\"}}} "
   -- Both ObjectRef arms have to survive. A count of one is elided, so both of
   -- these write the ref alone.
   Spec.it s "CreateCopy round-trips both ObjectRef arms" $ do
