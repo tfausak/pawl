@@ -2609,7 +2609,7 @@ templeAltisaurSpec s registry = Spec.describe s "Temple Altisaur (CR 615.10)" $ 
 -- with the field Temple Altisaur's leaves empty: a DamagePattern whose PRINTED
 -- recipient side names an object half ("a planeswalker you control") AND a
 -- player half ("you"), which Replacement.matchesPrintedRecipient joins with
--- `or`. A conjunction would admit nothing, CR 120.3a's two kinds of recipient
+-- `or`. A conjunction would admit nothing, CR 120.3's two kinds of recipient
 -- being disjoint, so the pair of positive legs below -- alice's life total and
 -- alice's other planeswalker, off one row -- is what the disjunction buys.
 -- CR 114.1 puts the emblem in the command zone and CR 114.4 is what makes its
@@ -2672,9 +2672,10 @@ ajaniSteadfastSpec s registry = Spec.describe s "Ajani Steadfast (CR 114.4, CR 6
       Spec.assertBool s (not (S.onBattlefield ajani armed)) "CR 704.5i Ajani paid his last loyalty counter for the ultimate and is buried"
       Spec.assertBool s (S.onBattlefield ajani base) "where the unactivated board still has him, at the seven counters he never spent"
   -- The -2, whose two instructions differ in every part: counter kind, the card
-  -- type swept, and whether the source itself is included. "Each other" is CR
-  -- 601.2c's "another", spelled Filter.Not Filter.IsSource, which is the only
-  -- thing keeping Ajani from topping himself up.
+  -- type swept, and whether the source itself is included. "Each other" is
+  -- spelled Filter.Not Filter.IsSource -- a SWEEP rather than a target, so the
+  -- exclusion is read off the ability's own source as the instruction is
+  -- reached -- and it is the only thing keeping Ajani from topping himself up.
   Spec.it s "CR 122.1e the -2 counters alice's creatures and every OTHER planeswalker she controls"
     . withBoard
     $ \printing ajani jace karn piker source base -> do
