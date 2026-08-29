@@ -1498,8 +1498,9 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
 -- never have stood in for it: no rule-702 provenance is equally true of every
 -- ordinary activated ability arriving through Pawl.Engine.Activate, while
 -- everything reaching this function is a mana ability by CR 605.1a -- which is
--- what makes Suppression Field's "unless they're mana abilities" spare every
--- activation gathered here.
+-- what makes Suppression Field's "unless they're mana abilities" and Zirda, the
+-- Dawnwaker's "that aren't mana abilities" spare every activation gathered here,
+-- the increase side and the reduction side of one rider.
 manaActivationAdjustments :: PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
 manaActivationAdjustments pid oid gs = manaActivationAdjustmentsGiven (PlayerEffect.applying pid gs) oid gs
 

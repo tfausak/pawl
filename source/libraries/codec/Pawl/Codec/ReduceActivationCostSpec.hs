@@ -3,6 +3,7 @@ module Pawl.Codec.ReduceActivationCostSpec where
 import qualified Pawl.Codec.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
@@ -22,6 +23,7 @@ spec s = Spec.describe s "Pawl.Codec.ReduceActivationCost" $ do
       ( ReduceActivationCost.MkReduceActivationCost
           { ReduceActivationCost.whichAbilities = Filter.HasCardType CardType.Creature,
             ReduceActivationCost.grantedBy = Nothing,
+            ReduceActivationCost.whichKind = Nothing,
             ReduceActivationCost.whichTargets = Nothing,
             ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 1],
             ReduceActivationCost.floor = 1
@@ -40,6 +42,7 @@ spec s = Spec.describe s "Pawl.Codec.ReduceActivationCost" $ do
       ( ReduceActivationCost.MkReduceActivationCost
           { ReduceActivationCost.whichAbilities = Filter.And [],
             ReduceActivationCost.grantedBy = Just KeywordFamily.Cycling,
+            ReduceActivationCost.whichKind = Nothing,
             ReduceActivationCost.whichTargets = Nothing,
             ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 2],
             ReduceActivationCost.floor = 0
@@ -58,10 +61,30 @@ spec s = Spec.describe s "Pawl.Codec.ReduceActivationCost" $ do
       ( ReduceActivationCost.MkReduceActivationCost
           { ReduceActivationCost.whichAbilities = Filter.And [],
             ReduceActivationCost.grantedBy = Just KeywordFamily.Equip,
+            ReduceActivationCost.whichKind = Nothing,
             ReduceActivationCost.whichTargets = Just Filter.IsSource,
             ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 2],
             ReduceActivationCost.floor = 0
           }
       )
       " {\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"grantedBy\":{\"type\":\"Equip\"},\"whichTargets\":{\"type\":\"IsSource\"},\"reduction\":[{\"type\":\"Generic\",\"value\":2}],\"floor\":0} "
+  -- CR 605.1a's rider, which Zirda, the Dawnwaker prints and the three cases
+  -- above do not: the key is written only where the sentence says it, and its
+  -- own case for the reason theirs have one -- whichKind is DEFAULTED, so a
+  -- round trip whose value is Nothing would stay green with it dropped from the
+  -- codec.
+  Spec.it s "MkReduceActivationCost, narrowed to abilities that are not mana abilities" $
+    Common.assertCodec
+      s
+      ReduceActivationCost.codec
+      ( ReduceActivationCost.MkReduceActivationCost
+          { ReduceActivationCost.whichAbilities = Filter.And [],
+            ReduceActivationCost.grantedBy = Nothing,
+            ReduceActivationCost.whichKind = Just AbilityKind.NonManaAbility,
+            ReduceActivationCost.whichTargets = Nothing,
+            ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 2],
+            ReduceActivationCost.floor = 1
+          }
+      )
+      " {\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"whichKind\":{\"type\":\"NonManaAbility\"},\"reduction\":[{\"type\":\"Generic\",\"value\":2}],\"floor\":1} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ReduceActivationCost.codec

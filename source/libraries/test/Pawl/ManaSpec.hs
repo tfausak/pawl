@@ -2559,7 +2559,10 @@ takesIgnusOnce ignusId p = case p of
 --
 --   * the INCREASE -- Suppression Field ("Activated abilities cost {2} more to
 --     activate unless they're mana abilities"), whose "unless" is CR 605.1a's
---     classification and reaches this seam by NOT applying here at all.
+--     classification and reaches this seam by NOT applying here at all. Zirda,
+--     the Dawnwaker prints the same rider on the reduction side, and is read the
+--     same way: its {2} spares the Golem's mana ability and reaches the
+--     Brothers'.
 --
 --   * the ADDITIONAL COST -- Drought ("Activated abilities cost an additional
 --     \"Sacrifice a Swamp\" to activate for each black mana symbol in their
@@ -2706,13 +2709,64 @@ activationAdjustmentSpec s registry = Spec.describe s "CR 601.2f a mana ability'
     Spec.assertEqWith s "CR 601.2f three Mountains cannot pay the taxed {3}{R}{R}" (offers taxed) 0
     Spec.assertEqWith s "and pay the printed {1}{R}{R} on the same board without the Field" (offers printed) 1
 
+  -- CR 605.1a's rider on the REDUCTION half, the sibling of the two cases above:
+  -- Zirda, the Dawnwaker ("Abilities you activate that aren't mana abilities cost
+  -- {2} less to activate. This effect can't reduce the mana in that cost to less
+  -- than one mana", checked against Scryfall) prints it, and its "that aren't
+  -- mana abilities" is a fact about the ABILITY rather than about the permanent
+  -- the reduction's Filter is asked of. Scryfall o:"aren't mana abilities cost",
+  -- 2026-08-29, one hit -- Zirda; a second such printing would join it here.
+  --
+  -- Two of Zirda's three clauses are not in its card file, and both omissions
+  -- leave pawl's Zirda STRICTER than printed rather than weaker: the Companion
+  -- clause, which nothing can choose or pay for (gap #2451), and "{1}, {T}:
+  -- Target creature can't block this turn", which no effect can say (gap #2588).
+  -- Neither bears on the sentence this case is about.
+  --
+  -- Proved at the PAYMENT and not at the offer, for the reason the Field's case
+  -- is: Cost.tapForManaWith is what folds the gathered reduction into the mana
+  -- part. Two Mountains against the Golem's {3} is what makes the two readings
+  -- differ -- spared, the {3} stands and no pair of Mountains pays it; reached,
+  -- the {2} takes it to Zirda's one-mana floor and a single Mountain buys three
+  -- red.
+  Spec.it s "CR 605.1a a reduction that spares mana abilities does not reach one" $ do
+    golem <- S.printingOf s registry "Coal Golem"
+    zirda <- S.printingOf s registry "Zirda, the Dawnwaker"
+    mountain <- S.printingOf s registry "Mountain"
+    let (golemId, reduced) = golemBoard golem mountain (Just zirda)
+        (_, printed) = golemBoard golem mountain Nothing
+        run gs = snd (State.evalState (Engine.runGame (takesSourceOnce golemId) gs Engine.priorityLoop) (0 :: Int))
+        golemsLeft = S.countOnBattlefieldByName (S.printingName golem) S.alice
+    Spec.assertEqWith s "CR 605.1a Zirda's {2} does not reach the Golem's mana ability, so two Mountains cannot pay its {3} and nothing floats" (poolTypes S.alice (run reduced)) []
+    Spec.assertEqWith s "so the Golem was never sacrificed to pay for it" (golemsLeft (run reduced)) 1
+    Spec.assertEqWith s "and neither Mountain was tapped in its name" (S.tappedCount S.alice (run reduced)) 0
+    Spec.assertEqWith s "the same tap on the same board without Zirda" (poolTypes S.alice (run printed)) []
+    Spec.assertEqWith s "with the same Golem still on the battlefield" (golemsLeft (run printed)) 1
+
+  -- The other side of the same sentence, and the reason the case above is not
+  -- passing because Zirda was transcribed as a {0}: Brothers of Fire ("{1}{R}{R},
+  -- {T}: Brothers of Fire deals 1 damage to any target") is no mana ability, so
+  -- the same Zirda takes its {1}{R}{R} to {R}{R} -- CR 118.7a, the {2} reaching
+  -- the one generic symbol and no further, which leaves two mana and never tests
+  -- the floor -- and two Mountains start paying for it.
+  Spec.it s "CR 601.2f the same reduction does reach an ability that is not one" $ do
+    brothers <- S.printingOf s registry "Brothers of Fire"
+    zirda <- S.printingOf s registry "Zirda, the Dawnwaker"
+    mountain <- S.printingOf s registry "Mountain"
+    let (brothersId, reduced) = brothersBoard brothers mountain (Just zirda)
+        (_, printed) = brothersBoard brothers mountain Nothing
+        offers gs = length (filter (isActivationOf brothersId) (Action.legalActions S.alice gs))
+    Spec.assertEqWith s "CR 118.7a reduced to {R}{R}, two Mountains pay for the Brothers" (offers reduced) 1
+    Spec.assertEqWith s "at the printed {1}{R}{R} the same two do not" (offers printed) 0
+
 -- alice, active, in her precombat main phase: one Coal Golem, two Mountains, and
--- the Heartstone or not. Returns the Golem.
+-- one reducer or not -- the Heartstone, whose sentence reaches the Golem's mana
+-- ability, or Zirda, whose sentence spares it. Returns the Golem.
 golemBoard :: Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
-golemBoard golem mountain heartstone =
+golemBoard golem mountain reducer =
   let (golemId, g1) = S.addCreature golem S.alice (Setup.emptyGame S.bothPlayers)
       g2 = foldr (\_ gs -> snd (S.addCreature mountain S.alice gs)) g1 [1 :: Int, 2]
-      g3 = case heartstone of
+      g3 = case reducer of
         Nothing -> g2
         Just printing -> snd (S.addCreature printing S.alice g2)
    in (golemId, g3 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
@@ -2729,6 +2783,18 @@ suppressionFieldBoard brothers mountain field =
         Nothing -> g3
         Just printing -> snd (S.addCreature printing S.alice g3)
    in (mountainId, brothersId, g4 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+
+-- alice, active, in her precombat main phase: one Brothers of Fire, two
+-- Mountains, and Zirda or not. Returns the Brothers -- one ability that is no
+-- mana ability, against a board one mana short of its printed cost.
+brothersBoard :: Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+brothersBoard brothers mountain zirda =
+  let (brothersId, g1) = S.addCreature brothers S.alice (Setup.emptyGame S.bothPlayers)
+      g2 = foldr (\_ gs -> snd (S.addCreature mountain S.alice gs)) g1 [1 :: Int, 2]
+      g3 = case zirda of
+        Nothing -> g2
+        Just printing -> snd (S.addCreature printing S.alice g2)
+   in (brothersId, g3 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
 
 -- alice, active, in her precombat main phase: one Transmogrant Altar, one Goblin
 -- Piker for the printed sacrifice, one `blackSource` for the {B} -- a Swamp

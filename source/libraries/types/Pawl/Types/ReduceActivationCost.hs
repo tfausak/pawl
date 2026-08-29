@@ -1,6 +1,7 @@
 module Pawl.Types.ReduceActivationCost where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
@@ -16,7 +17,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- means, why a floor never raises a cost, and why the two kinds cannot share one
 -- floor over the pool.
 --
--- THREE criteria, and they ask about different things. `whichAbilities` names the
+-- FOUR criteria, and they ask about different things. `whichAbilities` names the
 -- ability's SOURCE OBJECT -- Heartstone's "activated abilities of creatures",
 -- Blossoming Tortoise's "of lands you control" -- and is matched by
 -- Pawl.Engine.PlayerEffect.matchesObject against that object's projection.
@@ -33,7 +34,19 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- here is which rule minted the ability (Pawl.Engine.Keyword.familyGranting),
 -- never what the ability does.
 --
--- `whichTargets` is the THIRD question, and it is neither of the other two: an
+-- `whichKind` is the THIRD, and neither of the two above can say it: CR 605.1a's
+-- classification of the ability BEING ACTIVATED, which is Zirda, the
+-- Dawnwaker's "abilities you activate THAT AREN'T MANA ABILITIES". Nothing is
+-- every activated ability of a matching source, which is what Heartstone and
+-- Blossoming Tortoise print; Just a kind is only the abilities on that side of
+-- the rule. `grantedBy`'s Nothing could never have stood in for it -- no
+-- rule-702 provenance is equally true of every ordinary non-keyword activated
+-- ability -- and a Filter atom could never either, since `whichAbilities` is
+-- asked of the Mountain and whether the Mountain's `{T}: Add {R}` is a mana
+-- ability is a fact about the ABILITY. The same field
+-- Pawl.Types.IncreaseActivationCost carries, for the same reason.
+--
+-- `whichTargets` is the FOURTH question, and it is none of the other three: an
 -- object again, but the ability's CHOSEN TARGET rather than its source -- Dwarven
 -- Mauler's "equip abilities you activate THAT TARGET THIS CREATURE". Nothing is
 -- the sentence that names no target, which is every other reducer in the pool;
@@ -43,13 +56,14 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- `whichAbilities`: that field is asked of the Equipment, and the creature the
 -- equip aims at is a different object entirely.
 --
--- Asked LATER than the other two, and that is the field's whole difficulty: CR
+-- Asked LATER than the other three, and that is the field's whole difficulty: CR
 -- 601.2c announces targets and CR 601.2f applies reductions, so a target-aware
 -- reduction cannot be gathered at CR 601.2b's position.
 -- Pawl.Engine.Activate.activateAbility gathers twice for exactly that reason.
 data ReduceActivationCost = MkReduceActivationCost
   { whichAbilities :: Filter.Filter Keyword.Keyword,
     grantedBy :: Maybe KeywordFamily.KeywordFamily,
+    whichKind :: Maybe AbilityKind.AbilityKind,
     whichTargets :: Maybe (Filter.Filter Keyword.Keyword),
     reduction :: ManaCost.ManaCost,
     floor :: Natural.Natural
