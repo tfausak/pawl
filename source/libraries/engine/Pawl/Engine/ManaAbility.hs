@@ -466,7 +466,10 @@ refReachesLibrary ref = case ref of
   ObjectRef.TopOfLibraryUntil {} -> True
   -- TRUE, the only sweeping arm that is: CR 605.1a's fourth clause asks
   -- whether the effect moves a card to or from a LIBRARY, and this one names
-  -- every card in the resolving controller's.
+  -- every card in the resolving controller's. A regression fence rather than a
+  -- proven line: rule 605.1a classifies ACTIVATED abilities, and every printing
+  -- of this arm puts it under a triggered ability or a spell, so no card in the
+  -- pool can tell True from False here. Kept because the rule states it.
   ObjectRef.EachCardInYourLibrary -> True
   ObjectRef.InSlot _ -> False
   ObjectRef.EachMatching _ -> False

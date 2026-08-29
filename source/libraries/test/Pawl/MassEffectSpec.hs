@@ -3086,6 +3086,11 @@ levelerSpec s registry =
               shuffled r = case r of
                 Response.Shuffled _ -> True
                 _ -> False
+          -- The two negatives are over a REAL response log, not an empty one:
+          -- the cast and the loop both recorded, so "no search" is a statement
+          -- about what this resolution asked rather than about a recorder that
+          -- never ran.
+          Spec.assertBool s (not (null responses)) "the run recorded responses"
           Spec.assertBool s (not (any searched responses)) "no search was put to a player"
           Spec.assertBool s (not (any shuffled responses)) "and no library was shuffled"
           -- Anti-vacuity: the sweep really did run under the same answerer, so
