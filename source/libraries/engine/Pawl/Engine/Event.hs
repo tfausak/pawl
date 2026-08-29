@@ -11839,9 +11839,9 @@ eventTriggers events gs =
       -- question, and CR 113.6m answers it differently: the rule's own "unless
       -- its trigger condition ... specifies that the object is put into that
       -- zone" exempts the dies triggers that arm serves, and THAT half of the
-      -- clause is not implemented (#819) -- `enchantedObjectLeaves` below reads
-      -- only its Aura half -- so filtering there would read the rule's first
-      -- sentence without the exception that governs this arm.
+      -- clause is not implemented (#2502) -- `enchantedObjectLeaves` below
+      -- reads only its Aura half -- so filtering there would read the rule's
+      -- first sentence without the exception that governs this arm.
       battlefieldAbilitiesOf pc = filter (functionsIn Zone.Battlefield) (abilitiesOf pc)
       -- CR 603.10's first sentence, per EVENT GROUP: the permanents that existed
       -- immediately after the event, with the abilities and the CR 603.3a
@@ -12603,10 +12603,15 @@ eventTriggers events gs =
 -- pins the ability to the graveyard, where the condition can never be checked,
 -- and the card does nothing.
 --
--- Not implemented: the clause's OTHER half, "a previous part of its cost or
--- effect specifies that the object is put into that zone", and the
--- delayed-triggered-ability sentence (#819). Neither needs a trigger condition,
--- so both belong to the fold below rather than here.
+-- The clause's "a previous part of its cost or effect specifies that the object
+-- is put into that zone" half belongs to the fold below rather than here, and
+-- the fold reads it by construction: Pawl.Engine.Activate.zoneFunctionedFrom
+-- carries the argument, which is CR 400.7's fresh id -- a later part cannot
+-- name the reserved source slot for an object an earlier part already moved.
+-- See #2501.
+--
+-- Not implemented: the delayed-triggered-ability sentence (#2500), which needs
+-- no trigger condition either and so belongs to the fold below too.
 zoneFunctionedFrom :: TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Maybe Zone
 zoneFunctionedFrom ability =
   if enchantedObjectLeaves (TriggeredAbility.condition ability)

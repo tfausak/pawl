@@ -1006,9 +1006,16 @@ funnelBack finalSub parent =
       -- objectsLeaveWith deleted the subgame's, so nothing represents it in
       -- either game. That is the two rules read together rather than an oversight
       -- -- CR 729.4a took it out of the main game and CR 800.4a took it out of
-      -- the subgame -- and Pawl.SetupSpec pins it. The two arms of the same road
-      -- do end differently, though, and CR 729.5's Example gives both sources one
-      -- destination, so which arm is wrong is open (#2469).
+      -- the subgame -- and Pawl.SetupSpec pins it. CR 729.5's funnel offers no
+      -- third answer: it takes "cards they own that are in the subgame", and
+      -- CR 800.4a removed this one before the subgame ended, so the rule's
+      -- Example never reaches it. Nor is the card lost -- CR 400.11 makes
+      -- outside the game a non-zone, which is a coherent terminal state.
+      --
+      -- The two arms of the same road end differently because they must. This
+      -- one returns a SIDEBOARD card to where CR 400.11a says it lives; pooling
+      -- a maindeck card there would make it fetchable by a later MAIN-GAME wish
+      -- and corrupt CR 100.4a's combined deck-and-sideboard accounting.
       --
       -- A player absent from the subgame's roster keeps the parent's pool too.
       -- The lookup cannot miss today -- subgameStateFrom rebuilds the players map
