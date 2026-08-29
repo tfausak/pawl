@@ -24,7 +24,7 @@ import qualified Pawl.Types.Zone as Zone
 -- owner's library instead." Its own ruling says which zones that is -- "Nexus of
 -- Fate's last ability applies if it would be put into a graveyard in any way,
 -- including while it's resolving" -- so the card states every zone (CR 113.6b)
--- and the three cases below drive three of them.
+-- and the cases below drive the hand, the library and the stack with it.
 --
 -- Not implemented: the reveal and the shuffle. Pawl.Types.ZoneChangeR names a
 -- destination zone and nothing else, so the card lands at
@@ -36,9 +36,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- CR 113.6b from a HIDDEN zone (CR 400.2), which CR 113.6's own defaults never
   -- reach: the row functions only because the card states the hand.
   --
-  -- A discard rather than a bare zone move, because CR 701.9c is the harder road
-  -- -- a redirected discard is still a discard -- and Pawl.Engine.Event.discard
-  -- is the funnel every discard goes through.
+  -- A discard rather than a bare zone move, because CR 701.9a's action is the
+  -- harder road -- a discard whose move CR 614.6 sends elsewhere is still a
+  -- discard -- and Pawl.Engine.Event.discard is the funnel every discard goes
+  -- through. CR 701.9c is what the missing reveal costs: a card discarded into a
+  -- hidden zone unrevealed has undefined characteristics, which pawl does not
+  -- model either way (#2591).
   Spec.it s "CR 113.6b a stated row functions from the hand, so a discard lands in the library" $ do
     nexus <- S.printingOf s registry "Nexus of Fate"
     let (nexusId, gs) = S.addHandCard nexus S.alice (Setup.emptyGame S.bothPlayers)
@@ -56,7 +59,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         milled = S.runPure S.identityAnswer gs (Event.changeZone nexusId Zone.Graveyard)
     Spec.assertEqWith s "CR 614.6 the card never left the library" (length (Game.zoneMembers Zone.Library S.alice milled)) 1
     Spec.assertEqWith s "and the graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice milled)) 0
-  -- CR 608.2m's trip to the graveyard, replaced from the STACK: the spell is the
+  -- CR 608.2n's trip to the graveyard, replaced from the STACK: the spell is the
   -- object with the ability, and it is still on the stack as the move is
   -- proposed. The ruling above is about exactly this road.
   Spec.it s "CR 113.6b a stated row functions from the stack, so the resolved spell goes to the library" $ do
@@ -73,7 +76,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         cast = S.runPure S.identityAnswer gs (S.cast S.alice nexusId)
         resolved = S.runPure S.identityAnswer cast Stack.resolveTop
     Spec.assertEqWith s "CR 614.6 the resolved spell is in its owner's library" (length (Game.zoneMembers Zone.Library S.alice resolved)) 1
-    Spec.assertEqWith s "and CR 608.2m's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 0
+    Spec.assertEqWith s "and CR 608.2n's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 0
     -- After the two above, so that neither can be absorbed by a cast that never
     -- happened: an uncast Nexus would leave the library empty and fail the first.
     Spec.assertEqWith s "the spell really was cast" (length (GameState.stack cast)) 1

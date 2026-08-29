@@ -4574,16 +4574,9 @@ abilitiesFromCharacteristics peers pc oid gs =
 replacementsOf :: Zone.Zone -> ObjectId -> GameState -> [(ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
 replacementsOf zone oid gs =
   let pc = project oid gs
-      -- CR 614.12: a card-authored condition reads the board an entering
-      -- permanent would arrive on, which holds neither the permanent itself nor
-      -- the ones arriving beside it -- boardAsEntering. The VIEW stays `fullView
-      -- gs`: what the rule takes off the board is membership, not
-      -- characteristics, and the permanent's own are exactly what CR 614.12 asks
-      -- to be read "as it would exist on the battlefield".
-      --
-      -- Proven by Pawl.ReplacementSpec's Frontier Mastodon pairs, one per
-      -- direction: reanimated beside Jedit Ojanen, and entering at 4/3 under
-      -- Glorious Anthem.
+      -- CR 113.6b first and CR 604.2 second: which zone the row functions from,
+      -- then whether its clause holds there (printedRowLives argues the board
+      -- that reads against).
       lives pr = functionsFromZoneOfRow zone pr && printedRowLives oid gs pr
    in -- The one place the two provenances are told apart, which is why the mark
       -- is made HERE rather than inferred downstream: the first segment is the
@@ -4958,11 +4951,10 @@ replacementsAffecting gs =
       -- gatherGiven's reason: an unstated row gathered here would have every card
       -- in every library replacing events from inside it.
       --
-      -- The PRINTED face, as gatherGiven's off-battlefield arms read one and not
-      -- the projection the two walks above take: `project` is what the
-      -- short-circuit beneath exists to skip, and a card in one of these zones is
-      -- outside every layer that could rewrite its rules text (CR 613.1e is
-      -- battlefield-and-stack). CR 604.2's clause still gates each row.
+      -- The PRINTED face, which is how every off-battlefield arm of gatherGiven
+      -- reads one, rather than the projection the two walks above take: `project`
+      -- is what the short-circuit beneath exists to skip. CR 604.2's clause still
+      -- gates each row.
       --
       -- MINTED rows are deliberately absent: CR 122.1's counters do not survive
       -- the trip off the battlefield (CR 122.2), and every other minted row is
