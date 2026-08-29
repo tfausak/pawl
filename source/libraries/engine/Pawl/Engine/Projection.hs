@@ -1035,15 +1035,16 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- phases out or leaves the battlefield, while CR 506.4c keeps the creature
       -- attacking with nothing to read -- and Game.removeFromCombat deletes only the
       -- departed permanent's own key, exactly as rule 506.4c demands, so the entry
-      -- naming it survives. Without the guard controllerOf still answers off
-      -- GameState.objects, which a phased-out permanent stays in (Pawl.Types.GameState's
-      -- phasedOut field says the same of that function). Pawl.CombatEffectSpec's
-      -- "CR 506.4c Clever Concealment" pair is the board.
+      -- naming it survives. Neither half is wrong; the composition was. Without the
+      -- guard controllerOf still answers, off GameState.objects, which CR 702.26d
+      -- keeps a phased-out permanent in -- the read Pawl.Types.GameState's phasedOut
+      -- field already names as the wrong one there. Pawl.CombatEffectSpec's "CR
+      -- 506.4c a planeswalker that phases out stops being attacked" pair is the board.
       --
-      -- Membership is the WHOLE guard, where Combat.stillAttacked is CR 506.4's whole
-      -- answer. Not reachable from here: Pawl.Engine.Combat imports this module, and
-      -- inlining its remaining two clauses would need Projection.isPlaneswalkerOf,
-      -- which projects -- the re-entry `peers` exists to keep out of this function.
+      -- Membership is all this asks; CR 506.4's whole answer is Combat.stillAttacked,
+      -- and it is not reachable from here. Pawl.Engine.Combat imports this module,
+      -- and inlining its type clause would need Projection.isPlaneswalkerOf, which
+      -- projects -- the re-entry `peers` exists to keep out of this function.
       --
       -- Not implemented: rule 506.4's other two clauses that leave the object on the
       -- battlefield under the same id -- the attacked planeswalker's controller
