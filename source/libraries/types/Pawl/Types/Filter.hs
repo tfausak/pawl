@@ -887,13 +887,13 @@ data Filter keyword
     -- nothing, because the field is only ever written on the way into exile.
     --
     -- NOT the same question as CR 406.4's permission to look, which is why the
-    -- card carries this and the rules core carries that: rule 406.4 keeps a
-    -- face-down exiled card out of a chooser's candidate set unless that player
-    -- may look at it (Pawl.Engine.Target's Pool.CardsInExile arm), and
-    -- Riftsweeper's printed qualifier then narrows what remains. A player who
-    -- may look at their own foretold card is offered it by rule 406.4 and
-    -- refused it by Riftsweeper's own words, which is what Pawl.ExileSpec's
-    -- Augury Raven group proves.
+    -- card carries this and the rules core carries that: rule 406.4 offers a
+    -- chooser who may not look at a face-down exiled card the PILE it sits in
+    -- instead (Pawl.Engine.Target.piledOffer, taken at the prompt rather than in
+    -- the pool), and Riftsweeper's printed qualifier narrows the candidates that
+    -- substitution runs over. A player who may look at their own foretold card
+    -- is offered it by rule 406.4 and refused it by Riftsweeper's own words,
+    -- which is what Pawl.ExileSpec's Augury Raven group proves.
     --
     -- Uncharacteristic, like IsToken and IsTapped: CR 406.3a leaves a face-down
     -- exiled card no characteristics at all, so being face down in exile is not
