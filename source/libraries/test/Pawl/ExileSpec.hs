@@ -24,6 +24,7 @@
 -- holds the same cards either way, and only how they got there differs.
 module Pawl.ExileSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -144,6 +145,80 @@ spec s registry = Spec.describe s "Face-down exile" $ do
           Spec.assertEqWith s "and they are offered as the two piles the two castings made" (Set.size (offerTo S.alice theSlot board)) 2
           Spec.assertEqWith s "the other pile's two cards are still in exile" (Set.size (GameState.exile after)) 2
         _ -> Spec.assertFailure s "the first casting should make a pile, and Synthetic Blind Reclamation print one target slot"
+    -- CR 406.4's draw is a QUESTION only where the pile holds more than one
+    -- card, which is CLAUDE.md's second invariant: where the rules leave nothing
+    -- to ask, don't prompt. A pair of piles on ONE board differing in exactly
+    -- that -- the first casting of Ignorant Bliss hid one card, the second hid
+    -- two -- so a board with no pile at all cannot pass for "not asked".
+    --
+    -- CR 702.143e is why this is not a corner: every foretold card is a pile of
+    -- its own, so every draw out of one would otherwise raise a prompt with one
+    -- candidate.
+    Spec.it s "CR 406.4 a pile of one card is drawn from without asking, and a pile of two is asked about" $ do
+      (pile, hidden, spellId, board) <- twoPileBoard s registry
+      sentry <- S.printingOf s registry "Ogre Sentry"
+      case (pile, otherPileThan pile board) of
+        (Just onePile, Just twoPile) -> do
+          let draws named = State.execState (Engine.runGame (countingDraws named) board (S.cast S.alice spellId)) (0 :: Int)
+          Spec.assertEqWith s "the pile of one card leaves nothing to draw, so the draw is not raised" (draws onePile) 0
+          Spec.assertEqWith s "the pile of two on the same board is a real draw, and is" (draws twoPile) 1
+          -- Proxies, AFTER the behaviour so neither can absorb a mutation: the
+          -- elided draw still hands over the pile's one card, which is what
+          -- makes the two options indistinguishable.
+          let after = S.runPure S.identityAnswer (S.runPure (throughPileOf onePile) board (S.cast S.alice spellId)) Engine.priorityLoop
+          Spec.assertEqWith s "and the unasked pile's one card is still what the draw hands over" (namesIn Zone.Library S.alice after) (Set.fromList [hidden, S.printingName sentry])
+          Spec.assertEqWith s "the two piles hold one card and two" (fmap (length . membersOfPile board) [onePile, twoPile]) [1, 2]
+        _ -> Spec.assertFailure s "the two castings should make two piles"
+    -- CR 406.4's draw is answered by the interpreter, so the answer is FILTERED
+    -- back against the pile rather than trusted -- the posture
+    -- Pawl.Engine.Resolve's RandomObject and RandomOpponent arms and
+    -- Pawl.Engine.Engine's RandomFirstPlayer all take.
+    --
+    -- The smuggled card is the OTHER pile's, which is the reading a legality
+    -- check cannot catch: rule 406.4 keeps every exiled card a legal target
+    -- (the case above), so Target.selectionLegal admits it and only this filter
+    -- refuses it.
+    Spec.it s "CR 406.4 a draw answered with a card outside the named pile falls back to a card in it" $ do
+      (pile, hidden, spellId, board) <- twoPileBoard s registry
+      sentry <- S.printingOf s registry "Ogre Sentry"
+      case (pile, otherPileThan pile board) of
+        (Just onePile, Just twoPile) -> case (membersOfPile board onePile, membersOfPile board twoPile) of
+          ([smuggled], firstOfTwo : _) -> do
+            let after = S.runPure S.identityAnswer (S.runPure (namingOutside twoPile smuggled) board (S.cast S.alice spellId)) Engine.priorityLoop
+            Spec.assertEqWith
+              s
+              "the card that joined alice's library is the named pile's own, not the card the answer smuggled in"
+              (namesIn Zone.Library S.alice after)
+              (Set.insert (S.printingName sentry) (namesOf [firstOfTwo] board))
+            -- Proxies, AFTER the behaviour so neither can absorb a mutation: the
+            -- smuggled card is the whole of the other pile and stayed put, and
+            -- the spell took one card out of exile.
+            Spec.assertBool s (Set.member hidden (namesOf (faceDownExiled after) after)) "the smuggled card, the whole of the other pile, is still hidden in exile"
+            Spec.assertEqWith s "and one card of the three left exile" (Set.size (GameState.exile after)) 2
+          _ -> Spec.assertFailure s "the first casting should make a pile of one card and the second a pile of two"
+        _ -> Spec.assertFailure s "the two castings should make two piles"
+    -- CR 104.4b, Pawl.InvestigateSpec's random reveal one rule over: being asked
+    -- for randomness is not being offered a CHOICE, so CR 406.4's draw goes
+    -- through Game.ask and leaves GameState.lastChoice alone. Otherwise a loop
+    -- of mandatory actions containing such a draw would look interruptible and
+    -- Pawl.Engine.Engine.checkMandatoryLoop could never call it a draw.
+    --
+    -- Driven through drawFromPiles itself rather than through a cast, because
+    -- announcing the target is a choice (Prompt.ChooseTargets) and would stamp
+    -- the field either way.
+    Spec.it s "CR 104.4b the draw out of a pile is not an optional action" $ do
+      exiled <- castBliss s registry
+      reclamation <- S.printingOf s registry "Synthetic Blind Reclamation"
+      case (S.spellTargetSlot reclamation, pilesIn exiled) of
+        (Just theSlot, [pile]) -> do
+          let board = exiled {GameState.lastChoice = Timestamp.MkTimestamp 0}
+              legal = Target.legalRecipients (Just S.alice) S.noSource theSlot board
+              (drawn, after) = S.runPureWith throughPile board (Target.drawFromPiles (Just S.alice) legal (Set.singleton (Recipient.ToPile pile)))
+          case membersOfPile board pile of
+            [_, second] -> Spec.assertEqWith s "the draw was honoured, naming the last card of the pile" (Set.toList drawn) [Recipient.ToObject second]
+            _ -> Spec.assertFailure s "the casting should hide two cards in one pile"
+          Spec.assertEqWith s "and nobody was recorded as having been offered a choice" (GameState.lastChoice after) (Timestamp.MkTimestamp 0)
+        _ -> Spec.assertFailure s "one casting should make one pile, and Synthetic Blind Reclamation print one target slot"
     -- The same gate from the other side, on a board differing in ONE thing: the
     -- two cards reach exile FACE UP instead, by the same route every other test
     -- puts a card there. Same printings, same seats, same zone, same count -- so a
@@ -396,6 +471,35 @@ throughPileOf pile p = case p of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring (Recipient.ToPile pile ==) sets
   Prompt.RandomObject members -> NonEmpty.last members
   _ -> S.identityAnswer p
+
+-- throughPileOf, counting the draws it is asked for -- Pawl.CopySpec's
+-- countingAnswer shape, since a pure answerer cannot tell "asked once" from
+-- "not asked at all".
+countingDraws :: Pile.Pile -> Prompt.Prompt r -> State.State Int r
+countingDraws pile p = case p of
+  Prompt.RandomObject _ -> do
+    State.modify' (+ 1)
+    pure (throughPileOf pile p)
+  _ -> pure (throughPileOf pile p)
+
+-- throughPileOf, but answering CR 406.4's draw with an object the named pile
+-- does NOT hold. The pile is still filtered out of the engine's own offer, so
+-- only the draw's answer is the smuggled one.
+namingOutside :: Pile.Pile -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+namingOutside pile oid p = case p of
+  Prompt.RandomObject _ -> oid
+  _ -> throughPileOf pile p
+
+-- The face-down exiled cards of one pile, in the order Pawl.Engine.Target's
+-- pileMembers offers them -- ascending by object id, which is Set.toList's.
+membersOfPile :: GameState.GameState -> Pile.Pile -> [ObjectId.ObjectId]
+membersOfPile gs pile = filter (\oid -> Exile.pileOf oid gs == Just pile) (faceDownExiled gs)
+
+-- The one other pile of a board that has exactly two.
+otherPileThan :: Maybe Pile.Pile -> GameState.GameState -> Maybe Pile.Pile
+otherPileThan pile gs = case filter (\p -> Just p /= pile) (pilesIn gs) of
+  [only] -> Just only
+  _ -> Nothing
 
 -- Answers CR 601.2c with the PILE -- filtered out of the offer rather than built,
 -- so a candidate the engine never offered cannot be smuggled in -- and answers CR
