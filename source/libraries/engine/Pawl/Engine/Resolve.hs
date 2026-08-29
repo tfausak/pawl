@@ -4270,11 +4270,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- FaceDownReason.TurnedFaceDown is CR 708.6's other half: it closes CR
       -- 701.40b's turn-face-up procedure and leaves CR 702.37e's open. No CR 400.7
       -- incarnation is minted, so the object id, marked damage, counters,
-      -- attachments, statuses and the CR 613.7d timestamp all ride through -- the
-      -- mirror of FaceDown.performTurnFaceUp.
+      -- attachments and statuses all ride through -- the mirror of
+      -- FaceDown.performTurnFaceUp.
       --
-      -- Not implemented: CR 613.7f's new timestamp for a permanent that turns face
-      -- down (#2476).
+      -- The TIMESTAMP does NOT ride through, and it is the one thing on that list
+      -- that does not: CR 613.7f gives a permanent a new one each time it turns
+      -- face down. Written by Game.turnFacing, the primitive the turn-face-up road
+      -- shares, so one rule has one writer.
       --
       -- CR 708.2b is the guard below: an effect that LISTS its own values would
       -- otherwise overwrite the list already there. No event is recorded, so
@@ -4285,15 +4287,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- match all turn nothing over. Unprompted and undirected: turning A face
       -- down cannot change whether B may be, so the rule's ordering clause never
       -- engages and there is nothing to ask.
-      foldr
-        ( \target g ->
+      --
+      -- LEFT fold, where RemoveFromCombat's is a right one, and the stamp above is
+      -- why: the fold now hands out timestamps, so it must run the enumeration
+      -- forwards for the relative order to be the enumeration's.
+      --
+      -- Not implemented: CR 613.7m's APNAP order over the permanents one effect
+      -- turns face down at once (#2571). They are stamped in the order
+      -- objectRefObjects enumerated them.
+      List.foldl'
+        ( \g target ->
             if maybe False (Facing.isFaceDown . Object.facing) (Map.lookup target (GameState.objects g))
               then g
-              else
-                g
-                  { GameState.objects =
-                      Map.adjust (\o -> o {Object.facing = Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.TurnedFaceDown, FaceDownState.listed = listed}}) target (GameState.objects g)
-                  }
+              else Game.turnFacing (Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.TurnedFaceDown, FaceDownState.listed = listed}) target g
         )
         gs
         (objectRefObjects legal resolving controller source gs ref)

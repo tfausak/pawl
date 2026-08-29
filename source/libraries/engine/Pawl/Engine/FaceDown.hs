@@ -38,7 +38,6 @@ module Pawl.Engine.FaceDown where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
-import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
@@ -290,10 +289,15 @@ revealsInsteadOfTurningUp oid gs =
 -- CR 708.8 falls out of the shape and is not implemented anywhere: "any effects
 -- that have been applied to the face-down permanent still apply to the face-up
 -- permanent", and this writes one status field on one object -- no CR 400.7
--- incarnation is minted, so damage, counters, attachments, Auras, the CR 613.7d
--- timestamp and every continuous effect naming the object ride through
--- untouched. Its last sentence is the same non-event: nothing here is a
--- battlefield entry, so no enters-the-battlefield ability is offered one.
+-- incarnation is minted, so damage, counters, attachments, Auras and every
+-- continuous effect naming the object ride through untouched. Its last sentence
+-- is the same non-event: nothing here is a battlefield entry, so no
+-- enters-the-battlefield ability is offered one.
+--
+-- The TIMESTAMP is the exception on that list, and CR 613.7f is why: "a permanent
+-- receives a new timestamp each time it turns face up or face down". Game.turnFacing
+-- writes it, so this road and Pawl.Engine.Resolve's Effect.TurnFaceDown arm cannot
+-- disagree about the rule.
 --
 -- CR 708.11 is the one thing here that is NOT a bare write: "if a face-down
 -- permanent would have an 'As [this permanent] is turned face up . . .' ability
@@ -315,14 +319,9 @@ performTurnFaceUp procedure oid = do
     else do
       -- CR 708.8: the copiable values revert, which for pawl is the status
       -- flipping -- Game.faceOf reads it, so the substitution simply stops
-      -- applying and the card's own face answers again.
-      State.modify'
-        ( \g ->
-            g
-              { GameState.objects =
-                  Map.adjust (\o -> o {Object.facing = Facing.FaceUp}) oid (GameState.objects g)
-              }
-        )
+      -- applying and the card's own face answers again. Through Game.turnFacing,
+      -- which carries CR 613.7f's new timestamp with the write.
+      State.modify' (Game.turnFacing Facing.FaceUp oid)
       -- CR 708.11 / 614.1e: the "as this permanent is turned face up"
       -- abilities, applied HERE -- after the status write and before the
       -- event record -- which is the rule's "while that permanent is being

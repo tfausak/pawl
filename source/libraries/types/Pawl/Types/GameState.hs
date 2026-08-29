@@ -319,7 +319,10 @@ data GameState = MkGameState
     -- the first thing Pawl.Engine.Engine.performSettle does, so the effects run
     -- before the SBA pass and before the trigger scan that would see the
     -- permanent -- which is what Monstrous War-Leech needs, since CR 704.5f asks
-    -- about a power and toughness the mill decides. What it is NOT is inside the
+    -- about a power and toughness the mill decides, and what Ixidron needs harder:
+    -- its power and toughness ARE the count its own sweep changes, so a drain
+    -- after the SBA pass would bury it as a 0/0.
+    --
     -- Not implemented: the effects running inside the entry, where CR 614.1c puts
     -- them. A resolution that puts a permanent onto the battlefield and then reads
     -- the board itself would see the pre-effect one (#1639); no card in the pool
