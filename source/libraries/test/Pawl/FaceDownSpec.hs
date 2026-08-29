@@ -590,20 +590,24 @@ aimAtCreature oid p = case p of
 -- when a turning-over restamps it after that removal. Nothing else differs, so the
 -- flip is the stamp's doing alone.
 --
--- Ixidron {3}{U}{U} Creature - Illusion */* is the FACE-DOWN card, and the only
--- one that can reach this: "as this creature enters, turn all other nontoken
--- creatures face down", so its victims need no morph ability -- where Backslide
--- and Weaver of Lies both name "creatures with morph abilities", and a removal
--- stamped between the suspect's entry and the turning-over would have taken the
--- morph ability away and left them no legal target at all. Its second line,
+-- Ixidron {3}{U}{U} Creature - Illusion */* is the FACE-DOWN card: "as this
+-- creature enters, turn all other nontoken creatures face down", so its victims
+-- need no morph ability. That much rules Backslide and Weaver of Lies out, since
+-- both name "creatures with morph abilities" and the removal this case needs
+-- between the entry and the turning-over would have taken the morph ability away
+-- and left them no legal target; Cyber Conversion's bare "target creature" would
+-- serve. Ixidron is preferred over it because it is also the pool's only
+-- turn-face-down instruction naming a CLASS of permanents rather than a slot, so
+-- this pair is where ObjectRef.EachMatching is driven at all. Its second line,
 -- "power and toughness each equal to the number of face-down creatures on the
--- battlefield", is what keeps it alive through the CR 704.5f pass that follows:
--- three other creatures go face down, so it settles a 3/3.
+-- battlefield", is what keeps it alive
+-- through the CR 704.5f pass that follows: three other creatures go face down, so
+-- it settles a 3/3.
 --
--- Ainok Tracker is the FACE-UP card, for the mirror reason: turning a permanent
--- face up needs a procedure, and CR 702.37e's asks about the card's morph cost
--- rather than a projected one -- which is what lets the Tracker be turned face up
--- while Turn to Frog is removing its abilities.
+-- Ainok Tracker is the FACE-UP card: turning a permanent face up needs a
+-- procedure, and CR 702.37e's asks about the card's morph cost rather than a
+-- projected one -- which is what lets the Tracker be turned face up while Turn to
+-- Frog is removing its abilities.
 --
 -- Turn to Frog {1}{U} ("until end of turn, target creature loses all abilities and
 -- becomes a blue Frog with base power and toughness 1/1") is the REMOVER, and a

@@ -314,10 +314,14 @@ data Object = MkObject
     -- needs nothing stamped onto the ability. Two objects, one monotone
     -- sequence, one `>`.
     --
-    -- NOT CR 613.7d's timestamp, and deliberately a second field rather than a
-    -- refresh of that one: turning over is not a zone change, so the permanent's
-    -- entry order -- which is what orders its static ability in layers 6 and 7 --
-    -- must not move underneath it.
+    -- NOT CR 613.7d's timestamp, and a second field rather than a refresh of that
+    -- one: every permanent has a `timestamp` and only one that has transformed has
+    -- this, so the two answer different questions whatever restamps.
+    --
+    -- Not implemented: CR 613.7g's new `timestamp` for a permanent that transforms
+    -- (#2572). Whether transforming moves the entry order is that rule's question
+    -- and not this field's -- CR 613.7f's turnings over already move it, through
+    -- Pawl.Engine.Game.turnFacing.
     --
     -- Per-incarnation state, like `face` above: cleared by newIncarnation,
     -- because CR 400.7 makes the moved object a new one that has never

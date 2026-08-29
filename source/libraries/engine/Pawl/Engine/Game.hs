@@ -669,8 +669,9 @@ turnFacing :: Facing.Facing -> ObjectId -> GameState -> GameState
 turnFacing facing oid gs =
   let (ts, stamped) = freshTimestamp gs
       restamps = Set.member oid (GameState.battlefield gs)
+      next = if restamps then stamped else gs
       adjust o = o {Object.facing = facing, Object.timestamp = if restamps then ts else Object.timestamp o}
-   in (if restamps then stamped else gs) {GameState.objects = Map.adjust adjust oid (GameState.objects gs)}
+   in next {GameState.objects = Map.adjust adjust oid (GameState.objects next)}
 
 -- CR 701.27a over ONE object: "turn it over so that its other face is up", or
 -- leave the map exactly as it was. The primitive BOTH transform paths share --
