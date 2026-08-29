@@ -193,6 +193,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   restampSpec s registry
   listedSpec s registry
   manifestSpec s registry
+  manifestOrderSpec s registry
   manifestDreadSpec s registry
   enteringFaceDownSpec s registry
   faceUpEffectSpec s registry
@@ -1804,6 +1805,94 @@ manifestSpec s registry = Spec.describe s "Manifest" $ do
         -- paid, and the counter lands.
         Spec.assertEqWith s "CR 702.37b the counter down the megamorph road" (S.counterOf CounterKind.PlusOnePlusOne permanent morphed) 1
         Spec.assertEqWith s "CR 613.4c and the 3/2 it makes" (S.powerToughnessOf permanent morphed) (Just (3, 2))
+
+-- CR 701.40e: "if an effect instructs a player to manifest multiple cards from
+-- their library, those cards are manifested one at a time." Ethereal Ambush
+-- {3}{G}{U} Instant, whole text: "Manifest the top two cards of your library."
+-- (oracle checked on Scryfall 2026-08-29.) The rule's own subject and the pool's
+-- only card in it: Ghastly Conscription manifests out of EXILE and manifest dread
+-- manifests ONE of two, so 701.40e reaches neither.
+--
+-- WHAT ONE AT A TIME MEANS ON A BOARD. A manifested permanent is a 2/2 creature
+-- (CR 708.2a), so the second card's CR 614.12 determination counts the first --
+-- already on the battlefield -- where one CR 608.2f batch has them entering
+-- beside each other and neither counting the other
+-- (Pawl.Engine.Projection.boardAsEntering). Synthetic Encircling Net is the row
+-- that reads the count: {2}{W} Instant, "Until end of turn, if you control two or
+-- more creatures, creatures enter the battlefield tapped." With ONE creature
+-- already out the clause is false for the first card and true for the second, so
+-- the rule is one manifested permanent tapped and one not; a batch taps neither.
+--
+-- SYNTHETIC for Synthetic Magnetic Lockdown's reason one rule over
+-- (Pawl.ReplacementSpec), the shape being an entry replacement that applies to
+-- OTHER permanents and is gated on a battlefield COUNT. Scryfall with a
+-- User-Agent, 2026-08-29: `o:/creature.? (you control )?enter.*if you control/
+-- -o:"this creature enters"` answers one card, Undercover Operative, whose row is
+-- about itself; `o:/enters? with .* counter/ o:"if you control"` answers nine,
+-- every one a self row (Frontier Mastodon, Ascendant Packleader, ...);
+-- `o:"enters tapped" o:"if you control"` answers sixteen, all lands about
+-- themselves. A printing whose row applied to OTHER creatures under a board count
+-- would refute that and replace the synthetic. Kismet and Authority of the
+-- Consuls print the row without a clause, so neither can tell the readings apart.
+manifestOrderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+manifestOrderSpec s registry = Spec.describe s "Manifest one at a time" $ do
+  -- THE PROVING TEST. The tap states come first: everything below them is fixture
+  -- (two face-down 2/2s, a shorter library, the one creature the count rests on),
+  -- and a proxy ahead of the behaviour would absorb the mutation.
+  Spec.it s "CR 701.40e the second card manifested counts the first, so it enters tapped and the first does not" $ do
+    (after, entered) <- ambushBoard s registry 1
+    case entered of
+      [first, second] -> do
+        Spec.assertEqWith s "the first manifested permanent entered untapped, the second tapped" (fmap Object.tapped (Game.lookupObject first after), fmap Object.tapped (Game.lookupObject second after)) (Just TapState.Untapped, Just TapState.Tapped)
+        Spec.assertEqWith s "CR 708.2a both are 2/2s" (S.powerToughnessOf first after, S.powerToughnessOf second after) (Just (2, 2), Just (2, 2))
+        Spec.assertEqWith s "CR 701.40a and both are face down, manifested" (fmap Object.facing (Game.lookupObject first after), fmap Object.facing (Game.lookupObject second after)) (Just (Facing.faceDown FaceDownReason.Manifested), Just (Facing.faceDown FaceDownReason.Manifested))
+        Spec.assertEqWith s "setup: one creature was already on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
+      permanents -> Spec.assertFailure s ("expected exactly two manifested permanents, got " <> show (length permanents))
+
+  -- THE CONTROL BELOW. The same board with NO creature out: the count is one as
+  -- the second card enters, the clause is false both times, and neither is
+  -- tapped -- so the tapped permanent above is the count reaching two and not the
+  -- second manifest being tapped by construction.
+  Spec.it s "CR 701.40e with no creature out the count never reaches two, so neither is tapped" $ do
+    (after, entered) <- ambushBoard s registry 0
+    Spec.assertEqWith s "both manifested permanents entered untapped" (fmap (fmap Object.tapped . flip Game.lookupObject after) entered) [Just TapState.Untapped, Just TapState.Untapped]
+
+  -- THE CONTROL ABOVE, and what stops the first leg's untapped permanent passing
+  -- for want of a row that applies at all: two creatures out makes the clause true
+  -- for both cards, and a manifested permanent is something the row taps.
+  Spec.it s "CR 614.12 two creatures out make the clause true for both, so the row taps both" $ do
+    (after, entered) <- ambushBoard s registry 2
+    Spec.assertEqWith s "both manifested permanents entered tapped" (fmap (fmap Object.tapped . flip Game.lookupObject after) entered) [Just TapState.Tapped, Just TapState.Tapped]
+
+-- alice with four Plains, four Forests and four Islands, `owned` Goblin Pikers on
+-- the battlefield, Synthetic Encircling Net and Ethereal Ambush in hand, and a
+-- library holding two Thragtusks over a Goblin Piker. Both spells are cast and
+-- resolved, and the answer is the settled board plus the permanents the Ambush
+-- manifested, in the order their ids were minted -- which is the order the funnel
+-- moved them in.
+--
+-- Twelve lands so the auto-tapper cannot make the {3}{G}{U} unpayable by
+-- spending a Forest or an Island on the Net's {2}{W}. The Piker under the two
+-- Thragtusks keeps CR 104.3c off the board and leaves the library non-empty.
+ambushBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (GameState.GameState, [ObjectId.ObjectId])
+ambushBoard s registry owned = do
+  plains <- S.printingOf s registry "Plains"
+  forest <- S.printingOf s registry "Forest"
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  net <- S.printingOf s registry "Synthetic Encircling Net"
+  ambush <- S.printingOf s registry "Ethereal Ambush"
+  thragtusk <- S.printingOf s registry "Thragtusk"
+  let lands = S.landsFor island S.alice 4 (S.landsFor forest S.alice 4 (S.landsInPlay plains 4))
+      creatures = List.foldl' (\g _ -> snd (S.addCreature piker S.alice g)) lands [1 .. owned]
+      (withNet, netId) = S.handOne net creatures
+      (ambushId, withAmbush) = S.addHandCard ambush S.alice withNet
+      (_, g1) = S.addLibraryCard piker S.alice withAmbush
+      (_, g2) = S.addLibraryCard thragtusk S.alice g1
+      (_, before) = S.addLibraryCard thragtusk S.alice g2
+      armed = S.runPure S.identityAnswer before (S.cast S.alice netId >> Stack.resolveTop)
+      after = S.runPure S.identityAnswer armed (S.cast S.alice ambushId >> Stack.resolveTop)
+  pure (after, Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield armed)))
 
 -- alice with two Plains and Soul Summons in hand, her library holding Thragtusk
 -- on top of a Goblin Piker, returned as (the board before the cast, the board
