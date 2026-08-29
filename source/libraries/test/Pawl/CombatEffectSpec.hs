@@ -2966,6 +2966,11 @@ soulSnareSpec s registry = Spec.describe s "SoulSnare" $ do
             thereAndBack = graftOntoSettling aura spare second stolen
             neverJace = graftOntoSettling aura host second sidestep
             bobFires = runToEndOfCombatWith (soulSnareAnswer bobSnare snareAbility pikerId)
+            -- A third run of each leg with the Snare never activated, so that
+            -- combat damage actually happens: the OTHER reader of the record is
+            -- Damage.combatRecipient, and CR 510.1b gives a creature attacking
+            -- nothing nothing to assign to.
+            noSnare = runToEndOfCombatWith (pure . attackThePlaneswalker)
         -- GAMEPLAY FIRST. Both boards read identically to anything asking about
         -- the board NOW, so an engine that re-derives rule 506.4 hands bob's
         -- Snare a creature "attacking a planeswalker you control" on both.
@@ -2973,6 +2978,8 @@ soulSnareSpec s registry = Spec.describe s "SoulSnare" $ do
         Spec.assertBool s (S.onBattlefield bobSnare (bobFires thereAndBack)) "and bob's Snare is unsacrificed: the ability was never activatable"
         Spec.assertBool s (not (S.onBattlefield pikerId (bobFires neverJace))) "control: with the Confiscate never on Jace, the same Snare exiles the attacker"
         Spec.assertBool s (not (S.onBattlefield bobSnare (bobFires neverJace))) "control: there it paid its own sacrifice, so the activation really happened"
+        Spec.assertEqWith s "CR 510.1b: and with no Snare fired the Piker assigns nothing on that leg, so Jace keeps all five loyalty" (S.counterOf CounterKind.Loyalty jaceId (noSnare thereAndBack)) 5
+        Spec.assertEqWith s "control: on the leg he never left combat the same Piker takes him to 3" (S.counterOf CounterKind.Loyalty jaceId (noSnare neverJace)) 3
         -- The pair really is one board differing in one thing: alice held Jace
         -- midway on one leg only, and by the end bob holds him on both.
         Spec.assertEqWith s "CR 613.1b: alice controls Jace midway on one leg only" (fmap (Projection.controllerOf jaceId) [stolen, sidestep]) [Just S.alice, Just S.bob]
