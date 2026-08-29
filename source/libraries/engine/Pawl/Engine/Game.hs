@@ -692,9 +692,13 @@ turnFacing facing oid gs =
 -- ONE FIELD, in place, because CR 712.18 says the permanent is not a new object:
 -- "when a double-faced permanent transforms or converts, it doesn't become a new
 -- object. Any effects that applied to that permanent will continue to apply to
--- it." So no id is minted, no timestamp is reissued, and damage, counters and
--- attachments ride through untouched. CR 400.7 is the negative half of the same
--- claim: this is not a zone change, so nothing mints an incarnation.
+-- it." So no id is minted and damage, counters and attachments ride through
+-- untouched. CR 400.7 is the negative half of the same claim: this is not a zone
+-- change, so nothing mints an incarnation.
+--
+-- Not implemented: CR 613.7g's new timestamp for a permanent that transforms or
+-- converts (#2572). Rule 712.18 does not settle that one -- turnFacing above
+-- restamps without minting an object either, which is CR 613.7f.
 --
 -- Reads the object's OWN card (cardOf), never a projected one, which is the
 -- footing Object.face is stored on: CR 712.9's first Example turns on a Clone

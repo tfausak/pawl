@@ -579,9 +579,11 @@ aimAtCreature oid p = case p of
 -- card's abilities away, so the permanent generates no continuous effect of its
 -- own -- but CR 701.60c's grant is the rulebook's rather than the card's, and
 -- Pawl.Engine.Projection.designationGathered stamps it with the PERMANENT's own
--- timestamp (CR 613.7a). A designation is not a copiable value, so it survives the
--- turning-over. That grant is therefore the one layer-6 effect on this board whose
--- order against Turn to Frog's removal the turning-over can move.
+-- timestamp (CR 613.7a). CR 701.60b says outright that suspected is "neither an
+-- ability nor part of the permanent's copiable values", so CR 708.2's substitution
+-- leaves it alone and the grant outlives the turning-over. That grant is therefore
+-- the one layer-6 effect on this board whose order against Turn to Frog's removal
+-- a turning-over can move.
 --
 -- THE PAIR IS TWO MOMENTS OF ONE BOARD rather than two boards: the suspect loses
 -- rule 701.60c's ability to a removal stamped after it entered, and gets it back
@@ -622,7 +624,7 @@ restampSpec s registry = Spec.describe s "Timestamps (CR 613.7f)" $ do
     ixidron <- S.printingOf s registry "Ixidron"
     let (board, suspect, other, attacker) = suspectedBoard piker piker [island, island]
         frogged = frogging frog suspect board
-        after = entering ixidron frogged
+        (after, entered) = entering ixidron frogged
     -- THE BEFORE moment, and the fixture's own control: Turn to Frog resolved
     -- later than the suspect entered, so CR 613.1f wipes the grant and both halves
     -- of rule 701.60c are gone.
@@ -633,7 +635,14 @@ restampSpec s registry = Spec.describe s "Timestamps (CR 613.7f)" $ do
     -- "this creature can't block" applies again.
     Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton suspect (Set.singleton attacker)) after)) "CR 613.7f the permanent it turned face down is stamped after the removal, so it can't block again"
     Spec.assertBool s (Projection.hasKeyword Keyword.Menace suspect after) "CR 613.7f and the menace half is back with it"
-    Spec.assertEqWith s "CR 708.2a the sweep did turn it face down" (fmap Object.facing (Game.lookupObject suspect after)) (Just (Facing.faceDown FaceDownReason.TurnedFaceDown))
+    -- Ixidron's own two lines, which no other case in the file reaches: the sweep
+    -- names a CLASS of permanents rather than a slot, so the assertion is the whole
+    -- set -- every other creature and not Ixidron itself ("all OTHER nontoken
+    -- creatures"), and no land, though bob's are permanents on the same
+    -- battlefield. Its */* is what carries it through the CR 704.5f pass that
+    -- follows the sweep: three face-down creatures make it a 3/3.
+    Spec.assertEqWith s "CR 708.2a the sweep turned over every other creature and left Ixidron face up" (faceDownIds after) (Set.fromList [suspect, other, attacker])
+    Spec.assertEqWith s "Ixidron is a 3/3, one for each creature its own sweep turned face down" (fmap (\oid -> S.powerToughnessOf oid after) entered) (Just (Just (3, 3)))
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton attacker)) after) "while the unsuspected Piker beside it blocks"
 
   Spec.it s "CR 613.7f turning face up restamps the permanent after a removal that had wiped its grant" $ do
@@ -644,7 +653,7 @@ restampSpec s registry = Spec.describe s "Timestamps (CR 613.7f)" $ do
     frog <- S.printingOf s registry "Turn to Frog"
     ixidron <- S.printingOf s registry "Ixidron"
     let (board, suspect, other, attacker) = suspectedBoard piker ainok [island, mountain, mountain, mountain, mountain, mountain, mountain, mountain]
-        hidden = entering ixidron board
+        (hidden, _) = entering ixidron board
         frogged = frogging frog suspect hidden
         after = S.runPure S.identityAnswer frogged (FaceDown.turnFaceUp S.bob TurnUpProcedure.Morph suspect >> Engine.settleForPriority)
     -- THE BEFORE moment: the Tracker is face down, and Turn to Frog resolved after
@@ -704,10 +713,11 @@ frogging frog victim gs =
 -- matters, since CR 614.1c's effects are queued as the permanent enters and
 -- Pawl.Engine.Resolve.runEntryEffects drains them at the start of the next one
 -- (#1639).
-entering :: Printing.Printing -> GameState.GameState -> GameState.GameState
+entering :: Printing.Printing -> GameState.GameState -> (GameState.GameState, Maybe ObjectId.ObjectId)
 entering printing gs =
   let (_, onStack) = S.spellOnStack printing S.alice gs
-   in S.runPure S.identityAnswer onStack (Stack.resolveTop >> Engine.settleForPriority)
+      after = S.runPure S.identityAnswer onStack (Stack.resolveTop >> Engine.settleForPriority)
+   in (after, enteredOne gs after)
 
 -- CR 708.2a's "no name", which a set says by being EMPTY: a face-down object
 -- has no name for CR 709.4a's membership test to find, rather than one that
