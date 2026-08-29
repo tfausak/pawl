@@ -1063,7 +1063,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       --
       -- Not implemented: a controller that changes and changes BACK mid-combat, which
       -- rule 506.4 removes from combat for good and this derived read re-attacks.
-      -- Combat.stillAttacked reads the same way, so the two agree (#2626).
+      -- Combat.stillAttacked reads the same way, so the two agree (#2627).
       --
       -- controllerOf is the lean fold rather than a projection, which is what
       -- makes it safe here: `viewUpTo` already calls it for the candidate's own
@@ -1104,8 +1104,8 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- battle" pair is the board.
       --
       -- The PROTECTOR conjunct is a regression fence rather than a proven behavior:
-      -- CR 310.9f's change needs an effect that moves a designation, and pawl has
-      -- none (see #853), so mutating it away leaves the suite green.
+      -- mutating it away leaves the suite green, CR 310.9f's change needing an
+      -- effect that moves a designation. Not implemented: any such effect (#853).
       Filter.attackingBattleProtector = case Map.lookup oid (Combat.attackers (GameState.combat gs)) of
         Just (AttackTarget.OfBattle battle)
           | Set.member battle (GameState.battlefield gs),
