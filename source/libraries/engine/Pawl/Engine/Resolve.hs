@@ -361,6 +361,9 @@ objectRefSlots ref = case ref of
   -- reason: Amnesia's ONLY use of its target slot is this scope, so dropping the
   -- read would have the D4 dataflow lint call that target unread.
   ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand scope _) -> graveyardScopeSlots scope
+  -- EachCardInYourHand's answer over the other hidden per-player zone: the
+  -- seat is CR 109.5's "you", so no slot names it.
+  ObjectRef.EachCardInYourLibrary -> Map.empty
   ObjectRef.EachCardExiledWithSource {} -> Map.empty
   ObjectRef.EachSpell _ -> Map.empty
   ObjectRef.EachOnStack _ -> Map.empty
@@ -410,6 +413,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.EachCardInGraveyard {} -> []
   ObjectRef.EachCardInYourHand -> []
   ObjectRef.EachCardInHand {} -> []
+  ObjectRef.EachCardInYourLibrary -> []
   ObjectRef.EachCardExiledWithSource {} -> []
   ObjectRef.EachSpell _ -> []
   ObjectRef.EachOnStack _ -> []
@@ -2387,6 +2391,17 @@ objectRefObjects legal resolving controller source gs ref = case ref of
           Nothing -> Game.zoneMembers Zone.Hand pid gs
           Just filter_ -> handCardsOf context gs pid filter_
      in concatMap held (graveyardScopePlayers legal controller gs scope)
+  -- CR 400.1's other hidden per-player zone, and only the RESOLVING
+  -- CONTROLLER's, so no scope to fold over and no APNAP order to impose --
+  -- EachCardInYourHand's answer above. CR 400.12 is what makes "from your
+  -- library" name every card in it. In the library's own order, top card
+  -- first, which CR 401.2 keeps players from looking at or changing; nothing
+  -- here reads it, and the whole zone leaves at once either way.
+  --
+  -- NOT a search (CR 701.23a) and so no shuffle (CR 701.24): Leveler names no
+  -- description and offers no choice, so CR 701.23b's "isn't required to
+  -- find" and CR 701.23f's search triggers have nothing to reach.
+  ObjectRef.EachCardInYourLibrary -> Game.zoneMembers Zone.Library controller gs
   -- CR 607.2a's linked set: the cards GameState.exiledWith files against this
   -- effect's SOURCE. The relation, not a zone sweep, is the membership test, so a
   -- card exiled by a second copy of the same printing is not named; a stated
@@ -2643,6 +2658,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardInGraveyard {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardInYourHand -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardInHand {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  ObjectRef.EachCardInYourLibrary -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardExiledWithSource {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibrary {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibraryUntil {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
@@ -4518,6 +4534,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- Swept once from the PRE-MOVE state (CR 608.2c, CR 608.2f), the arm
             -- above's answer over the wider scope.
             ObjectRef.EachCardInHand {} -> do
+              gs <- State.get
+              pure (objectRefObjects legal resolving controller source gs ref)
+            -- Swept once from the PRE-MOVE state (CR 608.2c, CR 608.2f), the two
+            -- arms above's answer over CR 400.1's other hidden per-player zone.
+            -- A resolving spell is on the stack (CR 608.1), not in the library,
+            -- so Paradigm Shift does not sweep itself.
+            ObjectRef.EachCardInYourLibrary -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
             -- CR 607.2a, swept once from the PRE-MOVE state (CR 608.2c, CR

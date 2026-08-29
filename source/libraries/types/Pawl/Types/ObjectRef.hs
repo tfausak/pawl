@@ -37,12 +37,17 @@ data ObjectRef
   | -- | Every PERMANENT ON THE BATTLEFIELD matching the Filter -- Day of
     -- Judgment's "all creatures". The battlefield is where CR 109.2 puts it; a
     -- set drawn from another zone is one of the arms below -- a graveyard's is
-    -- EachCardInGraveyard, a hand's EachCardInYourHand, exile's
-    -- EachCardExiledWithSource -- and a FILTERED sweep of a zone is written on
-    -- the arm for that zone: the battlefield's is here, and a graveyard's, a
-    -- hand's, the stack's and the linked exile set's are on their own arms. A
-    -- library still has none (gap #2416). A SEARCH is not the shape that would
-    -- fill it: CR 701.23b lets the searcher find fewer than all the matching
+    -- EachCardInGraveyard, a hand's EachCardInYourHand, a library's
+    -- EachCardInYourLibrary, exile's EachCardExiledWithSource -- and a FILTERED
+    -- sweep of a zone is written on the arm for that zone: the battlefield's is
+    -- here, and a graveyard's, a hand's, the stack's and the linked exile set's
+    -- are on their own arms.
+    --
+    -- Not implemented: a library's FILTERED sweep. EachCardInYourLibrary below
+    -- takes the whole zone and states no characteristic, so a card cannot say
+    -- "exile all Mountain cards from your library" (#2416). A SEARCH is not the
+    -- shape that would fill it: CR 701.23b lets the searcher find fewer than
+    -- all the matching
     -- cards, which is a choice under Pawl.Types.Effect's Search -- but Caldera
     -- Breaker's "exile all Mountain cards from your library" names no search and
     -- offers no choice, so CR 701.23b does not reach it and Search cannot say it.
@@ -123,6 +128,17 @@ data ObjectRef
     -- Pawl.Types.EachCardInHand's header says why this one may have them and what
     -- answers the CR 400.2 visibility question there.
     EachCardInHand EachCardInHand.EachCardInHand
+  | -- | Every card in the resolving controller's library -- Leveler's "exile all
+    -- cards from your library" (CR 400.12). EachCardInYourHand's arm over CR
+    -- 400.1's other hidden zone, nullary for its reasons (CR 400.2, CR 109.5).
+    --
+    -- NOT a search, which is why it is an arm here rather than a use of
+    -- Pawl.Types.Effect.Search: CR 701.23a's search finds a card matching a
+    -- description and no producer states one, so CR 701.23b and CR 701.23f's
+    -- search triggers do not reach it and CR 701.24 shuffles nothing. Proved by
+    -- Pawl.MassEffectSpec's "CR 701.23a a sweep is not a search, and CR 701.24
+    -- shuffles nothing".
+    EachCardInYourLibrary
   | -- | CR 607.2a's linked set: every card in exile that an instruction in an
     -- ability of THIS EFFECT'S SOURCE put there -- Hoarding Dragon's "the exiled
     -- card". EachMatching's sibling with CR 109.2's battlefield default switched

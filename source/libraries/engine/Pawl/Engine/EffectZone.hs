@@ -68,6 +68,7 @@ zoneFunctionedFrom effect = case effect of
     ObjectRef.EachCardInGraveyard {} -> Nothing
     ObjectRef.EachCardInYourHand -> Nothing
     ObjectRef.EachCardInHand {} -> Nothing
+    ObjectRef.EachCardInYourLibrary -> Nothing
     ObjectRef.EachCardExiledWithSource {} -> Nothing
     ObjectRef.EachSpell _ -> Nothing
     ObjectRef.EachOnStack _ -> Nothing
