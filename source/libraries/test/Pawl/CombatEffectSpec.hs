@@ -1905,10 +1905,10 @@ creaturePlaneswalkerCombatSpec s registry = Spec.describe s "CreaturePlaneswalke
         Spec.assertEqWith s "CR 506.4: Jace is blocking nothing" (Combat.blockersOf atBob atEnd) Set.empty
         Spec.assertBool s (Combat.isBlocked atBob atEnd) "CR 509.1h: but that attacker remains blocked"
         -- Half two, which no other leg can assert: he stops being attacked as well.
-        -- pawl derives attacked-ness at Combat.stillAttacked rather than storing
-        -- it, and CR 506.4c keeps the ATTACKER in combat, so its Combat.attackers
-        -- entry still names the planeswalker -- asserting that entry is gone would
-        -- fail a correct engine.
+        -- pawl reads attacked-ness at Combat.stillAttacked, and CR 506.4c keeps
+        -- the ATTACKER in combat, so its Combat.attackers entry still names the
+        -- planeswalker -- asserting that entry is gone would fail a correct
+        -- engine.
         Spec.assertBool s (not (Combat.stillAttacked jaceId atEnd)) "CR 506.4: and he stops being attacked"
         Spec.assertEqWith s "CR 506.4c: while the attacker aimed at him stays in combat, record entry and all" (Map.lookup atJace attackers) (Just (AttackTarget.OfPlaneswalker jaceId))
 

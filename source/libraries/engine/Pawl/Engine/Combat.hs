@@ -120,8 +120,10 @@ attackableOpponents gs = filter (/= GameState.activePlayer gs) (Game.stillPlayin
 --
 -- The defending player is FIRST, the one candidate that exists on every board, so
 -- an interpreter taking the head gets what Replay.defaultAnswer's fallback gives.
--- Derived at DECLARATION and again at damage assignment (stillAttacked below):
--- re-asking this filter IS CR 506.4's removal.
+-- Derived at DECLARATION and again at damage assignment (stillAttacked below);
+-- re-asking this filter is HALF of CR 506.4's removal, the other half being the
+-- record noteAttackingNothing keeps so that a removal already sampled cannot be
+-- re-derived away.
 --
 -- Not implemented: CR 802's attack-multiple-players option, which would put a
 -- second player on this list (#175).
@@ -1034,7 +1036,7 @@ removeChanged gs =
 --
 -- Only ever adds, for removeChanged's own reason: taking an id back out would
 -- invent a CR 506.4 the rules do not have. A creature put onto the battlefield
--- attacking that same planeswalker (CR 508.8) needs no such removal -- the record
+-- attacking that same planeswalker (CR 508.4) needs no such removal -- the record
 -- is keyed by the ATTACKER, so the arriving creature is simply not in it, and CR
 -- 506.4c leaves the earlier attacker attacking nothing all the same.
 noteAttackingNothing :: GameState -> GameState

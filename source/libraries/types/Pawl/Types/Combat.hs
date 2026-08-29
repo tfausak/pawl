@@ -193,7 +193,9 @@ data Combat = MkCombat
     -- and not by the departed permanent, which is what CR 506.4c's own wording
     -- asks for: a planeswalker that stops being attacked by one creature can
     -- still be attacked by another put onto the battlefield attacking it (CR
-    -- 508.8), so the fact belongs to the attack rather than to the target.
+    -- 508.4, which CR 506.3c bars only once the permanent has left the
+    -- battlefield or stopped being one), so the fact belongs to the attack
+    -- rather than to the target.
     --
     -- Stored, not re-derived, and that is the whole point. CR 506.4 lists
     -- EVENTS -- "its controller or protector changes", "it phases out" -- so a
@@ -203,8 +205,8 @@ data Combat = MkCombat
     -- entry on CR 506.4c's orders, and the departed permanent's own
     -- characteristics have returned to what they were.
     --
-    -- Written by Pawl.Engine.Combat.removeChanged, the CR 117.5 sampler that
-    -- already answers CR 506.4's other derived clauses, and pruned by
+    -- Written by Pawl.Engine.Combat.noteAttackingNothing, which the CR 117.5
+    -- sampler answering rule 506.4's other derived clauses runs, and pruned by
     -- Pawl.Engine.Game.removeFromCombat when the attacker itself leaves combat.
     -- Read by Pawl.Engine.Damage.combatRecipient and by
     -- Pawl.Engine.Projection.viewOfCharacteristics, alongside the live
