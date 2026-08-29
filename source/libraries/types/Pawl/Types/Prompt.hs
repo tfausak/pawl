@@ -933,6 +933,20 @@ data Prompt r where
   -- Asked only where the order is observable within a pass, which
   -- Pawl.Engine.Cost.orderObservable decides.
   OrderCostComponents :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [CostComponent.CostComponent Keyword.Keyword] -> Prompt [Natural.Natural]
+  -- | CR 508.1j / 509.1f: the costs of a combat toll are paid "in any order",
+  -- and the order is the payer's. The [ObjectId] is the taxing permanents in
+  -- the order the charges were gathered (Pawl.Engine.AttackCost.totalCost,
+  -- Pawl.Engine.BlockCost.totalCost), one entry per charge; the answer is a
+  -- permutation of their indices, first-named paid first.
+  --
+  -- The tags and not the components, unlike OrderCostComponents above: each
+  -- charge is the price one permanent's text states, so the permanent names it,
+  -- and the components of that one charge are ordered by their own prompt as it
+  -- is paid.
+  --
+  -- Asked only where the order is observable, which
+  -- Pawl.Engine.Cost.tollOrderObservable decides.
+  OrderCombatTolls :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt [Natural.Natural]
   -- | The relative order of a per-object batch over objects ONE player
   -- controls. The [Recipient] is one such group in the engine's canonical
   -- order; the answer is a permutation of its indices.

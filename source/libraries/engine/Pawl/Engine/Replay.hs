@@ -118,6 +118,7 @@ encode p answer = case p of
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
   Prompt.OrderDamage {} -> Response.OrderedDamage answer
   Prompt.OrderCostComponents {} -> Response.OrderedCostComponents answer
+  Prompt.OrderCombatTolls {} -> Response.OrderedCombatTolls answer
   Prompt.OrderForEach {} -> Response.OrderedForEach answer
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
   Prompt.ChooseBoundToken {} -> Response.ChoseBoundToken answer
@@ -360,6 +361,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.OrderCostComponents {} -> case response of
     Response.OrderedCostComponents order -> Just order
+    _ -> Nothing
+  Prompt.OrderCombatTolls {} -> case response of
+    Response.OrderedCombatTolls order -> Just order
     _ -> Nothing
   Prompt.OrderForEach {} -> case response of
     Response.OrderedForEach order -> Just order
@@ -731,6 +735,9 @@ defaultAnswer p = case p of
   -- CR 601.2h: likewise, and it is the cost's PRINTED order -- what pawl paid in
   -- before the order became the payer's to choose.
   Prompt.OrderCostComponents _ _ _ components -> zipWith const [0 ..] components
+  -- CR 508.1j / 509.1f: likewise, and it is the order the charges were gathered
+  -- in -- what pawl paid in before the order became the payer's to choose.
+  Prompt.OrderCombatTolls _ _ tags -> zipWith const [0 ..] tags
   -- CR 608.2f: likewise, and it is the engine's own APNAP-then-ascending sweep
   -- order -- what pawl walked in before the intra-seat key became the resolving
   -- controller's to choose.
