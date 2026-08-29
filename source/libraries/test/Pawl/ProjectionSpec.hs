@@ -3503,8 +3503,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- `o:"emblem with"`, 2026-08-27, 96 cards, has_more false. Of the emblems on
   -- that list printing a replacement effect, Jaya Ballard's "cast this way" is a
   -- back-reference to the permission the same emblem grants, and Ajani
-  -- Steadfast's emblem is authorable but its card is not yet transcribed
-  -- (gap #2613) -- so Serra's is the one this case can be built on.
+  -- Steadfast's is a DAMAGE row rather than a life-loss one (data/cards/
+  -- ajani-steadfast.json, proved from the command zone by Pawl.ReplacementSpec's
+  -- Ajani Steadfast group) -- so Serra's is the one that reaches
+  -- ReplacementEffect.LifeLossR, which is the row this case reads.
   --
   -- Each board differs from `board` by exactly one ACT: whether the ultimate was
   -- activated, whether alice controls a creature, or how much life is at stake.
