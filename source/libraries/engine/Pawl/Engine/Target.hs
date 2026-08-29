@@ -1205,9 +1205,24 @@ selectionLegal perspective source x slots sets chosen gs =
     slotLegal slot targetSlot =
       let legal = Map.findWithDefault Set.empty slot sets
           picked = Map.findWithDefault Set.empty slot chosen
-          (lo, hi) = announcedRange x targetSlot legal
+          (_, hi) = announcedRange x targetSlot legal
+          -- The count the slot DEMANDS, unnarrowed by the board -- unlike the
+          -- ceiling beside it, which the board is entitled to lower (a caster
+          -- cannot choose more targets than there are). CR 601.2c gives no such
+          -- relief on the minimum: an announcement that cannot be filled makes the
+          -- casting or the activation illegal, and CR 601.2e returns the game to
+          -- before it was proposed.
+          --
+          -- Where the count is printed, `fillableModes` refused the mode before
+          -- the announcement began and this bound is the same number
+          -- announcedRange narrowed to. Where it is CR 601.2b's X, that gate ran
+          -- at the X=0 floor and could not know the value, so this is the only
+          -- place an X announced above what the board can supply is caught --
+          -- Pawl.CombatSpec's "CR 601.2c announcing more X than there are
+          -- creatures reverses the whole activation" proves it.
+          demanded = TargetCount.least (SlotCount.at x (TargetSlot.count targetSlot))
           size = Natural.length picked
-       in Set.isSubsetOf picked legal && size >= lo && size <= hi
+       in Set.isSubsetOf picked legal && size >= demanded && size <= hi
     coherent slot targetSlot =
       Set.isSubsetOf
         (Map.findWithDefault Set.empty slot chosen)

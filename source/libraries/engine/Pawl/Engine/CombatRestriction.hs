@@ -299,9 +299,9 @@ inForce gs =
       -- CR 122.1b's keyword counter is the fourth road a minting keyword takes
       -- onto a permanent, and it is on no base face and in neither of the two
       -- other-zone disjuncts: decayed is on rule 122.1b's list and mints rule
-      -- 702.147a's "can't block". Pawl.CombatSpec's "CR 122.1b a decayed counter
-      -- keeps the creature it is put on from blocking" proves it, through
-      -- Rot-Curse Rakshasa. The twin gate in Pawl.Engine.Projection needs no such
+      -- 702.147a's "can't block". Pawl.CombatSpec's "CR 122.1b two decayed
+      -- counters, announced as X, stop both creatures blocking" proves it,
+      -- through Rot-Curse Rakshasa. The twin gate in Pawl.Engine.Projection needs no such
       -- read: rule 122.1b's list and Keyword.mintsReplacement's set are disjoint.
       anyMinted =
         any baseCouldMint (Set.toList (GameState.battlefield gs))

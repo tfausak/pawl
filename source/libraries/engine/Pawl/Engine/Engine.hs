@@ -814,8 +814,9 @@ placeBorne srcId pending = do
       -- (#2472). Every such slot in the pool is on a spell.
       let slots = Modal.modesTargetSlots chosenModes modal
           sets = Target.legalSets (Just controller) bound srcId slots gs
-      -- CR 107.3b's zero: a triggered ability announces no X, so no slot of one
-      -- counts by it (CR 601.2b belongs to casting and to activating).
+      -- Zero, there being no announcement to read: CR 601.2b's is made while
+      -- casting a spell or activating an ability, and a triggered ability is
+      -- neither, so no slot of one can count by an X.
       chosen <- Target.chooseTargets decider controller abilId 0 slots sets
       -- CR 113.7: the ability's SOURCE is bound under the reserved slot as it is
       -- placed, so "this creature" resolves as an ordinary slot read even after

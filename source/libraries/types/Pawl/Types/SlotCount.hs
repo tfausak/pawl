@@ -25,9 +25,10 @@ data SlotCount
 -- X fixes the number of targets, so the range collapses to a point and there is
 -- nothing left for CR 601.2c to ask.
 --
--- CR 107.3b's zero is the value to pass where no X was announced: an ability
--- with no {X} in its cost announces none, and a cast's own castability gate is
--- asked at that same floor before the announcement exists.
+-- Zero is the value to pass where no X has been announced: an ability
+-- with no {X} in its cost announces none (CR 601.2b), and a castability gate
+-- asked before the announcement exists reads the card in another zone, whose
+-- {X} CR 107.3g already treats as zero.
 at :: Natural.Natural -> SlotCount -> TargetCount.TargetCount
 at x c = case c of
   Printed count -> count

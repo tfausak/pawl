@@ -1233,8 +1233,9 @@ amassing oid p = case p of
 -- CR 701.41 support, which is card DATA and no opcode: "support N" is written out
 -- as the counters it means, over a CR 601.2c slot of 0 to N.
 --
--- N is a LITERAL range here. A count that reads X -- The Crowd Goes Wild's
--- "Support X" -- is not expressible (#1271).
+-- N is a LITERAL range here. A count of 0 to the announced X -- The Crowd Goes
+-- Wild's "Support X" -- is not expressible (#2580); the point range X to X is,
+-- and Rot-Curse Rakshasa writes one (Pawl.CombatSpec).
 --
 -- Lead by Example {1}{G} Instant (data/cards/lead-by-example.json): "Support 2.",
 -- and nothing else -- CR 701.41a's INSTANT reading, which has no "other" in it.

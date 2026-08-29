@@ -31,6 +31,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -3492,10 +3493,14 @@ textChangedCombatAffectedSpec s registry = Spec.describe s "TextChangedCombatAff
 -- of X target creatures. Activate only as a sorcery" (Tarkir: Dragonstorm,
 -- checked against Scryfall 2026-08-29; data/cards/rot-curse-rakshasa.json).
 --
--- alice has four Swamps, one Goblin Piker to attack with and the Rakshasa in her
--- graveyard; bob has THREE Pikers, one more than the largest X announced below,
--- so the announcement chooses which creatures it lands on rather than taking
--- every candidate the board offers.
+-- alice has eight Swamps, one Goblin Piker to attack with and the Rakshasa in
+-- her graveyard; bob has THREE Pikers, one more than the largest X that resolves
+-- below, so the announcement chooses which creatures it lands on rather than
+-- taking every candidate the board offers.
+--
+-- Eight Swamps and not four: the third case announces X as five to watch the
+-- activation reverse for want of TARGETS, and on a board that could not pay
+-- {5}{B}{B} it would reverse for want of MANA and prove nothing.
 --
 -- Two boards differing in the announced X alone, because only the pair says the
 -- count came from CR 601.2b's announcement rather than from a number written on
@@ -3504,7 +3509,7 @@ textChangedCombatAffectedSpec s registry = Spec.describe s "TextChangedCombatAff
 -- both, so a board on which nothing may block fails here rather than passing.
 renewBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 renewBoard rakshasa swamp piker =
-  let (gyId, withCard) = S.addGraveyardCard rakshasa S.alice (S.landsInPlay swamp 4)
+  let (gyId, withCard) = S.addGraveyardCard rakshasa S.alice (S.landsInPlay swamp 8)
       (attacker, withAttacker) = S.addCreature piker S.alice withCard
       (theirs, board) =
         List.foldl'
@@ -3521,14 +3526,19 @@ renewBoard rakshasa swamp piker =
           }
       )
 
--- Announces X and answers CR 601.2c's targets with exactly `oids`, by FILTERING
--- the offered set: the pool decides which flavour of Recipient a candidate
--- arrives as, and a hand-built one of another flavour is dropped by CR 608.2b's
--- re-read (Pawl.ActivateSpec's answerXTargeting says the same).
+-- Announces X and answers CR 601.2c's targets out of `oids`, by FILTERING the
+-- offered set: the pool decides which flavour of Recipient a candidate arrives
+-- as, and a hand-built one of another flavour is dropped by CR 608.2b's re-read
+-- (Pawl.ActivateSpec's answerXTargeting says the same).
+--
+-- As many of them as the slot was OFFERED, rather than all of them: an offer of
+-- the wrong size then lands counters on the wrong creatures instead of failing
+-- Target.selectionLegal and reversing the activation whole, which is what leaves
+-- the announced count itself observable on the board.
 renewing :: Natural.Natural -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 renewing x oids p = case p of
   Prompt.ChooseX {} -> x
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (maybe False (`elem` oids) . Recipient.objectOf) . snd) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(count, legal) -> Set.take (Natural.toIntSaturating count) (Set.filter (maybe False (`elem` oids) . Recipient.objectOf) legal)) sets
   _ -> S.identityAnswer p
 
 -- S.combatBoardOf's own board shape, taken over a board a test built for itself:
@@ -3577,8 +3587,10 @@ keywordCounterRestrictionSpec s registry = Spec.describe s "KeywordCounterRestri
           "two of the three Pikers carry one decayed counter each"
           (fmap (\oid -> S.counterOf decayed oid resolved) theirs)
           [1, 1, 0]
-        -- The rest of the activation: CR 602.2b paid the {X}{B}{B} and CR 406.2's
-        -- exile paid the rest of the cost, so the Rakshasa left the graveyard.
+        -- The rest of the activation: CR 602.2b routes it through CR 601.2b-i, so
+        -- the {X}{B}{B} was paid and CR 406.2's exile paid the rest of the cost.
+        -- The Rakshasa is in exile rather than the graveyard it was activated
+        -- from.
         Spec.assertEqWith s "the Rakshasa exiled itself to pay for it" (Game.zoneMembers Zone.Graveyard S.alice resolved, length (Game.zoneMembers Zone.Exile S.alice resolved)) ([], 1)
       (abilities, _) -> Spec.assertEqWith s "exactly one ability to activate, on three Pikers" (length abilities) 1
   -- The pair's other half: the same board, the same card, X announced as one. The
@@ -3601,6 +3613,36 @@ keywordCounterRestrictionSpec s registry = Spec.describe s "KeywordCounterRestri
           "only the named Piker carries a decayed counter"
           (fmap (\oid -> S.counterOf decayed oid resolved) theirs)
           [1, 0, 0]
+      (abilities, _) -> Spec.assertEqWith s "exactly one ability to activate, on three Pikers" (length abilities) 1
+  -- CR 601.2c against CR 601.2b's freedom: X is announced without reference to the
+  -- board, so an X larger than the creatures available is announceable and then
+  -- unfillable -- whereupon CR 601.2e, which CR 602.2b routes an activation
+  -- through, returns the game to before the activation was proposed.
+  -- Reject-not-repair: the counters do not land on the four creatures there ARE.
+  Spec.it s "CR 601.2c announcing more X than there are creatures reverses the whole activation" $ do
+    rakshasa <- S.printingOf s registry "Rot-Curse Rakshasa"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gyId, attacker, theirs, gs) = renewBoard rakshasa swamp piker
+    case (Activate.abilitiesFor gyId gs, theirs) of
+      ([ability], [first_, _, _]) -> do
+        -- FIVE, against the four creatures the board holds -- bob's three and
+        -- alice's attacker, since "X target creatures" names no controller -- and
+        -- answered with every one of them, so the announcement fails on the number
+        -- alone rather than on an answer that left a legal creature out.
+        let resolved = S.runPure (renewing 5 (attacker : theirs)) gs (Activate.activateAbility S.alice gyId ability >> Stack.resolveTop)
+            board = declaringAttackers resolved
+            decayed = CounterKind.Keyword Keyword.Decayed
+        Spec.assertEqWith
+          s
+          "no creature carries a decayed counter"
+          (fmap (\oid -> S.counterOf decayed oid resolved) (attacker : theirs))
+          [0, 0, 0, 0]
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton first_ (Set.singleton attacker)) board) "so the first Piker still blocks"
+        Spec.assertEqWith s "and all three are offered" (Combat.legalBlockers S.bob board) theirs
+        -- CR 601.2e's reversal is of the WHOLE activation, so the cost is unpaid
+        -- too: the Rakshasa is in the graveyard it would have exiled itself from.
+        Spec.assertEqWith s "the Rakshasa never left the graveyard" (Game.zoneMembers Zone.Graveyard S.alice resolved) [gyId]
       (abilities, _) -> Spec.assertEqWith s "exactly one ability to activate, on three Pikers" (length abilities) 1
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
