@@ -3532,9 +3532,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
-        -- CR 120.1a: damage only to a battle, creature, or planeswalker, so both
-        -- arms of the ObjectRef go through Damage.damageRecipient and neither is
-        -- trusted. A player recipient survives untouched (CR 115.4, CR 120.3a).
+        -- CR 120.1a: damage only to a battle, creature, or planeswalker, so every
+        -- object an ObjectRef names goes through Damage.damageRecipient and none
+        -- is trusted. A player recipient survives untouched (CR 115.4, CR 120.3a).
         -- ONE recipient list from EVERY description the instruction names, so a
         -- sentence naming objects and players at once -- Molten Disaster's "each
         -- creature without flying and each player" -- reaches applyDamage as a

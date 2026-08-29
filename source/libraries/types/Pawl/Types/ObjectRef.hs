@@ -251,8 +251,8 @@ data ObjectRef
   | -- | Every OPPONENT of the resolving controller -- Soul Immolation's "each
     -- opponent". EachPlayer's set narrowed by CR 102.1's relation, and here for
     -- that arm's reason: it names no object at all, and it is an ObjectRef
-    -- because Effect.DealDamage's ref is one (CR 120.3a makes a player a damage
-    -- recipient).
+    -- because Effect.DealDamage's refs are ObjectRefs (CR 120.3a makes a player
+    -- a damage recipient).
     --
     -- Payload-free, EachPlayer's call: "each opponent" is what the card says,
     -- and a Pawl.Types.PlayerRef would make InSlot sayable twice over. The
@@ -275,8 +275,8 @@ data ObjectRef
   | -- | The player this effect's SOURCE chose as it entered the battlefield --
     -- Stuffy Doll's "it deals that much damage to the chosen player". EachPlayer's
     -- sibling one seat wide, and here for that arm's reason: the arm names no
-    -- object at all, and it is an ObjectRef because Effect.DealDamage's ref is one
-    -- (CR 120.3a makes a player a damage recipient).
+    -- object at all, and it is an ObjectRef because Effect.DealDamage's refs are
+    -- ObjectRefs (CR 120.3a makes a player a damage recipient).
     --
     -- Read off Object.chosenPlayer of the effect's SOURCE, which is CR 113.7a's
     -- source permanent rather than the resolving ability object -- the direction
