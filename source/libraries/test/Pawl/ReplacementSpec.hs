@@ -1962,9 +1962,9 @@ deflectionCombat blocker attacker wanted p = case p of
   _ -> S.identityAnswer p
 
 -- Cast Molten Disaster UNKICKED for `x`, spending a contested shield on the
--- batch's hits in `wanted` order. The kicker answer is pinned rather than
--- deferred, since kicking it grants split second (CR 702.61a) and that is a
--- second difference between the boards below.
+-- batch's hits in `wanted` order. The kicker answer is PINNED rather than
+-- deferred: kicking it turns on a static ability that grants split second (CR
+-- 702.61a), and the case below is about the damage sentence alone.
 --
 -- The order is stated by RECIPIENT, deflectionCombat's shape, so the assertions
 -- do not depend on the order the instruction's own sweep gathered the batch in.
