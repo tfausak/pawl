@@ -322,7 +322,7 @@ movesLibraryCard effect = case effect of
   -- zone change and only its ZONES answer the question. Three ways to touch a
   -- library: arriving in one, being named as leaving one (CR 113.6m's origin),
   -- or being referred to by position in one.
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone _ _ origin _) ->
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone _ _ origin _ _) ->
     zone == Zone.Library || origin == Just Zone.Library || refReachesLibrary ref
   -- CR 701.42a's destination is the battlefield, so the "to" half is never a
   -- library; the "from" half is wherever the named cards are, which is the same

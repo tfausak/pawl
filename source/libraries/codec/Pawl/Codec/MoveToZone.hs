@@ -4,6 +4,7 @@ module Pawl.Codec.MoveToZone where
 
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.LibraryPlacement as LibraryPlacement
+import qualified Pawl.Codec.MoveDuration as MoveDuration
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.Zone as Zone
@@ -13,9 +14,9 @@ import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.MoveToZone as MoveToZone
 
--- | Four independently elided keys, each omitted when it is its default: the
--- riders (CR 110.5b), the bound slot, CR 113.6m's origin zone and CR 401.2's
--- library placement.
+-- | Five independently elided keys, each omitted when it is its default: the
+-- riders (CR 110.5b), the bound slot, CR 113.6m's origin zone, CR 401.2's
+-- library placement and CR 610.3's duration.
 --
 -- This is what retires @moveTail@. That function read a VARIABLE-LENGTH array
 -- tail and recovered which element was which from each one's JSON type, in a
@@ -31,6 +32,7 @@ codec = Fields.object $ do
   slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) MoveToZone.slot
   origin <- Fields.defaulted "origin" Nothing (Common.maybe Zone.codec) MoveToZone.origin
   placement <- Fields.defaulted "placement" LibraryPlacement.defaultValue LibraryPlacement.codec MoveToZone.placement
+  duration <- Fields.defaulted "duration" Nothing (Common.maybe MoveDuration.codec) MoveToZone.duration
   pure
     MoveToZone.MkMoveToZone
       { MoveToZone.ref = ref,
@@ -38,5 +40,6 @@ codec = Fields.object $ do
         MoveToZone.riders = riders,
         MoveToZone.slot = slot,
         MoveToZone.origin = origin,
-        MoveToZone.placement = placement
+        MoveToZone.placement = placement,
+        MoveToZone.duration = duration
       }

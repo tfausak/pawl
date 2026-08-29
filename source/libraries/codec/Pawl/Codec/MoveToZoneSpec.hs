@@ -8,6 +8,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.MoveDuration as MoveDuration
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Quantity as Quantity
@@ -28,7 +29,8 @@ bare =
       MoveToZone.riders = EntryRiders.defaultValue,
       MoveToZone.slot = Nothing,
       MoveToZone.origin = Nothing,
-      MoveToZone.placement = LibraryPlacement.defaultValue
+      MoveToZone.placement = LibraryPlacement.defaultValue,
+      MoveToZone.duration = Nothing
     }
 
 tapped :: EntryRiders.EntryRiders Quantity.Quantity
@@ -57,11 +59,11 @@ spec s = Spec.describe s "Pawl.Codec.MoveToZone" $ do
           MoveToZone.origin = Just Zone.Graveyard
         }
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"zone\":{\"type\":\"Battlefield\"},\"riders\":{\"tapped\":{\"type\":\"Tapped\"}},\"origin\":{\"type\":\"Graveyard\"}} "
-  -- All four optional keys at once, which no card in the corpus writes: the
+  -- All five optional keys at once, which no card in the corpus writes: the
   -- longest form moveTail accepted was six elements and it had to reject a
   -- repeat of any of them by hand. Griptide's Top rather than Bottom, since
   -- Bottom is LibraryPosition's default and would elide the key.
-  Spec.it s "all four optional keys at once" $
+  Spec.it s "all five optional keys at once" $
     Common.assertCodec
       s
       MoveToZone.codec
@@ -70,7 +72,8 @@ spec s = Spec.describe s "Pawl.Codec.MoveToZone" $ do
           MoveToZone.riders = tapped,
           MoveToZone.slot = Just (SlotName.MkSlotName (Text.pack "moved")),
           MoveToZone.origin = Just Zone.Exile,
-          MoveToZone.placement = LibraryPlacement.Stated LibraryPosition.Top
+          MoveToZone.placement = LibraryPlacement.Stated LibraryPosition.Top,
+          MoveToZone.duration = Just MoveDuration.UntilSourceLeavesTheBattlefield
         }
-      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"zone\":{\"type\":\"Library\"},\"riders\":{\"tapped\":{\"type\":\"Tapped\"}},\"slot\":\"moved\",\"origin\":{\"type\":\"Exile\"},\"placement\":{\"type\":\"Stated\",\"value\":{\"type\":\"Top\"}}} "
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"zone\":{\"type\":\"Library\"},\"riders\":{\"tapped\":{\"type\":\"Tapped\"}},\"slot\":\"moved\",\"origin\":{\"type\":\"Exile\"},\"placement\":{\"type\":\"Stated\",\"value\":{\"type\":\"Top\"}},\"duration\":{\"type\":\"UntilSourceLeavesTheBattlefield\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s MoveToZone.codec

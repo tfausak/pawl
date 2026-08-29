@@ -2160,7 +2160,7 @@ rewriteEffect pairs effect = case effect of
   --
   -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
   -- printed keyword through the swap (#1190).
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone riders mSlot mOrigin position) -> Effect.MoveToZone (MoveToZone.MkMoveToZone (rewriteObjectRef pairs ref) zone (rewriteEntryRiders pairs riders) mSlot mOrigin position)
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone riders mSlot mOrigin position duration) -> Effect.MoveToZone (MoveToZone.MkMoveToZone (rewriteObjectRef pairs ref) zone (rewriteEntryRiders pairs riders) mSlot mOrigin position duration)
   Effect.Draw x -> Effect.Draw x {Draw.quantity = rewriteQuantity pairs (Draw.quantity x)}
   Effect.Mill (Mill.MkMill ref quantity mTally mSlot) ->
     Effect.Mill (Mill.MkMill ref (rewriteQuantity pairs quantity) (fmap (\t -> t {MillTally.filter = Filter.rewrite pairs (MillTally.filter t)}) mTally) mSlot)
