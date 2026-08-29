@@ -239,6 +239,7 @@ import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotArity as SlotArity
+import qualified Pawl.Types.SlotCount as SlotCount
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
@@ -250,7 +251,6 @@ import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
-import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
@@ -1540,10 +1540,17 @@ modalCountsOffend :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility C
 modalCountsOffend modal =
   let modeOffends mode =
         let read_ = Resolve.modeSlots mode
-            plural targetSlot = TargetCount.plural (TargetSlot.count targetSlot)
+            plural targetSlot = SlotCount.plural (TargetSlot.count targetSlot)
             offends slot targetSlot = plural targetSlot && Map.lookup slot read_ == Just SlotArity.One
          in or (Map.elems (Map.mapWithKey offends (Mode.targetSlots mode)))
    in any modeOffends (Modal.modes modal)
+
+-- CR 601.2c with CR 601.2b: does this modal read the announced X through a
+-- TARGET SLOT's count -- "each of X target creatures" (Rot-Curse Rakshasa)? A
+-- reader Resolve.readsX cannot see, that one walking effects and this X sitting
+-- on the slot, so the two reads-equal-declares lints below ask both.
+modalReadsAnnouncedX :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+modalReadsAnnouncedX = any ((==) SlotCount.AnnouncedX . TargetSlot.count) . Modal.allTargetSlots
 
 -- Every ReplacementEffect a card AUTHORS: the ones it PRINTS
 -- (Face.replacementEffects, Eon Hub's) and the ones an effect of its own
@@ -5268,6 +5275,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- effect, so Card.allEffects cannot see it: Clash of Wills' only reader of the
   -- X it announces is the "pays {X}" its clause offers at resolution
   -- (`payGateCostsOf`, substituted in by Pawl.Engine.Resolve.announcedXOn).
+  --
+  -- A TARGET SLOT counting the announced X is the fourth such reader
+  -- (modalReadsAnnouncedX): CR 601.2c's variable number of targets is named at
+  -- the announcement rather than by anything the modes do.
   Spec.it s "every printing that reads X declares X, and vice versa" $ do
     ps <- S.allPrintings s
     let -- CR 107.3m's other reader, one CR 614.1c row over from the printed
@@ -5286,6 +5297,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             || Face.loyalty c == Just Loyalty.Variable
             || entryCountersReadX c
             || any declaresVariable (payGateCostsOf (Face.spell c))
+            || modalReadsAnnouncedX (Face.spell c)
         offenders =
           filter
             (anyFace (\f -> readsX f /= any declaresVariable (spellCostsOf f)) . Printing.card)
@@ -5334,7 +5346,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
         abilities = concatMap abilitiesOf ps
         offends (_, ab) =
-          Resolve.readsX (Modal.allEffects (ActivatedAbility.modal ab))
+          (Resolve.readsX (Modal.allEffects (ActivatedAbility.modal ab)) || modalReadsAnnouncedX (ActivatedAbility.modal ab))
             /= declaresVariable (ActivatedAbility.cost ab)
     -- Guards the sweep against passing vacuously, in both directions: an empty
     -- pool of abilities, and a pool in which no activation cost declares an X at
@@ -5948,7 +5960,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                     <> fmap TriggeredAbility.modal (Face.triggeredAbilities face)
         modals = concatMap carriers ps
         takesSeveral (_, modal) =
-          any (any (TargetCount.plural . TargetSlot.count) . Mode.targetSlots) (Modal.modes modal)
+          any (any (SlotCount.plural . TargetSlot.count) . Mode.targetSlots) (Modal.modes modal)
     -- The pool must actually contain one, or the sweep says nothing.
     Spec.assertBool s (any takesSeveral modals) "the pool has a slot that takes more than one target"
     Spec.assertEqWith s "no multi-target slot is read one at a time" (fmap fst (filter (modalCountsOffend . snd) modals)) []

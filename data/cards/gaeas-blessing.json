@@ -61,8 +61,11 @@
             "targetSlots": {
               "cards": {
                 "count": {
-                  "least": 0,
-                  "most": 3
+                  "type": "Printed",
+                  "value": {
+                    "least": 0,
+                    "most": 3
+                  }
                 },
                 "pool": {
                   "type": "CardsInGraveyard",

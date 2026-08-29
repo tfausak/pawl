@@ -46,6 +46,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.SlotCount as SlotCount
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Subtype as Subtype
@@ -413,7 +414,7 @@ fallsOff pcs gs oid = case Map.lookup oid pcs of
 -- matched rather than widened.
 stillLegalEnchant :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> TargetSlot.TargetSlot -> Recipient.Recipient -> Bool
 stillLegalEnchant pcs gs source slot recipient = case (slot, recipient) of
-  (TargetSlot.MkTargetSlot Pool.Creatures Nothing count Nothing, Recipient.ToCreature target) | count == TargetCount.one ->
+  (TargetSlot.MkTargetSlot Pool.Creatures Nothing count Nothing, Recipient.ToCreature target) | count == SlotCount.Printed TargetCount.one ->
     case Map.lookup target pcs of
       Nothing -> False
       Just pc ->

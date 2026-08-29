@@ -7,10 +7,11 @@ import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Pool as Pool
 import qualified Pawl.Codec.Quantity as Quantity
-import qualified Pawl.Codec.TargetCount as TargetCount
+import qualified Pawl.Codec.SlotCount as SlotCount
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
+import qualified Pawl.Types.SlotCount as SlotCount
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -31,7 +32,7 @@ codec :: Codec.Codec TargetSlot.TargetSlot
 codec = Fields.object $ do
   pool <- Fields.required "pool" Pool.codec TargetSlot.pool
   filter_ <- Fields.defaulted "filter" Nothing (Common.maybe (Filter.codec Keyword.codec)) TargetSlot.filter
-  count <- Fields.defaulted "count" TargetCount.one TargetCount.codec TargetSlot.count
+  count <- Fields.defaulted "count" (SlotCount.Printed TargetCount.one) SlotCount.codec TargetSlot.count
   amount <- Fields.defaulted "amount" Nothing (Common.maybe Quantity.codec) TargetSlot.amount
   pure
     TargetSlot.MkTargetSlot

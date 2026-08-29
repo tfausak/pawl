@@ -1585,8 +1585,8 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   -- was computed from the same post-move `gs`, so a "target spell"
                   -- slot draws from the pool CR 601.2a built -- with this spell in
                   -- it, and CR 115.5 taking it back out.
-                  chosen <- Target.chooseTargets decider pid sid slots sets
-                  if not (Target.selectionLegal (Just pid) sid slots sets chosen bestowedGs)
+                  chosen <- Target.chooseTargets decider pid sid (Maybe.fromMaybe 0 mAmount) slots sets
+                  if not (Target.selectionLegal (Just pid) sid (Maybe.fromMaybe 0 mAmount) slots sets chosen bestowedGs)
                     then reject
                     else do
                       -- CR 601.2b then 601.2f: X substituted and the Phyrexian

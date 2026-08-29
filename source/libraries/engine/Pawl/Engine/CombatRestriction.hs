@@ -18,6 +18,7 @@
 module Pawl.Engine.CombatRestriction where
 
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -34,6 +35,7 @@ import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Condition as Condition.Type
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
@@ -294,11 +296,13 @@ inForce gs =
       -- Pawl.ProjectionSpec's three "still bars the ... blocker" boards are one
       -- each.
       --
-      -- Not implemented: a minting keyword arriving on a CR 122.1b keyword
-      -- counter is on no base face and in neither disjunct -- decayed is on rule
-      -- 122.1b's list and mints rule 702.147a's "can't block" (#2452). The twin
-      -- gate in Pawl.Engine.Projection needs no such note: rule 122.1b's list and
-      -- Keyword.mintsReplacement's set are disjoint.
+      -- CR 122.1b's keyword counter is the fourth road a minting keyword takes
+      -- onto a permanent, and it is on no base face and in neither of the two
+      -- other-zone disjuncts: decayed is on rule 122.1b's list and mints rule
+      -- 702.147a's "can't block". Pawl.CombatSpec's "CR 122.1b two decayed
+      -- counters, announced as X, stop both creatures blocking" proves it,
+      -- through Rot-Curse Rakshasa. The twin gate in Pawl.Engine.Projection needs no such
+      -- read: rule 122.1b's list and Keyword.mintsReplacement's set are disjoint.
       anyMinted =
         any baseCouldMint (Set.toList (GameState.battlefield gs))
           || Projection.storedWrites minting gs
@@ -307,6 +311,28 @@ inForce gs =
       baseCouldMint oid =
         any (any (Projection.grantsKeywordWhere Keyword.mintsCombatRestriction) . StaticAbility.modifications) (Projection.staticAbilitiesOf oid gs)
           || Projection.anyCopiableKeyword Keyword.mintsCombatRestriction oid gs
+          || any countedKeywordMints (Map.keys (Projection.countersOf oid gs))
+      -- CR 122.1b: the keyword a keyword counter grants, asked of the counters
+      -- themselves rather than of the projection that turns them into layer-6
+      -- grants -- this is the SHORT-CIRCUIT, and projecting the permanent is the
+      -- work it exists to skip. Exhaustive rather than a wildcard, so a later
+      -- kind that grants a keyword fails to compile here instead of silently
+      -- granting nothing.
+      countedKeywordMints kind = case kind of
+        CounterKind.Keyword kw -> Keyword.mintsCombatRestriction kw
+        CounterKind.PlusOnePlusOne -> False
+        CounterKind.MinusOneMinusOne -> False
+        CounterKind.Loyalty -> False
+        CounterKind.Lore -> False
+        CounterKind.Defense -> False
+        CounterKind.Time -> False
+        CounterKind.Fade -> False
+        CounterKind.Shield -> False
+        CounterKind.Finality -> False
+        CounterKind.Stun -> False
+        CounterKind.Level -> False
+        CounterKind.Hone -> False
+        CounterKind.Named _ -> False
       -- CR 701.60c: "a suspected permanent has menace and 'This creature can't
       -- block' for as long as it's suspected". Decayed's row (CR 702.147a) with
       -- the keyword swapped for the designation -- aimed at the source alone,
