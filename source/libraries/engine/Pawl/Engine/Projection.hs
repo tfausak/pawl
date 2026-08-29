@@ -3957,7 +3957,7 @@ filterReads f = case f of
   -- Controller: CR 506.4 stops a battle being attacked when it stops being a
   -- battle, and CR 613.1d's layer 4 writes card types, the conjunct
   -- viewOfCharacteristics forces through `peers`. A REGRESSION FENCE for the atom
-  -- above's reason and citing the same issue.
+  -- above's reason. Not implemented: a cross-object CR 613.8a dependency (#2632).
   --
   -- The PROTECTOR half of the same read declares nothing, for IsAttacking's
   -- reason: CR 310.9's protector is a designation stored on the battle
