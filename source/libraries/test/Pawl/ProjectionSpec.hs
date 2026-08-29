@@ -461,6 +461,12 @@ chorusBadMoon chorus badMoon bogWraith childOfNight chorusFirst =
 -- creature". Neither Piker's ability is ever activated: these cases read a
 -- projection off a board that gives nobody priority.
 --
+-- Synthetic Artificers' Ascent, {2}{U} Enchantment, whole text: "Creatures with
+-- an activated ability that isn't a mana ability have flying." Presence of Gond
+-- is PRINTED -- {2}{G} Enchantment - Aura, "Enchant creature. Enchanted creature
+-- has '{T}: Create a 1/1 green Elf Warrior creature token.'" -- Oracle text
+-- verified against Scryfall, 2026-08-29.
+--
 -- SYNTHETIC because no printed continuous effect's affected set asks whether a
 -- permanent has an activated ability. Scryfall o:/with an activated abilit/ and
 -- o:/(has|have) an activated abilit/, 2026-08-29: Ravager Wurm, Tsabo's Web,

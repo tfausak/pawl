@@ -4031,8 +4031,10 @@ filterReads f = case f of
   -- Reads nothing: CR 712.8d/e make which face is up the thing characteristics
   -- are read OFF rather than one of them, so no Modification writes Object.face.
   Filter.Type.Transformed -> Set.empty
-  -- CR 109.3 / 613.1f: the aspect LoseAllAbilities writes, Aspect having no
-  -- finer grain than "the abilities".
+  -- CR 109.3 / 613.1f: the aspect GainAbility, LoseNamedAbility and
+  -- LoseAllAbilities write, Aspect having no finer grain than "the abilities".
+  -- Pawl.ProjectionSpec's "CR 613.8a a granted activated ability puts the
+  -- creature into the Ascent's set" proves this row load-bearing.
   --
   -- Not implemented: what an ability's OWN CR 604.2 gate reads, which
   -- abilitiesFromCharacteristics runs through Condition.holds and which a
