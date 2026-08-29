@@ -1052,7 +1052,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- forgets its protector"), so dropping it changes no board pawl can build
       -- and mutating it to True leaves the suite green.
       --
-      -- Battle.protectorOf is a Object.protector lookup and reads no projection,
+      -- Battle.protectorOf is an Object.protector lookup and reads no projection,
       -- so unlike controllerOf above it re-enters nothing at all.
       Filter.attackingBattleProtector = case Map.lookup oid (Combat.attackers (GameState.combat gs)) of
         Just (AttackTarget.OfBattle battle)

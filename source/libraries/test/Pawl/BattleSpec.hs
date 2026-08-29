@@ -20,9 +20,9 @@
 -- Event.designateProtector, Object.protector and AttackTarget.OfBattle.
 --
 -- Invasion of Dominaria // Serra Faithkeeper is the battle every case here is
--- built on, and is the only battle in `data/cards`. {2}{W} Battle -- Siege, defense 5, "When
--- this Siege enters, you gain 4 life and draw a card", transforming into a 4/4
--- Angel with flying and vigilance.
+-- built on, and is the only battle in `data/cards`. {2}{W} Battle -- Siege,
+-- defense 5, "When this Siege enters, you gain 4 life and draw a card",
+-- transforming into a 4/4 Angel with flying and vigilance.
 --
 -- It is deliberately not Invasion of Kaladesh. That card's front face is simpler
 -- still, but its BACK face is a Legendary Artifact -- Vehicle with a
@@ -578,7 +578,8 @@ snareName = "Synthetic Bulwark Snare"
 -- The target set is FILTERED rather than replaced, so a leg whose slot does not
 -- admit the victim takes no target at all instead of quietly succeeding on a
 -- hand-built recipient -- and on such a leg the activation is never offered at
--- all, CR 601.2c's target choice being part of what makes an ability activatable.
+-- all, CR 602.2b / 601.2c's target choice being part of what makes an ability
+-- activatable.
 snareAnswer ::
   ObjectId.ObjectId ->
   ObjectId.ObjectId ->
