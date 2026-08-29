@@ -5,8 +5,10 @@
 -- CR 406.4's two halves over Pawl.Engine.Target's Pool.CardsInExile arm -- the
 -- permission Pawl.Engine.Exile.mayLookAt answers, the pile
 -- Pawl.Engine.Exile.pileOf sorts a card into and Pawl.Engine.Target's piledOffer
--- offers instead, and the draw drawFromPiles takes out of it -- and
--- ObjectRef.EachCardInYourHand as Pawl.Engine.Resolve sweeps it.
+-- offers instead, and the draw drawFromPiles takes out of it, elided at a
+-- one-card pile, filtered back against the pile and asked with Game.ask rather
+-- than Game.choose (CR 104.4b) -- and ObjectRef.EachCardInYourHand as
+-- Pawl.Engine.Resolve sweeps it.
 --
 -- CR 406.4's separate piles are read off the same Ignorant Bliss: one casting
 -- makes one pile of what it hid, two castings make two, and which pile a chooser
