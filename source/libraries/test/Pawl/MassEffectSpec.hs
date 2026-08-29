@@ -2717,7 +2717,7 @@ communeWithLavaSpec s registry =
         -- slips through: objectRefSlots and readsX reach it only via
         -- objectRefQuantities, and Effect.Reveal is the cheapest of the
         -- ObjectRef-taking opcodes to plant it under. A damage clause's ref is the
-        -- same seam and answers the same way, which the last pair below pins:
+        -- same seam and answers the same way, which the last assertion pins:
         -- CR 120.1a admits no card in a library as a damage recipient, so nothing
         -- printed can reach it and only a planted effect can.
         Spec.it s "CR 603.3b a depth nested in an ObjectRef is a slot read and an X read" $ do

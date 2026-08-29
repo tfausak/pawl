@@ -2214,10 +2214,10 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     brothers <- S.printingOf s registry "Brothers of Fire"
     let base = S.landsFor mountain S.alice 3 (S.landsInPlay plains 2)
         (mine, g1) = S.addCreature jedit S.alice base
-        (theirs, g2) = S.addCreature brothers S.alice g1
+        (dealerId, g2) = S.addCreature brothers S.alice g1
         (deflectionId, unshielded) = S.addHandCard deflection S.alice g2
         shielded = castAndResolve (castDeflection 1 S.bob) unshielded deflectionId
-        burn order g = S.runPure (aimCreatureAndOrder mine order) g (Activate.activateAbility S.alice theirs (theAbility brothers) Monad.>> Stack.resolveTop)
+        burn order g = S.runPure (aimCreatureAndOrder mine order) g (Activate.activateAbility S.alice dealerId (theAbility brothers) Monad.>> Stack.resolveTop)
         aliceFirst = burn [Recipient.ToPlayer S.alice, Recipient.ToCreature mine] shielded
         creatureFirst = burn [Recipient.ToCreature mine, Recipient.ToPlayer S.alice] shielded
         control = burn [] unshielded
@@ -2230,7 +2230,7 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     -- dealer took none of its own damage, and the unshielded board differs in
     -- exactly the shield.
     Spec.assertEqWith s "the rider deals bob the 1 that was prevented, either way" (S.lifeOf S.bob aliceFirst, S.lifeOf S.bob creatureFirst) (Just 19, Just 19)
-    Spec.assertEqWith s "and the dealer itself is untouched" (S.damageOf theirs aliceFirst, S.damageOf theirs creatureFirst) (Just 0, Just 0)
+    Spec.assertEqWith s "and the dealer itself is untouched" (S.damageOf dealerId aliceFirst, S.damageOf dealerId creatureFirst) (Just 0, Just 0)
     Spec.assertEqWith s "without the shield both halves land" (S.damageOf mine control, S.lifeOf S.alice control) (Just 1, Just 19)
     Spec.assertEqWith s "and bob is untouched, there being no rider to run" (S.lifeOf S.bob control) (Just 20)
   -- The mass shape of the same conversion. Winter Sky ({R} Sorcery, "Flip a coin.
