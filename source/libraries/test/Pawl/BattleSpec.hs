@@ -608,6 +608,7 @@ filterSpec s registry = Spec.describe s "Filter" $ do
               S.runPure (graftAnswer song destination) declared $ do
                 S.cast S.alice spell
                 Stack.resolveTop
+                Engine.settleForPriority
             landed = onto battle
             elsewhere = onto spare
             fires = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (snareAnswer battle carolSnare ability piker)
@@ -667,8 +668,10 @@ filterSpec s registry = Spec.describe s "Filter" $ do
                 Engine.settleForPriority
             -- Song goes to the Siege and then off it; against the leg where it
             -- never goes near the Siege at all.
-            thereAndBack = onto second spare (onto first battle declared)
-            neverBattle = onto second host (onto first spare declared)
+            stopped = onto first battle declared
+            untouched = onto first spare declared
+            thereAndBack = onto second spare stopped
+            neverBattle = onto second host untouched
             fires = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (snareAnswer battle carolSnare ability piker)
         -- GAMEPLAY FIRST, and both boards read identically to anything asking
         -- about the board NOW.
@@ -677,7 +680,7 @@ filterSpec s registry = Spec.describe s "Filter" $ do
         Spec.assertBool s (not (S.onBattlefield piker (fires neverBattle))) "control: with the Song never on the Siege, the same Snare exiles the attacker"
         Spec.assertBool s (not (S.onBattlefield carolSnare (fires neverBattle))) "control: there it paid its own sacrifice, so the activation really happened"
         -- The pair really is one board differing in one thing.
-        Spec.assertEqWith s "CR 613.1d: it stopped being a battle midway on one leg only" (fmap (Battle.isBattle . Projection.project battle) [onto first battle declared, onto first spare declared]) [False, True]
+        Spec.assertEqWith s "CR 613.1d: it stopped being a battle midway on one leg only" (fmap (Battle.isBattle . Projection.project battle) [stopped, untouched]) [False, True]
         Spec.assertEqWith s "and it is a battle again on BOTH, so no live read can tell the legs apart" (fmap (Battle.isBattle . Projection.project battle) [thereAndBack, neverBattle]) [True, True]
         Spec.assertEqWith s "CR 310.9g: carol protects it on both" (fmap (protectorOf battle) [thereAndBack, neverBattle]) [Just S.carol, Just S.carol]
         Spec.assertEqWith s "CR 506.4: nor did it leave the battlefield" (fmap (Set.member battle . GameState.battlefield) [thereAndBack, neverBattle]) [True, True]

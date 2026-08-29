@@ -2961,10 +2961,10 @@ soulSnareSpec s registry = Spec.describe s "SoulSnare" $ do
             -- Leg one: the Confiscate goes to Jace, then on to the spare
             -- Bonesplitter. Leg two: it goes to the spare Bonesplitter and back
             -- to the one it started on, so Jace is never touched.
-            stolen = graftOntoSettling aura jaceId graft declared
-            sidestep = graftOntoSettling aura spare graft declared
-            thereAndBack = graftOntoSettling aura spare second stolen
-            neverJace = graftOntoSettling aura host second sidestep
+            stolen = graftOnto aura jaceId graft declared
+            sidestep = graftOnto aura spare graft declared
+            thereAndBack = graftOnto aura spare second stolen
+            neverJace = graftOnto aura host second sidestep
             bobFires = runToEndOfCombatWith (soulSnareAnswer bobSnare snareAbility pikerId)
             -- A third run of each leg with the Snare never activated, so that
             -- combat damage actually happens: the OTHER reader of the record is
@@ -3073,11 +3073,16 @@ graftBoard s registry auraName = do
 -- leg whose slot or whose Attach.hostsFor list does not admit the id takes the
 -- fallback instead of quietly succeeding, and each case's per-leg assertions on
 -- Jace's controller and card type are what catch that.
+--
+-- CR 117.5's settle follows the resolution: it is where Combat.removeChanged
+-- samples rule 506.4's derived clauses, and no real game can skip it between one
+-- spell resolving and the next being cast.
 graftOnto :: ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 graftOnto aura host spell gs =
   S.runPure (graftAnswer aura host) gs $ do
     S.cast S.alice spell
     Stack.resolveTop
+    Engine.settleForPriority
 
 -- graftBoard's board plus a SECOND Aura Graft and three more Islands to cast it
 -- with, for the one case that has to move an Aura twice inside one combat. The
@@ -3098,16 +3103,6 @@ regraftBoard s registry = do
   (gs, ability, ids) <- graftBoard s registry "Confiscate"
   let (second, gs1) = S.addHandCard graft S.alice (S.landsFor island S.alice 3 gs)
   pure (gs1, ability, ids, second)
-
--- graftOnto with CR 117.5's settle behind it -- where Combat.removeChanged
--- samples rule 506.4's derived clauses, and a moment no real game can skip
--- between one spell resolving and the next being cast.
-graftOntoSettling :: ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-graftOntoSettling aura host spell gs =
-  S.runPure (graftAnswer aura host) gs $ do
-    S.cast S.alice spell
-    Stack.resolveTop
-    Engine.settleForPriority
 
 graftAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 graftAnswer aura host p = case p of
