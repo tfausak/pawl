@@ -15,10 +15,11 @@
 -- casts a printed wish and resolves it through the stack, so what is asserted is
 -- the whole path from card JSON to the card in hand -- Burning Wish ({1}{R}
 -- sorcery, "You may reveal a sorcery card you own from outside the game and put
--- it into your hand. Exile Burning Wish.") for the pool, and, in the last two
--- cases, a Shahrazad subgame for CR 729.4's main game -- Living Wish reaching two
--- main-game creatures, then Burning Wish reaching the resolving Shahrazad itself
--- (CR 729.5).
+-- it into your hand. Exile Burning Wish.") for the pool, with Cunning Wish for
+-- the cycle's instant speed and Death Wish for a card that prints no reveal,
+-- and, in the last two cases, a Shahrazad subgame for CR 729.4's main game --
+-- Living Wish reaching two main-game creatures, then Burning Wish reaching the
+-- resolving Shahrazad itself (CR 729.5).
 --
 -- Not implemented: Ring of Ma'ruf is not in data/cards/, so nothing here reaches
 -- outside the game through a draw replacement (#2470).
@@ -204,7 +205,7 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
     -- what the answer above names.
     Spec.assertEqWith s "the card she named is the one in her hand" (printingsIn Zone.Hand S.alice resolved) [psychicMiasma]
     Spec.assertEqWith s "and the other card is still outside the game" (Map.size (poolOf S.alice resolved)) 1
-  -- CR 601.3a / 307.1: Cunning Wish ({2}{U} instant, "You may reveal an instant
+  -- CR 304.1 / 307.1: Cunning Wish ({2}{U} instant, "You may reveal an instant
   -- card you own from outside the game and put it into your hand. Exile Cunning
   -- Wish.") is the cycle's instant, so it is the one wish that reaches outside
   -- the game with another spell already on the stack.
@@ -230,7 +231,10 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
         held = snd (Engine.runGamePure exercising ready (S.cast S.alice occupantId))
     Spec.assertEqWith s "the stack holds the spell cast first" (length (Game.zoneMembers Zone.Stack S.alice held)) 1
     Spec.assertEqWith s "CR 307.1: the sorcery in hand cannot be cast into that window" (S.castable S.alice burningId held) False
-    Spec.assertEqWith s "CR 601.3a: the instant can" (S.castable S.alice cunningId held) True
+    -- The same card off the same board with an EMPTY stack, so the reading above
+    -- cannot be passing for want of mana or for anything else about the card.
+    Spec.assertEqWith s "and it was castable on that board before the stack held anything" (S.castable S.alice burningId ready) True
+    Spec.assertEqWith s "CR 304.1: the instant can" (S.castable S.alice cunningId held) True
     -- Driven, not merely gated: the wish is actually cast in that window, and what
     -- arrives is the INSTANT its filter names rather than the sorcery sitting
     -- beside it in the pool -- which the wish underneath then takes in its turn.
@@ -272,7 +276,7 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
     Spec.assertEqWith s "where Burning Wish brings in the same card" (printingsIn Zone.Hand S.alice afterBurning) [signInBlood]
     Spec.assertEqWith s "and does reveal it" (Maybe.isJust (eventIndex isRevealed afterBurning)) True
     -- The rest of Death Wish's sentence, which is what tells a resolution apart
-    -- from a fizzle: CR 118.3, half of twenty rounded up.
+    -- from a fizzle: CR 119.3 and CR 107.1a, half of twenty rounded up.
     Spec.assertEqWith s "she lost half her life, rounded up" (S.lifeOf S.alice afterDeath) (Just 10)
     Spec.assertEqWith s "and Burning Wish cost her none" (S.lifeOf S.alice afterBurning) (Just 20)
   -- CR 103.2a: the sideboard is set aside before the game, which is the one path
