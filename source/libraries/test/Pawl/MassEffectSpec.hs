@@ -12,6 +12,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
@@ -46,6 +47,8 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
+import qualified Pawl.Types.DamagePart as DamagePart
+import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -2712,8 +2715,11 @@ communeWithLavaSpec s registry =
         -- printing puts a TARGET slot in a library's depth and the gameplay cases
         -- above pass whatever these two answer. Both are the seam a nested Quantity
         -- slips through: objectRefSlots and readsX reach it only via
-        -- objectRefQuantities, and Effect.Reveal is the cheapest of the three
-        -- ObjectRef-taking opcodes to plant it under.
+        -- objectRefQuantities, and Effect.Reveal is the cheapest of the
+        -- ObjectRef-taking opcodes to plant it under. A damage clause's ref is the
+        -- same seam and answers the same way, which the last pair below pins:
+        -- CR 120.1a admits no card in a library as a damage recipient, so nothing
+        -- printed can reach it and only a planted effect can.
         Spec.it s "CR 603.3b a depth nested in an ObjectRef is a slot read and an X read" $ do
           let slot = SlotName.MkSlotName (Text.pack "victim")
               -- A slotless reveal: the planted Quantity is in the ref's depth,
@@ -2747,6 +2753,24 @@ communeWithLavaSpec s registry =
               Resolve.slotsAreExhaustive (depthOf (Quantity.Literal 3))
             )
             (False, True)
+          -- The same three answers off Effect.DealDamage, whose clause carries a
+          -- ref of its own: its amount is a Literal throughout, so every answer
+          -- here is the REF's depth and not the clause's amount.
+          let damageDepthOf q =
+                Effect.DealDamage
+                  ( DealDamage.MkDealDamage
+                      (Seq.singleton (DamagePart.MkDamagePart (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) q)) (Quantity.Literal 1)))
+                      Nothing
+                      Nothing
+                  )
+          Spec.assertEqWith
+            s
+            "a damage clause's own ref reports its depth's slot, X read and exhaustiveness alike"
+            ( Resolve.slotsOf (damageDepthOf (Quantity.InSlot slot)),
+              Resolve.readsX [damageDepthOf (Quantity.InSlot Binding.variableX)],
+              Resolve.slotsAreExhaustive (damageDepthOf (Quantity.LifeTotal (PlayerRef.InSlot slot)))
+            )
+            (Map.singleton slot SlotArity.One, True, False)
 
 -- alice is mid-combat with one creature per printing in `mine`, bob defends with
 -- one per printing in `theirs`, and alice holds a Trumpet Blast plus exactly the

@@ -121,6 +121,7 @@ import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.DamagePart as DamagePart
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
@@ -821,7 +822,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
 -- card (the same nesting Pawl.Codec's round trip walks).
 effectCounts :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Count.Type.Count Quantity.Type.Quantity]
 effectCounts effect = case effect of
-  Effect.DealDamage (DealDamage.MkDealDamage _ quantity _ _) -> quantityCounts quantity
+  Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> concatMap (quantityCounts . DamagePart.quantity) parts
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationCounts duration <> modificationCounts modification
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
@@ -3135,8 +3136,8 @@ objectRefFilters ref = case ref of
   -- Count on Luck's "the top card of your library" names a POSITION, so it states
   -- no Filter of its own, and its PlayerRef names players. Its DEPTH is a
   -- Quantity, which reaches one through a Count -- "the top X cards" where X is
-  -- itself a fold -- so the depth goes through refCounts for the reason
-  -- Effect.DealDamage's quantity does.
+  -- itself a fold -- so the depth goes through refCounts for the reason a damage
+  -- clause's quantity does.
   ObjectRef.TopOfLibrary {} -> countFilters (refCounts ref)
   -- Treasure Hunt's "until you reveal a nonland card" states its Filter directly
   -- as well as carrying the arm above's count, so both are linted: the
@@ -4061,7 +4062,7 @@ effectFilters effect = case effect of
   -- AttachTarget's; CR 303.4d only moves whose choice it is.
   Effect.AttachTargetToEach (AttachTarget.MkAttachTarget _ f) -> [(AttachDestination, f)]
   -- The dealer is a SlotName and carries no Filter.
-  Effect.DealDamage (DealDamage.MkDealDamage refs quantity _ _) -> sourceHosted (concatMap objectRefFilters refs) <> unframed (quantityFilters quantity)
+  Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> foldMap (\part -> sourceHosted (objectRefFilters (DamagePart.ref part)) <> unframed (quantityFilters (DamagePart.quantity part))) parts
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     unframed (durationFilters duration <> modificationFilters modification) <> sourceHosted (objectRefFilters ref)
   Effect.ChangeText {} -> []
@@ -4363,7 +4364,7 @@ effectObjectRefs effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
-  Effect.DealDamage (DealDamage.MkDealDamage refs _ _ _) -> read_ (Foldable.toList refs)
+  Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> read_ (fmap DamagePart.ref (Foldable.toList parts))
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> read_ [ref]
   Effect.ChangeText {} -> []
   Effect.AddMana {} -> []
@@ -5249,7 +5250,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       )
       stems
   Spec.it s "the lint itself catches a dangling reference" $
-    let bad = Map.keysSet (Resolve.slotsOf (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost")))) (Quantity.Type.Literal 3) Nothing Nothing)))
+    let bad = Map.keysSet (Resolve.slotsOf (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (DamagePart.MkDamagePart (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost"))) (Quantity.Type.Literal 3))) Nothing Nothing)))
      in Spec.assertBool s (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSlot.TargetSlot)) "misauthored card detected"
   -- CR 120.2b's dealer is a slot READ like any other, so the same lint has to
   -- reach it. The effect below references no other slot, so the answer is the
@@ -5259,7 +5260,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
      in Spec.assertEqWith
           s
           "the dealer slot is read"
-          (Map.keysSet (Resolve.slotsOf (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton ObjectRef.EachPlayer) (Quantity.Type.Literal 3) (Just ghost) Nothing))))
+          (Map.keysSet (Resolve.slotsOf (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (DamagePart.MkDamagePart ObjectRef.EachPlayer (Quantity.Type.Literal 3))) (Just ghost) Nothing))))
           (Set.singleton ghost)
   -- The SPELL half of CR 601.2b's contract: what a card's own modes read is
   -- announced against the card's own cost -- mana cost, additional costs and

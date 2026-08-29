@@ -291,6 +291,8 @@ library codec
     Pawl.Codec.DamageEventSpec
     Pawl.Codec.DamageKind
     Pawl.Codec.DamageKindSpec
+    Pawl.Codec.DamagePart
+    Pawl.Codec.DamagePartSpec
     Pawl.Codec.DamagePattern
     Pawl.Codec.DamagePatternSpec
     Pawl.Codec.DamagePrevented
@@ -1366,6 +1368,7 @@ library types
     Pawl.Types.DamageDirection
     Pawl.Types.DamageEvent
     Pawl.Types.DamageKind
+    Pawl.Types.DamagePart
     Pawl.Types.DamagePattern
     Pawl.Types.DamagePrevented
     Pawl.Types.DamageR

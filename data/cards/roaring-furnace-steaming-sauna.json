@@ -32,36 +32,38 @@
                       {
                         "type": "DealDamage",
                         "value": {
-                          "quantity": {
-                            "type": "Count",
-                            "value": {
-                              "aggregation": {
-                                "type": "Members"
-                              },
-                              "filter": {
-                                "type": "And",
-                                "value": []
-                              },
-                              "scope": {
-                                "type": "InZone",
+                          "parts": [
+                            {
+                              "quantity": {
+                                "type": "Count",
                                 "value": {
-                                  "player": {
-                                    "type": "Relative",
-                                    "value": {
-                                      "type": "You"
-                                    }
+                                  "aggregation": {
+                                    "type": "Members"
                                   },
-                                  "zone": {
-                                    "type": "Hand"
+                                  "filter": {
+                                    "type": "And",
+                                    "value": []
+                                  },
+                                  "scope": {
+                                    "type": "InZone",
+                                    "value": {
+                                      "player": {
+                                        "type": "Relative",
+                                        "value": {
+                                          "type": "You"
+                                        }
+                                      },
+                                      "zone": {
+                                        "type": "Hand"
+                                      }
+                                    }
                                   }
                                 }
+                              },
+                              "ref": {
+                                "type": "InSlot",
+                                "value": "target"
                               }
-                            }
-                          },
-                          "refs": [
-                            {
-                              "type": "InSlot",
-                              "value": "target"
                             }
                           ]
                         }

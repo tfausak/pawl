@@ -1977,6 +1977,18 @@ castDisaster x wanted p = case p of
      in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
   _ -> S.identityAnswer p
 
+-- Cast Char, aiming CR 115.4's "any target" at `victim` and spending a contested
+-- prevention shield on the batch's hits in `wanted` order. The target is
+-- FILTERED out of the offered set rather than built, castDeflection's shape, and
+-- the order is stated by RECIPIENT, castDisaster's.
+castChar :: ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt.Prompt r -> r
+castChar victim wanted p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature victim) . snd) sets
+  Prompt.OrderDamage _ _ events ->
+    let rank e = Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)
+     in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
+  _ -> S.identityAnswer p
+
 -- CR 615.7's shield over SEVERAL recipients at once, whose producer is Divine
 -- Deflection ({X}{W} Instant: "Prevent the next X damage that would be dealt to
 -- you and/or permanents you control this turn. If damage is prevented this way,
@@ -2109,6 +2121,67 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     Spec.assertEqWith s "without the shield alice takes all 2" (S.lifeOf S.alice control) (Just 18)
     Spec.assertEqWith s "her creature takes all 2" (S.damageOf mine control) (Just 2)
     Spec.assertEqWith s "and bob takes 2, there being no rider to run" (S.lifeOf S.bob control) (Just 18)
+  -- CR 608.2f again, over a sentence whose halves deal DIFFERENT amounts. Char
+  -- ({2}{R} Instant, "Char deals 4 damage to any target and 2 damage to you" --
+  -- name, cost, type line and Oracle text checked against api.scryfall.com
+  -- 2026-08-29) is one instruction over two clauses, 4 at the target and 2 at its
+  -- caster, where Molten Disaster's two clauses share one amount.
+  --
+  -- Aimed at alice's OWN creature, so the shield above spans both halves: the
+  -- sentence's whole 6 is dealt to her side at once, and 3 of it is prevented.
+  --
+  -- Written as two instructions -- one amount per instruction, which is what the
+  -- opcode could carry before -- the target's 4 runs first and takes the shield
+  -- whole, which is exactly the creature-first board below. So the alice-first
+  -- board is the one no two-instruction reading can produce.
+  --
+  -- Numbers all distinct -- shield 3, 4 at the creature, 2 at alice, a 5/5 and a
+  -- 2/1 -- so no two readings land on the same board.
+  Spec.it s "CR 608.2f one sentence's differing amounts are one batch" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    piker <- S.printingOf s registry "Goblin Piker"
+    deflection <- S.printingOf s registry "Divine Deflection"
+    char <- S.printingOf s registry "Char"
+    let base = S.landsFor mountain S.alice 3 (S.landsInPlay plains 4)
+        (mine, g1) = S.addCreature jedit S.alice base
+        (theirs, g2) = S.addCreature piker S.bob g1
+        (deflectionId, g3) = S.addHandCard deflection S.alice g2
+        (charId, unshielded) = S.addHandCard char S.alice g3
+        shielded = castAndResolve (castDeflection 3 S.bob) unshielded deflectionId
+        burn order g = castAndResolve (castChar mine order) g charId
+        aliceFirst = burn [Recipient.ToPlayer S.alice, Recipient.ToCreature mine] shielded
+        creatureFirst = burn [Recipient.ToCreature mine, Recipient.ToPlayer S.alice] shielded
+        control = burn [] unshielded
+    -- THE case. Spending the pool on alice's own 2 first leaves 1 for her
+    -- creature's 4, so 3 is marked. Two instructions cannot produce this board:
+    -- the target's 4 is the sentence's first half and would take the shield
+    -- whole, leaving 1.
+    Spec.assertEqWith s "spent on alice, 3 of her creature's 4 is dealt" (S.damageOf mine aliceFirst) (Just 3)
+    Spec.assertEqWith s "and all 2 aimed at alice were prevented" (S.lifeOf S.alice aliceFirst) (Just 20)
+    -- The other allocation, which is also what two instructions would have
+    -- produced -- kept so the pair of boards differs in the answer and in
+    -- nothing else.
+    Spec.assertEqWith s "spent on her creature instead, only 1 of its 4 is dealt" (S.damageOf mine creatureFirst) (Just 1)
+    Spec.assertEqWith s "and alice takes the whole 2" (S.lifeOf S.alice creatureFirst) (Just 18)
+    -- The question itself: two instructions leave the shield uncontested in each,
+    -- so nothing is asked.
+    Spec.assertBool
+      s
+      (wasAskedToOrderDamage (answersFor (castChar mine []) shielded (S.cast S.alice charId Monad.>> Stack.resolveTop)))
+      "alice was asked which damage the one batch's shield prevents"
+    -- The fences. Bob's creature is no part of the sentence, and CR 615.5's rider
+    -- throws back the 3 that was prevented, which is one pool's worth however it
+    -- was allocated.
+    Spec.assertEqWith s "the rider deals bob the 3 that was prevented, either way" (S.lifeOf S.bob aliceFirst, S.lifeOf S.bob creatureFirst) (Just 17, Just 17)
+    Spec.assertEqWith s "and bob's creature, named by neither half, is untouched" (S.damageOf theirs aliceFirst, S.damageOf theirs creatureFirst) (Just 0, Just 0)
+    Spec.assertEqWith s "and the shield is spent to 0 either way (CR 615.7)" (shieldsLeft aliceFirst, shieldsLeft creatureFirst) ([], [])
+    -- The unshielded board, differing in exactly the shield: her creature takes
+    -- all 4, alice takes all 2, and bob takes nothing at all.
+    Spec.assertEqWith s "without the shield her creature takes all 4" (S.damageOf mine control) (Just 4)
+    Spec.assertEqWith s "and alice takes all 2" (S.lifeOf S.alice control) (Just 18)
+    Spec.assertEqWith s "and bob is untouched, there being no rider to run" (S.lifeOf S.bob control) (Just 20)
 
 -- CR 615.5's additional effect on the UNBOUNDED shield (CR 615.1 / 615.3), which
 -- Test of Faith's countdown shield above cannot reach. Brace for Impact ({4}{W}

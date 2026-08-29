@@ -52,36 +52,44 @@
                   {
                     "type": "DealDamage",
                     "value": {
-                      "quantity": {
-                        "type": "InSlot",
-                        "value": "X"
-                      },
-                      "refs": [
+                      "parts": [
                         {
-                          "type": "EachMatching",
-                          "value": {
-                            "type": "And",
-                            "value": [
-                              {
-                                "type": "HasCardType",
-                                "value": {
-                                  "type": "Creature"
-                                }
-                              },
-                              {
-                                "type": "Not",
-                                "value": {
-                                  "type": "HasKeyword",
+                          "quantity": {
+                            "type": "InSlot",
+                            "value": "X"
+                          },
+                          "ref": {
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "HasCardType",
                                   "value": {
-                                    "type": "Flying"
+                                    "type": "Creature"
+                                  }
+                                },
+                                {
+                                  "type": "Not",
+                                  "value": {
+                                    "type": "HasKeyword",
+                                    "value": {
+                                      "type": "Flying"
+                                    }
                                   }
                                 }
-                              }
-                            ]
+                              ]
+                            }
                           }
                         },
                         {
-                          "type": "EachPlayer"
+                          "quantity": {
+                            "type": "InSlot",
+                            "value": "X"
+                          },
+                          "ref": {
+                            "type": "EachPlayer"
+                          }
                         }
                       ]
                     }

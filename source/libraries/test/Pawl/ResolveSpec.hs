@@ -56,6 +56,7 @@ import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.DamagePart as DamagePart
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
@@ -613,7 +614,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     -- dropped later, on the payment path (#1673).
     let named = ManaAddition.MkManaAddition (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) ManaProduction.AnyColor ManaRetention.Ordinary Nothing Nothing
     Spec.assertEqWith s "a named recipient does not disqualify" (ManaAbility.manaProduced (Effect.AddMana named)) (Just named)
-    Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x")))) (Quantity.Literal 1) Nothing Nothing))) Nothing
+    Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (DamagePart.MkDamagePart (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1))) Nothing Nothing))) Nothing
   Spec.it s "CR 612.1 a text change reaches a Filter carried by an effect" $ do
     -- Boil ("Destroy all Islands") is the first card whose effect selects by
     -- a BASIC LAND TYPE, so it is the first that can tell whether CR 612.1's
