@@ -2116,9 +2116,11 @@ rewriteEffect pairs effect = case effect of
   -- the same kind (#1840).
   Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) ->
     Effect.PutCounters (PutCounters.MkPutCounters kind (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
+  -- The count is a Quantity and takes the same descent PutCounters' case above
+  -- makes.
+  --
   -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
-  -- printed keyword through the swap, PutCounters' case above (#1840). The count
-  -- is a Quantity and takes the same descent that case makes.
+  -- printed keyword through the swap, PutCounters' case above (#1840).
   Effect.RemoveCounters x -> Effect.RemoveCounters x {RemoveCounters.quantity = rewriteQuantity pairs (RemoveCounters.quantity x)}
   -- Filter.rewrite renames no slot, so none of the three bare slots is rewritten;
   -- the count is a Quantity and goes through rewriteQuantity, PutCounters' case
@@ -2796,7 +2798,7 @@ rewriteDamagePart pairs part =
       DamagePart.quantity = rewriteQuantity pairs (DamagePart.quantity part)
     }
 
--- The count alone: a PlayerRef names a rules category (CR 102) and not a word
+-- The count alone: a PlayerRef names a rules category (CR 102.1) and not a word
 -- rule 612 can swap.
 rewritePlayerQuantity :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> PlayerQuantity.PlayerQuantity -> PlayerQuantity.PlayerQuantity
 rewritePlayerQuantity pairs x = x {PlayerQuantity.quantity = rewriteQuantity pairs (PlayerQuantity.quantity x)}

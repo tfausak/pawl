@@ -2223,7 +2223,7 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
   --
   -- pawl's Goblin War Strike is aimed with Pool.Players, so it cannot be pointed
   -- at a planeswalker -- stricter than printed, since no pool names that pair
-  -- (#2594).
+  -- (gap #2594).
   --
   -- The control first, so the pair cannot pass on a chain that never resolved the
   -- Strike.
