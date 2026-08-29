@@ -1934,7 +1934,7 @@ rewritePlayerEffect pairs effect = case effect of
   -- there today and neutralising that descent leaves the suite green -- it is
   -- here so that the card which does write one cannot silently keep the printed
   -- word.
-  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f family targets cost floor_) -> PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.rewrite pairs f) family (fmap (Filter.rewrite pairs) targets) cost floor_)
+  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f family kind targets cost floor_) -> PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.rewrite pairs f) family kind (fmap (Filter.rewrite pairs) targets) cost floor_)
   -- The two arms with a word in TWO places: their own criterion ("nontoken
   -- Rebels"), and the criterion inside each component they add ("sacrifice a
   -- LAND", "sacrifice a SWAMP"). Both descend, which is Filter.rewriteCost's

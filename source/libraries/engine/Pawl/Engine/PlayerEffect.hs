@@ -1265,10 +1265,17 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
       reductionOf (source, effect) = case effect of
-        PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost criterion granted aimedAt amount floor_) ->
+        PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost criterion granted wantedKind aimedAt amount floor_) ->
           -- Never confined to coloured mana: no printed activation-cost reducer
           -- states Edgewalker's sentence, so CR 118.7b-d's spill stands.
-          if matchesObjectFrom source criterion srcId gs && maybe True (\g -> Just g == family) granted && maybe True (aims source) aimedAt
+          --
+          -- `kind` is read here exactly as increaseOf above reads it, and CR
+          -- 605.1a is the whole of that read: Zirda, the Dawnwaker's "abilities
+          -- you activate that aren't mana abilities" is a fact about the ability
+          -- being activated, which neither the source filter nor the rule-702
+          -- family could answer. A reduction carrying no `whichKind` ignores it,
+          -- which is every other reducer in the pool.
+          if matchesObjectFrom source criterion srcId gs && maybe True (\g -> Just g == family) granted && maybe True (== kind) wantedKind && maybe True (aims source) aimedAt
             then Just (AppliedReduction.MkAppliedReduction amount floor_ False)
             else Nothing
         -- The non-mana addition, gathered by `additionOf` below: CR 601.2f's
