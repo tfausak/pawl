@@ -4297,8 +4297,8 @@ data Asks
     -- raises no prompt: every ObjectRef position but the three below.
     AsksNothing
   | -- | Pawl.Engine.Resolve's Effect.MoveToZone gather, which runs in the Game
-    -- monad. It asks the graveyard, hand, from-among and one-permanent arms;
-    -- the random arm answers @pure []@ there (#1733).
+    -- monad. It asks the graveyard, hand, from-among, one-permanent and
+    -- any-number arms; the random arm answers @pure []@ there (#1733).
     AsksMoveGather
   | -- | Pawl.Engine.Resolve's Effect.Reveal arm. It asks the from-among arm
     -- through chooseCardFromAmong and the random arm through
@@ -4359,6 +4359,7 @@ asksFor asks ref = case asks of
     ObjectRef.ChosenCardInHand {} -> True
     ObjectRef.ChosenCardFromAmong {} -> True
     ObjectRef.ChosenPermanent {} -> True
+    ObjectRef.AnyNumberMatching {} -> True
     _ -> False
   AsksRevealArm -> case ref of
     ObjectRef.ChosenCardFromAmong {} -> True
@@ -4366,7 +4367,7 @@ asksFor asks ref = case asks of
     _ -> False
   -- One arm and one only, which is what keeps the widening from weakening the
   -- guarantee: this site asks for the battlefield subset and for nothing else,
-  -- so every (site, arm) pair the three arms above classify is unmoved.
+  -- so every (site, arm) pair the four arms above classify is unmoved.
   AsksTransformGather -> case ref of
     ObjectRef.AnyNumberMatching {} -> True
     _ -> False
@@ -6638,8 +6639,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- asks everything" by that same random arm (#1733); "the three chosen arms
   -- always ask, the random one never does" by Reveal accepting the random arm and
   -- rejecting both zone-keyed chosen ones; "the battlefield subset asks
-  -- everywhere" by the last assertion, which rejects it at three sites and
-  -- accepts it at one.
+  -- everywhere" by the last assertion, which rejects it at two sites and
+  -- accepts it at two.
   Spec.it s "the lint itself catches a chosen card under an opcode that cannot ask" $ do
     exhume <- S.printingOf s registry "Exhume"
     let anyCard = Filter.Type.HasCardType CardType.Creature
@@ -6673,16 +6674,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       (inert (fmap Effect.Transform [inGraveyard, inHand, fromAmong, atRandom]))
       [True, True, True, True]
     -- The fourth degenerate classification, and the one widening the matrix for
-    -- #774 introduced: "the new arm asks everywhere". Accepted under Transform,
-    -- whose gather asks it, and rejected under every other site -- MoveToZone's
-    -- gather and Reveal's arm, the two that DO ask other arms, plus Tap, an
+    -- #774 introduced: "the new arm asks everywhere". Accepted under the two
+    -- gathers that ask it -- Transform's and MoveToZone's -- and rejected under
+    -- Reveal's arm, which asks other arms but not this one, and under Tap, an
     -- AsksNothing opcode. Without this leg an asksFor row answering True for the
     -- new arm at every site would pass the three assertions above unchanged.
     Spec.assertEqWith
       s
-      "the battlefield subset is asked by the transform gather alone"
+      "the battlefield subset is asked by the transform and move gathers and by neither other site"
       (inert [Effect.Transform anyNumber, moves anyNumber, reveals anyNumber, Effect.Tap anyNumber])
-      [False, True, True, True]
+      [False, False, True, True]
     -- The singular of the arm above, asked by the MoveToZone gather alone --
     -- Hanweir Battlements' "exile them, then meld them", the printing that wanted
     -- it. Rejected under Transform and Reveal, the two other sites that ask any

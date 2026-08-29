@@ -70,6 +70,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Revealed as Revealed
@@ -2824,6 +2825,170 @@ affectedSets = fmap ContinuousEffect.affected . GameState.continuousEffects
 attackerIds :: GameState.GameState -> [ObjectId.ObjectId]
 attackerIds = Map.keys . Combat.Type.attackers . GameState.combat
 
+-- ObjectRef.AnyNumberMatching under Effect.MoveToZone: the CR 608.2d subset a
+-- MOVE names, where Tovolar's is the subset a CR 701.27a turn names.
+--
+-- Glorious Protector {2}{W}{W} Creature -- Angel Cleric 3/4 (flash, flying,
+-- foretell {2}{W}) is the producer: "when this creature enters, you may exile any
+-- number of non-Angel creatures you control until this creature leaves the
+-- battlefield". The return half is the pair Savior of Ollenbock already proves
+-- (Pawl.KeywordTriggerSpec), so what is new here is only the gather.
+--
+-- The board makes every conjunct of the ref's Filter load-bearing, and each is a
+-- different way a wrong gather would over-reach: three non-Angel creatures alice
+-- controls are the candidates, of which the chooser names ONE, so "the chosen
+-- ones" and "all of them" differ; alice's Angel of Finality is a creature she
+-- controls that the printed "non-Angel" excludes; bob's Hill Giant is a non-Angel
+-- creature that "you control" excludes; and the Protector itself is an Angel, so
+-- the card never sweeps itself up without needing a printed "other".
+gloriousProtectorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+gloriousProtectorSpec s registry =
+  let named = CardName.MkCardName . Text.pack
+      -- The names a seat CONTROLS, which is the question CR 110.2a answers for an
+      -- arrival and Game.zoneMembers -- indexed by OWNER (CR 108.3) -- cannot.
+      controlledNames pid gs =
+        List.sort
+          [ fmap S.nameOf (Game.cardOf oid gs)
+          | oid <- Set.toList (GameState.battlefield gs),
+            Projection.controllerOf oid gs == Just pid
+          ]
+      exiledNames gs = List.sort (namesIn Zone.Exile S.alice gs <> namesIn Zone.Exile S.bob gs)
+      -- alice: four Plains, three non-Angel creatures, an Angel, and the Protector
+      -- in hand. bob: one non-Angel creature. Nothing is tapped and nothing has
+      -- entered this way, so the only trigger any leg places is the Protector's.
+      board protector plains piker maiden sentry angel giant =
+        let g0 = List.foldl' (\g _ -> snd (S.addCreature plains S.alice g)) (Setup.emptyGame S.bothPlayers) [1 :: Int .. 4]
+            (_, g1) = S.addCreature piker S.alice g0
+            (_, g2) = S.addCreature maiden S.alice g1
+            (_, g3) = S.addCreature sentry S.alice g2
+            (_, g4) = S.addCreature angel S.alice g3
+            (_, g5) = S.addCreature giant S.bob g4
+         in S.handOne protector g5
+      -- Cast the Protector and run the priority loop out, so its enters trigger is
+      -- placed and resolved under the same answerer.
+      cast :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState, ObjectId.ObjectId) -> GameState.GameState
+      cast answer (withSpell, spell) =
+        let afterCast = S.runPure answer withSpell (S.cast S.alice spell)
+         in S.runPure answer afterCast Engine.priorityLoop
+      -- Accepts the printed "may" -- without which no leg below reaches the
+      -- gather at all, CR 603.5's default being to decline.
+      accepting :: Prompt.Prompt r -> r
+      accepting p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      -- Accepts the may and names EXACTLY these permanents, offered or not: the
+      -- fixture has to say what the chooser said, since a fallback that happened
+      -- to agree would prove nothing.
+      namingExactly :: Set.Set ObjectId.ObjectId -> Prompt.Prompt r -> r
+      namingExactly wanted p = case p of
+        Prompt.ChooseAnyNumberOfPermanents {} -> wanted
+        _ -> accepting p
+      -- Was the subset actually put to a player? Read off the recorded responses
+      -- rather than off the board, so "nobody was asked" and "asked and answered
+      -- with nothing" stay distinguishable.
+      wasAsked responses =
+        let isChoice r = case r of
+              Response.ChoseAnyNumberOfPermanents _ -> True
+              _ -> False
+         in any isChoice responses
+      recording :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState, ObjectId.ObjectId) -> (GameState.GameState, [Response.Response])
+      recording answer (withSpell, spell) =
+        let ((_, afterCast), castResponses) = Replay.record answer withSpell (S.cast S.alice spell)
+            ((_, after), loopResponses) = Replay.record answer afterCast Engine.priorityLoop
+         in (after, castResponses <> loopResponses)
+      printings = do
+        protector <- S.printingOf s registry "Glorious Protector"
+        plains <- S.printingOf s registry "Plains"
+        piker <- S.printingOf s registry "Goblin Piker"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        sentry <- S.printingOf s registry "Ogre Sentry"
+        angel <- S.printingOf s registry "Angel of Finality"
+        giant <- S.printingOf s registry "Hill Giant"
+        pure (board protector plains piker maiden sentry angel giant)
+      -- The Bird Maiden on alice's battlefield, which is the one permanent every
+      -- leg below names or declines to name.
+      maidenId gs =
+        List.find
+          (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (named "Bird Maiden"))
+          (Set.toList (GameState.battlefield gs))
+   in Spec.describe s "GloriousProtector" $ do
+        -- The headline: the ONE creature the chooser named leaves, and the two it
+        -- passed over stay. Those two are what part "the chosen subset" from
+        -- "every match".
+        Spec.it s "CR 608.2d only the permanents the controller named are exiled" $ do
+          staged <- printings
+          case maidenId (fst staged) of
+            Nothing -> Spec.assertFailure s "fixture should give alice a Bird Maiden"
+            Just maiden -> do
+              let after = cast (namingExactly (Set.singleton maiden)) staged
+              Spec.assertEqWith s "the named creature, and only it, is in exile" (exiledNames after) [Just (named "Bird Maiden")]
+              Spec.assertEqWith
+                s
+                "the two candidates she passed over, the Angel and the Protector stay on her battlefield"
+                (controlledNames S.alice after)
+                (List.sort (fmap (Just . named) ["Angel of Finality", "Glorious Protector", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
+              Spec.assertEqWith s "and bob's non-Angel creature was never a candidate" (controlledNames S.bob after) [Just (named "Hill Giant")]
+        -- The paired control, on the same board: the DEFAULT answerer names every
+        -- candidate, and three creatures leave instead of one. Without this leg
+        -- "only the named one" could be an engine that moves whatever it likes.
+        Spec.it s "CR 608.2d the engine does not pick: naming every candidate exiles all three" $ do
+          staged <- printings
+          let after = cast accepting staged
+          Spec.assertEqWith
+            s
+            "all three non-Angel creatures alice controls are in exile"
+            (exiledNames after)
+            (List.sort (fmap (Just . named) ["Bird Maiden", "Goblin Piker", "Ogre Sentry"]))
+          Spec.assertEqWith
+            s
+            "the Angel the filter excludes and the Protector stay"
+            (controlledNames S.alice after)
+            (List.sort (fmap (Just . named) ["Angel of Finality", "Glorious Protector", "Plains", "Plains", "Plains", "Plains"]))
+          Spec.assertEqWith s "and bob still has his Giant" (controlledNames S.bob after) [Just (named "Hill Giant")]
+        -- The empty answer CR 608.2d admits, which is a different thing from the
+        -- may being declined below: the player WAS asked and named nobody.
+        Spec.it s "CR 608.2d naming nobody is a legal answer, and the player was still asked" $ do
+          staged <- printings
+          let (after, responses) = recording (namingExactly Set.empty) staged
+          Spec.assertBool s (wasAsked responses) "the subset was put to the controller"
+          Spec.assertEqWith s "and nothing left the battlefield" (exiledNames after) []
+        -- CR 603.5's printed "may", declined: no exile, and no subset question --
+        -- the clause's instructions never run, so the gather is never reached.
+        Spec.it s "CR 603.5 declining the may exiles nothing and asks no subset" $ do
+          staged <- printings
+          let (after, responses) = recording S.identityAnswer staged
+          Spec.assertBool s (not (wasAsked responses)) "no subset was put to the controller"
+          Spec.assertEqWith s "exile is empty" (exiledNames after) []
+          Spec.assertEqWith
+            s
+            "and every creature alice controls is still hers"
+            (controlledNames S.alice after)
+            (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Glorious Protector", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
+        -- The whole card: "until this creature leaves the battlefield" is the
+        -- SelfLeavesTheBattlefield half, and what it returns is what the gather
+        -- exiled -- so the subset the chooser named is the subset that comes back.
+        Spec.it s "CR 607.2a the departure returns exactly the subset that was exiled" $ do
+          staged <- printings
+          case maidenId (fst staged) of
+            Nothing -> Spec.assertFailure s "fixture should give alice a Bird Maiden"
+            Just maiden -> do
+              let exiled = cast (namingExactly (Set.singleton maiden)) staged
+                  protectorId =
+                    List.find
+                      (\oid -> fmap S.nameOf (Game.cardOf oid exiled) == Just (named "Glorious Protector"))
+                      (Set.toList (GameState.battlefield exiled))
+              case protectorId of
+                Nothing -> Spec.assertFailure s "the Protector should be on the battlefield"
+                Just oid -> do
+                  let killed = S.runPure S.identityAnswer exiled (Event.destroy Regenerability.Regenerable [oid])
+                      after = S.runPure S.identityAnswer killed Engine.priorityLoop
+                  Spec.assertEqWith s "exile is empty again" (exiledNames after) []
+                  Spec.assertEqWith
+                    s
+                    "and the Bird Maiden is back on alice's battlefield"
+                    (controlledNames S.alice after)
+                    (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
+
 -- Trumpet Blast ({2}{R} instant, "Attacking creatures get +2/+0 until end of
 -- turn") is the pool's first card whose CONTINUOUS effect names a filter-selected
 -- set rather than a target. Day of Judgment's EachMatching feeds a ONE-SHOT, so
@@ -3933,6 +4098,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   bloodForBonesSpec s registry
   skullwinderSpec s registry
   elvishPiperSpec s registry
+  gloriousProtectorSpec s registry
   trumpetBlastSpec s registry
   auraThiefSpec s registry
   baneOfProgressSpec s registry
