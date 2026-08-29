@@ -113,6 +113,10 @@
 -- Ainok Tracker is the card underneath it again for CR 701.40c, where the
 -- Tracker's {5}{R} against its morph {4}{R} is the only thing that tells the
 -- rule's two turn-face-up procedures apart.
+--
+-- Ethereal Ambush is CR 701.40e's card, the one manifest here that moves more
+-- than one card, and Synthetic Encircling Net is what makes "one at a time"
+-- readable off a board; manifestOrderSpec says why each.
 module Pawl.FaceDownSpec where
 
 import qualified Data.Foldable as Foldable
@@ -1809,9 +1813,14 @@ manifestSpec s registry = Spec.describe s "Manifest" $ do
 -- CR 701.40e: "if an effect instructs a player to manifest multiple cards from
 -- their library, those cards are manifested one at a time." Ethereal Ambush
 -- {3}{G}{U} Instant, whole text: "Manifest the top two cards of your library."
--- (oracle checked on Scryfall 2026-08-29.) The rule's own subject and the pool's
--- only card in it: Ghastly Conscription manifests out of EXILE and manifest dread
--- manifests ONE of two, so 701.40e reaches neither.
+-- (oracle checked on Scryfall 2026-08-29.) The rule's own subject and the only
+-- printing in it: Scryfall with a User-Agent, 2026-08-29, `o:/manifest the top/`
+-- answers twenty-two cards, every one but this manifesting the top CARD, and
+-- `o:manifest -o:"manifest the top card" -o:"manifest dread" -o:manifested`
+-- answers fourteen, of which Scroll of Fate manifests from a HAND, Ghastly
+-- Conscription out of EXILE and Write into Being ONE of two looked at. Manifest
+-- dread manifests one of two as well (CR 701.62a), so 701.40e reaches none of
+-- them. A printing manifesting several cards off a library would join this card.
 --
 -- WHAT ONE AT A TIME MEANS ON A BOARD. A manifested permanent is a 2/2 creature
 -- (CR 708.2a), so the second card's CR 614.12 determination counts the first --
