@@ -1496,6 +1496,19 @@ attackNoBlock p = case p of
   Prompt.DeclareBlockers {} -> Map.empty
   _ -> S.identityAnswer p
 
+-- Attack with everything and block ONE named attacker with ONE named creature,
+-- so a lifelink blocker's own damage lands in the same CR 510.2 batch as the
+-- unblocked attacker's. `attackNoBlock` above is this with the block taken away.
+--
+-- The pair is filtered out of the OFFERED attackers rather than built, so an
+-- attacker that never attacked leaves the blocker absent (CR 509.1) instead of
+-- silently becoming a legal block.
+attackAndBlock :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+attackAndBlock blocker attacker p = case p of
+  Prompt.DeclareAttackers _ _ ids -> ids
+  Prompt.DeclareBlockers _ _ _ attackers -> Map.fromList [(blocker, Set.singleton a) | a <- attackers, a == attacker]
+  _ -> S.identityAnswer p
+
 -- Put a board at declare attackers with BOB active and alice defending -- the
 -- mirror of testOfFaithSpec's `atCombat`, since a shield over "you" is over the
 -- player who activated it and it takes combat damage only when that player is
@@ -1669,6 +1682,35 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
         after = S.runCombat attackNoBlock (bobAttacks (atLife S.alice 2 g4))
     Spec.assertEqWith s "alice is at 1, not at the 0 a pre-batch reading would give" (S.lifeOf S.alice after) (Just 1)
     Spec.assertEqWith s "CR 702.15e each lifelink source gained its own amount, 3 and 2" (S.lifeOf S.bob after) (Just 25)
+  -- CR 120.4d's SECOND Example, which is the half CR 120.3f's gain makes
+  -- reachable without Awe Strike: one damage event whose results are both a loss
+  -- and a gain. "That's processed into its results, so the damage event is now
+  -- [the defending player loses 5 life, the defending player gains 5 life].
+  -- Worship's effect sees that the damage event would not reduce the player's
+  -- life total to less than 1, so Worship's effect is not applied."
+  --
+  -- Alice at 4 takes 5 from an unblocked Jedit Ojanen and gains 3 from her own
+  -- lifelink Celestine striking the Goblin Piker she blocked -- one CR 510.2
+  -- batch. The event leaves her at 2, so the floor is never breached. Reading
+  -- the loss against a board the gain has not reached yet gives 4, which is what
+  -- this discriminates; see #2563.
+  --
+  -- Every number distinct: 4 life, 5 damage, 3 gained, 2 left, a floor of 1.
+  Spec.it s "CR 120.4c a simultaneous life gain keeps the same event off the floor" $ do
+    plains <- S.printingOf s registry "Plains"
+    worship <- S.printingOf s registry "Worship"
+    celestine <- S.printingOf s registry "Celestine, the Living Saint"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base = S.landsInPlay plains 2
+        (_, g1) = S.addCreature worship S.alice base
+        (blocker, g2) = S.addCreature celestine S.alice g1
+        (_, g3) = S.addCreature jedit S.bob g2
+        (blocked, g4) = S.addCreature piker S.bob g3
+        after = S.runCombat (attackAndBlock blocker blocked) (bobAttacks (atLife S.alice 4 g4))
+    Spec.assertEqWith s "CR 120.4c alice ends at 4 - 5 + 3 = 2, the floor never applying" (S.lifeOf S.alice after) (Just 2)
+    Spec.assertEqWith s "setup: the block happened, so Celestine's 3 killed the 2/1 Piker (CR 704.5g)" (S.creaturesInPlay S.bob after) 1
+    Spec.assertEqWith s "setup: alice's lifelink blocker survived the Piker's 2, so Worship's clause stayed true" (S.creaturesInPlay S.alice after) 1
   -- Worship's own ruling: "Worship does not prevent loss of life, so loss of life
   -- bypasses Worship." Zof Consumption ({4}{B}{B} Sorcery, "Each opponent loses 4
   -- life and you gain 4 life") is the road CR 119.3 owns, against the same board

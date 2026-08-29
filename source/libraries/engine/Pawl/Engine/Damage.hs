@@ -943,10 +943,11 @@ applyDamage events = do
         -- same reason.
         Recipient.ToPlayer _ -> g
       -- CR 120.3f: lifelink damage gains its source's controller that much life,
-      -- IN ADDITION to the damage's other results. A second pass over the same
+      -- IN ADDITION to the damage's other results. A pass of its own over the same
       -- survivors, deliberately not a branch inside markOne: "in addition" is
       -- then structural, and no arm of CR 120.3 above can be turned into
-      -- "instead" by an edit here.
+      -- "instead" by an edit here. Run below, ahead of the life-loss pass, for
+      -- the reason stated there.
       --
       -- Every survivor, whatever it was dealt to. CR 702.15b hangs the gain off
       -- the SOURCE, so which of CR 120.3's results the damage had is none of this
@@ -966,7 +967,7 @@ applyDamage events = do
       -- CR 903.10a: the running tally of COMBAT damage each commander has dealt
       -- each player, kept under the commander's OWNER (Player.commanderDamage).
       --
-      -- A third pass rather than a line inside markOne, for `gainOne`'s reason:
+      -- A pass of its own rather than a line inside markOne, for `gainOne`'s reason:
       -- the tally is not one of CR 120.3's results at all -- it is a record CR
       -- 903.10a keeps beside them -- so no arm of markOne can turn it off.
       --
@@ -1005,8 +1006,8 @@ applyDamage events = do
       -- A separate pass rather than a line inside markOne, for the reason the
       -- recording block below gives: markOne runs BEFORE either record is
       -- appended, so a life loss written there would be logged ahead of the
-      -- damage that caused it and would move CR 603.3a's control sample onto a
-      -- pre-lifelink board.
+      -- damage that caused it, and CR 603.3a's control sample would be taken
+      -- before the cause it describes.
       --
       -- Only where life was actually lost. CR 120.3b's infect diversion replaces
       -- the life loss with poison counters, and a 0-damage event loses nothing --
@@ -1025,9 +1026,10 @@ applyDamage events = do
             losing > 0 ->
               [GameEvent.LifeLost (LifeChange.MkLifeChange pid losing)]
         _ -> []
-      -- CR 120.3f's gain, recorded where `gainOne` above performs it, so that
+      -- CR 120.3f's gain, recorded for the pass `gainOne` above performs, so that
       -- "whenever you gain life" sees lifelink (CR 702.15b) and not only an
-      -- effect that says the words.
+      -- effect that says the words. The RECORD lands here and the gain itself
+      -- earlier, which is the split `lifeLostBy` above already has.
       --
       -- ONE record per damage event, never per player, which is CR 702.15e in as
       -- many words: "if multiple sources with lifelink deal damage at the same
@@ -1174,6 +1176,17 @@ applyDamage events = do
                       Recipient.ToObject oid -> onObject oid
                       Recipient.ToPlayer pid -> place poison (Event.putPlayerCounters cause pid PlayerCounterKind.Poison)
                       Recipient.ToPile _ -> pure ()
+  -- CR 120.3f's gain, performed HERE and not in the fold below, because CR 120.4c
+  -- processes the damage into ALL of its results as one event and the life-loss
+  -- pass that follows reads the resulting total off the live board (see the note
+  -- on `lost`). Writing the gain afterwards let a floor row (Worship) fire on a
+  -- drain a simultaneous gain covered; see #2563.
+  --
+  -- Ahead of `markOne` and `tallyOne` too, which changes nothing they can see:
+  -- those write GameState.objects and Player.commanderDamage, and this writes
+  -- Player.life. The RECORDS keep their old order below -- `lifeGainedBy` still
+  -- logs the gain after the damage that caused it.
+  State.modify' (\gs -> List.foldl' gainOne gs survivors)
   -- CR 120.4c: "damage that's been dealt is processed into its results, as
   -- modified by replacement effects that interact with those results (such as
   -- life loss or counters)". This is that step for CR 120.3a's life loss, and the
@@ -1196,8 +1209,15 @@ applyDamage events = do
   -- already written, so a player at 2 taking two simultaneous lethal hits under
   -- Worship has the first cut to a loss of 1 and the second cut to nothing, and
   -- ends at 1. Reading every proposal against the pre-batch board would cut both
-  -- to 1 and kill them. CR 120.4d's second example is that board with its Awe
-  -- Strike taken away.
+  -- to 1 and kill them.
+  --
+  -- The same reading is why CR 120.3f's gain is written ABOVE rather than in the
+  -- fold below: the board each proposal reads has to be the one the WHOLE damage
+  -- event's results leave, gains included. CR 120.4d's second Example is that
+  -- board -- at 2, with results "loses 5 life" and "gains 5 life", "Worship's
+  -- effect sees that the damage event would not reduce the player's life total to
+  -- less than 1, so Worship's effect is not applied" -- and Pawl.ReplacementSpec's
+  -- Worship group proves it with a lifelink blocker in place of its Awe Strike.
   --
   -- The DAMAGE is untouched: `gainOne`, `tallyOne` and the DamageDealt record
   -- below all still read DamageEvent.amount. CR 120.4b dealt it, and this
@@ -1237,8 +1257,7 @@ applyDamage events = do
   State.modify'
     ( \gs ->
         let marked = List.foldl' markOne gs survivors
-            gained = List.foldl' gainOne marked survivors
-            tallied = List.foldl' tallyOne gained survivors
+            tallied = List.foldl' tallyOne marked survivors
             noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (Prevention.by p) (Prevention.source p) (Prevention.recipient p) (Prevention.amount p))) g) tallied (filter (\p -> Prevention.amount p > 0) prevented)
             dealt = List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) noted survivors
          in -- CR 119.2's life loss and CR 120.3f's life gain are recorded AFTER
