@@ -2877,6 +2877,13 @@ soulSnareSpec s registry = Spec.describe s "SoulSnare" $ do
         -- GAMEPLAY FIRST. alice now controls Jace, so an engine reading his
         -- controller anyway hands alice's Snare a creature "attacking a
         -- planeswalker you control" and lets her exile her own attacker.
+        --
+        -- No board can give ALICE's Snare a positive leg, and that is the rule
+        -- rather than a hole in the fixture: CR 506.2 admits only the DEFENDING
+        -- player's planeswalkers into a declaration, so a seat this atom answers
+        -- for is never a seat that just took the planeswalker. What proves her
+        -- Snare is funded and offerable is the mutation: dropping the controller
+        -- conjunct makes exactly this leg exile the Piker.
         Spec.assertBool s (S.onBattlefield pikerId (aliceFires stolen)) "CR 506.4: Jace left combat with bob's control of him, so alice's Snare cannot name the Piker"
         Spec.assertBool s (S.onBattlefield aliceSnare (aliceFires stolen)) "and alice's Snare is unsacrificed: the ability was never activatable"
         -- The control, on the leg where the Confiscate went to the spare
@@ -2954,8 +2961,8 @@ data GraftIds = MkGraftIds
 -- 701.3b keeps the current host out of Attach.hostsFor) and the second Bonesplitter
 -- is the destination the control leg uses.
 --
--- Every element is load-bearing. The two Snares are the same printing with a
--- Plains each, so the two seats differ only in who holds one. Loyalty 5 against a
+-- Every element is load-bearing. The two Snares are the same printing and each
+-- seat holds Plains of its own, so the two differ only in who holds one. Loyalty 5 against a
 -- 2/1 keeps CR 704.5i from burying Jace mid-combat, which would answer through the
 -- battlefield guard instead. alice's lands cover {1}{U} and {W} together, so the
 -- Graft and her own activation cannot compete for mana.
