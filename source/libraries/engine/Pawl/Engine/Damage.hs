@@ -300,10 +300,18 @@ combatRecipient gs attacker target =
         if List.elem pid (Game.stillPlaying gs)
           then Just (Recipient.ToPlayer pid)
           else Nothing
+      -- CR 506.4c: this attacker's target has not ALREADY been removed from
+      -- combat. Asked alongside the live derivation and not instead of it,
+      -- because rule 506.4 names events -- see Pawl.Types.Combat's
+      -- attackingNothing.
+      notNotedAsAttackingNothing =
+        Set.notMember attacker (Combat.Type.attackingNothing (GameState.combat gs))
    in case target of
         AttackTarget.OfPlayer defender -> stillPlaying defender
         AttackTarget.OfPlaneswalker oid
-          | Combat.stillAttacked oid gs -> Just (Recipient.ToPlaneswalker oid)
+          | notNotedAsAttackingNothing,
+            Combat.stillAttacked oid gs ->
+              Just (Recipient.ToPlaneswalker oid)
           | Projection.hasKeyword Keyword.TrampleOverPlaneswalkers attacker gs ->
               stillPlaying =<< Combat.Type.defender (GameState.combat gs)
           | otherwise -> Nothing
@@ -312,7 +320,7 @@ combatRecipient gs attacker target =
         -- gives the creature nothing to assign to. No CR 702.19e for a battle: that
         -- rule names a planeswalker only.
         AttackTarget.OfBattle oid ->
-          if Combat.stillAttackedBattle oid gs
+          if notNotedAsAttackingNothing && Combat.stillAttackedBattle oid gs
             then Just (Recipient.ToBattle oid)
             else Nothing
 

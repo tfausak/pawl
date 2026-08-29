@@ -65,6 +65,7 @@ emptyCombat =
       Combat.declaredAttackers = Set.empty,
       Combat.declaredBlockers = Set.empty,
       Combat.blockersDeclared = False,
+      Combat.attackingNothing = Set.empty,
       Combat.defender = Nothing
     }
 
@@ -163,10 +164,12 @@ attackableBattles defender gs =
 -- attacking a planeswalker that is gone" from "was never attacking anything"
 -- (Thrasta, Tempest's Roar).
 --
--- Not implemented: a controller that changes and changes BACK mid-combat, which
--- rule 506.4 removes from combat for good and this derived read re-attacks.
--- Projection.viewOfCharacteristics' attackingPlaneswalkerController reads the same
--- way, so the two agree (#2627).
+-- A LIVE derivation, and only half of rule 506.4's answer: the rule names events,
+-- so a permanent removed from combat stays removed even once the board looks the
+-- way it did before. Combat.attackingNothing is the half that remembers, sampled
+-- from this very function by noteAttackingNothing below and asked ahead of it by
+-- both callers (Damage.combatRecipient and
+-- Projection.viewOfCharacteristics).
 --
 -- Not implemented: CR 508.3b's planeswalker and battle subjects. The event that
 -- would carry them is there -- GameEvent.BecameAttacked names the permanent --
@@ -991,13 +994,13 @@ combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.ele
 --
 -- Battlefield-scoped, so this stays these two clauses: an object that has LEFT the
 -- battlefield is a separate clause of CR 506.4, in Pawl.Engine.Departure and
--- Pawl.Engine.Damage. Creatures only, which is what `combatants` gathers -- an
--- ATTACKED planeswalker or battle is answered at stillAttacked and
--- stillAttackedBattle, and again at Projection.viewOfCharacteristics' two
--- attacking-target fields, CR 506.4d falls out of that split (Pawl.CombatSpec's
--- CreaturePlaneswalkerInCombat is the proof), and the phases-out clause is
--- Pawl.Engine.Phasing.phaseOut's. Not implemented: CR 506.4e and the
--- becomes-a-battle clause (#981).
+-- Pawl.Engine.Damage. Creatures only, which is what `combatants` gathers -- CR
+-- 506.4d falls out of that split (Pawl.CombatSpec's CreaturePlaneswalkerInCombat
+-- is the proof), and the phases-out clause is Pawl.Engine.Phasing.phaseOut's. Not
+-- implemented: CR 506.4e and the becomes-a-battle clause (#981).
+--
+-- The ATTACKED planeswalker or battle is noteAttackingNothing's, below, run on
+-- the state this fold leaves behind.
 --
 -- The gather is NOT shared with Sba.performStateBasedActions' earlier one: a
 -- state-based action can change the board between the two.
@@ -1016,7 +1019,35 @@ removeChanged gs =
       leaving = filter (\oid -> onBattlefield oid && changed oid) (Set.toList inCombat)
    in if Set.null inCombat
         then gs
-        else List.foldl' (flip Game.removeFromCombat) gs leaving
+        else noteAttackingNothing (List.foldl' (flip Game.removeFromCombat) gs leaving)
+
+-- CR 506.4's clauses about the ATTACKED planeswalker or battle, recorded rather
+-- than re-derived -- Pawl.Types.Combat's attackingNothing field is the record and
+-- says why.
+--
+-- The condition is stillAttacked / stillAttackedBattle themselves, so the sample
+-- and the live read cannot disagree: what the record adds is that the answer
+-- STICKS. Rule 506.4 lists events, so a controller who changes and changes back
+-- inside one combat leaves the permanent removed, and every derivation from the
+-- current board puts it back (Pawl.CombatEffectSpec's two-Graft pair is the
+-- board).
+--
+-- Only ever adds, for removeChanged's own reason: taking an id back out would
+-- invent a CR 506.4 the rules do not have. A creature put onto the battlefield
+-- attacking that same planeswalker (CR 508.8) needs no such removal -- the record
+-- is keyed by the ATTACKER, so the arriving creature is simply not in it, and CR
+-- 506.4c leaves the earlier attacker attacking nothing all the same.
+noteAttackingNothing :: GameState -> GameState
+noteAttackingNothing gs =
+  let c = GameState.combat gs
+      removed target = case target of
+        -- CR 800.4e, not CR 506.4: a departed player is still being attacked, and
+        -- Damage.combatRecipient is where the damage goes missing.
+        AttackTarget.OfPlayer _ -> False
+        AttackTarget.OfPlaneswalker pw -> not (stillAttacked pw gs)
+        AttackTarget.OfBattle battle -> not (stillAttackedBattle battle gs)
+      gone = Map.keysSet (Map.filter removed (Combat.attackers c))
+   in gs {GameState.combat = c {Combat.attackingNothing = Set.union gone (Combat.attackingNothing c)}}
 
 -- CR 507.1 / CR 703.4h: immediately after the beginning of combat step begins,
 -- the active player chooses one of their opponents, and that player becomes the

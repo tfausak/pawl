@@ -280,7 +280,11 @@ removeFromCombat oid gs =
         c
           { Combat.attackers = Map.delete oid (Combat.attackers c),
             Combat.blockers = fmap (Set.delete oid) (Map.delete oid (Combat.blockers c)),
-            Combat.joinedUnder = Map.delete oid (Combat.joinedUnder c)
+            Combat.joinedUnder = Map.delete oid (Combat.joinedUnder c),
+            -- CR 506.4c is about a creature that is STILL attacking, so a
+            -- creature that has itself left combat has no place in that record
+            -- either -- the same reason joinedUnder loses its entry above.
+            Combat.attackingNothing = Set.delete oid (Combat.attackingNothing c)
           }
    in gs {GameState.combat = c1}
 

@@ -1061,9 +1061,14 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- under the active player and the attacked planeswalker under the defending
       -- one, so this cannot re-enter itself.
       --
-      -- Not implemented: a controller that changes and changes BACK mid-combat, which
-      -- rule 506.4 removes from combat for good and this derived read re-attacks.
-      -- Combat.stillAttacked reads the same way, so the two agree (#2627).
+      -- THE RECORD, first and above all three: rule 506.4 lists EVENTS, so a
+      -- controller who changes and changes back inside one combat leaves the
+      -- planeswalker removed while every conjunct below re-derives it back in.
+      -- Combat.attackingNothing is what makes the removal stick, keyed by this
+      -- attacker; Pawl.Types.Combat says why it is stored, and
+      -- Pawl.Engine.Combat.noteAttackingNothing is its one writer. The conjuncts
+      -- stay because that record is sampled at CR 117.5's moments and this
+      -- function is asked at every other one.
       --
       -- controllerOf is the lean fold rather than a projection, which is what
       -- makes it safe here: `viewUpTo` already calls it for the candidate's own
@@ -1071,7 +1076,8 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- object re-enters nothing that `peers` guards against.
       Filter.attackingPlaneswalkerController = case Map.lookup oid (Combat.attackers (GameState.combat gs)) of
         Just (AttackTarget.OfPlaneswalker pw)
-          | Set.member pw (GameState.battlefield gs),
+          | Set.notMember oid (Combat.attackingNothing (GameState.combat gs)),
+            Set.member pw (GameState.battlefield gs),
             controllerOf pw gs == Combat.defender (GameState.combat gs),
             any (Set.member CardType.Planeswalker . Filter.cardTypes) (peers pw) ->
               controllerOf pw gs
@@ -1106,9 +1112,14 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- The PROTECTOR conjunct is a regression fence rather than a proven behavior:
       -- mutating it away leaves the suite green, CR 310.9f's change needing an
       -- effect that moves a designation. Not implemented: any such effect (#853).
+      --
+      -- Combat.attackingNothing leads here as it does above, and for the same
+      -- reason: it is the only one of the four that remembers a removal rather
+      -- than re-deriving it.
       Filter.attackingBattleProtector = case Map.lookup oid (Combat.attackers (GameState.combat gs)) of
         Just (AttackTarget.OfBattle battle)
-          | Set.member battle (GameState.battlefield gs),
+          | Set.notMember oid (Combat.attackingNothing (GameState.combat gs)),
+            Set.member battle (GameState.battlefield gs),
             Battle.protectorOf battle gs == Combat.defender (GameState.combat gs),
             any (Set.member CardType.Battle . Filter.cardTypes) (peers battle) ->
               Battle.protectorOf battle gs

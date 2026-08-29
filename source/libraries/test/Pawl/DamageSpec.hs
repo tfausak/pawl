@@ -2175,6 +2175,7 @@ departedAttackerSpec s registry =
                       -- declaration, which is what put the entry in
                       -- Combat.blockers above.
                       Combat.Type.blockersDeclared = True,
+                      Combat.Type.attackingNothing = Set.empty,
                       Combat.Type.defender = Just S.bob
                     }
               }
@@ -2249,6 +2250,7 @@ departedDefenderSpec s registry =
                       -- CR 506.7b: attackers are declared and blockers are not,
                       -- which is the moment the comment above describes.
                       Combat.Type.blockersDeclared = False,
+                      Combat.Type.attackingNothing = Set.empty,
                       Combat.Type.defender = Just S.bob
                     }
               }
@@ -2300,6 +2302,7 @@ departedDefenderSpec s registry =
                       Combat.Type.declaredAttackers = Set.empty,
                       Combat.Type.declaredBlockers = Set.empty,
                       Combat.Type.blockersDeclared = True,
+                      Combat.Type.attackingNothing = Set.empty,
                       Combat.Type.defender = Just S.carol
                     }
               }
