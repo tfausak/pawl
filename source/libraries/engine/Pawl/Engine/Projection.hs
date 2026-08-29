@@ -4565,6 +4565,12 @@ abilitiesFromCharacteristics peers pc oid gs =
 -- rather than the bare stated set replacementsAffecting's other walks take. The
 -- MINTED rows below take no such gate: each is minted by a rule for the object
 -- it is on rather than printed on a face, so none of them can state a zone.
+--
+-- Nothing OBSERVES that gate yet -- no card in data/cards/ carries a row whose
+-- stated set leaves out the zone the object holding it can be in, and dropping it
+-- leaves the suite green -- so it is a regression fence resting on CR 113.6b's
+-- "only" rather than a proved behaviour. What IS proved is the empty-set limb,
+-- by Pawl.ZoneReplacementSpec's Rest in Peace pair.
 replacementsOf :: Zone.Zone -> ObjectId -> GameState -> [(ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
 replacementsOf zone oid gs =
   let pc = project oid gs
@@ -4713,11 +4719,13 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 -- ability, so the layer system has nothing to remove.
 --
 -- The rule's FROM-ZONE is not in the pattern -- Pawl.Types.ZoneChangePattern has
--- no such field -- and does not need to be: replacementsAffecting gathers
+-- no such field -- and does not need to be: replacementsAffecting projects
 -- battlefield permanents and the command zone's emblems, and CR 122.1h mints
 -- this row from counters on a PERMANENT, which CR 114.5 says an emblem is not --
 -- so a row minted here can only ever be a candidate while its source is on the
--- battlefield, which is exactly "from the battlefield". Filter.IsSource is the rule's "this permanent", the self-scope
+-- battlefield, which is exactly "from the battlefield". The four walks that
+-- reach the other zones cannot carry it: CR 113.6b gathers PRINTED rows and this
+-- one is minted. Filter.IsSource is the rule's "this permanent", the self-scope
 -- CR 614.1c's entry rows use.
 finalityOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 finalityOf oid gs =
