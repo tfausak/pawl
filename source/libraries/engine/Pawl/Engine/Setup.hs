@@ -180,6 +180,7 @@ emptyGame order =
           GameState.exiledUntilMonarch = Map.empty,
           GameState.haunting = Map.empty,
           GameState.exiledWith = Map.empty,
+          GameState.exilePiles = Map.empty,
           GameState.extraTurns = [],
           GameState.turnAnchor = Nothing
         }
@@ -542,6 +543,9 @@ restartGame perform exempt starter = do
             -- Every other entry names a card the rebuild shuffled into a
             -- library, where CR 400.7 has already made it a different object.
             GameState.exiledWith = Map.restrictKeys (GameState.exiledWith gs) exempt,
+            -- CR 406.4's pile, kept for exactly the cards the line above keeps
+            -- and cleared with the rest: a pile is about a card still in exile.
+            GameState.exilePiles = Map.restrictKeys (GameState.exilePiles gs) exempt,
             -- CR 727.1: the game that scheduled them has ended, so no extra
             -- turn survives into the new one.
             GameState.extraTurns = [],
@@ -716,6 +720,7 @@ subgameStateFrom starter parent =
           GameState.exiledUntilMonarch = Map.empty,
           GameState.haunting = Map.empty,
           GameState.exiledWith = Map.empty,
+          GameState.exilePiles = Map.empty,
           -- CR 729.1a: the subgame is its own game and starts from turn 1, so
           -- the main game's pending extra turns are not in it. Its own copy
           -- sits untouched in the outer frame, still waiting when the subgame
@@ -792,9 +797,9 @@ applyCrossings finalSub parent =
       -- The same deletion Departure.objectsLeaveWith performs, dropping the same
       -- carriers keyed on the departing id: its combat entries (CR 506.4 removes
       -- a permanent from combat as it leaves the battlefield), its
-      -- exile-until-monarch entry, CR 702.55b's haunt link and CR 607.2a's
-      -- exiled-with link. See there for why each is keyed on the KEY and not the
-      -- value.
+      -- exile-until-monarch entry, CR 702.55b's haunt link, CR 607.2a's
+      -- exiled-with link and CR 406.4's pile stamp. See there for why each is
+      -- keyed on the KEY and not the value.
       leave g oid = case Map.lookup oid (GameState.objects g) of
         -- Unreachable: `mine` holds only ids GameState.objects answered for, and
         -- no id crosses twice -- OutsideTheGame.bringInFrom drops the entry it
@@ -812,7 +817,8 @@ applyCrossings finalSub parent =
                       },
                   GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g1),
                   GameState.haunting = Map.delete oid (GameState.haunting g1),
-                  GameState.exiledWith = Map.delete oid (GameState.exiledWith g1)
+                  GameState.exiledWith = Map.delete oid (GameState.exiledWith g1),
+                  GameState.exilePiles = Map.delete oid (GameState.exilePiles g1)
                 }
       -- CR 608.2h, taken against `g` -- the running state, which is this game as
       -- it stands at the moment THIS card crosses. The object itself is still in

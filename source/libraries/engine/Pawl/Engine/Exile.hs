@@ -13,6 +13,7 @@
 module Pawl.Engine.Exile where
 
 import qualified Control.Monad as Monad
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Game as Game
@@ -86,14 +87,30 @@ mayChoose perspective oid gs = case perspective of
 -- incarnation was exiled -- unique, so the pile is a singleton and the rule's
 -- random draw over it names the one card in it.
 --
--- Not implemented: the same separation for the rest, which are pooled per owner.
--- Two effects that each exile cards face down make one pile here where the rule
--- makes two, so a chooser is offered one candidate where they should have had
--- the choice of which (#2566).
+-- Every OTHER face-down exiled card is sorted by the stamp
+-- Pawl.Engine.Resolve.recordExilePile gave the instruction that exiled it, which
+-- is the rule's two criteria together: one execution of one instruction is one
+-- moment, and its being that instruction is the how. Two effects that each exile
+-- a hand face down therefore make two piles, and a chooser who may not look picks
+-- which of them to draw out of.
+--
+-- The FORETOLD arm wins where both would answer, since CR 702.143e is the
+-- stronger separation: a card an effect exiled face down carries a pile stamp
+-- already, and rule 702.143d can then make that card foretold where it sits, at
+-- which point rule 702.143e wants it differentiable from the pile it was in.
+--
+-- A card in exile face down with NO stamp falls back to a pile of its own, and no
+-- such card exists: every face-down exile pawl can reach carries
+-- EntryRiders.exiledFaceDown, which only an effect sets (Pawl.Engine.Foretell is
+-- the other writer, and its cards take the arm above), and every effect runs
+-- inside recordExilePile's window. That fallback is unreachable rather than a
+-- second reading of the rule, and it is the direction to be careful about rather
+-- than the safe one -- a pile of one is a card the chooser has effectively named
+-- -- which is why the writer's window is the thing to keep total.
 pileOf :: ObjectId -> GameState.GameState -> Maybe Pile.Pile
 pileOf oid gs = do
   obj <- Game.lookupObject oid gs
   Monad.guard (Set.member oid (GameState.exile gs) && Object.exiledFaceDown obj)
   pure $ case Object.foretold obj of
     Just _ -> Pile.OfForetold (Object.timestamp obj)
-    Nothing -> Pile.OfFaceDown (Object.owner obj)
+    Nothing -> Pile.OfFaceDown (Map.findWithDefault (Object.timestamp obj) oid (GameState.exilePiles gs))
