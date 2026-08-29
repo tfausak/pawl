@@ -31,8 +31,9 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.UntapRestriction as UntapRestriction
 
 -- CR 502.3 with CR 101.2: which of `candidates` an effect in force right now says
--- DOESN'T UNTAP during its controller's untap step. Tsabo's Web's second
--- sentence.
+-- DOESN'T UNTAP during its controller's untap step. Tsabo's Web's second sentence
+-- is one printing and Meekstone's whole text another; `untapRestrictions` in
+-- data/cards is the carrier, and this answers for every card that fills it.
 --
 -- Pawl.Engine.SacrificeRestriction.cantBeSacrificed's body, gate for gate, and
 -- every step of its argument holds here unchanged: the same CR 305.7 and CR
