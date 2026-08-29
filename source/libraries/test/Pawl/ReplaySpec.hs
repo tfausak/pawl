@@ -505,6 +505,25 @@ combatReplaySpec s =
             "identity permutation"
             (Replay.defaultAnswer (Prompt.OrderCostComponents decider S.alice oid orderComponents))
             [0, 1 :: Natural.Natural]
+        -- CR 508.1j's payment order, the fourth prompt carrying a [Natural]
+        -- permutation, and discriminating against the three above for their own
+        -- stated reason: a shared Response constructor would let one cost's
+        -- transcript entry reorder the taxing permanents.
+        Spec.it s "OrderCombatTolls records and replays a permutation" $ do
+          let p = Prompt.OrderCombatTolls decider S.alice [oid, ObjectId.MkObjectId 8]
+              answer = [1, 0] :: [Natural.Natural]
+          Spec.assertEqWith s "round-trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+          Spec.assertEqWith
+            s
+            "an OrderCostComponents transcript entry does not answer an OrderCombatTolls"
+            (Replay.decode p (Replay.encode (Prompt.OrderCostComponents decider S.alice oid orderComponents) answer))
+            Nothing
+        Spec.it s "defaultAnswer keeps the battlefield order the charges were gathered in" $
+          Spec.assertEqWith
+            s
+            "identity permutation"
+            (Replay.defaultAnswer (Prompt.OrderCombatTolls decider S.alice [oid, ObjectId.MkObjectId 8]))
+            [0, 1 :: Natural.Natural]
         Spec.it s "ChooseSacrifices records and replays a Set ObjectId" $ do
           let p = Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1
               answer = Set.singleton (ObjectId.MkObjectId 8)

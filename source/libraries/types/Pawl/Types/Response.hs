@@ -367,6 +367,12 @@ data Response
     -- above, though the payload has the same shape: replaying a transcript
     -- against the wrong one would reorder a trigger batch instead of a payment.
     OrderedCostComponents [Natural.Natural]
+  | -- | CR 508.1j / 509.1f: the order a payer chose to pay a combat toll's
+    -- charges in, as a permutation of the offered indices. A separate
+    -- constructor from the one above for its reason: replaying a transcript
+    -- against the wrong one would reorder one cost's parts instead of the
+    -- taxing permanents.
+    OrderedCombatTolls [Natural.Natural]
   | -- | CR 608.2f: the relative order a resolving spell's controller chose for the
     -- members of one APNAP group a per-object body walks, as a permutation of the
     -- offered indices. A separate constructor from the three above for their

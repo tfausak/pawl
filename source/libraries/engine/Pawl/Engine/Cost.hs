@@ -2077,10 +2077,17 @@ pay moment subject spending pid oid cost = do
 -- into -- CR 508.1j and CR 509.1f name a payment and no effect, where CR
 -- 601.2f's components are paid for a spell that goes on to resolve.
 --
--- Not implemented: CR 601.2h's order prompt ACROSS tags. Each tag's own components
--- are ordered by payComponents below, but two taxing permanents are paid in
--- battlefield order rather than the payer's. Exact for one taxing permanent, which
--- is every board `data/cards/` can build (#2023).
+-- The ORDER ACROSS TAGS is the payer's, which is what "in any order" says about
+-- a toll two permanents taxed: `tollOrderObservable` below decides whether the
+-- payer can tell one order from another, and Prompt.OrderCombatTolls asks. Each
+-- tag's OWN components are ordered by payComponents after that, so the two
+-- prompts nest rather than compete. CombatEffectSpec's "CR 508.1j the payer
+-- orders the two taxing permanents: Hollow Warrior before Exalted Dragon" is the
+-- proof.
+--
+-- The pooled MANA is paid before the order is asked, which is CR 508.1i and CR
+-- 509.1e sitting ahead of the payment rule rather than a choice pawl made, and
+-- `pay` above takes the same posture for CR 601.2g.
 payToll :: PlayerId -> [(ObjectId, Cost Keyword.Type.Keyword)] -> Game Bool
 payToll pid charges = do
   before <- State.get
@@ -2099,12 +2106,44 @@ payToll pid charges = do
       if not paidMana
         then pure False
         else do
-          outcome <- payTagged pid (fmap (fmap Cost.components) charges)
+          let tagged = fmap (fmap Cost.components) charges
+          ordered <-
+            if tollOrderObservable tagged
+              then do
+                gs <- State.get
+                answer <- Game.choose (Prompt.OrderCombatTolls (Decide.deciderFor pid gs) pid (fmap fst tagged))
+                -- FILTERED, NOT TRUSTED: Game.permute keeps the gathered order
+                -- for an answer that is not a permutation of the offered indices,
+                -- payPass's posture below.
+                pure (Game.permute tagged answer)
+              else pure tagged
+          outcome <- payTagged pid ordered
           case outcome of
             Payment.Paid _ -> pure True
             Payment.Unpaid -> do
               State.put before
               pure False
+
+-- CR 508.1j / 509.1f: can the payer tell one order of a toll's CHARGES from
+-- another? `orderObservable` below, one level up, and its two conditions read
+-- over whole charges rather than parts.
+--
+-- TWO OR MORE charges holding a part that touches an object (`orderSensitive`):
+-- a charge that is mana alone is spent from a pool payToll has already pooled,
+-- so nothing about it competes with anything.
+--
+-- And NOT ALL EQUAL by their PARTS, the tags being distinct permanents by
+-- construction and so never equal. Two Exalted Dragons owe the same
+-- "sacrifice a land" twice, and the payer who orders those two picks the same
+-- land from the same offer either way. Sound only while no toll in `data/cards/`
+-- prints a part naming the permanent it is on -- Pawl.Types.CostComponent's
+-- SacrificeThis and TapThis, which would make two equal lists name two different
+-- permanents; the pool's tolls are Exalted Dragon's Sacrifice, Hollow Warrior's
+-- TapPermanents and Sphere of Safety's counted mana, and none of them does.
+tollOrderObservable :: [(ObjectId, [CostComponent.CostComponent Keyword.Type.Keyword])] -> Bool
+tollOrderObservable charges = case filter (any orderSensitive . snd) charges of
+  first : rest@(_ : _) -> not (all (\charge -> snd charge == snd first) rest)
+  _ -> False
 
 -- payToll's fold: each tag's components against the permanent that printed them,
 -- stopping at the first refusal. payInOrder's shape one level up, and the merge is
