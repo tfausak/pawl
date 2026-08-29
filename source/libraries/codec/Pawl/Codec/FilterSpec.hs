@@ -228,6 +228,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.IsAttackingPlaneswalker PlayerRelation.You)
       " {\"type\":\"IsAttackingPlaneswalker\",\"value\":{\"type\":\"You\"}} "
+  Spec.it s "IsAttackingBattle" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.IsAttackingBattle PlayerRelation.You)
+      " {\"type\":\"IsAttackingBattle\",\"value\":{\"type\":\"You\"}} "
   Spec.it s "IsBlocking" $
     Common.assertCodec
       s
@@ -460,6 +466,9 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
         flashFoliage = Filter.IsAttackingPlayer PlayerRelation.You
         -- Soul Snare's whole target filter, the composite the new atom ships in.
         soulSnare = Filter.Or [Filter.IsAttackingPlayer PlayerRelation.You, Filter.IsAttackingPlaneswalker PlayerRelation.You]
+        -- Synthetic Bulwark Snare's whole target filter, the composite this atom
+        -- ships in.
+        bulwarkSnare = Filter.Or [Filter.IsAttackingPlayer PlayerRelation.You, Filter.IsAttackingBattle PlayerRelation.You]
         relentlessAssault = Filter.AttackedThisTurn
         -- Break Open's whole target filter, the composite the new atom actually
         -- ships in.
@@ -500,6 +509,7 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
             killShot,
             flashFoliage,
             soulSnare,
+            bulwarkSnare,
             relentlessAssault,
             breakOpen,
             crownOfTheAges,

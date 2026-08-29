@@ -2745,6 +2745,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsAttacking -> 0
   Filter.Type.IsAttackingPlayer _ -> 0
   Filter.Type.IsAttackingPlaneswalker _ -> 0
+  Filter.Type.IsAttackingBattle _ -> 0
   Filter.Type.DeclaredAttackedThisCombat -> 0
   Filter.Type.IsBlocking -> 0
   Filter.Type.IsBlocked -> 0
