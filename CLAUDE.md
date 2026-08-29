@@ -103,9 +103,13 @@ to agents as written. What it doesn't say:
   - whether the rules core cases on an effect's *identity* --- an explicit "no"
   - what was deferred
 
-- Keep the prose terse --- PR bodies, issue comments and code comments alike,
-  and a citation in place of a quoted rule. Do the verification work in full;
-  write it up short.
+- Keep the prose terse --- PR bodies, issue comments, commit messages and code
+  comments alike, and a citation in place of a quoted rule. Do the verification
+  work in full; write it up short. A commit message is a subject line and, at
+  most, two sentences of why. A PR body is the bullets above and nothing else:
+  no narrative, no restating the diff. The one thing never to trim is the
+  mutation line --- which assertion reddened, named --- because that is what
+  catches a mutation absorbed by an assertion ahead of the gameplay one.
 
 - Mark the PR ready once the self-review's findings are pushed and the suite is
   green, report it, and stop. Don't wait for CI. Don't start the next unit ---
@@ -274,6 +278,15 @@ project-specific rules it doesn't cover:
 
 - One type per module under `Pawl.Types.<TypeName>`, holding the type and its
   instances only; cross-type logic lives in other `Pawl.*` modules.
+
+- A constructor's haddock is ONE line saying what it means, plus its CR
+  citation. Not a paragraph, not the rule's text, not a worked example, not the
+  history of how it came to exist. `pawl:types` currently runs 4.5 comment
+  lines per line of code and `Pawl.Types.Keyword` alone carries 1283 comment
+  lines; that is the debt this rule stops growing (#2561). Two things earn more
+  than a line: an elision paragraph, which states what is NOT implemented and
+  cites its issue, and a note naming the test that PROVES a behaviour. Both
+  outlive the one-liner; nothing else does.
 
 - Language extensions come from the allowlist in `.hlint.yaml`. Using one it
   doesn't name means adding it there in the same change, with the reason.

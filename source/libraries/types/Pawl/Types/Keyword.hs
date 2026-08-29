@@ -57,60 +57,17 @@ data Keyword
     -- TARGET only, and CR 702.6e's "equip planeswalker" (#2291).
     Equip (Cost.Cost Keyword)
   | FirstStrike -- 702.7
-  | -- | 702.8a: this card may be played any time you could cast an instant. The
-    -- only keyword here about WHEN a card may be cast -- rule 702's other casting
-    -- keywords in this pool move a different axis -- and nothing reads it once the
-    -- spell is on the stack. Read by Pawl.Engine.Cast.instantSpeed.
-    --
-    -- Nullary, because rule 702.8a takes no parameter, and CR 702.8b makes
-    -- multiple instances redundant -- so its reader takes membership rather than
-    -- the per-keyword count the projection carries.
-    --
-    -- Not a Pawl.Types.CastingPermission: that type's arms name a ZONE a card may
-    -- be cast from (CR 601.3), where rule 702.8a names a TIME and no zone at all.
-    -- A Pouncing Cheetah in a graveyard is as uncastable as a War Mammoth there.
+  | -- | 702.8a: may be cast any time you could cast an instant. Names a time,
+    -- not a zone, so it is not a Pawl.Types.CastingPermission (CR 601.3).
     Flash
   | Flying -- 702.9
   | Haste -- 702.10
-  | -- | 702.11b with Nothing: this permanent can't be the target of spells or
-    -- abilities your opponents control. 702.11d with Just: "hexproof from
-    -- [quality]" -- this permanent can't be the target of [quality] spells your
-    -- opponents control or abilities your opponents control from [quality]
-    -- sources.
-    --
-    -- Shroud's sibling (702.18a) and deliberately NOT the same constructor: the
-    -- CONTROLLER AXIS is what separates them, and both arms of this one carry it.
-    -- Shroud names no player, so it stops the permanent's own controller as
-    -- readily as anyone else; hexproof's "your opponents control" makes the answer
-    -- depend on WHO is aiming the spell, which is why
-    -- Pawl.Engine.Target.targetable reads CR 109.5's "you" and not only the
-    -- candidate. The quality below narrows the same rule a second time, by WHAT is
-    -- aiming -- the question protection (702.16b) asks and the one shroud never
-    -- does.
-    --
-    -- The quality RIDES this constructor rather than taking one of its own,
-    -- because rule 702.11d's last sentence says "a 'hexproof from [quality]'
-    -- ability is a hexproof ability" and rule 702.11e spends three sentences
-    -- spelling out what that buys: an effect that removes hexproof removes these
-    -- too, an effect that ignores hexproof ignores these too, and an effect that
-    -- looks for hexproof finds these too. One constructor makes all three true for
-    -- free at every reader instead of restating them at each -- the argument CR
-    -- 702.29f makes for typecycling riding Cycling. Humility (CR 613.1f) drops a
-    -- "hexproof from black" because it drops KEYWORDS, not because anything
-    -- enumerated the pair.
-    --
-    -- A Filter and not a Color, because rule 702.11d's "[quality]" is any quality:
-    -- "hexproof from planeswalkers" (Eradicator Valkyrie) is a card type,
-    -- "hexproof from instants" (Elenda, Saint of Dusk) another, and "hexproof from
-    -- monocolored" (Sphinx of the Guildpact) is CR 105.2a's exactly-one-colour,
-    -- which needs the combinators. Cycling's `Maybe (Filter Keyword)` exactly.
-    --
-    -- CR 702.11f's "hexproof from [quality A] and from [quality B]" and CR
-    -- 702.11g's "hexproof from each [characteristic]" need no arm of their own:
-    -- both rules say the card HAS SEVERAL hexproof abilities rather than one
-    -- compound one, and Pawl.Types.Face.keywords is a Set, so such a card prints
-    -- one entry per quality. CR 702.11h's redundancy is then per key, which is
-    -- what its "the same hexproof ability" means.
+  | -- | 702.11b with Nothing, 702.11d with Just: can't be targeted by
+    -- opponents' spells or abilities, narrowed to a quality. Distinct from
+    -- Shroud (702.18a), which names no player. The quality rides this
+    -- constructor because 702.11d makes it a hexproof ability, so 702.11e's
+    -- three clauses come free at every reader; several qualities are several
+    -- abilities (702.11f, 702.11g), one Set entry each.
     Hexproof (Maybe (Filter.Filter Keyword))
   | Indestructible -- 702.12
   | Intimidate -- 702.13
@@ -193,35 +150,11 @@ data Keyword
     -- allows it to be cast ... converted, that ability is also considered when
     -- evaluating that spell to determine if it can be cast."
     MoreThanMeetsTheEye (Cost.Cost Keyword)
-  | -- | 702.16a: "Protection from [quality]." FOUR SEPARATE PROHIBITIONS, stated
-    -- in five clauses and reaching four different readers: CR 702.16b's targeting
-    -- (Pawl.Engine.Target.targetable), CR 702.16e's damage (a prevent-all row
-    -- minted by Pawl.Engine.Keyword.mintedReplacementsFor), CR 702.16f's blocking
-    -- (a CR 509.1b pairwise restriction minted by
-    -- Pawl.Engine.Keyword.mintedCombatRestrictionsFor), and the attachment of CR
-    -- 702.16c's Auras and CR 702.16d's Equipment and Fortifications (a
-    -- destination-side prohibition minted by
-    -- Pawl.Engine.Keyword.mintedAttachRestrictionsFor, whose two state-based
-    -- outcomes are Pawl.Engine.Sba's fallsOff and becomesUnattached).
-    --
-    -- HEXPROOF'S SHAPE (702.11d), minus the controller axis and plus three more
-    -- clauses. The quality rides the constructor for rule 702.11d's reason,
-    -- restated by CR 702.16g: "protection from [quality A] and from [quality B]"
-    -- IS two protection abilities, so a card printing two writes two entries in
-    -- Pawl.Types.Face's Set and CR 702.16m's redundancy is per key. A Filter
-    -- rather than a Color because CR 702.16a says the quality "can be any
-    -- characteristic value or information": Angelic Curator prints protection
-    -- from artifacts and Soldier of the Pantheon protection from multicolored.
-    --
-    -- NOT a hexproof arm, for the reason Shroud is not one either: rule 702.11d
-    -- asks WHO is aiming as well as what, and rule 702.16b asks only what -- a
-    -- creature with protection from black cannot be targeted by its own
-    -- controller's black spell. Three of protection's four clauses have no
-    -- hexproof counterpart at all.
-    --
-    -- ONE constructor rather than one per clause: CR 702.16m makes a second copy
-    -- of the same quality redundant across all four clauses at once, which is
-    -- only expressible if one key carries all four.
+  | -- | 702.16a: four prohibitions under one key -- targeting (702.16b),
+    -- damage (702.16e), blocking (702.16f), and attachment (702.16c, 702.16d).
+    -- One constructor rather than one per clause, because 702.16m's redundancy
+    -- is per quality across all four. Not a Hexproof arm: 702.16b asks only
+    -- what is aiming, where 702.11d also asks who.
     --
     -- Not implemented: rule 702.16j's "protection from everything", rule
     -- 702.16k's "protection from [a player]" -- whose quality is a PLAYER and not
