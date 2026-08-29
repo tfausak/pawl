@@ -13,14 +13,12 @@ Two lanes.
 
 - **The build lane** runs one implementation agent at a time, in an isolated
   worktree; `jobs: $ncpus` already saturates the machine. Its unit of exclusion
-  is the BUILD, not the merge: a ready PR waits ten-plus minutes on CI, and a
-  lane that waits for the merge idles for all of it (~30% of wall-clock per
-  unit, measured). Dispatch the next unit when the current one's PR is ready,
-  and let auto-merge keep the merges serial.
-- **The research lane** runs read-only agents alongside. They never touch the
-  build, so they are free wall-clock. Anything the implementer would otherwise
-  re-derive costs the same tokens on either lane and only one is the critical
-  path. Push it here --- but see "Research one unit ahead" for the bound.
+  is the BUILD, not the merge. Dispatch the next unit when the current one's PR
+  is ready --- but no further than the cap in "Merging", because throughput is
+  CI-bound, not agent-bound.
+- **The audit lane** runs read-only agents alongside. It does NOT brief the
+  next unit --- see "Do not brief ahead". Its one standing job is the
+  cross-unit audit.
 
 Measured 2026-08-16: ~25 min from dispatch to PR-ready, ~5 of them compiling
 (cold build ~2.5 min, incremental ~2); ~12 min from ready to merged; the CI
@@ -93,32 +91,32 @@ A cluster is one dispatch, one worktree, one PR closing every issue in it, and
 when it is real the per-unit fixed cost is paid once. But a shared TOPIC is not
 a cluster: the eleven topic trackers #2190--#2200 each assert shared machinery
 in the body, and every one of them split into unrelated units under triage.
-Require the researcher to name the function or constructor every issue in the
-cluster edits; without that, dispatch them separately.
+Two issues qualify when they share an edit site OR take the SAME fix shape in
+adjacent code: #2534 and #2535 were one bracket around two neighbouring folds,
+dispatched an hour apart as two units, and should have been one PR. Closing two
+or three issues from one PR is the good case, not a liberty. What does not
+qualify is a shared topic with no shared shape.
 
-**Research one unit ahead, not more.** The in-flight implementation rewrites
-the files the next brief is derived against, so research further ahead than one
-unit is derived against a tree that no longer exists --- a research pass was
-killed mid-run for exactly this, its subject function being rewritten by the
-active unit. Keep one read-only agent running alongside the build, and make its
-subject file-disjoint from the build for the same reason the next dispatch must
-be. Its brief must open with: read `docs/agents/researching.md` first.
+**Do not brief ahead.** A pre-implementation brief does not buy throughput:
+with and without one the lane lands 1--2 PRs an hour, because the ceiling is
+CI. The implementer re-derives everything anyway, and corrected the brief every
+time it was tried --- a wrong precedent, a vacuous control, an unnecessary
+`GameState` field, a producer that proved nothing. Dispatch straight off the
+issue, and tell the agent the issue body is the artefact most often wrong.
 
-Standing assignments, in order of yield:
+**Audit every few merges.** This is the audit lane's one standing job, and the
+only mechanism that looks ACROSS units. Two units each correct alone can
+compose wrong and no single unit's mutations see it: three consecutive rounds
+each found a real defect (#2505, #2529, and #2555 --- a regression the run
+itself had introduced five units earlier). Read the merged diffs, not the
+tests. A comment-only unit is the same shape from the other side --- nothing
+red catches a false CR classification. Its brief must open with: read
+`docs/agents/researching.md` first.
 
-- turn the NEXT issue (or cluster) into a dispatch-ready brief carrying what
-  the implementer would otherwise re-derive --- see "Writing a brief" in the
-  role file, which now says which fields to carry and which to stop writing
-- audit the last few MERGED units against each other. Two units each correct
-  alone can compose wrong, and no single unit's mutations see it: a delayed
-  trigger that never consulted the batch scoping landed that way (#2384). Read
-  the merged diffs, not the tests. A comment-only unit is the same shape from
-  the other side --- nothing red catches a false CR classification or a haddock
-  naming a function with no callers --- so read its diff before it merges
-- the **staleness sweep** the role file describes, against the TREE. Sweeping
-  card names for fired `expires:card-driven` triggers is a closed seam: two
-  independent passes over every open card-driven issue found none
-- check whether a claimed missing capability still is missing
+Sweeps that do not need an agent: fired `expires:card-driven` triggers (a
+closed seam --- two independent passes found none), and re-checking whether a
+claimed missing capability still is missing. Both are `gh` queries; run them
+inline rather than spending a lane on them.
 
 **Expect research to change the unit, not just describe it.** In one nine-unit
 run it changed the scope or verdict of every issue it touched: one had no
@@ -150,9 +148,15 @@ the commonest cause is a tool timeout reaping a backgrounded `cabal`. Tell
 agents to run `cabal` in the foreground with a generous timeout, and never to
 `pkill` by pattern.
 
-**Merging.** Arm auto-merge (squash) on each PR. The ruleset requires branches
-be up to date, so an armed auto-merge silently stalls at `BEHIND` --- poll
-`mergeStateStatus` and run `gh pr update-branch`. That adds a merge commit to
+**Merging, and the cap that keeps it moving.** Arm auto-merge (squash) on each
+PR. The ruleset requires branches be up to date, so every merge invalidates
+every other armed PR and the queue drains at exactly one per CI cycle however
+many are open. So **cap open PRs at two and pause dispatch above it** --- a
+third branch buys nothing but re-syncing. When several sit green and `BEHIND`,
+do NOT update them all: that is what starves them, each losing the race to the
+next merge. If any PR is already up to date, wait for it; if none is, update
+the OLDEST one only and wait for it to merge. Poll `mergeStateStatus` and run
+`gh pr update-branch`. That adds a merge commit to
 the agent's branch, which is why agents must not force-push. Arming does not
 stick: a push to the branch can drop it, and a PR reported ready is not an
 armed one --- re-check `autoMergeRequest` after arming and after every push,
