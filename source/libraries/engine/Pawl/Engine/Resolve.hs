@@ -2129,10 +2129,10 @@ turnPermanentsOver legal resolving controller source ref = do
 -- processes a swept set simultaneously and a later CR 701.27f comparison must not
 -- tell two victims apart. `pcs` is hoisted likewise.
 --
--- TWO boards: `frozen` is the pre-turn one both gates are asked of (CR 608.2c), so
--- no member of the batch is judged against a board a sibling has already turned
--- over on, while `gs` is the fold's accumulator, which carries CR 613.7g's stamps
--- as they are handed out.
+-- TWO boards: `frozen` is the pre-turn one both gates are asked of (CR 608.2f's
+-- simultaneous processing), so no member of the batch is judged against a board a
+-- sibling has already turned over on, while `gs` is the fold's accumulator, which
+-- carries CR 613.7g's stamps as they are handed out.
 turnOver :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> Timestamp.Timestamp -> GameState -> GameState -> ObjectId -> GameState
 turnOver pcs resolving now frozen gs oid
   | alreadyTurnedFor resolving oid frozen = gs
