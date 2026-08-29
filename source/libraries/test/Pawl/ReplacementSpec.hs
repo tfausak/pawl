@@ -1977,13 +1977,25 @@ castDisaster x wanted p = case p of
      in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
   _ -> S.identityAnswer p
 
--- Cast Char, aiming CR 115.4's "any target" at `victim` and spending a contested
--- prevention shield on the batch's hits in `wanted` order. The target is
--- FILTERED out of the offered set rather than built, castDeflection's shape, and
--- the order is stated by RECIPIENT, castDisaster's.
-castChar :: ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt.Prompt r -> r
-castChar victim wanted p = case p of
+-- Aim CR 115.4's "any target" at `victim` and spend a contested prevention
+-- shield on the batch's hits in `wanted` order. The target is FILTERED out of
+-- the offered set rather than built, castDeflection's shape, and the order is
+-- stated by RECIPIENT, castDisaster's.
+aimCreatureAndOrder :: ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt.Prompt r -> r
+aimCreatureAndOrder victim wanted p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToCreature victim) . snd) sets
+  Prompt.OrderDamage _ _ events ->
+    let rank e = Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)
+     in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
+  _ -> S.identityAnswer p
+
+-- Win Winter Sky's CR 705.2 call, then spend a contested shield in `wanted`
+-- order. The flip is pinned rather than deferred: the losing branch draws cards
+-- instead of dealing damage, and the case below is about the damage sentence.
+winTheFlipAndOrder :: [Recipient.Recipient] -> Prompt.Prompt r -> r
+winTheFlipAndOrder wanted p = case p of
+  Prompt.FlipCoin -> CoinFace.Heads
+  Prompt.CallCoin {} -> CoinFace.Heads
   Prompt.OrderDamage _ _ events ->
     let rank e = Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)
      in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
@@ -2150,7 +2162,7 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
         (deflectionId, g3) = S.addHandCard deflection S.alice g2
         (charId, unshielded) = S.addHandCard char S.alice g3
         shielded = castAndResolve (castDeflection 3 S.bob) unshielded deflectionId
-        burn order g = castAndResolve (castChar mine order) g charId
+        burn order g = castAndResolve (aimCreatureAndOrder mine order) g charId
         aliceFirst = burn [Recipient.ToPlayer S.alice, Recipient.ToCreature mine] shielded
         creatureFirst = burn [Recipient.ToCreature mine, Recipient.ToPlayer S.alice] shielded
         control = burn [] unshielded
@@ -2169,7 +2181,7 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     -- so nothing is asked.
     Spec.assertBool
       s
-      (wasAskedToOrderDamage (answersFor (castChar mine []) shielded (S.cast S.alice charId Monad.>> Stack.resolveTop)))
+      (wasAskedToOrderDamage (answersFor (aimCreatureAndOrder mine []) shielded (S.cast S.alice charId Monad.>> Stack.resolveTop)))
       "alice was asked which damage the one batch's shield prevents"
     -- The fences. Bob's creature is no part of the sentence, and CR 615.5's rider
     -- throws back the 3 that was prevented, which is one pool's worth however it
@@ -2182,6 +2194,80 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     Spec.assertEqWith s "without the shield her creature takes all 4" (S.damageOf mine control) (Just 4)
     Spec.assertEqWith s "and alice takes all 2" (S.lifeOf S.alice control) (Just 18)
     Spec.assertEqWith s "and bob is untouched, there being no rider to run" (S.lifeOf S.bob control) (Just 20)
+  -- The same sentence shape on an ACTIVATED ability, and with the halves' amounts
+  -- EQUAL. Brothers of Fire ({1}{R}{R} Creature -- Human Shaman 2/2,
+  -- "{1}{R}{R}: This creature deals 1 damage to any target and 1 damage to you" --
+  -- name, cost, type line, power/toughness and Oracle text checked against
+  -- api.scryfall.com 2026-08-29) was written as two instructions until this
+  -- change, and equal amounts fit one instruction as the opcode already stood.
+  --
+  -- Aimed at alice's own creature again, so the shield spans both halves. The
+  -- discriminator is the PAIR: a shield of 1 spent on alice's own 1 leaves her
+  -- creature's 1 dealt, where two instructions spend it on the target's 1 first
+  -- and leave alice's own dealt instead. Either board marks one damage somewhere,
+  -- so neither reading is told apart by one number alone.
+  Spec.it s "CR 608.2f an ability's two halves are one batch" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    deflection <- S.printingOf s registry "Divine Deflection"
+    brothers <- S.printingOf s registry "Brothers of Fire"
+    let base = S.landsFor mountain S.alice 3 (S.landsInPlay plains 2)
+        (mine, g1) = S.addCreature jedit S.alice base
+        (theirs, g2) = S.addCreature brothers S.alice g1
+        (deflectionId, unshielded) = S.addHandCard deflection S.alice g2
+        shielded = castAndResolve (castDeflection 1 S.bob) unshielded deflectionId
+        burn order g = S.runPure (aimCreatureAndOrder mine order) g (Activate.activateAbility S.alice theirs (theAbility brothers) Monad.>> Stack.resolveTop)
+        aliceFirst = burn [Recipient.ToPlayer S.alice, Recipient.ToCreature mine] shielded
+        creatureFirst = burn [Recipient.ToCreature mine, Recipient.ToPlayer S.alice] shielded
+        control = burn [] unshielded
+    -- THE case, read as a pair: the shield went on alice's own 1, so her
+    -- creature's 1 is dealt. Two instructions produce the other board, which the
+    -- next assertion is.
+    Spec.assertEqWith s "spent on alice, her creature takes the 1 and she takes none" (S.damageOf mine aliceFirst, S.lifeOf S.alice aliceFirst) (Just 1, Just 20)
+    Spec.assertEqWith s "spent on her creature instead, alice takes the 1" (S.damageOf mine creatureFirst, S.lifeOf S.alice creatureFirst) (Just 0, Just 19)
+    -- The fences: CR 615.5's rider throws back the 1 that was prevented, the
+    -- dealer took none of its own damage, and the unshielded board differs in
+    -- exactly the shield.
+    Spec.assertEqWith s "the rider deals bob the 1 that was prevented, either way" (S.lifeOf S.bob aliceFirst, S.lifeOf S.bob creatureFirst) (Just 19, Just 19)
+    Spec.assertEqWith s "and the dealer itself is untouched" (S.damageOf theirs aliceFirst, S.damageOf theirs creatureFirst) (Just 0, Just 0)
+    Spec.assertEqWith s "without the shield both halves land" (S.damageOf mine control, S.lifeOf S.alice control) (Just 1, Just 19)
+    Spec.assertEqWith s "and bob is untouched, there being no rider to run" (S.lifeOf S.bob control) (Just 20)
+  -- The mass shape of the same conversion. Winter Sky ({R} Sorcery, "Flip a coin.
+  -- If you win the flip, Winter Sky deals 1 damage to each creature and each
+  -- player. If you lose the flip, each player draws a card." -- name, cost, type
+  -- line and Oracle text checked against api.scryfall.com 2026-08-29) is Molten
+  -- Disaster's sentence at a fixed 1, and was written as two instructions until
+  -- this change. The flip is PINNED to a win, this case being about the damage
+  -- sentence alone.
+  Spec.it s "CR 608.2f creatures and players in a won flip are one batch" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    piker <- S.printingOf s registry "Goblin Piker"
+    deflection <- S.printingOf s registry "Divine Deflection"
+    sky <- S.printingOf s registry "Winter Sky"
+    let base = S.landsFor mountain S.alice 1 (S.landsInPlay plains 2)
+        (mine, g1) = S.addCreature jedit S.alice base
+        (theirs, g2) = S.addCreature piker S.bob g1
+        (deflectionId, g3) = S.addHandCard deflection S.alice g2
+        (skyId, unshielded) = S.addHandCard sky S.alice g3
+        shielded = castAndResolve (castDeflection 1 S.bob) unshielded deflectionId
+        blast order g = castAndResolve (winTheFlipAndOrder order) g skyId
+        aliceFirst = blast [Recipient.ToPlayer S.alice, Recipient.ToCreature mine] shielded
+        creatureFirst = blast [Recipient.ToCreature mine, Recipient.ToPlayer S.alice] shielded
+        control = blast [] unshielded
+    -- THE case, the pair again: alice's shield of 1 covers her own 1 and her
+    -- creature's 1, and two instructions would spend it on the creature half the
+    -- sentence writes first.
+    Spec.assertEqWith s "spent on alice, her creature takes the 1 and she takes none" (S.damageOf mine aliceFirst, S.lifeOf S.alice aliceFirst) (Just 1, Just 20)
+    Spec.assertEqWith s "spent on her creature instead, alice takes the 1" (S.damageOf mine creatureFirst, S.lifeOf S.alice creatureFirst) (Just 0, Just 19)
+    -- The fences: the shield covers alice's side only, so bob takes the sorcery's
+    -- 1 plus CR 615.5's rider, and his creature takes the whole 1.
+    Spec.assertEqWith s "bob takes the sorcery's 1 and the rider's 1, either way" (S.lifeOf S.bob aliceFirst, S.lifeOf S.bob creatureFirst) (Just 18, Just 18)
+    Spec.assertEqWith s "and his unshielded creature is marked with the whole 1" (S.damageOf theirs aliceFirst, S.damageOf theirs creatureFirst) (Just 1, Just 1)
+    Spec.assertEqWith s "without the shield both of alice's halves land" (S.damageOf mine control, S.lifeOf S.alice control) (Just 1, Just 19)
+    Spec.assertEqWith s "and bob takes 1, there being no rider to run" (S.lifeOf S.bob control) (Just 19)
 
 -- CR 615.5's additional effect on the UNBOUNDED shield (CR 615.1 / 615.3), which
 -- Test of Faith's countdown shield above cannot reach. Brace for Impact ({4}{W}
