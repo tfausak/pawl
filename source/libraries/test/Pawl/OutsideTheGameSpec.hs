@@ -311,7 +311,7 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
   -- IsBound in a wish's filter" is what keeps a card out of the position.
   --
   -- The pair differs in exactly one thing: the same board, the same bound slot,
-  -- and the filter is the atom or the empty And.
+  -- the same card-type conjunct, and the atom present or absent.
   Spec.it s "CR 400.11c a wish's filter cannot see what the resolution bound" $ do
     mountain <- S.printingOf s registry "Mountain"
     wish <- S.printingOf s registry "Burning Wish"
@@ -330,7 +330,7 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
     -- exclusion a card would write -- Not of the same atom -- is vacuously true.
     Spec.assertEqWith s "the wish brings in nothing" (printingsIn Zone.Hand S.alice (bringing atom)) [wish]
     Spec.assertEqWith s "where the same wish without the atom brings the sorcery in" (List.sort (printingsIn Zone.Hand S.alice (bringing (Filter.HasCardType CardType.Sorcery)))) (List.sort [wish, signInBlood])
-    -- And the offer itself, one step nearer the atom: the Not is False for a
+    -- And the offer itself, one step nearer the atom: the atom is False for a
     -- candidate with no identity, so the conjunction admits nobody.
     Spec.assertEqWith s "nothing was even offered" (length (OutsideTheGame.eligible atom wishId S.alice gs)) 0
     Spec.assertEqWith s "where the sorcery filter offers the one card" (length (OutsideTheGame.eligible (Filter.HasCardType CardType.Sorcery) wishId S.alice gs)) 1

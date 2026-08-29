@@ -4954,8 +4954,8 @@ isBoundTag = Text.pack "IsBound"
 
 -- How many CR 115.10a bound-object atoms this card carries inside a WISH's
 -- filter, and how many anywhere else. The FIRST number is the offence here,
--- which is the other three position lints turned around: the atom is answerable
--- in every position whose evaluator supplies the resolution's slots, and
+-- which is the sibling position lints turned around: the atom is answerable in
+-- every position whose evaluator supplies the resolution's slots, and
 -- unanswerable in the one whose candidates are not objects.
 isBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
 isBoundCounts card =
@@ -7553,9 +7553,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let offenders = filter (anyFace isBoundOffends . Printing.card) ps
     Spec.assertEqWith s "no card names a bound slot where the candidate is a card outside the game" (fmap (S.nameOf . Printing.card) offenders) []
     -- NOT vacuous: the pool authors the atom, and the cards that do are ACCEPTED
-    -- here rather than skipped. Showstopping Surprise is the card the atom was
-    -- added for -- "each other creature" is Not (IsBound "target") -- and its one
-    -- atom is counted on the accepted side.
+    -- here rather than skipped: Showstopping Surprise writes "each other
+    -- creature" as Not (IsBound "target"), and that atom is counted on the
+    -- accepted side.
     surprise <- S.printingOf s registry "Showstopping Surprise"
     Spec.assertEqWith
       s
