@@ -128,6 +128,7 @@ codec = Fields.object $ do
   exiledUntilMonarch <- Fields.required "exiledUntilMonarch" (Common.naturalMap ObjectId.codec MonarchWatch.codec) GameState.exiledUntilMonarch
   haunting <- Fields.required "haunting" (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.haunting
   exiledWith <- Fields.required "exiledWith" (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.exiledWith
+  exilePiles <- Fields.required "exilePiles" (Common.naturalMap ObjectId.codec Timestamp.codec) GameState.exilePiles
   extraTurns <- Fields.required "extraTurns" (Common.list ExtraTurn.codec) GameState.extraTurns
   turnAnchor <- Fields.required "turnAnchor" (Common.maybe PlayerId.codec) GameState.turnAnchor
   pure
@@ -197,6 +198,7 @@ codec = Fields.object $ do
         GameState.exiledUntilMonarch = exiledUntilMonarch,
         GameState.haunting = haunting,
         GameState.exiledWith = exiledWith,
+        GameState.exilePiles = exilePiles,
         GameState.extraTurns = extraTurns,
         GameState.turnAnchor = turnAnchor,
         -- Derived rather than written: see the note above.

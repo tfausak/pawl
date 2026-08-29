@@ -24,6 +24,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Timestamp as Timestamp
 
 -- | Whether choosing between these two objects is choosing between options the
 -- game cannot tell apart. Takes the projection rather than computing it, so a
@@ -181,6 +182,8 @@ noCombat =
 --     value the object that card haunts.
 --   * GameState.exiledWith (CR 607.2), keyed by the exiled card, its value the
 --     object CR 607.2a's or CR 607.2b's link names.
+--   * GameState.exilePiles (CR 406.4), keyed by the card in exile face down, its
+--     value the stamp of the pile it is in.
 --
 -- phasedOut and exiledUntilMonarch can never name a CANDIDATE through the one
 -- caller (Pawl.Engine.Cost's mana-source window): both key on an object not on
@@ -196,17 +199,19 @@ noCombat =
 -- value moved.
 --
 -- The KEY side is a regression fence rather than a proof, and so is exiledWith's
--- value side. Every one of these relations keys on an object that is not on the
--- battlefield -- an exiled incarnation, or a permanent GameState.battlefield
--- excludes (CR 702.26b) -- so no key can ever be a mana-source candidate, and
--- neutering `key == oid` below leaves the whole suite green. The line stays
--- because a row does name its key; do not read the green as coverage.
+-- value side and exilePiles' whole arm. Every one of these relations keys on an
+-- object that is not on the battlefield -- an exiled incarnation, or a permanent
+-- GameState.battlefield excludes (CR 702.26b) -- so no key can ever be a
+-- mana-source candidate, and neutering `key == oid` below leaves the whole suite
+-- green. The line stays because a row does name its key; do not read the green as
+-- coverage.
 namedByRelation :: ObjectId -> GameState -> Bool
 namedByRelation oid gs =
   relates phasedOutNames (GameState.phasedOut gs)
     || relates monarchWatchNames (GameState.exiledUntilMonarch gs)
     || relates Set.singleton (GameState.haunting gs)
     || relates Set.singleton (GameState.exiledWith gs)
+    || relates pileNames (GameState.exilePiles gs)
   where
     relates names = any (\(key, value) -> key == oid || Set.member oid (names value)) . Map.toList
 
@@ -227,6 +232,13 @@ phasedOutNames row = case row of
 monarchWatchNames :: MonarchWatch.MonarchWatch -> Set.Set ObjectId
 monarchWatchNames watch = case watch of
   MonarchWatch.MkMonarchWatch _controller _due -> Set.empty
+
+-- The objects a GameState.exilePiles row names beyond its key: none. Its value is
+-- CR 406.4's pile stamp, which names a pile rather than an object. Positional for
+-- phasedOutNames' reason.
+pileNames :: Timestamp.Timestamp -> Set.Set ObjectId
+pileNames stamp = case stamp of
+  Timestamp.MkTimestamp _n -> Set.empty
 
 -- Whether any OTHER object names this one: an Aura or Equipment attached to it,
 -- which CR 303.4 stores on the rider rather than on the host, and a spell or

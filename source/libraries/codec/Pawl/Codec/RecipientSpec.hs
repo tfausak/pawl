@@ -7,6 +7,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Pile as Pile
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Timestamp as Timestamp
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Recipient" $ do
@@ -48,6 +49,6 @@ spec s = Spec.describe s "Pawl.Codec.Recipient" $ do
     Common.assertCodec
       s
       Recipient.codec
-      (Recipient.ToPile (Pile.OfFaceDown (PlayerId.MkPlayerId 6)))
+      (Recipient.ToPile (Pile.OfFaceDown (Timestamp.MkTimestamp 6)))
       " {\"type\":\"ToPile\",\"value\":{\"type\":\"OfFaceDown\",\"value\":6}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Recipient.codec
