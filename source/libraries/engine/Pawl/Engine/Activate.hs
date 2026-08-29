@@ -240,11 +240,21 @@ zoneAbilitiesOf zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs
 -- Pawl.Engine.Event.zoneFunctionedFrom is the triggered one, and has only the
 -- effect half to fold, CR 603.1 giving a triggered ability no cost.
 --
--- Not implemented: CR 113.6m's "a previous part of its cost or effect specifies
--- that the object is put into that zone" clause, which would need this fold to
--- be ORDER-sensitive across the cost and the effects, and its
--- delayed-triggered-ability sentence (#819). The clause's Aura half needs a
--- trigger condition and so belongs to the triggered reading alone.
+-- CR 113.6m's "a previous part of its cost or effect specifies that the
+-- object is put into that zone" clause needs no order-sensitivity here, and
+-- gets none: it can cancel no answer this fold gives. CR 400.7 mints a fresh
+-- id on every zone change, so a part that puts the object into a zone leaves
+-- CR 113.7a's source nothing to move -- a later part has to name the ARRIVAL
+-- instead (Pawl.Engine.Binding.became, or a slot the move itself minted, as
+-- Meandering Towershell's "exiled" is), and Pawl.Engine.EffectZone answers
+-- Nothing for every ref but the reserved source slot. So first-answer-wins and
+-- the rule's order-sensitive reading agree on every ability that can be
+-- written, and a card whose later part moved the reserved source slot out of a
+-- zone an earlier part put it into is what would refute that; see #2501.
+--
+-- Not implemented: CR 113.6m's delayed-triggered-ability sentence (#2500). The
+-- clause's Aura half needs a trigger condition and so belongs to the triggered
+-- reading alone.
 zoneFunctionedFrom :: ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Maybe Zone.Zone
 zoneFunctionedFrom ability =
   case Cost.zoneFunctionedFrom (ActivatedAbility.cost ability) of

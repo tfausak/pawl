@@ -4308,9 +4308,9 @@ bystanderSpec s registry =
 --
 -- CR 603.10a is deliberately NOT this case. There the rule's own "unless its
 -- trigger condition ... specifies that the object is put into that zone" arm
--- decides, and that half of the clause is unimplemented (#819) -- the Aura half
--- beside it is read, in `screamsFromWithinSpec` below; a bystander carries any
--- condition at all, so nothing about either reaches here.
+-- decides, and that half of the clause is unimplemented (#2502) -- the Aura
+-- half beside it is read, in `screamsFromWithinSpec` below; a bystander carries
+-- any condition at all, so nothing about either reaches here.
 --
 -- The pair, chosen so that ONE derivation is the only difference between them:
 --
