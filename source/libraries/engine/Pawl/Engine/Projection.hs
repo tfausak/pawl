@@ -268,9 +268,15 @@ applyModification viewOf src gs oid unitTypes m pc =
         -- Cost.mana's own Maybe means -- and honest, since no cost equal to no
         -- mana cost can be paid.
         --
-        -- Not implemented: CR 107.3g's "{X} in a zone other than the stack is 0"
-        -- (#2413), nor CR 707.2's copiable mana cost, since the read is of the
-        -- printed face (#2414).
+        -- An {X} copied out of the mana cost stays an {X}, per CR 107.3a: CR
+        -- 107.3g's zero settles the card's own mana VALUE where it lies (CR
+        -- 202.3e), not this alternative cost, which is paid at CR 601.2f after
+        -- CR 601.2a has put the spell on the stack. Pawl.CastSpec's "CR 107.3a
+        -- a granted flashback {X}{R} announces X rather than treating it as 0"
+        -- proves it, with Lier granting Blaze its own {X}{R}.
+        --
+        -- Not implemented: CR 707.2's copiable mana cost, since the read is of
+        -- the printed face (#2414).
         Modification.GainFlashbackAtManaCost ->
           let cost = Cost.MkCost (Game.faceOf oid gs >>= Face.manaCost) []
            in pc {PC.keywords = Map.insertWith (+) (Keyword.Type.Flashback cost) 1 (PC.keywords pc)}
