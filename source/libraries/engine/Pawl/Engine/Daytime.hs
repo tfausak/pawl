@@ -127,11 +127,13 @@ dueToTurn gs = case GameState.daytime gs of
 -- immediately and isn't a state-based action", which is why `becomes` calls this
 -- itself rather than leaving it to the settle.
 --
--- ONE timestamp for the whole sweep: a single nightfall turns every daybound
--- permanent over at the same moment, so a later CR 701.27f comparison must not be
--- able to tell them apart. CR 701.27f is not otherwise consulted -- it gates an
--- instruction from an ability on the STACK, and this turn comes from a static
--- ability.
+-- ONE Object.turnedOverAt stamp for the whole sweep: a single nightfall turns
+-- every daybound permanent over at the same moment, so a later CR 701.27f
+-- comparison must not be able to tell them apart. CR 613.7g's per-permanent
+-- stamp is a second thing, minted inside Game.turnFaceOver, exactly as
+-- Resolve.turnPermanentsOver's fold says. CR 701.27f is not otherwise consulted
+-- -- it gates an instruction from an ability on the STACK, and this turn comes
+-- from a static ability.
 --
 -- Runs to a fixed point by construction rather than by looping: turning a
 -- permanent over swaps which of the pair of keywords it has, so no permanent this

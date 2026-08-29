@@ -2556,6 +2556,24 @@ templeAltisaurSpec s registry = Spec.describe s "Temple Altisaur (CR 615.10)" $ 
     $ \_ raptor _ _ source board -> do
       let after = settleDamage S.identityAnswer board [hit source (Recipient.ToCreature raptor) 1]
       Spec.assertEqWith s "the lone 1 is marked, nothing having been prevented" (S.damageOf raptor after) (Just 1)
+  -- CR 615.10's last sentence -- the shield "will apply separately to damage
+  -- from other applicable events that would happen at the same time" -- which is
+  -- the rule stating the OPPOSITE of CR 615.7 for a static shield: two
+  -- simultaneous events each keep their own 1, where a countdown of 1 would have
+  -- covered one of them and asked which. Hence no OrderDamage: with no supply to
+  -- allocate there is nothing to decide, and Replacement.contestedResource giving
+  -- this rewrite one is what that negative catches.
+  Spec.it s "CR 615.10 two simultaneous events each keep 1, and nothing is asked"
+    . withBoard
+    $ \_ raptor _ theirs source board -> do
+      let batch = [hit source (Recipient.ToCreature raptor) 5, hit theirs (Recipient.ToCreature raptor) 3]
+          after = settleDamage S.identityAnswer board batch
+      Spec.assertEqWith s "1 from each event is marked, so 2 in all" (S.damageOf raptor after) (Just 2)
+      Spec.assertEqWith s "and both events happened, each at 1" (fmap DamageEvent.amount (S.damageEventsOf after)) [1, 1]
+      Spec.assertBool
+        s
+        (not (wasAskedToOrderDamage (answersFor S.identityAnswer board (Damage.applyDamage batch))))
+        "no OrderDamage was raised: a static shield allocates nothing across a batch"
   -- CR 615.12 / 615.1a: the clause says "prevent", so this IS a prevention
   -- effect, and unpreventable damage is dealt in full. An instead-amount of 1
   -- would cut the Excruciator's 3 to 1 here; the pair of legs is the same 3 from

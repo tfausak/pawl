@@ -3501,10 +3501,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   --
   -- The producer, out of every card that mints an emblem -- Scryfall
   -- `o:"emblem with"`, 2026-08-27, 96 cards, has_more false. Of the emblems on
-  -- that list printing a replacement effect, Ajani Steadfast still needs a
-  -- "prevent all but 1" rewrite (#2443) and Jaya Ballard's "cast this way" is a
-  -- back-reference to the permission the same emblem grants, so Serra's is the
-  -- one pawl can author.
+  -- that list printing a replacement effect, Jaya Ballard's "cast this way" is a
+  -- back-reference to the permission the same emblem grants, and Ajani
+  -- Steadfast's emblem is authorable but its card is not yet transcribed
+  -- (gap #2613) -- so Serra's is the one this case can be built on.
   --
   -- Each board differs from `board` by exactly one ACT: whether the ultimate was
   -- activated, whether alice controls a creature, or how much life is at stake.

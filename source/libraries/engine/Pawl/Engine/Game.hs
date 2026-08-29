@@ -170,7 +170,7 @@ printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
 -- (Pawl.Engine.Engine), CR 401.4's library arrangement and CR 701.44d's per-seat
 -- "for each" groups (Pawl.Engine.Resolve), CR 601.2h's cost components and the
 -- combat tolls beside them (Pawl.Engine.Cost), and the arrangement of a melded
--- permanent's component cards (Pawl.Engine.Event). Those five, not every ordering
+-- permanent's component cards (Pawl.Engine.Event). Not every ordering
 -- prompt: Prompt.OrderDamage spells this body out inline in
 -- Pawl.Engine.Replacement.askOne, and Prompt.Shuffle -- the sibling branch of the
 -- CR 401.4 site named above -- answers with object ids and goes through
