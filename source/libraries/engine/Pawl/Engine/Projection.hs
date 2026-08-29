@@ -850,7 +850,7 @@ viewOfCard face =
           Filter.attacking = False,
           -- CR 508.1b: a printed face attacks nothing, for the reason above.
           Filter.attackingPlayer = Nothing,
-          -- CR 508.1b / 306.6: nor any planeswalker, for the same reason.
+          -- CR 508.1b: nor any planeswalker, for the same reason.
           Filter.attackingPlaneswalkerController = Nothing,
           Filter.blocking = False,
           Filter.blocked = False,
@@ -1022,10 +1022,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.attackingPlayer = case Map.lookup oid (Combat.attackers (GameState.combat gs)) of
         Just (AttackTarget.OfPlayer pid) -> Just pid
         _ -> Nothing,
-      -- CR 508.1b / 306.6: the SAME map's value, kept only when it names a
-      -- planeswalker, and then followed to that planeswalker's CONTROLLER --
-      -- which CR 613.1b lets layer 2 move, so a Confiscated planeswalker answers
-      -- the Aura's controller and not CR 108.3's owner.
+      -- CR 508.1b: the SAME map's value, kept only when it names a planeswalker,
+      -- and then followed to that planeswalker's CONTROLLER -- which CR 613.1b
+      -- lets layer 2 move, so a Confiscated planeswalker answers the Aura's
+      -- controller and not CR 108.3's owner.
       --
       -- controllerOf is the lean fold rather than a projection, which is what
       -- makes it safe here: `viewUpTo` already calls it for the candidate's own
@@ -3848,11 +3848,17 @@ filterReads f = case f of
   -- Reads nothing, for IsAttacking's reason and off the same map: what a creature
   -- is attacking is no characteristic of it (CR 109.3).
   Filter.Type.IsAttackingPlayer _ -> Set.empty
-  -- Reads a CONTROLLER, unlike every other combat atom here: CR 306.6 asks who
-  -- controls the attacked planeswalker, and CR 613.1b's layer 2 writes that. What
+  -- Reads a CONTROLLER, unlike every other combat atom here: CR 508.1b names the
+  -- attacked planeswalker's controller, and CR 613.1b's layer 2 writes that. What
   -- is attacked is still no characteristic (CR 109.3); the seat it is followed to
   -- is one Aspect names, and Aspect names no OBJECT, so the read declares as the
   -- candidate's own.
+  --
+  -- A REGRESSION FENCE rather than a proven line: reaching it needs a CR 613.8a
+  -- dependency between a layer-2 control effect and an effect whose affected set
+  -- names this atom, and no card in the pool writes the pair, so mutating it to
+  -- Set.empty leaves the suite green. Kept because under-declaring is the defect
+  -- this function can carry and CR 613.1b says the aspect is written.
   Filter.Type.IsAttackingPlaneswalker _ -> Set.singleton Controller
   -- Reads nothing, for IsAttacking's reason and off the same record -- who was
   -- declared attacked is no characteristic of anything.

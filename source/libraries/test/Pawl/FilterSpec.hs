@@ -901,9 +901,9 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.IsAttackingPlayer PlayerRelation.AnyPlayer))) "player"
 
   Spec.describe s "IsAttackingPlaneswalker" $ do
-    -- CR 306.6's subject: attacking, attacking no PLAYER, and the planeswalker it
-    -- is attacking is controlled by `pid`. Pawl.Engine.Projection fills the two
-    -- fields off the same map's arms, so they are never both Just.
+    -- CR 508.1b's second subject: attacking, attacking no PLAYER, and the
+    -- planeswalker it is attacking is controlled by `pid`. Pawl.Engine.Projection
+    -- fills the two fields off the same map's arms, so they are never both Just.
     let attackingPlaneswalkerOf pid =
           blackCreature
             { Filter.attacking = True,
@@ -915,7 +915,7 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertBool s (Filter.matches self (attackingPlaneswalkerOf 0) (Filter.Type.IsAttackingPlaneswalker PlayerRelation.You)) "attacking your planeswalker"
 
     -- The point of the atom's PlayerRelation, and the reading a defender-blind
-    -- implementation gets wrong: CR 306.6 asks who CONTROLS the attacked
+    -- implementation gets wrong: CR 508.1b names who CONTROLS the attacked
     -- planeswalker, so the same attacking creature answers one way for its
     -- controller's seat and the other way for a bystander's. `self` is player 0.
     Spec.it s "reads the relation against the perspective" $ do

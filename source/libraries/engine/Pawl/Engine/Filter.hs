@@ -143,16 +143,15 @@ data View = MkView
     -- apart from "a planeswalker they control", so this field is CR 508.1b's
     -- player and never CR 508.5's defending player (Pawl.Engine.Defender).
     attackingPlayer :: Maybe PlayerId.PlayerId,
-    -- CR 508.1b / 306.6: WHO CONTROLS the planeswalker this candidate is
-    -- attacking? The same map's value as `attackingPlayer` above, read off its
-    -- other arm and then followed to a controller -- so the two fields are
-    -- disjoint by construction and each is CR 509.1a's own subject rather than CR
-    -- 508.5's defending player.
+    -- CR 508.1b: WHO CONTROLS the planeswalker this candidate is attacking? The
+    -- same map's value as `attackingPlayer` above, read off its other arm and then
+    -- followed to a controller -- so the two fields are disjoint by construction
+    -- and each is CR 509.1a's own subject rather than CR 508.5's defending player.
     --
-    -- The CONTROLLER and never the owner: CR 306.6 makes a planeswalker
-    -- attackable through the player who controls it, and CR 613.1b lets layer 2
-    -- move that. Nothing for every candidate `attacking` is False for, and for an
-    -- attacking creature whose AttackTarget is a player or a battle.
+    -- The CONTROLLER, which is the seat CR 508.1b names and CR 613.1b's layer 2
+    -- can move, and never CR 108.3's owner. Nothing for every candidate
+    -- `attacking` is False for, and for an attacking creature whose AttackTarget
+    -- is a player or a battle.
     attackingPlaneswalkerController :: Maybe PlayerId.PlayerId,
     -- CR 508.3b: was this candidate DECLARED ATTACKED this COMBAT PHASE? Read
     -- from GameState.combat like `attacking`, off Combat.declaredAttacked -- the
@@ -1076,9 +1075,9 @@ matches context view predicate = case predicate of
   Filter.IsAttackingPlayer relation -> case (attackingPlayer view, perspective context) of
     (Just a, Just p) -> PlayerRelation.holds relation p a
     _ -> False
-  -- CR 508.1b / 306.6: the atom above one arm of AttackTarget over, and the same
-  -- posture in every respect -- the relation is answered against the perspective
-  -- here, and either half being unreadable is vacuously False.
+  -- CR 508.1b: the atom above one arm of AttackTarget over, and the same posture
+  -- in every respect -- the relation is answered against the perspective here, and
+  -- either half being unreadable is vacuously False.
   --
   -- The seat compared is the planeswalker's CONTROLLER, which
   -- Pawl.Engine.Projection fills through Projection.controllerOf: reading its

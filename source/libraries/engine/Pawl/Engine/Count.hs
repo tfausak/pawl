@@ -694,8 +694,8 @@ viewOfSnapshot mController isToken counters snapshot =
       -- CR 508.1b: nothing a snapshot holds says what was attacked, for the
       -- reason `attacking` above is False.
       Filter.attackingPlayer = Nothing,
-      -- CR 508.1b / 306.6: nothing a snapshot holds says what was attacked, for the
-      -- reason the field above is Nothing.
+      -- CR 508.1b: nothing a snapshot holds says what was attacked, for the reason
+      -- the field above is Nothing.
       Filter.attackingPlaneswalkerController = Nothing,
       -- CR 508.3b: whether the candidate was declared attacked is no more a
       -- characteristic than `attacking` above is, so a snapshot has nothing to

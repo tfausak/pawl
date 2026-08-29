@@ -2681,8 +2681,9 @@ soulSnareAnswer snareId ability victim p = case p of
 -- Every element is load-bearing. The two Snares are the same card with the same
 -- {W} available at the same seat count, so a leg that fails cannot fail for want
 -- of mana -- the only difference between them is who holds one. Jace's OWNER is
--- carol and his CONTROLLER is bob, so reading CR 306.6's controller and reading CR
--- 108.3's owner name different seats and answer the pair the opposite way round.
+-- carol and his CONTROLLER is bob, so reading CR 508.1b's controller and reading
+-- CR 108.3's owner name different seats and answer the pair the opposite way
+-- round.
 -- Loyalty 5 against a 2/1 leaves 3, so the damaged and undamaged readings differ.
 --
 -- Positioned at the BEGINNING of combat with the defender unchosen, so the
@@ -2721,7 +2722,7 @@ soulSnareBoard s registry = do
 -- planeswalker and never a player, so the first atom answers False on every leg.
 --
 -- A PAIR of legs off ONE board differing in exactly one thing: which seat's Soul
--- Snare is fired. CR 306.6 reads the attacked planeswalker's CONTROLLER, so bob's
+-- Snare is fired. CR 508.1b reads the attacked planeswalker's CONTROLLER, so bob's
 -- admits the Piker and carol's does not. An engine reading the OWNER answers both
 -- the other way round; one dropping the PlayerRelation answers both yes.
 soulSnareSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -2750,7 +2751,7 @@ soulSnareSpec s registry = Spec.describe s "SoulSnare" $ do
           "CR 508.1b: the Piker really was announced at Jace and not at bob"
           (Map.lookup pikerId (Combat.Type.attackers (GameState.combat bystander)))
           (Just (AttackTarget.OfPlaneswalker jaceId))
-        -- The two seats the pair tells apart: CR 306.6's controller is bob, CR
+        -- The two seats the pair tells apart: CR 508.1b's controller is bob, CR
         -- 108.3's owner is carol, and the Confiscate is what separates them.
         Spec.assertEqWith s "CR 613.1b: bob controls Jace through the Confiscate" (Projection.controllerOf jaceId bystander) (Just S.bob)
         Spec.assertEqWith s "CR 108.3: carol owns him" (fmap Object.owner (Game.lookupObject jaceId bystander)) (Just S.carol)
