@@ -998,8 +998,8 @@ applyDamage events = do
       -- A separate pass rather than a line inside markOne, for the reason the
       -- recording block below gives: markOne runs BEFORE either record is
       -- appended, so a life loss written there would be logged ahead of the
-      -- damage that caused it and would move CR 603.3a's control sample onto a
-      -- pre-lifelink board.
+      -- damage that caused it, and CR 603.3a's control sample would be taken
+      -- before the cause it describes.
       --
       -- Only where life was actually lost. CR 120.3b's infect diversion replaces
       -- the life loss with poison counters, and a 0-damage event loses nothing --
@@ -1018,9 +1018,10 @@ applyDamage events = do
             losing > 0 ->
               [GameEvent.LifeLost (LifeChange.MkLifeChange pid losing)]
         _ -> []
-      -- CR 120.3f's gain, recorded where `gainOne` above performs it, so that
+      -- CR 120.3f's gain, recorded for the pass `gainOne` above performs, so that
       -- "whenever you gain life" sees lifelink (CR 702.15b) and not only an
-      -- effect that says the words.
+      -- effect that says the words. The RECORD lands here and the gain itself
+      -- earlier, which is the split `lifeLostBy` above already has.
       --
       -- ONE record per damage event, never per player, which is CR 702.15e in as
       -- many words: "if multiple sources with lifelink deal damage at the same
@@ -1170,7 +1171,7 @@ applyDamage events = do
   -- processes the damage into ALL of its results as one event and the life-loss
   -- pass that follows reads the resulting total off the live board (see the note
   -- on `lost`). Writing the gain afterwards let a floor row (Worship) fire on a
-  -- drain a simultaneous gain covered (#2563).
+  -- drain a simultaneous gain covered; see #2563.
   --
   -- Ahead of `markOne` and `tallyOne` too, which changes nothing they can see:
   -- those write GameState.objects and Player.commanderDamage, and this writes

@@ -1693,7 +1693,7 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
   -- lifelink Celestine striking the Goblin Piker she blocked -- one CR 510.2
   -- batch. The event leaves her at 2, so the floor is never breached. Reading
   -- the loss against a board the gain has not reached yet gives 4, which is what
-  -- this discriminates (#2563).
+  -- this discriminates; see #2563.
   --
   -- Every number distinct: 4 life, 5 damage, 3 gained, 2 left, a floor of 1.
   Spec.it s "CR 120.4c a simultaneous life gain keeps the same event off the floor" $ do
