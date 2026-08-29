@@ -85,7 +85,8 @@ import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 -- rather than a SlotName once a rule reaches players the card did not target
 -- (Draw's `Relative You` beside Ancestral Recall's `InSlot`).
 data Effect card ability
-  = -- | CR 120.1: deal this much damage to what the ObjectRef names. CR 120.1a /
+  = -- | CR 120.1: deal damage to what the payload's clauses name, each clause
+    -- carrying its own amount and all of them one CR 608.2f action. CR 120.1a /
     -- 115.4 let damage reach a PLAYER, which no ObjectRef can name, so the
     -- InSlot arm reads a Recipient rather than an ObjectId. WHO deals it is the
     -- payload's `dealer` (CR 120.2b), absent where CR 113.7's resolving source is
@@ -602,7 +603,8 @@ data Effect card ability
   | -- | CR 615.7: install a prevention SHIELD over the recipients an ObjectRef
     -- names, for a duration (Mending Hands). The quantity is the shield's printed
     -- size, which then counts DAMAGE down (Pawl.Types.DamageRewrite.PreventNext).
-    -- DealDamage's ObjectRef, because CR 115.4's "any target" reaches a PLAYER.
+    -- A damage clause's ObjectRef, because CR 115.4's "any target" reaches a
+    -- PLAYER.
     -- One shield per recipient the ref NAMES, CR 615.11's shape for free.
     --
     -- Its own DESCRIBED recipient side beside that ref (whatRecipient and

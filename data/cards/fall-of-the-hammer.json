@@ -27,19 +27,21 @@
                     "type": "DealDamage",
                     "value": {
                       "dealer": "dealer",
-                      "quantity": {
-                        "type": "AgainstSlot",
-                        "value": {
-                          "quantity": {
-                            "type": "Power"
-                          },
-                          "slot": "dealer"
-                        }
-                      },
-                      "refs": [
+                      "parts": [
                         {
-                          "type": "InSlot",
-                          "value": "victim"
+                          "quantity": {
+                            "type": "AgainstSlot",
+                            "value": {
+                              "quantity": {
+                                "type": "Power"
+                              },
+                              "slot": "dealer"
+                            }
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "victim"
+                          }
                         }
                       ]
                     }

@@ -30,14 +30,16 @@
                         "type": "DealDamage",
                         "value": {
                           "dealer": "victim",
-                          "quantity": {
-                            "type": "Literal",
-                            "value": 6
-                          },
-                          "refs": [
+                          "parts": [
                             {
-                              "type": "InSlot",
-                              "value": "victim"
+                              "quantity": {
+                                "type": "Literal",
+                                "value": 6
+                              },
+                              "ref": {
+                                "type": "InSlot",
+                                "value": "victim"
+                              }
                             }
                           ]
                         }

@@ -792,7 +792,7 @@ inHandNamed name gs = length (filter (nameOnStack (CardName.MkCardName $ Text.pa
 -- fallback elsewhere.
 --
 -- Bob and not alice, and the player and not their creature, for the same reason:
--- Char's two damage instructions name different recipients, and every wrong
+-- Char's two damage clauses name different recipients, and every wrong
 -- wiring that collapses them onto one recipient has to be distinguishable. A
 -- test that aimed the target slot at alice would see 20 -> 14 whether CR 109.5's
 -- `you` bound anything or not.
@@ -813,11 +813,11 @@ charSpec s registry = Spec.describe s "Char" $ do
   -- Pawl.Engine.Activate.activateAbility and Pawl.Engine.Engine's trigger
   -- placement do.
   --
-  -- CR 608.2c has the controller follow the instructions "in the order written",
-  -- and these two are separate instructions naming different recipients rather
-  -- than one naming both -- which is what the untouched Piker below pins. Their
-  -- ORDER is unobservable here: neither instruction can change what the other
-  -- does, so this case makes no claim about it.
+  -- CR 608.2f makes the sentence ONE action over both recipients, so Char is one
+  -- instruction over two clauses -- 4 at the chosen target and 2 at its caster --
+  -- and neither clause's amount reaches the other's recipient, which is what the
+  -- untouched Piker below pins. That the two are dealt at once rather than in
+  -- sequence is unobservable here and is Pawl.ReplacementSpec's Char case.
   Spec.it s "CR 109.5/120.3a Char deals 4 to bob and 2 to its caster" $ do
     char <- S.printingOf s registry "Char"
     mountain <- S.printingOf s registry "Mountain"

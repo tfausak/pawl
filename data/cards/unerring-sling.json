@@ -54,19 +54,21 @@
                       {
                         "type": "DealDamage",
                         "value": {
-                          "quantity": {
-                            "type": "AgainstSlot",
-                            "value": {
-                              "quantity": {
-                                "type": "Power"
-                              },
-                              "slot": "thatTappedPermanent"
-                            }
-                          },
-                          "refs": [
+                          "parts": [
                             {
-                              "type": "InSlot",
-                              "value": "target"
+                              "quantity": {
+                                "type": "AgainstSlot",
+                                "value": {
+                                  "quantity": {
+                                    "type": "Power"
+                                  },
+                                  "slot": "thatTappedPermanent"
+                                }
+                              },
+                              "ref": {
+                                "type": "InSlot",
+                                "value": "target"
+                              }
                             }
                           ]
                         }

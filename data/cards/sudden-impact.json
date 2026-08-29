@@ -26,34 +26,36 @@
                   {
                     "type": "DealDamage",
                     "value": {
-                      "quantity": {
-                        "type": "Count",
-                        "value": {
-                          "aggregation": {
-                            "type": "Members"
-                          },
-                          "filter": {
-                            "type": "And",
-                            "value": []
-                          },
-                          "scope": {
-                            "type": "InZone",
+                      "parts": [
+                        {
+                          "quantity": {
+                            "type": "Count",
                             "value": {
-                              "player": {
-                                "type": "InSlot",
-                                "value": "target"
+                              "aggregation": {
+                                "type": "Members"
                               },
-                              "zone": {
-                                "type": "Hand"
+                              "filter": {
+                                "type": "And",
+                                "value": []
+                              },
+                              "scope": {
+                                "type": "InZone",
+                                "value": {
+                                  "player": {
+                                    "type": "InSlot",
+                                    "value": "target"
+                                  },
+                                  "zone": {
+                                    "type": "Hand"
+                                  }
+                                }
                               }
                             }
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
                           }
-                        }
-                      },
-                      "refs": [
-                        {
-                          "type": "InSlot",
-                          "value": "target"
                         }
                       ]
                     }

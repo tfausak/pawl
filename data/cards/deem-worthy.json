@@ -51,14 +51,16 @@
                   {
                     "type": "DealDamage",
                     "value": {
-                      "quantity": {
-                        "type": "Literal",
-                        "value": 7
-                      },
-                      "refs": [
+                      "parts": [
                         {
-                          "type": "InSlot",
-                          "value": "target"
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 7
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
                         }
                       ]
                     }
@@ -90,14 +92,16 @@
                       {
                         "type": "DealDamage",
                         "value": {
-                          "quantity": {
-                            "type": "Literal",
-                            "value": 2
-                          },
-                          "refs": [
+                          "parts": [
                             {
-                              "type": "InSlot",
-                              "value": "target"
+                              "quantity": {
+                                "type": "Literal",
+                                "value": 2
+                              },
+                              "ref": {
+                                "type": "InSlot",
+                                "value": "target"
+                              }
                             }
                           ]
                         }
