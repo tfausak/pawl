@@ -301,6 +301,8 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.IsAttackingPlayer _ -> predicate
   -- Untouched for the atom above's reason.
   Filter.Type.IsAttackingPlaneswalker _ -> predicate
+  -- Untouched for the two atoms above's reason.
+  Filter.Type.IsAttackingBattle _ -> predicate
   Filter.Type.DeclaredAttackedThisCombat -> predicate
   Filter.Type.IsBlocking -> predicate
   Filter.Type.IsBlocked -> predicate
@@ -697,6 +699,9 @@ viewOfSnapshot mController isToken counters snapshot =
       -- CR 508.1b: nothing a snapshot holds says what was attacked, for the reason
       -- the field above is Nothing.
       Filter.attackingPlaneswalkerController = Nothing,
+      -- CR 310.9d: nor who protected a battle, for the reason the field above is
+      -- Nothing.
+      Filter.attackingBattleProtector = Nothing,
       -- CR 508.3b: whether the candidate was declared attacked is no more a
       -- characteristic than `attacking` above is, so a snapshot has nothing to
       -- answer it with either.

@@ -1849,6 +1849,7 @@ stubView table oid =
                 Filter.attacking = False,
                 Filter.attackingPlayer = Nothing,
                 Filter.attackingPlaneswalkerController = Nothing,
+                Filter.attackingBattleProtector = Nothing,
                 Filter.declaredAttackedThisCombat = False,
                 Filter.blocking = False,
                 Filter.blocked = False,

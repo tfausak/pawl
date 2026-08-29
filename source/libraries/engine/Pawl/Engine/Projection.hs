@@ -12,6 +12,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
@@ -852,6 +853,8 @@ viewOfCard face =
           Filter.attackingPlayer = Nothing,
           -- CR 508.1b: nor any planeswalker, for the same reason.
           Filter.attackingPlaneswalkerController = Nothing,
+          -- CR 310.9d: nor any battle, for the same reason.
+          Filter.attackingBattleProtector = Nothing,
           Filter.blocking = False,
           Filter.blocked = False,
           Filter.attackedThisTurn = False,
@@ -1033,6 +1036,24 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- object re-enters nothing that `peers` guards against.
       Filter.attackingPlaneswalkerController = case Map.lookup oid (Combat.attackers (GameState.combat gs)) of
         Just (AttackTarget.OfPlaneswalker pw) -> controllerOf pw gs
+        _ -> Nothing,
+      -- CR 310.9d: the SAME map's last arm, followed to the attacked battle's
+      -- PROTECTOR -- the seat that rule substitutes for the defending player while
+      -- the battle is being attacked, and not the battle's controller.
+      --
+      -- Battlefield membership guards the read the way Defender.playerOf's battle
+      -- arm does: CR 506.4 stops a departed battle being attacked while CR 506.4c
+      -- keeps the creature attacking, so the honest answer there is Nothing rather
+      -- than a protector. Belt and braces, since CR 400.7 leaves the object that
+      -- reaches the new zone with no designation to read either
+      -- (Pawl.BattleSpec, "CR 400.7 a battle that leaves the battlefield forgets
+      -- its protector").
+      --
+      -- Battle.protectorOf is a Object.protector lookup and reads no projection,
+      -- so unlike controllerOf above it re-enters nothing at all.
+      Filter.attackingBattleProtector = case Map.lookup oid (Combat.attackers (GameState.combat gs)) of
+        Just (AttackTarget.OfBattle battle)
+          | Set.member battle (GameState.battlefield gs) -> Battle.protectorOf battle gs
         _ -> Nothing,
       -- CR 509.1g: likewise. Combat.blockers is keyed by ATTACKER, so blocking is
       -- membership in some attacker's set rather than a key lookup.
@@ -3860,6 +3881,12 @@ filterReads f = case f of
   -- Set.empty leaves the suite green. Kept because under-declaring is the defect
   -- this function can carry and CR 613.1b says the aspect is written.
   Filter.Type.IsAttackingPlaneswalker _ -> Set.singleton Controller
+  -- Reads NOTHING, unlike the atom directly above and for IsAttacking's reason:
+  -- CR 310.9's protector is a designation stored on the battle (Object.protector),
+  -- chosen as it enters (CR 310.9a) and moved only by CR 310.9f -- no layer writes
+  -- it, and this type has no aspect naming it, so there is no CR 613.8a dependency
+  -- to see through this atom.
+  Filter.Type.IsAttackingBattle _ -> Set.empty
   -- Reads nothing, for IsAttacking's reason and off the same record -- who was
   -- declared attacked is no characteristic of anything.
   Filter.Type.DeclaredAttackedThisCombat -> Set.empty

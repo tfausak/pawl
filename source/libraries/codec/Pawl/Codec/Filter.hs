@@ -75,6 +75,7 @@ codec keywordCodec =
       Arm.nullary "IsAttacking" Filter.IsAttacking,
       Arm.payload "IsAttackingPlayer" PlayerRelation.codec Filter.IsAttackingPlayer (\x -> case x of Filter.IsAttackingPlayer y -> Just y; _ -> Nothing),
       Arm.payload "IsAttackingPlaneswalker" PlayerRelation.codec Filter.IsAttackingPlaneswalker (\x -> case x of Filter.IsAttackingPlaneswalker y -> Just y; _ -> Nothing),
+      Arm.payload "IsAttackingBattle" PlayerRelation.codec Filter.IsAttackingBattle (\x -> case x of Filter.IsAttackingBattle y -> Just y; _ -> Nothing),
       Arm.nullary "DeclaredAttackedThisCombat" Filter.DeclaredAttackedThisCombat,
       Arm.nullary "IsBlocking" Filter.IsBlocking,
       Arm.nullary "IsBlocked" Filter.IsBlocked,
