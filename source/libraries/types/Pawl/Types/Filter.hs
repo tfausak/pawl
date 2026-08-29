@@ -490,8 +490,9 @@ data Filter keyword
     -- answers CR 508.5 and therefore folds all three together -- is the wrong
     -- function to answer this with.
     --
-    -- Not implemented: "attacking a planeswalker you control" and "attacking a
-    -- battle you protect", the other two of that list (#2445).
+    -- The second of that list is IsAttackingPlaneswalker below.
+    --
+    -- Not implemented: "attacking a battle you protect", the third (#2616).
     --
     -- Carries a PlayerRelation rather than being a nullary IsAttackingYou,
     -- because the pool wants the other direction too -- Roar of Resistance's
@@ -505,6 +506,17 @@ data Filter keyword
     -- attacking creature but "is not attacking any player", which is the Nothing
     -- Pawl.Engine.Projection already answers by keeping only AttackTarget.OfPlayer.
     IsAttackingPlayer PlayerRelation.PlayerRelation
+  | -- | CR 508.1b: the candidate is an attacking creature AND the CONTROLLER of
+    -- the planeswalker it is attacking stands in this relation to the perspective
+    -- (CR 109.5's "you"), the second subject of CR 509.1a's and CR 802.4a's list.
+    -- Soul Snare's "target creature that's attacking you or a planeswalker you
+    -- control" is @Or [IsAttackingPlayer You, IsAttackingPlaneswalker You]@.
+    --
+    -- CR 508.1b's CONTROLLER and never CR 108.3's owner, which
+    -- Pawl.CombatEffectSpec's "CR 508.1b whole card: Soul Snare reaches a creature
+    -- attacking a planeswalker you CONTROL" proves off a Confiscated planeswalker,
+    -- the two readings naming different seats there.
+    IsAttackingPlaneswalker PlayerRelation.PlayerRelation
   | -- | CR 508.3b / 508.1b: the candidate WAS DECLARED ATTACKED this COMBAT
     -- PHASE -- one or more creatures were declared as attackers attacking it.
     -- DeclaredAttackerThisCombat's mirror: that atom asks whether the candidate

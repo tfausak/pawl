@@ -54,6 +54,7 @@ blackCreature =
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
       Filter.attackingPlayer = Nothing,
+      Filter.attackingPlaneswalkerController = Nothing,
       Filter.declaredAttackedThisCombat = False,
       Filter.blocking = False,
       Filter.blocked = False,
@@ -104,6 +105,7 @@ devoidBigCreature =
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
       Filter.attackingPlayer = Nothing,
+      Filter.attackingPlaneswalkerController = Nothing,
       Filter.declaredAttackedThisCombat = False,
       Filter.blocking = False,
       Filter.blocked = False,
@@ -853,9 +855,15 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- attackingPlayer only from AttackTarget.OfPlayer, so this is the shape a
     -- board produces for CR 508.1b's first subject.
     let attackingPlayer pid = blackCreature {Filter.attacking = True, Filter.attackingPlayer = Just (PlayerId.MkPlayerId pid)}
-        -- CR 508.1b's other two subjects, which viewOfCharacteristics leaves as
-        -- Nothing: attacking, but attacking no player.
-        attackingPlaneswalker = blackCreature {Filter.attacking = True, Filter.attackingPlayer = Nothing}
+        -- CR 508.1b's SECOND subject, which viewOfCharacteristics fills the other
+        -- field for: attacking, attacking no player, and attacking a planeswalker
+        -- the perspective controls.
+        attackingPlaneswalker =
+          blackCreature
+            { Filter.attacking = True,
+              Filter.attackingPlayer = Nothing,
+              Filter.attackingPlaneswalkerController = Just (PlayerId.MkPlayerId 0)
+            }
 
     Spec.it s "matches a creature attacking the perspective" $ do
       Spec.assertBool s (Filter.matches self (attackingPlayer 0) (Filter.Type.IsAttackingPlayer PlayerRelation.You)) "attacking you"
@@ -891,6 +899,53 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- IsAttacking is.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.IsAttackingPlayer PlayerRelation.AnyPlayer))) "player"
+
+  Spec.describe s "IsAttackingPlaneswalker" $ do
+    -- CR 508.1b's second subject: attacking, attacking no PLAYER, and the
+    -- planeswalker it is attacking is controlled by `pid`. Pawl.Engine.Projection
+    -- fills the two fields off the same map's arms, so they are never both Just.
+    let attackingPlaneswalkerOf pid =
+          blackCreature
+            { Filter.attacking = True,
+              Filter.attackingPlaneswalkerController = Just (PlayerId.MkPlayerId pid)
+            }
+        attackingPlayer pid = blackCreature {Filter.attacking = True, Filter.attackingPlayer = Just (PlayerId.MkPlayerId pid)}
+
+    Spec.it s "matches a creature attacking a planeswalker the perspective controls" $ do
+      Spec.assertBool s (Filter.matches self (attackingPlaneswalkerOf 0) (Filter.Type.IsAttackingPlaneswalker PlayerRelation.You)) "attacking your planeswalker"
+
+    -- The point of the atom's PlayerRelation, and the reading a defender-blind
+    -- implementation gets wrong: CR 508.1b names who CONTROLS the attacked
+    -- planeswalker, so the same attacking creature answers one way for its
+    -- controller's seat and the other way for a bystander's. `self` is player 0.
+    Spec.it s "reads the relation against the perspective" $ do
+      Spec.assertBool s (not (Filter.matches self (attackingPlaneswalkerOf 1) (Filter.Type.IsAttackingPlaneswalker PlayerRelation.You))) "someone else's planeswalker is not yours"
+      Spec.assertBool s (Filter.matches self (attackingPlaneswalkerOf 1) (Filter.Type.IsAttackingPlaneswalker PlayerRelation.Opponent)) "it is an opponent's"
+      Spec.assertBool s (Filter.matches self (attackingPlaneswalkerOf 1) Filter.Type.IsAttacking) "and it is attacking either way"
+
+    -- The other half of CR 509.1a's split, from this atom's side: the two subjects
+    -- are disjoint, so a creature attacking a PLAYER is not attacking a
+    -- planeswalker however squarely that player is its defending player (CR
+    -- 508.5).
+    Spec.it s "does not match a creature attacking a player" $ do
+      Spec.assertBool s (not (Filter.matches self (attackingPlayer 0) (Filter.Type.IsAttackingPlaneswalker PlayerRelation.You))) "attacking you is not attacking your planeswalker"
+      Spec.assertBool s (not (Filter.matches self (attackingPlayer 0) (Filter.Type.IsAttackingPlaneswalker PlayerRelation.AnyPlayer))) "nor anyone's"
+
+    -- IsAttackingPlayer's posture, and for its reason: CR 109.5's "you" is what
+    -- the match is framed by, so AnyPlayer demands one too.
+    Spec.it s "is vacuously false with no perspective" $ do
+      Spec.assertBool s (not (Filter.matches noPerspective (attackingPlaneswalkerOf 0) (Filter.Type.IsAttackingPlaneswalker PlayerRelation.AnyPlayer))) "no perspective"
+
+    -- CR 506.4c: a creature whose planeswalker left combat stays an attacking
+    -- creature attacking nothing, which is the view with both fields Nothing.
+    Spec.it s "does not match a creature attacking nothing at all" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.attacking = True}) (Filter.Type.IsAttackingPlaneswalker PlayerRelation.AnyPlayer))) "attacking nothing"
+      Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.IsAttackingPlaneswalker PlayerRelation.AnyPlayer))) "not attacking"
+
+    -- CR 506.3: a player attacks nothing, so Pawl.Engine.Filter.playerView leaves
+    -- the field Nothing, as it does for IsAttackingPlayer.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.IsAttackingPlaneswalker PlayerRelation.AnyPlayer))) "player"
 
   Spec.describe s "DeclaredAttackedThisCombat" $ do
     Spec.it s "matches a view whose combat record says so" $ do

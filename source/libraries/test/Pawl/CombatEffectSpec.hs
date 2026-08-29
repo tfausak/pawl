@@ -2638,6 +2638,125 @@ lastKnownDefendingPlayerSpec s registry = Spec.describe s "LastKnownDefendingPla
     Spec.assertBool s (S.onBattlefield jaceId gs) "Jace is still on the battlefield"
     Spec.assertBool s (blocks blocker wraith gs) "the owner's Swamp is not bob's, so the block is legal"
 
+-- Soul Snare's only activated ability -- "{W}, Sacrifice this enchantment: Exile
+-- target creature that's attacking you or a planeswalker you control" -- read off
+-- the JSON-loaded printing for removalAbility's reason, so every leg below
+-- exercises the codec's parse of the committed card data.
+soulSnareAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+soulSnareAbility printing = case Face.activatedAbilities (S.combinedFace printing) of
+  [ability] -> Just ability
+  _ -> Nothing
+
+-- Fire ONE Soul Snare at `victim`, pinning bob as the defending player (CR
+-- 506.2a) and announcing every attack at a planeswalker.
+--
+-- STATEFUL for mazeAnswer's reason. The target set is FILTERED rather than
+-- replaced, so a leg whose slot does not admit the victim takes no target at all
+-- instead of quietly succeeding on a hand-built recipient -- and the activation
+-- is simply never offered on such a leg, CR 602.2b's target choice being part of
+-- what makes the ability activatable.
+soulSnareAnswer ::
+  ObjectId.ObjectId ->
+  ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) ->
+  ObjectId.ObjectId ->
+  Prompt.Prompt r ->
+  State.State Bool r
+soulSnareAnswer snareId ability victim p = case p of
+  Prompt.ChooseAction _ _ actions -> do
+    tried <- State.get
+    if tried || notElem (A.Activate snareId ability) actions
+      then pure A.Pass
+      else do
+        State.put True
+        pure (A.Activate snareId ability)
+  Prompt.ChooseTargets _ _ _ sets -> pure (fmap (\(_, rs) -> Set.filter (== Recipient.ToCreature victim) rs) sets)
+  Prompt.ChooseDefender {} -> pure S.bob
+  _ -> pure (attackThePlaneswalker p)
+
+-- THREE seats and a stolen planeswalker, stolenJaceLandwalkBoard's shape: alice
+-- attacks with one Goblin Piker, bob is the defending player and controls carol's
+-- Jace Beleren through a Confiscate, and bob and carol hold ONE Soul Snare and
+-- ONE Plains each.
+--
+-- Every element is load-bearing. The two Snares are the same card with the same
+-- {W} available at the same seat count, so a leg that fails cannot fail for want
+-- of mana -- the only difference between them is who holds one. Jace's OWNER is
+-- carol and his CONTROLLER is bob, so reading CR 508.1b's controller and reading
+-- CR 108.3's owner name different seats and answer the pair the opposite way
+-- round.
+-- Loyalty 5 against a 2/1 leaves 3, so the damaged and undamaged readings differ.
+--
+-- Positioned at the BEGINNING of combat with the defender unchosen, so the
+-- engine's own declare attackers step builds the combat record: the fixture
+-- declares nothing by hand.
+--
+-- Returns the state, the Piker, Jace, bob's Snare and carol's Snare.
+soulSnareBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+soulSnareBoard s registry = do
+  piker <- S.printingOf s registry "Goblin Piker"
+  plains <- S.printingOf s registry "Plains"
+  jace <- S.printingOf s registry "Jace Beleren"
+  confiscate <- S.printingOf s registry "Confiscate"
+  snare <- S.printingOf s registry "Soul Snare"
+  let (gs0, ours, _, hers) = S.threePlayerCombat [piker] [plains] [jace, plains]
+  case (ours, hers) of
+    ([pikerId], jaceId : _) -> do
+      let (confiscateId, gs1) = S.addCreature confiscate S.bob gs0
+          gs2 = S.addCounter CounterKind.Loyalty 5 jaceId (S.attachTo confiscateId (Recipient.ToObject jaceId) gs1)
+          (bobSnare, gs3) = S.addCreature snare S.bob gs2
+          (carolSnare, gs4) = S.addCreature snare S.carol gs3
+      pure (gs4, pikerId, jaceId, bobSnare, carolSnare)
+    _ -> Spec.assertFailure s "fixture should have one Piker and one Jace"
+
+-- CR 508.1b's SECOND subject -- "a planeswalker they control", the middle of CR
+-- 509.1a's and CR 802.4a's three-way list -- through the pool's cleanest
+-- producer: Soul Snare {W} -- Enchantment, "{W}, Sacrifice this enchantment:
+-- Exile target creature that's attacking you or a planeswalker you control."
+-- (Murders at Karlov Manor Commander; oracle text checked against Scryfall.) Its
+-- target slot is Or [IsAttackingPlayer You, IsAttackingPlaneswalker You], and the
+-- second atom is the whole of what this board pays for -- the Piker attacks a
+-- planeswalker and never a player, so the first atom answers False on every leg.
+--
+-- A PAIR of legs off ONE board differing in exactly one thing: which seat's Soul
+-- Snare is fired. CR 508.1b reads the attacked planeswalker's CONTROLLER, so bob's
+-- admits the Piker and carol's does not. An engine reading the OWNER answers both
+-- the other way round; one dropping the PlayerRelation answers both yes.
+soulSnareSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+soulSnareSpec s registry = Spec.describe s "SoulSnare" $ do
+  Spec.it s "CR 508.1b whole card: Soul Snare reaches a creature attacking a planeswalker you CONTROL" $ do
+    snare <- S.printingOf s registry "Soul Snare"
+    (gs, pikerId, jaceId, bobSnare, carolSnare) <- soulSnareBoard s registry
+    case soulSnareAbility snare of
+      Just ability -> do
+        let defended = runToEndOfCombatWith (soulSnareAnswer bobSnare ability pikerId) gs
+            -- The control leg: the same board, the same answerer, the same {W}
+            -- and the same ability -- fired from carol's seat instead of bob's.
+            bystander = runToEndOfCombatWith (soulSnareAnswer carolSnare ability pikerId) gs
+        -- GAMEPLAY FIRST, on the quantity the two readings differ on: the Piker's
+        -- 2 never reached Jace, because bob exiled it before combat damage.
+        Spec.assertEqWith s "CR 306.8: bob's Snare exiled the attacker, so Jace's loyalty is untouched" (S.counterOf CounterKind.Loyalty jaceId defended) 5
+        Spec.assertEqWith s "control: carol's Snare cannot name it, so the Piker's 2 comes off Jace's loyalty" (S.counterOf CounterKind.Loyalty jaceId bystander) 3
+        Spec.assertBool s (not (S.onBattlefield pikerId defended)) "the Piker was exiled"
+        Spec.assertBool s (S.onBattlefield pikerId bystander) "control: on carol's leg it is untouched"
+        Spec.assertBool s (not (S.onBattlefield bobSnare defended)) "bob's Snare paid its own sacrifice, so the ability really was activated"
+        Spec.assertBool s (S.onBattlefield carolSnare bystander) "control: carol's Snare is unsacrificed, so hers was never activated"
+        -- Anti-vacuity, read on the leg where nothing was exiled: the Piker IS an
+        -- attacking creature, and what it is attacking is Jace rather than bob.
+        Spec.assertEqWith
+          s
+          "CR 508.1b: the Piker really was announced at Jace and not at bob"
+          (Map.lookup pikerId (Combat.Type.attackers (GameState.combat bystander)))
+          (Just (AttackTarget.OfPlaneswalker jaceId))
+        -- The two seats the pair tells apart: CR 508.1b's controller is bob, CR
+        -- 108.3's owner is carol, and the Confiscate is what separates them.
+        Spec.assertEqWith s "CR 613.1b: bob controls Jace through the Confiscate" (Projection.controllerOf jaceId bystander) (Just S.bob)
+        Spec.assertEqWith s "CR 108.3: carol owns him" (fmap Object.owner (Game.lookupObject jaceId bystander)) (Just S.carol)
+      Nothing -> Spec.assertFailure s "Soul Snare should have exactly one activated ability"
+
 -- CR 508.4 / CR 508.3a / CR 508.8, through the one card in the pool that puts a
 -- creature onto the battlefield attacking WITHOUT anything having been declared.
 --
@@ -5047,6 +5166,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   trampleOverPlaneswalkersSpec s registry
   sharedBlockerSpec s registry
   lastKnownDefendingPlayerSpec s registry
+  soulSnareSpec s registry
   attackCostSpec s registry
   alluringSirenSpec s registry
   conditionalAttackRequirementSpec s registry
