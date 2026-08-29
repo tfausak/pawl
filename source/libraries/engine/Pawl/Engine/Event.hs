@@ -1137,6 +1137,10 @@ applyInertly candidate rewrite event = do
     -- remaining amount is exactly the "existing damage prevention shield" the
     -- rule's last sentence protects.
     DamageRewrite.PreventNext _ -> pure ()
+    -- CR 615.10's static shield stores nothing and carries no additional effect
+    -- of its own either; a CR 615.5 rider printed beside it rides the CANDIDATE,
+    -- as Fog's does below.
+    DamageRewrite.PreventAllBut _ -> pure ()
     -- Fog's blanket prevention likewise carries nothing beyond the prevention:
     -- CR 615.5's authored rider rides on the CANDIDATE rather than on the
     -- rewrite, so it is `loop`'s business above -- which queues it through
@@ -2090,6 +2094,20 @@ apply batch candidate event =
         if prevented >= amount
           then pure Nothing
           else pure (Just (ProposedEvent.WouldDealDamage de {DamageEvent.amount = amount - prevented}))
+      -- CR 615.10's static shield with an amount that SURVIVES rather than one
+      -- that is stopped -- Temple Altisaur's "prevent all but 1 of that damage".
+      -- The event shrinks to the smaller of the two, so an event already at or
+      -- under the floor is handed back untouched and `preventionBy` reports no
+      -- prevention of it, which is CR 615.13's own condition.
+      --
+      -- No `setShield` and no arithmetic written back: CR 615.10's shields are
+      -- deliberately not reduced, applying separately to each event.
+      DamageRewrite.PreventAllBut surviving -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        let left = min surviving (DamageEvent.amount de)
+        if left == 0
+          then pure Nothing
+          else pure (Just (ProposedEvent.WouldDealDamage de {DamageEvent.amount = left}))
       -- CR 614.1a's "instead" with a flat amount (Galvanic Blast). Only the
       -- AMOUNT is rewritten, and that is the rule rather than economy: a
       -- replaced damage event keeps its source, its recipient and every

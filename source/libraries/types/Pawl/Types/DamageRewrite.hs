@@ -13,10 +13,10 @@ import qualified Pawl.Types.Scaling as Scaling
 -- while Effect.PreventAllDamage bakes one over a named recipient (Selfless
 -- Squire).
 --
--- CR 615.1a is what makes the three Prevent arms below a different KIND of
--- rewrite from the ones under them, rather than merely a different amount: an
--- effect that uses the word "prevent" is a prevention effect, so only those three
--- prevent anything, and only they fire CR 615.13's triggers.
+-- CR 615.1a is what makes the Prevent arms below a different KIND of rewrite from
+-- the ones under them, rather than merely a different amount: an effect that uses
+-- the word "prevent" is a prevention effect, so only those prevent anything, and
+-- only they fire CR 615.13's triggers.
 -- Pawl.Engine.Replacement.prevents is that classification.
 --
 -- PreventNext is CR 615.7's shield (Mending Hands), and its Natural is the
@@ -75,6 +75,20 @@ data DamageRewrite
     -- one shield counter covers one damage event of any size.
     PreventRemovingShieldCounter
   | PreventNext Natural.Natural
+  | -- | CR 615.10: a static prevention that leaves this much of each applicable
+    -- damage event standing and prevents the rest -- Temple Altisaur's "prevent
+    -- all but 1 of that damage".
+    --
+    -- A FLOOR on what survives, and thereby the opposite of PreventNext's
+    -- ceiling on what is stopped: the rule's static shields are "not used up"
+    -- and apply separately to each event, so nothing is written back and
+    -- Pawl.Engine.Replacement.contestedResource gives it no supply.
+    --
+    -- Not SetAmount with the same number, which is what makes this its own arm:
+    -- that one never says "prevent", so CR 615.1a would classify it out of
+    -- `prevents` and out of CR 615.13's trigger. The two also disagree on an
+    -- event SMALLER than the number -- SetAmount would raise a 1 to a 3.
+    PreventAllBut Natural.Natural
   | SetAmount Natural.Natural
   | Scale Scaling.Scaling
   | Redirect Recipient.Recipient

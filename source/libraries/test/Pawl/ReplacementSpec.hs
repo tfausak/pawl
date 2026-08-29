@@ -2496,6 +2496,85 @@ stormwildCapridorSpec s registry = Spec.describe s "Stormwild Capridor (CR 615.5
     Spec.assertEqWith s "and no counters, since nothing was prevented" (countersOn CounterKind.PlusOnePlusOne capridor after) 0
     Spec.assertEqWith s "so it is still a 1/3" (S.powerToughnessOf capridor after) (Just (1, 3))
 
+-- CR 615.10's static shield with an amount, which is the shape neither Fog's
+-- blanket prevention nor CR 615.7's countdown can reach: Temple Altisaur ({4}{W}
+-- Creature -- Dinosaur 3/4) prints "If a source would deal damage to another
+-- Dinosaur you control, prevent all but 1 of that damage" (name, cost, type
+-- line, P/T and Oracle text checked against api.scryfall.com 2026-08-29). Its
+-- whole text is that one ability, so nothing else on the card can be what these
+-- assertions read.
+--
+-- The rewrite is a FLOOR on what survives rather than a ceiling on what is
+-- stopped, and every case below is a pair of boards differing in one thing:
+--
+--   * the recipient, across the printed clause's three narrowings -- "another"
+--     (the Altisaur's own damage lands whole), "Dinosaur" (the Goblin Piker's
+--     does), and "you control" (bob's Dinosaur's does);
+--   * the AMOUNT, an event already at the floor passing through untouched;
+--   * CR 615.12's "can't be prevented", which is what proves the rewrite is a
+--     PREVENTION effect (CR 615.1a) rather than an instead-amount that happens
+--     to shrink the event: an instead-amount would still cut the Excruciator's
+--     damage to 1, where a prevention prevents none of it.
+--
+-- Numbers all distinct: the floor is 1, the ordinary hit is 5, the unpreventable
+-- one is 3, and the shielded Dinosaur is a 4/4. Damage is settled through
+-- Damage.applyDamage rather than a resolution, so nothing has taken priority to
+-- run CR 704.3's check and a 4/4 with 5 marked on it is marked rather than dead.
+templeAltisaurSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+templeAltisaurSpec s registry = Spec.describe s "Temple Altisaur (CR 615.10)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      withBoard act = do
+        plains <- S.printingOf s registry "Plains"
+        altisaurPrinting <- S.printingOf s registry "Temple Altisaur"
+        raptorPrinting <- S.printingOf s registry "Putrid Raptor"
+        pikerPrinting <- S.printingOf s registry "Goblin Piker"
+        let base = S.landsInPlay plains 1
+            (altisaur, g1) = S.addCreature altisaurPrinting S.alice base
+            (raptor, g2) = S.addCreature raptorPrinting S.alice g1
+            (piker, g3) = S.addCreature pikerPrinting S.alice g2
+            (theirs, g4) = S.addCreature raptorPrinting S.bob g3
+            (source, g5) = S.addCreature pikerPrinting S.bob g4
+        act altisaur raptor piker theirs source g5
+  -- The behaviour and the printed clause's three narrowings, off ONE board: the
+  -- only difference between the four readings below is which permanent the same
+  -- 5 is aimed at.
+  Spec.it s "CR 615.10 all but 1 of the 5 is prevented, and only for another Dinosaur alice controls"
+    . withBoard
+    $ \altisaur raptor piker theirs source board -> do
+      let at victim = settleDamage S.identityAnswer board [hit source (Recipient.ToCreature victim) 5]
+      Spec.assertEqWith s "setup: the shielded Dinosaur is a 4/4" (S.powerToughnessOf raptor board) (Just (4, 4))
+      Spec.assertEqWith s "1 of the 5 is marked on the Dinosaur beside it" (S.damageOf raptor (at raptor)) (Just 1)
+      Spec.assertEqWith s "the Altisaur is not \"another\", so its own 5 lands whole" (S.damageOf altisaur (at altisaur)) (Just 5)
+      Spec.assertEqWith s "the Goblin Piker is no Dinosaur, so its 5 lands whole" (S.damageOf piker (at piker)) (Just 5)
+      Spec.assertEqWith s "and bob's Dinosaur is not one alice controls" (S.damageOf theirs (at theirs)) (Just 5)
+  -- The AMOUNT, one field of the event over: an event already at the floor is
+  -- handed back untouched rather than shrunk or dropped, which is the half of
+  -- the rewrite a "prevent all" reading cannot produce.
+  Spec.it s "CR 615.10 an event already at the floor passes through whole"
+    . withBoard
+    $ \_ raptor _ _ source board -> do
+      let after = settleDamage S.identityAnswer board [hit source (Recipient.ToCreature raptor) 1]
+      Spec.assertEqWith s "the lone 1 is marked, nothing having been prevented" (S.damageOf raptor after) (Just 1)
+  -- CR 615.12 / 615.1a: the clause says "prevent", so this IS a prevention
+  -- effect, and unpreventable damage is dealt in full. An instead-amount of 1
+  -- would cut the Excruciator's 3 to 1 here; the pair of legs is the same 3 from
+  -- two sources, one of which says its damage can't be prevented.
+  Spec.it s "CR 615.12 the Excruciator's 3 lands whole, where an ordinary source's is cut to 1" $ do
+    plains <- S.printingOf s registry "Plains"
+    altisaurPrinting <- S.printingOf s registry "Temple Altisaur"
+    raptorPrinting <- S.printingOf s registry "Putrid Raptor"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    excruciatorPrinting <- S.printingOf s registry "Excruciator"
+    let base = S.landsInPlay plains 1
+        (_altisaur, g1) = S.addCreature altisaurPrinting S.alice base
+        (raptor, g2) = S.addCreature raptorPrinting S.alice g1
+        (piker, g3) = S.addCreature pikerPrinting S.bob g2
+        (avatar, g4) = S.addCreature excruciatorPrinting S.bob g3
+        from src = settleDamage S.identityAnswer g4 [hit src (Recipient.ToCreature raptor) 3]
+    Spec.assertEqWith s "the Excruciator's whole 3 is marked" (S.damageOf raptor (from avatar)) (Just 3)
+    Spec.assertEqWith s "where the Piker's same 3 is cut to 1" (S.damageOf raptor (from piker)) (Just 1)
+
 -- Protean Hydra {X}{G} Creature -- Hydra, printed 0/0: "this creature enters with
 -- X +1/+1 counters on it. If damage would be dealt to this creature, prevent that
 -- damage and remove that many +1/+1 counters from it."
@@ -5732,6 +5811,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   braceForImpactSpec s registry
   inkshieldSpec s registry
   stormwildCapridorSpec s registry
+  templeAltisaurSpec s registry
   proteanHydraSpec s registry
   jaredCarthalionSpec s registry
   glitteringLionSpec s registry

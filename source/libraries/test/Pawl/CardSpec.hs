@@ -1841,6 +1841,10 @@ engineMintedDamage rewrite = case rewrite of
   DamageRewrite.PreventNext _ -> True
   DamageRewrite.PreventRemovingShieldCounter -> True
   DamageRewrite.PreventAll -> False
+  -- CR 615.10's counterpart to that first rule: a shield with an amount that a
+  -- STATIC ability prints (Temple Altisaur), which names nothing an engine has to
+  -- bake.
+  DamageRewrite.PreventAllBut _ -> False
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
   DamageRewrite.Redirect _ -> True
@@ -1921,6 +1925,7 @@ preventsDamage :: DamageRewrite.DamageRewrite -> Bool
 preventsDamage rewrite = case rewrite of
   DamageRewrite.PreventAll -> True
   DamageRewrite.PreventNext _ -> True
+  DamageRewrite.PreventAllBut _ -> True
   DamageRewrite.PreventRemovingShieldCounter -> True
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
@@ -3839,6 +3844,7 @@ damageRewriteFilters rewrite = case rewrite of
   DamageRewrite.PreventAll -> []
   DamageRewrite.PreventRemovingShieldCounter -> []
   DamageRewrite.PreventNext _ -> []
+  DamageRewrite.PreventAllBut _ -> []
   DamageRewrite.SetAmount _ -> []
   DamageRewrite.Scale _ -> []
 

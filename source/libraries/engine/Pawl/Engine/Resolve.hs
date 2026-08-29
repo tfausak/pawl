@@ -765,6 +765,7 @@ damageRewriteFilters rewrite = case rewrite of
   DamageRewrite.PreventAll -> []
   DamageRewrite.PreventRemovingShieldCounter -> []
   DamageRewrite.PreventNext _ -> []
+  DamageRewrite.PreventAllBut _ -> []
   DamageRewrite.SetAmount _ -> []
   DamageRewrite.Scale _ -> []
 
