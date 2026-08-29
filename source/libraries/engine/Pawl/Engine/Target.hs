@@ -2,6 +2,7 @@ module Pawl.Engine.Target where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -1133,9 +1134,21 @@ piledOffer perspective gs = Set.map replace
 -- ever meets a pile.
 --
 -- Prompt.RandomObject is the draw, which is the engine asking rather than
--- rolling. `legal` is the slot's own legal set, the one piledOffer substituted
--- over, so the pile's members here are exactly the cards that candidate stood
--- for.
+-- rolling, and Game.ask rather than Game.choose: randomness is not CR 104.4b's
+-- optional action, so a loop containing a draw out of a pile stays a loop of
+-- mandatory actions. `legal` is the slot's own legal set, the one piledOffer
+-- substituted over, so the pile's members here are exactly the cards that
+-- candidate stood for.
+--
+-- Elided at one member and skipped at none, the posture the three randomness
+-- prompts over a candidate list take (Pawl.Engine.Resolve's RandomObject and
+-- RandomOpponent, Pawl.Engine.Engine's RandomFirstPlayer): a one-card pile
+-- leaves nothing to draw, and CR 702.143e makes every foretold card such a
+-- pile. Filtered rather than trusted, so an answer naming a card outside the
+-- pile falls back to the first of them -- from
+-- Pawl.Engine.Resolve.chooseNewTargetsFor nothing downstream checks the drawn
+-- card at all, and from chooseTargets selectionLegal would admit any other
+-- exiled card, CR 406.4 keeping every one of them legal.
 --
 -- A pile whose members have gone is DROPPED rather than kept: an answer holding
 -- a pile no longer offered is short by one target, which selectionLegal then
@@ -1152,9 +1165,14 @@ drawFromPiles perspective legal picked = do
     draw recipient = case recipient of
       Recipient.ToPile pile -> do
         gs <- State.get
-        case NonEmpty.nonEmpty (pileMembers perspective pile legal gs) of
-          Nothing -> pure Nothing
-          Just members -> fmap (Just . Recipient.ToObject) (Game.choose (Prompt.RandomObject members))
+        case pileMembers perspective pile legal gs of
+          [] -> pure Nothing
+          [only] -> pure (Just (Recipient.ToObject only))
+          first : second : more -> do
+            let offered = first NonEmpty.:| (second : more)
+            answer <- Game.ask (Prompt.RandomObject offered)
+            pure . Just . Recipient.ToObject $
+              if List.elem answer (NonEmpty.toList offered) then answer else first
       _ -> pure (Just recipient)
 
 -- The cards piledOffer folded into one pile: the members of `legal` this chooser
