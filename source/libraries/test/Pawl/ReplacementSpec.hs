@@ -2596,6 +2596,121 @@ templeAltisaurSpec s registry = Spec.describe s "Temple Altisaur (CR 615.10)" $ 
     Spec.assertEqWith s "the Excruciator's whole 3 is marked" (S.damageOf raptor (from avatar)) (Just 3)
     Spec.assertEqWith s "where the Piker's same 3 is cut to 1" (S.damageOf raptor (from piker)) (Just 1)
 
+-- Ajani Steadfast {3}{W} Legendary Planeswalker -- Ajani, loyalty 4. "+1: Until
+-- end of turn, up to one target creature gets +1/+1 and gains first strike,
+-- vigilance, and lifelink. -2: Put a +1/+1 counter on each creature you control
+-- and a loyalty counter on each other planeswalker you control. -7: You get an
+-- emblem with 'If a source would deal damage to you or a planeswalker you
+-- control, prevent all but 1 of that damage.'" (Name, cost, type line, loyalty
+-- and all three loyalty abilities checked against api.scryfall.com 2026-08-29;
+-- the card is transcribed whole, with nothing omitted.)
+--
+-- The emblem is the half this group exists for, and it is CR 615.10's shield
+-- with the field Temple Altisaur's leaves empty: a DamagePattern whose PRINTED
+-- recipient side names an object half ("a planeswalker you control") AND a
+-- player half ("you"), which Replacement.matchesPrintedRecipient joins with
+-- `or`. A conjunction would admit nothing, CR 120.3a's two kinds of recipient
+-- being disjoint, so the pair of positive legs below -- alice's life total and
+-- alice's other planeswalker, off one row -- is what the disjunction buys.
+-- CR 114.1 puts the emblem in the command zone and CR 114.4 is what makes its
+-- ability function there.
+--
+-- Each leg moves exactly one thing off one board: the RECIPIENT across the
+-- clause's three narrowings (bob's life total, bob's planeswalker, and alice's
+-- CREATURE, which the clause names not at all), and the single ACT of whether
+-- the ultimate was activated. Activating it costs Ajani his last loyalty
+-- counter and CR 704.5i buries him, which is the game's own consequence rather
+-- than a second knob.
+--
+-- Every number distinct: alice at 9 and bob at 7, alice's other planeswalker on
+-- 8 loyalty counters and bob's on 6, Ajani on 7 (his ultimate's exact cost), the
+-- hit 5 and the floor 1. So the floored readings are 8 and 7, the unfloored ones
+-- 4 and 3, and a "prevent all" reading would leave 9 and 8; no two readings of
+-- the rule land on the same number.
+ajaniSteadfastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ajaniSteadfastSpec s registry = Spec.describe s "Ajani Steadfast (CR 114.4, CR 615.10)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      -- alice's precombat main phase with an empty stack, the window CR 606.3
+      -- gives a loyalty ability. Loyalty counters are handed over directly
+      -- rather than by casting, so each planeswalker's count is exactly the
+      -- number named here and no CR 306.5b entry replacement is in play.
+      withBoard act = do
+        ajaniPrinting <- S.printingOf s registry "Ajani Steadfast"
+        jacePrinting <- S.printingOf s registry "Jace Beleren"
+        karnPrinting <- S.printingOf s registry "Karn Liberated"
+        pikerPrinting <- S.printingOf s registry "Goblin Piker"
+        let base = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain}
+            (ajani, g1) = S.addCreature ajaniPrinting S.alice base
+            (jace, g2) = S.addCreature jacePrinting S.alice g1
+            (karn, g3) = S.addCreature karnPrinting S.bob g2
+            (piker, g4) = S.addCreature pikerPrinting S.alice g3
+            (source, g5) = S.addCreature pikerPrinting S.bob g4
+            stocked =
+              S.addCounter CounterKind.Loyalty 7 ajani
+                . S.addCounter CounterKind.Loyalty 8 jace
+                . S.addCounter CounterKind.Loyalty 6 karn
+                $ g5
+        act ajaniPrinting ajani jace karn piker source (atLife S.alice 9 (atLife S.bob 7 stocked))
+  Spec.it s "CR 615.10 the emblem floors damage to alice and to her other planeswalker at 1, and reaches nothing else"
+    . withBoard
+    $ \printing ajani jace karn piker source base -> do
+      let armed = loyaltyAbility 2 S.identityAnswer printing ajani base
+          at recipient gs = settleDamage S.identityAnswer gs [hit source recipient 5]
+      Spec.assertEqWith s "CR 120.3a 1 of the 5 reaches alice's life total: 9 - 1" (S.lifeOf S.alice (at (Recipient.ToPlayer S.alice) armed)) (Just 8)
+      Spec.assertEqWith s "CR 120.3c and 1 loyalty counter comes off her other planeswalker: 8 - 1" (countersOn CounterKind.Loyalty jace (at (Recipient.ToPlaneswalker jace) armed)) 7
+      Spec.assertEqWith s "CR 109.5 bob is outside the emblem's \"you\", so his 7 takes the whole 5" (S.lifeOf S.bob (at (Recipient.ToPlayer S.bob) armed)) (Just 2)
+      Spec.assertEqWith s "and bob's planeswalker is not one alice controls: 6 - 5" (countersOn CounterKind.Loyalty karn (at (Recipient.ToPlaneswalker karn) armed)) 1
+      Spec.assertEqWith s "the clause names no creature, so alice's own Piker is marked with the whole 5" (S.damageOf piker (at (Recipient.ToCreature piker) armed)) (Just 5)
+      Spec.assertEqWith s "and with the ultimate never activated the same 5 takes alice to 4, so 5 really is unfloored here" (S.lifeOf S.alice (at (Recipient.ToPlayer S.alice) base)) (Just 4)
+      Spec.assertEqWith s "taking 5 loyalty counters off her planeswalker: 8 - 5" (countersOn CounterKind.Loyalty jace (at (Recipient.ToPlaneswalker jace) base)) 3
+      -- The fixture's own preconditions, after the behaviour so neither can
+      -- absorb a mutation aimed at it.
+      Spec.assertEqWith s "CR 114.2 one emblem, in the command zone" (Set.size (GameState.command armed)) 1
+      Spec.assertEqWith s "and none on the board where the ultimate was never activated" (Set.size (GameState.command base)) 0
+      Spec.assertEqWith s "setup: alice's other planeswalker holds 8 before any damage" (countersOn CounterKind.Loyalty jace armed) 8
+      Spec.assertBool s (not (S.onBattlefield ajani armed)) "CR 704.5i Ajani paid his last loyalty counter for the ultimate and is buried"
+      Spec.assertBool s (S.onBattlefield ajani base) "where the unactivated board still has him, at the seven counters he never spent"
+  -- The -2, whose two instructions differ in every part: counter kind, the card
+  -- type swept, and whether the source itself is included. "Each other" is CR
+  -- 601.2c's "another", spelled Filter.Not Filter.IsSource, which is the only
+  -- thing keeping Ajani from topping himself up.
+  Spec.it s "CR 122.1e the -2 counters alice's creatures and every OTHER planeswalker she controls"
+    . withBoard
+    $ \printing ajani jace karn piker source base -> do
+      let after = loyaltyAbility 1 S.identityAnswer printing ajani base
+      Spec.assertEqWith s "alice's Piker takes a +1/+1 counter, so the 2/1 is a 3/2" (S.powerToughnessOf piker after) (Just (3, 2))
+      Spec.assertEqWith s "CR 306.5c her other planeswalker gains one loyalty counter: 8 + 1" (countersOn CounterKind.Loyalty jace after) 9
+      Spec.assertEqWith s "\"each other\" excludes Ajani, who only pays: 7 - 2" (countersOn CounterKind.Loyalty ajani after) 5
+      Spec.assertEqWith s "CR 109.5 bob's planeswalker is untouched" (countersOn CounterKind.Loyalty karn after) 6
+      Spec.assertEqWith s "and bob's Piker takes no +1/+1 counter, so it is still a 2/1" (S.powerToughnessOf source after) (Just (2, 1))
+  -- The +1, whose four instructions all aim at ONE target slot. The answerer
+  -- FILTERS the offered set rather than building a recipient by hand, so a slot
+  -- the pool never offered cannot be smuggled past CR 608.2b's re-read.
+  Spec.it s "the +1 pumps up to one target creature and hands it three keywords"
+    . withBoard
+    $ \printing ajani _ _ piker source base -> do
+      let after = loyaltyAbility 0 (preferTarget [Recipient.ToCreature piker]) printing ajani base
+      Spec.assertEqWith s "CR 613.4c the targeted 2/1 is a 3/2" (S.powerToughnessOf piker after) (Just (3, 2))
+      Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike piker after) "CR 613.1f and it has first strike"
+      Spec.assertBool s (Projection.hasKeyword Keyword.Vigilance piker after) "and vigilance"
+      Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink piker after) "and lifelink"
+      Spec.assertEqWith s "CR 606.4 the cost put a loyalty counter on Ajani: 7 + 1" (countersOn CounterKind.Loyalty ajani after) 8
+      Spec.assertEqWith s "bob's untargeted Piker is still a 2/1" (S.powerToughnessOf source after) (Just (2, 1))
+      Spec.assertBool s (not (Projection.hasKeyword Keyword.FirstStrike source after)) "and has gained nothing"
+
+-- Activate the nth loyalty ability of `walker` in printed order, resolve it, and
+-- settle CR 704's state-based actions -- which is what buries a planeswalker
+-- that paid its last loyalty counter (CR 704.5i). alice is the controller
+-- throughout.
+loyaltyAbility :: Int -> (forall r. Prompt.Prompt r -> r) -> Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+loyaltyAbility n answer printing walker gs =
+  S.settleSba
+    ( case drop n (Face.activatedAbilities (S.combinedFace printing)) of
+        ability : _ -> S.runPure answer gs (do Activate.activateAbility S.alice walker ability; Stack.resolveTop)
+        [] -> gs
+    )
+
 -- Protean Hydra {X}{G} Creature -- Hydra, printed 0/0: "this creature enters with
 -- X +1/+1 counters on it. If damage would be dealt to this creature, prevent that
 -- damage and remove that many +1/+1 counters from it."
@@ -5833,6 +5948,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   inkshieldSpec s registry
   stormwildCapridorSpec s registry
   templeAltisaurSpec s registry
+  ajaniSteadfastSpec s registry
   proteanHydraSpec s registry
   jaredCarthalionSpec s registry
   glitteringLionSpec s registry
