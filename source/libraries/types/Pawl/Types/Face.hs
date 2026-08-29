@@ -129,12 +129,16 @@ data Face card = MkFace
     -- these through Pawl.Engine.Projection.abilitiesOf, never directly: layer 6
     -- (Humility) removes abilities.
     activatedAbilities :: [ActivatedAbility.ActivatedAbility card (GrantedAbility.GrantedAbility card)],
-    -- | CR 614: this face's replacement effects, active while it is on the
-    -- battlefield. Read through Pawl.Engine.Projection.replacementsOf (never
-    -- directly) so layer 6 LoseAllAbilities strips them uniformly, and so CR
-    -- 604.2's "as long as" clause on each is asked against the board of the
-    -- moment -- the live one, less whatever an entry loop has materialized but
-    -- not entered (Pawl.Engine.Projection.boardAsEntering).
+    -- | CR 614: this face's replacement effects, active while it is in the zone CR
+    -- 113.6 leaves each functioning in -- the battlefield unless the row states
+    -- otherwise (PrintedReplacement.functionsFrom). A battlefield row is read
+    -- through Pawl.Engine.Projection.replacementsOf (never directly) so layer 6
+    -- LoseAllAbilities strips them uniformly, and so CR 604.2's "as long as"
+    -- clause on each is asked against the board of the moment -- the live one,
+    -- less whatever an entry loop has materialized but not entered
+    -- (Pawl.Engine.Projection.boardAsEntering). A row functioning from one of the
+    -- four other zones is read off this list directly, as every off-battlefield
+    -- ability walk in that module reads a printed face.
     replacementEffects :: [PrintedReplacement.PrintedReplacement (Effect.Effect card (GrantedAbility.GrantedAbility card))],
     -- | CR 603: this face's triggered abilities, read through
     -- Pawl.Engine.Projection.triggeredAbilitiesOf.

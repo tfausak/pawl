@@ -1,5 +1,6 @@
 module Pawl.Codec.PrintedReplacementSpec where
 
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Effect as Effect
@@ -17,6 +18,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.PrintedReplacement" $ do
@@ -28,6 +30,7 @@ spec s = Spec.describe s "Pawl.Codec.PrintedReplacement" $ do
       ( PrintedReplacement.MkPrintedReplacement
           { PrintedReplacement.condition = Nothing,
             PrintedReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
+            PrintedReplacement.functionsFrom = Set.empty,
             PrintedReplacement.name = Nothing
           }
       )
@@ -49,6 +52,7 @@ spec s = Spec.describe s "Pawl.Codec.PrintedReplacement" $ do
                     )
                 ),
             PrintedReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
+            PrintedReplacement.functionsFrom = Set.empty,
             PrintedReplacement.name = Nothing
           }
       )
@@ -64,10 +68,26 @@ spec s = Spec.describe s "Pawl.Codec.PrintedReplacement" $ do
       ( PrintedReplacement.MkPrintedReplacement
           { PrintedReplacement.condition = Nothing,
             PrintedReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
+            PrintedReplacement.functionsFrom = Set.empty,
             PrintedReplacement.name = Just (AbilityName.MkAbilityName (Text.pack "shield"))
           }
       )
       " {\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}},\"name\":\"shield\"} "
+  -- CR 113.6b's zone clause, Nexus of Fate's shape. Optional for the condition's
+  -- reason, and the three cases above pin the absent half: an encoder that always
+  -- emitted the key would rewrite every card already committed.
+  Spec.it s "MkPrintedReplacement, a stated set of zones" $
+    Common.assertCodec
+      s
+      codec
+      ( PrintedReplacement.MkPrintedReplacement
+          { PrintedReplacement.condition = Nothing,
+            PrintedReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
+            PrintedReplacement.functionsFrom = Set.fromList [Zone.Graveyard, Zone.Stack],
+            PrintedReplacement.name = Nothing
+          }
+      )
+      " {\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}},\"functionsFrom\":[{\"type\":\"Graveyard\"},{\"type\":\"Stack\"}]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
   where
     -- The effect codec the card boundary would pass in (CR 615.5's riders ride

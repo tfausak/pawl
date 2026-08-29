@@ -4607,22 +4607,27 @@ abilitiesFromCharacteristics peers pc oid gs =
 -- for CR 109.5's "you".
 -- Nothing is latched, so Jared Carthalion's shield goes away the moment the
 -- monarchy does, with no trigger and no resolution in between.
-replacementsOf :: ObjectId -> GameState -> [(ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
-replacementsOf oid gs =
+--
+-- The ZONE is the one the object is in, and CR 113.6b is what it answers: a
+-- printed row naming some other zone is not gathered here. The two callers pass
+-- the two zones CR 113.6 gives a DEFAULT to -- the battlefield and, for an
+-- emblem, the command zone -- which is why the gate is functionsFromZoneOfRow
+-- rather than the bare stated set replacementsAffecting's other walks take. The
+-- MINTED rows below take no such gate: each is minted by a rule for the object
+-- it is on rather than printed on a face, so none of them can state a zone.
+--
+-- Nothing OBSERVES that gate yet -- no card in data/cards/ carries a row whose
+-- stated set leaves out the zone the object holding it can be in, and dropping it
+-- leaves the suite green -- so it is a regression fence resting on CR 113.6b's
+-- "only" rather than a proved behaviour. What IS proved is the empty-set limb,
+-- by Pawl.ZoneReplacementSpec's Rest in Peace pair.
+replacementsOf :: Zone.Zone -> ObjectId -> GameState -> [(ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
+replacementsOf zone oid gs =
   let pc = project oid gs
-      -- CR 614.12: a card-authored condition reads the board an entering
-      -- permanent would arrive on, which holds neither the permanent itself nor
-      -- the ones arriving beside it -- boardAsEntering. The VIEW stays `fullView
-      -- gs`: what the rule takes off the board is membership, not
-      -- characteristics, and the permanent's own are exactly what CR 614.12 asks
-      -- to be read "as it would exist on the battlefield".
-      --
-      -- Proven by Pawl.ReplacementSpec's Frontier Mastodon pairs, one per
-      -- direction: reanimated beside Jedit Ojanen, and entering at 4/3 under
-      -- Glorious Anthem.
-      lives pr = case PrintedReplacement.condition pr of
-        Nothing -> True
-        Just cond -> Condition.holds (fullView gs) (Filter.contextFor (controllerOf oid gs) (Just oid)) (boardAsEntering gs) oid cond
+      -- CR 113.6b first and CR 604.2 second: which zone the row functions from,
+      -- then whether its clause holds there (printedRowLives argues the board
+      -- that reads against).
+      lives pr = functionsFromZoneOfRow zone pr && printedRowLives oid gs pr
    in -- The one place the two provenances are told apart, which is why the mark
       -- is made HERE rather than inferred downstream: the first segment is the
       -- card's own rules text and every segment after it is a rule minting a row
@@ -4632,6 +4637,53 @@ replacementsOf oid gs =
         <> fmap ((,) ReplacementProvenance.Minted) (shieldOf oid gs)
         <> fmap ((,) ReplacementProvenance.Minted) (finalityOf oid gs)
         <> fmap ((,) ReplacementProvenance.Minted) (stunOf oid gs)
+
+-- CR 604.2's "as long as" clause, asked of one printed row against the board the
+-- event would happen on.
+--
+-- CR 614.12: a card-authored condition reads the board an entering permanent
+-- would arrive on, which holds neither the permanent itself nor the ones arriving
+-- beside it -- boardAsEntering. The VIEW stays `fullView gs`: what the rule takes
+-- off the board is membership, not characteristics, and the permanent's own are
+-- exactly what CR 614.12 asks to be read "as it would exist on the battlefield".
+--
+-- Proven by Pawl.ReplacementSpec's Frontier Mastodon pairs, one per direction:
+-- reanimated beside Jedit Ojanen, and entering at 4/3 under Glorious Anthem.
+--
+-- Its own function rather than a local of replacementsOf, because CR 604.2 gates
+-- a row wherever the row functions: replacementsAffecting's four off-battlefield
+-- walks ask it of the printed face, where replacementsOf asks it of the
+-- projection.
+printedRowLives :: ObjectId -> GameState -> PrintedReplacement.PrintedReplacement effect -> Bool
+printedRowLives oid gs pr = case PrintedReplacement.condition pr of
+  Nothing -> True
+  Just cond -> Condition.holds (fullView gs) (Filter.contextFor (controllerOf oid gs) (Just oid)) (boardAsEntering gs) oid cond
+
+-- CR 113.6b: does this printed replacement row function from `zone`?
+-- functionsFromZone's twin for rows, with the same empty-set reading -- a row
+-- that states no zone leaves CR 113.6's own defaults standing, and a stated set
+-- is the rule's "only", so it replaces them rather than adding to them.
+functionsFromZoneOfRow :: Zone.Zone -> PrintedReplacement.PrintedReplacement effect -> Bool
+functionsFromZoneOfRow zone pr =
+  let zones = PrintedReplacement.functionsFrom pr
+   in Set.null zones || Set.member zone zones
+
+-- CR 113.6b's stated set without that default folded in, statesZone's twin: the
+-- question the four zones CR 113.6 gives no default to have to ask, where "states
+-- no zone" must mean "not here" rather than "wherever the caller is looking".
+statesZoneOfRow :: Zone.Zone -> PrintedReplacement.PrintedReplacement effect -> Bool
+statesZoneOfRow zone = Set.member zone . PrintedReplacement.functionsFrom
+
+-- mayStateZone's twin for printed replacement rows, and cheap for its reason: a
+-- fold over the base card's faces against building the face the object shows.
+-- A superset, on that function's argument, and a face-down object is the one case
+-- it does not narrow.
+mayStateZoneOfRow :: GameState -> Zone.Zone -> Object.Object -> Bool
+mayStateZoneOfRow gs zone obj = case Object.facing obj of
+  Facing.FaceDown _ -> True
+  Facing.FaceUp -> case Game.cardOfSource gs (Just (Object.source obj)) of
+    Nothing -> False
+    Just card -> any (any (statesZoneOfRow zone) . Face.replacementEffects) (Card.Type.faces card)
 
 -- CR 107.3m: the value of X for this object's enters-the-battlefield replacement
 -- effects, and 0 for every object no such spell stands behind. Read off the
@@ -4710,11 +4762,13 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 -- ability, so the layer system has nothing to remove.
 --
 -- The rule's FROM-ZONE is not in the pattern -- Pawl.Types.ZoneChangePattern has
--- no such field -- and does not need to be: replacementsAffecting gathers
+-- no such field -- and does not need to be: replacementsAffecting projects
 -- battlefield permanents and the command zone's emblems, and CR 122.1h mints
 -- this row from counters on a PERMANENT, which CR 114.5 says an emblem is not --
 -- so a row minted here can only ever be a candidate while its source is on the
--- battlefield, which is exactly "from the battlefield". Filter.IsSource is the rule's "this permanent", the self-scope
+-- battlefield, which is exactly "from the battlefield". The four walks that
+-- reach the other zones cannot carry it: CR 113.6b gathers PRINTED rows and this
+-- one is minted. Filter.IsSource is the rule's "this permanent", the self-scope
 -- CR 614.1c's entry rows use.
 finalityOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 finalityOf oid gs =
@@ -4898,7 +4952,7 @@ replacementsAffecting gs =
           -- exists to skip, so any board holding a granting ability is gathered
           -- whole.
           || any (any grantsMintingType . StaticAbility.modifications) (staticAbilitiesOf oid gs)
-      forOne oid = fmap (\(provenance, re) -> (oid, provenance, re)) (replacementsOf oid gs)
+      forOne zone oid = fmap (\(provenance, re) -> (oid, provenance, re)) (replacementsOf zone oid gs)
       -- The grantors standing where `baseHas` cannot see them, asked BOTH of
       -- baseHas's grantor disjuncts again: a stored effect and an off-battlefield
       -- static ability write the same two modifications a permanent's static
@@ -4932,11 +4986,6 @@ replacementsAffecting gs =
       -- CR 114.3 makes the emblem's abilities the whole of it, and no copy effect
       -- has an emblem to copy.
       --
-      -- Not implemented: a printed replacement row functioning from a graveyard,
-      -- a hand, a library or the stack under CR 113.6b's stated set.
-      -- Pawl.Types.PrintedReplacement carries no functionsFrom field, where
-      -- Pawl.Types.StaticAbility does, so no row can state a zone and a walk past
-      -- this one has nothing to gate on (#2462).
       isEmblem oid = case fmap Object.source (Game.lookupObject oid gs) of
         Just (Source.OfEmblem _) -> True
         _ -> False
@@ -4944,9 +4993,52 @@ replacementsAffecting gs =
       emblemHas oid = case Game.faceOf oid gs of
         Nothing -> False
         Just face -> not (null (Face.replacementEffects face))
-   in if not (any baseHas onBattlefield || elsewhereHas || any emblemHas emblems)
-        then []
-        else concatMap forOne (onBattlefield <> emblems)
+      -- CR 113.6b's stated set, in the four zones CR 113.6 gives no default that
+      -- reaches a replacement row: Nexus of Fate's "would be put into a graveyard
+      -- from anywhere" names every one of them, and a row that states nothing is
+      -- left to the two walks above. So this arm asks statesZoneOfRow rather than
+      -- functionsFromZoneOfRow, gatherGiven's hidden-zone arms' reading for
+      -- gatherGiven's reason: an unstated row gathered here would have every card
+      -- in every library replacing events from inside it.
+      --
+      -- The PRINTED face, which is how every off-battlefield arm of gatherGiven
+      -- reads one, rather than the projection the two walks above take: `project`
+      -- is what the short-circuit beneath exists to skip. CR 604.2's clause still
+      -- gates each row.
+      --
+      -- MINTED rows are deliberately absent: CR 122.1's counters do not survive
+      -- the trip off the battlefield (CR 122.2), and every other minted row is
+      -- CR 614.1c's entry rewrite, which a card that is not entering cannot use.
+      --
+      -- Not implemented: a row stating the exile zone, which gets no arm here --
+      -- the same hole gatherGiven's static walk has (gap #1933) -- and CR 113.6's
+      -- first-sentence default, which would function an instant's or sorcery's
+      -- unstated row from the stack (gap #2590).
+      statedFrom zone oid = case Game.lookupObject oid gs of
+        Nothing -> []
+        Just obj | not (mayStateZoneOfRow gs zone obj) -> []
+        Just obj -> case Game.faceOfObject gs obj of
+          Nothing -> []
+          Just face ->
+            [ (oid, ReplacementProvenance.Printed, PrintedReplacement.effect pr)
+            | pr <- Face.replacementEffects face,
+              statesZoneOfRow zone pr,
+              printedRowLives oid gs pr
+            ]
+      stated =
+        concatMap (statedFrom Zone.Stack) (GameState.stack gs)
+          <> concatMap (statedFrom Zone.Graveyard) (graveyardCards gs)
+          <> foldZoneCards GameState.hand (statedFrom Zone.Hand) gs
+          <> foldZoneCards GameState.library (statedFrom Zone.Library) gs
+      -- The short-circuit guards the two walks that PROJECT, and nothing else:
+      -- `stated` reads printed faces behind mayStateZoneOfRow, so it costs what
+      -- gatherGiven's hidden walks cost and answers [] on a board with no such row
+      -- without any of the reads baseHas makes.
+      onBoard =
+        if not (any baseHas onBattlefield || elsewhereHas || any emblemHas emblems)
+          then []
+          else concatMap (forOne Zone.Battlefield) onBattlefield <> concatMap (forOne Zone.Command) emblems
+   in onBoard <> stated
 
 -- CR 611.2a: does any STORED continuous effect write a modification satisfying
 -- `p`? gatherGiven's `stored` arm, and a disjunct of each of the two

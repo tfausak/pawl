@@ -1234,6 +1234,7 @@ library test
     Pawl.UntapRestrictionSpec
     Pawl.VariableEffectSpec
     Pawl.ZoneChangeSpec
+    Pawl.ZoneReplacementSpec
     Pawl.ZoneTriggerSpec
 
 -- All of the type definitions, without any associated behavior.

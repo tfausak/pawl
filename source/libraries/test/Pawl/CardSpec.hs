@@ -7767,6 +7767,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                     [ PrintedReplacement.MkPrintedReplacement
                         Nothing
                         (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern Nothing CounterSubject.ByAnything ControllerRelation.Yours buried Nothing) (Scaling.AddMore 1)))
+                        Set.empty
                         Nothing
                     ]
                 }
@@ -7787,6 +7788,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                             )
                         )
                         (ReplacementEffect.DestructionR DestructionRewrite.Regenerate)
+                        Set.empty
                         Nothing
                     ]
                 }

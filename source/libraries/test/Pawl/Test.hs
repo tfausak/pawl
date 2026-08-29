@@ -473,6 +473,7 @@ import qualified Pawl.UntapRestrictionSpec
 import qualified Pawl.Uri.FragmentSpec
 import qualified Pawl.VariableEffectSpec
 import qualified Pawl.ZoneChangeSpec
+import qualified Pawl.ZoneReplacementSpec
 import qualified Pawl.ZoneTriggerSpec
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
@@ -1010,4 +1011,5 @@ spec s registry = do
   Pawl.Uri.FragmentSpec.spec s
   Pawl.VariableEffectSpec.spec s registry
   Pawl.ZoneChangeSpec.spec s registry
+  Pawl.ZoneReplacementSpec.spec s registry
   Pawl.ZoneTriggerSpec.spec s registry
