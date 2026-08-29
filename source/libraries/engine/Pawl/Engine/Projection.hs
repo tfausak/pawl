@@ -3870,10 +3870,10 @@ designationGathered gs = concatMap fromObject (Set.toList (GameState.battlefield
 -- WHOSE would still have to match a plain write of the same aspect -- an identical
 -- order for a larger type; see #357.
 --
--- `changesAt` confirms such a declaration by applying the other effect
--- EVERYWHERE and re-asking the set through the resulting board, so a
--- cross-object atom's row is load-bearing rather than a fence. Pawl.ProjectionSpec's
--- "CR 613.8a an Aura's host is animated under it" pair is the proof.
+-- That confirmation is board-wide, which is what makes a cross-object row
+-- load-bearing rather than a fence: `changesAt` applies the other effect
+-- everywhere it applies and re-asks the set through the resulting board.
+-- Pawl.ProjectionSpec's "CR 613.8a an Aura's host is animated under it" proves it.
 data Aspect
   = Types
   | Subtypes
@@ -4401,11 +4401,11 @@ projectDeciding admits cands = forObject
                 -- reading ANOTHER object -- an Aura's host (CR 701.3a), a
                 -- creature's attachers (CR 303.4b), the planeswalker or battle an
                 -- attacker was declared against (CR 506.4) -- reaches it through
-                -- this reader. CR 613 puts no bound on that state, so inside
-                -- `resolve` it is the running board and the peer's same-layer
-                -- effects are visible; on the branch below where nothing is
-                -- movable it is `bounded`, which is the same answer because no
-                -- effect there can move any other's set.
+                -- this reader, and CR 613 puts no bound on that state. The
+                -- parameter is how `resolve`'s running board gets in, that being
+                -- every caller; the branch below where nothing is movable calls
+                -- affectsGiven with `bounded` itself, which is the same answer
+                -- there because no effect on it can move any other's set.
                 appliesTo viewOf o ds pc c = case gEffect c of
                   Just k | Just answer <- Map.lookup k ds -> answer
                   _ -> affectsGiven viewOf (gSource c) o (gAffected c) pc gs

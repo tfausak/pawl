@@ -393,10 +393,15 @@ ashayaBloodMoon forest piker ashaya bloodMoon ashayaFirst =
 -- Pacifism carries no static ability, so the only layer-4 effects on the board
 -- are the two under test. The Forest is there for Ashaya's CDA to count.
 --
--- Synthetic (#2632): no printed card's affected set reads a characteristic of
--- another object in a layer that writes it. The two attacking-target atoms would
--- (CR 506.4), but CR 506.4's own record answers ahead of them --
--- Pawl.Engine.Projection.filterReads says so at both rows.
+-- SYNTHETIC because no printed card's affected set reads a characteristic of
+-- another object in a layer that writes the same one. Scryfall o:"auras attached
+-- to" and o:"enchanted creatures", 2026-08-29: Umbra Mystic, Greater Auramancy
+-- and A Tale for the Ages are the whole cross-object static pool, and each sits
+-- in layer 6 or 7 while its filter reads a subtype or a controller. The two
+-- attacking-target atoms would reach layer 4 (CR 506.4), but CR 506.4's own
+-- record answers ahead of them -- Pawl.Engine.Projection.filterReads says so at
+-- both rows. A card that would refute this: any layer-4 type-changer whose set is
+-- phrased on a second permanent's types.
 rootedWardings :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, GameState.GameState, GameState.GameState)
 rootedWardings forest piker pacifism wardings ashaya wardingsFirst =
   let (_, g1) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
