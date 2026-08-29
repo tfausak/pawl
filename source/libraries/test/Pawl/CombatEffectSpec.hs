@@ -736,6 +736,7 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
                       Combat.Type.declaredAttackers = Set.empty,
                       Combat.Type.declaredBlockers = Set.empty,
                       Combat.Type.blockersDeclared = True,
+                      Combat.Type.attackingNothing = Set.empty,
                       Combat.Type.defender = Just S.bob
                     }
               }
@@ -1904,10 +1905,10 @@ creaturePlaneswalkerCombatSpec s registry = Spec.describe s "CreaturePlaneswalke
         Spec.assertEqWith s "CR 506.4: Jace is blocking nothing" (Combat.blockersOf atBob atEnd) Set.empty
         Spec.assertBool s (Combat.isBlocked atBob atEnd) "CR 509.1h: but that attacker remains blocked"
         -- Half two, which no other leg can assert: he stops being attacked as well.
-        -- pawl derives attacked-ness at Combat.stillAttacked rather than storing
-        -- it, and CR 506.4c keeps the ATTACKER in combat, so its Combat.attackers
-        -- entry still names the planeswalker -- asserting that entry is gone would
-        -- fail a correct engine.
+        -- pawl reads attacked-ness at Combat.stillAttacked, and CR 506.4c keeps
+        -- the ATTACKER in combat, so its Combat.attackers entry still names the
+        -- planeswalker -- asserting that entry is gone would fail a correct
+        -- engine.
         Spec.assertBool s (not (Combat.stillAttacked jaceId atEnd)) "CR 506.4: and he stops being attacked"
         Spec.assertEqWith s "CR 506.4c: while the attacker aimed at him stays in combat, record entry and all" (Map.lookup atJace attackers) (Just (AttackTarget.OfPlaneswalker jaceId))
 
@@ -2940,6 +2941,62 @@ soulSnareSpec s registry = Spec.describe s "SoulSnare" $ do
           (Map.lookup pikerId (Combat.Type.attackers (GameState.combat enchanted)))
           (Just (AttackTarget.OfPlaneswalker jaceId))
       _ -> Spec.assertFailure s "fixture should give alice a Piker and a Snare and bob a Jace, a Snare and two Bonesplitters"
+  -- CR 506.4's controller clause read as the EVENT it is: a planeswalker whose
+  -- controller changes and changes BACK inside one combat stays removed from
+  -- combat, and CR 506.4c leaves the creature attacking nothing for the rest of
+  -- it. No reading of the CURRENT board can answer this, however many conjuncts
+  -- it gets -- which is what Pawl.Types.Combat's attackingNothing record is for.
+  --
+  -- TWO Aura Grafts move the one Confiscate twice, so both legs end with the
+  -- same board: Jace on the battlefield, still a planeswalker, under bob, with
+  -- the Confiscate on a Bonesplitter. The legs differ only in whether the Aura
+  -- passed through Jace on the way, and each Graft is settled before the next
+  -- (CR 117.5), which is the moment rule 506.4's sampler runs and the moment a
+  -- real game cannot skip between two spells resolving.
+  Spec.it s "CR 506.4 a planeswalker whose controller changes and changes BACK stays removed from combat, so Soul Snare still cannot name the attacker" $ do
+    (board, ability, ids, second) <- regraftBoard s registry
+    case (ability, ids) of
+      (Just snareAbility, MkGraftIds {graftPiker = pikerId, graftJace = jaceId, graftBobSnare = bobSnare, graftHost = host, graftSpare = spare, graftAura = aura, graftSpell = graft}) -> do
+        let declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) attackThePlaneswalker board
+            -- Leg one: the Confiscate goes to Jace, then on to the spare
+            -- Bonesplitter. Leg two: it goes to the spare Bonesplitter and back
+            -- to the one it started on, so Jace is never touched.
+            stolen = graftOnto aura jaceId graft declared
+            sidestep = graftOnto aura spare graft declared
+            thereAndBack = graftOnto aura spare second stolen
+            neverJace = graftOnto aura host second sidestep
+            bobFires = runToEndOfCombatWith (soulSnareAnswer bobSnare snareAbility pikerId)
+            -- A third run of each leg with the Snare never activated, so that
+            -- combat damage actually happens: the OTHER reader of the record is
+            -- Damage.combatRecipient, and CR 510.1b gives a creature attacking
+            -- nothing nothing to assign to.
+            noSnare = runToEndOfCombatWith (pure . attackThePlaneswalker)
+        -- GAMEPLAY FIRST. Both boards read identically to anything asking about
+        -- the board NOW, so an engine that re-derives rule 506.4 hands bob's
+        -- Snare a creature "attacking a planeswalker you control" on both.
+        Spec.assertBool s (S.onBattlefield pikerId (bobFires thereAndBack)) "CR 506.4: Jace left combat when alice took him, and giving him back does not put him back, so bob's Snare cannot name the Piker"
+        Spec.assertBool s (S.onBattlefield bobSnare (bobFires thereAndBack)) "and bob's Snare is unsacrificed: the ability was never activatable"
+        Spec.assertBool s (not (S.onBattlefield pikerId (bobFires neverJace))) "control: with the Confiscate never on Jace, the same Snare exiles the attacker"
+        Spec.assertBool s (not (S.onBattlefield bobSnare (bobFires neverJace))) "control: there it paid its own sacrifice, so the activation really happened"
+        Spec.assertEqWith s "CR 510.1b: and with no Snare fired the Piker assigns nothing on that leg, so Jace keeps all five loyalty" (S.counterOf CounterKind.Loyalty jaceId (noSnare thereAndBack)) 5
+        Spec.assertEqWith s "control: on the leg he never left combat the same Piker takes him to 3" (S.counterOf CounterKind.Loyalty jaceId (noSnare neverJace)) 3
+        -- The pair really is one board differing in one thing: alice held Jace
+        -- midway on one leg only, and by the end bob holds him on both.
+        Spec.assertEqWith s "CR 613.1b: alice controls Jace midway on one leg only" (fmap (Projection.controllerOf jaceId) [stolen, sidestep]) [Just S.alice, Just S.bob]
+        Spec.assertEqWith s "and bob controls him again on BOTH, so no live read can tell the legs apart" (fmap (Projection.controllerOf jaceId) [thereAndBack, neverJace]) [Just S.bob, Just S.bob]
+        Spec.assertEqWith s "nor can the card type: he is a planeswalker on both" (fmap (Projection.isPlaneswalkerOf jaceId) [thereAndBack, neverJace]) [True, True]
+        Spec.assertEqWith s "nor the battlefield: he never left it" (fmap (Set.member jaceId . GameState.battlefield) [thereAndBack, neverJace]) [True, True]
+        -- The record, and CR 506.4c's requirement that the entry survive it.
+        Spec.assertEqWith s "CR 506.4c: the Piker is attacking nothing on one leg only" (fmap (Set.member pikerId . Combat.Type.attackingNothing . GameState.combat) [thereAndBack, neverJace]) [True, False]
+        Spec.assertEqWith
+          s
+          "CR 506.4c: and it is still an attacking creature, its entry still naming Jace"
+          (fmap (Map.lookup pikerId . Combat.Type.attackers . GameState.combat) [thereAndBack, neverJace])
+          [Just (AttackTarget.OfPlaneswalker jaceId), Just (AttackTarget.OfPlaneswalker jaceId)]
+        -- Anti-vacuity: both Grafts resolved on both legs, so the Aura really
+        -- travelled twice and no leg failed for want of mana.
+        Spec.assertEqWith s "CR 701.3a: the Aura ends on a Bonesplitter on both legs" (fmap (Projection.hostOf aura) [thereAndBack, neverJace]) [Just spare, Just host]
+      _ -> Spec.assertFailure s "fixture should give alice a Piker and a Snare and bob a Jace, a Snare and two Bonesplitters"
 
 -- The ids graftBoard hands back. A record rather than a tuple, and BUILT AND READ
 -- by field name rather than by position: every field is an ObjectId, so a
@@ -2949,6 +3006,7 @@ data GraftIds = MkGraftIds
     graftAliceSnare :: ObjectId.ObjectId,
     graftJace :: ObjectId.ObjectId,
     graftBobSnare :: ObjectId.ObjectId,
+    graftHost :: ObjectId.ObjectId,
     graftSpare :: ObjectId.ObjectId,
     graftAura :: ObjectId.ObjectId,
     graftSpell :: ObjectId.ObjectId
@@ -3001,6 +3059,7 @@ graftBoard s registry auraName = do
               graftAliceSnare = aliceSnare,
               graftJace = jaceId,
               graftBobSnare = bobSnare,
+              graftHost = host,
               graftSpare = spare,
               graftAura = auraId,
               graftSpell = spell
@@ -3014,11 +3073,36 @@ graftBoard s registry auraName = do
 -- leg whose slot or whose Attach.hostsFor list does not admit the id takes the
 -- fallback instead of quietly succeeding, and each case's per-leg assertions on
 -- Jace's controller and card type are what catch that.
+--
+-- CR 117.5's settle follows the resolution: it is where Combat.removeChanged
+-- samples rule 506.4's derived clauses, and no real game can skip it between one
+-- spell resolving and the next being cast.
 graftOnto :: ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 graftOnto aura host spell gs =
   S.runPure (graftAnswer aura host) gs $ do
     S.cast S.alice spell
     Stack.resolveTop
+    Engine.settleForPriority
+
+-- graftBoard's board plus a SECOND Aura Graft and three more Islands to cast it
+-- with, for the one case that has to move an Aura twice inside one combat. The
+-- extra lands are alice's own, so neither Snare's {W} can be spent on a Graft.
+regraftBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m
+    ( GameState.GameState,
+      Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)),
+      GraftIds,
+      ObjectId.ObjectId
+    )
+regraftBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  graft <- S.printingOf s registry "Aura Graft"
+  (gs, ability, ids) <- graftBoard s registry "Confiscate"
+  let (second, gs1) = S.addHandCard graft S.alice (S.landsFor island S.alice 3 gs)
+  pure (gs1, ability, ids, second)
 
 graftAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 graftAnswer aura host p = case p of

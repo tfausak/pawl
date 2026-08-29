@@ -33,6 +33,7 @@ codec = Fields.object $ do
   declaredAttackers <- Fields.required "declaredAttackers" (Common.set ObjectId.codec) Combat.declaredAttackers
   declaredBlockers <- Fields.required "declaredBlockers" (Common.set ObjectId.codec) Combat.declaredBlockers
   blockersDeclared <- Fields.required "blockersDeclared" Common.boolean Combat.blockersDeclared
+  attackingNothing <- Fields.required "attackingNothing" (Common.set ObjectId.codec) Combat.attackingNothing
   defender <- Fields.required "defender" (Common.maybe PlayerId.codec) Combat.defender
   pure
     Combat.MkCombat
@@ -46,5 +47,6 @@ codec = Fields.object $ do
         Combat.declaredAttackers = declaredAttackers,
         Combat.declaredBlockers = declaredBlockers,
         Combat.blockersDeclared = blockersDeclared,
+        Combat.attackingNothing = attackingNothing,
         Combat.defender = defender
       }

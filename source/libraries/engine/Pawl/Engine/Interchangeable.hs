@@ -164,6 +164,7 @@ noCombat =
       Combat.declaredAttackers = Set.empty,
       Combat.declaredBlockers = Set.empty,
       Combat.blockersDeclared = False,
+      Combat.attackingNothing = Set.empty,
       Combat.defender = Nothing
     }
 
