@@ -174,8 +174,8 @@ data CostComponent keyword
     -- The Filter is matched against the card's own CR 613 projection,
     -- ExileCardsFromGraveyard's reading below and for its reason -- see
     -- Pawl.Engine.Cost.discardCandidates.
-    -- DiscardThis below states the rest of what reading a hand costs, for both
-    -- of the components that do.
+    -- DiscardThis below states the rest of what reading a hand costs, for every
+    -- component that does.
     DiscardCards (DiscardCards.DiscardCards keyword)
   | -- | CR 702.29a's and CR 702.77a's "Discard this card": discard the card the
     -- cost is on, from the hand it is in. Two rules print that clause and cards
@@ -230,7 +230,9 @@ data CostComponent keyword
     -- DiscardCards' axis rather than DiscardCards': every printing of this cost
     -- names ONE card, so a count field would be 1 on every card in the pool.
     -- Scryfall o:"from your hand onto the battlefield. If you", 2026-08-28: nine
-    -- printings, all singular. A card putting two would be what refutes that.
+    -- printings, all singular, and Dermoplasm's "...face up. If you do", which
+    -- that query's wording misses, is singular too. A card putting two would be
+    -- what refutes this.
     --
     -- No Pawl.Types.EntryRiders either. Every printing of this cost leaves CR
     -- 110.5b's defaults standing, and the "face up" Dermoplasm prints is that
