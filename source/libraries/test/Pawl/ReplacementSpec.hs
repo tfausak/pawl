@@ -5778,6 +5778,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   warLeechSpec s registry
   dragonstormGlobeSpec s registry
   tidewalkerSpec s registry
+  redirectedPermanentSpellSpec s registry
   hurrJackalSpec s registry
 
 -- Monstrous War-Leech {3}{B} Creature -- Leech Horror \*/*, whole text: "Kicker
@@ -9657,6 +9658,128 @@ tidewalkerChain s registry hack = do
         _ -> onStack
       after = S.runPure S.identityAnswer before Stack.resolveTop
   pure (before, after, newestNamed (S.printingName tidewalker) after)
+
+-- The OTHER side of the rule tidewalkerSpec above proves: CR 400.7a carries an
+-- effect over to "the permanent that spell becomes", so a permanent spell a CR
+-- 614.6 redirect sent somewhere other than the battlefield becomes no permanent
+-- and carries nothing (#2399). CR 608.3e is the rulebook stating the same shape
+-- from the other end.
+--
+-- THE PRODUCER IS SYNTHETIC, and the search that says so: Scryfall's oracle text
+-- for a replacement of a cast permanent spell's battlefield entry
+-- (`o:"would enter" o:instead`, 2026-08-29) returns thirteen cards and not one
+-- of them can be this board. Containment Priest, Hallowed Moonlight, Mistcaller
+-- and Primeval Spawn all exclude a creature that WAS cast; Don't Blink reaches a
+-- cast permanent spell but shuffles it into a library, where no characteristic
+-- can be read; the seven Alliances-style lands (Lotus Vale is the shape) are
+-- PLAYED rather than cast, so CR 400.7a never speaks to them and CR 400.7i's
+-- carrier is a different one (gap #2398). Mox Diamond is the one real card that
+-- sends a resolving permanent spell to a graveyard -- and its destination hangs
+-- on an optional cost that Pawl.Types.ZoneChangeR, whose destination is a single
+-- zone, cannot express. It could not discriminate here in any case: nothing in
+-- the pool puts a continuous effect on a colorless artifact spell that a
+-- graveyard can show.
+--
+-- Synthetic Entry Interdiction is "If a green spell would enter the battlefield,
+-- put it into its owner's graveyard instead" -- the CR 614.1a replacement of
+-- exactly the CR 608.3a zone change. `IsInZone Stack` is the "spell" half, and
+-- it is load-bearing twice: the Queen's Bay Paladin below is cast on the same
+-- board, and the card the Paladin returns FROM THE GRAVEYARD must not be
+-- redirected back on its way in.
+--
+-- Giant Spider {3}{G} Creature -- Spider 2/4, whole text: "Reach". Artificial
+-- Evolution {U} Instant: "Change the text of target spell or permanent by
+-- replacing all instances of one creature type with another. The new creature
+-- type can't be Wall." Queen's Bay Paladin {3}{B}{B} Creature -- Vampire Knight
+-- 5/4: "Whenever this creature enters or attacks, return up to one target
+-- Vampire card from your graveyard to the battlefield with a finality counter on
+-- it. You lose life equal to its mana value." (oracle checked on Scryfall
+-- 2026-08-29)
+--
+-- THE DISCRIMINATOR is the Paladin's target slot, a filter read of the
+-- redirected card in the zone it was redirected TO. Spider -> Vampire is made on
+-- the SPELL; if the redirect carried it over, the card in alice's graveyard is a
+-- Vampire card the Paladin can return, and alice loses the Spider's four life.
+-- If it does not, the graveyard holds a Spider and the Paladin's "up to one
+-- target" finds nothing.
+redirectedPermanentSpellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+redirectedPermanentSpellSpec s registry = Spec.describe s "a redirected permanent spell carries nothing over (CR 400.7a / 614.6)" $ do
+  Spec.it s "CR 400.7a a spell that became no permanent carries no text change into its graveyard" $ do
+    (spiderName, after) <- redirectedSpellChain s registry True
+    Spec.assertEqWith s "the Paladin found no Vampire card, so nothing came back to the battlefield" (S.countOnBattlefieldByName spiderName S.alice after) 0
+    Spec.assertEqWith s "and alice lost no life, which the returned card's mana value would have cost her" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "the redirect put the card in her graveyard, where it still sits" (length (filter ((==) (Just spiderName) . fmap Face.name . flip Game.faceOf after) (Game.zoneMembers Zone.Graveyard S.alice after))) 1
+  -- The control, and the positive half of the same rule: the same board without
+  -- the interdiction, so the spell DOES become a permanent and the text change
+  -- rides across with it. The pair differs in exactly whether the redirect is on
+  -- the battlefield.
+  Spec.it s "uninterdicted, the same spell becomes a permanent and the text change rides across" $ do
+    (spiderName, after) <- redirectedSpellChain s registry False
+    Spec.assertEqWith s "the Spider resolved onto the battlefield" (S.countOnBattlefieldByName spiderName S.alice after) 1
+    case newestNamed spiderName after of
+      Nothing -> Spec.assertFailure s "the Giant Spider did not reach the battlefield"
+      Just spiderId -> do
+        Spec.assertEqWith s "CR 400.7a the permanent the spell became is a Vampire" (Set.member Subtype.Vampire (Projection.subtypesOf spiderId after)) True
+        Spec.assertEqWith s "CR 612.1 replaced the word, so it is no longer a Spider" (Set.member Subtype.Spider (Projection.subtypesOf spiderId after)) False
+
+-- alice holds a Giant Spider, an Artificial Evolution and a Queen's Bay Paladin,
+-- and (when `interdict`) controls a Synthetic Entry Interdiction. She casts the
+-- Spider, leaves it ON THE STACK -- that is the whole point, since evolving the
+-- permanent afterwards is a different rule -- casts the Evolution at the SPELL
+-- swapping Spider for Vampire, resolves the Spider, then casts the Paladin and
+-- lets its enters trigger resolve. Returns the Spider's name and the final state.
+--
+-- FOUR Islands for a {U} spell, tidewalkerChain's reason at this board's size:
+-- the Spider is the only spell cast before the Evolution and spends at most four
+-- lands, so an Island survives however the payment picks. Seven Swamps then
+-- cover the Paladin's {B}{B} whatever the two casts before it ate.
+redirectedSpellChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (CardName.CardName, GameState.GameState)
+redirectedSpellChain s registry interdict = do
+  forest <- S.printingOf s registry "Forest"
+  island <- S.printingOf s registry "Island"
+  swamp <- S.printingOf s registry "Swamp"
+  spider <- S.printingOf s registry "Giant Spider"
+  evolution <- S.printingOf s registry "Artificial Evolution"
+  paladin <- S.printingOf s registry "Queen's Bay Paladin"
+  interdiction <- S.printingOf s registry "Synthetic Entry Interdiction"
+  let lands = S.landsFor swamp S.alice 7 (S.landsFor island S.alice 4 (S.landsInPlay forest 4))
+      warded = if interdict then snd (S.addCreature interdiction S.alice lands) else lands
+      (spiderId, g1) = S.addHandCard spider S.alice warded
+      (evolutionId, g2) = S.addHandCard evolution S.alice g1
+      (paladinId, g3) = S.addHandCard paladin S.alice g2
+      ready =
+        g3
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      onStack = S.runPure S.identityAnswer ready (S.cast S.alice spiderId)
+      -- The Evolution's target is FILTERED out of the offered set rather than
+      -- rebuilt, hackAt's reason: a hand-built recipient would be dropped at CR
+      -- 608.2b's re-read with no error.
+      evolved = case GameState.stack onStack of
+        spellId : _ -> S.runPure (evolvingAt spellId) onStack (S.cast S.alice evolutionId >> Stack.resolveTop)
+        [] -> onStack
+      resolved = S.runPure S.identityAnswer evolved Stack.resolveTop
+      after = S.runPure takingEveryTarget resolved (S.cast S.alice paladinId >> Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
+  pure (S.printingName spider, after)
+
+-- Aims the Evolution at `oid` by narrowing the offered set to it, and answers CR
+-- 612.1's word swap with Spider for Vampire.
+evolvingAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+evolvingAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
+  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Spider, Subtype.Vampire)
+  _ -> S.identityAnswer p
+
+-- Takes every candidate the engine offers. S.identityAnswer declines, which
+-- would answer the Paladin's "up to one target" with none on either board and
+-- prove nothing; this answerer reads the engine's own candidate list back, so
+-- the assertion is about what was LEGAL to target.
+takingEveryTarget :: Prompt.Prompt r -> r
+takingEveryTarget p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap snd sets
+  _ -> S.identityAnswer p
 
 -- Hurr Jackal {R} Creature -- Jackal 1/1, whole text: "{T}: Target creature
 -- can't be regenerated this turn." (oracle checked on Scryfall)
