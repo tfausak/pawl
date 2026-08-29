@@ -115,6 +115,7 @@ costMovesLibraryCard component = case component of
   -- LIBRARY and none of these is one.
   CostComponent.DiscardCards {} -> False
   CostComponent.DiscardThis _ -> False
+  CostComponent.PutCardFromHandOntoBattlefield _ -> False
   CostComponent.SacrificeThis -> False
   CostComponent.Sacrifice {} -> False
   CostComponent.ReturnThis -> False

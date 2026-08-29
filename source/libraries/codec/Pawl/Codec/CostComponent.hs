@@ -46,6 +46,7 @@ codec keywordCodec =
       -- discard-this cost is not a cycle" is what proves the cause it decodes to
       -- -- a round trip cannot, the wire having one spelling for both causes.
       Arm.nullary "DiscardThis" (CostComponent.DiscardThis DiscardCause.Ordinary),
+      Arm.payload "PutCardFromHandOntoBattlefield" (Filter.codec keywordCodec) CostComponent.PutCardFromHandOntoBattlefield (\x -> case x of CostComponent.PutCardFromHandOntoBattlefield y -> Just y; _ -> Nothing),
       Arm.payload "PayEnergy" Common.natural CostComponent.PayEnergy (\x -> case x of CostComponent.PayEnergy y -> Just y; _ -> Nothing),
       Arm.payload "AddLoyaltyToThis" Common.natural CostComponent.AddLoyaltyToThis (\x -> case x of CostComponent.AddLoyaltyToThis y -> Just y; _ -> Nothing),
       Arm.payload "RemoveLoyaltyFromThis" Common.natural CostComponent.RemoveLoyaltyFromThis (\x -> case x of CostComponent.RemoveLoyaltyFromThis y -> Just y; _ -> Nothing),

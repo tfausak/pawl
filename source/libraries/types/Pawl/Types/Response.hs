@@ -207,7 +207,8 @@ data Response
     -- Prompt.ChooseSacrifices.
     ChoseCardInGraveyard ObjectId.ObjectId
   | -- | CR 608.2d: the card a player chose out of their own hand for an
-    -- Pawl.Types.ObjectRef.ChosenCardInHand. One of these per chooser.
+    -- Pawl.Types.ObjectRef.ChosenCardInHand, or out of the same hand to pay CR
+    -- 118.12's PutCardFromHandOntoBattlefield cost. One of these per chooser.
     --
     -- Its own constructor rather than ChoseCardInGraveyard reused, for that
     -- constructor's reason: the two prompts offer cards out of different zones,

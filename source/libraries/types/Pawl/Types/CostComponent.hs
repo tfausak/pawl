@@ -174,8 +174,8 @@ data CostComponent keyword
     -- The Filter is matched against the card's own CR 613 projection,
     -- ExileCardsFromGraveyard's reading below and for its reason -- see
     -- Pawl.Engine.Cost.discardCandidates.
-    -- DiscardThis below states the rest of what reading a hand costs, for both
-    -- of the components that do.
+    -- DiscardThis below states the rest of what reading a hand costs, for every
+    -- component that does.
     DiscardCards (DiscardCards.DiscardCards keyword)
   | -- | CR 702.29a's and CR 702.77a's "Discard this card": discard the card the
     -- cost is on, from the hand it is in. Two rules print that clause and cards
@@ -199,8 +199,9 @@ data CostComponent keyword
     -- quality names one card (CR 201.2's name comes closest and two copies share
     -- it).
     --
-    -- One of the two components that read a HAND rather than the battlefield
-    -- (DiscardCards is the other), so its payability asks about a zone rather
+    -- One of the components that read a HAND rather than the battlefield
+    -- (DiscardCards above and PutCardFromHandOntoBattlefield below are the
+    -- others), so its payability asks about a zone rather
     -- than about control -- CR 108.4 gives a card in a hand no controller at all.
     --
     -- A hand-reading component must exclude the spell being cast from its
@@ -209,6 +210,43 @@ data CostComponent keyword
     -- the object the cost is on, and a cost on an object that is no longer in a
     -- hand is simply unpayable.
     DiscardThis DiscardCause.DiscardCause
+  | -- | CR 118.12's cost in its hand-to-battlefield form: the paying player puts
+    -- one card matching the Filter from their own hand onto the battlefield.
+    -- Hakbal of the Surging Soul's "you may put a land card from your hand onto
+    -- the battlefield. If you don't, draw a card" is the printing, under
+    -- Pawl.Types.PayBranch's IfNotPaid; the same cost prints under IfPaid on
+    -- Flash, Metathran Aerostat and Shifty Doppelganger, and with a different
+    -- criterion on Origin of the Avengers ("a Hero creature card with mana value
+    -- 3 or less"), so the arm is a family rather than one card's shape.
+    --
+    -- A COST and not an Effect, which is CR 118.12's own sentence: "the action
+    -- [do something] is a cost, paid when the spell or ability resolves". The
+    -- move itself is expressible as an effect already -- Elvish Piper writes
+    -- Pawl.Types.Effect's MoveToZone over an ObjectRef.ChosenCardInHand -- and
+    -- that is exactly what cannot carry the "if you don't", since
+    -- Pawl.Types.Optionality records no answer a later clause can read.
+    --
+    -- A bare Filter and no count, which is ExileTopFromGraveyard's side of
+    -- DiscardCards' axis rather than DiscardCards': every printing of this cost
+    -- names ONE card, so a count field would be 1 on every card in the pool.
+    -- Scryfall o:"from your hand onto the battlefield. If you", 2026-08-28: nine
+    -- printings, all singular, and Dermoplasm's "...face up. If you do", which
+    -- that query's wording misses, is singular too. A card putting two would be
+    -- what refutes this.
+    --
+    -- No Pawl.Types.EntryRiders either. Every printing of this cost leaves CR
+    -- 110.5b's defaults standing, and the "face up" Dermoplasm prints is that
+    -- rule's own default said out loud. A cost printing "tapped" would be what
+    -- earns the field.
+    --
+    -- The Filter is matched against the card's own CR 613 projection,
+    -- DiscardCards' reading above and for its reason -- see
+    -- Pawl.Engine.Cost.putOntoBattlefieldCandidates.
+    --
+    -- The third component that reads a HAND, DiscardCards' and DiscardThis'
+    -- note above, and it is the only one that reads a hand while ADDING to the
+    -- battlefield rather than emptying a zone.
+    PutCardFromHandOntoBattlefield (Filter.Filter keyword)
   | -- | CR 107.14 / 118: pay N energy counters (Longtusk Cub). Energy-specific,
     -- not a general PayPlayerCounters -- energy is the only player counter ever
     -- spent as a cost. A Natural, not a Quantity, for PayLife's reason.

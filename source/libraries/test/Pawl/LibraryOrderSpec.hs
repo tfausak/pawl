@@ -1482,9 +1482,9 @@ explorePromptSpec s registry = Spec.describe s "ExplorePrompt" $ do
 -- The Forest beneath is never reached and keeps the library non-empty.
 --
 -- Hakbal's second printed ability ("whenever Hakbal attacks, you may put a land
--- card from your hand onto the battlefield. If you don't, draw a card") is absent
--- from its card file, which leaves pawl's Hakbal stricter than printed (#2553).
--- Nothing here attacks, so it is inert.
+-- card from your hand onto the battlefield. If you don't, draw a card") is on the
+-- card too; nothing here attacks, so it never triggers.
+-- Pawl.CounterspellSpec's Hakbal group is what proves it.
 hakbalBoard ::
   (Monad m) =>
   Spec.Spec m n ->

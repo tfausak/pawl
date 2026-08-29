@@ -325,6 +325,13 @@ data Prompt r where
   -- posture and elision. The chooser owns the hand: CR 400.2 and CR 402.3 make
   -- the seat asked the only seat the candidates are shown to, which is why
   -- there is no second PlayerId as ChooseFateseal has.
+  --
+  -- Also the PAYMENT's question, over the same zone and the same posture:
+  -- Pawl.Types.CostComponent's PutCardFromHandOntoBattlefield asks it while a
+  -- CR 118.12 cost is paid (Pawl.Engine.Cost.payComponent), where the ObjectId
+  -- is the object the cost is on rather than the object resolving. One prompt
+  -- and not two, because the question is the same one: which of these cards in
+  -- your hand.
   ChooseCardInHand :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 608.2d: which card of a bound GROUP a player chooses for a
   -- Pawl.Types.ObjectRef.ChosenCardFromAmong -- Commune with the Gods' "a
