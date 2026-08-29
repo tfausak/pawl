@@ -1827,6 +1827,7 @@ aimingAtEveryPlayer n p = case p of
       Recipient.ToPlaneswalker _ -> False
       Recipient.ToBattle _ -> False
       Recipient.ToObject _ -> False
+      Recipient.ToPile _ -> False
 
 -- CR 107.14's "you may pay any amount of {E}" (Effect.PayAnyEnergy): the payer
 -- names the amount as the spell RESOLVES -- not at CR 601.2b, which is what

@@ -625,6 +625,7 @@ defaultAnswer p = case p of
           Recipient.ToBattle _ -> False
           Recipient.ToPlayer _ -> False
           Recipient.ToObject _ -> False
+          Recipient.ToPile _ -> False
      in case blockers of
           r : _ -> Map.singleton r n
           [] -> Map.empty

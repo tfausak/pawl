@@ -245,6 +245,7 @@ isCreatureRecipient r = case r of
   Recipient.ToBattle _ -> False
   Recipient.ToPlayer _ -> False
   Recipient.ToObject _ -> False
+  Recipient.ToPile _ -> False
 
 -- The offered way of tapping a source whose YIELD is `wanted`, or the head where
 -- it offers no such yield. What a Prompt.ChooseManaYield answerer that cares

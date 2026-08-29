@@ -96,6 +96,10 @@ tier r = case r of
   Recipient.ToPlaneswalker _ -> 1
   Recipient.ToBattle _ -> 1
   Recipient.ToPlayer _ -> 2
+  -- Unreachable, and the same for every arm this module writes for it: CR
+  -- 406.4's pile is a candidate at CR 601.2c that Pawl.Engine.Target.drawFromPiles
+  -- replaces before a target is recorded, so no damage ever names one.
+  Recipient.ToPile _ -> 0
 
 -- CR 510.1e's other half: the gates the trample rules stack, as ORDERED TIERS
 -- rather than one split:
@@ -166,6 +170,7 @@ deathtouchedRecipients events =
         Recipient.ToPlaneswalker _ -> []
         Recipient.ToBattle _ -> []
         Recipient.ToPlayer _ -> []
+        Recipient.ToPile _ -> []
     ]
 
 -- CR 702.19b / 702.2c: a blocker's lethal threshold is toughness minus marked
@@ -675,6 +680,7 @@ damageRecipient gs recipient = case recipient of
     | Projection.isPlaneswalkerOf oid gs -> Just (Recipient.ToPlaneswalker oid)
     | Projection.isBattleOf oid gs -> Just (Recipient.ToBattle oid)
     | otherwise -> Nothing
+  Recipient.ToPile _ -> Nothing
 
 -- CR 120.3: "damage may have one or more of the following results, depending on
 -- ... the characteristics of the damage's recipient". ONE OR MORE, and the
@@ -709,6 +715,7 @@ damagedCardTypes gs recipient =
         Recipient.ToBattle _ -> Set.singleton CardType.Battle
         Recipient.ToObject _ -> Set.empty
         Recipient.ToPlayer _ -> Set.empty
+        Recipient.ToPile _ -> Set.empty
       projected = case Recipient.objectOf recipient of
         Nothing -> Set.empty
         Just oid -> Set.intersection damageable (Projection.cardTypesOf oid gs)
@@ -927,6 +934,7 @@ applyDamage events = do
         Recipient.ToPlaneswalker oid -> onPermanent ev oid g
         Recipient.ToBattle oid -> onPermanent ev oid g
         Recipient.ToObject oid -> onPermanent ev oid g
+        Recipient.ToPile _ -> g
         -- CR 120.3a's life loss is NOT here. It is the one result of CR 120.3 a
         -- replacement effect can rewrite (CR 120.4c, Worship), so it goes through
         -- Event.resolveLifeLoss and the CR 616.1 loop -- a Game action, where this
@@ -1165,6 +1173,7 @@ applyDamage events = do
                       Recipient.ToBattle oid -> onObject oid
                       Recipient.ToObject oid -> onObject oid
                       Recipient.ToPlayer pid -> place poison (Event.putPlayerCounters cause pid PlayerCounterKind.Poison)
+                      Recipient.ToPile _ -> pure ()
   -- CR 120.4c: "damage that's been dealt is processed into its results, as
   -- modified by replacement effects that interact with those results (such as
   -- life loss or counters)". This is that step for CR 120.3a's life loss, and the

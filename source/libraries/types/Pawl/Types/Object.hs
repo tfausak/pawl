@@ -106,15 +106,14 @@ data Object = MkObject
     --
     -- WHAT IT DOES, which is CR 406.4's first half: a player may choose a
     -- specific face-down exiled card "only if the player is allowed to look at
-    -- that card", so Pawl.Engine.Target's Pool.CardsInExile arm offers one only
-    -- to a player Pawl.Engine.Exile.mayLookAt names -- which CR 406.3's tail
-    -- makes exact for the lifetime of this field, since the permission ends when
-    -- the card leaves exile and CR 400.7 clears the field at that same moment.
+    -- that card", so Pawl.Engine.Target's offer names one only to a player
+    -- Pawl.Engine.Exile.mayLookAt names -- which CR 406.3's tail makes exact for
+    -- the lifetime of this field, since the permission ends when the card leaves
+    -- exile and CR 400.7 clears the field at that same moment -- and offers
+    -- everybody else the pile Pawl.Engine.Exile.pileOf sorts it into.
     --
     -- Not implemented: CR 406.3a's "no characteristics", so a filter that read a
-    -- face-down exiled card's card types would see the printed ones (#1479). Nor
-    -- CR 406.4's second half -- the pile a player who may not look chooses
-    -- instead, and the random card out of it (#1480).
+    -- face-down exiled card's card types would see the printed ones (#1479).
     --
     -- Per-incarnation state, like `facing`: reset by newIncarnation, so a card
     -- that leaves exile is face up again wherever it lands (CR 400.7). The one

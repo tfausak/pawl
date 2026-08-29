@@ -2272,6 +2272,7 @@ isPlayerRecipient r = case r of
   Recipient.ToPlaneswalker _ -> False
   Recipient.ToBattle _ -> False
   Recipient.ToObject _ -> False
+  Recipient.ToPile _ -> False
 
 isCastAction :: A.Action -> Bool
 isCastAction a = case a of
