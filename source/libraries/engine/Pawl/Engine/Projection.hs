@@ -1044,10 +1044,13 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- Battlefield membership guards the read the way Defender.playerOf's battle
       -- arm does: CR 506.4 stops a departed battle being attacked while CR 506.4c
       -- keeps the creature attacking, so the honest answer there is Nothing rather
-      -- than a protector. Belt and braces, since CR 400.7 leaves the object that
-      -- reaches the new zone with no designation to read either
-      -- (Pawl.BattleSpec, "CR 400.7 a battle that leaves the battlefield forgets
-      -- its protector").
+      -- than a protector.
+      --
+      -- The GUARD is a regression fence rather than a proven behavior. CR 400.7
+      -- leaves the object that reaches the new zone with no designation to read
+      -- either (Pawl.BattleSpec, "CR 400.7 a battle that leaves the battlefield
+      -- forgets its protector"), so dropping it changes no board pawl can build
+      -- and mutating it to True leaves the suite green.
       --
       -- Battle.protectorOf is a Object.protector lookup and reads no projection,
       -- so unlike controllerOf above it re-enters nothing at all.
