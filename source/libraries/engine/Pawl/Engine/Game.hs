@@ -709,11 +709,13 @@ turnFacing facing oid gs =
 -- either, which is CR 613.7f.
 --
 -- TWO stamps, and they answer different questions. Object.turnedOverAt takes
--- `now`, one for the whole instruction, because CR 701.27f compares it against a
--- resolving ability and must not tell two simultaneous victims apart.
--- Object.timestamp takes a fresh one PER PERMANENT, because CR 613.7g stamps the
--- permanent rather than the turning-over and Pawl.Engine.Projection's
--- abilityRemovalAfter rests on two objects never sharing a timestamp.
+-- `now`, supplied by the caller so that a caller turning SEVERAL permanents over
+-- at once -- CR 608.2f for one Moonmist, CR 702.145c for one nightfall -- gives
+-- them all the same one, CR 701.27f's comparison against a resolving ability
+-- being unable to tell simultaneous victims apart. Object.timestamp takes a fresh
+-- one PER PERMANENT, because CR 613.7g stamps the permanent rather than the
+-- turning-over and Pawl.Engine.Projection's abilityRemovalAfter rests on two
+-- objects never sharing a timestamp.
 --
 -- Not implemented: CR 613.7m's APNAP order over the permanents one instruction
 -- restamps at once (#2571). They are stamped in the order the caller's fold
@@ -722,11 +724,6 @@ turnFacing facing oid gs =
 -- Reads the object's OWN card (cardOf), never a projected one, which is the
 -- footing Object.face is stored on: CR 712.9's first Example turns on a Clone
 -- being a one-faced card whatever it copied, and that is the same read.
---
--- `now` is supplied by the caller rather than minted here, because a caller that
--- turns SEVERAL permanents over does so simultaneously -- CR 608.2f for one
--- Moonmist, CR 702.145c for one nightfall -- and a later CR 701.27f comparison
--- must not be able to tell them apart.
 turnFaceOver :: Timestamp.Timestamp -> ObjectId -> GameState -> GameState
 turnFaceOver now oid gs
   | not (Set.member oid (GameState.battlefield gs)) = gs
