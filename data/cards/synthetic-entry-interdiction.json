@@ -1,0 +1,63 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Entry Interdiction",
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "ZoneChangeR",
+            "value": {
+              "destination": {
+                "type": "Graveyard"
+              },
+              "matching": {
+                "whatObject": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "IsInZone",
+                      "value": {
+                        "type": "Stack"
+                      }
+                    },
+                    {
+                      "type": "HasColor",
+                      "value": {
+                        "type": "Green"
+                      }
+                    }
+                  ]
+                },
+                "whenDestination": {
+                  "type": "Battlefield"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

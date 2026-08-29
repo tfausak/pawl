@@ -4411,11 +4411,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- `sofar` is the half a test separates: Pawl.AuraSpec's returned Aura and
         -- Pawl.CopySpec's reanimated Clone both fail without it. `before` is
         -- threaded because CR 614.4 asks which effects existed before the BATCH,
-        -- but nothing in data/cards separates it from Nothing -- every
+        -- but nothing in data/cards separates it from Nothing. Every
         -- ReplacementEffect.ZoneChangeR there names a `whenDestination` of
         -- Graveyard or Stack (rest-in-peace, leyline-of-the-void,
         -- anafenza-the-foremost, yawgmoths-will, synthetic-stack-interdiction),
-        -- and no member of a batch moving ONTO THE BATTLEFIELD goes to either.
+        -- which no member of a batch moving ONTO THE BATTLEFIELD goes to, or the
+        -- Battlefield under a Filter.IsInZone Stack conjunct
+        -- (synthetic-entry-interdiction), which no batch member arriving from a
+        -- graveyard or a hand satisfies.
         -- The engine installs one row naming NO destination -- CR 702.34a's
         -- exile, Pawl.Engine.Keyword.castFromGraveyardExile -- which admits the
         -- battlefield too. It separates nothing either: the three rules that
@@ -4423,7 +4426,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- and CR 702.133a say so outright; CR 702.127a's aftermath is printed on
         -- a split card's instant and sorcery halves), and no such spell is a
         -- member of a batch entering the battlefield. A card whose ZoneChangeR
-        -- named the battlefield would separate them.
+        -- watched the battlefield and could match a member of such a batch would
+        -- separate them.
         moveOne mBlocked frozen before (sofar, acc) (target, position) = do
           mNew <- Event.changeZoneEnteringIn (Just before) sofar target zone position frozen (Just controller)
           -- CR 614.6: the move was cancelled, or the id was already gone (CR
