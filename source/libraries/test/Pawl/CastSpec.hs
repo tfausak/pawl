@@ -1745,13 +1745,13 @@ grantedFlashbackSpec s registry = Spec.describe s "GrantedFlashback" $ do
     Spec.assertEqWith s "CR 400.7g: the flashed-back Bolt did not return to the graveyard" (Game.zoneMembers Zone.Graveyard S.alice resolved) []
     Spec.assertEqWith s "CR 400.7g: it was exiled" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 1
   -- CR 107.3a / 601.2b: the {X} the grant copies is a COST's {X}, announced as
-  -- the spell is cast. CR 107.3g -- "{X} in the mana cost of a card in any zone
-  -- other than the stack is treated as 0" -- settles the card's mana VALUE where
-  -- it lies (CR 202.3e), not the alternative cost paid at CR 601.2f, by which
-  -- point CR 601.2a has put the spell on the stack. Snapcaster Mage's ruling
-  -- states the same: "If you cast an instant or sorcery with {X} in its mana cost
-  -- this way, you still choose the value of X as part of casting the spell and
-  -- pay that cost."
+  -- the spell is cast. CR 107.3g's zero is about a card's own mana cost where it
+  -- lies, which is what fixes its mana VALUE off the stack (CR 202.3e); the
+  -- alternative cost here is paid at CR 601.2f, by which point CR 601.2a has put
+  -- the spell on the stack. Snapcaster Mage's ruling says the same in as many
+  -- words: "If you cast an instant or sorcery with {X} in its mana cost this way,
+  -- you still choose the value of X as part of casting the spell and pay that
+  -- cost."
   --
   -- Lier, Disciple of the Drowned {3}{U}{U} is the granter and Blaze {X}{R}
   -- Sorcery ("Blaze deals X damage to any target") the receiver, so the flashback
@@ -1768,8 +1768,10 @@ grantedFlashbackSpec s registry = Spec.describe s "GrantedFlashback" $ do
     -- The gameplay assertion, and it ahead of every proxy: Blaze deals the
     -- announced X, so 16 is the announcement having survived into the resolution.
     Spec.assertEqWith s "bob took the 4 that was announced" (S.lifeOf S.bob after) (Just 16)
-    -- {4}{R} is five Mountains; the sixth is what makes 4 a value the board could
-    -- have refused, so the announcement is not the only value on offer.
+    -- {4}{R} is five Mountains, and the sixth is spare: 4 is neither the floor CR
+    -- 601.2b measures castability at nor the most the board could pay, so an
+    -- engine that clamped to the affordable maximum would have announced 5 and
+    -- left bob at 15.
     Spec.assertEqWith s "five Mountains paid the {4}{R}" (S.tappedCount S.alice after) 5
     -- CR 702.34a's second static ability, which says the cast really was a
     -- flashback cast rather than some other permission.
