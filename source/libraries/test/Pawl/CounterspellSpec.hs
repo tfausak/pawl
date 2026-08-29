@@ -1880,6 +1880,70 @@ goblinWarStrikeChain s registry swap = do
             Stack.resolveTop
   pure (S.runPure S.identityAnswer evolved Stack.resolveTop)
 
+-- CR 612.1 through the LAST carrier of a card's rules text in this group: a
+-- quoted ability handed over by a RESOLUTION rather than by a static ability.
+-- Presence of Gond (Pawl.ActivateSpec) is the static half; this is the half that
+-- goes through Projection.rewriteEffect's Effect.ModifyTarget arm.
+--
+-- Clavileño, First of the Blessed {1}{W}{B} Legendary Creature -- Vampire Cleric
+-- 2/2, "Whenever you attack, target attacking Vampire that isn't a Demon becomes
+-- a Demon in addition to its other types. It gains 'When this creature dies,
+-- draw a card and create a tapped 4/3 white and black Vampire Demon creature
+-- token with flying.'" (checked against Scryfall). The word Demon rides two
+-- positions of that one ability -- a layer-4 Modification.AddCreatureSubtype,
+-- and the token defined INSIDE the quoted ability -- so the token is the only
+-- assertion that answers for the descent, the subtype add being reached by an
+-- arm Tidal Warrior already proves.
+--
+-- alice attacks with the Clavileño and a Bloodrage Vampire ({2}{B} Creature --
+-- Vampire 3/1, checked against Scryfall); the attack trigger targets the
+-- Vampire, and a Murder then kills it so the granted dies trigger mints the
+-- token. Returns the Clavileño's id, the victim's, the state in which the victim
+-- was still alive, the tokens and the final state.
+--
+-- BOTH attackers match "attacking Vampire that isn't a Demon", so the trigger's
+-- target is a real choice rather than one the board forces.
+--
+-- An Island for the Evolution's {U} and three Swamps for the Murder's {1}{B}{B},
+-- plus a library card, since the granted trigger draws and CR 104.3c would
+-- otherwise take the game from alice before the token existed.
+clavilenoChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, [ObjectId.ObjectId], GameState.GameState)
+clavilenoChain s registry swap = do
+  swamp <- S.printingOf s registry "Swamp"
+  island <- S.printingOf s registry "Island"
+  clavileno <- S.printingOf s registry "Clavileño, First of the Blessed"
+  bloodrageVampire <- S.printingOf s registry "Bloodrage Vampire"
+  murder <- S.printingOf s registry "Murder"
+  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+  let (board, mine, _) = S.combatBoardOf [clavileno, bloodrageVampire] []
+      (clavilenoId, victimId) = case mine of
+        [a, b] -> (a, b)
+        _ -> (ObjectId.MkObjectId 998, ObjectId.MkObjectId 999)
+      withLands = List.foldl' (\g p -> snd (S.addCreature p S.alice g)) board [island, swamp, swamp, swamp]
+      (evolutionId, g1) = S.addHandCard artificialEvolution S.alice withLands
+      (murderId, g2) = S.addHandCard murder S.alice g1
+      g3 = snd (S.addLibraryCard swamp S.alice g2)
+      evolved = case swap of
+        Nothing -> g3
+        Just (from, to) ->
+          S.runPure (evolveAt clavilenoId from to) g3 $ do
+            S.cast S.alice evolutionId
+            Stack.resolveTop
+      attacked = S.runPure S.aggressiveAnswer evolved (Combat.declareAttackers S.alice)
+      -- CR 603.3: the attack trigger goes on the stack the next time a player
+      -- would receive priority, and CR 603.3d chooses its target THERE rather
+      -- than at resolution -- so the answerer that pins the victim rides this
+      -- step and not the resolution below.
+      triggered = S.runPure (aimAtCreature victimId) attacked Engine.settleForPriority
+      granted = S.runPure S.identityAnswer triggered Stack.resolveTop
+      killed =
+        S.runPure (aimAtCreature victimId) granted $ do
+          S.cast S.alice murderId
+          Stack.resolveTop
+      settled = S.runPure S.identityAnswer killed Engine.settleForPriority
+      after = S.runPure S.identityAnswer settled Stack.resolveTop
+  pure (clavilenoId, victimId, granted, S.tokensOf after, after)
+
 -- Narrows every target slot to bob, by FILTERING what the engine offered rather
 -- than building a recipient of its own -- a hand-built ToPlayer would be dropped
 -- by CR 608.2b's re-read at resolution with no error. The Players pool offers
@@ -2238,6 +2302,50 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     after <- goblinWarStrikeChain s registry (Just (Subtype.Goblin, Subtype.Elf))
     Spec.assertEqWith s "bob took 4, one per Elf alice controls" (S.lifeOf S.bob after) (Just 16)
     Spec.assertEqWith s "the stack emptied" (length (GameState.stack after)) 0
+
+  -- CR 612.1 into a quoted ability a RESOLUTION grants: the words are printed on
+  -- the GRANTER, so a text change affecting the Clavileño rewrites them before
+  -- its trigger hands them over. CR 612.3 bounds the other direction -- an
+  -- ability granted TO an object -- and does not reach this one.
+  --
+  -- The control first, so the pair cannot pass on a chain that killed nothing.
+  Spec.it s "CR 111.4 an unevolved Clavileño's granted ability mints a Vampire Demon Token" $ do
+    (clavilenoId, victimId, alive, tokens, after) <- clavilenoChain s registry Nothing
+    Spec.assertEqWith s "one Creature -- Vampire Demon" (tokenSubtypes tokens after) [[Subtype.Demon, Subtype.Vampire]]
+    Spec.assertEqWith s "named Vampire Demon Token" (tokenNames tokens after) [[CardName.MkCardName (Text.pack "Vampire Demon Token")]]
+    -- The trigger DID resolve at the victim, so the assertions above are not
+    -- reading a board where nothing happened.
+    Spec.assertEqWith s "the victim was a Vampire Demon while it lived" (Projection.subtypesOf victimId alive) (Set.fromList [Subtype.Vampire, Subtype.Demon])
+    Spec.assertEqWith s "and the Clavileño's own type line prints no Demon" (Projection.subtypesOf clavilenoId alive) (Set.fromList [Subtype.Vampire, Subtype.Cleric])
+
+  -- And the point. The swap reaches the token defined inside the quoted ability,
+  -- name and type line alike (CR 612.2a), and the rest of that token is untouched.
+  Spec.it s "CR 612.1 an evolved Clavileño's granted ability mints a Vampire Elf Token" $ do
+    (clavilenoId, victimId, alive, tokens, after) <- clavilenoChain s registry (Just (Subtype.Demon, Subtype.Elf))
+    Spec.assertEqWith s "one Creature -- Vampire Elf" (tokenSubtypes tokens after) [[Subtype.Elf, Subtype.Vampire]]
+    Spec.assertEqWith s "named Vampire Elf Token" (tokenNames tokens after) [[CardName.MkCardName (Text.pack "Vampire Elf Token")]]
+    -- Only the word moved: the token is the printed 4/3 with flying still.
+    mapM_ (\oid -> Spec.assertEqWith s "still 4/3" (Projection.powerOf oid after, Projection.toughnessOf oid after) (Just (4 :: Integer), Just (3 :: Integer))) tokens
+    mapM_ (\oid -> Spec.assertBool s (Projection.hasKeyword Keyword.Flying oid after) "and still flying") tokens
+    -- The layer-4 half of the same ability took the swap too, by an arm Tidal
+    -- Warrior already proves -- so it cannot be what the token assertions read.
+    Spec.assertEqWith s "the victim was a Vampire Elf while it lived" (Projection.subtypesOf victimId alive) (Set.fromList [Subtype.Vampire, Subtype.Elf])
+    Spec.assertEqWith s "and the Clavileño is a Vampire Cleric still" (Projection.subtypesOf clavilenoId alive) (Set.fromList [Subtype.Vampire, Subtype.Cleric])
+
+  -- The falsifier for a word-blind rewrite, on the same board with one word
+  -- changed: Cleric is printed on the Clavileño's type line and nowhere in the
+  -- ability, so an Evolution naming it moves that one word and leaves the quoted
+  -- ability's Demon standing. Vampire would not serve -- it is the trigger's own
+  -- target filter, and swapping it leaves the trigger with no legal target at
+  -- all (CR 608.2b), which is a different reason for a Demon to survive.
+  Spec.it s "CR 612.2 an Evolution naming Cleric leaves the token's Demon a Demon" $ do
+    (clavilenoId, victimId, alive, tokens, after) <- clavilenoChain s registry (Just (Subtype.Cleric, Subtype.Zombie))
+    Spec.assertEqWith s "one Creature -- Vampire Demon still" (tokenSubtypes tokens after) [[Subtype.Demon, Subtype.Vampire]]
+    Spec.assertEqWith s "named Vampire Demon Token" (tokenNames tokens after) [[CardName.MkCardName (Text.pack "Vampire Demon Token")]]
+    Spec.assertEqWith s "the victim was a Vampire Demon while it lived" (Projection.subtypesOf victimId alive) (Set.fromList [Subtype.Vampire, Subtype.Demon])
+    -- The Evolution DID resolve and DID land on the Clavileño, so the assertions
+    -- above are not reading a board where the swap never happened.
+    Spec.assertEqWith s "and the Clavileño itself is a Vampire Zombie" (Projection.subtypesOf clavilenoId alive) (Set.fromList [Subtype.Vampire, Subtype.Zombie])
 
 -- The one activated ability of a printing that declares exactly one -- Prodigal
 -- Sorcerer's {T}, which is all these fixtures reach for. Nothing for any other
