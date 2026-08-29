@@ -3870,9 +3870,10 @@ designationGathered gs = concatMap fromObject (Set.toList (GameState.battlefield
 -- WHOSE would still have to match a plain write of the same aspect -- an identical
 -- order for a larger type; see #357.
 --
--- Not implemented: `changesAt` confirming such a declaration, which needs the
--- other object's same-layer state and today has only the candidate's (#2632). So
--- every cross-object atom's row is a regression fence.
+-- That confirmation is board-wide, which is what makes a cross-object row
+-- load-bearing rather than a fence: `changesAt` applies the other effect
+-- everywhere it applies and re-asks the set through the resulting board.
+-- Pawl.ProjectionSpec's "CR 613.8a an Aura's host is animated under it" proves it.
 data Aspect
   = Types
   | Subtypes
@@ -3954,21 +3955,19 @@ filterReads f = case f of
   -- layer 4 writes card types -- the conjunct viewOfCharacteristics forces through
   -- `peers`.
   --
-  -- Both halves are a REGRESSION FENCE rather than a proven line, and the reason is
-  -- structural rather than a missing card: every read this atom declares is off
-  -- ANOTHER object, and CR 613.8a's dependency scan is object-local -- `changesAt`
-  -- asks whether applying `b` AT THE CANDIDATE moves the candidate's membership,
-  -- and `appliesTo` reads every peer off the layer-bounded view -- so no board
-  -- reaches this declaration and mutating either half away leaves the suite green.
-  -- Not implemented: a cross-object CR 613.8a dependency (#2632). Kept because
-  -- under-declaring is the defect this function can carry, and closing that issue
-  -- needs these rows already right.
+  -- Both halves are a REGRESSION FENCE rather than a proven line, and no longer for
+  -- a structural reason: `changesAt` now sees a cross-object edge, and the pair
+  -- that proves it is Pawl.ProjectionSpec's "CR 613.8a an Aura's host is animated
+  -- under it". What blocks a board HERE is CR 506.4's own record --
+  -- Combat.attackingNothing is sampled between projections and answers Nothing
+  -- ahead of either conjunct -- so mutating either half away leaves the suite
+  -- green. Kept because under-declaring is the defect this function can carry.
   Filter.Type.IsAttackingPlaneswalker _ -> Set.fromList [Controller, Types]
   -- Reads TYPES and nothing else, where the atom directly above also reads a
   -- Controller: CR 506.4 stops a battle being attacked when it stops being a
   -- battle, and CR 613.1d's layer 4 writes card types, the conjunct
   -- viewOfCharacteristics forces through `peers`. A REGRESSION FENCE for the atom
-  -- above's reason. Not implemented: a cross-object CR 613.8a dependency (#2632).
+  -- above's reason.
   --
   -- The PROTECTOR half of the same read declares nothing, for IsAttacking's
   -- reason: CR 310.9's protector is a designation stored on the battle
@@ -4396,9 +4395,20 @@ projectDeciding admits cands = forObject
                 -- lowest layer it reaches, and remembered for its other layers.
                 -- Object-parameterised, like applyUnit and applyOne below: the
                 -- dependency scan asks all three about every object.
-                appliesTo o ds pc c = case gEffect c of
+                --
+                -- VIEW-parameterised for the same reason applyUnit is. The
+                -- candidate's own characteristics arrive as `pc`, but a filter
+                -- reading ANOTHER object -- an Aura's host (CR 701.3a), a
+                -- creature's attachers (CR 303.4b), the planeswalker or battle an
+                -- attacker was declared against (CR 506.4) -- reaches it through
+                -- this reader, and CR 613 puts no bound on that state. The
+                -- parameter is how `resolve`'s running board gets in, that being
+                -- every caller; the branch below where nothing is movable calls
+                -- affectsGiven with `bounded` itself, which is the same answer
+                -- there because no effect on it can move any other's set.
+                appliesTo viewOf o ds pc c = case gEffect c of
                   Just k | Just answer <- Map.lookup k ds -> answer
-                  _ -> affectsGiven bounded (gSource c) o (gAffected c) pc gs
+                  _ -> affectsGiven viewOf (gSource c) o (gAffected c) pc gs
                 -- Fold every part of ONE effect landing in this layer, in the
                 -- order the card lists them (CR 613.6). The ViewOf is the SAME
                 -- for every object the effect reaches, so a count inside it
@@ -4417,7 +4427,7 @@ projectDeciding admits cands = forObject
                 -- Re-inserting an existing key rewrites the value just read.
                 applyOne viewOf o (pc, ds) cs =
                   let c = NonEmpty.head cs
-                      answer = appliesTo o ds pc c
+                      answer = appliesTo viewOf o ds pc c
                       ds' = case gEffect c of
                         Nothing -> ds
                         Just k -> Map.insert k answer ds
@@ -4474,7 +4484,7 @@ projectDeciding admits cands = forObject
                         -- object, shared by the dependency scan -- this is the
                         -- hot loop. CR 613.6 makes the head part answer for the
                         -- unit.
-                        answersAt o p d = fmap (\(i, cs) -> (i, appliesTo o d p (NonEmpty.head cs))) pending
+                        answersAt o p d = fmap (\(i, cs) -> (i, appliesTo view o d p (NonEmpty.head cs))) pending
                         answerFor ans i = Maybe.fromMaybe False (List.lookup i ans)
                         -- The board as it stands: every battlefield object plus
                         -- the projected one, which need not be there.
@@ -4500,34 +4510,37 @@ projectDeciding admits cands = forObject
                         -- Every object CR 613.8a's question ranges over, the
                         -- projected one first.
                         boards = (oid, pc, ds, answersAt oid pc ds) : fmap (\(o, (p, d)) -> (o, p, d, answersAt o p d)) (Map.toList others)
-                        -- CR 613.8a clause (b)'s "what it applies to", at ONE
-                        -- object: applying `b` there changes whether `a` applies.
-                        -- The tentative application is thrown away. `b` is
-                        -- applied WHOLE -- half an effect is not a state CR 613
-                        -- describes.
+                        -- CR 613.8a clause (b)'s "what it applies to", asked at one
+                        -- object against the board `b` leaves behind EVERYWHERE it
+                        -- applies -- changesMagnitude's own posture, and for the
+                        -- rule's reason: clause (b) says nothing about the two
+                        -- effects sharing an object, so `b` applying to a
+                        -- permanent whose characteristics `a`'s filter reads moves
+                        -- `a`'s set at a permanent `b` never touched. The
+                        -- tentative application is thrown away. `b` is applied
+                        -- WHOLE -- half an effect is not a state CR 613 describes.
                         --
-                        -- Not implemented: the CROSS-object edge, where `b`
-                        -- applies to one permanent and `a`'s membership moves at
-                        -- another -- `answerFor ans j` demands both at `o`, and
-                        -- `appliesTo` would read the other off `bounded` anyway
-                        -- (#2632). changesMagnitude below already does it the
-                        -- other way, off appliedEverywhere.
-                        changesAt (j, bs) (i, as) (o, p, d, ans) =
+                        -- `after` and `afterView` come from the caller so the
+                        -- board is built once per PAIR rather than once per
+                        -- object; an id outside `after` cannot arise, since
+                        -- appliedEverywhere maps over the same `running` that
+                        -- `boards` is built from.
+                        changesAt after afterView (i, as) (o, p, d, ans) =
                           let a = NonEmpty.head as
                            in not (decidedAt d a)
-                                && answerFor ans j
-                                && appliesTo o d (applyUnit view o p bs) a /= answerFor ans i
+                                && appliesTo afterView o d (maybe p fst (Map.lookup o after)) a /= answerFor ans i
                         -- `a` depends on `b` when that holds ANYWHERE: CR 613.8a
                         -- asks about the whole affected SET, which is also how CR
                         -- 613.8b's loop becomes visible. Clause (c)'s CDA
                         -- exclusion needs no test -- a CDA is never a candidate;
                         -- clause (b)'s "existence" half is liveGiven's.
-                        movesSet x@(_, as) y@(_, bs) =
+                        movesSet x@(_, as) (_, bs) =
                           case movableAspects (NonEmpty.head as) of
                             Nothing -> False
                             Just aspects ->
                               not (Set.disjoint aspects (unitWrites bs))
-                                && any (changesAt y x) boards
+                                && let after = appliedEverywhere bs
+                                    in any (changesAt after (viewOfBoard after) x) boards
                         -- CR 613.8a clause (b)'s LAST limb: applying `b` changes
                         -- what `a` does to the things it applies to. Only a
                         -- magnitude can move, so what is compared is the P/T `a`
@@ -4548,7 +4561,7 @@ projectDeciding admits cands = forObject
                         -- against the board as it stands (CR 613.6).
                         appliedEverywhere bs =
                           Map.mapWithKey
-                            (\o (p, d) -> (if appliesTo o d p (NonEmpty.head bs) then applyUnit view o p bs else p, d))
+                            (\o (p, d) -> (if appliesTo view o d p (NonEmpty.head bs) then applyUnit view o p bs else p, d))
                             running
                         dependsOnOne x@(i, as) y@(j, bs) =
                           j /= i
