@@ -947,31 +947,19 @@ data Prompt r where
   -- Asked only where the order is observable, which
   -- Pawl.Engine.Cost.tollOrderObservable decides.
   OrderCombatTolls :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt [Natural.Natural]
-  -- | CR 712.21a: a melded permanent put into its owner's graveyard or library
-  -- becomes two cards, and "that player may arrange the two cards in any
-  -- order". The Zone is that destination and the [PrintingId] is the component
-  -- cards in the order they melded in; the answer is a permutation of their
-  -- indices, first-named put into the zone first.
+  -- | CR 712.21a: the owner arranges the two cards a melded permanent becomes
+  -- when it is put into their graveyard or library. The Zone is that
+  -- destination and the [PrintingId] the components in the order they melded
+  -- in; the answer is a permutation of their indices, first-named PUT IN first
+  -- -- so at a graveyard (CR 404.1) and at a library's top the last-named ends
+  -- up on top. The printings and not the arrivals, which have no ids until this
+  -- has settled where they go.
   --
-  -- Put-in order rather than the resulting top-to-bottom arrangement, which is
-  -- the sibling Order prompts' shape and states the same choice: CR 404.1 puts
-  -- a graveyard arrival on top and Pawl.Engine.Game.insertIntoZone prepends a
-  -- LibraryPosition.Top one, so at both of those ends the LAST-named card is the
-  -- one on top, while at a library's bottom the first-named is the higher of the
-  -- two. Every arrangement is reachable either way, which is what the rule asks.
-  --
-  -- The printings and not the arrivals: the cards have no ids until they are
-  -- placed, and placing them is what this orders. That is also why this is not
-  -- ArrangeLibraryArrivals above, which CR 401.4 asks over ids a resolution
-  -- has already minted -- and the two never both fire, since the split places
-  -- through Pawl.Engine.Event.placeObject rather than through the CR 401.4 batch
-  -- Pawl.Engine.Resolve gathers. Nothing diverges either way: CR 401.4 gives a
-  -- library's arrangement to the same owner, and CR 712.21a is what extends it
-  -- to a graveyard.
-  --
-  -- CR 730.3a says the same sentence for a merged permanent (#874), so the
-  -- prompt is named for the components a leaving permanent splits into rather
-  -- than for meld.
+  -- Not ArrangeLibraryArrivals above, which CR 401.4 asks over ids a resolution
+  -- already minted; the two never both fire, and neither diverges, CR 401.4
+  -- giving a library's arrangement to the same owner. CR 730.3a says the
+  -- sentence again for a merged permanent (#874), so the name is the leaving
+  -- permanent's components rather than meld's.
   OrderComponentCards :: Decider.Decider -> PlayerId.PlayerId -> Zone.Zone -> [PrintingId.PrintingId] -> Prompt [Natural.Natural]
   -- | The relative order of a per-object batch over objects ONE player
   -- controls. The [Recipient] is one such group in the engine's canonical

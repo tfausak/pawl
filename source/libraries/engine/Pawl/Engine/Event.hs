@@ -4028,8 +4028,8 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
 
 -- CR 712.21a: "if a melded permanent is put into its owner's graveyard or
 -- library, that player may arrange the two cards in any order." Answers the
--- components in the order they are to be PUT INTO the zone; Prompt.OrderComponentCards
--- says how that maps onto which card ends up on top.
+-- components in the order they are to be PUT INTO the zone;
+-- Prompt.OrderComponentCards says how that maps onto which card ends up on top.
 --
 -- The OWNER is asked, which is the rule's "that player": the sentence's subject
 -- is the melded permanent put into ITS OWNER's graveyard or library, and
