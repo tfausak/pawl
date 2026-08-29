@@ -373,9 +373,15 @@ data Response
     -- against the wrong one would reorder one cost's parts instead of the
     -- taxing permanents.
     OrderedCombatTolls [Natural.Natural]
+  | -- | CR 712.21a: the order a melded permanent's owner chose to put its two
+    -- cards into their graveyard or library in, as a permutation of the offered
+    -- indices. A separate constructor from the ones above for their reason:
+    -- replaying a transcript against the wrong one would reorder a payment
+    -- instead of the two cards.
+    OrderedComponentCards [Natural.Natural]
   | -- | CR 608.2f: the relative order a resolving spell's controller chose for the
     -- members of one APNAP group a per-object body walks, as a permutation of the
-    -- offered indices. A separate constructor from the three above for their
+    -- offered indices. A separate constructor from the ones above for their
     -- reason: replaying a transcript against the wrong one would reorder a sweep
     -- instead of a trigger batch.
     OrderedForEach [Natural.Natural]

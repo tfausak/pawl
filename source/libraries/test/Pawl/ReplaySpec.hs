@@ -524,6 +524,25 @@ combatReplaySpec s =
             "identity permutation"
             (Replay.defaultAnswer (Prompt.OrderCombatTolls decider S.alice [oid, ObjectId.MkObjectId 8]))
             [0, 1 :: Natural.Natural]
+        -- CR 712.21a's arrangement, the fifth prompt carrying a [Natural]
+        -- permutation, and discriminating against the four above for their own
+        -- stated reason: a shared Response constructor would let a payment's
+        -- transcript entry rearrange a melded permanent's two cards.
+        Spec.it s "OrderComponentCards records and replays a permutation" $ do
+          let p = Prompt.OrderComponentCards decider S.alice Zone.Library [PrintingId.MkPrintingId 3, PrintingId.MkPrintingId 4]
+              answer = [1, 0] :: [Natural.Natural]
+          Spec.assertEqWith s "round-trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+          Spec.assertEqWith
+            s
+            "an OrderCombatTolls transcript entry does not answer an OrderComponentCards"
+            (Replay.decode p (Replay.encode (Prompt.OrderCombatTolls decider S.alice [oid, ObjectId.MkObjectId 8]) answer))
+            Nothing
+        Spec.it s "defaultAnswer keeps the order the cards melded in" $
+          Spec.assertEqWith
+            s
+            "identity permutation"
+            (Replay.defaultAnswer (Prompt.OrderComponentCards decider S.alice Zone.Graveyard [PrintingId.MkPrintingId 3, PrintingId.MkPrintingId 4]))
+            [0, 1 :: Natural.Natural]
         Spec.it s "ChooseSacrifices records and replays a Set ObjectId" $ do
           let p = Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1
               answer = Set.singleton (ObjectId.MkObjectId 8)

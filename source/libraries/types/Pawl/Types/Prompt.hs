@@ -947,6 +947,26 @@ data Prompt r where
   -- Asked only where the order is observable, which
   -- Pawl.Engine.Cost.tollOrderObservable decides.
   OrderCombatTolls :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt [Natural.Natural]
+  -- | CR 712.21a: a melded permanent put into its owner's graveyard or library
+  -- becomes two cards, and "that player may arrange the two cards in any
+  -- order". The Zone is that destination and the [PrintingId] is the component
+  -- cards in the order they melded in; the answer is a permutation of their
+  -- indices, first-named put into the zone first.
+  --
+  -- Put-in order rather than the resulting top-to-bottom arrangement, which is
+  -- the sibling Order prompts' shape and states the same choice: CR 404.1 puts
+  -- a graveyard arrival on top and Pawl.Engine.Game.insertIntoZone prepends a
+  -- LibraryPosition.Top one, so at both of those ends the LAST-named card is the
+  -- one on top, while at a library's bottom the first-named is the higher of the
+  -- two. Every arrangement is reachable either way, which is what the rule asks.
+  --
+  -- The printings and not the arrivals: the cards have no ids until they are
+  -- placed, and placing them is what this orders.
+  --
+  -- CR 730.3a says the same sentence for a merged permanent (#874), so the
+  -- prompt is named for the components a leaving permanent splits into rather
+  -- than for meld.
+  OrderComponentCards :: Decider.Decider -> PlayerId.PlayerId -> Zone.Zone -> [PrintingId.PrintingId] -> Prompt [Natural.Natural]
   -- | The relative order of a per-object batch over objects ONE player
   -- controls. The [Recipient] is one such group in the engine's canonical
   -- order; the answer is a permutation of its indices.
