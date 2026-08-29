@@ -246,6 +246,17 @@ to agents as written. What it doesn't say:
     when the neighbouring argument's type happens to clash. It has bitten twice
     (PRs #2009 and #2021). Grep every construction site of the type by hand.
 
+    WIDENING AN EXISTING FUNCTION'S RESULT is the same hazard with no tripwire
+    at all. Every case above adds a case to a TYPE, so a fallthrough or a
+    positional site is at least greppable; returning a second element where one
+    used to come back changes no type, so `-Werror` is silent and step 3 is too
+    --- a mutation proves the test is sensitive to the line you wrote, never
+    that you found the other readers. That shipped a regression (PR #2537 ->
+    #2555): `Card.castableFaces` gained a second face, the gate legitimising it
+    went in one caller, and `Resolve.offerCast` --- which builds its own
+    candidate list --- offered the face for free. Grep the function's callers,
+    and say in the PR body which paths you drove and which you did not.
+
 5.  Closing #N means moving every census row that cites it. #875, #876 and #877
     annotate implemented rows with the issue numbers of what those rows still
     don't do, and nothing checks the three bodies against anything. Read them
