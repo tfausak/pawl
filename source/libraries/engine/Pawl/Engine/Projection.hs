@@ -1093,9 +1093,25 @@ viewOfCharacteristics peers oid pc controller counters gs =
       --
       -- Battle.protectorOf is an Object.protector lookup and reads no projection,
       -- so unlike controllerOf above it re-enters nothing at all.
+      --
+      -- The other two conjuncts are rule 506.4's battle clauses, arm for arm with the
+      -- planeswalker field above and with Combat.stillAttackedBattle's own list: the
+      -- PROTECTOR compared against Combat.defender, which CR 310.9d makes the
+      -- defending player while a battle is attacked, and the CARD TYPE through
+      -- `peers`. The type conjunct is load-bearing precisely because CR 310.9g keeps
+      -- the designation when a permanent stops being a battle, so Battle.protectorOf
+      -- goes on answering; Pawl.BattleSpec's "CR 506.4 a battle that stops being a
+      -- battle" pair is the board.
+      --
+      -- The PROTECTOR conjunct is a regression fence rather than a proven behavior:
+      -- CR 310.9f's change needs an effect that moves a designation, and pawl has
+      -- none (see #853), so mutating it away leaves the suite green.
       Filter.attackingBattleProtector = case Map.lookup oid (Combat.attackers (GameState.combat gs)) of
         Just (AttackTarget.OfBattle battle)
-          | Set.member battle (GameState.battlefield gs) -> Battle.protectorOf battle gs
+          | Set.member battle (GameState.battlefield gs),
+            Battle.protectorOf battle gs == Combat.defender (GameState.combat gs),
+            any (Set.member CardType.Battle . Filter.cardTypes) (peers battle) ->
+              Battle.protectorOf battle gs
         _ -> Nothing,
       -- CR 509.1g: likewise. Combat.blockers is keyed by ATTACKER, so blocking is
       -- membership in some attacker's set rather than a key lookup.

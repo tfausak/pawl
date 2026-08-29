@@ -520,7 +520,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
 -- Synthetic Bulwark Snare is Soul Snare with CR 509.1a's third subject in place of
 -- its second: {W} Enchantment, "{W}, Sacrifice this enchantment: Exile target
 -- creature that's attacking you or a battle you protect."
-filterSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+filterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 filterSpec s registry = Spec.describe s "Filter" $ do
   Spec.it s "CR 310.9d whole card: Synthetic Bulwark Snare reaches a creature attacking a battle you PROTECT" $ do
     -- THREE Snares off ONE board, differing in exactly one thing: which seat fires
@@ -567,6 +567,75 @@ filterSpec s registry = Spec.describe s "Filter" $ do
         Spec.assertEqWith s "CR 310.9a: carol protects the Siege" (protectorOf battle bystander) (Just S.carol)
         Spec.assertEqWith s "CR 310.12a: alice controls it, and is the player attacking it" (Projection.controllerOf battle bystander) (Just S.alice)
       _ -> Spec.assertFailure s "fixture should have one ability, one Piker and three Snares"
+  -- CR 506.4's battle clause -- "if it's a battle that's being attacked and stops
+  -- being a battle" -- read through the same atom. CR 310.9g is what makes it a
+  -- real hole rather than a redundancy: the protector designation SURVIVES the
+  -- type change, so Battle.protectorOf goes on naming carol and the atom goes on
+  -- answering her unless the card type is asked as well.
+  --
+  -- The producer is two printings and no new card. Song of the Dryads {2}{G} --
+  -- Enchantment - Aura, "Enchant permanent / Enchanted permanent is a colorless
+  -- Forest land", is sorcery-speed and so cannot be cast mid-combat; Aura Graft
+  -- {1}{U} -- Instant, "Gain control of target Aura that's attached to a
+  -- permanent. Attach it to another permanent it can enchant", moves one that is
+  -- already down. Both oracle texts checked against Scryfall, 2026-08-29.
+  --
+  -- A PAIR off ONE board differing in exactly one thing: which permanent alice's
+  -- Aura Graft moves the Song onto. Same spell, same two Islands, same answerer.
+  -- The move lands AFTER the declaration, which is the point.
+  Spec.it s "CR 506.4 a battle that stops being a battle stops being attacked, so the Snare cannot name the attacker" $ do
+    snare <- S.printingOf s registry snareName
+    (gs0, battle, mine, _, hers) <-
+      battleCombatOf s registry S.carol S.carol ["Goblin Piker", "Island", "Island", "Bonesplitter", "Bonesplitter", "Song of the Dryads"] [] ["Plains", snareName]
+    graft <- S.printingOf s registry "Aura Graft"
+    case (Face.activatedAbilities (S.combinedFace snare), mine, hers) of
+      ([ability], [piker, _, _, host, spare, song], [_, carolSnare]) -> do
+        let (spell, gs1) = S.addHandCard graft S.alice (S.attachTo song (Recipient.ToObject host) gs0)
+            queued =
+              gs1
+                { GameState.remaining =
+                    Seq.fromList
+                      [ Phase.Combat CombatStep.DeclareBlockers,
+                        Phase.Combat CombatStep.CombatDamage,
+                        Phase.Combat CombatStep.EndOfCombat,
+                        Phase.PostcombatMain
+                      ]
+                }
+            declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackTheBattle battle) queued
+            onto destination =
+              S.runPure (graftAnswer song destination) declared $ do
+                S.cast S.alice spell
+                Stack.resolveTop
+            landed = onto battle
+            elsewhere = onto spare
+            fires = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (snareAnswer battle carolSnare ability piker)
+        -- GAMEPLAY FIRST. The Siege is a colorless Forest land, so nothing is
+        -- attacking a battle carol protects; an engine reading the surviving
+        -- designation anyway hands her Snare the attacker.
+        Spec.assertBool s (S.onBattlefield piker (fires landed)) "CR 506.4: the Siege stopped being a battle, so carol's Snare cannot name the Piker"
+        Spec.assertBool s (S.onBattlefield carolSnare (fires landed)) "and her Snare is unsacrificed: the ability was never activatable"
+        Spec.assertBool s (not (S.onBattlefield piker (fires elsewhere))) "control: with the Song moved to the spare Bonesplitter instead, the same Snare exiles the attacker"
+        Spec.assertBool s (not (S.onBattlefield carolSnare (fires elsewhere))) "control: there it paid its own sacrifice, so the activation really happened"
+        -- Anti-vacuity, and the isolation. CR 613.1d's layer 4 moved and CR 310.9g's
+        -- designation did not, which is the whole reason the type has to be asked.
+        Spec.assertEqWith s "CR 613.1d: it is no longer a battle on one leg only" (fmap (Battle.isBattle . Projection.project battle) [landed, elsewhere]) [False, True]
+        Spec.assertEqWith s "CR 310.9g: carol protects it on both all the same" (fmap (protectorOf battle) [landed, elsewhere]) [Just S.carol, Just S.carol]
+        Spec.assertBool s (Set.member battle (GameState.battlefield landed)) "CR 506.4: nor did it leave the battlefield"
+        Spec.assertEqWith
+          s
+          "CR 506.4c: the Piker is still an attacking creature, its entry still naming the Siege"
+          (Map.lookup piker (Combat.Type.attackers (GameState.combat landed)))
+          (Just (AttackTarget.OfBattle battle))
+      _ -> Spec.assertFailure s "fixture should have one ability, one Piker, two Bonesplitters, a Song and carol's Snare"
+
+-- Choose `aura` for Aura Graft's one target slot and `destination` for the host
+-- CR 701.3a then moves it to. FILTERED rather than replaced, for snareAnswer's
+-- reason; Pawl.CombatEffectSpec holds its own copy for its planeswalker pair.
+graftAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+graftAnswer aura destination p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just aura) . Recipient.objectOf) legal) sets
+  Prompt.ChooseAttachment _ _ _ offered -> if List.elem destination (NonEmpty.toList offered) then destination else NonEmpty.head offered
+  _ -> S.aggressiveAnswer p
 
 snareName :: String
 snareName = "Synthetic Bulwark Snare"
