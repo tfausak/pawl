@@ -817,11 +817,12 @@ resolveZoneChange asOf zc = do
 --
 -- Not implemented: a place in CR 616.1's ordering, where CR 616.1e leaves the
 -- affected player free to pick among the applicable effects and this offer instead
--- always goes last (#2266). Unobservable while no ZoneChangeR in data/cards/ matches a
--- hand or a library -- all six match a graveyard or the stack and redirect to exile
--- -- so no second candidate can be applicable to the same event; a printed redirect
--- naming a hand or a library as the destination it watches (Wheel of Sun and Moon
--- is the shape) would refute that.
+-- always goes last (#2266). Unobservable while no ZoneChangeR in data/cards/
+-- matches a hand or a library -- every row there names a `whenDestination` of
+-- the graveyard, the stack or the battlefield -- so no second candidate can be
+-- applicable to the same event; a printed redirect naming a hand or a library as
+-- the destination it watches (Wheel of Sun and Moon is the shape) would refute
+-- that.
 --
 -- No case on effect identity: the question is a proposed event's destination ZONE
 -- and whether its subject is a commander.
@@ -1082,11 +1083,13 @@ loop asOf batch applied prevented exiledBy event = do
 -- no card arrives in exile for the rule to speak of. One that leaves an
 -- already-exile destination alone changes nothing, since the earlier row is
 -- still what caused the exile. Neither of those two arms is exercised, and not
--- by a claim about Magic: every ReplacementEffect.ZoneChangeR in data/cards/
--- names exile as its destination, so no board can stack two of them into a
--- rewrite chain that leaves it again. A printed row naming any other zone --
--- Wheel of Sun and Moon's "into its owner's library instead" is the shape --
--- would refute that and reach both arms. Only the first has a producer.
+-- by a claim about Magic: no ReplacementEffect.ZoneChangeR in data/cards/ names
+-- exile -- or nothing, which admits every zone -- as the `whenDestination` it
+-- watches, so none can fire on a destination an earlier row already moved into
+-- exile, and no board can stack two of them into a rewrite chain that leaves it
+-- again. A printed row watching exile, or one naming no destination at all
+-- (CR 702.34a's "instead of putting it anywhere else" is the wording), would
+-- refute that and reach both arms. Only the first has a producer.
 --
 -- `offerCommandZone` is not a second way to reach them either: it runs after this
 -- loop has finished, so no candidate is read off its answer, and rule 903.9b only
@@ -3306,7 +3309,9 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing Set.empty oi
 -- inert for every destination but exile.
 -- `carrying` is CR 400.7a's exception, Carried for Pawl.Engine.Stack's two
 -- permanent-spell branches and NotCarried for every other door -- see carryOver
--- below, which the body calls before the entry loop.
+-- below, which the body calls before the entry loop, under a `dest ==
+-- Battlefield` gate rather than a `dest == requestedDest` one: the rule is about
+-- the permanent the spell becomes, and only a battlefield destination makes one.
 --
 -- `position` needs no `dest == requestedDest` gate, unlike `face` and `facing`
 -- below: it is inert everywhere but a library, so a CR 616.1 redirect AWAY from
@@ -3460,13 +3465,15 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               --
               -- Gated on the SETTLED destination rather than the requested one,
               -- so a CR 616.1 rewrite that redirects the move decides this too
-              -- (CR 614.6: the modified event is what happens). Indistinguishable
-              -- from gating on the request today, and not because of a claim
-              -- about Magic: no ReplacementEffect.ZoneChangeR in data/cards/
-              -- names the battlefield as its destination -- every one of them
-              -- names exile (see exiledByAfter, which rests on the same fact) --
-              -- and the one RULES-based redirect in this funnel, rule 903.9b's
-              -- offerCommandZone above, answers Zone.Command.
+              -- (CR 614.6: the modified event is what happens). The two now read
+              -- different zones on a real board: synthetic-entry-interdiction
+              -- sends a battlefield-bound permanent spell to a graveyard, where
+              -- the request-gated reading would write an entry controller onto a
+              -- graveyard card. The other direction is still unreached -- no
+              -- ReplacementEffect.ZoneChangeR in data/cards/ names the
+              -- battlefield as its own destination, and the one RULES-based
+              -- redirect in this funnel, rule 903.9b's offerCommandZone above,
+              -- answers Zone.Command.
               --
               -- CR 400.7: Object.newIncarnation is the whole forgetting -- the
               -- entry controller (CR 110.2), the as-enters choices (CR 614.1c),
@@ -3866,12 +3873,14 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- stack, its own "enters with a time counter for each Island"
               -- counts Swamps.
               --
-              -- Not implemented: a gate on `dest`, so a CR 614.6 redirect that
-              -- sent this permanent spell somewhere other than the battlefield
-              -- carries anyway -- both exceptions carryOver makes are for "the
-              -- permanent that spell becomes", and a spell that became no
-              -- permanent makes neither (#2399).
-              carryOver carrying oid newId
+              -- Gated on the SETTLED destination, because both exceptions
+              -- carryOver makes are for "the permanent that spell becomes" (CR
+              -- 400.7a, CR 400.7c) and a permanent spell a CR 614.6 redirect
+              -- sent anywhere else becomes no permanent. CR 608.3e is the
+              -- rulebook's own case of the same shape. Pawl.ReplacementSpec's
+              -- "a redirected permanent spell carries nothing over" is the
+              -- proof.
+              Monad.when (dest == Zone.Battlefield) (carryOver carrying oid newId)
               -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
               -- nowhere else. CR 616.1g's nesting of one event inside another is
               -- expressed as call nesting rather than a field. `batch` is the
@@ -4037,10 +4046,11 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
 -- to: Auriok Replica's chosen source, since Resolve.damageSourceCandidates
 -- offers the spells on the stack.
 --
--- Called INSIDE changeZoneAttaching, before the CR 614.1c entry loop, and
--- Pawl.Types.CarryOver is how the move says whether CR 400.7's exception is
--- the one it is making. Scoped to Pawl.Engine.Stack's two permanent-spell
--- branches. Not implemented: CR 400.7b's static-ability ability grants (CR
+-- Called INSIDE changeZoneAttaching, before the CR 614.1c entry loop and only
+-- where the settled destination is the battlefield, and Pawl.Types.CarryOver is
+-- how the move says whether CR 400.7's exception is the one it is making. Scoped
+-- to Pawl.Engine.Stack's two permanent-spell branches. Not implemented: CR
+-- 400.7b's static-ability ability grants (CR
 -- 611.3d), which this carrier cannot reach at all -- a static grant is derived
 -- on every projection rather than stored, so there is no row here to re-key
 -- (#2425). CR 400.7i is unimplemented too, on a carrier this one never sees --
