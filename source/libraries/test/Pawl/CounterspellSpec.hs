@@ -1845,6 +1845,50 @@ coulsonChain s registry swap = do
         [] -> evolved
   pure (punkId, pikerId, used)
 
+-- alice controls two Goblin Pikers and four Glistener Elves; she casts Goblin
+-- War Strike at bob, optionally has an Artificial Evolution resolved at the
+-- STRIKE ON THE STACK first, and then the Strike resolves. Returns the final
+-- state.
+--
+-- The two counts are deliberately unequal, and neither equals the number of
+-- creatures on the board: a Strike that counted everything, or that counted
+-- nothing, is a different life total from either reading.
+goblinWarStrikeChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m GameState.GameState
+goblinWarStrikeChain s registry swap = do
+  mountain <- S.printingOf s registry "Mountain"
+  island <- S.printingOf s registry "Island"
+  goblinPiker <- S.printingOf s registry "Goblin Piker"
+  glistenerElf <- S.printingOf s registry "Glistener Elf"
+  goblinWarStrike <- S.printingOf s registry "Goblin War Strike"
+  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+  let board =
+        List.foldl'
+          (\gs printing -> snd (S.addCreature printing S.alice gs))
+          (S.landsFor island S.alice 1 (S.landsInPlay mountain 1))
+          [goblinPiker, goblinPiker, glistenerElf, glistenerElf, glistenerElf, glistenerElf]
+      (strikeId, g1) = S.addHandCard goblinWarStrike S.alice board
+      (evolutionId, g2) = S.addHandCard artificialEvolution S.alice g1
+      onStack = S.runPure aimAtBob g2 (S.cast S.alice strikeId)
+      spellId = case GameState.stack onStack of
+        top : _ -> top
+        [] -> ObjectId.MkObjectId 999
+      evolved = case swap of
+        Nothing -> onStack
+        Just (from, to) ->
+          S.runPure (evolveAt spellId from to) onStack $ do
+            S.cast S.alice evolutionId
+            Stack.resolveTop
+  pure (S.runPure S.identityAnswer evolved Stack.resolveTop)
+
+-- Narrows every target slot to bob, by FILTERING what the engine offered rather
+-- than building a recipient of its own -- a hand-built ToPlayer would be dropped
+-- by CR 608.2b's re-read at resolution with no error. The Players pool offers
+-- both seats, so this is a real choice.
+aimAtBob :: Prompt.Prompt r -> r
+aimAtBob p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToPlayer S.bob) . snd) sets
+  _ -> S.identityAnswer p
+
 -- Aims every target slot at `oid` as a creature (Turn to Frog's Pool.Creatures
 -- recipient shape); the board holds more than one creature, so the choice has to
 -- be answered rather than forced by construction.
@@ -2169,6 +2213,31 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     (punkId, pikerId, after) <- coulsonChain s registry (Just (Subtype.Hero, Subtype.Goblin))
     Spec.assertEqWith s "the Goblin Piker got the counter" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 1
     Spec.assertEqWith s "the Spider-Punk got none" (S.counterOf CounterKind.PlusOnePlusOne punkId after) 0
+
+  -- CR 612.1's "any words or symbols printed on that object" reaches a word held
+  -- inside a NUMBER the effect computes, not only the ones naming an object.
+  -- Goblin War Strike {R} Sorcery -- "Goblin War Strike deals damage to target
+  -- player or planeswalker equal to the number of Goblins you control" (checked
+  -- against Scryfall) -- puts the changeable word inside its damage clause's own
+  -- Count, where every other case in this group puts it in a filter or a subtype.
+  --
+  -- pawl's Goblin War Strike is aimed with Pool.Players, so it cannot be pointed
+  -- at a planeswalker -- stricter than printed, since no pool names that pair
+  -- (gap #2594).
+  --
+  -- The control first, so the pair cannot pass on a chain that never resolved the
+  -- Strike.
+  Spec.it s "CR 120.1 an unevolved Goblin War Strike counts Goblins" $ do
+    after <- goblinWarStrikeChain s registry Nothing
+    Spec.assertEqWith s "bob took 2, one per Goblin alice controls" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "the stack emptied" (length (GameState.stack after)) 0
+
+  -- And the point: the swap reaches the Count inside the damage clause, so the
+  -- resolving Strike counts alice's four Elves instead of her two Goblins.
+  Spec.it s "CR 612.1 an evolved Goblin War Strike counts Elves instead" $ do
+    after <- goblinWarStrikeChain s registry (Just (Subtype.Goblin, Subtype.Elf))
+    Spec.assertEqWith s "bob took 4, one per Elf alice controls" (S.lifeOf S.bob after) (Just 16)
+    Spec.assertEqWith s "the stack emptied" (length (GameState.stack after)) 0
 
 -- The one activated ability of a printing that declares exactly one -- Prodigal
 -- Sorcerer's {T}, which is all these fixtures reach for. Nothing for any other

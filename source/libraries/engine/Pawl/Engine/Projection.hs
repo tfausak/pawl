@@ -55,6 +55,7 @@ import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CopySpell as CopySpell
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
@@ -73,6 +74,7 @@ import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Discard as Discard
+import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
@@ -83,6 +85,7 @@ import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
@@ -127,8 +130,10 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
+import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Power as Power
@@ -142,12 +147,14 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
+import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Reveal as Reveal
+import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
@@ -155,6 +162,7 @@ import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
@@ -1988,14 +1996,19 @@ rewriteEffect pairs effect = case effect of
   -- subtype word (#2420).
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     Effect.ModifyTarget (ModifyTarget.MkModifyTarget (rewriteDuration pairs duration) (rewriteModification pairs modification) (rewriteObjectRef pairs ref))
-  Effect.DealDamage (DealDamage.MkDealDamage parts dealer excess) -> Effect.DealDamage (DealDamage.MkDealDamage (fmap (\part -> part {DamagePart.ref = rewriteObjectRef pairs (DamagePart.ref part)}) parts) dealer excess)
+  -- CR 612.1 through BOTH halves of every clause: the recipient's ref, and the
+  -- clause's own amount, whose Count may name a creature type -- Goblin War
+  -- Strike's "damage equal to the number of Goblins you control". CR 120.2b's
+  -- dealer is a slot name and CR 120.4a's excess rider a destination; neither is a
+  -- word rule 612 can swap.
+  Effect.DealDamage (DealDamage.MkDealDamage parts dealer excess) -> Effect.DealDamage (DealDamage.MkDealDamage (fmap (rewriteDamagePart pairs) parts) dealer excess)
   -- Two SlotNames and nothing else: no word a swap could reach.
   Effect.Fight _ -> effect
   -- CR 612.1: a text-changer's own restriction clause is text like any other.
   Effect.ChangeText (ChangeText.MkChangeText family forbidden slot) ->
     Effect.ChangeText (ChangeText.MkChangeText family (Set.map (swapWordIn family pairs) forbidden) slot)
   Effect.AddMana _ -> effect
-  Effect.Search (Search.MkSearch searcher owner zones quantity filter_ upTo destination) -> Effect.Search (Search.MkSearch searcher owner zones quantity (Filter.rewrite pairs filter_) upTo destination)
+  Effect.Search (Search.MkSearch searcher owner zones quantity filter_ upTo destination) -> Effect.Search (Search.MkSearch searcher owner zones (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination)
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
   -- CR 612.1: rule 201.4a's restriction is printed card text, so a text-changer
@@ -2008,12 +2021,12 @@ rewriteEffect pairs effect = case effect of
   -- board and mutating this line reddens nothing.
   Effect.RevealFromOutsideTheGame predicate -> Effect.RevealFromOutsideTheGame (Filter.rewrite pairs predicate)
   Effect.ExileThisSpell -> effect
-  Effect.Bolster _ -> effect
+  Effect.Bolster quantity -> Effect.Bolster (rewriteQuantity pairs quantity)
   -- CR 612.1 / 612.2a: amass's subtype is a printed word of CR 205.3m's family,
   -- and the token's own name follows it.
   Effect.Amass (Amass.MkAmass quantity subtype) ->
-    Effect.Amass (Amass.MkAmass quantity (List.foldl' (\s (from, to) -> if s == from && Subtype.isCreatureType from then to else s) subtype pairs))
-  Effect.Blight _ -> effect
+    Effect.Amass (Amass.MkAmass (rewriteQuantity pairs quantity) (List.foldl' (\s (from, to) -> if s == from && Subtype.isCreatureType from then to else s) subtype pairs))
+  Effect.Blight x -> Effect.Blight (rewritePlayerQuantity pairs x)
   Effect.TemptWithTheRing -> effect
   -- CR 612.2's gate, and this arm is where it bites rather than where it is
   -- restated: the payload IS a subtype word (CR 701.49d's quality), but a pair
@@ -2023,7 +2036,7 @@ rewriteEffect pairs effect = case effect of
   -- this function can be given names it.
   Effect.Venture {} -> effect
   Effect.ExileHandThenDraw -> effect
-  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot (Filter.rewrite pairs filter_) quantity)
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot (Filter.rewrite pairs filter_) (rewriteQuantity pairs quantity))
   Effect.RestartGame exempt -> Effect.RestartGame (fmap (rewriteObjectRef pairs) exempt)
   Effect.ControlPlayerNextTurn _ -> effect
   Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot mBuried mPermanents) -> Effect.Destroy (Destroy.MkDestroy (rewriteObjectRef pairs ref) regenerability mSlot mBuried mPermanents)
@@ -2041,42 +2054,48 @@ rewriteEffect pairs effect = case effect of
   Effect.TurnFaceUp _ -> effect
   Effect.RemoveFromCombat ref -> Effect.RemoveFromCombat (rewriteObjectRef pairs ref)
   Effect.BecomesBlocked _ -> effect
+  -- The riders' counter AMOUNTS are Quantities and take rewriteQuantity's
+  -- descent, PutCounters' case below.
+  --
   -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
   -- printed keyword through the swap (#1190).
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone riders mSlot mOrigin position) -> Effect.MoveToZone (MoveToZone.MkMoveToZone (rewriteObjectRef pairs ref) zone riders mSlot mOrigin position)
-  Effect.Draw {} -> effect
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone riders mSlot mOrigin position) -> Effect.MoveToZone (MoveToZone.MkMoveToZone (rewriteObjectRef pairs ref) zone (rewriteEntryRiders pairs riders) mSlot mOrigin position)
+  Effect.Draw x -> Effect.Draw x {Draw.quantity = rewriteQuantity pairs (Draw.quantity x)}
   Effect.Mill (Mill.MkMill ref quantity mTally mSlot) ->
-    Effect.Mill (Mill.MkMill ref quantity (fmap (\t -> t {MillTally.filter = Filter.rewrite pairs (MillTally.filter t)}) mTally) mSlot)
+    Effect.Mill (Mill.MkMill ref (rewriteQuantity pairs quantity) (fmap (\t -> t {MillTally.filter = Filter.rewrite pairs (MillTally.filter t)}) mTally) mSlot)
   Effect.Reveal (Reveal.MkReveal ref slot) -> Effect.Reveal (Reveal.MkReveal (rewriteObjectRef pairs ref) slot)
   Effect.LookAt (LookAt.MkLookAt ref slot) -> Effect.LookAt (LookAt.MkLookAt (rewriteObjectRef pairs ref) slot)
-  Effect.Scry {} -> effect
-  Effect.Surveil {} -> effect
-  Effect.Fateseal {} -> effect
+  Effect.Scry x -> Effect.Scry (rewritePlayerQuantity pairs x)
+  Effect.Surveil x -> Effect.Surveil (rewritePlayerQuantity pairs x)
+  Effect.Fateseal x -> Effect.Fateseal (rewritePlayerQuantity pairs x)
   Effect.Explore ref -> Effect.Explore (rewriteObjectRef pairs ref)
   -- The These arm's ref carries a Filter, so rule 612's text change reaches it
   -- exactly as Reveal's does; the Counted arm holds two slot NAMES and a count,
-  -- and a slot name is not a word rule 612 can swap.
+  -- and only the count is a word rule 612 can reach -- a slot name is not.
   Effect.Discard subject -> case subject of
-    Discard.Counted _ -> effect
+    Discard.Counted x -> Effect.Discard (Discard.Counted x {CountedDiscard.quantity = rewriteQuantity pairs (CountedDiscard.quantity x)})
     Discard.These ref -> Effect.Discard (Discard.These (rewriteObjectRef pairs ref))
-  Effect.LoseLife {} -> effect
-  Effect.GainLife {} -> effect
+  Effect.LoseLife x -> Effect.LoseLife (rewritePlayerQuantity pairs x)
+  Effect.GainLife x -> Effect.GainLife (rewritePlayerQuantity pairs x)
   Effect.ExchangeLifeTotals _ -> effect
-  Effect.SetLifeTotal {} -> effect
+  Effect.SetLifeTotal x -> Effect.SetLifeTotal (rewritePlayerQuantity pairs x)
   Effect.RedistributeLifeTotals -> effect
-  Effect.IncreaseSpeed {} -> effect
-  Effect.DecreaseSpeed {} -> effect
+  Effect.IncreaseSpeed x -> Effect.IncreaseSpeed (rewritePlayerQuantity pairs x)
+  Effect.DecreaseSpeed x -> Effect.DecreaseSpeed x {SpeedDecrease.quantity = rewriteQuantity pairs (SpeedDecrease.quantity x)}
   -- CR 612.2a: the token's creature types and its name are the same words, and
-  -- they live in the defining card.
+  -- they live in the defining card. The count and the riders' counter amounts are
+  -- Quantities and take rewriteQuantity's descent, PutCounters' case below.
   --
   -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
   -- printed keyword (#1190).
-  Effect.Create (Create.MkCreate quantity card riders slot creator) -> Effect.Create (Create.MkCreate quantity (rewriteCard pairs card) riders slot creator)
+  Effect.Create (Create.MkCreate quantity card riders slot creator) -> Effect.Create (Create.MkCreate (rewriteQuantity pairs quantity) (rewriteCard pairs card) (rewriteEntryRiders pairs riders) slot creator)
   -- CR 707.2 excludes text-changing effects from copiable values, so what the
-  -- token becomes is not rewritten -- only the ref is. The riders are left alone
-  -- for the reason Create's arm above leaves its own: a CR 122.1b keyword counter
-  -- named in them keeps its printed keyword (#1190).
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> Effect.CreateCopy (CreateCopy.MkCreateCopy quantity (rewriteObjectRef pairs ref) riders)
+  -- token becomes is not rewritten -- only the ref, the count and the riders'
+  -- counter amounts are.
+  --
+  -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
+  -- printed keyword, Create's arm above (#1190).
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> Effect.CreateCopy (CreateCopy.MkCreateCopy (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref) (rewriteEntryRiders pairs riders))
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) ->
     Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (rewriteObjectRef pairs original) (rewriteObjectRef pairs subject))
   -- The ref alone, CreateCopy's reason: CR 707.2 keeps a text change out of the
@@ -2087,7 +2106,7 @@ rewriteEffect pairs effect = case effect of
   Effect.SkipNextPhase {} -> effect
   -- CR 612.1: a rider's text is as changeable as any other.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref whatRecipient whoRecipient chosenSource quantity rider) ->
-    Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage (rewriteDuration pairs duration) kind ref whatRecipient whoRecipient chosenSource quantity (fmap (rewriteEffect pairs) rider))
+    Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage (rewriteDuration pairs duration) kind ref whatRecipient whoRecipient chosenSource (rewriteQuantity pairs quantity) (fmap (rewriteEffect pairs) rider))
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref direction chosenSource whatSource rider) ->
     Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage (rewriteDuration pairs duration) kind ref direction chosenSource whatSource (fmap (rewriteEffect pairs) rider))
   Effect.RedirectDamage {} -> effect
@@ -2097,7 +2116,12 @@ rewriteEffect pairs effect = case effect of
   -- the same kind (#1840).
   Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) ->
     Effect.PutCounters (PutCounters.MkPutCounters kind (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
-  Effect.RemoveCounters {} -> effect
+  -- The count is a Quantity and takes the same descent PutCounters' case above
+  -- makes.
+  --
+  -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
+  -- printed keyword through the swap, PutCounters' case above (#1840).
+  Effect.RemoveCounters x -> Effect.RemoveCounters x {RemoveCounters.quantity = rewriteQuantity pairs (RemoveCounters.quantity x)}
   -- Filter.rewrite renames no slot, so none of the three bare slots is rewritten;
   -- the count is a Quantity and goes through rewriteQuantity, PutCounters' case
   -- above.
@@ -2105,8 +2129,11 @@ rewriteEffect pairs effect = case effect of
   -- printed keyword through the swap, PutCounters' case above (#1840).
   Effect.MoveCounters (MoveCounters.MkMoveCounters from kind quantity slot to) ->
     Effect.MoveCounters (MoveCounters.MkMoveCounters from kind (rewriteQuantity pairs quantity) slot to)
-  Effect.GainPlayerCounters {} -> effect
-  Effect.RemovePlayerCounters {} -> effect
+  -- A player counter kind is a closed list (CR 122.1f, CR 122.1i, CR 107.14, and
+  -- CR 122.1's bare first sentence) with no subtype word in it, so only the count
+  -- descends.
+  Effect.GainPlayerCounters x -> Effect.GainPlayerCounters x {PlayerCounters.quantity = rewriteQuantity pairs (PlayerCounters.quantity x)}
+  Effect.RemovePlayerCounters x -> Effect.RemovePlayerCounters x {PlayerCounters.quantity = rewriteQuantity pairs (PlayerCounters.quantity x)}
   Effect.PayAnyEnergy _ -> effect
   Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
@@ -2175,7 +2202,9 @@ rewriteEffect pairs effect = case effect of
   Effect.PlaySubgame _ -> effect
   Effect.ChooseOpponent _ -> effect
   Effect.ChooseOpponentAtRandom _ -> effect
-  Effect.RollDie {} -> effect
+  -- CR 706.1's number of sides is a numeral rather than a computed count; the
+  -- modifier added to the result is the Quantity, PutCounters' descent above.
+  Effect.RollDie x -> Effect.RollDie x {RollDie.modifier = fmap (rewriteQuantity pairs) (RollDie.modifier x)}
   Effect.FlipCoin {} -> effect
   Effect.TakeExtraTurn {} -> effect
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (rewriteObjectRef pairs ref))
@@ -2759,6 +2788,30 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.BlockersBeyondFirst -> quantity
   -- Not a leaf: the payload is a whole Quantity and may hide a Count.
   Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot (rewriteQuantity pairs inner))
+
+-- CR 612.1 over a damage clause: the recipient's ref, and the amount CR 120.1
+-- has that recipient dealt.
+rewriteDamagePart :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> DamagePart.DamagePart -> DamagePart.DamagePart
+rewriteDamagePart pairs part =
+  part
+    { DamagePart.ref = rewriteObjectRef pairs (DamagePart.ref part),
+      DamagePart.quantity = rewriteQuantity pairs (DamagePart.quantity part)
+    }
+
+-- The count alone: a PlayerRef names a rules category (CR 102.1) and not a word
+-- rule 612 can swap.
+rewritePlayerQuantity :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> PlayerQuantity.PlayerQuantity -> PlayerQuantity.PlayerQuantity
+rewritePlayerQuantity pairs x = x {PlayerQuantity.quantity = rewriteQuantity pairs (PlayerQuantity.quantity x)}
+
+-- CR 612.1 over an entry row's counter AMOUNTS -- "enters with a +1/+1 counter
+-- for each Goblin you control" is a Count like any other. The keys are left as
+-- printed, which is why this needs none of rewriteWithCounters' collision
+-- combiner.
+--
+-- Not implemented: a CR 122.1b keyword counter named in a key keeps its printed
+-- keyword (#1190).
+rewriteEntryRiders :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> EntryRiders.EntryRiders Quantity.Type.Quantity -> EntryRiders.EntryRiders Quantity.Type.Quantity
+rewriteEntryRiders pairs riders = riders {EntryRiders.counters = fmap (rewriteQuantity pairs) (EntryRiders.counters riders)}
 
 -- Greatest is the only Aggregation carrying a Quantity.
 rewriteAggregation :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Aggregation.Aggregation Quantity.Type.Quantity -> Aggregation.Aggregation Quantity.Type.Quantity
