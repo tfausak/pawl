@@ -52,7 +52,7 @@ hasLeftTheBattlefield oid gs = case Game.lookupObject oid gs of
 -- deciding at the departure and moving at the next settle is indistinguishable
 -- from moving at the departure. What it is NOT is a triggered ability -- rule
 -- 610.3 gives nobody a window to respond, and a return that used the stack could
--- be countered or removed (#2626).
+-- be countered or removed -- see #2626.
 --
 -- ONE BATCH read off one board (CR 610.3d): every due watch is collected before
 -- any object moves, and each move is judged against that board, so returns after

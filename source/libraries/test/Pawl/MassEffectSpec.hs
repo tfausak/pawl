@@ -24,6 +24,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Resolve as Resolve
@@ -63,6 +64,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -3005,29 +3007,43 @@ gloriousProtectorSpec s registry =
                     (controlledNames S.alice after)
                     (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
         -- CR 610.3b: kill the Protector while its own enters trigger is still on
-        -- the stack, and NOTHING is exiled -- the card's ruling states it in those
+        -- the stack, and nothing is exiled -- the card's ruling states it in those
         -- words. The answerer is the accepting one, which names every candidate, so
         -- an engine that exiled would exile three creatures here rather than none.
+        --
+        -- The +1/+1 counter is what makes the leg discriminating, and an
+        -- exile-is-empty reading on its own would not be: the CR 610.3 sweep
+        -- returns whatever was exiled inside this same priority loop, so a board
+        -- read afterwards shows an empty exile either way. What it cannot hand back
+        -- is the OBJECT -- CR 400.7 mints a new one, and the card's ruling spells
+        -- out the consequence, that counters on the exiled permanent cease to
+        -- exist. So the counter surviving on the id the fixture put it on is
+        -- "this creature never moved".
         Spec.it s "CR 610.3b a source that has left before its trigger resolves exiles nothing" $ do
           staged <- printings
-          let onStack = triggerOnStack accepting staged
-          case permanentNamed "Glorious Protector" onStack of
-            Nothing -> Spec.assertFailure s "the Protector should have entered"
-            Just oid -> do
-              Spec.assertEqWith s "the enters trigger is on the stack and has not resolved" (length (GameState.stack onStack)) 1
-              let killed = S.runPure accepting onStack (Event.destroy Regenerability.Regenerable [oid])
-                  after = S.runPure accepting killed Engine.priorityLoop
-              Spec.assertEqWith s "nothing is exiled" (exiledNames after) []
-              Spec.assertEqWith
-                s
-                "and every creature alice controlled is still hers, the Protector aside"
-                (controlledNames S.alice after)
-                (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
+          case maidenId (fst staged) of
+            Nothing -> Spec.assertFailure s "fixture should give alice a Bird Maiden"
+            Just maiden -> do
+              let (board0, spell) = staged
+                  onStack = triggerOnStack accepting (S.addCounter CounterKind.PlusOnePlusOne 1 maiden board0, spell)
+              case permanentNamed "Glorious Protector" onStack of
+                Nothing -> Spec.assertFailure s "the Protector should have entered"
+                Just oid -> do
+                  Spec.assertEqWith s "the enters trigger is on the stack and has not resolved" (length (GameState.stack onStack)) 1
+                  let killed = S.runPure accepting onStack (Event.destroy Regenerability.Regenerable [oid])
+                      after = S.runPure accepting killed Engine.priorityLoop
+                  Spec.assertEqWith s "the Bird Maiden never moved: the same object still carries its +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne maiden after) 1
+                  Spec.assertEqWith s "nothing is exiled" (exiledNames after) []
+                  Spec.assertEqWith
+                    s
+                    "and every creature alice controlled is still hers, the Protector aside"
+                    (controlledNames S.alice after)
+                    (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
         -- CR 610.3: the return is a one-shot effect created immediately after the
         -- departure, so ONE settle brings the creature back and puts nothing on the
         -- stack. Written as a second triggered ability it would be an object on the
         -- stack instead, with the creature still in exile through a round of
-        -- priority -- which is the divergence this case exists to hold shut (#2626).
+        -- priority -- which is the divergence this case exists to hold shut; see #2626.
         Spec.it s "CR 610.3 the return uses no stack: one settle brings the creature back" $ do
           staged <- printings
           case maidenId (fst staged) of
@@ -3046,6 +3062,25 @@ gloriousProtectorSpec s registry =
                     (controlledNames S.alice settled)
                     (List.sort (fmap (Just . named) ["Angel of Finality", "Bird Maiden", "Goblin Piker", "Ogre Sentry", "Plains", "Plains", "Plains", "Plains"]))
                   Spec.assertEqWith s "and nothing was put on the stack to do it" (length (GameState.stack settled)) 0
+        -- The same board with the one thing changed: the Protector PHASES OUT
+        -- instead of dying. CR 702.26d makes that no zone change, so CR 610.3's
+        -- specified event has not happened and the creature stays in exile --
+        -- which is why the watch asks the source's zone rather than its membership
+        -- of the battlefield set, the one question rule 702.26b makes answer
+        -- differently.
+        Spec.it s "CR 702.26d phasing the source out is not leaving, so nothing returns" $ do
+          staged <- printings
+          case maidenId (fst staged) of
+            Nothing -> Spec.assertFailure s "fixture should give alice a Bird Maiden"
+            Just maiden -> do
+              let exiled = cast (namingExactly (Set.singleton maiden)) staged
+              case permanentNamed "Glorious Protector" exiled of
+                Nothing -> Spec.assertFailure s "the Protector should be on the battlefield"
+                Just oid -> do
+                  let phased = Phasing.phaseOut (PhasedOut.Directly S.alice) oid exiled
+                      settled = S.runPure S.identityAnswer phased Engine.settleForPriority
+                  Spec.assertEqWith s "the Bird Maiden is still in exile" (exiledNames settled) [Just (named "Bird Maiden")]
+                  Spec.assertEqWith s "and the watch still stands" (Map.size (GameState.movedUntilSourceLeaves settled)) 1
 
 -- ObjectRef.EachCardInYourLibrary under Effect.MoveToZone: CR 400.12's
 -- whole-zone instruction over CR 400.1's other hidden per-player zone, where

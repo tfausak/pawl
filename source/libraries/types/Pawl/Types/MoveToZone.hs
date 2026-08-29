@@ -39,7 +39,7 @@ import qualified Pawl.Types.Zone as Zone
 -- GameState.movedUntilSourceLeaves, whose sweep performs rule 610.3's second
 -- one-shot effect. Nothing on a card returns the object, and nothing may:
 -- writing the return as a second triggered ability puts it on the stack, where
--- rule 610.3 gives nobody a window to respond (#2626).
+-- rule 610.3 gives nobody a window to respond -- see #2626.
 data MoveToZone = MkMoveToZone
   { ref :: ObjectRef.ObjectRef,
     zone :: Zone.Zone,
