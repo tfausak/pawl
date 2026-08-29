@@ -1880,8 +1880,8 @@ goblinWarStrikeChain s registry swap = do
             Stack.resolveTop
   pure (S.runPure S.identityAnswer evolved Stack.resolveTop)
 
--- CR 612.1 through the LAST carrier of a card's rules text in this group: a
--- quoted ability handed over by a RESOLUTION rather than by a static ability.
+-- CR 612.1 through a quoted ability handed over by a RESOLUTION rather than by
+-- a static ability.
 -- Presence of Gond (Pawl.ActivateSpec) is the static half; this is the half that
 -- goes through Projection.rewriteEffect's Effect.ModifyTarget arm.
 --
@@ -1891,9 +1891,9 @@ goblinWarStrikeChain s registry swap = do
 -- draw a card and create a tapped 4/3 white and black Vampire Demon creature
 -- token with flying.'" (checked against Scryfall). The word Demon rides two
 -- positions of that one ability -- a layer-4 Modification.AddCreatureSubtype,
--- and the token defined INSIDE the quoted ability -- so the token is the only
--- assertion that answers for the descent, the subtype add being reached by an
--- arm Tidal Warrior already proves.
+-- and the token defined INSIDE the quoted ability -- and only the token answers
+-- for the descent, the subtype add being a sibling arm of rewriteModification
+-- that the same walk reaches without ever entering the quoted ability.
 --
 -- alice attacks with the Clavileño and a Bloodrage Vampire ({2}{B} Creature --
 -- Vampire 3/1, checked against Scryfall); the attack trigger targets the
@@ -2327,8 +2327,8 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     -- Only the word moved: the token is the printed 4/3 with flying still.
     mapM_ (\oid -> Spec.assertEqWith s "still 4/3" (Projection.powerOf oid after, Projection.toughnessOf oid after) (Just (4 :: Integer), Just (3 :: Integer))) tokens
     mapM_ (\oid -> Spec.assertBool s (Projection.hasKeyword Keyword.Flying oid after) "and still flying") tokens
-    -- The layer-4 half of the same ability took the swap too, by an arm Tidal
-    -- Warrior already proves -- so it cannot be what the token assertions read.
+    -- The layer-4 half of the same ability took the swap too, by a sibling arm of
+    -- rewriteModification -- so it cannot be what the token assertions read.
     Spec.assertEqWith s "the victim was a Vampire Elf while it lived" (Projection.subtypesOf victimId alive) (Set.fromList [Subtype.Vampire, Subtype.Elf])
     Spec.assertEqWith s "and the Clavileño is a Vampire Cleric still" (Projection.subtypesOf clavilenoId alive) (Set.fromList [Subtype.Vampire, Subtype.Cleric])
 
@@ -2336,8 +2336,9 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
   -- changed: Cleric is printed on the Clavileño's type line and nowhere in the
   -- ability, so an Evolution naming it moves that one word and leaves the quoted
   -- ability's Demon standing. Vampire would not serve -- it is the trigger's own
-  -- target filter, and swapping it leaves the trigger with no legal target at
-  -- all (CR 608.2b), which is a different reason for a Demon to survive.
+  -- target filter, and swapping it leaves the trigger with no legal target when it
+  -- goes on the stack (CR 603.3d), which is a different reason for a Demon to
+  -- survive.
   Spec.it s "CR 612.2 an Evolution naming Cleric leaves the token's Demon a Demon" $ do
     (clavilenoId, victimId, alive, tokens, after) <- clavilenoChain s registry (Just (Subtype.Cleric, Subtype.Zombie))
     Spec.assertEqWith s "one Creature -- Vampire Demon still" (tokenSubtypes tokens after) [[Subtype.Demon, Subtype.Vampire]]
