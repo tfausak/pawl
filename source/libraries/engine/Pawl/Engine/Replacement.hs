@@ -1548,6 +1548,9 @@ chooserOf gs event = case event of
     -- "defending player", which rule 616 nowhere says.
     Recipient.ToBattle oid -> Projection.controllerOf oid gs
     Recipient.ToObject oid -> Projection.controllerOf oid gs
+    -- Unreachable: CR 406.4's pile is a candidate at CR 601.2c and never a
+    -- target, so nothing deals damage to one.
+    Recipient.ToPile _ -> Nothing
   ProposedEvent.WouldBeDestroyed oid _ _ -> Projection.controllerOf oid gs
   ProposedEvent.WouldPutCounters _ oid _ _ -> Projection.controllerOf oid gs
   -- CR 616.1's affected player is the one the event happens to, which for a

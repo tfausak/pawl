@@ -3445,19 +3445,30 @@ chooseNewTargetsFor controller copyId = do
           -- a fresh choice of targets rather than a re-check of the old one, so
           -- it reads what the board can supply now.
           fresh = Target.legalSets (Just controller) Map.empty copyId slots gs
-          offer slot recipients = (Natural.length recipients, Set.union recipients (Map.findWithDefault Set.empty slot fresh))
+          -- CR 406.4: what this player may not name specifically is offered as
+          -- the pile it sits in, exactly as at CR 601.2c. The targets already
+          -- CHOSEN are offered unchanged whatever they are, rule 707.10c letting
+          -- one stand even when it is now illegal.
+          offer slot recipients = (Natural.length recipients, Set.union recipients (Target.piledOffer (Just controller) gs (Map.findWithDefault Set.empty slot fresh)))
           asked = Map.mapWithKey offer current
           -- Every slot answerable only one way means the options are
           -- indistinguishable, and CR 707.10c's offer is elided.
-          settled slot = Set.isSubsetOf (Map.findWithDefault Set.empty slot fresh)
+          settled slot = Set.isSubsetOf (Target.piledOffer (Just controller) gs (Map.findWithDefault Set.empty slot fresh))
       Monad.unless (and (Map.elems (Map.mapWithKey settled current))) $ do
         answer <- Game.choose (Prompt.ChooseTargets (Decide.deciderFor controller gs) controller copyId asked)
         let admits (n, offered) picked = Natural.length picked == n && Set.isSubsetOf picked offered
             wellFormed =
               Map.keysSet answer == Map.keysSet asked
                 && and (Map.elems (Map.intersectionWith admits asked answer))
-            write o = o {Object.bindings = Map.union (fmap Binding.toRecipients answer) (Object.bindings o)}
-        Monad.when wellFormed (State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)}))
+        Monad.when wellFormed $ do
+          -- CR 406.4's draw, run on the ANSWER: a pile the player named becomes
+          -- the card randomness picked out of it before any target is recorded.
+          drawn <-
+            Map.traverseWithKey
+              (\slot picked -> Target.drawFromPiles (Just controller) (Map.findWithDefault Set.empty slot fresh) picked)
+              answer
+          let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients drawn) (Object.bindings o)}
+          State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)})
 
 -- One effect, applied. `runSubgame` is the injected nested-game runner; only
 -- the PlaySubgame arm consults it.

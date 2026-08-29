@@ -471,6 +471,9 @@ playersFor context gs ref =
             Recipient.ToPlaneswalker _ -> Nothing
             Recipient.ToBattle _ -> Nothing
             Recipient.ToObject _ -> Nothing
+            -- Unreachable: Pawl.Engine.Target.drawFromPiles replaces CR 406.4's
+            -- pile with the card drawn from it before any slot is bound.
+            Recipient.ToPile _ -> Nothing
         -- InSlot's plural, off the same bindings: EVERY player the slot names,
         -- with the non-player recipients dropped rather than collapsing the
         -- whole read the way Binding.onlyOne does above. An UNBOUND slot is

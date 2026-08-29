@@ -254,6 +254,7 @@ import qualified Pawl.Codec.PhasePatternSpec
 import qualified Pawl.Codec.PhaseSelectorSpec
 import qualified Pawl.Codec.PhaseSpec
 import qualified Pawl.Codec.PhasedOutSpec
+import qualified Pawl.Codec.PileSpec
 import qualified Pawl.Codec.PlayPermissionOriginSpec
 import qualified Pawl.Codec.PlayerAttacksWithSpec
 import qualified Pawl.Codec.PlayerCounterKindSpec
@@ -785,6 +786,7 @@ spec s registry = do
   Pawl.Codec.PhaseSelectorSpec.spec s
   Pawl.Codec.PhaseSpec.spec s
   Pawl.Codec.PhasedOutSpec.spec s
+  Pawl.Codec.PileSpec.spec s
   Pawl.Codec.PlayPermissionOriginSpec.spec s
   Pawl.Codec.PlayerCounterKindSpec.spec s
   Pawl.Codec.PlayerAttacksWithSpec.spec s
