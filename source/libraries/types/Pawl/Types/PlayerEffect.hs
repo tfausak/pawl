@@ -122,27 +122,27 @@ data PlayerEffect
     -- ReduceActivationCost.grantedBy, which names a rule-702 family rather than a
     -- Filter; see that type for why the two cannot be one field.
     --
-    -- A THIRD criterion beside those two names what the ability TARGETS --
-    -- Dwarven Mauler's "equip abilities you activate that target this creature"
-    -- -- and rides ReduceActivationCost.whichTargets. It is a Filter like the
-    -- first, and an object question like the first, but asked of CR 601.2c's
-    -- chosen target rather than of the ability's source, and therefore asked at
-    -- a later moment than either of the others.
+    -- A THIRD criterion is CR 605.1a's mana-ability classification, which rides
+    -- ReduceActivationCost.whichKind -- Zirda, the Dawnwaker's "abilities you
+    -- activate that aren't mana abilities". Neither a Filter nor a rule-702
+    -- family, and IncreaseActivationCost above carries the same field for the
+    -- same reason.
+    --
+    -- A FOURTH criterion names what the ability TARGETS -- Dwarven Mauler's
+    -- "equip abilities you activate that target this creature" -- and rides
+    -- ReduceActivationCost.whichTargets. It is a Filter like the first, and an
+    -- object question like the first, but asked of CR 601.2c's chosen target
+    -- rather than of the ability's source, and therefore asked at a later moment
+    -- than any of the others.
     --
     -- The FLOOR is carried rather than assumed, because it is card text (CR
-    -- 101.1) and not a rule: both printings say "This effect can't reduce the
-    -- mana in that cost to less than one mana" and so carry 1, while an
-    -- activation-cost reducer that does not say it (Blossoming Tortoise's
-    -- "Activated abilities of lands you control cost {1} less to activate")
-    -- carries 0. See Pawl.Types.CostAdjustments.reductions for what zero means,
-    -- why a floor never raises a cost, and why the two kinds cannot share one
-    -- floor over the pool.
-    --
-    -- IncreaseActivationCost above is this arm's sibling, and carries CR 605.1a's
-    -- mana-ability classification as its own `whichKind`. Not implemented: the
-    -- same narrowing on THIS arm, which Zirda, the Dawnwaker's "Abilities you
-    -- activate that aren't mana abilities cost {2} less to activate" needs
-    -- (#2293).
+    -- 101.1) and not a rule: Heartstone, Training Grounds and Zirda all say
+    -- "This effect can't reduce the mana in that cost to less than one mana" and
+    -- so carry 1, while an activation-cost reducer that does not say it
+    -- (Blossoming Tortoise's "Activated abilities of lands you control cost {1}
+    -- less to activate") carries 0. See Pawl.Types.CostAdjustments.reductions
+    -- for what zero means, why a floor never raises a cost, and why the two
+    -- kinds cannot share one floor over the pool.
     ReduceActivationCost ReduceActivationCost.ReduceActivationCost
   | -- | CR 613.11 / 601.2f / Brutal Suppression: the activated abilities of
     -- matching permanents cost these additional NON-MANA components to activate

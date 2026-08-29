@@ -12,7 +12,7 @@ import qualified Pawl.Types.Keyword as Keyword
 -- The amount is GENERIC mana (CR 601.2f), IncreaseSpellCost's reason one
 -- constructor over: no printing taxes an activation by a coloured symbol.
 --
--- TWO criteria where ReduceActivationCost carries three. `whichAbilities` names
+-- TWO criteria where ReduceActivationCost carries four. `whichAbilities` names
 -- the ability's SOURCE OBJECT -- Oppressive Rays' "activated abilities of
 -- enchanted creature" -- and is matched by
 -- Pawl.Engine.PlayerEffect.matchesObjectFrom against that object's projection.

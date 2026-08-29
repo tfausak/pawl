@@ -3467,15 +3467,16 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _ _) -> [f]
   -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE
   -- PERMANENT rather than a spell, and is authored the same way. The grantedBy
-  -- beside it is not returned: a KeywordFamily is not a Filter, so the lints this
-  -- list feeds have nothing to say about it.
+  -- and whichKind beside it are not returned: neither a KeywordFamily nor CR
+  -- 605.1a's classification is a Filter, so the lints this list feeds have
+  -- nothing to say about either.
   --
   -- BOTH Filters, and they are held to one standard because they are evaluated
   -- through one context: `whichTargets` (Dwarven Mauler's "that target this
   -- creature") asks about the ability's chosen TARGET rather than its source, but
   -- Pawl.Engine.PlayerEffect.matchesObjectFrom builds the same Context for it, so
   -- the same framing and the same atom vocabulary apply.
-  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f _ targets _ _) -> f : Maybe.maybeToList targets
+  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f _ _ targets _ _) -> f : Maybe.maybeToList targets
   -- CR 601.2f's addition carries a Filter in two places: its own criterion
   -- ("nontoken Rebels"), and one inside each component it adds ("sacrifice a
   -- land"). Both are authored by the card, so both are linted, and the inner

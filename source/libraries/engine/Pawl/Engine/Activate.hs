@@ -406,8 +406,9 @@ aimingSomewhere candidates family pid srcId gs payable =
   -- module, and CR 605.3b is why: activatableGiven refuses a mana ability
   -- outright and the cost conjunct this gate serves sits after that refusal,
   -- while activateAbility below puts the ability on the stack, which no mana
-  -- ability does. So Suppression Field's "unless they're mana abilities" never
-  -- turns an adjustment away on this path -- the mana window is where it does
+  -- ability does. So neither Suppression Field's "unless they're mana abilities"
+  -- nor Zirda's "that aren't mana abilities" ever turns an adjustment away on
+  -- this path -- the mana window is where they do
   -- (Cost.manaActivationAdjustments).
   let gather aimedAt = Cost.activationAdjustments aimedAt family AbilityKind.NonManaAbility pid srcId gs
       blind = gather Set.empty
