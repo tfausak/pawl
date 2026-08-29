@@ -40,8 +40,11 @@
                 "targetSlots": {
                   "creatures": {
                     "count": {
-                      "least": 0,
-                      "most": 2
+                      "type": "Printed",
+                      "value": {
+                        "least": 0,
+                        "most": 2
+                      }
                     },
                     "pool": {
                       "type": "Creatures"

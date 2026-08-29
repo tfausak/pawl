@@ -239,6 +239,7 @@ import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotArity as SlotArity
+import qualified Pawl.Types.SlotCount as SlotCount
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
@@ -250,7 +251,6 @@ import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
-import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
@@ -1540,7 +1540,7 @@ modalCountsOffend :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility C
 modalCountsOffend modal =
   let modeOffends mode =
         let read_ = Resolve.modeSlots mode
-            plural targetSlot = TargetCount.plural (TargetSlot.count targetSlot)
+            plural targetSlot = SlotCount.plural (TargetSlot.count targetSlot)
             offends slot targetSlot = plural targetSlot && Map.lookup slot read_ == Just SlotArity.One
          in or (Map.elems (Map.mapWithKey offends (Mode.targetSlots mode)))
    in any modeOffends (Modal.modes modal)
@@ -5948,7 +5948,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                     <> fmap TriggeredAbility.modal (Face.triggeredAbilities face)
         modals = concatMap carriers ps
         takesSeveral (_, modal) =
-          any (any (TargetCount.plural . TargetSlot.count) . Mode.targetSlots) (Modal.modes modal)
+          any (any (SlotCount.plural . TargetSlot.count) . Mode.targetSlots) (Modal.modes modal)
     -- The pool must actually contain one, or the sweep says nothing.
     Spec.assertBool s (any takesSeveral modals) "the pool has a slot that takes more than one target"
     Spec.assertEqWith s "no multi-target slot is read one at a time" (fmap fst (filter (modalCountsOffend . snd) modals)) []

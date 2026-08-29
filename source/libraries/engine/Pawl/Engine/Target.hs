@@ -42,6 +42,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.Quantity (Quantity)
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.SlotCount as SlotCount
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.TargetCount as TargetCount
 import Pawl.Types.TargetSlot (TargetSlot)
@@ -1050,9 +1051,15 @@ dependsOnSlot pool = case pool of
 -- The board narrowing is the WHOLE ceiling for "any number of target ..."
 -- (Soulfire Eruption), which prints no maximum -- TargetCount.ceilingOn is where
 -- the two cases meet.
-announcedRange :: TargetSlot -> Set Recipient -> (Natural, Natural)
-announcedRange slot legal =
-  let count = TargetSlot.count slot
+--
+-- `x` is the value announced at CR 601.2b, which a slot counting "each of X
+-- target creatures" reads instead of a printed range (SlotCount.at). It comes in
+-- as a number rather than being read off the board here because CR 601.2b's
+-- announcement is not recorded anywhere yet -- the object is put on the stack
+-- carrying it only after CR 601.2c is done.
+announcedRange :: Natural -> TargetSlot -> Set Recipient -> (Natural, Natural)
+announcedRange x slot legal =
+  let count = SlotCount.at x (TargetSlot.count slot)
       ceiling_ = TargetCount.ceilingOn (Natural.length legal) count
    in (min (TargetCount.least count) ceiling_, ceiling_)
 
@@ -1066,13 +1073,13 @@ announcedRange slot legal =
 --
 -- The answer is NOT validated here -- `selectionLegal` below is that, asked by
 -- the callers that reverse an announcement (CR 601.2e, CR 602.2).
-chooseTargets :: Decider -> PlayerId -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Game (Map SlotName (Set Recipient))
-chooseTargets decider pid oid slots sets = do
+chooseTargets :: Decider -> PlayerId -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Game (Map SlotName (Set Recipient))
+chooseTargets decider pid oid x slots sets = do
   gs <- State.get
   let offered = fmap (piledOffer (Just pid) gs) sets
-      ranges = Map.intersectionWith announcedRange slots offered
+      ranges = Map.intersectionWith (announcedRange x) slots offered
       variable = Map.keysSet (Map.filter (uncurry (/=)) ranges)
-      offers = Map.restrictKeys (Map.intersectionWith (\targetSlot legal -> (TargetSlot.count targetSlot, legal)) slots offered) variable
+      offers = Map.restrictKeys (Map.intersectionWith (\targetSlot legal -> (SlotCount.at x (TargetSlot.count targetSlot), legal)) slots offered) variable
   announced <-
     if Map.null offers
       then pure Map.empty
@@ -1188,8 +1195,8 @@ pileMembers perspective pile legal gs =
 -- returns the game to before the spell was proposed, the same posture CR 601.2b's
 -- unaffordable X announcement already takes. Narrowing the offered count
 -- to what a coherent answer could reach is not implemented (#1296).
-selectionLegal :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Map SlotName (Set Recipient) -> GameState -> Bool
-selectionLegal perspective source slots sets chosen gs =
+selectionLegal :: Maybe PlayerId -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Map SlotName (Set Recipient) -> GameState -> Bool
+selectionLegal perspective source x slots sets chosen gs =
   Set.isSubsetOf (Map.keysSet chosen) (Map.keysSet sets)
     && and (Map.elems (Map.mapWithKey slotLegal slots))
     && and (Map.elems (Map.mapWithKey coherent (Map.filter (jointlyJudged (Map.keysSet slots)) slots)))
@@ -1198,7 +1205,7 @@ selectionLegal perspective source slots sets chosen gs =
     slotLegal slot targetSlot =
       let legal = Map.findWithDefault Set.empty slot sets
           picked = Map.findWithDefault Set.empty slot chosen
-          (lo, hi) = announcedRange targetSlot legal
+          (lo, hi) = announcedRange x targetSlot legal
           size = Natural.length picked
        in Set.isSubsetOf picked legal && size >= lo && size <= hi
     coherent slot targetSlot =
@@ -1244,7 +1251,10 @@ fillableModesGiven pcs grants pools perspective seed source extra modal gs =
             if or (Map.elems (Map.intersectionWith short slots sets))
               then Nothing
               else Just (ModeIndex.MkModeIndex i)
-      short slot legal = Natural.length legal < TargetCount.least (TargetSlot.count slot)
+      -- CR 601.2b's X=0 FLOOR, the value every castability and activation gate
+      -- is asked at: a slot counting the announced X demands no target until
+      -- that announcement exists, and announcing zero is a legal answer.
+      short slot legal = Natural.length legal < TargetCount.least (SlotCount.at 0 (TargetSlot.count slot))
    in Set.fromList (Maybe.mapMaybe (uncurry fillable) (zip [0 :: Natural ..] ms))
 
 -- CR 603.2: every target slot with its "that player" atoms baked against this

@@ -43,7 +43,10 @@
                 "targetSlots": {
                   "targets": {
                     "count": {
-                      "least": 0
+                      "type": "Printed",
+                      "value": {
+                        "least": 0
+                      }
                     },
                     "pool": {
                       "type": "Players"
@@ -119,7 +122,10 @@
                 "targetSlots": {
                   "targets": {
                     "count": {
-                      "least": 0
+                      "type": "Printed",
+                      "value": {
+                        "least": 0
+                      }
                     },
                     "pool": {
                       "type": "Players"

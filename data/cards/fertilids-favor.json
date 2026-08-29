@@ -86,8 +86,11 @@
             "targetSlots": {
               "permanent": {
                 "count": {
-                  "least": 0,
-                  "most": 1
+                  "type": "Printed",
+                  "value": {
+                    "least": 0,
+                    "most": 1
+                  }
                 },
                 "filter": {
                   "type": "Or",
