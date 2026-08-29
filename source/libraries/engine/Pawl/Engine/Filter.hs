@@ -724,6 +724,20 @@ data Context = MkContext
     -- bare contextFor while a resolution's bindings do exist (#2141), and
     -- Pawl.Engine.Projection.freezeQuantities was a fifth until it took its
     -- context from the caller.
+    --
+    -- Pawl.Engine.OutsideTheGame.eligible is a FIFTH in-resolution caller and is
+    -- NOT one of #2141's, honest for a reason of its own rather than for the
+    -- reason above: its candidates are cards outside the game, which CR 400.11c
+    -- keeps every spell and ability from affecting, so no slot of the resolution
+    -- can name one. Pawl.Engine.Projection.viewOfCard fills no `identity` --
+    -- nothing mints an object until Pawl.Engine.OutsideTheGame.bringInto does --
+    -- so IsBound is False for every candidate there whatever this map holds. The
+    -- other readers cannot reach it either: SameNameAsBound reads slotNames
+    -- rather than this map and carries its own lint, IsControllerOfBound and
+    -- ControlledByBound are False wherever `matches` reaches them, and no Filter
+    -- atom carries a Quantity. Pawl.CardSpec's "CR 400.11c no card asks IsBound
+    -- in a wish's filter" is what keeps a card out of that position, and
+    -- Pawl.OutsideTheGameSpec proves the atom answers nothing there.
     slotObjects :: Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId),
     -- CR 201.1 / 709.4a: the NAMES of the objects the surrounding announcement's
     -- slots hold, for the one atom that compares a candidate's against them

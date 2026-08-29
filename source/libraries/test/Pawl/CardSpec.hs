@@ -3983,6 +3983,14 @@ data Framing
     -- filter" to that lint, and a stored Effect.Replace's row would otherwise
     -- appear on one side of the comparison and not the other.
     ReplacementRowFramed
+  | -- | CR 400.11c's wish filter -- Effect.FromOutsideTheGame's, the one
+    -- card-authored position whose candidates are never objects in the game:
+    -- Pawl.Engine.OutsideTheGame.eligible matches it against a printed FACE
+    -- (Pawl.Engine.Projection.viewOfCard). Marked not because its evaluator
+    -- FILLS a field the others leave empty but because its candidate view leaves
+    -- one empty that every other position fills -- `identity` -- so
+    -- Filter.IsBound is a silent False there and nowhere else.
+    OutsideTheGameFramed
   deriving (Eq, Ord, Show)
 
 -- Does this position's evaluator supply CR 303.4b's host? Two constructors
@@ -3995,6 +4003,7 @@ hostFramed framing = case framing of
   AttachDestination -> False
   InTargetSlot -> False
   SearchFramed -> False
+  OutsideTheGameFramed -> False
 
 -- Tag a Filter position as UNFRAMED -- one none of the framings above applies
 -- to, which is every position in the type except the ones they name.
@@ -4019,6 +4028,11 @@ replacementRowFramed = fmap ((,) ReplacementRowFramed)
 -- Filter.View.canAttachToSubject (CR 701.3a from the candidate's side).
 searchFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 searchFramed = fmap ((,) SearchFramed)
+
+-- Tag a Filter position as a WISH's, the one position matched against a printed
+-- face rather than against an object (CR 400.11c).
+outsideTheGameFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+outsideTheGameFramed = fmap ((,) OutsideTheGameFramed)
 
 -- Both predicates a CR 106.6 restriction can carry. Its own type has two fields
 -- and no traversal, so a lint that reached only one of them would go quiet on
@@ -4091,10 +4105,11 @@ effectFilters effect = case effect of
   -- an answerer to obey rather than matched against a candidate at all, so none of
   -- the framings' evaluators is the one that reads it.
   Effect.ChooseCardName restriction -> unframed [restriction]
-  -- CR 400.11c's filter, UNFRAMED for ChooseCardName's reason turned around: it
-  -- is matched against a PRINTED FACE (Pawl.Engine.Projection.viewOfCard) rather
-  -- than against an object any of the framings' evaluators project.
-  Effect.FromOutsideTheGame payload -> unframed [FromOutsideTheGame.filter payload]
+  -- THE one wish-framed position. CR 400.11c's filter is matched against a
+  -- PRINTED FACE (Pawl.Engine.Projection.viewOfCard) rather than against an
+  -- object any of the other framings' evaluators project, which is what makes
+  -- Filter.IsBound a silent False in it.
+  Effect.FromOutsideTheGame payload -> outsideTheGameFramed [FromOutsideTheGame.filter payload]
   Effect.ExileThisSpell -> []
   -- Only the count's Filters: rule 701.39a describes the candidate pool, so no
   -- Filter on the card names it.
@@ -4933,6 +4948,42 @@ hostOfSourceOffends :: Face.Face Card.Type.Card -> Bool
 hostOfSourceOffends card =
   let (framed, elsewhere) = hostOfSourceCounts card
    in elsewhere /= 0 || framed + elsewhere /= jsonAtoms hostOfSourceTag (Codec.encode (Face.Codec.codec Card.codec) card)
+
+-- The CR 115.10a bound-object tag, spelled once.
+isBoundTag :: Text.Text
+isBoundTag = Text.pack "IsBound"
+
+-- How many CR 115.10a bound-object atoms this card carries inside a WISH's
+-- filter, and how many anywhere else. The FIRST number is the offence here,
+-- which is the sibling position lints turned around: the atom is answerable in
+-- every position whose evaluator supplies the resolution's slots, and
+-- unanswerable in the one whose candidates are not objects.
+isBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
+isBoundCounts card =
+  let total wanted = sum [filterAtoms isBoundTag f | (framing, f) <- cardFilters card, (framing == OutsideTheGameFramed) == wanted]
+   in (total True, total False)
+
+-- CR 400.11c's candidates are cards outside the game, which no spell or ability
+-- affects, so no slot of the resolution names one -- and
+-- Pawl.Engine.Projection.viewOfCard, the view they are matched through, fills no
+-- `identity` for Filter.IsBound to compare in any case. The atom in a wish's
+-- filter is therefore a silent False rather than a rejected card. This is where
+-- that is made loud.
+--
+-- Two offences under one name, for hostOfSourceOffends' two reasons turned
+-- around: the traversal found the atom inside a wish's filter, or the traversal
+-- and the codec disagree about how many the card holds. The second disjunct is a
+-- REGRESSION FENCE for sameNameAsBoundOffends' reason.
+--
+-- Only IsBound, of the atoms that read a Context's slots. SameNameAsBound is
+-- fenced to a mode's target slot by its own lint, so a wish's filter already
+-- rejects it; IsControllerOfBound and ControlledByBound are False wherever
+-- Pawl.Engine.Filter.matches reaches them -- a fact about every position but a
+-- Scope.OverPlayers count's, not about this one.
+isBoundOffends :: Face.Face Card.Type.Card -> Bool
+isBoundOffends card =
+  let (wished, elsewhere) = isBoundCounts card
+   in wished /= 0 || wished + elsewhere /= jsonAtoms isBoundTag (Codec.encode (Face.Codec.codec Card.codec) card)
 
 -- A lint fixture built as a FACE, put back into the one-face card an
 -- Effect.Create's token payload has to be.
@@ -7493,6 +7544,47 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             }
     Spec.assertEqWith s "a planted atom is an offence" (hostOfSourceCounts planted) (0, 1)
     Spec.assertBool s (hostOfSourceOffends planted) "and the lint says so"
+  -- CR 115.10a's Filter.IsBound is the position lints' MIRROR: it is answerable
+  -- wherever the evaluator hands over the resolution's slots and the candidate is
+  -- an object, and unanswerable in the one card-authored position whose
+  -- candidates are not objects in the game -- CR 400.11c's wish filter, matched
+  -- against a printed face. See isBoundOffends for the two offences.
+  Spec.it s "CR 400.11c no card asks IsBound in a wish's filter" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace isBoundOffends . Printing.card) ps
+    Spec.assertEqWith s "no card names a bound slot where the candidate is a card outside the game" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: the pool authors the atom, and the cards that do are ACCEPTED
+    -- here rather than skipped: Showstopping Surprise writes "each other
+    -- creature" as Not (IsBound "target"), and that atom is counted on the
+    -- accepted side.
+    surprise <- S.printingOf s registry "Showstopping Surprise"
+    Spec.assertEqWith
+      s
+      "Showstopping Surprise's one atom is outside a wish's filter"
+      (isBoundCounts (S.combinedFace surprise))
+      (0, 1)
+    Spec.assertBool s (sum (fmap (snd . isBoundCounts . S.combinedFace) ps) > 5) "and the pool gives the accepted side other atoms to be about"
+    -- The rejected side, which the sweep above cannot show while the pool has no
+    -- offender: the SAME atom, buried under all three combinators, in a wish's
+    -- own filter -- so an implementation reading only the top of a Filter would
+    -- accept it.
+    let slot = SlotName.MkSlotName (Text.pack "target")
+        buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Sorcery, Filter.Type.Not (Filter.Type.IsBound slot)]]
+        spellOf effects =
+          Modal.MkModal
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) Map.empty))
+            (ModeSelection.ChooseExactly 1)
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base = S.combinedFace piker
+        wished = base {Face.spell = spellOf [Effect.FromOutsideTheGame (FromOutsideTheGame.MkFromOutsideTheGame buried True)]}
+    Spec.assertEqWith s "a planted atom in a wish's filter is an offence" (isBoundCounts wished) (1, 0)
+    Spec.assertBool s (isBoundOffends wished) "and the lint says so"
+    -- And the pair that differs in exactly one thing: the same face carrying the
+    -- same filter in a position whose candidates ARE objects is accepted -- so the
+    -- lint is reading the position rather than rejecting every planted atom.
+    let destroying = base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing Nothing)]}
+    Spec.assertEqWith s "the same atom over objects is not" (isBoundCounts destroying) (0, 1)
+    Spec.assertBool s (not (isBoundOffends destroying)) "and the lint accepts it"
   -- The two source-power comparisons are answerable only where the CONTEXT
   -- supplies a source power: Filter.Context.sourcePower is filled by
   -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.134a), by

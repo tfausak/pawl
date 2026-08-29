@@ -64,6 +64,15 @@ import qualified Pawl.Types.Zone as Zone
 -- braces -- and cheap enough to keep, since a caller assembling this map by hand
 -- would otherwise offer a card that is no longer out there.
 --
+-- The Context is a BARE Filter.contextFor, carrying no slot bindings even though
+-- a resolution is in flight. Honest here rather than #2141's silence: CR 400.11c
+-- keeps a spell or ability from affecting a card outside the game, so no slot of
+-- the resolution can name one, and the candidate view below is a printed FACE
+-- with no `identity` for Filter.IsBound to compare in any case. Pawl.CardSpec's
+-- "CR 400.11c no card asks IsBound in a wish's filter" is what keeps a card out
+-- of the position; Pawl.OutsideTheGameSpec's "CR 400.11c a wish's filter cannot
+-- see what the resolution bound" proves the atom answers nothing here.
+--
 -- Two sources feed this, both read the same way: CR 103.2a's sideboard pool
 -- (OutsideCard.InPool) and, when this game is a subgame, CR 729.4's main-game
 -- objects held in GameState.outsideObjects (OutsideCard.InAnotherGame). The
