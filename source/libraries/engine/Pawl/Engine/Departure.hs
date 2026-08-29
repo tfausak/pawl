@@ -177,6 +177,10 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 --     which is the whole of what Hoarding Dragon's dies trigger reads. Only an
 --     entry whose KEY -- the exiled card -- belongs to the departing player is
 --     dropped.
+--
+--   * a GameState.exilePiles entry, which has no value side to keep: CR 406.4's
+--     stamp names a pile rather than an object, so the key is the whole of it and
+--     a departing player's exiled card takes its pile membership with it.
 objectsLeaveWith :: PlayerId -> GameState -> GameState
 objectsLeaveWith pid gs =
   let owned = Map.keys (Map.filter (\obj -> Object.owner obj == pid) (GameState.objects gs))
@@ -193,7 +197,8 @@ objectsLeaveWith pid gs =
                     },
                 GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g1),
                 GameState.haunting = Map.delete oid (GameState.haunting g1),
-                GameState.exiledWith = Map.delete oid (GameState.exiledWith g1)
+                GameState.exiledWith = Map.delete oid (GameState.exiledWith g1),
+                GameState.exilePiles = Map.delete oid (GameState.exilePiles g1)
               }
       -- CR 608.2h: each object ceases here, so this is the last moment its
       -- information is known -- the same five-part record

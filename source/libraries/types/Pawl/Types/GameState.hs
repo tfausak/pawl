@@ -691,6 +691,33 @@ data GameState = MkGameState
     -- cards CR 727.5 exempted from the rebuild, which are the only ones still in
     -- exile when the new game begins.
     exiledWith :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
+    -- | CR 406.4: which pile each card now in exile face down is in, as a stamp
+    -- shared by every card the same instruction exiled at the same time --
+    -- "separate piles based on when they were exiled and how they were exiled".
+    -- A NAME and not an order: two cards are in one pile exactly when this holds
+    -- the same value for both, and Pawl.Engine.Exile.pileOf is what reads it.
+    --
+    -- Drawn from GameState.nextTimestamp, which is a supply of distinct values
+    -- before it is an ordering, rather than a counter of its own: one monotone
+    -- source is what keeps a pile stamp from ever colliding with the CR 613.7d
+    -- stamp Pile.OfForetold names its own pile by.
+    --
+    -- Board state rather than a field on the exiled Object, for `exiledWith`'s
+    -- reason one field up: CR 400.7 would strip it from an object that moved
+    -- again, and a card that has moved is out of every pile anyway.
+    --
+    -- ONE writer, Pawl.Engine.Resolve.recordExilePile, which stamps every card
+    -- that arrived in exile face down while one effect ran. That window is CR
+    -- 406.4's "when and how" exactly: one execution of one instruction, at one
+    -- time. A difference over GameState.exile and not a case over the opcode, so
+    -- the rules core stays off effect identity -- `exiledWith`'s road above.
+    --
+    -- Cleaned up by key, by the three sweeps `exiledWith` names and for its
+    -- reasons: recordExilePile drops a key that has left exile,
+    -- Pawl.Engine.Departure drops what CR 800.4a takes out of the game, and
+    -- Pawl.Engine.Setup.restartGame keeps only CR 727.5's exempted cards, which
+    -- are the only ones still in a pile when the new game begins.
+    exilePiles :: Map.Map ObjectId.ObjectId Timestamp.Timestamp,
     -- | CR 500.7: the extra turns that have been created and not yet taken, MOST
     -- RECENTLY CREATED FIRST. A stack, not a queue, and a list precisely because
     -- the style guide reserves lists for stacks (GameState.stack is the other

@@ -3313,6 +3313,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = do
   before <- State.gets GameState.exile
   applyOneEffect runSubgame resolving source controller legal chosen effect
   State.modify' (recordExiledWith source before)
+  State.modify' (recordExilePile before)
 
 -- CR 607.2a's link, filed as the instruction that made it finishes: every card
 -- that ARRIVED in exile while the effect ran is filed against that effect's
@@ -3342,6 +3343,42 @@ recordExiledWith source before gs =
   let arrived = Set.difference (GameState.exile gs) before
       file oid = Map.insertWith (\_ inner -> inner) oid source
    in gs {GameState.exiledWith = Map.restrictKeys (foldr file (GameState.exiledWith gs) arrived) (GameState.exile gs)}
+
+-- CR 406.4's separate piles, filed off the same window: "face-down cards in exile
+-- should be kept in separate piles based on when they were exiled and how they
+-- were exiled", so every card that arrived in exile FACE DOWN while one effect
+-- ran shares one stamp, and the next effect's arrivals get another.
+--
+-- That window is the rule's two criteria at once and is why the stamp is taken
+-- here rather than in Pawl.Engine.Event's zone-change funnel: the funnel moves one
+-- card, so a stamp minted there would put every card in a pile of its own -- and a
+-- pile of one is a card the chooser has effectively named, which is the direction
+-- rule 406.4 exists to forbid. One EXECUTION of one instruction is "when", and its
+-- being that instruction is "how".
+--
+-- A difference over GameState.exile and not a case over the opcode, recordExiledWith's
+-- road above and for its reason: the rules core stays off effect identity.
+--
+-- Only cards NOT already stamped, which is what makes a nested application's
+-- filing stand -- applyEffectWith recurses, so the innermost window is the one
+-- that ran the instruction, and the outer one must not re-pile what it saw
+-- arrive. That gate is also what keeps the timestamp supply still: no stamp is
+-- drawn by an effect that exiled nothing face down.
+--
+-- Then RESTRICTED to what is still in exile, recordExiledWith's sweep: CR 400.7
+-- gives a card that left a new id, so the old key can never be named again.
+recordExilePile :: Set ObjectId -> GameState -> GameState
+recordExilePile before gs =
+  let kept = Map.restrictKeys (GameState.exilePiles gs) (GameState.exile gs)
+      unstamped =
+        filter
+          (\oid -> not (Map.member oid kept) && maybe False Object.exiledFaceDown (Game.lookupObject oid gs))
+          (Set.toList (Set.difference (GameState.exile gs) before))
+   in case unstamped of
+        [] -> gs {GameState.exilePiles = kept}
+        _ ->
+          let (stamp, gs1) = Game.freshTimestamp gs
+           in gs1 {GameState.exilePiles = foldr (\oid -> Map.insert oid stamp) kept unstamped}
 
 -- CR 724.1b: how one object leaves the stack when an effect ends the turn. A card
 -- or a token is EXILED, which is a zone change like any other; an ability is not
