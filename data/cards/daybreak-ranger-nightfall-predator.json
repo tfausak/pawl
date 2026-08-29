@@ -24,10 +24,12 @@
                             "type": "Literal",
                             "value": 2
                           },
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "victim"
-                          }
+                          "refs": [
+                            {
+                              "type": "InSlot",
+                              "value": "victim"
+                            }
+                          ]
                         }
                       }
                     ]

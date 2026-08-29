@@ -25,10 +25,12 @@
                             "type": "Literal",
                             "value": 50.0
                           },
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "target"
-                          }
+                          "refs": [
+                            {
+                              "type": "InSlot",
+                              "value": "target"
+                            }
+                          ]
                         }
                       }
                     ]

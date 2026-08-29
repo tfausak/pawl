@@ -38,10 +38,12 @@
                             "type": "Literal",
                             "value": 2
                           },
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "thatPlayer"
-                          }
+                          "refs": [
+                            {
+                              "type": "InSlot",
+                              "value": "thatPlayer"
+                            }
+                          ]
                         }
                       }
                     ]

@@ -1961,6 +1961,22 @@ deflectionCombat blocker attacker wanted p = case p of
      in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
   _ -> S.identityAnswer p
 
+-- Cast Molten Disaster UNKICKED for `x`, spending a contested shield on the
+-- batch's hits in `wanted` order. The kicker answer is PINNED rather than
+-- deferred: kicking it turns on a static ability that grants split second (CR
+-- 702.61a), and the case below is about the damage sentence alone.
+--
+-- The order is stated by RECIPIENT, deflectionCombat's shape, so the assertions
+-- do not depend on the order the instruction's own sweep gathered the batch in.
+castDisaster :: Natural.Natural -> [Recipient.Recipient] -> Prompt.Prompt r -> r
+castDisaster x wanted p = case p of
+  Prompt.ChooseKicker {} -> KickerDecision.Declines
+  Prompt.ChooseX {} -> x
+  Prompt.OrderDamage _ _ events ->
+    let rank e = Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)
+     in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
+  _ -> S.identityAnswer p
+
 -- CR 615.7's shield over SEVERAL recipients at once, whose producer is Divine
 -- Deflection ({X}{W} Instant: "Prevent the next X damage that would be dealt to
 -- you and/or permanents you control this turn. If damage is prevented this way,
@@ -1984,7 +2000,7 @@ deflectionCombat blocker attacker wanted p = case p of
 --
 -- The numbers are all distinct -- shield 3, 5 at alice, 2 at her creature, 5 back
 -- at the attacker -- so no two readings of the rule land on the same board.
-divineDeflectionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+divineDeflectionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)" $ do
   -- THE case. One shield of 3 against 5 aimed at alice and 2 aimed at her
   -- creature, in one combat damage batch: a shield per recipient would prevent
@@ -2036,6 +2052,63 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     -- Ordered last on purpose, since a row count sitting first absorbs every
     -- mutation of the arm that builds the rows and reports itself instead.
     Spec.assertEqWith s "and the resolution installed ONE shield, holding 3" (shieldsLeft shielded) [3]
+  -- CR 608.2f: one instruction naming objects AND players is ONE action, so its
+  -- damage is one batch. Molten Disaster ({X}{R}{R} Sorcery, "Kicker {R}. If this
+  -- spell was kicked, it has split second. Molten Disaster deals X damage to each
+  -- creature without flying and each player." -- name, cost, type line and Oracle
+  -- text checked against api.scryfall.com 2026-08-29) is the sentence, written as
+  -- one Effect.DealDamage over two ObjectRefs.
+  --
+  -- The shield above is the only observer in data/cards/ that can tell one batch
+  -- from two: it alone spans a player AND their permanents, so it alone is
+  -- contested by a batch holding both. Two sequential batches spend it on
+  -- whichever ran first and raise no CR 615.7 question at all.
+  --
+  -- Numbers all distinct -- shield 3, X of 2, a 5/5 and a 2/1 -- so no two
+  -- readings land on the same board.
+  Spec.it s "CR 608.2f creatures and players in one sentence are one batch" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    piker <- S.printingOf s registry "Goblin Piker"
+    deflection <- S.printingOf s registry "Divine Deflection"
+    disaster <- S.printingOf s registry "Molten Disaster"
+    let base = S.landsFor mountain S.alice 6 (S.landsInPlay plains 4)
+        (mine, g1) = S.addCreature jedit S.alice base
+        (theirs, g2) = S.addCreature piker S.bob g1
+        (deflectionId, g3) = S.addHandCard deflection S.alice g2
+        (disasterId, unshielded) = S.addHandCard disaster S.alice g3
+        shielded = castAndResolve (castDeflection 3 S.bob) unshielded deflectionId
+        blast order g = castAndResolve (castDisaster 2 order) g disasterId
+        aliceFirst = blast [Recipient.ToPlayer S.alice, Recipient.ToCreature mine] shielded
+        creatureFirst = blast [Recipient.ToCreature mine, Recipient.ToPlayer S.alice] shielded
+        control = blast [] unshielded
+    -- THE case. Spending the pool on alice's own 2 first leaves 1 for her
+    -- creature's 2, so 1 is marked. Two batches cannot produce this board: the
+    -- creature half is the sentence's first half and would take the shield whole.
+    Spec.assertEqWith s "spent on alice, 1 of her creature's 2 is dealt" (S.damageOf mine aliceFirst) (Just 1)
+    Spec.assertEqWith s "and all 2 aimed at alice were prevented" (S.lifeOf S.alice aliceFirst) (Just 20)
+    -- The other allocation, which is also what two batches would have produced --
+    -- kept so the pair of boards differs in the answer and in nothing else.
+    Spec.assertEqWith s "spent on her creature instead, its 2 never happens" (S.damageOf mine creatureFirst) (Just 0)
+    Spec.assertEqWith s "and 1 of alice's 2 is dealt" (S.lifeOf S.alice creatureFirst) (Just 19)
+    -- The question itself: two batches leave the shield uncontested in each, so
+    -- nothing is asked.
+    Spec.assertBool
+      s
+      (wasAskedToOrderDamage (answersFor (castDisaster 2 []) shielded (S.cast S.alice disasterId Monad.>> Stack.resolveTop)))
+      "alice was asked which damage the one batch's shield prevents"
+    -- The fences. The shield covers alice's side only, so bob and his Piker take
+    -- the whole 2 either way -- and CR 615.5's rider throws back the 3 that was
+    -- prevented, which is one pool's worth however it was allocated.
+    Spec.assertEqWith s "bob takes the disaster's 2 and the rider's 3" (S.lifeOf S.bob aliceFirst, S.lifeOf S.bob creatureFirst) (Just 15, Just 15)
+    Spec.assertEqWith s "and his unshielded creature is marked with the whole 2" (S.damageOf theirs aliceFirst, S.damageOf theirs creatureFirst) (Just 2, Just 2)
+    Spec.assertEqWith s "and the shield is spent to 0 either way (CR 615.7)" (shieldsLeft aliceFirst, shieldsLeft creatureFirst) ([], [])
+    -- The unshielded board, differing in exactly the shield: alice takes all 2 and
+    -- so does her creature, and bob takes 2 with no rider behind it.
+    Spec.assertEqWith s "without the shield alice takes all 2" (S.lifeOf S.alice control) (Just 18)
+    Spec.assertEqWith s "her creature takes all 2" (S.damageOf mine control) (Just 2)
+    Spec.assertEqWith s "and bob takes 2, there being no rider to run" (S.lifeOf S.bob control) (Just 18)
 
 -- CR 615.5's additional effect on the UNBOUNDED shield (CR 615.1 / 615.3), which
 -- Test of Faith's countdown shield above cannot reach. Brace for Impact ({4}{W}

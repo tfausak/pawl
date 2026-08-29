@@ -30,10 +30,12 @@
                         "type": "Literal",
                         "value": 4
                       },
-                      "ref": {
-                        "type": "InSlot",
-                        "value": "target"
-                      }
+                      "refs": [
+                        {
+                          "type": "InSlot",
+                          "value": "target"
+                        }
+                      ]
                     }
                   },
                   {
@@ -43,10 +45,12 @@
                         "type": "Literal",
                         "value": 2
                       },
-                      "ref": {
-                        "type": "InSlot",
-                        "value": "you"
-                      }
+                      "refs": [
+                        {
+                          "type": "InSlot",
+                          "value": "you"
+                        }
+                      ]
                     }
                   }
                 ]

@@ -81,10 +81,12 @@
                                 "slot": "exiled"
                               }
                             },
-                            "ref": {
-                              "type": "InSlot",
-                              "value": "victim"
-                            }
+                            "refs": [
+                              {
+                                "type": "InSlot",
+                                "value": "victim"
+                              }
+                            ]
                           }
                         },
                         {

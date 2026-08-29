@@ -1987,7 +1987,7 @@ rewriteEffect pairs effect = case effect of
   -- subtype word (#2420).
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     Effect.ModifyTarget (ModifyTarget.MkModifyTarget (rewriteDuration pairs duration) (rewriteModification pairs modification) (rewriteObjectRef pairs ref))
-  Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer excess) -> Effect.DealDamage (DealDamage.MkDealDamage (rewriteObjectRef pairs ref) quantity dealer excess)
+  Effect.DealDamage (DealDamage.MkDealDamage refs quantity dealer excess) -> Effect.DealDamage (DealDamage.MkDealDamage (fmap (rewriteObjectRef pairs) refs) quantity dealer excess)
   -- Two SlotNames and nothing else: no word a swap could reach.
   Effect.Fight _ -> effect
   -- CR 612.1: a text-changer's own restriction clause is text like any other.

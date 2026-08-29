@@ -44,10 +44,12 @@
                         "type": "Literal",
                         "value": 2
                       },
-                      "ref": {
-                        "type": "InSlot",
-                        "value": "target"
-                      }
+                      "refs": [
+                        {
+                          "type": "InSlot",
+                          "value": "target"
+                        }
+                      ]
                     }
                   }
                 ]

@@ -55,10 +55,12 @@
                         "type": "Literal",
                         "value": 7
                       },
-                      "ref": {
-                        "type": "InSlot",
-                        "value": "target"
-                      }
+                      "refs": [
+                        {
+                          "type": "InSlot",
+                          "value": "target"
+                        }
+                      ]
                     }
                   }
                 ]
@@ -92,10 +94,12 @@
                             "type": "Literal",
                             "value": 2
                           },
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "target"
-                          }
+                          "refs": [
+                            {
+                              "type": "InSlot",
+                              "value": "target"
+                            }
+                          ]
                         }
                       }
                     ],

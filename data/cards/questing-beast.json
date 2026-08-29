@@ -112,10 +112,12 @@
                             "type": "InSlot",
                             "value": "thatMuch"
                           },
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "target"
-                          }
+                          "refs": [
+                            {
+                              "type": "InSlot",
+                              "value": "target"
+                            }
+                          ]
                         }
                       }
                     ]

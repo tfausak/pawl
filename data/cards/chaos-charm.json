@@ -59,10 +59,12 @@
                         "type": "Literal",
                         "value": 1
                       },
-                      "ref": {
-                        "type": "InSlot",
-                        "value": "damaged"
-                      }
+                      "refs": [
+                        {
+                          "type": "InSlot",
+                          "value": "damaged"
+                        }
+                      ]
                     }
                   }
                 ]

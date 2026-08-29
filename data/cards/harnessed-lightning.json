@@ -52,10 +52,12 @@
                         "type": "InSlot",
                         "value": "paid"
                       },
-                      "ref": {
-                        "type": "InSlot",
-                        "value": "target"
-                      }
+                      "refs": [
+                        {
+                          "type": "InSlot",
+                          "value": "target"
+                        }
+                      ]
                     }
                   }
                 ]

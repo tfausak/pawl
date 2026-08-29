@@ -168,20 +168,20 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3) Nothing Nothing))
-      " {\"type\":\"DealDamage\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"quantity\":{\"type\":\"Literal\",\"value\":3}}} "
+      (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))) (Quantity.Literal 3) Nothing Nothing))
+      " {\"type\":\"DealDamage\",\"value\":{\"refs\":[{\"type\":\"InSlot\",\"value\":\"target\"}],\"quantity\":{\"type\":\"Literal\",\"value\":3}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying)) (Quantity.Literal 1) Nothing Nothing))
-      " {\"type\":\"DealDamage\",\"value\":{\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasKeyword\",\"value\":{\"type\":\"Flying\"}}},\"quantity\":{\"type\":\"Literal\",\"value\":1}}} "
+      (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying))) (Quantity.Literal 1) Nothing Nothing))
+      " {\"type\":\"DealDamage\",\"value\":{\"refs\":[{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasKeyword\",\"value\":{\"type\":\"Flying\"}}}],\"quantity\":{\"type\":\"Literal\",\"value\":1}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.DealDamage (DealDamage.MkDealDamage ObjectRef.EachPlayer (Quantity.Literal 2) Nothing Nothing))
-      " {\"type\":\"DealDamage\",\"value\":{\"ref\":{\"type\":\"EachPlayer\"},\"quantity\":{\"type\":\"Literal\",\"value\":2}}} "
+      (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton ObjectRef.EachPlayer) (Quantity.Literal 2) Nothing Nothing))
+      " {\"type\":\"DealDamage\",\"value\":{\"refs\":[{\"type\":\"EachPlayer\"}],\"quantity\":{\"type\":\"Literal\",\"value\":2}}} "
   -- Both ObjectRef arms have to survive the trip through the payload.
   Spec.it s "ModifyTarget round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
@@ -800,10 +800,10 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
             { ForEach.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "victims")),
               ForEach.slot = SlotName.MkSlotName (Text.pack "victim"),
               ForEach.body =
-                Seq.singleton (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "victim"))) (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot (SlotName.MkSlotName (Text.pack "exiled")) Quantity.ManaValue)) Nothing Nothing))
+                Seq.singleton (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "victim")))) (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot (SlotName.MkSlotName (Text.pack "exiled")) Quantity.ManaValue)) Nothing Nothing))
             }
       )
-      " {\"type\":\"ForEach\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"victims\"},\"slot\":\"victim\",\"body\":[{\"type\":\"DealDamage\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"victim\"},\"quantity\":{\"type\":\"AgainstSlot\",\"value\":{\"slot\":\"exiled\",\"quantity\":{\"type\":\"ManaValue\"}}}}}]}} "
+      " {\"type\":\"ForEach\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"victims\"},\"slot\":\"victim\",\"body\":[{\"type\":\"DealDamage\",\"value\":{\"refs\":[{\"type\":\"InSlot\",\"value\":\"victim\"}],\"quantity\":{\"type\":\"AgainstSlot\",\"value\":{\"slot\":\"exiled\",\"quantity\":{\"type\":\"ManaValue\"}}}}}]}} "
   -- CR 615.1: the same shield with no amount to spend (Selfless Squire).
   Spec.it s "PreventAllDamage" $
     Common.assertJsonCodec
