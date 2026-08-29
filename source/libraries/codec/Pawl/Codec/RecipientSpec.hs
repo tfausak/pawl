@@ -4,6 +4,7 @@ import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Pile as Pile
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 
@@ -42,4 +43,11 @@ spec s = Spec.describe s "Pawl.Codec.Recipient" $ do
       Recipient.codec
       (Recipient.ToObject (ObjectId.MkObjectId 4))
       " {\"type\":\"ToObject\",\"value\":4} "
+  -- CR 406.4's pile, the one arm naming neither an object nor a player.
+  Spec.it s "ToPile" $
+    Common.assertCodec
+      s
+      Recipient.codec
+      (Recipient.ToPile (Pile.OfFaceDown (PlayerId.MkPlayerId 6)))
+      " {\"type\":\"ToPile\",\"value\":{\"type\":\"OfFaceDown\",\"value\":6}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Recipient.codec

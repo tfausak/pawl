@@ -572,6 +572,8 @@ library codec
     Pawl.Codec.PhaseSelector
     Pawl.Codec.PhaseSelectorSpec
     Pawl.Codec.PhaseSpec
+    Pawl.Codec.Pile
+    Pawl.Codec.PileSpec
     Pawl.Codec.Player
     Pawl.Codec.PlayerAttacksWith
     Pawl.Codec.PlayerAttacksWithSpec
@@ -1528,6 +1530,7 @@ library types
     Pawl.Types.PhasePattern
     Pawl.Types.PhaseSelector
     Pawl.Types.PhyrexianPayment
+    Pawl.Types.Pile
     Pawl.Types.Player
     Pawl.Types.PlayerAttacksWith
     Pawl.Types.PlayerCounterKind

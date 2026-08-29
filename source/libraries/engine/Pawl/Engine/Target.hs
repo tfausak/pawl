@@ -1,6 +1,8 @@
 module Pawl.Engine.Target where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -32,6 +34,7 @@ import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.ModeIndex (ModeIndex)
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Pile as Pile
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -226,6 +229,10 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
         Recipient.ToPlaneswalker oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
         Recipient.ToBattle oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
         Recipient.ToObject oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
+        -- Unreachable: no pool holds a pile. CR 406.4's pile is substituted into
+        -- the OFFER by piledOffer, after this narrowing has run over the cards
+        -- it stands for.
+        Recipient.ToPile _ -> False
       against view = case narrowing of
         Nothing -> True
         Just f -> Filter.matches context view f
@@ -531,6 +538,10 @@ targetable pcs perspective source sourceView gs recipient =
         Recipient.ToPlaneswalker oid -> restrictedObject oid
         Recipient.ToBattle oid -> restrictedObject oid
         Recipient.ToObject oid -> restrictedObject oid
+        -- Unreachable, for the reason `keep` above gives: no pool holds a pile.
+        -- Unrestricted rather than excluded, which is the answer rule 702 gives
+        -- every candidate that is not a permanent.
+        Recipient.ToPile _ -> True
 
 -- CR 702.11b / CR 702.11d's "your opponents": is `perspective` -- CR 109.5's
 -- "you" for the spell or ability being aimed -- someone other than the
@@ -642,8 +653,9 @@ poolsGiven pcs gs =
 -- slot's own answer. Every battlefield and stack arm ignores both, because those
 -- zones are shared by all players (CR 400.1 again) -- which is what lets those
 -- arms be hoisted into Pools and leaves a graveyard one built here, per slot,
--- against that slot's own Context. Exile is shared too and stays hoisted, but CR
--- 406.4 narrows it per chooser; see its arm.
+-- against that slot's own Context. Exile is shared too and stays hoisted; CR
+-- 406.4's per-chooser narrowing is `piledOffer`'s, taken at the prompt rather
+-- than here -- see its arm.
 basePoolGiven :: Pools -> Filter.Context -> Map SlotName (Set Recipient) -> Pool.Pool -> GameState -> Set Recipient
 basePoolGiven pools context bindings pool gs = case pool of
   Pool.Creatures -> creaturePool pools
@@ -654,28 +666,22 @@ basePoolGiven pools context bindings pool gs = case pool of
   Pool.Abilities -> abilityPool pools
   Pool.SpellsAndPermanents -> spellsAndPermanentsPool pools
   Pool.CardsInGraveyard scope -> graveyardRecipients context bindings scope gs
-  -- CR 406.4's first half, and the one arm outside a graveyard that reads the
-  -- Context at all: "if a player is instructed to choose an exiled card, the
-  -- player may choose a specific face-down card ONLY IF the player is allowed to
-  -- look at that card". The zone is still shared (CR 400.1), so the SET is not
-  -- per-player the way a graveyard's is -- what is per-player is which of its
-  -- members this chooser may name, so the pool stays hoisted in Pools and only
-  -- this narrowing is taken per slot. Pawl.Engine.Exile.mayChoose is the rule.
-  Pool.CardsInExile -> Set.filter (choosableInExile context gs) (exilePool pools)
+  -- CR 406.1's whole zone, face-down cards included, and hoisted because CR 400.1
+  -- shares it between all players the way no graveyard is shared.
+  --
+  -- CR 406.4's per-chooser narrowing is NOT taken here, and the rule's two halves
+  -- are why: a face-down card a player may not look at is still a LEGAL target
+  -- for their spell -- the pile they choose instead can name it -- so dropping it
+  -- from this set would make CR 608.2b fizzle the very target CR 406.4 handed
+  -- them. What the rule restricts is the ANNOUNCEMENT, so `piledOffer` takes the
+  -- narrowing where the prompt is raised and nowhere else.
+  Pool.CardsInExile -> exilePool pools
   -- The union of the two arms above, built HERE rather than hoisted into Pools for
   -- the graveyard arm's reason: half of it is per-slot. The battlefield half is the
   -- shared thunk, so a slot naming this pool pays the creature walk once with every
   -- other slot that names one.
   Pool.CreaturesAndCardsInGraveyard scope ->
     Set.union (creaturePool pools) (graveyardRecipients context bindings scope gs)
-
--- CR 406.4's first half against one candidate of the exile pool. A recipient
--- with no object behind it cannot arise here -- exileRecipients tags every
--- member ToObject -- and True is the harmless answer if one ever did, since the
--- rule is about a CARD.
-choosableInExile :: Filter.Context -> GameState -> Recipient -> Bool
-choosableInExile context gs recipient =
-  all (\oid -> Exile.mayChoose (Filter.perspective context) oid gs) (Recipient.objectOf recipient)
 
 -- CR 115.2 (only permanents are legal targets, save for the exceptions the
 -- graveyard, exile, spell and player arms above are) with CR 109.2 (an
@@ -878,6 +884,7 @@ playerOf recipient = case recipient of
   Recipient.ToPlaneswalker _ -> Nothing
   Recipient.ToBattle _ -> Nothing
   Recipient.ToObject _ -> Nothing
+  Recipient.ToPile _ -> Nothing
 
 -- CR 406.1: the cards in the exile zone, tagged ToObject -- Riftsweeper's
 -- "choose target face-up exiled card". CR 115.2's clause (a) again, the same
@@ -902,12 +909,12 @@ playerOf recipient = case recipient of
 -- objects still controlled by that player are exiled, and they are owned by
 -- somebody still here.
 --
--- EVERY exiled card, face up or face down. CR 406.4's per-chooser narrowing is
--- the caller's, at basePoolGiven's Pool.CardsInExile arm: that rule asks whether
--- a PLAYER is allowed to look at the card, and this function has no player to
--- ask it of -- which is the same reason this pool takes no scope. Hoisting a
--- per-chooser filter in here would answer for whoever the first slot of the
--- enumeration happened to belong to.
+-- EVERY exiled card, face up or face down. CR 406.4's per-chooser substitution
+-- is `piledOffer`'s, made as a prompt is raised: that rule asks whether a PLAYER
+-- is allowed to look at the card, and this function has no player to ask it of
+-- -- which is the same reason this pool takes no scope. Hoisting a per-chooser
+-- question in here would answer for whoever the first slot of the enumeration
+-- happened to belong to.
 exileRecipients :: GameState -> Set Recipient
 exileRecipients gs = Set.fromList (fmap Recipient.ToObject (Set.toList (GameState.exile gs)))
 
@@ -1061,9 +1068,11 @@ announcedRange slot legal =
 -- the callers that reverse an announcement (CR 601.2e, CR 602.2).
 chooseTargets :: Decider -> PlayerId -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Game (Map SlotName (Set Recipient))
 chooseTargets decider pid oid slots sets = do
-  let ranges = Map.intersectionWith announcedRange slots sets
+  gs <- State.get
+  let offered = fmap (piledOffer (Just pid) gs) sets
+      ranges = Map.intersectionWith announcedRange slots offered
       variable = Map.keysSet (Map.filter (uncurry (/=)) ranges)
-      offers = Map.restrictKeys (Map.intersectionWith (\targetSlot legal -> (TargetSlot.count targetSlot, legal)) slots sets) variable
+      offers = Map.restrictKeys (Map.intersectionWith (\targetSlot legal -> (TargetSlot.count targetSlot, legal)) slots offered) variable
   announced <-
     if Map.null offers
       then pure Map.empty
@@ -1073,10 +1082,85 @@ chooseTargets decider pid oid slots sets = do
           Map.mapWithKey
             (\slot (lo, hi) -> max lo (min hi (Map.findWithDefault lo slot announced)))
             ranges
-      asked = Map.intersectionWith (,) counts sets
+      asked = Map.intersectionWith (,) counts offered
   if Map.null asked
     then pure Map.empty
-    else Game.choose (Prompt.ChooseTargets decider pid oid asked)
+    else do
+      answer <- Game.choose (Prompt.ChooseTargets decider pid oid asked)
+      Map.traverseWithKey (\slot picked -> drawFromPiles (Just pid) (Map.findWithDefault Set.empty slot sets) picked) answer
+
+-- CR 406.4's second half, taken over one slot's legal set as a prompt is built:
+-- a candidate this chooser may not name specifically -- a card exiled face down
+-- that they are not allowed to look at -- is replaced by the PILE it sits in,
+-- "otherwise, they may choose a pile of face-down exiled cards".
+--
+-- A SUBSTITUTION rather than an addition, which is the rule's "otherwise": the
+-- pile is what the chooser gets INSTEAD of the card. Two cards of one pile
+-- collapse to one candidate, so the offer says how many piles there are and
+-- never how many cards are in one.
+--
+-- Taken here rather than in the pool, because the two halves of rule 406.4 are
+-- about different moments: legality is the card's (basePoolGiven's exile arm),
+-- and only the ANNOUNCEMENT is narrowed. Every caller that raises a prompt over
+-- a target set owes this call -- Pawl.Engine.Resolve.chooseNewTargetsFor is the
+-- other one -- or it would offer by name what the rule says may not be named.
+--
+-- Applied to the set the slot's Filter already narrowed, so a pile stands for
+-- its filter-passing members alone. Not implemented: the rule's own order, which
+-- draws from the whole pile and then judges the card drawn, so a filtered slot
+-- that offered a pile would here always draw a card it admits (#2567). No card in
+-- `data/cards/` reaches it: Riftsweeper's "face-up exiled card" is the pool's
+-- one filtered exile slot and it admits no face-down card, so it offers no pile.
+piledOffer :: Maybe PlayerId -> GameState -> Set Recipient -> Set Recipient
+piledOffer perspective gs = Set.map replace
+  where
+    replace recipient = Maybe.fromMaybe recipient $ do
+      oid <- Recipient.objectOf recipient
+      if Exile.mayChoose perspective oid gs
+        then Nothing
+        else fmap Recipient.ToPile (Exile.pileOf oid gs)
+
+-- CR 406.4: "and then a card is chosen at random from within that pile" -- every
+-- pile an announcement named, replaced by the card the draw picked out of it, so
+-- what CR 601.2c records as a target is a card and nothing downstream of this
+-- ever meets a pile.
+--
+-- Prompt.RandomObject is the draw, which is the engine asking rather than
+-- rolling. `legal` is the slot's own legal set, the one piledOffer substituted
+-- over, so the pile's members here are exactly the cards that candidate stood
+-- for.
+--
+-- A pile whose members have gone is DROPPED rather than kept: an answer holding
+-- a pile no longer offered is short by one target, which selectionLegal then
+-- refuses under CR 601.2e. Keeping it would record a pile as a target.
+--
+-- Not implemented: CR 406.4's last sentence, which delays the drawn card's
+-- reveal until a cost is paid. Nothing in pawl reveals a chosen target at all,
+-- and no cost in `data/cards/` chooses an exiled card (#2568).
+drawFromPiles :: Maybe PlayerId -> Set Recipient -> Set Recipient -> Game (Set Recipient)
+drawFromPiles perspective legal picked = do
+  drawn <- traverse draw (Set.toList picked)
+  pure (Set.fromList (Maybe.catMaybes drawn))
+  where
+    draw recipient = case recipient of
+      Recipient.ToPile pile -> do
+        gs <- State.get
+        case NonEmpty.nonEmpty (pileMembers perspective pile legal gs) of
+          Nothing -> pure Nothing
+          Just members -> fmap (Just . Recipient.ToObject) (Game.choose (Prompt.RandomObject members))
+      _ -> pure (Just recipient)
+
+-- The cards piledOffer folded into one pile: the members of `legal` this chooser
+-- may not name and Pawl.Engine.Exile.pileOf sorts into this pile. Ascending by
+-- object id, which is Set.toList's order and is what the draw is offered.
+pileMembers :: Maybe PlayerId -> Pile.Pile -> Set Recipient -> GameState -> [ObjectId]
+pileMembers perspective pile legal gs =
+  [ oid
+  | recipient <- Set.toList legal,
+    oid <- Maybe.maybeToList (Recipient.objectOf recipient),
+    not (Exile.mayChoose perspective oid gs),
+    Exile.pileOf oid gs == Just pile
+  ]
 
 -- CR 601.2c: is this answer a legal filling of these slots? Each slot answered
 -- with a number of targets its count allows, nothing named that was not offered,

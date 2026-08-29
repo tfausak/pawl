@@ -2,8 +2,10 @@
 
 -- Covers: CR 406.3's face-down exile -- Object.exiledFaceDown, the
 -- EntryRiders.exiledFaceDown rider Pawl.Engine.Event.changeZoneEntering reads,
--- CR 406.4's per-chooser gate on Pawl.Engine.Target's Pool.CardsInExile arm and
--- the permission Pawl.Engine.Exile.mayLookAt answers it with, and
+-- CR 406.4's two halves over Pawl.Engine.Target's Pool.CardsInExile arm -- the
+-- permission Pawl.Engine.Exile.mayLookAt answers, the pile
+-- Pawl.Engine.Exile.pileOf sorts a card into and Pawl.Engine.Target's piledOffer
+-- offers instead, and the draw drawFromPiles takes out of it -- and
 -- ObjectRef.EachCardInYourHand as Pawl.Engine.Resolve sweeps it.
 --
 -- Gameplay-level, off two producers that exile face down and differ in exactly
@@ -18,7 +20,9 @@
 -- holds the same cards either way, and only how they got there differs.
 module Pawl.ExileSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -30,6 +34,7 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -37,12 +42,14 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Pile as Pile
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 
@@ -61,7 +68,7 @@ spec s registry = Spec.describe s "Face-down exile" $ do
     -- ALICE, who owns them and cast the spell that hid them. Ignorant Bliss
     -- grants no look, and CR 406.3's permission comes only from an instruction
     -- that gives one; owning the card is not one.
-    Spec.it s "CR 406.4 a card exiled face down is a legal target for nobody, not even its owner, while the face-up one still is" $ do
+    Spec.it s "CR 406.4 a card exiled face down is named by nobody, not even its owner, and offered as the pile it is in" $ do
       board <- castBliss s registry
       reclamation <- S.printingOf s registry "Synthetic Blind Reclamation"
       case S.spellTargetSlot reclamation of
@@ -69,11 +76,38 @@ spec s registry = Spec.describe s "Face-down exile" $ do
           Spec.assertEqWith s "all three cards are in the exile zone" (Set.size (GameState.exile board)) 3
           Spec.assertEqWith
             s
-            "but only the face-up one may be chosen (CR 406.4)"
+            "the offer names the face-up card and the PILE the two face-down ones are in (CR 406.4)"
+            (offerTo S.alice theSlot board)
+            (Set.insert (Recipient.ToPile (Pile.OfFaceDown S.alice)) (Set.fromList (fmap Recipient.ToObject (faceUpExiled board))))
+          Spec.assertEqWith s "and the face-up card is exactly one" (length (faceUpExiled board)) 1
+          -- The other half of the same rule: the pile stands for cards that are
+          -- LEGAL targets -- CR 406.4 restricts the announcement, not legality,
+          -- and CR 608.2b re-derives this set at resolution.
+          Spec.assertEqWith
+            s
+            "while all three remain legal targets, which is what the drawn card needs at CR 608.2b"
             (Target.legalRecipients (Just S.alice) S.noSource theSlot board)
-            (Set.fromList (fmap Recipient.ToObject (faceUpExiled board)))
-          Spec.assertEqWith s "and that is exactly one card" (length (faceUpExiled board)) 1
+            (Set.fromList (fmap Recipient.ToObject (Set.toList (GameState.exile board))))
         Nothing -> Spec.assertFailure s "Synthetic Blind Reclamation should print one target slot"
+    -- CR 406.4's second half at gameplay level, and the only board in the tree
+    -- with a pile of MORE THAN ONE card -- Ignorant Bliss exiles a whole hand in
+    -- one go, where each foretold card is a pile of its own (CR 702.143e). So the
+    -- draw is a real draw here: the answerer takes the pile, randomness is
+    -- answered with the LAST of the two cards it holds, and which card left exile
+    -- is what tells that answer from the first one.
+    Spec.it s "CR 406.4 choosing the pile shuffles the card the random draw named, not the other one" $ do
+      (drawn, other, board) <- pileBoard s registry
+      sentry <- S.printingOf s registry "Ogre Sentry"
+      let after = S.runPure S.identityAnswer board Engine.priorityLoop
+      Spec.assertEqWith
+        s
+        "the card the draw named joined its owner's library, and the other card of its pile did not"
+        (namesIn Zone.Library S.alice after)
+        (Set.fromList [drawn, S.printingName sentry])
+      -- Proxies, AFTER the behaviour so neither can absorb a mutation: the spell
+      -- did resolve, and it took exactly one card out of exile.
+      Spec.assertEqWith s "the other card of the pile is the one still in exile face down" (namesOf (faceDownExiled after) after) (Set.singleton other)
+      Spec.assertEqWith s "one card left exile, of the three that were there" (Set.size (GameState.exile after)) 2
     -- The same gate from the other side, on a board differing in ONE thing: the
     -- two cards reach exile FACE UP instead, by the same route every other test
     -- puts a card there. Same printings, same seats, same zone, same count -- so a
@@ -124,7 +158,7 @@ spec s registry = Spec.describe s "Face-down exile" $ do
 -- content and the one thing the two casts differ in.
 foretold :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 foretold s registry = Spec.describe s "Augury Raven" $ do
-  Spec.it s "CR 406.4 the owner of a foretold card shuffles it out of exile and an opponent cannot reach it" $ do
+  Spec.it s "CR 406.4 the owner of a foretold card shuffles it out of exile and an opponent aiming at it by name gets the face-up one" $ do
     (downId, upId, aliceSpell, bobSpell, board) <- foretoldBoard s registry
     let aliceAfter = resolveCast S.alice aliceSpell downId board
         bobAfter = resolveCast S.bob bobSpell downId board
@@ -147,7 +181,7 @@ foretold s registry = Spec.describe s "Augury Raven" $ do
   -- third leg is what keeps CR 406.4's permission and Riftsweeper's printed
   -- qualifier from being one question: rule 406.4 OFFERS alice her foretold card,
   -- and Riftsweeper's own "face-up exiled card" then refuses it.
-  Spec.it s "CR 406.4 the pool offers a face-down exiled card only to a player who may look at it" $ do
+  Spec.it s "CR 406.4 the pool names a face-down exiled card to a player who may look at it, and offers the others its pile" $ do
     reclamation <- S.printingOf s registry "Synthetic Blind Reclamation"
     riftsweeper <- S.printingOf s registry "Riftsweeper"
     (downId, upId, _, _, board) <- foretoldBoard s registry
@@ -155,18 +189,22 @@ foretold s registry = Spec.describe s "Augury Raven" $ do
       (Just unqualified, Just faceUpOnly) -> do
         Spec.assertEqWith
           s
-          "alice is offered both exiled cards"
-          (Target.legalRecipients (Just S.alice) S.noSource unqualified board)
+          "alice is offered both exiled cards by name"
+          (offerTo S.alice unqualified board)
           (Set.fromList (fmap Recipient.ToObject [downId, upId]))
+        -- CR 702.143e keeps a foretold card differentiable from every other
+        -- face-down card its owner owns, so its pile holds it alone -- and the
+        -- pile bob is offered is that one rather than alice's face-down cards at
+        -- large.
         Spec.assertEqWith
           s
-          "bob is offered only the face-up one"
-          (Target.legalRecipients (Just S.bob) S.noSource unqualified board)
-          (Set.singleton (Recipient.ToObject upId))
+          "bob is offered the face-up one by name and the foretold card only as its own pile"
+          (offerTo S.bob unqualified board)
+          (Set.fromList [Recipient.ToObject upId, Recipient.ToPile (Pile.OfForetold (timestampOf downId board))])
         Spec.assertEqWith
           s
-          "and Riftsweeper's printed face-up qualifier refuses the foretold card even to alice"
-          (Target.legalRecipients (Just S.alice) S.noSource faceUpOnly board)
+          "and Riftsweeper's printed face-up qualifier refuses the foretold card even to alice, offering no pile in its place"
+          (offerTo S.alice faceUpOnly board)
           (Set.singleton (Recipient.ToObject upId))
       _ -> Spec.assertFailure s "Riftsweeper and Synthetic Blind Reclamation should each print one target slot"
 
@@ -204,6 +242,71 @@ foretoldBoard s registry = do
         _ -> S.noSource
   pure (downId, upId, aliceSpell, bobSpell, board)
 
+-- What CR 601.2c would put in front of this player: the slot's legal set with CR
+-- 406.4's substitution taken over it, which is the pair Pawl.Engine.Target's
+-- chooseTargets raises a prompt with.
+offerTo :: PlayerId.PlayerId -> TargetSlot.TargetSlot -> GameState.GameState -> Set.Set Recipient.Recipient
+offerTo pid slot gs = Target.piledOffer (Just pid) gs (Target.legalRecipients (Just pid) S.noSource slot gs)
+
+-- CR 613.7d's stamp, which is what names a foretold card's pile.
+timestampOf :: ObjectId.ObjectId -> GameState.GameState -> Timestamp.Timestamp
+timestampOf oid gs = maybe (Timestamp.MkTimestamp 0) Object.timestamp (Game.lookupObject oid gs)
+
+-- castBliss' board with distinct card names and the {1}{U} alice needs for a copy
+-- of the instant, cast with the PILE chosen. Every name is its own card, so the
+-- two cards of the pile can be told apart in the zone each ends up in. Returns
+-- the name of the card the draw named and of the other card of the same pile,
+-- with the spell still on the stack.
+pileBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (CardName.CardName, CardName.CardName, GameState.GameState)
+pileBoard s registry = do
+  bliss <- S.printingOf s registry "Ignorant Bliss"
+  mountain <- S.printingOf s registry "Mountain"
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  sentry <- S.printingOf s registry "Ogre Sentry"
+  riftsweeper <- S.printingOf s registry "Riftsweeper"
+  reclamation <- S.printingOf s registry "Synthetic Blind Reclamation"
+  let (g1, blissId) = S.handOne bliss (S.landsFor island S.alice 2 (S.landsInPlay mountain 2))
+      (_, g2) = S.addHandCard piker S.alice g1
+      (_, g3) = S.addHandCard bolt S.alice g2
+      (_, g4) = S.addLibraryCard sentry S.alice g3
+      (_, g5) = S.addExiledCard riftsweeper S.bob g4
+      blissed = S.runPure S.identityAnswer (S.runPure S.identityAnswer g5 (S.cast S.alice blissId)) Engine.priorityLoop
+      (spellId, g6) = S.addHandCard reclamation S.alice blissed
+      before =
+        g6
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      -- WHICH card is which is read off the board rather than assumed: CR 400.7
+      -- mints a fresh incarnation as each card is exiled, so the ids the pile
+      -- holds are not the ids the hand held, and it is the pile's own order that
+      -- throughPile's draw answers with.
+      nameAt i = Set.toList (namesOf (take 1 (drop i (faceDownExiled before))) before)
+   in pure $ case (nameAt 1, nameAt 0) of
+        ([last_], [first_]) -> (last_, first_, S.runPure throughPile before (S.cast S.alice spellId))
+        _ -> (S.printingName bolt, S.printingName piker, before)
+
+-- Answers CR 601.2c with the PILE -- filtered out of the offer rather than built,
+-- so a candidate the engine never offered cannot be smuggled in -- and answers CR
+-- 406.4's draw with the LAST card of the pile, which is the one answer a draw
+-- that took the first would not produce.
+throughPile :: Prompt.Prompt r -> r
+throughPile p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter isPile . snd) sets
+  Prompt.RandomObject members -> NonEmpty.last members
+  _ -> S.identityAnswer p
+  where
+    isPile recipient = case recipient of
+      Recipient.ToPile _ -> True
+      _ -> False
+
 -- One player casts their copy of the instant with the slot's whole offer FILTERED
 -- down to the foretold card, then the stack is resolved. Filtered rather than
 -- answered with a hand-built recipient, so a candidate the engine never offered
@@ -218,6 +321,15 @@ aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimedAt oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring ((==) (Just oid) . Recipient.objectOf) sets
   _ -> S.identityAnswer p
+
+-- The card names in one player's copy of a zone, and the same over a list of
+-- objects -- a shuffle mints a new incarnation (CR 400.7), so a card that moved
+-- is followed by name rather than by object id.
+namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> Set.Set CardName.CardName
+namesIn zone pid gs = namesOf (Game.zoneMembers zone pid gs) gs
+
+namesOf :: [ObjectId.ObjectId] -> GameState.GameState -> Set.Set CardName.CardName
+namesOf oids gs = Set.fromList (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) oids)
 
 -- The exiled cards CR 406.3's rider left face down.
 faceDownExiled :: GameState.GameState -> [ObjectId.ObjectId]

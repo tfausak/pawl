@@ -78,12 +78,12 @@ data Pool
     -- word.
     --
     -- "FACE-UP" is a Filter (Filter.IsExiledFaceDown), and the two questions it
-    -- sits beside are different ones. CR 406.4 keeps a face-down exiled card out
-    -- of a chooser's candidate set unless that player is allowed to look at it,
-    -- which the rules core applies to this pool for every card that names it;
-    -- Riftsweeper's printed qualifier then narrows what remains, and
-    -- it is not redundant -- the owner of a foretold card MAY look at it, so
-    -- rule 406.4 offers it and Riftsweeper's own words refuse it.
+    -- sits beside are different ones. CR 406.4 keeps a face-down exiled card from
+    -- being NAMED by a chooser not allowed to look at it, offering them the pile
+    -- it sits in instead, which the rules core applies to this pool for every card
+    -- that names it; Riftsweeper's printed qualifier then narrows what remains,
+    -- and it is not redundant -- the owner of a foretold card MAY look at it, so
+    -- rule 406.4 offers it by name and Riftsweeper's own words refuse it.
     CardsInExile
   | -- | CR 115.2 clause (a) exercised TWICE in one slot -- Savior of Ollenbock's
     -- "up to one other target creature from the battlefield or creature card from

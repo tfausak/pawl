@@ -8057,6 +8057,9 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
       Recipient.ToPlaneswalker _ -> False
       Recipient.ToBattle _ -> False
       Recipient.ToObject _ -> False
+      -- Unreachable: CR 406.4's pile is a candidate at CR 601.2c and never
+      -- something damage is dealt to.
+      Recipient.ToPile _ -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -10320,6 +10323,8 @@ eventBindings bearerBecame cond event = case (cond, event) of
       Recipient.ToPlaneswalker _ -> Map.empty
       Recipient.ToBattle _ -> Map.empty
       Recipient.ToObject _ -> Map.empty
+      -- Unreachable, for the reason the DamageToPlayerPrevented arm above gives.
+      Recipient.ToPile _ -> Map.empty
   -- CR 603.2's "that much": how many counters actually came off, read off the
   -- event's own before/after pair. Chandra, Fire Artisan's "she deals that much
   -- damage" counts THAT and not the damage that caused it -- CR 306.8's removal
@@ -11360,6 +11365,7 @@ isPlayerRecipient r = case r of
   Recipient.ToPlaneswalker _ -> False
   Recipient.ToBattle _ -> False
   Recipient.ToObject _ -> False
+  Recipient.ToPile _ -> False
 
 -- CR 603.10a: is this one of the conditions the game "looks back in time" for?
 --

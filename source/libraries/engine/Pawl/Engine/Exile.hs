@@ -12,11 +12,14 @@
 -- reading a Phase. Nothing here asks which CARD is in exile.
 module Pawl.Engine.Exile where
 
+import qualified Control.Monad as Monad
 import qualified Data.Maybe as Maybe
+import qualified Data.Set as Set
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Pile as Pile
 import Pawl.Types.PlayerId (PlayerId)
 
 -- | CR 406.3: may this player look at this exiled card?
@@ -38,11 +41,12 @@ import Pawl.Types.PlayerId (PlayerId)
 -- same lifetime -- it is per-incarnation state, so CR 400.7's fresh incarnation
 -- on the way out clears it at the same moment the rule ends the permission. That
 -- rule's OTHER ending -- the card becoming part of a pile of cards that are
--- shuffled -- has nothing to end, since pawl builds no piles (gap #1480). A stored
--- per-player relation would answer identically for every board pawl can build,
--- since foretell is the only grant that exists: no card in the pool has hideaway
--- (CR 702.75a's granted "may look at this card in the exile zone"), and
--- Effect.GrantPlayFromExile carries no look permission of its own.
+-- shuffled -- has nothing to end: pileOf below builds the piles, and no card in
+-- `data/cards/` shuffles one. A stored per-player relation would answer
+-- identically for every board pawl can build, since foretell is the only grant
+-- that exists: no card in the pool has hideaway (CR 702.75a's granted "may look
+-- at this card in the exile zone"), and Effect.GrantPlayFromExile carries no
+-- look permission of its own.
 --
 -- Not implemented: a grant that names a player who is not the card's owner.
 -- CR 702.75a's hideaway is the printed shape -- "the player who controls the
@@ -63,12 +67,33 @@ mayLookAt pid oid gs = Maybe.fromMaybe False $ do
 -- Pawl.Engine.Target takes: no player is allowed to look, so no face-down card
 -- is choosable.
 --
--- Not implemented: the rule's second half, where a player who may NOT look
--- chooses a PILE of face-down exiled cards and a card is taken at random out of
--- it. A pile is a candidate that is not an object, which no Prompt can carry, so
--- the face-down cards this drops are offered as nothing at all rather than as a
--- pile (#1480).
+-- A card this answers False for is not thereby unreachable: CR 406.4's second
+-- half offers the chooser the PILE it sits in instead, which
+-- Pawl.Engine.Target.piledOffer substitutes and Pawl.Engine.Target.drawFromPiles
+-- draws out of.
 mayChoose :: Maybe PlayerId -> ObjectId -> GameState.GameState -> Bool
 mayChoose perspective oid gs = case perspective of
   Just pid -> mayLookAt pid oid gs
   Nothing -> not (maybe False Object.exiledFaceDown (Game.lookupObject oid gs))
+
+-- | CR 406.4: which pile this card is in, or Nothing for one that is in none --
+-- every card in exile face up, and every object outside exile.
+--
+-- CR 406.4's criteria are when and how the card was exiled. A FORETOLD card is
+-- its own pile under CR 702.143e, which requires a player's foretold cards to
+-- stay differentiable from each other and from the rest of their face-down
+-- exiled cards, and Object.timestamp is CR 613.7d's record of when this
+-- incarnation was exiled -- unique, so the pile is a singleton and the rule's
+-- random draw over it names the one card in it.
+--
+-- Not implemented: the same separation for the rest, which are pooled per owner.
+-- Two effects that each exile cards face down make one pile here where the rule
+-- makes two, so a chooser is offered one candidate where they should have had
+-- the choice of which (#2566).
+pileOf :: ObjectId -> GameState.GameState -> Maybe Pile.Pile
+pileOf oid gs = do
+  obj <- Game.lookupObject oid gs
+  Monad.guard (Set.member oid (GameState.exile gs) && Object.exiledFaceDown obj)
+  pure $ case Object.foretold obj of
+    Just _ -> Pile.OfForetold (Object.timestamp obj)
+    Nothing -> Pile.OfFaceDown (Object.owner obj)
