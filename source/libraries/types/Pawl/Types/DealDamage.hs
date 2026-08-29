@@ -16,10 +16,10 @@ data DealDamage = MkDealDamage
     -- prove each is one batch, which is what a CR 615.7 shield covering a player
     -- and their permanents can tell apart.
     --
-    -- Nothing here deduplicates, so two clauses naming one recipient would deal
-    -- it two events. Every card in data/cards/ writing more than one clause names
-    -- disjoint sets; a sentence whose halves overlap would be the card that
-    -- refutes this.
+    -- Nothing here deduplicates or sums: two clauses naming one recipient deal
+    -- it two events, which Char aimed at its own caster does. Whether the rules
+    -- make that one event of the total is unsettled (#2586); CR 615.7 cannot
+    -- tell the readings apart, counting amounts rather than events.
     parts :: Seq.Seq DamagePart.DamagePart,
     -- | WHICH OBJECT DEALS IT -- CR 120.1's "an object that deals damage is the
     -- source of that damage", which CR 120.2b lets a spell or ability name for
@@ -42,10 +42,10 @@ data DealDamage = MkDealDamage
     -- redirects every one of them at once.
     --
     -- A SlotName rather than an ObjectRef, where a clause's ref above is the
-    -- wider type: a damage event has exactly ONE source (CR 120.1), and every dealer in the
-    -- pool is a single object named before the effect runs -- CR 115.10a's
-    -- distinction, which is exactly the InSlot arm's. A swept SET of dealers
-    -- would be a different sentence and no card in the pool writes one.
+    -- wider type: a damage event has exactly ONE source (CR 120.1), and every
+    -- dealer in the pool is a single object named before the effect runs -- CR
+    -- 115.10a's distinction, which is exactly the InSlot arm's. A swept SET of
+    -- dealers would be a different sentence and no card in the pool writes one.
     --
     -- An empty slot deals nothing. The dealer of a printed card is a TARGET, so
     -- one that has become illegal (CR 608.2b) leaves the instruction with no
