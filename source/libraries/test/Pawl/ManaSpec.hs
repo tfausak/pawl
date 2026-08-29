@@ -2711,9 +2711,16 @@ activationAdjustmentSpec s registry = Spec.describe s "CR 601.2f a mana ability'
   -- CR 605.1a's rider on the REDUCTION half, the sibling of the two cases above:
   -- Zirda, the Dawnwaker ("Abilities you activate that aren't mana abilities cost
   -- {2} less to activate. This effect can't reduce the mana in that cost to less
-  -- than one mana", checked against Scryfall) is the pool's only printing of it,
-  -- and its "that aren't mana abilities" is a fact about the ABILITY rather than
-  -- about the permanent the reduction's Filter is asked of.
+  -- than one mana", checked against Scryfall) prints it, and its "that aren't
+  -- mana abilities" is a fact about the ABILITY rather than about the permanent
+  -- the reduction's Filter is asked of. Scryfall o:"aren't mana abilities cost",
+  -- 2026-08-29, one hit -- Zirda; a second such printing would join it here.
+  --
+  -- Two of Zirda's three clauses are not in its card file, and both omissions
+  -- leave pawl's Zirda STRICTER than printed rather than weaker: the Companion
+  -- clause, which nothing can choose or pay for (gap #2451), and "{1}, {T}:
+  -- Target creature can't block this turn", which no effect can say (gap #2588).
+  -- Neither bears on the sentence this case is about.
   --
   -- Proved at the PAYMENT and not at the offer, for the reason the Field's case
   -- is: Cost.tapForManaWith is what folds the gathered reduction into the mana
