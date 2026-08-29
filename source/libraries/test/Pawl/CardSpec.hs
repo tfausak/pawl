@@ -1545,6 +1545,13 @@ modalCountsOffend modal =
          in or (Map.elems (Map.mapWithKey offends (Mode.targetSlots mode)))
    in any modeOffends (Modal.modes modal)
 
+-- CR 601.2c with CR 601.2b: does this modal read the announced X through a
+-- TARGET SLOT's count -- "each of X target creatures" (Rot-Curse Rakshasa)? A
+-- reader Resolve.readsX cannot see, that one walking effects and this X sitting
+-- on the slot, so the two reads-equal-declares lints below ask both.
+modalReadsAnnouncedX :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+modalReadsAnnouncedX = any ((==) SlotCount.AnnouncedX . TargetSlot.count) . Modal.allTargetSlots
+
 -- Every ReplacementEffect a card AUTHORS: the ones it PRINTS
 -- (Face.replacementEffects, Eon Hub's) and the ones an effect of its own
 -- installs (Effect.Replace, a floating one) -- and, through effectReplacements
@@ -5268,6 +5275,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- effect, so Card.allEffects cannot see it: Clash of Wills' only reader of the
   -- X it announces is the "pays {X}" its clause offers at resolution
   -- (`payGateCostsOf`, substituted in by Pawl.Engine.Resolve.announcedXOn).
+  --
+  -- A TARGET SLOT counting the announced X is the fourth such reader
+  -- (modalReadsAnnouncedX): CR 601.2c's variable number of targets is named at
+  -- the announcement rather than by anything the modes do.
   Spec.it s "every printing that reads X declares X, and vice versa" $ do
     ps <- S.allPrintings s
     let -- CR 107.3m's other reader, one CR 614.1c row over from the printed
@@ -5286,6 +5297,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             || Face.loyalty c == Just Loyalty.Variable
             || entryCountersReadX c
             || any declaresVariable (payGateCostsOf (Face.spell c))
+            || modalReadsAnnouncedX (Face.spell c)
         offenders =
           filter
             (anyFace (\f -> readsX f /= any declaresVariable (spellCostsOf f)) . Printing.card)
@@ -5334,7 +5346,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
         abilities = concatMap abilitiesOf ps
         offends (_, ab) =
-          Resolve.readsX (Modal.allEffects (ActivatedAbility.modal ab))
+          (Resolve.readsX (Modal.allEffects (ActivatedAbility.modal ab)) || modalReadsAnnouncedX (ActivatedAbility.modal ab))
             /= declaresVariable (ActivatedAbility.cost ab)
     -- Guards the sweep against passing vacuously, in both directions: an empty
     -- pool of abilities, and a pool in which no activation cost declares an X at

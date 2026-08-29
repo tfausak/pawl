@@ -21,6 +21,8 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
@@ -3484,6 +3486,123 @@ textChangedCombatAffectedSpec s registry = Spec.describe s "TextChangedCombatAff
     Spec.assertEqWith s "hacked, nothing is declared" (S.attackerDeclarationsOf control) []
     Spec.assertEqWith s "and bob takes nothing" (S.lifeOf S.bob control) (Just 20)
 
+-- CR 122.1b / 702.147a, through the card that puts the counter: Rot-Curse
+-- Rakshasa {1}{B} Creature -- Demon 5/5, "Trample", "Decayed" and "Renew --
+-- {X}{B}{B}, Exile this card from your graveyard: Put a decayed counter on each
+-- of X target creatures. Activate only as a sorcery" (Tarkir: Dragonstorm,
+-- checked against Scryfall 2026-08-29; data/cards/rot-curse-rakshasa.json).
+--
+-- alice has four Swamps, one Goblin Piker to attack with and the Rakshasa in her
+-- graveyard; bob has THREE Pikers, one more than the largest X announced below,
+-- so the announcement chooses which creatures it lands on rather than taking
+-- every candidate the board offers.
+--
+-- Two boards differing in the announced X alone, because only the pair says the
+-- count came from CR 601.2b's announcement rather than from a number written on
+-- the card: at X=2 two of bob's Pikers stop blocking and at X=1 only one does.
+-- The untouched Piker is the third leg -- it stands on both boards and blocks on
+-- both, so a board on which nothing may block fails here rather than passing.
+renewBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+renewBoard rakshasa swamp piker =
+  let (gyId, withCard) = S.addGraveyardCard rakshasa S.alice (S.landsInPlay swamp 4)
+      (attacker, withAttacker) = S.addCreature piker S.alice withCard
+      (theirs, board) =
+        List.foldl'
+          (\(ids, g) _ -> let (oid, g1) = S.addCreature piker S.bob g in (ids <> [oid], g1))
+          ([], withAttacker)
+          [1 .. (3 :: Int)]
+   in ( gyId,
+        attacker,
+        theirs,
+        board
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Announces X and answers CR 601.2c's targets with exactly `oids`, by FILTERING
+-- the offered set: the pool decides which flavour of Recipient a candidate
+-- arrives as, and a hand-built one of another flavour is dropped by CR 608.2b's
+-- re-read (Pawl.ActivateSpec's answerXTargeting says the same).
+renewing :: Natural.Natural -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+renewing x oids p = case p of
+  Prompt.ChooseX {} -> x
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (maybe False (`elem` oids) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
+
+-- S.combatBoardOf's own board shape, taken over a board a test built for itself:
+-- alice active in her declare-attackers step, with bob the defending player by CR
+-- 506.2's second sentence. Stated rather than derived, for that fixture's reason
+-- -- a direct-call test never runs the turn-based action that would fill it in.
+declaringAttackers :: GameState.GameState -> GameState.GameState
+declaringAttackers gs =
+  S.runPure
+    S.aggressiveAnswer
+    gs
+      { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+        GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.bob}
+      }
+    (Combat.declareAttackers S.alice)
+
+-- CR 122.1b: a keyword counter grants its keyword, so a creature carrying a
+-- decayed counter has rule 702.147a's "This creature can't block" -- and the
+-- short-circuit Pawl.Engine.CombatRestriction.inForce takes before it looks for a
+-- minting keyword has to see the counter, no permanent on the board printing or
+-- granting one.
+keywordCounterRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+keywordCounterRestrictionSpec s registry = Spec.describe s "KeywordCounterRestriction" $ do
+  Spec.it s "CR 122.1b two decayed counters, announced as X, stop both creatures blocking" $ do
+    rakshasa <- S.printingOf s registry "Rot-Curse Rakshasa"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gyId, attacker, theirs, gs) = renewBoard rakshasa swamp piker
+    case (Activate.abilitiesFor gyId gs, theirs) of
+      ([ability], [first_, second, spared]) -> do
+        let resolved = S.runPure (renewing 2 [first_, second]) gs (Activate.activateAbility S.alice gyId ability >> Stack.resolveTop)
+            board = declaringAttackers resolved
+            decayed = CounterKind.Keyword Keyword.Decayed
+        -- CR 509.1b, the behaviour this case exists for: the counter alone forbids
+        -- the block, and the Piker beside it is what says the answer is about
+        -- those two creatures rather than about the board.
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton first_ (Set.singleton attacker)) board)) "blocking with the first counter-bearer is illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton second (Set.singleton attacker)) board)) "and so is blocking with the second"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton spared (Set.singleton attacker)) board) "the Piker that got no counter still blocks"
+        Spec.assertEqWith s "and it is the only blocker offered" (Combat.legalBlockers S.bob board) [spared]
+        -- CR 601.2c: the announcement put the counters on exactly the two
+        -- creatures it named, which is what makes the block answers above about
+        -- the counter rather than about bob's board.
+        Spec.assertEqWith
+          s
+          "two of the three Pikers carry one decayed counter each"
+          (fmap (\oid -> S.counterOf decayed oid resolved) theirs)
+          [1, 1, 0]
+        -- The rest of the activation: CR 602.2b paid the {X}{B}{B} and CR 406.2's
+        -- exile paid the rest of the cost, so the Rakshasa left the graveyard.
+        Spec.assertEqWith s "the Rakshasa exiled itself to pay for it" (Game.zoneMembers Zone.Graveyard S.alice resolved, length (Game.zoneMembers Zone.Exile S.alice resolved)) ([], 1)
+      (abilities, _) -> Spec.assertEqWith s "exactly one ability to activate, on three Pikers" (length abilities) 1
+  -- The pair's other half: the same board, the same card, X announced as one. The
+  -- count follows the announcement, so the second Piker keeps blocking.
+  Spec.it s "CR 601.2c announcing X as one leaves the second creature blocking" $ do
+    rakshasa <- S.printingOf s registry "Rot-Curse Rakshasa"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gyId, attacker, theirs, gs) = renewBoard rakshasa swamp piker
+    case (Activate.abilitiesFor gyId gs, theirs) of
+      ([ability], [first_, second, spared]) -> do
+        let resolved = S.runPure (renewing 1 [first_]) gs (Activate.activateAbility S.alice gyId ability >> Stack.resolveTop)
+            board = declaringAttackers resolved
+            decayed = CounterKind.Keyword Keyword.Decayed
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton first_ (Set.singleton attacker)) board)) "the one creature it named cannot block"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton second (Set.singleton attacker)) board) "the one X=2 would have named still can"
+        Spec.assertEqWith s "and both untouched Pikers are offered" (Combat.legalBlockers S.bob board) [second, spared]
+        Spec.assertEqWith
+          s
+          "only the named Piker carries a decayed counter"
+          (fmap (\oid -> S.counterOf decayed oid resolved) theirs)
+          [1, 0, 0]
+      (abilities, _) -> Spec.assertEqWith s "exactly one ability to activate, on three Pikers" (length abilities) 1
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   declareSpec s registry
@@ -3498,6 +3617,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   blockRequirementSpec s registry
   attackRequirementSpec s registry
   combatRestrictionSpec s registry
+  keywordCounterRestrictionSpec s registry
   suspectedAbilityRemovalSpec s registry
   conditionalCombatRestrictionSpec s registry
   defendingPlayerRestrictionSpec s registry
