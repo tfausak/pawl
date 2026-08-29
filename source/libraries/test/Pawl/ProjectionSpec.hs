@@ -478,6 +478,62 @@ chorusBadMoon chorus badMoon bogWraith childOfNight chorusFirst =
       (childId, gs) = S.addCreature childOfNight S.alice g2
    in (wraithId, childId, gs)
 
+-- Synthetic Artificers' Ascent, two Goblin Pikers and a Presence of Gond on the
+-- first of them, all alice's. `ascentFirst` controls the timestamp order (fresh
+-- timestamps ascend with placement). Returns the enchanted Piker, the bare one,
+-- the board, and the same board with the Presence of Gond left off.
+--
+-- A STATE fixture: S.attach mints no CR 613.7e timestamp, so the Aura's is the
+-- one its placement gave it. That is what lets `ascentFirst` set the order at
+-- all -- a cast Aura would take its stamp at the attach and so always land after
+-- the Ascent.
+--
+-- CR 613.8a clause (b)'s "what it applies to", where what MOVES the set is a
+-- granted ability rather than a type or a subtype. Both effects are CR 613.1f
+-- layer 6 and neither is characteristic-defining (CR 604.3a), so clauses (a) and
+-- (c) hold; clause (b) holds at the enchanted Piker, since applying the Presence
+-- of Gond gives it "{T}: Create a 1/1 green Elf Warrior creature token" and that
+-- puts it into the Ascent's "creatures with an activated ability that isn't a
+-- mana ability". The Presence of Gond does not depend on the Ascent -- its
+-- affected set is CR 303.4m's Attached, which no modification can move -- so the
+-- edge is one-way and CR 613.8b gives grant-then-Ascent in EITHER timestamp
+-- order.
+--
+-- The Goblin Piker is vanilla, so the only activated ability on the enchanted one
+-- is the granted one, and the bare one is what stops the Ascent reading as "every
+-- creature". The granted ability is never activated: these cases read a
+-- projection off a board that gives nobody priority.
+--
+-- The Ascent is SYNTHETIC -- {2}{U} Enchantment, whole text: "Creatures with an
+-- activated ability that isn't a mana ability have flying." -- because no printed
+-- continuous effect's affected set asks whether a permanent has an activated
+-- ability. Scryfall o:"with activated abilities", o:/with an activated abilit/
+-- and o:/(has|have) an activated abilit/, 2026-08-29: Ravager Wurm, Tsabo's Web,
+-- Magewright's Stone, Zirda, the Dawnwaker and Tazri, Stalwart Survivor are the
+-- whole pool, and each uses the question as a targeting restriction, an untap
+-- restriction, a cost reduction or an activation restriction inside a granted
+-- ability rather than as a layer's affected set. A card that would refute this:
+-- any layer-6 effect phrased "creatures with an activated ability ...".
+--
+-- Presence of Gond is PRINTED -- {2}{G} Enchantment - Aura, "Enchant creature.
+-- Enchanted creature has '{T}: Create a 1/1 green Elf Warrior creature token.'"
+-- -- Oracle text verified against Scryfall, 2026-08-29.
+ascentGond :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+ascentGond ascent gond piker ascentFirst =
+  let (pikerId, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+      (bareId, g2) = S.addCreature piker S.alice g1
+      place g =
+        if ascentFirst
+          then
+            let (_, g') = S.addCreature ascent S.alice g
+                (gondId, g'') = S.addCreature gond S.alice g'
+             in S.attach gondId pikerId g''
+          else
+            let (gondId, g') = S.addCreature gond S.alice g
+                (_, g'') = S.addCreature ascent S.alice g'
+             in S.attach gondId pikerId g''
+   in (pikerId, bareId, place g2, snd (S.addCreature ascent S.alice g2))
+
 -- The printings the graveyard-dependency group below shares: Synthetic Charnel
 -- Measure, Grist, the Hunger Tide and a Hill Giant.
 charnelPrintings ::
@@ -2076,6 +2132,36 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "the Wraith is its printed 3/3" (Projection.toughnessOf wraithId gs) (Just 3)
     Spec.assertEqWith s "the Child is its printed 2/1" (Projection.powerOf childId gs) (Just 2)
     Spec.assertEqWith s "the Child is its printed 2/1" (Projection.toughnessOf childId gs) (Just 1)
+
+  -- CR 613.8a clause (b)'s "what it applies to", where the aspect that moves the
+  -- set is an ABILITY rather than a type. See ascentGond for the board and why
+  -- the Ascent is synthetic.
+  --
+  -- This is the proving test for modificationWrites declaring that GainAbility
+  -- writes Keywords: movesSet screens a candidate pair on aspect overlap before
+  -- asking changesAt, so with the grant declared as writing nothing the pair
+  -- never reaches the confirmation that would find the edge, and the Ascent
+  -- applies first in CR 613.7 timestamp order against a Piker that has no
+  -- ability yet.
+  Spec.it s "CR 613.8a a granted activated ability puts the creature into the Ascent's set (Ascent older)" $ do
+    ascent <- S.printingOf s registry "Synthetic Artificers' Ascent"
+    gond <- S.printingOf s registry "Presence of Gond"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, bareId, gs, without) = ascentGond ascent gond piker True
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId gs) "CR 613.8b: the Ascent waits for the grant, so the enchanted Piker flies"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying bareId gs)) "the bare Piker has no activated ability, so the Ascent passes it by"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying pikerId without)) "and with the Presence of Gond gone, neither does the first one"
+
+  -- The dependency overrides CR 613.7, so the answer is the same with the
+  -- timestamps swapped. This board passes on timestamp order alone, which is why
+  -- it is not the proving test.
+  Spec.it s "CR 613.8b the Ascent still waits for the grant with the timestamps swapped (grant older)" $ do
+    ascent <- S.printingOf s registry "Synthetic Artificers' Ascent"
+    gond <- S.printingOf s registry "Presence of Gond"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, bareId, gs, _) = ascentGond ascent gond piker False
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId gs) "still flies, order-independent"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying bareId gs)) "and the bare Piker still does not"
 
   -- The same limb of CR 613.8a clause (b), asked about an object OFF the
   -- battlefield. CR 613.1 names no zone, so the scan CR 613.8a describes ranges
