@@ -375,6 +375,45 @@ ashayaBloodMoon forest piker ashaya bloodMoon ashayaFirst =
       (ashayaId, gs) = place g3
    in (forestId, pikerId, tokenId, ashayaId, gs)
 
+-- A basic Forest, a Goblin Piker with a Pacifism on it, Synthetic Rooted Wardings
+-- and Ashaya, all alice's. `wardingsFirst` controls the timestamp order (fresh
+-- timestamps ascend with placement). Returns the Pacifism's id, the board, and
+-- the same board with Ashaya left out.
+--
+-- CR 613.8a's dependency across TWO permanents, which no same-object board can
+-- show. The Wardings' affected set is "Auras attached to lands", and the land
+-- half is read off the HOST (CR 701.3a, Filter.attachedToView) while Ashaya
+-- applies to that host and never to the Aura. Both effects are layer 4 (CR
+-- 613.1d) and neither is characteristic-defining (CR 604.3a), so clauses (a) and
+-- (c) hold; clause (b) holds at the Pacifism, since applying Ashaya puts the
+-- Piker into "lands" and moves what the Wardings apply to. Ashaya does not depend
+-- on the Wardings -- an Aura they animate is still no creature -- so the edge is
+-- one-way and CR 613.8b gives Ashaya-then-Wardings in EITHER timestamp order.
+--
+-- Pacifism carries no static ability, so the only layer-4 effects on the board
+-- are the two under test. The Forest is there for Ashaya's CDA to count.
+--
+-- SYNTHETIC because no printed card's affected set reads a characteristic of
+-- another object in a layer that writes the same one. Scryfall o:"auras attached
+-- to" and o:"enchanted creatures", 2026-08-29: Umbra Mystic, Greater Auramancy
+-- and A Tale for the Ages are the whole cross-object static pool, and each sits
+-- in layer 6 or 7 while its filter reads a subtype or a controller. The two
+-- attacking-target atoms would reach layer 4 (CR 506.4), but CR 506.4's own
+-- record answers ahead of them -- Pawl.Engine.Projection.filterReads says so at
+-- both rows. A card that would refute this: any layer-4 type-changer whose set is
+-- phrased on a second permanent's types.
+rootedWardings :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+rootedWardings forest piker pacifism wardings ashaya wardingsFirst =
+  let (_, g1) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
+      (pikerId, g2) = S.addCreature piker S.alice g1
+      (pacifismId, g3) = S.addCreature pacifism S.alice g2
+      attached = S.attach pacifismId pikerId g3
+      place g =
+        if wardingsFirst
+          then snd (S.addCreature ashaya S.alice (snd (S.addCreature wardings S.alice g)))
+          else snd (S.addCreature wardings S.alice (snd (S.addCreature ashaya S.alice g)))
+   in (pacifismId, place attached, snd (S.addCreature wardings S.alice attached))
+
 -- A basic Forest, a Merfolk Seer, a Lord of Atlantis and Ashaya, all alice's,
 -- built twice: once as-is and once with a Blood Moon added last. Returns the
 -- Seer's id and the two boards.
@@ -1975,6 +2014,32 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf pikerId gs)) "still a land"
     Spec.assertBool s (Set.member Subtype.Type.Mountain (Projection.subtypesOf pikerId gs)) "still a Mountain, order-independent"
     Spec.assertBool s (not (Set.member Subtype.Type.Forest (Projection.subtypesOf pikerId gs))) "still not a Forest, order-independent"
+
+  -- CR 613.8a clause (b) across two permanents: see rootedWardings above for the
+  -- derivation. The pair is the proving test for `changesAt` applying the other
+  -- effect EVERYWHERE rather than at the one object, and for `appliesTo` reading
+  -- its peers off the running board rather than the layer-bounded view -- neither
+  -- half alone animates the Aura.
+  Spec.it s "CR 613.8a an Aura's host is animated under it, so the Aura joins the Wardings' set (Wardings older)" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    pacifism <- S.printingOf s registry "Pacifism"
+    wardings <- S.printingOf s registry "Synthetic Rooted Wardings"
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    let (pacifismId, gs, without) = rootedWardings forest piker pacifism wardings ashaya True
+    Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf pacifismId gs)) "CR 613.8b: the Wardings wait for Ashaya, so the Pacifism is a land"
+    Spec.assertBool s (Set.member Subtype.Type.Forest (Projection.subtypesOf pacifismId gs)) "and a Forest, the same unit's other part (CR 205.3d)"
+    Spec.assertBool s (not (Set.member CardType.Land (Projection.cardTypesOf pacifismId without))) "and with Ashaya gone the Piker is no land, so the Wardings pass the Pacifism by"
+
+  Spec.it s "CR 613.8b the Wardings still wait for Ashaya with the timestamps swapped (Ashaya older)" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    pacifism <- S.printingOf s registry "Pacifism"
+    wardings <- S.printingOf s registry "Synthetic Rooted Wardings"
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    let (pacifismId, gs, _) = rootedWardings forest piker pacifism wardings ashaya False
+    Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf pacifismId gs)) "still a land, order-independent"
+    Spec.assertBool s (Set.member Subtype.Type.Forest (Projection.subtypesOf pacifismId gs)) "still a Forest, order-independent"
 
   Spec.it s "CR 305.7 Ashaya's own type change reaches herself, and Blood Moon then reaches her" $ do
     forest <- S.printingOf s registry "Forest"
