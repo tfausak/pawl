@@ -26,6 +26,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -2712,6 +2713,22 @@ soulSnareBoard s registry = do
       pure (gs4, pikerId, jaceId, bobSnare, carolSnare)
     _ -> Spec.assertFailure s "fixture should have one Piker and one Jace"
 
+-- Announce exactly one target and choose `victim` for it, for a spell whose slot
+-- takes "any number" (CR 601.2c). The set is FILTERED rather than replaced, for
+-- soulSnareAnswer's reason.
+aimedAtOne :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAtOne victim p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const (1 :: Natural)) offers
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just victim) . Recipient.objectOf) legal) sets
+  _ -> S.aggressiveAnswer p
+
+-- bob casts `spell` naming `victim` alone, and resolves it.
+concealOne :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+concealOne victim spell gs =
+  S.runPure (aimedAtOne victim) gs $ do
+    S.cast S.bob spell
+    Stack.resolveTop
+
 -- CR 508.1b's SECOND subject -- "a planeswalker they control", the middle of CR
 -- 509.1a's and CR 802.4a's three-way list -- through the pool's cleanest
 -- producer: Soul Snare {W} -- Enchantment, "{W}, Sacrifice this enchantment:
@@ -2725,7 +2742,7 @@ soulSnareBoard s registry = do
 -- Snare is fired. CR 508.1b reads the attacked planeswalker's CONTROLLER, so bob's
 -- admits the Piker and carol's does not. An engine reading the OWNER answers both
 -- the other way round; one dropping the PlayerRelation answers both yes.
-soulSnareSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+soulSnareSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 soulSnareSpec s registry = Spec.describe s "SoulSnare" $ do
   Spec.it s "CR 508.1b whole card: Soul Snare reaches a creature attacking a planeswalker you CONTROL" $ do
     snare <- S.printingOf s registry "Soul Snare"
@@ -2756,6 +2773,80 @@ soulSnareSpec s registry = Spec.describe s "SoulSnare" $ do
         Spec.assertEqWith s "CR 613.1b: bob controls Jace through the Confiscate" (Projection.controllerOf jaceId bystander) (Just S.bob)
         Spec.assertEqWith s "CR 108.3: carol owns him" (fmap Object.owner (Game.lookupObject jaceId bystander)) (Just S.carol)
       Nothing -> Spec.assertFailure s "Soul Snare should have exactly one activated ability"
+  -- CR 506.4 / CR 506.4c: a planeswalker that PHASES OUT is removed from combat,
+  -- and the creature that was attacking it "continues to be an attacking creature,
+  -- although it is not attacking any player, planeswalker, or battle" -- so Soul
+  -- Snare's Or [IsAttackingPlayer You, IsAttackingPlaneswalker You] has to answer
+  -- False on both atoms and the ability stops being activatable at all.
+  --
+  -- The trap this pays for is CR 506.4c's own requirement: Game.removeFromCombat
+  -- deletes ONLY the departed planeswalker's key, so the attacker's entry survives
+  -- still naming him, and Projection.controllerOf answers off GameState.objects,
+  -- which CR 702.26d keeps a phased-out permanent in. Both halves are correct; the
+  -- composition was not.
+  --
+  -- A PAIR off ONE board differing in exactly one thing: WHICH permanent Clever
+  -- Concealment ({2}{W}{W} Instant, Marvel Super Heroes Commander; oracle text
+  -- checked against Scryfall) is aimed at. Same spell, same five Plains, same
+  -- activation, same answerer -- bob phases out his Jace on one leg and his
+  -- Bonesplitter on the other, so a leg that failed for want of mana or of a
+  -- resolved Concealment would fail on both.
+  --
+  -- The phase-out happens AFTER the declaration, which is the whole point: the
+  -- Confiscate pair above applies its control change before combat, so the
+  -- planeswalker is on the battlefield the entire time and no guard is load-bearing
+  -- there.
+  Spec.it s "CR 506.4c a planeswalker that phases out stops being attacked, so Soul Snare cannot name the attacker" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    jace <- S.printingOf s registry "Jace Beleren"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    snare <- S.printingOf s registry "Soul Snare"
+    conceal <- S.printingOf s registry "Clever Concealment"
+    let (gs0, ours, theirs) = S.combatBoardOf [piker] [jace, bonesplitter, snare]
+    case (soulSnareAbility snare, ours, theirs) of
+      (Just ability, [pikerId], [jaceId, splitter, snareId]) -> do
+        let gs1 = S.addCounter CounterKind.Loyalty 5 jaceId (S.landsFor plains S.bob 5 gs0)
+            (spell, gs2) = S.addHandCard conceal S.bob gs1
+            declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) attackThePlaneswalker gs2
+            gone = concealOne jaceId spell declared
+            -- The control: the same Concealment aimed at the Bonesplitter instead,
+            -- so Jace is still there and still attacked.
+            stays = concealOne splitter spell declared
+            hidden = runToEndOfCombatWith (soulSnareAnswer snareId ability pikerId) gone
+            attacked = runToEndOfCombatWith (soulSnareAnswer snareId ability pikerId) stays
+        -- GAMEPLAY FIRST, on the one quantity the two readings differ on: whether
+        -- the attacker is exiled. Reading the departed planeswalker's controller
+        -- anyway makes bob's Snare reach a creature attacking nothing.
+        Spec.assertBool s (S.onBattlefield pikerId hidden) "CR 506.4c: the Piker attacks nothing, so bob's Snare cannot name it and it survives"
+        Spec.assertBool s (not (S.onBattlefield pikerId attacked)) "control: with the Bonesplitter phased out instead, the same Snare exiles it"
+        Spec.assertBool s (S.onBattlefield snareId hidden) "so bob's Snare is unsacrificed: the ability was never activatable"
+        Spec.assertBool s (not (S.onBattlefield snareId attacked)) "control: there it paid its own sacrifice, so the activation really happened"
+        -- Anti-vacuity. The declaration is real, and it named Jace rather than bob,
+        -- so the first atom of the Or is False on both legs.
+        Spec.assertEqWith
+          s
+          "setup: the Piker was announced at Jace and not at bob"
+          (Map.lookup pikerId (Combat.Type.attackers (GameState.combat declared)))
+          (Just (AttackTarget.OfPlaneswalker jaceId))
+        -- Each leg's Concealment resolved, and moved the permanent the leg names.
+        Spec.assertEqWith s "CR 702.26b: Jace phased out on one leg only" (fmap (Phasing.isPhasedOut jaceId) [gone, stays]) [True, False]
+        Spec.assertEqWith s "and the Bonesplitter on the other only" (fmap (Phasing.isPhasedOut splitter) [gone, stays]) [False, True]
+        -- CR 702.26d: phasing changes no zone, so S.onBattlefield still says yes for
+        -- him. GameState.battlefield is the set every live read walks, and the set
+        -- the guard asks about.
+        Spec.assertEqWith s "CR 702.26b: he is off GameState.battlefield all the same" (Set.member jaceId (GameState.battlefield gone)) False
+        -- CR 506.4c itself, which is why the guard cannot be a Map.delete: the
+        -- attacker's entry SURVIVES the removal, still naming the departed Jace.
+        Spec.assertEqWith
+          s
+          "CR 506.4c: the Piker is still an attacking creature, its entry still naming Jace"
+          (Map.lookup pikerId (Combat.Type.attackers (GameState.combat gone)))
+          (Just (AttackTarget.OfPlaneswalker jaceId))
+        -- And Jace is still an object with a controller to read, which is the whole
+        -- reason a battlefield guard rather than a missing lookup is what closes it.
+        Spec.assertEqWith s "CR 702.26d: he is still in GameState.objects under bob" (Projection.controllerOf jaceId gone) (Just S.bob)
+      _ -> Spec.assertFailure s "fixture should give alice a Piker and bob a Jace, a Bonesplitter and a Soul Snare"
 
 -- CR 508.4 / CR 508.3a / CR 508.8, through the one card in the pool that puts a
 -- creature onto the battlefield attacking WITHOUT anything having been declared.

@@ -1030,12 +1030,32 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- lets layer 2 move, so a Confiscated planeswalker answers the Aura's
       -- controller and not CR 108.3's owner.
       --
+      -- Battlefield membership guards the read, as the battle arm below and
+      -- Defender.playerOf's do: CR 506.4 removes a planeswalker from combat when it
+      -- phases out or leaves the battlefield, while CR 506.4c keeps the creature
+      -- attacking with nothing to read -- and Game.removeFromCombat deletes only the
+      -- departed permanent's own key, exactly as rule 506.4c demands, so the entry
+      -- naming it survives. Without the guard controllerOf still answers off
+      -- GameState.objects, which a phased-out permanent stays in (Pawl.Types.GameState's
+      -- phasedOut field says the same of that function). Pawl.CombatEffectSpec's
+      -- "CR 506.4c Clever Concealment" pair is the board.
+      --
+      -- Membership is the WHOLE guard, where Combat.stillAttacked is CR 506.4's whole
+      -- answer. Not reachable from here: Pawl.Engine.Combat imports this module, and
+      -- inlining its remaining two clauses would need Projection.isPlaneswalkerOf,
+      -- which projects -- the re-entry `peers` exists to keep out of this function.
+      --
+      -- Not implemented: rule 506.4's other two clauses that leave the object on the
+      -- battlefield under the same id -- the attacked planeswalker's controller
+      -- changing mid-combat, and its ceasing to be a planeswalker (#2624).
+      --
       -- controllerOf is the lean fold rather than a projection, which is what
       -- makes it safe here: `viewUpTo` already calls it for the candidate's own
       -- controller from INSIDE the CR 613 layer fold, so asking it for one more
       -- object re-enters nothing that `peers` guards against.
       Filter.attackingPlaneswalkerController = case Map.lookup oid (Combat.attackers (GameState.combat gs)) of
-        Just (AttackTarget.OfPlaneswalker pw) -> controllerOf pw gs
+        Just (AttackTarget.OfPlaneswalker pw)
+          | Set.member pw (GameState.battlefield gs) -> controllerOf pw gs
         _ -> Nothing,
       -- CR 310.9d: the SAME map's last arm, followed to the attacked battle's
       -- PROTECTOR -- the seat that rule substitutes for the defending player while
