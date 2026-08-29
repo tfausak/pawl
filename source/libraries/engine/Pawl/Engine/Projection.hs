@@ -4085,9 +4085,16 @@ modificationWrites m = case m of
   -- leaves the suite green.
   Modification.GainEnchant _ -> Set.singleton Keywords
   -- Writes ProjectedCharacteristics.activatedAbilities or .triggeredAbilities,
-  -- neither of which any Filter atom reads. LoseAllAbilities declares Keywords
-  -- because it also empties the map.
-  Modification.GainAbility _ -> Set.empty
+  -- which Aspect has no finer grain for than Keywords -- the same answer
+  -- LoseNamedAbility gives below, this being the same write in the other
+  -- direction. Filter.HasNonManaActivatedAbility is the atom that reads the
+  -- first list, through abilitiesFromCharacteristics; the triggered half is
+  -- over-declared, which is the safe direction, since this is only a SCREEN and
+  -- changesAt confirms the dependency by re-asking the set.
+  --
+  -- Pawl.ProjectionSpec's "CR 613.8a a granted activated ability puts the
+  -- creature into the Ascent's set" proves it.
+  Modification.GainAbility _ -> Set.singleton Keywords
   Modification.LoseAllAbilities -> Set.singleton Keywords
   -- Writes ProjectedCharacteristics.activatedAbilities, which Aspect has no finer
   -- grain for than Keywords -- Filter.HasNonManaActivatedAbility, the atom that
