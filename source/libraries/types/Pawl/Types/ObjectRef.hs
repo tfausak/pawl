@@ -38,15 +38,16 @@ data ObjectRef
     -- Judgment's "all creatures". The battlefield is where CR 109.2 puts it; a
     -- set drawn from another zone is one of the arms below -- a graveyard's is
     -- EachCardInGraveyard, a hand's EachCardInYourHand, a library's
-    -- EachCardInYourLibrary, exile's
-    -- EachCardExiledWithSource -- and a FILTERED sweep of a zone is written on
-    -- the arm for that zone: the battlefield's is here, and a graveyard's, a
-    -- hand's, the stack's and the linked exile set's are on their own arms.
+    -- EachCardInYourLibrary, exile's EachCardExiledWithSource -- and a FILTERED
+    -- sweep of a zone is written on the arm for that zone: the battlefield's is
+    -- here, and a graveyard's, a hand's, the stack's and the linked exile set's
+    -- are on their own arms.
     --
     -- Not implemented: a library's FILTERED sweep. EachCardInYourLibrary below
     -- takes the whole zone and states no characteristic, so a card cannot say
-    -- "exile all Mountain cards from your library" (gap #2416). A SEARCH is not the shape that would
-    -- fill it: CR 701.23b lets the searcher find fewer than all the matching
+    -- "exile all Mountain cards from your library" (#2416). A SEARCH is not the
+    -- shape that would fill it: CR 701.23b lets the searcher find fewer than
+    -- all the matching
     -- cards, which is a choice under Pawl.Types.Effect's Search -- but Caldera
     -- Breaker's "exile all Mountain cards from your library" names no search and
     -- offers no choice, so CR 701.23b does not reach it and Search cannot say it.
@@ -127,29 +128,16 @@ data ObjectRef
     -- Pawl.Types.EachCardInHand's header says why this one may have them and what
     -- answers the CR 400.2 visibility question there.
     EachCardInHand EachCardInHand.EachCardInHand
-  | -- | Every card in the RESOLVING CONTROLLER's library -- Leveler's "exile all
-    -- cards from your library". EachCardInYourHand's arm over CR 400.1's other
-    -- hidden per-player zone, and nullary for its reasons: CR 400.2 makes a
-    -- library hidden, so an arm reaching anyone else's would owe a visibility
-    -- question this one never asks, and a whole-zone sweep states no
-    -- characteristic to filter by. CR 400.12 is what makes "from your library"
-    -- an instruction about every card in it.
+  | -- | Every card in the resolving controller's library -- Leveler's "exile all
+    -- cards from your library" (CR 400.12). EachCardInYourHand's arm over CR
+    -- 400.1's other hidden zone, nullary for its reasons (CR 400.2, CR 109.5).
     --
-    -- NOT A SEARCH, which is why it is an arm here rather than a use of
-    -- Pawl.Types.Effect.Search: CR 701.23a's search FINDS a card matching a
-    -- description, and every producer sweeps the zone whole with no description
-    -- and no choice. So CR 701.23b's "isn't required to find" has nothing to
-    -- reach, and CR 701.23f's search triggers do not fire. Nothing shuffles
-    -- either: CR 701.24 gives a merely-swept library no shuffle, so Paradigm
-    -- Shift and Inverter of Truth print their own.
-    --
-    -- Not a target and never one (CR 115.10a) -- a hidden zone has no target pool
-    -- at all (#559) -- and swept when the effect executes (CR 608.2c), the two
-    -- properties EachMatching above has.
-    --
-    -- CR 401.2's "can't look at or change the order" is not violated by the
-    -- sweep itself: the cards leave the library, and where they land face up
-    -- (Leveler) that is the printing's own doing rather than this arm's.
+    -- NOT a search, which is why it is an arm here rather than a use of
+    -- Pawl.Types.Effect.Search: CR 701.23a's search finds a card matching a
+    -- description and no producer states one, so CR 701.23b and CR 701.23f's
+    -- search triggers do not reach it and CR 701.24 shuffles nothing. Proved by
+    -- Pawl.MassEffectSpec's "CR 701.23a a sweep is not a search, and CR 701.24
+    -- shuffles nothing".
     EachCardInYourLibrary
   | -- | CR 607.2a's linked set: every card in exile that an instruction in an
     -- ability of THIS EFFECT'S SOURCE put there -- Hoarding Dragon's "the exiled
