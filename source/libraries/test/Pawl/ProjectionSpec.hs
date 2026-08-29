@@ -2543,10 +2543,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         (corpsejackId, g1) = S.addCreature corpsejackMenace S.alice base
         (_, g2) = S.addCreature piker S.alice g1
         (_, g3) = S.addCreature ashaya S.alice g2
-    Spec.assertEqWith s "it has one before Blood Moon" (length (Projection.replacementsOf corpsejackId g3)) 1
+    Spec.assertEqWith s "it has one before Blood Moon" (length (Projection.replacementsOf Zone.Battlefield corpsejackId g3)) 1
     let (_, gs) = S.addCreature bloodMoon S.alice g3
     Spec.assertBool s (Set.member Subtype.Type.Mountain (Projection.subtypesOf corpsejackId gs)) "the Menace is a Mountain now"
-    Spec.assertEqWith s "and its rules text is gone" (fmap snd (Projection.replacementsOf corpsejackId gs)) []
+    Spec.assertEqWith s "and its rules text is gone" (fmap snd (Projection.replacementsOf Zone.Battlefield corpsejackId gs)) []
 
   Spec.it s "CR 612 hacking Blood Moon Mountain->Island: nonbasic lands become Islands (hack newer)" $ do
     urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
@@ -3062,13 +3062,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith
       s
       "one redirect replacement"
-      (fmap snd (Projection.replacementsOf rip gs))
+      (fmap snd (Projection.replacementsOf Zone.Battlefield rip gs))
       [ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR (ZoneChangePattern.MkZoneChangePattern (Just Zone.Graveyard) ControllerRelation.Anyones (Filter.Type.And [])) Zone.Exile)]
 
   Spec.it s "a vanilla creature projects no replacements" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (piker, gs) = S.addCreature pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)
-    Spec.assertEqWith s "none" (fmap snd (Projection.replacementsOf piker gs)) []
+    Spec.assertEqWith s "none" (fmap snd (Projection.replacementsOf Zone.Battlefield piker gs)) []
 
   Spec.it s "CR 122.1a a +1/+1 counter adds +1/+1 (layer 7c)" $ do
     forest <- S.printingOf s registry "Forest"

@@ -2,10 +2,12 @@
 
 module Pawl.Codec.PrintedReplacement where
 
+import qualified Data.Set as Set
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -24,10 +26,12 @@ codec ::
 codec effectCodec = Fields.object $ do
   condition <- Fields.defaulted "condition" Nothing (Common.maybe Condition.codec) PrintedReplacement.condition
   effect <- Fields.required "effect" (ReplacementEffect.codec effectCodec) PrintedReplacement.effect
+  functionsFrom <- Fields.defaulted "functionsFrom" Set.empty (Common.set Zone.codec) PrintedReplacement.functionsFrom
   name <- Fields.defaulted "name" Nothing (Common.maybe AbilityName.codec) PrintedReplacement.name
   pure
     PrintedReplacement.MkPrintedReplacement
       { PrintedReplacement.condition = condition,
         PrintedReplacement.effect = effect,
+        PrintedReplacement.functionsFrom = functionsFrom,
         PrintedReplacement.name = name
       }

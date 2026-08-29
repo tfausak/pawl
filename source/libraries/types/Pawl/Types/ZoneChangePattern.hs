@@ -43,9 +43,12 @@ import qualified Pawl.Types.Zone as Zone
 -- CR 122.1h's finality row DOES name a from-zone -- "put into a graveyard from
 -- the battlefield" -- and still needs no field: it is minted per permanent by
 -- Pawl.Engine.Projection.finalityOf, reached only through that module's
--- replacementsOf, whose one caller folds over the battlefield alone, so the row
--- cannot be a candidate while its source is anywhere else. A CARD stating a
--- from-zone is what would need the field.
+-- replacementsOf, whose callers walk the battlefield and the command zone --
+-- and CR 122.2 makes the counters cease to exist on the way out of either -- so
+-- the row cannot be a candidate while its source is anywhere else. Nor can the
+-- four off-battlefield walks beside them reach it: CR 113.6b's stated set gathers
+-- PRINTED rows alone, and rule 122.1h's is minted. A CARD stating a from-zone is
+-- what would need the field.
 data ZoneChangePattern = MkZoneChangePattern
   { whenDestination :: Maybe Zone.Zone,
     whoseObject :: ControllerRelation.ControllerRelation,
