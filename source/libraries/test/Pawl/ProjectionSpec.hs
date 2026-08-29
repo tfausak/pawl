@@ -480,9 +480,13 @@ chorusBadMoon chorus badMoon bogWraith childOfNight chorusFirst =
 
 -- Synthetic Artificers' Ascent, two Goblin Pikers and a Presence of Gond on the
 -- first of them, all alice's. `ascentFirst` controls the timestamp order (fresh
--- timestamps ascend with placement; S.attach mints no new one). Returns the
--- enchanted Piker, the bare one, the board, and the same board with the Presence
--- of Gond left off.
+-- timestamps ascend with placement). Returns the enchanted Piker, the bare one,
+-- the board, and the same board with the Presence of Gond left off.
+--
+-- A STATE fixture: S.attach mints no CR 613.7e timestamp, so the Aura's is the
+-- one its placement gave it. That is what lets `ascentFirst` set the order at
+-- all -- a cast Aura would take its stamp at the attach and so always land after
+-- the Ascent.
 --
 -- CR 613.8a clause (b)'s "what it applies to", where what MOVES the set is a
 -- granted ability rather than a type or a subtype. Both effects are CR 613.1f
@@ -497,22 +501,23 @@ chorusBadMoon chorus badMoon bogWraith childOfNight chorusFirst =
 --
 -- The Goblin Piker is vanilla, so the only activated ability on the enchanted one
 -- is the granted one, and the bare one is what stops the Ascent reading as "every
--- creature". Neither Piker's ability is ever activated: these cases read a
+-- creature". The granted ability is never activated: these cases read a
 -- projection off a board that gives nobody priority.
 --
--- Synthetic Artificers' Ascent, {2}{U} Enchantment, whole text: "Creatures with
--- an activated ability that isn't a mana ability have flying." Presence of Gond
--- is PRINTED -- {2}{G} Enchantment - Aura, "Enchant creature. Enchanted creature
--- has '{T}: Create a 1/1 green Elf Warrior creature token.'" -- Oracle text
--- verified against Scryfall, 2026-08-29.
---
--- SYNTHETIC because no printed continuous effect's affected set asks whether a
--- permanent has an activated ability. Scryfall o:/with an activated abilit/ and
--- o:/(has|have) an activated abilit/, 2026-08-29: Ravager Wurm, Tsabo's Web,
--- Magewright's Stone and Zirda, the Dawnwaker are the whole pool, and each uses
--- the question as a targeting restriction, an untap restriction or a cost
--- reduction rather than as a layer's affected set. A card that would refute this:
+-- The Ascent is SYNTHETIC -- {2}{U} Enchantment, whole text: "Creatures with an
+-- activated ability that isn't a mana ability have flying." -- because no printed
+-- continuous effect's affected set asks whether a permanent has an activated
+-- ability. Scryfall o:"with activated abilities", o:/with an activated abilit/
+-- and o:/(has|have) an activated abilit/, 2026-08-29: Ravager Wurm, Tsabo's Web,
+-- Magewright's Stone, Zirda, the Dawnwaker and Tazri, Stalwart Survivor are the
+-- whole pool, and each uses the question as a targeting restriction, an untap
+-- restriction, a cost reduction or an activation restriction inside a granted
+-- ability rather than as a layer's affected set. A card that would refute this:
 -- any layer-6 effect phrased "creatures with an activated ability ...".
+--
+-- Presence of Gond is PRINTED -- {2}{G} Enchantment - Aura, "Enchant creature.
+-- Enchanted creature has '{T}: Create a 1/1 green Elf Warrior creature token.'"
+-- -- Oracle text verified against Scryfall, 2026-08-29.
 ascentGond :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
 ascentGond ascent gond piker ascentFirst =
   let (pikerId, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
