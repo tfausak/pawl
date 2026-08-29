@@ -1133,10 +1133,12 @@ piledOffer perspective gs = Set.map replace
 -- substituted over, so the pile's members here are exactly the cards that
 -- candidate stood for.
 --
--- Elided at one member and skipped at none, the posture every other randomness
--- prompt takes: a one-card pile leaves nothing to draw, and CR 702.143e makes
--- every foretold card such a pile. Filtered rather than trusted, so an answer
--- naming a card outside the pile falls back to the first of it -- from
+-- Elided at one member and skipped at none, the posture the three randomness
+-- prompts over a candidate list take (Pawl.Engine.Resolve's RandomObject and
+-- RandomOpponent, Pawl.Engine.Engine's RandomFirstPlayer): a one-card pile
+-- leaves nothing to draw, and CR 702.143e makes every foretold card such a
+-- pile. Filtered rather than trusted, so an answer naming a card outside the
+-- pile falls back to the first of them -- from
 -- Pawl.Engine.Resolve.chooseNewTargetsFor nothing downstream checks the drawn
 -- card at all, and from chooseTargets selectionLegal would admit any other
 -- exiled card, CR 406.4 keeping every one of them legal.
