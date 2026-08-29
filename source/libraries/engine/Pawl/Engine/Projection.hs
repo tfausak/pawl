@@ -3854,10 +3854,14 @@ designationGathered gs = concatMap fromObject (Set.toList (GameState.battlefield
 --
 -- Names an aspect of ONE object's projection, with no way to say WHOSE, and that
 -- is not a shortfall: `unitWrites` names no object either, and the per-object
--- question is exactly what `changesAt` answers. So a cross-object atom declares
--- the aspects it reads off ANOTHER object as if they were the candidate's, and
--- an aspect qualified by WHOSE would still have to match a plain write of the
--- same aspect -- an identical order for a larger type; see #357.
+-- question is `changesAt`'s. So a cross-object atom declares the aspects it reads
+-- off ANOTHER object as if they were the candidate's, and an aspect qualified by
+-- WHOSE would still have to match a plain write of the same aspect -- an identical
+-- order for a larger type; see #357.
+--
+-- Not implemented: `changesAt` confirming such a declaration, which needs the
+-- other object's same-layer state and today has only the candidate's (#2632). So
+-- every cross-object atom's row is a regression fence.
 data Aspect
   = Types
   | Subtypes
@@ -3928,24 +3932,38 @@ filterReads f = case f of
   -- Reads nothing, for IsAttacking's reason and off the same map: what a creature
   -- is attacking is no characteristic of it (CR 109.3).
   Filter.Type.IsAttackingPlayer _ -> Set.empty
-  -- Reads a CONTROLLER, unlike every other combat atom here: CR 508.1b names the
-  -- attacked planeswalker's controller, and CR 613.1b's layer 2 writes that. What
-  -- is attacked is still no characteristic (CR 109.3); the seat it is followed to
-  -- is one Aspect names, and Aspect names no OBJECT, so the read declares as the
-  -- candidate's own.
+  -- Reads TWO aspects of the ATTACKED permanent, unlike every other combat atom
+  -- here, and declares both as the candidate's own for the reason the note on
+  -- Aspect gives. What is attacked is still no characteristic (CR 109.3); the
+  -- planeswalker the entry is followed to has characteristics like any other.
   --
-  -- A REGRESSION FENCE rather than a proven line: reaching it needs a CR 613.8a
-  -- dependency between a layer-2 control effect and an effect whose affected set
-  -- names this atom, and no card in the pool writes the pair, so mutating it to
-  -- Set.empty leaves the suite green. Kept because under-declaring is the defect
-  -- this function can carry and CR 613.1b says the aspect is written.
-  Filter.Type.IsAttackingPlaneswalker _ -> Set.singleton Controller
-  -- Reads NOTHING, unlike the atom directly above and for IsAttacking's reason:
-  -- CR 310.9's protector is a designation stored on the battle (Object.protector),
-  -- chosen as it enters (CR 310.9a) and moved only by CR 310.9f -- no layer writes
-  -- it, and this type has no aspect naming it, so there is no CR 613.8a dependency
-  -- to see through this atom.
-  Filter.Type.IsAttackingBattle _ -> Set.empty
+  -- CONTROLLER, because CR 508.1b names the attacked planeswalker's controller
+  -- and CR 613.1b's layer 2 writes that. TYPES, because CR 506.4 stops a
+  -- planeswalker being attacked when it stops being a planeswalker and CR 613.1d's
+  -- layer 4 writes card types -- the conjunct viewOfCharacteristics forces through
+  -- `peers`.
+  --
+  -- Both halves are a REGRESSION FENCE rather than a proven line, and the reason is
+  -- structural rather than a missing card: every read this atom declares is off
+  -- ANOTHER object, and CR 613.8a's dependency scan is object-local -- `changesAt`
+  -- asks whether applying `b` AT THE CANDIDATE moves the candidate's membership,
+  -- and `appliesTo` reads every peer off the layer-bounded view -- so no board
+  -- reaches this declaration and mutating either half away leaves the suite green.
+  -- Not implemented: a cross-object CR 613.8a dependency (#2632). Kept because
+  -- under-declaring is the defect this function can carry, and closing that issue
+  -- needs these rows already right.
+  Filter.Type.IsAttackingPlaneswalker _ -> Set.fromList [Controller, Types]
+  -- Reads TYPES and nothing else, where the atom directly above also reads a
+  -- Controller: CR 506.4 stops a battle being attacked when it stops being a
+  -- battle, and CR 613.1d's layer 4 writes card types, the conjunct
+  -- viewOfCharacteristics forces through `peers`. A REGRESSION FENCE for the atom
+  -- above's reason and citing the same issue.
+  --
+  -- The PROTECTOR half of the same read declares nothing, for IsAttacking's
+  -- reason: CR 310.9's protector is a designation stored on the battle
+  -- (Object.protector), chosen as it enters (CR 310.9a) and moved only by CR
+  -- 310.9f -- no layer writes it, and this type has no aspect naming it.
+  Filter.Type.IsAttackingBattle _ -> Set.singleton Types
   -- Reads nothing, for IsAttacking's reason and off the same record -- who was
   -- declared attacked is no characteristic of anything.
   Filter.Type.DeclaredAttackedThisCombat -> Set.empty
@@ -4004,6 +4022,10 @@ filterReads f = case f of
   Filter.Type.Transformed -> Set.empty
   -- CR 109.3 / 613.1f: the aspect LoseAllAbilities writes, Aspect having no
   -- finer grain than "the abilities".
+  --
+  -- Not implemented: what an ability's OWN CR 604.2 gate reads, which
+  -- abilitiesFromCharacteristics runs through Condition.holds and which a
+  -- Quantity can take anywhere (#2633).
   Filter.Type.HasNonManaActivatedAbility -> Set.singleton Keywords
   -- CR 400.1 / 109.3: a zone is not a characteristic, so no Modification writes
   -- one and no layer's ordering turns on this atom.
@@ -4472,6 +4494,13 @@ projectDeciding admits cands = forObject
                         -- The tentative application is thrown away. `b` is
                         -- applied WHOLE -- half an effect is not a state CR 613
                         -- describes.
+                        --
+                        -- Not implemented: the CROSS-object edge, where `b`
+                        -- applies to one permanent and `a`'s membership moves at
+                        -- another -- `answerFor ans j` demands both at `o`, and
+                        -- `appliesTo` would read the other off `bounded` anyway
+                        -- (#2632). changesMagnitude below already does it the
+                        -- other way, off appliedEverywhere.
                         changesAt (j, bs) (i, as) (o, p, d, ans) =
                           let a = NonEmpty.head as
                            in not (decidedAt d a)
