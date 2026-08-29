@@ -671,9 +671,9 @@ data Effect card ability
     -- CR 614.16 gate -- that rule replaces a PLACEMENT.
     RemoveCounters RemoveCounters.RemoveCounters
   | -- | CR 122.5: move counters from the first slot's permanent onto the second
-    -- slot's. WHICH kind is the card's call when it names one and the player's
-    -- when it does not, and HOW MANY is a whole Quantity crossing in one batch;
-    -- see Pawl.Types.MoveCounters' `kind` and `quantity`.
+    -- slot's. WHICH kinds cross and HOW MANY of each is Pawl.Types.MovedKinds,
+    -- three spellings over one batch per kind; see Pawl.Types.MoveCounters'
+    -- `kinds`.
     --
     -- NOT a RemoveCounters beside a PutCounters, which is the whole reason this
     -- arm exists: rule 122.5 makes the pair ATOMIC -- "if either of these actions
