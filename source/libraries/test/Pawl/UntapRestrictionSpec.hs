@@ -210,11 +210,16 @@ prohibitionSpec s registry = Spec.describe s "Prohibition" $ do
     Spec.assertBool s (not (Game.isTapped sorcererId untapped)) "the Sorcerer untapped"
 
 -- CR 502.3 with an affected set that filters on POWER: Meekstone's "creatures
--- with power 3 or greater". The pool's first static ability whose affected set
--- reads a power (see #1111), and the reason it earns a group of its own is CR
--- 613.4c's layer 7c: the set is re-derived at every untap step off the full
--- projection, so a creature the printed numbers put under the threshold is caught
--- once an anthem pushes it over.
+-- with power 3 or greater". The pool's first affected set that filters on a
+-- POWER, and the reason it earns a group of its own is CR 613.4c's layer 7c: the
+-- set is re-derived at every untap step off the FULL projection, so a creature
+-- the printed numbers put under the threshold is caught once an anthem pushes it
+-- over.
+--
+-- Reading the full projection is also why this is not the producer #1111 wants:
+-- that defect is in the within-layer ordering decision, which reads a mid-fold
+-- partial, and CR 613.11 keeps an untap prohibition out of the fold entirely
+-- (see #1111).
 --
 -- Meekstone's own "creatures" conjunct is faithful to the printed word rather
 -- than discriminating: Affected.Matching is battlefield-gated, CR 208.3 gives a
