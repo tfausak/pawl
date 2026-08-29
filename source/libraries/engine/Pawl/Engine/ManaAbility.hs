@@ -256,6 +256,7 @@ manaProduced effect = case effect of
   Effect.Attach _ -> Nothing
   Effect.AttachTarget {} -> Nothing
   Effect.AttachTargetToEach {} -> Nothing
+  Effect.AttachBound {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
   Effect.ChooseOpponent _ -> Nothing
   Effect.ChooseOpponentAtRandom _ -> Nothing
@@ -435,6 +436,7 @@ movesLibraryCard effect = case effect of
   Effect.Attach _ -> False
   Effect.AttachTarget {} -> False
   Effect.AttachTargetToEach {} -> False
+  Effect.AttachBound {} -> False
   Effect.ChooseOpponent _ -> False
   Effect.ChooseOpponentAtRandom _ -> False
   Effect.RollDie {} -> False

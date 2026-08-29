@@ -957,6 +957,7 @@ effectCounts effect = case effect of
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
+  Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChooseOpponent _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
@@ -1222,6 +1223,7 @@ effectNestedEffects effect = case effect of
   Effect.Attach {} -> []
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
+  Effect.AttachBound {} -> []
   Effect.PlaySubgame {} -> []
   Effect.ChooseOpponent {} -> []
   Effect.ChooseOpponentAtRandom {} -> []
@@ -1711,6 +1713,7 @@ effectReplacements effect = case effect of
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
+  Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChooseOpponent _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
@@ -2474,6 +2477,7 @@ effectMintedFaces effect = case effect of
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
+  Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChooseOpponent _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
@@ -4229,6 +4233,7 @@ effectFilters effect = case effect of
   -- CR 701.3's other attach, which moves the SOURCE rather than a target and
   -- carries no destination filter at all.
   Effect.Attach _ -> []
+  Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChooseOpponent _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
@@ -4350,6 +4355,7 @@ effectObjectRefs :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility 
 effectObjectRefs effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
+  Effect.AttachBound {} -> []
   Effect.DealDamage (DealDamage.MkDealDamage ref _ _ _) -> read_ [ref]
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> read_ [ref]
   Effect.ChangeText {} -> []
