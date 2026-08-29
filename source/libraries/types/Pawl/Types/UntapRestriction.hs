@@ -4,7 +4,7 @@ import qualified Pawl.Types.Affected as Affected
 
 -- | CR 502.3 / CR 101.2: one printed UNTAP PROHIBITION -- an effect saying a
 -- permanent "doesn't untap during its controller's untap step". Tsabo's Web's
--- second sentence is the pool's printing.
+-- second sentence is one printing; `untapRestrictions` in data/cards is the rest.
 --
 -- Pawl.Types.SacrificeRestriction's shape and its filing, one turn-based action
 -- over: CR 613.11 puts a continuous effect that "affects game rules rather than

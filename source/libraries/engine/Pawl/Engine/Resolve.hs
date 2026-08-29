@@ -4414,7 +4414,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- but nothing in data/cards separates it from Nothing. Every
         -- ReplacementEffect.ZoneChangeR there names a `whenDestination` of
         -- Graveyard or Stack (rest-in-peace, leyline-of-the-void,
-        -- anafenza-the-foremost, yawgmoths-will, synthetic-stack-interdiction),
+        -- anafenza-the-foremost, yawgmoths-will, nexus-of-fate,
+        -- dire-fleet-daredevil, synthetic-stack-interdiction),
         -- which no member of a batch moving ONTO THE BATTLEFIELD goes to, or the
         -- Battlefield under a Filter.IsInZone Stack conjunct
         -- (synthetic-entry-interdiction), which no batch member arriving from a

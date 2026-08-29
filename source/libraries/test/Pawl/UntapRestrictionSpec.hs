@@ -12,6 +12,10 @@
 -- claim that a reinforce ability "continues to exist while the object is on the
 -- battlefield and in all other zones".
 --
+-- Meekstone is the printed carrier's SECOND fixture, in the Power group below,
+-- and the one whose affected set filters on a characteristic the CR 613 fold can
+-- move rather than on a card type.
+--
 -- Tsabo's Web and Rustic Clachan are the PRINTED carrier's fixtures, and the
 -- pairing is the whole
 -- point: rule 702.77b is unobservable without an effect that depends on an object
@@ -110,6 +114,29 @@ hunterBoard s registry atGiant = do
       activated = foldr (flip activate) board (take 1 (Face.activatedAbilities (S.combinedFace hunter)))
   pure (hunterId, pikerId, giantId, activated)
 
+-- Alice's board for the PRINTED carrier's power-filtered affected set: a tapped
+-- Hill Giant (3/3), a tapped Goblin Piker (2/1) and a tapped Typhoid Rats (1/1),
+-- with `stone` deciding whether Meekstone is on the battlefield and `anthem`
+-- whether Glorious Anthem is. Three printed powers, one on each side of the
+-- card's threshold and one that only the Anthem can push over it.
+--
+-- Nothing here has an ability that runs at an untap step, so the three tapped
+-- creatures differ in their POWER and in nothing else.
+meekstoneBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> Bool -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+meekstoneBoard s registry stone anthem = do
+  giant <- S.printingOf s registry "Hill Giant"
+  piker <- S.printingOf s registry "Goblin Piker"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  meekstone <- S.printingOf s registry "Meekstone"
+  gloriousAnthem <- S.printingOf s registry "Glorious Anthem"
+  let (giantId, g0) = S.addCreature giant S.alice (Setup.emptyGame S.bothPlayers)
+      (pikerId, g1) = S.addCreature piker S.alice g0
+      (ratsId, g2) = S.addCreature rats S.alice g1
+      g3 = if stone then snd (S.addCreature meekstone S.alice g2) else g2
+      g4 = if anthem then snd (S.addCreature gloriousAnthem S.alice g3) else g3
+      tapped = S.tapObject ratsId (S.tapObject pikerId (S.tapObject giantId g4))
+  pure (giantId, pikerId, ratsId, tapped)
+
 -- Aim every target slot at one object, and leave the mana payment to
 -- S.identityAnswer. ColorSpec.aimAtObject's shape, group-local per this suite's
 -- convention.
@@ -121,6 +148,7 @@ aimAt oid p = case p of
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "UntapRestriction" $ do
   prohibitionSpec s registry
+  powerSpec s registry
   oneShotSpec s registry
   existenceSpec s registry
 
@@ -180,6 +208,51 @@ prohibitionSpec s registry = Spec.describe s "Prohibition" $ do
     Spec.assertBool s (not (Game.isTapped clachanId untapped)) "the Clachan untapped"
     Spec.assertBool s (not (Game.isTapped seatId untapped)) "the Seat untapped"
     Spec.assertBool s (not (Game.isTapped sorcererId untapped)) "the Sorcerer untapped"
+
+-- CR 502.3 with an affected set that filters on POWER: Meekstone's "creatures
+-- with power 3 or greater". The pool's first affected set that filters on a
+-- POWER, and the reason it earns a group of its own is CR 613.4c's layer 7c: the
+-- set is re-derived at every untap step off the FULL projection, so a creature
+-- the printed numbers put under the threshold is caught once an anthem pushes it
+-- over.
+--
+-- Reading the full projection is also why this is not the producer #1111 wants:
+-- that defect is in the within-layer ordering decision, which reads a mid-fold
+-- partial, and CR 613.11 keeps an untap prohibition out of the fold entirely
+-- (see #1111).
+--
+-- Meekstone's own "creatures" conjunct is faithful to the printed word rather
+-- than discriminating: Affected.Matching is battlefield-gated, CR 208.3 gives a
+-- noncreature permanent no power at all, and Filter.PowerAtLeast is vacuously
+-- False without one, so no board can tell the conjunct from its absence.
+powerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+powerSpec s registry = Spec.describe s "Power" $ do
+  -- The unit's central claim, with all three creatures asserted on one board so
+  -- no assertion can pass on a board the others did not see.
+  Spec.it s "CR 502.3/208.1 whole card: under Meekstone the Hill Giant does not untap, and the smaller creatures do" $ do
+    (giantId, pikerId, ratsId, gs) <- meekstoneBoard s registry True False
+    let untapped = untapStep gs
+    Spec.assertBool s (Game.isTapped giantId untapped) "the 3/3 is still tapped"
+    Spec.assertBool s (not (Game.isTapped pikerId untapped)) "the 2/1 untapped"
+    Spec.assertBool s (not (Game.isTapped ratsId untapped)) "and so did the 1/1"
+  -- The same board with Meekstone taken away and nothing else changed, so the
+  -- case above cannot be passing because a Hill Giant never untaps.
+  Spec.it s "CR 502.3 without Meekstone the Hill Giant untaps too" $ do
+    (giantId, pikerId, ratsId, gs) <- meekstoneBoard s registry False False
+    let untapped = untapStep gs
+    Spec.assertBool s (not (Game.isTapped giantId untapped)) "the 3/3 untapped"
+    Spec.assertBool s (not (Game.isTapped pikerId untapped)) "the 2/1 untapped"
+    Spec.assertBool s (not (Game.isTapped ratsId untapped)) "the 1/1 untapped"
+  -- The same Meekstone board plus a Glorious Anthem, which is the pair that says
+  -- the affected set reads the PROJECTED power: the Goblin Piker flips from
+  -- untapping to staying tapped, and the Typhoid Rats -- pushed to 2 power by the
+  -- same anthem -- still untaps, so the anthem did not simply freeze the board.
+  Spec.it s "CR 613.4c layer 7c: a Glorious Anthem pushes the 2/1 over Meekstone's threshold" $ do
+    (giantId, pikerId, ratsId, gs) <- meekstoneBoard s registry True True
+    let untapped = untapStep gs
+    Spec.assertBool s (Game.isTapped pikerId untapped) "the 2/1 the anthem made a 3/2 is still tapped"
+    Spec.assertBool s (not (Game.isTapped ratsId untapped)) "the 1/1 the anthem made a 2/2 untapped"
+    Spec.assertBool s (Game.isTapped giantId untapped) "and the 3/3 the anthem made a 4/4 is still tapped"
 
 -- CR 702.77b's two halves, which pull in opposite directions: the ability EXISTS
 -- on the battlefield, and it can be ACTIVATED only from a hand.

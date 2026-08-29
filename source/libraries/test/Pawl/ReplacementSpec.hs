@@ -9662,7 +9662,7 @@ tidewalkerChain s registry hack = do
 -- The OTHER side of the rule tidewalkerSpec above proves: CR 400.7a carries an
 -- effect over to "the permanent that spell becomes", so a permanent spell a CR
 -- 614.6 redirect sent somewhere other than the battlefield becomes no permanent
--- and carries nothing (#2399). CR 608.3e is the rulebook stating the same shape
+-- and carries nothing; see #2399. CR 608.3e is the rulebook stating the same shape
 -- from the other end.
 --
 -- THE PRODUCER IS SYNTHETIC, and the search that says so: Scryfall's oracle text
