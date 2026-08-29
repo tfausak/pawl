@@ -163,7 +163,7 @@ spec s registry = Spec.describe s "Face-down exile" $ do
         (Just onePile, Just twoPile) -> do
           let draws named = State.execState (Engine.runGame (countingDraws named) board (S.cast S.alice spellId)) (0 :: Int)
           Spec.assertEqWith s "the pile of one card leaves nothing to draw, so the draw is not raised" (draws onePile) 0
-          Spec.assertEqWith s "the pile of two on the same board is a real draw, and is" (draws twoPile) 1
+          Spec.assertEqWith s "the pile of two on the same board is a real draw, and is asked about once" (draws twoPile) 1
           -- Proxies, AFTER the behaviour so neither can absorb a mutation: the
           -- elided draw still hands over the pile's one card, which is what
           -- makes the two options indistinguishable.
