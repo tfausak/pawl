@@ -847,6 +847,9 @@ applyCrossings finalSub parent =
                 -- its owner. The fallback is unreachable for the reason
                 -- Departure.objectsLeaveWith gives.
                 (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid g))
+                -- CR 108.3, which no projection moves: read straight off the
+                -- object, unlike the controller above.
+                (Object.owner obj)
                 (Object.source obj)
                 (Object.counters obj)
                 (Event.copiedSnapshot oid g)
