@@ -663,15 +663,23 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Create (Create.MkCreate (Quantity.Literal 1) card plain Nothing (PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "victim")))))
       " {\"type\":\"Create\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":1},\"card\":\"Goblin Piker\",\"creator\":{\"type\":\"ControllerOfBound\",\"value\":\"victim\"}}} "
-  -- Both keys required, so there is one form: Alchemy states the conjured card
-  -- and where it goes in the same sentence.
+  -- The count elided at one and the destination stated, which is what "conjure a
+  -- card named Ornithopter into your hand" prints.
   Spec.it s "Conjure" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Conjure (Conjure.MkConjure (Text.pack "Ornithopter") ConjureDestination.Hand))
+      (Effect.Conjure (Conjure.MkConjure Conjure.defaultQuantity (Text.pack "Ornithopter") ConjureDestination.Hand))
       " {\"type\":\"Conjure\",\"value\":{\"card\":\"Ornithopter\",\"destination\":{\"type\":\"Hand\"}}} "
+  -- Toralf's Disciple's form: a stated count and a library.
+  Spec.it s "Conjure with a stated count" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Conjure (Conjure.MkConjure (Quantity.Literal 4) (Text.pack "Lightning Bolt") ConjureDestination.Library))
+      " {\"type\":\"Conjure\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":4},\"card\":\"Lightning Bolt\",\"destination\":{\"type\":\"Library\"}}} "
   -- Both ObjectRef arms have to survive. A count of one is elided, so both of
   -- these write the ref alone.
   Spec.it s "CreateCopy round-trips both ObjectRef arms" $ do
