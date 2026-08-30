@@ -6748,6 +6748,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- it wants rather than what defeats it. Effect.ControlPlayerNextTurn,
         -- MonarchTarget's InSlot and ExchangeSides' WithController match
         -- Recipient.ToPlayer, and no binder in boundPlurally mints a player slot.
+        --
+        -- Not implemented: the object slot PlayerRef.ControllerOfBound reads
+        -- singly, which no arm below can see because a PlayerRef sits inside a
+        -- payload rather than being one (#2707).
         readSingly effect = case effect of
           -- CR 701.14b's pair, which is why both slots count.
           Effect.Fight (Fight.MkFight one two) -> [one, two]
