@@ -145,13 +145,14 @@ loadNoAuraDeck registry = do
 -- one (AddCardType Creature onto every Swamp), so a Swamp the Bell animates
 -- joins Ashaya's set.
 --
--- Ashaya -> Bell is NOT a dependency, and it is the half that costs more to
--- settle. Kormus Bell's set reads a subtype and Ashaya writes one
--- (AddLandSubtype Forest), so the aspect screen clears and `changesAt` runs on
--- that pair as well -- but Ashaya ADDS Forest rather than setting a subtype, and
--- CR 305.7 keeps a land's existing land types when it gains one in addition, so
--- applying Ashaya moves no object into or out of `HasSubtype Swamp` and the
--- confirmation answers no after the full board-wide re-ask.
+-- Ashaya -> Bell is NOT a dependency, and reaching that answer is the other half
+-- of what the scenario exercises. Kormus Bell's set reads a subtype and Ashaya
+-- writes one (AddLandSubtype Forest), so the aspect screen clears here too and
+-- the confirmation runs -- but Ashaya ADDS Forest rather than setting a subtype,
+-- and CR 305.7 keeps a land's existing land types when it gains one in addition,
+-- so applying Ashaya moves no object into or out of `HasSubtype Swamp` and the
+-- confirmation answers no. Both directions take `changesHere` rather than
+-- `changesAt`, neither affected filter reading a peer projection.
 --
 -- Neither card SETS a land subtype, so CR 305.7 never strips Ashaya's
 -- characteristic-defining ability -- which is what rules Blood Moon out as the
