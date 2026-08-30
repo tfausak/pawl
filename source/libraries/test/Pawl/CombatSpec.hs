@@ -36,6 +36,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackTarget as AttackTarget
@@ -3653,7 +3654,7 @@ keywordCounterRestrictionSpec s registry = Spec.describe s "KeywordCounterRestri
 -- gathered live off a source standing on the battlefield. Zirda, the Dawnwaker's
 -- "{1}, {T}: Target creature can't block this turn" (checked against Scryfall) is
 -- the pool's printing; the row lands in GameState.blockProhibitions and
--- Pawl.Engine.CombatRestriction.prohibited is what reads it.
+-- Pawl.Engine.CombatRestriction.blockProhibited is what reads it.
 --
 -- THE PAIR that makes these cases discriminating: the SAME activation is made on
 -- both boards, for the same {1} and the same tap, and the two differ only in
@@ -3727,6 +3728,139 @@ namingTarget oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter ((== Just oid) . Recipient.objectOf) offered) sets
   _ -> S.identityAnswer p
 
+-- CR 508.1c / 611.1 / 613.11: the group above's twin one rule over -- a stored
+-- ATTACKING restriction, which no printed row can state for a creature whose
+-- source has left. Netter en-Dal's "{W}, {T}, Discard a card: Target creature
+-- can't attack this turn" (checked against Scryfall) is the pool's printing; the
+-- row lands in GameState.attackProhibitions and
+-- Pawl.Engine.CombatRestriction.attackProhibited is what reads it.
+--
+-- THE PAIR: the same activation is made on every board here, for the same {W},
+-- the same tap and the same discard, and the boards differ only in which creature
+-- the one target slot named -- one of alice's two identical Pikers, or bob's,
+-- whose attack the restriction has nothing to reach. A green control leg
+-- therefore cannot come from an unpaid cost, an empty hand, or a board on which
+-- nobody could have attacked.
+storedAttackRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+storedAttackRestrictionSpec s registry = Spec.describe s "StoredAttackRestriction" $ do
+  Spec.it s "CR 508.1c the creature Netter en-Dal named cannot attack, and its twin still does" $ do
+    (victim, twin, _, resolved) <- netterResolved s registry (\v _ _ -> v)
+    let after = declaringAttackers resolved
+    Spec.assertEqWith s "only the twin ended up attacking" (declaredAttackers after) [twin]
+    Spec.assertBool s (not (Combat.canAttack S.alice victim resolved)) "and the named creature is off CR 508.1a's candidate list"
+    Spec.assertEqWith s "one restriction was stored, over the creature named" (fmap ActiveAttackProhibition.object (GameState.attackProhibitions resolved)) [victim]
+  -- The pair's other half: the same activation, aimed at bob's Piker.
+  Spec.it s "CR 508.1c aimed elsewhere, both of alice's twins attack" $ do
+    (victim, twin, elsewhere, resolved) <- netterResolved s registry (\_ _ e -> e)
+    let after = declaringAttackers resolved
+    Spec.assertEqWith s "both twins attacked" (declaredAttackers after) [victim, twin]
+    Spec.assertEqWith s "and the restriction was stored all the same, over bob's Piker" (fmap ActiveAttackProhibition.object (GameState.attackProhibitions resolved)) [elsewhere]
+  -- CR 514.2 / 611.2a: "this turn" arms Expiry.AtCleanup, so the cleanup sweep
+  -- drops the row and the creature attacks again. Through the sweep directly,
+  -- which is the narrowest path that shows it.
+  Spec.it s "CR 514.2 the restriction ends at cleanup" $ do
+    (victim, _, _, resolved) <- netterResolved s registry (\v _ _ -> v)
+    let swept = Expiry.dropAtCleanup resolved
+    Spec.assertBool s (not (Combat.canAttack S.alice victim resolved)) "restricted on the turn it resolved"
+    Spec.assertBool s (Combat.canAttack S.alice victim swept) "and attacking again once the turn's cleanup has run"
+    Spec.assertEqWith s "with nothing left stored" (GameState.attackProhibitions swept) []
+  -- The asymmetry with CR 509.1b that this side has and the block side does not:
+  -- CR 508.1d counts requirements obeyed "without disobeying any restrictions",
+  -- so a stored restriction does not deadlock a Curse of the Nightly Hunt -- it
+  -- takes the creature off Pawl.Engine.Combat.legalAttackers, which is the
+  -- candidate list Pawl.Engine.AttackRequirement.instances mints against, and the
+  -- maximum drops to zero. The control is the SAME Curse and the SAME activation
+  -- aimed at bob's Piker, where declining stays illegal.
+  Spec.it s "CR 508.1d a required creature the restriction covers may decline after all" $ do
+    -- CR 506.2's defending player has to be stated, because CR 508.1d mints an
+    -- instance per (creature, announcement) pair and a board with no defender
+    -- offers no announcement -- on which declining is trivially legal and the
+    -- control leg cannot fail.
+    (restrained, control, piker1) <- cursedNetterBoards s registry
+    Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] restrained) "the required Piker may decline once it can't attack"
+    Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] control)) "while the control's required Piker may not"
+    Spec.assertEqWith s "nothing is offered on the restricted board" (Combat.legalAttackers S.alice restrained) []
+    Spec.assertEqWith s "and the Piker is offered on the control" (Combat.legalAttackers S.alice control) [piker1]
+
+-- Alice's Netter en-Dal, activated once and resolved, over a board of her two
+-- identical Pikers and one of bob's. `pick` chooses which of the three the one
+-- target slot names, and is the only thing the boards above differ in. The single
+-- card in alice's hand is the discard the cost takes, and the one Plains is its
+-- {W}.
+netterResolved ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  (ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId) ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+netterResolved s registry pick = do
+  netter <- S.printingOf s registry "Netter en-Dal"
+  plains <- S.printingOf s registry "Plains"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (netterId, withNetter) = S.addCreature netter S.alice (S.landsInPlay plains 1)
+      (_, withCard) = S.addHandCard plains S.alice withNetter
+      (victim, withVictim) = S.addCreature piker S.alice withCard
+      (twin, withTwin) = S.addCreature piker S.alice withVictim
+      (elsewhere, placed) = S.addCreature piker S.bob withTwin
+      board = mainPhaseFor placed
+      abilities = Activate.abilitiesFor netterId board
+      resolved = activatingNetter netterId (pick victim twin elsewhere) board
+  Spec.assertEqWith s "Netter en-Dal states exactly one activated ability" (length abilities) 1
+  pure (victim, twin, elsewhere, resolved)
+
+-- The CR 508.1d board: a Curse of the Nightly Hunt on alice over one Piker of
+-- hers, with the same Netter en-Dal activation aimed at that Piker (the first
+-- state) and at bob's (the second). Netter itself pays {T}, so it is tapped and
+-- required of nothing.
+cursedNetterBoards ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (GameState.GameState, GameState.GameState, ObjectId.ObjectId)
+cursedNetterBoards s registry = do
+  netter <- S.printingOf s registry "Netter en-Dal"
+  plains <- S.printingOf s registry "Plains"
+  piker <- S.printingOf s registry "Goblin Piker"
+  curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+  let (netterId, withNetter) = S.addCreature netter S.alice (S.landsInPlay plains 1)
+      (_, withCard) = S.addHandCard plains S.alice withNetter
+      (piker1, withPiker) = S.addCreature piker S.alice withCard
+      (elsewhere, withBob) = S.addCreature piker S.bob withPiker
+      (aura, withAura) = S.addCreature curse S.alice withBob
+      board = mainPhaseFor (S.attachTo aura (Recipient.ToPlayer S.alice) withAura)
+      abilities = Activate.abilitiesFor netterId board
+      run named = activatingNetter netterId named board
+  Spec.assertEqWith s "Netter en-Dal states exactly one activated ability" (length abilities) 1
+  pure (facingBob (run piker1), facingBob (run elsewhere), piker1)
+
+-- CR 506.2: alice in her declare-attackers step with bob the defending player,
+-- stated rather than derived for `declaringAttackers`' reason -- a direct call to
+-- Pawl.Engine.Combat.legalAttackDeclaration never runs the turn-based action that
+-- would fill it in.
+facingBob :: GameState.GameState -> GameState.GameState
+facingBob gs =
+  gs
+    { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+      GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.bob}
+    }
+
+-- Alice active with priority in her precombat main phase, which is when the
+-- activation above is made.
+mainPhaseFor :: GameState.GameState -> GameState.GameState
+mainPhaseFor gs =
+  gs
+    { GameState.activePlayer = S.alice,
+      GameState.phase = Phase.PrecombatMain,
+      GameState.priority = Just S.alice
+    }
+
+-- Netter en-Dal's one ability, activated and resolved with its target slot aimed
+-- at `named`.
+activatingNetter :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+activatingNetter netterId named board = case Activate.abilitiesFor netterId board of
+  [ability] -> S.runPure (namingTarget named) board (Activate.activateAbility S.alice netterId ability >> Stack.resolveTop)
+  _ -> board
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   declareSpec s registry
@@ -3743,6 +3877,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatRestrictionSpec s registry
   keywordCounterRestrictionSpec s registry
   storedBlockRestrictionSpec s registry
+  storedAttackRestrictionSpec s registry
   suspectedAbilityRemovalSpec s registry
   conditionalCombatRestrictionSpec s registry
   defendingPlayerRestrictionSpec s registry

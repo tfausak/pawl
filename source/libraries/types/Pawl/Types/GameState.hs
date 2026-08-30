@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
@@ -421,6 +422,13 @@ data GameState = MkGameState
     -- -- Pawl.Engine.CombatRestriction.inForce re-derives those live off the
     -- battlefield.
     blockProhibitions :: [ActiveBlockProhibition.ActiveBlockProhibition],
+    -- | CR 508.1c / 611.1: stored ATTACKING RESTRICTIONS from resolutions
+    -- (Netter en-Dal), each with an expiry the Pawl.Engine.Expiry sweeps
+    -- consult. Read at Pawl.Engine.CombatRestriction.attackProhibited, which
+    -- unions them into that module's `cantAttack`. A permanent's printed
+    -- restrictions are NOT here -- Pawl.Engine.CombatRestriction.inForce
+    -- re-derives those live off the battlefield.
+    attackProhibitions :: [ActiveAttackProhibition.ActiveAttackProhibition],
     -- | CR 116.2d: the ignores players have paid for, each with an expiry the
     -- Pawl.Engine.Expiry sweeps consult. Read by Pawl.Engine.PlayerEffect.applying,
     -- which drops an ignored permanent's abilities for the ignoring player alone

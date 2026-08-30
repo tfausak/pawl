@@ -40,6 +40,7 @@ import qualified Pawl.Codec.Fight as Fight
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.FlipCoin as FlipCoin
 import qualified Pawl.Codec.ForEach as ForEach
+import qualified Pawl.Codec.ForbidAttack as ForbidAttack
 import qualified Pawl.Codec.ForbidBlock as ForbidBlock
 import qualified Pawl.Codec.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Codec.GrantPlayFromExile as GrantPlayFromExile
@@ -166,6 +167,7 @@ codec cardCodec abilityCodec =
       Arm.payload "CantBeRegenerated" CantBeRegenerated.codec Effect.CantBeRegenerated (\x -> case x of Effect.CantBeRegenerated y -> Just y; _ -> Nothing),
       Arm.payload "RequireAttack" RequireAttack.codec Effect.RequireAttack (\x -> case x of Effect.RequireAttack y -> Just y; _ -> Nothing),
       Arm.payload "ForbidBlock" ForbidBlock.codec Effect.ForbidBlock (\x -> case x of Effect.ForbidBlock y -> Just y; _ -> Nothing),
+      Arm.payload "ForbidAttack" ForbidAttack.codec Effect.ForbidAttack (\x -> case x of Effect.ForbidAttack y -> Just y; _ -> Nothing),
       Arm.payload "CreateEmblem" cardCodec Effect.CreateEmblem (\x -> case x of Effect.CreateEmblem y -> Just y; _ -> Nothing),
       Arm.payload "BecomeMonarch" MonarchTarget.codec Effect.BecomeMonarch (\x -> case x of Effect.BecomeMonarch y -> Just y; _ -> Nothing),
       Arm.payload "Designate" Designate.codec Effect.Designate (\x -> case x of Effect.Designate y -> Just y; _ -> Nothing),

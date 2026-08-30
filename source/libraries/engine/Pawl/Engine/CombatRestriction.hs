@@ -6,9 +6,10 @@
 --
 -- Not all of them are card data: CR 701.35a's detain forbids both declarations
 -- and is read off the victim (Pawl.Engine.Detain) rather than off any card's
--- printed text, and CR 509.1b's "can't block this turn" is stored by the
--- resolution that said it (GameState.blockProhibitions). See `detained` and
--- `prohibited`.
+-- printed text, and CR 508.1c's "can't attack this turn" and CR 509.1b's "can't
+-- block this turn" are stored by the resolution that said them
+-- (GameState.attackProhibitions, GameState.blockProhibitions). See `detained`,
+-- `attackProhibited` and `blockProhibited`.
 --
 -- The only module that may CASE on Pawl.Types.CombatRestriction.
 -- Pawl.Engine.Keyword constructs one -- rule 702.98a's unleash -- and reads none.
@@ -31,6 +32,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
@@ -53,10 +55,15 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 
 -- CR 508.1c: which of `candidates` an effect in force right now says CAN'T
--- ATTACK. Pacifism's first half, Blind-Spot Giant's when its gate is shut, and CR
--- 701.35a's first clause.
+-- ATTACK. Pacifism's first half, Blind-Spot Giant's when its gate is shut, CR
+-- 701.35a's first clause, and Netter en-Dal's stored restriction.
 cantAttack :: [ObjectId] -> GameState -> Set ObjectId
-cantAttack candidates gs = Set.union (restricted attacking candidates gs) (detained candidates gs)
+cantAttack candidates gs =
+  Set.unions
+    [ restricted attacking candidates gs,
+      detained candidates gs,
+      attackProhibited candidates gs
+    ]
 
 -- CR 509.1b: which of `candidates` an effect in force right now says CAN'T
 -- BLOCK. Pacifism's second half, Blind-Spot Giant's when its gate is shut, CR
@@ -66,8 +73,29 @@ cantBlock candidates gs =
   Set.unions
     [ restricted blocking candidates gs,
       detained candidates gs,
-      prohibited candidates gs
+      blockProhibited candidates gs
     ]
+
+-- CR 508.1c / 611.1: the candidates a stored, resolution-generated restriction
+-- forbids attacking. Netter en-Dal's "target creature can't attack this
+-- turn".
+--
+-- blockProhibited's twin one rule over, sharing every argument that function's
+-- comment makes, and asymmetric with it in one place the CR names: CR 508.1d's
+-- maximization counts requirements obeyed "without disobeying any restrictions",
+-- and Pawl.Engine.Combat.attackCeilingGiven gets that for free because its
+-- candidate list is Pawl.Engine.Combat.legalAttackers, already narrowed by this
+-- set. A creature under a stored prohibition therefore excuses a Curse of the
+-- Nightly Hunt requirement rather than deadlocking the declaration. CR 509.1c
+-- says the same of blocking, but no requirement there reads a set this narrows.
+--
+-- No CR 508.1c "unless" gate, for blockProhibited's reason: every gate in the
+-- pool is printed beside the restriction it gates, and Pawl.Types.ForbidAttack
+-- states none.
+attackProhibited :: [ObjectId] -> GameState -> Set ObjectId
+attackProhibited candidates gs =
+  let stopped = Set.fromList (fmap ActiveAttackProhibition.object (GameState.attackProhibitions gs))
+   in Set.intersection (Set.fromList candidates) stopped
 
 -- CR 509.1b / 611.1: the candidates a stored, resolution-generated restriction
 -- forbids blocking. Zirda, the Dawnwaker's "target creature can't block this
@@ -86,11 +114,8 @@ cantBlock candidates gs =
 -- modifies the rules rather than an object's characteristics, so no
 -- Pawl.Types.Modification could have carried it and Pawl.Engine.Projection sees
 -- nothing of it.
---
--- No attacking counterpart. Not implemented: a stored restriction on the CR
--- 508.1c side, "target creature can't attack this turn" (#2683).
-prohibited :: [ObjectId] -> GameState -> Set ObjectId
-prohibited candidates gs =
+blockProhibited :: [ObjectId] -> GameState -> Set ObjectId
+blockProhibited candidates gs =
   let stopped = Set.fromList (fmap ActiveBlockProhibition.object (GameState.blockProhibitions gs))
    in Set.intersection (Set.fromList candidates) stopped
 
