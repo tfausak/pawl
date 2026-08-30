@@ -5192,6 +5192,41 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             (anyFace cardOffends . Printing.card)
             ps
     Spec.assertEqWith s "no dangling or unused slots" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The ENCHANT half, which the sweep above cannot reach: CR 303.4a's slot is
+  -- declared on the FACE beside the modes (Card.enchantSlotMap), so it is in no
+  -- mode's targetSlots and Resolve.modeSlots never folds it.
+  --
+  -- A one-sided claim rather than the equality above, and the asymmetry is where
+  -- the slot is DECLARED: CR 303.4a puts it on the enchant ability, beside the
+  -- modes rather than in one, so there is no mode whose declared set it belongs to
+  -- and nothing for an equality to compare it against. What CR 601.2c answers it
+  -- with is bound under Card.enchantSlot like any other target (Pawl.Engine.Stack
+  -- reads it back from there), so "reads nothing" is the whole of what there is to
+  -- say. What it fences is a pool, filter or CR 202.3 computed bound naming a
+  -- slot: it would compile, pass every lint here, and then be judged in
+  -- Target.slotContext against whatever the announcement happened to seed.
+  Spec.it s "an Aura's enchant slot reads no slot" $ do
+    ps <- S.allPrintings s
+    let reads_ face = Set.unions (fmap (Map.keysSet . Resolve.targetSlotSlots) (Face.enchant face))
+        offenders = filter (anyFace (not . Set.null . reads_) . Printing.card) ps
+    -- The guard, because a pool with no enchant slot at all would pass saying
+    -- nothing.
+    Spec.assertBool
+      s
+      (any (anyFace (not . null . Face.enchant) . Printing.card) ps)
+      "the pool prints an enchant slot"
+    Spec.assertEqWith s "no enchant slot names a slot" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The REJECTING direction, against a printed Aura restated rather than a card
+  -- file, as the hand-action lint below does it. Filter.IsBound is the atom, since
+  -- Filter.boundSlots is one of the three folds targetSlotSlots joins.
+  Spec.it s "the lint itself catches an enchant slot naming a slot" $ do
+    pacifism <- S.printingOf s registry "Pacifism"
+    let face = S.combinedFace pacifism
+        stray = SlotName.MkSlotName (Text.pack "stray")
+        named = fmap (\slot -> slot {TargetSlot.filter = Just (Filter.Type.IsBound stray)}) (Face.enchant face)
+        reads_ slots = Set.unions (fmap (Map.keysSet . Resolve.targetSlotSlots) slots)
+    Spec.assertEqWith s "the real Pacifism's enchant slot reads nothing" (reads_ (Face.enchant face)) Set.empty
+    Spec.assertEqWith s "a filter naming a slot is reported" (reads_ named) (Set.singleton stray)
   -- The same equality over the two PREGAME windows, which the sweep above does not
   -- reach: Card.allEffects is the spell's modes, and CR 103.5b's and CR 103.6's
   -- actions hang off Pawl.Types.Face beside it. See handActionSlotsOffend for why
