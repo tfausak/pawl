@@ -53,6 +53,13 @@ spec s = Spec.describe s "Pawl.Codec.Pool" $ do
       Pool.codec
       Pool.SpellsAndPermanents
       " {\"type\":\"SpellsAndPermanents\"} "
+  -- CR 115.2 clause (a) in both halves: players plus battlefield planeswalkers.
+  Spec.it s "PlayersAndPlaneswalkers" $
+    Common.assertCodec
+      s
+      Pool.codec
+      Pool.PlayersAndPlaneswalkers
+      " {\"type\":\"PlayersAndPlaneswalkers\"} "
   -- CR 404.1: the cards in a graveyard, tagged with WHOSE.
   Spec.it s "CardsInGraveyard" $
     Common.assertCodec

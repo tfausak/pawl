@@ -18,6 +18,7 @@ codec =
       Arm.nullary "Spells" Pool.Spells,
       Arm.nullary "Abilities" Pool.Abilities,
       Arm.nullary "SpellsAndPermanents" Pool.SpellsAndPermanents,
+      Arm.nullary "PlayersAndPlaneswalkers" Pool.PlayersAndPlaneswalkers,
       Arm.payload "CardsInGraveyard" GraveyardScope.codec Pool.CardsInGraveyard (\x -> case x of Pool.CardsInGraveyard y -> Just y; _ -> Nothing),
       -- Nullary: CR 400.1's shared zones have no per-player copy for a payload
       -- to select among.

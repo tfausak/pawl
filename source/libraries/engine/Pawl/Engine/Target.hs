@@ -406,6 +406,9 @@ poolHeldLastKnown pool view =
         Pool.Permanents -> any Card.isPermanentType (Set.toList types)
         Pool.AnyTarget -> hasType CardType.Creature || hasType CardType.Planeswalker || hasType CardType.Battle
         Pool.SpellsAndPermanents -> any Card.isPermanentType (Set.toList types)
+        -- Only the planeswalker half can be asked: the player half is looked up by
+        -- PlayerId, as Pool.Players below is.
+        Pool.PlayersAndPlaneswalkers -> hasType CardType.Planeswalker
         Pool.Players -> False
         Pool.Spells -> False
         Pool.Abilities -> False
@@ -617,6 +620,7 @@ data Pools = MkPools
     spellPool :: Set Recipient,
     abilityPool :: Set Recipient,
     spellsAndPermanentsPool :: Set Recipient,
+    playersAndPlaneswalkersPool :: Set Recipient,
     exilePool :: Set Recipient
   }
 
@@ -640,6 +644,10 @@ poolsGiven pcs gs =
       spellPool = spellRecipients gs,
       abilityPool = abilityRecipients gs,
       spellsAndPermanentsPool = Set.union (spellRecipients gs) (permanentRecipients gs),
+      -- No onePerObject, unlike anyTargetPool above: the two halves are a player
+      -- and an object, so no permanent can appear under two tags here.
+      playersAndPlaneswalkersPool =
+        Set.union (playerRecipients gs) (planeswalkerRecipientsGiven pcs gs),
       exilePool = exileRecipients gs
     }
 
@@ -667,6 +675,7 @@ basePoolGiven pools context bindings pool gs = case pool of
   Pool.Spells -> spellPool pools
   Pool.Abilities -> abilityPool pools
   Pool.SpellsAndPermanents -> spellsAndPermanentsPool pools
+  Pool.PlayersAndPlaneswalkers -> playersAndPlaneswalkersPool pools
   Pool.CardsInGraveyard scope -> graveyardRecipients context bindings scope gs
   -- CR 406.1's whole zone, face-down cards included, and hoisted because CR 400.1
   -- shares it between all players the way no graveyard is shared.
@@ -703,9 +712,10 @@ creatureRecipientsGiven pcs gs =
           (filter isCreatureId . (\pid -> Game.zoneMembers Zone.Battlefield pid gs))
           (Game.stillPlaying gs)
 
--- CR 115.4: planeswalkers on the battlefield, per playing player's zone, tagged
--- ToPlaneswalker. The same walk creatureRecipientsGiven makes and shares its
--- projection with, asking Projection.isPlaneswalkerGiven instead.
+-- CR 115.4 and CR 115.2: planeswalkers on the battlefield, per playing player's
+-- zone, tagged ToPlaneswalker -- the planeswalker half of both anyTargetPool and
+-- playersAndPlaneswalkersPool. The same walk creatureRecipientsGiven makes and
+-- shares its projection with, asking Projection.isPlaneswalkerGiven instead.
 --
 -- A pool of its own rather than a widened creatureRecipients, because the two
 -- describe different candidate sets: CR 306 planeswalkers and CR 302 creatures
@@ -1033,6 +1043,7 @@ dependsOnSlot pool = case pool of
   Pool.Spells -> False
   Pool.Abilities -> False
   Pool.SpellsAndPermanents -> False
+  Pool.PlayersAndPlaneswalkers -> False
   Pool.CardsInGraveyard scope -> case scope of
     GraveyardScope.Scoped _ -> False
     GraveyardScope.InSlot _ -> True
