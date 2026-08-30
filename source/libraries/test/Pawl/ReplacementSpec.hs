@@ -1833,8 +1833,8 @@ wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $
     let (armed, _) = wordsBoard plains wordsOfWorship piker True
         stocked = snd (S.addLibraryCard piker S.bob armed)
         after = S.runPure S.identityAnswer stocked (Event.drawCard S.bob)
-    Spec.assertEqWith s "CR 121.1 bob drew his card" (S.handSize S.bob after) 1
-    Spec.assertEqWith s "CR 109.5 and alice gained nothing off his draw" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "CR 109.5 alice gained nothing off his draw" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "CR 121.1 and bob drew his card" (S.handSize S.bob after) 1
     Spec.assertEqWith s "CR 614.3 the row is unspent" (length (GameState.replacements after)) 1
 
 -- alice with a Plains, a Words of Worship and two library cards, with the
