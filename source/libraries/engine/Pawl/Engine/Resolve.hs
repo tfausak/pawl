@@ -988,168 +988,172 @@ filterSlotsOf = Map.fromSet (const SlotArity.One) . Filter.boundSlots
 -- Quantities nested in this effect's ObjectRefs are taken from effectObjectRefs
 -- ahead of the case rather than arm by arm, and why no arm below names one.
 slotsAreExhaustive :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
-slotsAreExhaustive effect =
-  all (all Quantity.slotsAreExhaustive . objectRefQuantities) (effectObjectRefs effect) && case effect of
-    Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> all (Quantity.slotsAreExhaustive . DamagePart.quantity) parts
-    Effect.Fight {} -> True
-    Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) ->
-      durationSlotsAreExhaustive duration
-        && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
-    Effect.ChangeText {} -> True
-    Effect.AddMana _ -> True
-    -- An unbounded search names no count, so it reads no slot to be exhaustive
-    -- about.
-    Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> all Quantity.slotsAreExhaustive quantity
-    Effect.ExileAllGraveyards -> True
-    Effect.Proliferate -> True
-    Effect.ChooseCardName _ -> True
-    Effect.FromOutsideTheGame _ -> True
-    Effect.ExileThisSpell -> True
-    Effect.Bolster quantity -> Quantity.slotsAreExhaustive quantity
-    Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.slotsAreExhaustive quantity
-    Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
-    Effect.TemptWithTheRing -> True
-    Effect.Venture {} -> True
-    Effect.ExileHandThenDraw -> True
-    Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.slotsAreExhaustive quantity
-    Effect.RestartGame _ -> True
-    Effect.ControlPlayerNextTurn _ -> True
-    Effect.Destroy {} -> True
-    Effect.Sacrifice _ -> True
-    Effect.TurnFaceDown _ -> True
-    Effect.TurnFaceUp _ -> True
-    Effect.RemoveFromCombat _ -> True
-    Effect.BecomesBlocked _ -> True
-    -- Three of the four whose ref may nest a Quantity; ForEach is the fourth. The
-    -- entry rider nests one too, CR 122.6's count per kind.
-    Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> all Quantity.slotsAreExhaustive (riderQuantities riders)
-    Effect.Draw (Draw.MkDraw _ quantity _) -> Quantity.slotsAreExhaustive quantity
-    Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
-    Effect.Reveal {} -> True
-    Effect.LookAt {} -> True
-    Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
-    Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
-    Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
-    Effect.Explore {} -> True
-    Effect.Discard subject -> case subject of
-      Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.slotsAreExhaustive quantity
-      Discard.These {} -> True
-    Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
-    Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
-    Effect.ExchangeLifeTotals _ -> True
-    Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
-    Effect.RedistributeLifeTotals -> True
-    Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
-    Effect.DecreaseSpeed d -> Quantity.slotsAreExhaustive (SpeedDecrease.quantity d)
-    -- CR 111.1's token is minted with empty bindings, so its card is literal text.
-    -- Its entry riders are not: CR 122.6's count per kind is the effect speaking,
-    -- read in the resolution's own slots.
-    Effect.Create (Create.MkCreate quantity _ riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
-    -- The conjured card is literal text, Create's token's reason; the COUNT is the
-    -- effect speaking, read in the resolution's own slots.
-    Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.slotsAreExhaustive quantity
-    Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
-    Effect.BecomeCopy {} -> True
-    Effect.CopySpell {} -> True
-    -- The ReplacementEffect holds no Quantity, and the one reference it can hold --
-    -- a Filter.IsBound in its pattern -- slotsOf reports through
-    -- replacementPatternSlots. Not implemented: the effects a rewrite or a CR 615.5
-    -- rider nests under this opcode read slots of their own and neither this answer
-    -- nor slotsOf reports them; every Effect.Replace in data/cards/ nests none
-    -- (gap #1962).
-    Effect.Replace (Replace.MkReplace duration _ _ condition _) ->
-      durationSlotsAreExhaustive duration && all conditionSlotsAreExhaustive condition
-    Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> True
-    Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity rider) ->
-      durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity && all slotsAreExhaustive rider
-    Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ rider) ->
-      durationSlotsAreExhaustive duration && all slotsAreExhaustive rider
-    Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _ _) -> durationSlotsAreExhaustive duration
-    Effect.Counter {} -> True
-    Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
-    -- No Quantity at all: CR 122.8 names neither a kind nor a count.
-    Effect.PutCountersFrom {} -> True
-    Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
-    -- BOTH Quantity positions: the count the moved kinds may write, and the one a
-    -- library walk in the GIVER carries -- `from` became an ObjectRef when CR
-    -- 122.5's first side was widened to a group, and an arm reading the kinds
-    -- alone kept compiling (#2729).
-    Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> all Quantity.slotsAreExhaustive (MovedKinds.quantityOf kinds)
-    Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
-    Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
-    Effect.PayAnyEnergy _ -> True
-    Effect.Tap _ -> True
-    Effect.Untap _ -> True
-    Effect.Detain _ -> True
-    Effect.Goad _ -> True
-    Effect.MakePlotted _ -> True
-    Effect.DoesNotUntapNext _ -> True
-    Effect.Transform _ -> True
-    Effect.Convert _ -> True
-    -- The combined face is interned with EMPTY bindings, CreateEmblem's reason, so
-    -- its text is literal.
-    Effect.Meld _ -> True
-    Effect.PhaseOut _ -> True
-    Effect.AddPhases _ -> True
-    Effect.EndTurn -> True
-    Effect.EndCombatPhase -> True
-    -- slotsOf's arm drops this Duration, so the slotless test is made here.
-    Effect.GainControl (DurationRef.MkDurationRef duration _) ->
-      Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
-    -- CR 603.7c: the armed ability inherits this object's whole environment.
-    Effect.ArmDelayedTrigger {} -> False
-    -- GainControl's reason for the Duration.
-    Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) ->
-      Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
-    -- slotsOf drops the Duration, so the slotless test is made here.
-    Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) ->
-      Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
-    -- RequireBlock's reason, one axis narrower.
-    Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) ->
-      Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
-    -- CantBeRegenerated's reason again.
-    Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) ->
-      Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
-    Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _) ->
-      Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
-    -- RequireBlock's reason, one axis over.
-    Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) ->
-      Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
-    -- CR 114.2's emblem is minted with EMPTY bindings, so its card is literal text.
-    Effect.CreateEmblem _ -> True
-    Effect.BecomeMonarch MonarchTarget.TheController -> True
-    -- The one arm answering NO: CR 725.2 reads Binding.triggerSource.
-    Effect.BecomeMonarch MonarchTarget.ControllerOfSource -> False
-    Effect.BecomeMonarch (MonarchTarget.InSlot _) -> True
-    Effect.Designate (Designate.MkDesignate _ _) -> True
-    Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> True
-    Effect.Unsuspect _ -> True
-    Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> True
-    Effect.Evolve _ -> True
-    Effect.Mentor _ -> True
-    Effect.Train _ -> True
-    Effect.ItBecomes _ -> True
-    Effect.ExileUntilMonarch _ -> True
-    Effect.ExileHaunting (ExileHaunting.MkExileHaunting _ _) -> True
-    Effect.Attach _ -> True
-    Effect.AttachTarget (AttachTarget.MkAttachTarget _ _) -> True
-    Effect.AttachTargetToEach (AttachTarget.MkAttachTarget _ _) -> True
-    Effect.AttachBound (AttachBound.MkAttachBound _ _) -> True
-    -- CR 729.1b: a DEFINITION, and the subgame reads no binding of the outer game.
-    Effect.PlaySubgame _ -> True
-    -- PlaySubgame's answer: a definition reads no slot.
-    Effect.ChooseOpponent _ -> True
-    Effect.ChooseOpponentAtRandom _ -> True
-    Effect.RollDie rollDie -> all Quantity.slotsAreExhaustive (RollDie.modifier rollDie)
-    Effect.FlipCoin {} -> True
-    Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> True
-    Effect.ShuffleIntoLibrary {} -> True
-    Effect.Shuffle {} -> True
-    Effect.OfferCast {} -> True
-    Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant)
-    -- PreventNextDamage's answer for the body, plus its own ref's: a PlayerRef
-    -- nested in the DEPTH is one slotsOf cannot see.
-    Effect.ForEach (ForEach.MkForEach _ _ body) -> all slotsAreExhaustive body
+slotsAreExhaustive effect = all (all Quantity.slotsAreExhaustive . objectRefQuantities) (effectObjectRefs effect) && ownSlotsAreExhaustive effect
+
+-- slotsAreExhaustive's half that is not an ObjectRef's: this opcode's own
+-- fields, and its nested effects through the recursion back into it.
+ownSlotsAreExhaustive :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+ownSlotsAreExhaustive effect = case effect of
+  Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> all (Quantity.slotsAreExhaustive . DamagePart.quantity) parts
+  Effect.Fight {} -> True
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) ->
+    durationSlotsAreExhaustive duration
+      && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
+  Effect.ChangeText {} -> True
+  Effect.AddMana _ -> True
+  -- An unbounded search names no count, so it reads no slot to be exhaustive
+  -- about.
+  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> all Quantity.slotsAreExhaustive quantity
+  Effect.ExileAllGraveyards -> True
+  Effect.Proliferate -> True
+  Effect.ChooseCardName _ -> True
+  Effect.FromOutsideTheGame _ -> True
+  Effect.ExileThisSpell -> True
+  Effect.Bolster quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.slotsAreExhaustive quantity
+  Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.TemptWithTheRing -> True
+  Effect.Venture {} -> True
+  Effect.ExileHandThenDraw -> True
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.RestartGame _ -> True
+  Effect.ControlPlayerNextTurn _ -> True
+  Effect.Destroy {} -> True
+  Effect.Sacrifice _ -> True
+  Effect.TurnFaceDown _ -> True
+  Effect.TurnFaceUp _ -> True
+  Effect.RemoveFromCombat _ -> True
+  Effect.BecomesBlocked _ -> True
+  -- Three of the four whose ref may nest a Quantity; ForEach is the fourth. The
+  -- entry rider nests one too, CR 122.6's count per kind.
+  Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> all Quantity.slotsAreExhaustive (riderQuantities riders)
+  Effect.Draw (Draw.MkDraw _ quantity _) -> Quantity.slotsAreExhaustive quantity
+  Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
+  Effect.Reveal {} -> True
+  Effect.LookAt {} -> True
+  Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.Explore {} -> True
+  Effect.Discard subject -> case subject of
+    Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.slotsAreExhaustive quantity
+    Discard.These {} -> True
+  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.ExchangeLifeTotals _ -> True
+  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.RedistributeLifeTotals -> True
+  Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.DecreaseSpeed d -> Quantity.slotsAreExhaustive (SpeedDecrease.quantity d)
+  -- CR 111.1's token is minted with empty bindings, so its card is literal text.
+  -- Its entry riders are not: CR 122.6's count per kind is the effect speaking,
+  -- read in the resolution's own slots.
+  Effect.Create (Create.MkCreate quantity _ riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
+  -- The conjured card is literal text, Create's token's reason; the COUNT is the
+  -- effect speaking, read in the resolution's own slots.
+  Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.slotsAreExhaustive quantity
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
+  Effect.BecomeCopy {} -> True
+  Effect.CopySpell {} -> True
+  -- The ReplacementEffect holds no Quantity, and the one reference it can hold --
+  -- a Filter.IsBound in its pattern -- slotsOf reports through
+  -- replacementPatternSlots. Not implemented: the effects a rewrite or a CR 615.5
+  -- rider nests under this opcode read slots of their own and neither this answer
+  -- nor slotsOf reports them; every Effect.Replace in data/cards/ nests none
+  -- (gap #1962).
+  Effect.Replace (Replace.MkReplace duration _ _ condition _) ->
+    durationSlotsAreExhaustive duration && all conditionSlotsAreExhaustive condition
+  Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> True
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity rider) ->
+    durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity && all slotsAreExhaustive rider
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ rider) ->
+    durationSlotsAreExhaustive duration && all slotsAreExhaustive rider
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _ _) -> durationSlotsAreExhaustive duration
+  Effect.Counter {} -> True
+  Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
+  -- No Quantity at all: CR 122.8 names neither a kind nor a count.
+  Effect.PutCountersFrom {} -> True
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
+  -- BOTH Quantity positions: the count the moved kinds may write, and the one a
+  -- library walk in the GIVER carries -- `from` became an ObjectRef when CR
+  -- 122.5's first side was widened to a group, and an arm reading the kinds
+  -- alone kept compiling (#2729).
+  Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> all Quantity.slotsAreExhaustive (MovedKinds.quantityOf kinds)
+  Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.PayAnyEnergy _ -> True
+  Effect.Tap _ -> True
+  Effect.Untap _ -> True
+  Effect.Detain _ -> True
+  Effect.Goad _ -> True
+  Effect.MakePlotted _ -> True
+  Effect.DoesNotUntapNext _ -> True
+  Effect.Transform _ -> True
+  Effect.Convert _ -> True
+  -- The combined face is interned with EMPTY bindings, CreateEmblem's reason, so
+  -- its text is literal.
+  Effect.Meld _ -> True
+  Effect.PhaseOut _ -> True
+  Effect.AddPhases _ -> True
+  Effect.EndTurn -> True
+  Effect.EndCombatPhase -> True
+  -- slotsOf's arm drops this Duration, so the slotless test is made here.
+  Effect.GainControl (DurationRef.MkDurationRef duration _) ->
+    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  -- CR 603.7c: the armed ability inherits this object's whole environment.
+  Effect.ArmDelayedTrigger {} -> False
+  -- GainControl's reason for the Duration.
+  Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) ->
+    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  -- slotsOf drops the Duration, so the slotless test is made here.
+  Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) ->
+    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  -- RequireBlock's reason, one axis narrower.
+  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) ->
+    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  -- CantBeRegenerated's reason again.
+  Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) ->
+    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _) ->
+    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  -- RequireBlock's reason, one axis over.
+  Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) ->
+    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  -- CR 114.2's emblem is minted with EMPTY bindings, so its card is literal text.
+  Effect.CreateEmblem _ -> True
+  Effect.BecomeMonarch MonarchTarget.TheController -> True
+  -- The one arm answering NO: CR 725.2 reads Binding.triggerSource.
+  Effect.BecomeMonarch MonarchTarget.ControllerOfSource -> False
+  Effect.BecomeMonarch (MonarchTarget.InSlot _) -> True
+  Effect.Designate (Designate.MkDesignate _ _) -> True
+  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> True
+  Effect.Unsuspect _ -> True
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> True
+  Effect.Evolve _ -> True
+  Effect.Mentor _ -> True
+  Effect.Train _ -> True
+  Effect.ItBecomes _ -> True
+  Effect.ExileUntilMonarch _ -> True
+  Effect.ExileHaunting (ExileHaunting.MkExileHaunting _ _) -> True
+  Effect.Attach _ -> True
+  Effect.AttachTarget (AttachTarget.MkAttachTarget _ _) -> True
+  Effect.AttachTargetToEach (AttachTarget.MkAttachTarget _ _) -> True
+  Effect.AttachBound (AttachBound.MkAttachBound _ _) -> True
+  -- CR 729.1b: a DEFINITION, and the subgame reads no binding of the outer game.
+  Effect.PlaySubgame _ -> True
+  -- PlaySubgame's answer: a definition reads no slot.
+  Effect.ChooseOpponent _ -> True
+  Effect.ChooseOpponentAtRandom _ -> True
+  Effect.RollDie rollDie -> all Quantity.slotsAreExhaustive (RollDie.modifier rollDie)
+  Effect.FlipCoin {} -> True
+  Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> True
+  Effect.ShuffleIntoLibrary {} -> True
+  Effect.Shuffle {} -> True
+  Effect.OfferCast {} -> True
+  Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant)
+  -- PreventNextDamage's answer for the body, plus its own ref's: a PlayerRef
+  -- nested in the DEPTH is one slotsOf cannot see.
+  Effect.ForEach (ForEach.MkForEach _ _ body) -> all slotsAreExhaustive body
 
 -- CR 611.2b: only ForAsLongAs reads anything, through its Condition.
 durationSlotsAreExhaustive :: Duration.Duration -> Bool
@@ -1184,129 +1188,131 @@ conditionSlotsAreExhaustive condition = case condition of
 readsX :: [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Bool
 readsX = any effectReadsX
   where
-    effectReadsX effect =
-      any (any Quantity.readsX . objectRefQuantities) (effectObjectRefs effect) || case effect of
-        Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> any (Quantity.readsX . DamagePart.quantity) parts
-        Effect.Fight {} -> False
-        -- Untamed Might's "+X/+X" sits inside the Modification, not on the effect.
-        Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
-        Effect.ChangeText {} -> False
-        Effect.AddMana _ -> False
-        Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> any Quantity.readsX quantity
-        Effect.ExileAllGraveyards -> False
-        Effect.Proliferate -> False
-        -- No Quantity: rule 201.4 chooses one name and states no count.
-        Effect.ChooseCardName _ -> False
-        Effect.FromOutsideTheGame _ -> False
-        Effect.ExileThisSpell -> False
-        Effect.Bolster quantity -> Quantity.readsX quantity
-        Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.readsX quantity
-        Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-        Effect.TemptWithTheRing -> False
-        Effect.Venture {} -> False
-        Effect.ExileHandThenDraw -> False
-        Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.readsX quantity
-        Effect.RestartGame _ -> False
-        Effect.ControlPlayerNextTurn _ -> False
-        Effect.Destroy {} -> False
-        Effect.Sacrifice _ -> False
-        Effect.TurnFaceDown _ -> False
-        Effect.TurnFaceUp _ -> False
-        Effect.RemoveFromCombat _ -> False
-        Effect.BecomesBlocked _ -> False
-        -- The entry rider is a nested position of its own, CR 122.6's count per
-        -- kind, and no ObjectRef holds it.
-        Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> any Quantity.readsX (riderQuantities riders)
-        Effect.Draw (Draw.MkDraw _ quantity _) -> Quantity.readsX quantity
-        Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.readsX quantity
-        Effect.Reveal {} -> False
-        Effect.LookAt {} -> False
-        Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-        Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-        Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-        Effect.Explore {} -> False
-        Effect.Discard subject -> case subject of
-          Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.readsX quantity
-          Discard.These {} -> False
-        Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-        Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-        Effect.ExchangeLifeTotals _ -> False
-        Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-        Effect.RedistributeLifeTotals -> False
-        Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
-        Effect.DecreaseSpeed d -> Quantity.readsX (SpeedDecrease.quantity d)
-        Effect.Create (Create.MkCreate quantity _ riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders)
-        Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.readsX quantity
-        Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> any Quantity.readsX (quantity : riderQuantities riders)
-        Effect.BecomeCopy {} -> False
-        Effect.CopySpell {} -> False
-        Effect.Replace {} -> False
-        Effect.SkipNextPhase {} -> False
-        -- CR 601.2b's X reaches the rider too.
-        Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ quantity rider) -> Quantity.readsX quantity || readsX (Foldable.toList rider)
-        Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ rider) -> readsX (Foldable.toList rider)
-        Effect.RedirectDamage {} -> False
-        Effect.Counter {} -> False
-        Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
-        Effect.PutCountersFrom {} -> False
-        Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.readsX quantity
-        Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> any Quantity.readsX (MovedKinds.quantityOf kinds)
-        Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
-        Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
-        -- CR 107.14's amount is asked for as the spell resolves, never CR
-        -- 601.2b's announced X.
-        Effect.PayAnyEnergy _ -> False
-        Effect.Tap _ -> False
-        Effect.Untap _ -> False
-        Effect.Detain _ -> False
-        Effect.Goad _ -> False
-        Effect.MakePlotted _ -> False
-        Effect.DoesNotUntapNext _ -> False
-        Effect.Transform _ -> False
-        Effect.Convert _ -> False
-        Effect.Meld _ -> False
-        Effect.PhaseOut _ -> False
-        Effect.AddPhases _ -> False
-        Effect.EndTurn -> False
-        Effect.EndCombatPhase -> False
-        Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
-        Effect.ArmDelayedTrigger {} -> False
-        Effect.AffectPlayers {} -> False
-        Effect.RequireBlock {} -> False
-        Effect.CantBeRegenerated {} -> False
-        Effect.ForbidBlock {} -> False
-        Effect.ForbidAttack {} -> False
-        Effect.RequireAttack {} -> False
-        Effect.CreateEmblem {} -> False
-        Effect.BecomeMonarch {} -> False
-        Effect.Designate (Designate.MkDesignate _ _) -> False
-        Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
-        Effect.Unsuspect _ -> False
-        Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> False
-        Effect.Evolve _ -> False
-        Effect.Mentor _ -> False
-        Effect.Train _ -> False
-        Effect.ItBecomes _ -> False
-        Effect.ExileUntilMonarch _ -> False
-        Effect.ExileHaunting {} -> False
-        Effect.Attach _ -> False
-        Effect.AttachTarget {} -> False
-        Effect.AttachTargetToEach {} -> False
-        Effect.AttachBound {} -> False
-        Effect.PlaySubgame _ -> False
-        Effect.ChooseOpponent _ -> False
-        Effect.ChooseOpponentAtRandom _ -> False
-        -- CR 706.2's modifier is an ordinary Quantity, so it may be the X the
-        -- caster announced (CR 601.2b).
-        Effect.RollDie rollDie -> any Quantity.readsX (RollDie.modifier rollDie)
-        Effect.FlipCoin {} -> False
-        Effect.TakeExtraTurn {} -> False
-        Effect.ShuffleIntoLibrary {} -> False
-        Effect.Shuffle {} -> False
-        Effect.OfferCast {} -> False
-        Effect.GrantPlayFromExile {} -> False
-        -- CR 608.2f's body is an effect list like any other, so an X inside it counts.
-        Effect.ForEach (ForEach.MkForEach _ _ body) -> readsX (Foldable.toList body)
+    effectReadsX effect = any (any Quantity.readsX . objectRefQuantities) (effectObjectRefs effect) || effectOwnReadsX effect
+    -- effectReadsX's half that is not an ObjectRef's: this opcode's own fields,
+    -- and its nested effects through the recursion back into readsX.
+    effectOwnReadsX effect = case effect of
+      Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> any (Quantity.readsX . DamagePart.quantity) parts
+      Effect.Fight {} -> False
+      -- Untamed Might's "+X/+X" sits inside the Modification, not on the effect.
+      Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
+      Effect.ChangeText {} -> False
+      Effect.AddMana _ -> False
+      Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> any Quantity.readsX quantity
+      Effect.ExileAllGraveyards -> False
+      Effect.Proliferate -> False
+      -- No Quantity: rule 201.4 chooses one name and states no count.
+      Effect.ChooseCardName _ -> False
+      Effect.FromOutsideTheGame _ -> False
+      Effect.ExileThisSpell -> False
+      Effect.Bolster quantity -> Quantity.readsX quantity
+      Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.readsX quantity
+      Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.TemptWithTheRing -> False
+      Effect.Venture {} -> False
+      Effect.ExileHandThenDraw -> False
+      Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.readsX quantity
+      Effect.RestartGame _ -> False
+      Effect.ControlPlayerNextTurn _ -> False
+      Effect.Destroy {} -> False
+      Effect.Sacrifice _ -> False
+      Effect.TurnFaceDown _ -> False
+      Effect.TurnFaceUp _ -> False
+      Effect.RemoveFromCombat _ -> False
+      Effect.BecomesBlocked _ -> False
+      -- The entry rider is a nested position of its own, CR 122.6's count per
+      -- kind, and no ObjectRef holds it.
+      Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> any Quantity.readsX (riderQuantities riders)
+      Effect.Draw (Draw.MkDraw _ quantity _) -> Quantity.readsX quantity
+      Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.readsX quantity
+      Effect.Reveal {} -> False
+      Effect.LookAt {} -> False
+      Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.Explore {} -> False
+      Effect.Discard subject -> case subject of
+        Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.readsX quantity
+        Discard.These {} -> False
+      Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.ExchangeLifeTotals _ -> False
+      Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.RedistributeLifeTotals -> False
+      Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.DecreaseSpeed d -> Quantity.readsX (SpeedDecrease.quantity d)
+      Effect.Create (Create.MkCreate quantity _ riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders)
+      Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.readsX quantity
+      Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> any Quantity.readsX (quantity : riderQuantities riders)
+      Effect.BecomeCopy {} -> False
+      Effect.CopySpell {} -> False
+      Effect.Replace {} -> False
+      Effect.SkipNextPhase {} -> False
+      -- CR 601.2b's X reaches the rider too.
+      Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ quantity rider) -> Quantity.readsX quantity || readsX (Foldable.toList rider)
+      Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ rider) -> readsX (Foldable.toList rider)
+      Effect.RedirectDamage {} -> False
+      Effect.Counter {} -> False
+      Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
+      Effect.PutCountersFrom {} -> False
+      Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.readsX quantity
+      Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> any Quantity.readsX (MovedKinds.quantityOf kinds)
+      Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
+      Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
+      -- CR 107.14's amount is asked for as the spell resolves, never CR
+      -- 601.2b's announced X.
+      Effect.PayAnyEnergy _ -> False
+      Effect.Tap _ -> False
+      Effect.Untap _ -> False
+      Effect.Detain _ -> False
+      Effect.Goad _ -> False
+      Effect.MakePlotted _ -> False
+      Effect.DoesNotUntapNext _ -> False
+      Effect.Transform _ -> False
+      Effect.Convert _ -> False
+      Effect.Meld _ -> False
+      Effect.PhaseOut _ -> False
+      Effect.AddPhases _ -> False
+      Effect.EndTurn -> False
+      Effect.EndCombatPhase -> False
+      Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
+      Effect.ArmDelayedTrigger {} -> False
+      Effect.AffectPlayers {} -> False
+      Effect.RequireBlock {} -> False
+      Effect.CantBeRegenerated {} -> False
+      Effect.ForbidBlock {} -> False
+      Effect.ForbidAttack {} -> False
+      Effect.RequireAttack {} -> False
+      Effect.CreateEmblem {} -> False
+      Effect.BecomeMonarch {} -> False
+      Effect.Designate (Designate.MkDesignate _ _) -> False
+      Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
+      Effect.Unsuspect _ -> False
+      Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> False
+      Effect.Evolve _ -> False
+      Effect.Mentor _ -> False
+      Effect.Train _ -> False
+      Effect.ItBecomes _ -> False
+      Effect.ExileUntilMonarch _ -> False
+      Effect.ExileHaunting {} -> False
+      Effect.Attach _ -> False
+      Effect.AttachTarget {} -> False
+      Effect.AttachTargetToEach {} -> False
+      Effect.AttachBound {} -> False
+      Effect.PlaySubgame _ -> False
+      Effect.ChooseOpponent _ -> False
+      Effect.ChooseOpponentAtRandom _ -> False
+      -- CR 706.2's modifier is an ordinary Quantity, so it may be the X the
+      -- caster announced (CR 601.2b).
+      Effect.RollDie rollDie -> any Quantity.readsX (RollDie.modifier rollDie)
+      Effect.FlipCoin {} -> False
+      Effect.TakeExtraTurn {} -> False
+      Effect.ShuffleIntoLibrary {} -> False
+      Effect.Shuffle {} -> False
+      Effect.OfferCast {} -> False
+      Effect.GrantPlayFromExile {} -> False
+      -- CR 608.2f's body is an effect list like any other, so an X inside it counts.
+      Effect.ForEach (ForEach.MkForEach _ _ body) -> readsX (Foldable.toList body)
 
 -- CR 603.7: the text an Effect.ArmDelayedTrigger's name resolves to, off the
 -- SOURCE's own card.
