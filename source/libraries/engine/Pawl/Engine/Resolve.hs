@@ -445,19 +445,19 @@ objectRefQuantities ref = case ref of
 -- Every ObjectRef this ONE effect holds, its own only: a nested effect's refs
 -- are its own answer here, reached by whichever caller recurses.
 --
--- The single enumeration of where an ObjectRef sits in an opcode. Four readers
--- share it -- slotsOf, slotsAreExhaustive, readsX and Pawl.CardSpec's Count
--- traversal -- so a reader that wants every ref calls this instead of naming
--- the opcodes itself, and the four cannot disagree about which arms hold one.
--- The test a reader can apply: grep objectRefSlots and objectRefQuantities and
--- see that every call site takes its refs from here.
+-- The single enumeration of where an ObjectRef sits in an opcode. Its readers
+-- -- slotsOf here, and slotsAreExhaustive, readsX and Pawl.CardSpec's Count
+-- traversal below -- call this rather than naming the opcodes themselves, so
+-- they cannot come to disagree about which opcodes hold a ref. The test a
+-- reader can apply: no arm of any of those four names an ObjectRef field.
 --
 -- No wildcard, and the arms that hold a ref destructure positionally: a new
 -- opcode the compiler forces, and so does a new FIELD on a payload that already
 -- holds one. What neither the compiler nor this shape catches is an existing
 -- field WIDENED to an ObjectRef, which is how a nested Quantity went unread
--- once (#2729); slotsOf's corpus coverage is what pays for the rest, since a
--- ref dropped here stops being reported there.
+-- once (#2729). Two things pay for that: slotsOf's corpus lints, since a ref
+-- dropped here stops being reported there, and Pawl.CardSpec's planted
+-- objectRefPositions, which is the only observer of a position no card writes.
 effectObjectRefs :: Effect card ability -> [ObjectRef]
 effectObjectRefs effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> Foldable.toList (fmap DamagePart.ref parts)
@@ -508,7 +508,7 @@ effectObjectRefs effect = case effect of
   -- Absent where the shield's recipients are described rather than named.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> Maybe.maybeToList ref
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _) -> [ref]
-  -- CR 615.8's two sides, the damage's old recipient and its new one.
+  -- CR 614.9's two sides, the damage's old recipient and its new one.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ from to _) -> [from, to]
   Effect.Counter (Counter.MkCounter ref _) -> [ref]
   Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> [ref]
@@ -540,11 +540,11 @@ effectObjectRefs effect = case effect of
   Effect.GainControl (DurationRef.MkDurationRef _ ref) -> [ref]
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
-  -- CR 509.1's two sides, the creature required to block and what it blocks.
+  -- CR 509.1a's two sides, the creature required to block and what it blocks.
   Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> [blocker, attacker]
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated _ ref) -> [ref]
-  -- One side only: CR 508.1b's defender is a player, so the arm beside it is a
-  -- PlayerRef.
+  -- One side only: what a creature attacks is a player (CR 508.1b), so the arm
+  -- beside this one is a PlayerRef.
   Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> [attacker]
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> [ref]
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ ref) -> [ref]
@@ -716,8 +716,9 @@ slotsOf effect = joinTwo (joinSlots (fmap objectRefSlots (effectObjectRefs effec
   -- destination is an ObjectRef and may sweep.
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _) -> oneSlot from
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity slot) -> insertOne slot (quantitySlots quantity)
-  -- CR 122.5's pair: the objects the counters leave, which is an ObjectRef and
-  -- may sweep, and the one object they land on, read singly. The count reads
+  -- CR 122.5's pair: the objects the counters leave are an ObjectRef, joined at
+  -- slotsOf's head with every other ref, and the one object they land on is read
+  -- singly here. The count reads
   -- slots of its own -- Black Panther, Wakandan King's "all +1/+1 counters" is a
   -- Quantity.AgainstSlot aimed at the slot its `from` names -- so it joins in
   -- here rather than being left to look dangling. The bound slot is a
@@ -798,7 +799,8 @@ slotsOf effect = joinTwo (joinSlots (fmap objectRefSlots (effectObjectRefs effec
   Effect.FlipCoin {} -> Map.empty
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref _) -> playerRefSlots ref
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> maybe Map.empty playerRefSlots named
-  -- One half of the arm above: the library, and nothing shuffled into it.
+  -- The arm above's library read; nothing is shuffled into it, so there is no
+  -- ref beside it.
   Effect.Shuffle ref -> playerRefSlots ref
   -- BOTH are reads: the slot is bound by an earlier effect of the list (CR 400.7).
   Effect.OfferCast (OfferCast.MkOfferCast slot caster _ _) -> joinTwo (oneSlot slot) (playerRefSlots caster)
