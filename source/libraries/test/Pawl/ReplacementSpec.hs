@@ -1826,6 +1826,10 @@ wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $
     Spec.assertBool s (Set.member S.alice (GameState.drewFromEmpty after)) "CR 104.3c and the failed draw is on the books"
   -- CR 109.5's "you": the pattern is ControllerRelation.Yours, so bob's draw is
   -- not alice's, and the row is still there afterwards.
+  --
+  -- BOB's life is what discriminates, not alice's: the rewrite gains the life to
+  -- the player the EVENT named, so a row that wrongly matched his draw would gain
+  -- HIM the 5 and leave alice at 20 either way.
   Spec.it s "CR 109.5 the row watches its controller's draws and nobody else's" $ do
     plains <- S.printingOf s registry "Plains"
     wordsOfWorship <- S.printingOf s registry "Words of Worship"
@@ -1833,8 +1837,9 @@ wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $
     let (armed, _) = wordsBoard plains wordsOfWorship piker True
         stocked = snd (S.addLibraryCard piker S.bob armed)
         after = S.runPure S.identityAnswer stocked (Event.drawCard S.bob)
-    Spec.assertEqWith s "CR 109.5 alice gained nothing off his draw" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "CR 109.5 bob's draw is not alice's, so the rewrite never ran" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "CR 121.1 and bob drew his card" (S.handSize S.bob after) 1
+    Spec.assertEqWith s "alice gained nothing either" (S.lifeOf S.alice after) (Just 20)
     Spec.assertEqWith s "CR 614.3 the row is unspent" (length (GameState.replacements after)) 1
 
 -- alice with a Plains, a Words of Worship and two library cards, with the
