@@ -35,7 +35,7 @@ import qualified Pawl.Types.Zone as Zone
 -- The card's two riders -- CR 701.20's reveal and CR 701.24's shuffle -- are
 -- Pawl.Types.ZoneChangeR's `revealing` and `shuffling`, proved by the last two
 -- cases below.
---
+
 -- An HONEST interpreter for CR 701.24a's randomness: a genuine permutation of
 -- what it was offered, which is what makes the shuffle observable at all --
 -- S.identityAnswer hands the order straight back, so a library it shuffled and

@@ -1198,6 +1198,14 @@ loop asOf batch applied prevented exiledBy shuffling event = do
 --
 -- No case on effect identity: the question is a proposed event's destination
 -- ZONE, and the answer is the row's source object.
+exiledByAfter :: ReplacementCandidate -> ProposedEvent -> ProposedEvent -> Maybe ObjectId -> Maybe ObjectId
+exiledByAfter candidate before after exiledBy =
+  case (fmap ZoneChange.to (Replacement.asZoneChange before), fmap ZoneChange.to (Replacement.asZoneChange after)) of
+    (Just old, Just new)
+      | new == Zone.Exile, old /= Zone.Exile -> Just (ReplacementCandidate.source candidate)
+      | new /= Zone.Exile -> Nothing
+    _ -> exiledBy
+
 -- CR 701.24: did the row that just applied say to shuffle? Read off the
 -- candidate rather than off the event, unlike `exiledByAfter` above, because a
 -- shuffle leaves no mark on the proposed event for a before/after diff to find.
@@ -1206,10 +1214,10 @@ loop asOf batch applied prevented exiledBy shuffling event = do
 -- shuffle cannot take back the first one's. CR 701.24c is why -- the library is
 -- shuffled even once the object has been moved elsewhere.
 --
--- A CLASSIFICATION of the row, not a test of which card it came from.
--- One arm per constructor, no wildcard, `readsApplier`'s discipline: a wildcard
--- answering False would let an author who teaches a new arm to carry a shuffle
--- get a silent no-op instead of a build failure.
+-- A CLASSIFICATION of the row, not a test of which card it came from. One arm
+-- per constructor and no wildcard, `Replacement.readsApplier`'s discipline: a
+-- wildcard answering False would let an author who teaches a new arm to carry a
+-- shuffle get a silent no-op instead of a build failure.
 shufflesAfter :: ReplacementCandidate -> Bool
 shufflesAfter candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.ZoneChangeR zoneChangeR -> ZoneChangeR.shuffling zoneChangeR
@@ -1223,14 +1231,6 @@ shufflesAfter candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.LifeLossR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.PhaseR _ -> False
-
-exiledByAfter :: ReplacementCandidate -> ProposedEvent -> ProposedEvent -> Maybe ObjectId -> Maybe ObjectId
-exiledByAfter candidate before after exiledBy =
-  case (fmap ZoneChange.to (Replacement.asZoneChange before), fmap ZoneChange.to (Replacement.asZoneChange after)) of
-    (Just old, Just new)
-      | new == Zone.Exile, old /= Zone.Exile -> Just (ReplacementCandidate.source candidate)
-      | new /= Zone.Exile -> Nothing
-    _ -> exiledBy
 
 -- CR 615.12: apply one chosen PREVENTION effect to damage that can't be
 -- prevented. The event comes back undiminished -- "those effects won't prevent
@@ -5432,6 +5432,25 @@ discardReturning cause pid oid = do
   Monad.forM_ moved $ \newId -> State.modify' (recordEvent (GameEvent.Discarded (Discarded.MkDiscarded pid newId cause)))
   pure moved
 
+-- Ask the interpreter to shuffle this player's library (CR 103.3 / 701.24).
+--
+-- Here rather than in Pawl.Engine.Mulligan, which is where it used to live, so
+-- that a library is randomized in exactly one place now that a CR 614.6 redirect
+-- shuffles one (see changeZoneAttaching). Pawl.Engine.Mulligan sits ABOVE this
+-- module, so the setup callers reach down to it and this one does not have to
+-- reach up.
+shuffleLibrary :: PlayerId -> Game ()
+shuffleLibrary pid = do
+  gs <- State.get
+  let ids = Game.zoneMembers Zone.Library pid gs
+  answer <- Game.ask (Prompt.Shuffle ids)
+  let shuffled = Game.honourShuffle ids answer
+  -- modify' rather than putting `gs` back: it was read before the prompt, and a
+  -- prompt may write state -- Game.choose writes GameState.lastChoice. This one
+  -- does not (Prompt.Shuffle is bare, being randomness rather than a choice),
+  -- so this is defending the invariant rather than fixing a live bug.
+  State.modify' (\g -> g {GameState.library = Map.insert pid (Seq.fromList shuffled) (GameState.library g)})
+
 -- The single reveal funnel (CR 701.20a): `pid` shows `oid` to all players, which
 -- here means appending what was shown to the public log. No-op for an unknown id.
 -- Per CR 701.20b nothing moves and nothing changes, so the event is the whole
@@ -5459,25 +5478,6 @@ discardReturning cause pid oid = do
 -- OUTCOME right -- the status is back to FaceUp -- but no caller reaches this
 -- funnel, so nothing can trigger on it, and the snapshot such a reveal would
 -- record is unsettled for the same reason nothing reads it (#921).
--- Ask the interpreter to shuffle this player's library (CR 103.3 / 701.24).
---
--- Here rather than in Pawl.Engine.Mulligan, which is where it used to live, so
--- that a library is randomized in exactly one place now that a CR 614.6 redirect
--- shuffles one (see changeZoneAttaching). Pawl.Engine.Mulligan sits ABOVE this
--- module, so the setup callers reach down to it and this one does not have to
--- reach up.
-shuffleLibrary :: PlayerId -> Game ()
-shuffleLibrary pid = do
-  gs <- State.get
-  let ids = Game.zoneMembers Zone.Library pid gs
-  answer <- Game.ask (Prompt.Shuffle ids)
-  let shuffled = Game.honourShuffle ids answer
-  -- modify' rather than putting `gs` back: it was read before the prompt, and a
-  -- prompt may write state -- Game.choose writes GameState.lastChoice. This one
-  -- does not (Prompt.Shuffle is bare, being randomness rather than a choice),
-  -- so this is defending the invariant rather than fixing a live bug.
-  State.modify' (\g -> g {GameState.library = Map.insert pid (Seq.fromList shuffled) (GameState.library g)})
-
 reveal :: RevealCause.RevealCause -> PlayerId -> ObjectId -> Game ()
 reveal cause pid oid = do
   gs <- State.get
