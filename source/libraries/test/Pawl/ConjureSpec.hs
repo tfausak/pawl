@@ -9,9 +9,9 @@
 -- Gameplay-level throughout: the first two cases put a printed Emporium
 -- Thopterist on the battlefield and begin its controller's upkeep so the printed
 -- trigger fires and resolves; the third declares a printed Toralf's Disciple as
--- an attacker. Each then CASTS what the conjure created, which is the point --
--- conjure creates a CARD and not CR 111.1's token, and a token in a hand or a
--- library would be swept up by CR 111.7 rather than cast.
+-- an attacker. The first and third then CAST what the conjure created, which is
+-- the point -- conjure creates a CARD and not CR 111.1's token, and a token in a
+-- hand or a library would be swept up by CR 111.7 before either cast.
 module Pawl.ConjureSpec where
 
 import qualified Control.Monad as Monad
@@ -127,7 +127,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
         attacked = S.runCombat S.aggressiveAnswer board
         inLibrary = namedIn lightningBolt Zone.Library attacked
         inHand = namedIn lightningBolt Zone.Hand attacked
-        -- CR 121.2 takes the TOP card of the library, which is what makes the
+        -- CR 121.1 takes the TOP card of the library, which is what makes the
         -- draw evidence about the library rather than about the mint: a card that
         -- did not reach the ordered pile cannot be drawn out of it.
         drawn = S.runPure S.identityAnswer attacked (Monad.replicateM_ 4 (Event.drawCardReturning S.alice))
