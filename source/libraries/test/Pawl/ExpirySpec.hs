@@ -6,6 +6,9 @@
 -- 611.2b), and the four gate cards (Master Thief, Hag of Inner Weakness, Jade
 -- Statue, and Soulfire Eruption for "until the END of your next turn").
 --
+-- Alchemy's "perpetually" is here too, at the bottom of the file: it is a
+-- duration in card data like any other, and its producer is Pearl Collector.
+--
 -- The two floating-replacement durations have a printed producer each, at the
 -- bottom of the file: Dovin, Hand of Control's -1 for CR 611.2a's turn-relative
 -- one and Old Fat Spider Can't See Me's chapter II for CR 611.2b's conditional
@@ -1780,6 +1783,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   conditionalSpec s registry
   untilEndOfCombatSpec s registry
   whenPaidSpec s
+  perpetualSpec s registry
   masterThiefSpec s registry
   monarchSpec s registry
   garlandSpec s registry
@@ -1841,3 +1845,111 @@ blueCost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaT
 -- That price, offered to one seat -- CR 109.5's "you" as Expiry.arm bakes it.
 blueOfferTo :: PlayerId.PlayerId -> PaidExpiry.PaidExpiry
 blueOfferTo pid = PaidExpiry.MkPaidExpiry pid blueCost
+
+-- Alchemy's "perpetually" (Pearl Collector), which no rule of the CR names --
+-- the printed sentence is the authority. What the rules DO settle is the default
+-- it overrides: CR 400.7 makes the object that arrives from a zone change a new
+-- object with no memory of the old one, so every other stored effect is left
+-- naming an id nothing answers to. Expiry.Perpetual is the mark
+-- Pawl.Engine.Event.perpetuate looks for, and the reason it is not Expiry.Never
+-- is IDENTITY rather than lifetime -- whenPaidSpec's reason above.
+perpetualSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+perpetualSpec s registry = Spec.describe s "Perpetual" $ do
+  Spec.it s "a perpetual duration arms to an expiry no sweep of the turn's structure ends" $ do
+    let armed = effectWith Expiry.Type.Perpetual (Setup.emptyGame S.bothPlayers)
+        conditional = S.runPure S.identityAnswer armed Expiry.sweepConditional
+    Spec.assertEqWith s "armed" (Expiry.arm Map.empty S.alice S.noSource Duration.Perpetual armGs) (Just Expiry.Type.Perpetual)
+    Spec.assertEqWith s "cleanup leaves it" (length (GameState.continuousEffects (Expiry.dropAtCleanup armed))) 1
+    Spec.assertEqWith s "a turn handoff leaves it" (length (GameState.continuousEffects (Expiry.dropAtTurnOf S.alice armed))) 1
+    Spec.assertEqWith s "the end of a phase leaves it" (length (GameState.continuousEffects (Expiry.dropAtEndOf PhaseSelector.CombatPhase armed))) 1
+    Spec.assertEqWith s "and the conditional sweep leaves it" (length (GameState.continuousEffects conditional)) 1
+  -- The IDENTITY the arm exists for, and the reason Expiry.Never is not it: a
+  -- zone change has to be able to tell the two apart.
+  Spec.it s "CR 400.7 only a perpetual duration follows its objects across a zone change" $ do
+    Spec.assertBool s (Expiry.follows Expiry.Type.Perpetual) "a perpetual effect follows its objects"
+    Spec.assertBool s (not (Expiry.follows Expiry.Type.Never)) "a rest-of-the-game one does not"
+    Spec.assertBool s (not (any Expiry.follows [Expiry.Type.AtCleanup, Expiry.Type.AtTurnOf S.alice, Expiry.Type.AtEndOf PhaseSelector.CombatPhase, Expiry.Type.WhenPaid (blueOfferTo S.alice)])) "and neither does any duration the turn's structure ends"
+  -- The whole card at gameplay level. Pearl Collector's {2}{W} grants lifelink
+  -- perpetually; the sibling Sorcerer carries the SAME layer-6 grant under
+  -- Expiry.Never. The two effects differ in their expiry and in their source, and
+  -- the source cannot be what discriminates: Pawl.Engine.Event.perpetuate reads
+  -- the expiry and the affected set, and nothing else. Both
+  -- creatures make the same round trip, and lifelink is unobservable in a
+  -- graveyard -- CR 702.15b pays off damage a source deals -- so the board reads
+  -- it back on the battlefield, off the incarnation that returned.
+  --
+  -- pawl's Pearl Collector omits the triggered ability entirely: "at the
+  -- beginning of your second main phase, if you gained 4 or more life this turn,
+  -- conjure a card named Mox Pearl into your hand. This ability triggers only
+  -- once" needs a once-per-GAME trigger limit, which Pawl.Types.TriggerLimit does
+  -- not have (#2655). The omission is stricter than printed -- alice gets no free
+  -- Mox Pearl -- and never weaker in the controller's favour.
+  Spec.it s "Pearl Collector's perpetual lifelink survives the graveyard, where an indefinite grant does not" $ do
+    collector <- S.printingOf s registry "Pearl Collector"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    plains <- S.printingOf s registry "Plains"
+    let (collectorId, g0) = S.addCreature collector S.alice (Setup.emptyGame S.bothPlayers)
+        (mineId, g1) = S.addCreature sorcerer S.alice g0
+        (controlId, g2) = S.addCreature sorcerer S.alice g1
+        g3 = S.landsFor plains S.alice 3 g2
+        ready = (lifelinkUnder Expiry.Type.Never controlId g3) {GameState.priority = Just S.alice}
+    case Face.activatedAbilities (S.combinedFace collector) of
+      [] -> Spec.assertFailure s "Pearl Collector should declare one activated ability"
+      ability : _ -> do
+        let granted = S.runPure (aimedAtObject mineId) ready (do Activate.activateAbility S.alice collectorId ability; Stack.resolveTop)
+            (mineAgain, once) = bounce mineId granted
+            (controlAgain, both) = bounce controlId once
+            back = unsick controlAgain (unsick mineAgain both) {GameState.priority = Just S.alice}
+            ping oid = case Face.activatedAbilities (S.combinedFace sorcerer) of
+              [] -> back
+              a : _ -> S.runPure pingsBob back (do Activate.activateAbility S.alice oid a; Stack.resolveTop)
+        Spec.assertEqWith s "the perpetual grant pays alice for the returned creature's ping" (S.lifeOf S.alice (ping mineAgain)) (Just 21)
+        Spec.assertEqWith s "the indefinite grant pays nothing for the sibling's" (S.lifeOf S.alice (ping controlAgain)) (Just 20)
+        Spec.assertEqWith s "bob took the first ping" (S.lifeOf S.bob (ping mineAgain)) (Just 19)
+        Spec.assertEqWith s "and the second one too, so both pings happened" (S.lifeOf S.bob (ping controlAgain)) (Just 19)
+        Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink mineAgain both) "the perpetual grant is on the incarnation that came back"
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Lifelink controlAgain both)) "while the indefinite one is left naming an id nothing answers to"
+        Spec.assertBool s (mineAgain /= mineId && controlAgain /= controlId) "CR 400.7: both round trips minted new objects"
+        Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink mineId granted && Projection.hasKeyword Keyword.Lifelink controlId granted) "and both grants applied before either creature moved"
+        Spec.assertEqWith s "the ability stored exactly one effect, under the perpetual arm" (fmap ContinuousEffect.expiry (filter ((== collectorId) . ContinuousEffect.source) (GameState.continuousEffects granted))) [Expiry.Type.Perpetual]
+
+-- The control grant, and the perpetual one's twin in every respect but its
+-- expiry: same stand-in source, same layer-6 modification, same CR 611.2c
+-- affected set.
+lifelinkUnder :: Expiry.Type.Expiry -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+lifelinkUnder expiry oid gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+      eff =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = effectSource,
+            ContinuousEffect.timestamp = ts,
+            ContinuousEffect.expiry = expiry,
+            ContinuousEffect.modification = Modification.GainKeyword Keyword.Lifelink,
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+          }
+   in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+
+-- Onto the battlefield by way of its owner's graveyard, which is two zone changes
+-- and so two of CR 400.7's new objects. Answers the id of the last one.
+bounce :: ObjectId.ObjectId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+bounce oid gs =
+  let move from dest g = case S.runPureWith S.identityAnswer g (Event.changeZoneReturning from dest) of
+        (ids, g1) -> case Seq.viewl ids of
+          Seq.EmptyL -> (from, g1)
+          arrived Seq.:< _ -> (arrived, g1)
+      (inGraveyard, buried) = move oid Zone.Graveyard gs
+   in move inGraveyard Zone.Battlefield buried
+
+-- CR 302.6's summoning sickness, which the arrival above leaves in place and
+-- which this unit is not about: the returned creature has to be able to use its
+-- tap ability for CR 702.15b to have any damage to pay off.
+unsick :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+unsick oid gs =
+  gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Settled S.alice}) oid (GameState.objects gs)}
+
+-- The ping, aimed at a player so CR 702.15b's life gain is read off a life total
+-- rather than off a creature that might die to it.
+pingsBob :: Prompt.Prompt r -> r
+pingsBob p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.bob) sets
+  _ -> S.identityAnswer p

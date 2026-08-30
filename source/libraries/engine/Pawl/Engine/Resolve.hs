@@ -668,6 +668,7 @@ durationSlots :: Duration.Duration -> Map.Map SlotName SlotArity
 durationSlots duration = case duration of
   Duration.UntilEndOfTurn -> Map.empty
   Duration.Indefinite -> Map.empty
+  Duration.Perpetual -> Map.empty
   Duration.UntilYourNextTurn -> Map.empty
   Duration.UntilEndOfYourNextTurn -> Map.empty
   Duration.ForAsLongAs condition -> conditionSlots condition
@@ -957,6 +958,7 @@ durationSlotsAreExhaustive :: Duration.Duration -> Bool
 durationSlotsAreExhaustive duration = case duration of
   Duration.UntilEndOfTurn -> True
   Duration.Indefinite -> True
+  Duration.Perpetual -> True
   Duration.UntilYourNextTurn -> True
   Duration.UntilEndOfYourNextTurn -> True
   Duration.ForAsLongAs condition -> conditionSlotsAreExhaustive condition

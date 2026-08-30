@@ -18,6 +18,7 @@ codec =
   Arm.tagged
     [ Arm.nullary "AtCleanup" Expiry.AtCleanup,
       Arm.nullary "Never" Expiry.Never,
+      Arm.nullary "Perpetual" Expiry.Perpetual,
       Arm.payload "While" While.codec Expiry.While (\x -> case x of Expiry.While y -> Just y; _ -> Nothing),
       Arm.payload "AtTurnOf" PlayerId.codec Expiry.AtTurnOf (\x -> case x of Expiry.AtTurnOf y -> Just y; _ -> Nothing),
       Arm.payload "AtEndOfTurnOf" AfterTurn.codec Expiry.AtEndOfTurnOf (\x -> case x of Expiry.AtEndOfTurnOf y -> Just y; _ -> Nothing),

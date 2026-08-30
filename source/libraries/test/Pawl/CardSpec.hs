@@ -602,6 +602,7 @@ durationCounts :: Duration.Duration -> [Count.Type.Count Quantity.Type.Quantity]
 durationCounts duration = case duration of
   Duration.UntilEndOfTurn -> []
   Duration.Indefinite -> []
+  Duration.Perpetual -> []
   Duration.UntilYourNextTurn -> []
   Duration.UntilEndOfYourNextTurn -> []
   Duration.ForAsLongAs condition -> conditionCounts condition
@@ -3228,6 +3229,7 @@ durationFilters duration =
     Duration.UntilPaid cost -> costFilters cost
     Duration.UntilEndOfTurn -> []
     Duration.Indefinite -> []
+    Duration.Perpetual -> []
     Duration.UntilYourNextTurn -> []
     Duration.UntilEndOfYourNextTurn -> []
     Duration.ForAsLongAs _ -> []

@@ -7,7 +7,9 @@ import qualified Pawl.Types.ObjectId as ObjectId
 
 -- | What a continuous effect applies to. CR 611.2c: a resolution effect's set is
 -- LOCKED when it begins (TheseObjects -- a bounced-and-returned creature is a new
--- id the effect no longer names). A static ability's set is DYNAMIC: Matching,
+-- id the effect no longer names, unless the effect is Alchemy's "perpetually",
+-- which Pawl.Engine.Event.perpetuate re-anchors to the incarnation that
+-- arrives). A static ability's set is DYNAMIC: Matching,
 -- MatchingAnywhere and MatchingOffBattlefield (any object currently matching a
 -- Filter, respectively on the battlefield, in any zone, and in any zone but the
 -- battlefield), Attached (the one object the source is attached to, if any) and

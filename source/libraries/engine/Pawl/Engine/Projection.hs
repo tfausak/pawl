@@ -2859,6 +2859,7 @@ rewriteDuration pairs duration = case duration of
   Duration.ForAsLongAs condition -> Duration.ForAsLongAs (rewriteCondition pairs condition)
   Duration.UntilEndOfTurn -> duration
   Duration.Indefinite -> duration
+  Duration.Perpetual -> duration
   Duration.UntilYourNextTurn -> duration
   Duration.UntilEndOfYourNextTurn -> duration
   Duration.UntilEndOfCombat -> duration

@@ -38,6 +38,19 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
       Expiry.codec
       Expiry.Never
       " {\"type\":\"Never\"} "
+  -- Alchemy's "perpetually", stored. Distinct on the wire from Never above for
+  -- the reason WhenPaid below is: Pawl.Engine.Event.perpetuate finds the effects
+  -- a zone change re-anchors by this arm, so the two cannot be collapsed.
+  Spec.it s "Perpetual" $ do
+    Common.assertCodec
+      s
+      Expiry.codec
+      Expiry.Perpetual
+      " {\"type\":\"Perpetual\"} "
+    Spec.assertBool
+      s
+      (Codec.encode Expiry.codec Expiry.Perpetual /= Codec.encode Expiry.codec Expiry.Never)
+      "perpetual and never encode differently"
   -- CR 611.2b, baked with the concrete PlayerId CR 109.5's "you" resolves to.
   Spec.it s "While carries its player and condition" $
     Common.assertCodec

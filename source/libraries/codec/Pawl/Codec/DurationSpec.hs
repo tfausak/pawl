@@ -1,6 +1,7 @@
 module Pawl.Codec.DurationSpec where
 
 import qualified Pawl.Codec.Duration as Duration
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Color as Color
@@ -29,6 +30,21 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.codec
       Duration.Indefinite
       " {\"type\":\"Indefinite\"} "
+  -- Alchemy's "perpetually" (Pearl Collector), which no rule of the CR names.
+  -- Distinct on the wire from Indefinite above, whose lifetime it shares: the two
+  -- differ only in whether the effect follows its objects across a zone change,
+  -- so a codec that collapsed them would silently make every rest-of-game effect
+  -- perpetual.
+  Spec.it s "Perpetual" $ do
+    Common.assertCodec
+      s
+      Duration.codec
+      Duration.Perpetual
+      " {\"type\":\"Perpetual\"} "
+    Spec.assertBool
+      s
+      (Codec.encode Duration.codec Duration.Perpetual /= Codec.encode Duration.codec Duration.Indefinite)
+      "perpetual and indefinite encode differently"
   -- CR 611.2a: until your next turn.
   Spec.it s "UntilYourNextTurn" $
     Common.assertCodec

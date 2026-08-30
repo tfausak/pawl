@@ -3994,6 +3994,14 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- "a redirected permanent spell carries nothing over" is the
               -- proof.
               Monad.when (dest == Zone.Battlefield) (carryOver carrying oid newId)
+              -- Alchemy's "perpetually", an exception to CR 400.7 that no
+              -- rule of the CR states. UNGATED, unlike carryOver above: the printed
+              -- sentence follows the object through every zone change and in
+              -- both directions, so the destination decides nothing here and
+              -- Pawl.Types.CarryOver is not consulted either -- a perpetual
+              -- effect follows an object the caller did not mean to carry
+              -- anything else over for.
+              perpetuate oid newId
               -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
               -- nowhere else. CR 616.1g's nesting of one event inside another is
               -- expressed as call nesting rather than a field. `batch` is the
@@ -4245,6 +4253,40 @@ rewatch oldId newId row = case ActiveReplacement.effect row of
         let pattern_ = DamageR.matching damage
          in row {ActiveReplacement.effect = ReplacementEffect.DamageR damage {DamageR.matching = pattern_ {DamagePattern.whichSource = Just newId}}}
   _ -> row
+
+-- Alchemy's "perpetually": the stored effects that FOLLOW their objects across a
+-- zone change, re-anchored to the incarnation that just arrived. No rule of the
+-- CR names the word -- it is digital-only, and the printed sentence is the
+-- authority -- so the citation here is for what the rules DO settle: CR 400.7
+-- makes the arriving object a new one with no memory of the old, which is why
+-- every other stored effect is left pointing at an id nothing answers to, and CR
+-- 611.2c is why there is a FIXED id set here to rewrite rather than a filter to
+-- re-derive. Neither rule licenses the rewrite; only the printed word does.
+--
+-- carryOver's shape and reanchor's rewrite, with two differences. It is not
+-- gated on Pawl.Types.CarryOver or on the destination, because the sentence
+-- names neither: the effect follows the card onto the battlefield, into a
+-- graveyard, into a hand and back out again. And it re-anchors only the
+-- CONTINUOUS effects, not the replacements beside them -- CR 400.7c's carrier is
+-- a different sentence, and no printed perpetual rider is a prevention effect.
+--
+-- Pawl.Engine.Expiry.follows is asked rather than a case on the arm, since that
+-- module is the only one that may case on Pawl.Types.Expiry.
+--
+-- Not implemented: the trailing ids a CR 712.21a meld arrangement places
+-- alongside `newId` are not re-anchored, so a perpetual effect on a melded
+-- permanent follows only the first card the arrangement named (#2654).
+perpetuate :: ObjectId -> ObjectId -> Game ()
+perpetuate oldId newId =
+  State.modify' $ \gs ->
+    gs
+      { GameState.continuousEffects = fmap follow (GameState.continuousEffects gs)
+      }
+  where
+    follow eff =
+      if Expiry.follows (ContinuousEffect.expiry eff)
+        then reanchor oldId newId eff
+        else eff
 
 -- carryOver's per-effect half: swap oldId for newId in a locked affected set
 -- that names it, and leave every other effect alone.
