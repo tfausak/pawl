@@ -40,13 +40,14 @@ import qualified Pawl.Types.Quantity as Quantity
 -- count out of the one kind picked, which is exact for a card that PRINTS a
 -- count, since every printing that prints one prints "a counter" -- Scryfall
 -- @oracle:\/(^|[^a-z])move [^.]*counter\/@, 2026-08-30, over every printing ever
--- released: the kindless moves carrying more than one counter say
--- "all counters" (Fate Transfer, Nexus Mentality, The Ozolith -- 'Every'), "any
--- number of counters" \/ "one or more counters" (Resourceful Defense, Slippery
--- Bogbonder, Goldberry's second ability -- 'AnyNumber') or "a counter of each
--- kind not on Goldberry" (Goldberry's first -- 'EachAbsentKind'), and NONE of
--- them prints a number. A printing saying "move two counters", where the player
--- could take one +1\/+1 counter and one shield counter, would refute that.
+-- released: the kindless moves carrying more than one counter say "all counters"
+-- (Fate Transfer, Nexus Mentality, The Ozolith -- 'Every'), "any number of
+-- counters" (Resourceful Defense, Slippery Bogbonder -- 'AnyNumber'), "one or
+-- more counters" (Goldberry, River-Daughter's second ability, which is that arm
+-- with zero excluded and is not written today, #2702) or "a counter of each kind
+-- not on Goldberry" (her first -- 'EachAbsentKind'), and NONE of them prints a
+-- number. A printing saying "move two counters", where the player could take one
+-- +1\/+1 counter and one shield counter, would refute that.
 data MovedKinds
   = -- | Fate Transfer's "move all counters": every kind on the first object, the
     -- whole tally of each (CR 122.5).

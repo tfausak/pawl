@@ -876,9 +876,10 @@ anyNumberSpec s registry = Spec.describe s "CR 122.5 moving any number of counte
         Spec.assertEqWith s "and with no kind to offer the player was not asked" asked 0
       Nothing -> Spec.assertFailure s "expected Resourceful Defense to offer exactly its one printed activated ability"
 
--- Goldberry, River-Daughter {1}{U} Legendary Creature - Nymph (Tales of Middle-
--- earth Commander; name, cost, type line, power, toughness and oracle text
--- checked against Scryfall 2026-08-30), data/cards/goldberry-river-daughter.json:
+-- Goldberry, River-Daughter {1}{U} Legendary Creature - Nymph (The Lord of the
+-- Rings: Tales of Middle-earth; name, cost, type line, power, toughness and
+-- oracle text checked against Scryfall 2026-08-30),
+-- data/cards/goldberry-river-daughter.json:
 --
 --   {T}: Move a counter of each kind not on Goldberry from another target
 --   permanent you control onto Goldberry.
@@ -902,15 +903,15 @@ anyNumberSpec s registry = Spec.describe s "CR 122.5 moving any number of counte
 -- 122.1c's shield and CR 122.1h's finality. Not CR 122.1a's -1/-1 beside its
 -- +1/+1, which CR 122.3 would annihilate as a state-based action before any
 -- assertion ran.
-goldberryOn :: ObjectId.ObjectId -> GameState.GameState -> (Natural, Natural, Natural)
-goldberryOn oid gs =
+finalityTripleOn :: ObjectId.ObjectId -> GameState.GameState -> (Natural, Natural, Natural)
+finalityTripleOn oid gs =
   ( S.counterOf CounterKind.PlusOnePlusOne oid gs,
     S.counterOf CounterKind.Shield oid gs,
     S.counterOf CounterKind.Finality oid gs
   )
 
--- CR 601.2c through an activated ability: the Piker in the ability's one target
--- slot. FILTERS the offered set rather than building a recipient, so CR 608.2b's
+-- CR 602.2b through CR 601.2c: the Piker in the ability's one target slot.
+-- FILTERS the offered set rather than building a recipient, so CR 608.2b's
 -- re-read at resolution still finds what was named -- aimingTransfer's posture.
 -- Every counter prompt is COUNTED, because what this group asserts about the
 -- arm is that it raises none: a pure @Prompt r -> r@ could not say so.
@@ -980,13 +981,13 @@ absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each k
   Spec.it s "one counter of each kind Goldberry lacks crosses, and the kind she has does not" $ do
     built <- board (S.addCounter CounterKind.Shield 2)
     let (goldberryId, giverId, before) = built
-    Spec.assertEqWith s "the Piker bears three +1/+1, four shield and two finality counters" (goldberryOn giverId before) (3, 4, 2)
-    Spec.assertEqWith s "and Goldberry bears two shield counters and nothing else" (goldberryOn goldberryId before) (0, 2, 0)
+    Spec.assertEqWith s "the Piker bears three +1/+1, four shield and two finality counters" (finalityTripleOn giverId before) (3, 4, 2)
+    Spec.assertEqWith s "and Goldberry bears two shield counters and nothing else" (finalityTripleOn goldberryId before) (0, 2, 0)
     case tap built of
       Just (asked, after) -> do
         -- THE GAMEPLAY-LEVEL ASSERTIONS, ahead of the prompt count.
-        Spec.assertEqWith s "Goldberry gained one +1/+1 and one finality counter and no shield counter" (goldberryOn goldberryId after) (1, 2, 1)
-        Spec.assertEqWith s "and the Piker is down one of each of those two kinds, its shield counters untouched" (goldberryOn giverId after) (2, 4, 1)
+        Spec.assertEqWith s "Goldberry gained one +1/+1 and one finality counter and no shield counter" (finalityTripleOn goldberryId after) (1, 2, 1)
+        Spec.assertEqWith s "and the Piker is down one of each of those two kinds, its shield counters untouched" (finalityTripleOn giverId after) (2, 4, 1)
         Spec.assertEqWith s "and nothing was asked, the card settling both the kinds and the count" asked 0
       Nothing -> Spec.assertFailure s "expected Goldberry to offer exactly its one transcribed activated ability"
   -- The same board differing in exactly ONE thing, what Goldberry already bears:
@@ -996,11 +997,11 @@ absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each k
   Spec.it s "and with that kind gone from Goldberry the same shield counter crosses" $ do
     built <- board (const id)
     let (goldberryId, giverId, before) = built
-    Spec.assertEqWith s "Goldberry bears no counter of any kind" (goldberryOn goldberryId before) (0, 0, 0)
+    Spec.assertEqWith s "Goldberry bears no counter of any kind" (finalityTripleOn goldberryId before) (0, 0, 0)
     case tap built of
       Just (_, after) -> do
-        Spec.assertEqWith s "Goldberry gained one counter of all three kinds" (goldberryOn goldberryId after) (1, 1, 1)
-        Spec.assertEqWith s "and the Piker is down one of each" (goldberryOn giverId after) (2, 3, 1)
+        Spec.assertEqWith s "Goldberry gained one counter of all three kinds" (finalityTripleOn goldberryId after) (1, 1, 1)
+        Spec.assertEqWith s "and the Piker is down one of each" (finalityTripleOn giverId after) (2, 3, 1)
       Nothing -> Spec.assertFailure s "expected Goldberry to offer exactly its one transcribed activated ability"
   -- The card's own targeting, which the answerer above cannot prove because it
   -- names the Piker rather than reading what was offered: "ANOTHER target
@@ -1008,7 +1009,7 @@ absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each k
   -- Filter.ControlledBy Filter.You, so Goldberry herself and bob's Piker are both
   -- off the list while alice's two Islands -- permanents she controls that bear
   -- no counter -- stay on it.
-  Spec.it s "CR 601.2c the ability offers every other permanent alice controls and neither Goldberry nor bob's" $ do
+  Spec.it s "CR 602.2b / 601.2c the ability offers every other permanent alice controls and neither Goldberry nor bob's" $ do
     (goldberryId, giverId, ready) <- board (const id)
     case Activate.abilitiesFor goldberryId ready of
       [only] -> do
@@ -1032,7 +1033,7 @@ absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each k
     let (goldberryId, giverId, _) = built
     case tap built of
       Just (asked, after) -> do
-        Spec.assertEqWith s "Goldberry is left with exactly what she started with" (goldberryOn goldberryId after) (1, 2, 1)
-        Spec.assertEqWith s "and the Piker kept every counter it had" (goldberryOn giverId after) (3, 4, 2)
+        Spec.assertEqWith s "Goldberry is left with exactly what she started with" (finalityTripleOn goldberryId after) (1, 2, 1)
+        Spec.assertEqWith s "and the Piker kept every counter it had" (finalityTripleOn giverId after) (3, 4, 2)
         Spec.assertEqWith s "and with no absent kind the player was not asked" asked 0
       Nothing -> Spec.assertFailure s "expected Goldberry to offer exactly its one transcribed activated ability"

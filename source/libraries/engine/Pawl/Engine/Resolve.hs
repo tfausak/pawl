@@ -6772,12 +6772,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- neither's when the card takes them all (Fate Transfer's "move all
     -- counters") or reads the DESTINATION for them (Goldberry, River-Daughter's
     -- "a counter of each kind not on Goldberry"), which is what `kinds` holds.
-    -- ATOMIC -- "if either of
-    -- these actions isn't possible, it's not possible to move a counter, and no
-    -- counter is removed from or put onto anything" -- so every impossibility the
-    -- rule names is checked BEFORE either half runs, and this arm is not a
-    -- RemoveCounters followed by a PutCounters however much its tail looks like
-    -- one.
+    -- ATOMIC -- "if either of these actions isn't possible, it's not possible to
+    -- move a counter, and no counter is removed from or put onto anything" -- so
+    -- every impossibility the rule names is checked BEFORE either half runs, and
+    -- this arm is not a RemoveCounters followed by a PutCounters however much its
+    -- tail looks like one.
     --
     -- All four of the rule's impossibilities are checked here, in its own order.
     -- Its third, "the second object can't have counters put onto it", is a
@@ -6857,9 +6856,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- spellings answer it in one place: a kind the destination refuses is
             -- not appropriate for this move, whether the card named it, the
             -- player would have, the card took every kind, or the destination's
-            -- own tally settled it. Rule 122.5's
-            -- atomicity is why it is dropped here rather than half-performed --
-            -- "no counter is removed from or put onto anything".
+            -- own tally settled it. Rule 122.5's atomicity is why it is dropped
+            -- here rather than half-performed -- "no counter is removed from or
+            -- put onto anything".
             let onFrom =
                   Map.filterWithKey
                     (\kind n -> n > 0 && not (CounterRestriction.prohibited to kind gs))
