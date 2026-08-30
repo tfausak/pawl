@@ -4064,6 +4064,110 @@ filterReads f = case f of
   Filter.Type.Or fs -> foldMap filterReads fs
   Filter.Type.Not g -> filterReads g
 
+-- Whether a Filter's answer can turn on ANOTHER object's projection. Exactly the
+-- five Filter.View fields viewOfCharacteristics fills through `peers` --
+-- attachedToView, attachedViews, attackingPlaneswalkerController,
+-- attackingBattleProtector and nonManaActivatedAbility -- since Filter.matches
+-- reads no other channel into a second object and every other field of that view
+-- comes from the candidate's own partial or from the GameState, which no layer
+-- writes.
+--
+-- What it buys is CR 613.8a's gate: at an object `b` does not apply to, a filter
+-- answering False here reads exactly what it read before `b` was applied, so
+-- `movesSet` can skip the board-wide re-ask there. Exhaustive, and
+-- over-approximating is the safe direction -- a True costs that re-ask, a wrong
+-- False loses a dependency.
+filterReadsPeers :: Filter.Type.Filter Keyword.Type.Keyword -> Bool
+filterReadsPeers f = case f of
+  -- The four atoms that read a peer view directly.
+  Filter.Type.AttachedTo _ -> True
+  Filter.Type.HasAttached _ -> True
+  Filter.Type.IsAttackingPlaneswalker _ -> True
+  Filter.Type.IsAttackingBattle _ -> True
+  -- The fifth: abilitiesFromCharacteristics runs CR 604.2's gate through
+  -- Condition.holds, which takes `peers` to any object at all (#2633).
+  Filter.Type.HasNonManaActivatedAbility -> True
+  -- Over-declared, as filterReads over-declares the same two: viewOfCharacteristics
+  -- answers both False outright, so no board can move them, but the subject whose
+  -- characteristics CR 301.5 and CR 702.5a compare against is another object.
+  Filter.Type.CanHostSubject -> True
+  Filter.Type.CanAttachToSubject -> True
+  -- DESCENT, over-declared for the two above's reason: Filter.matches answers this
+  -- atom False outright, Pawl.Engine.Count.bakePerspective having settled it
+  -- between projections, so the nest is not read here at all.
+  Filter.Type.ControlsMoreThanYou g -> filterReadsPeers g
+  -- DESCENT, where filterReads deliberately does not: CR 708.12's nest is matched
+  -- against the printed card's view rather than a projected one, so False would be
+  -- right, and descending only costs the re-ask.
+  Filter.Type.RepresentedByCard g -> filterReadsPeers g
+  Filter.Type.And fs -> any filterReadsPeers fs
+  Filter.Type.Or fs -> any filterReadsPeers fs
+  Filter.Type.Not g -> filterReadsPeers g
+  -- Everything below reads the candidate's own view field, or the Context, or the
+  -- GameState -- never a second projection.
+  Filter.Type.HasCardType _ -> False
+  Filter.Type.HasSupertype _ -> False
+  Filter.Type.HasColor _ -> False
+  Filter.Type.HasSubtype _ -> False
+  Filter.Type.HasName _ -> False
+  Filter.Type.HasKeyword _ -> False
+  Filter.Type.HasKeywordFamily _ -> False
+  Filter.Type.PowerAtLeast _ -> False
+  Filter.Type.PowerAtMost _ -> False
+  -- The SOURCE's power arrives on the Context, which affectsGiven builds with
+  -- Filter.contextFor -- no projection of a second object is read.
+  Filter.Type.PowerLessThanSource -> False
+  Filter.Type.PowerGreaterThanSource -> False
+  Filter.Type.ControlledBy _ -> False
+  Filter.Type.ControlledByDefendingPlayer -> False
+  Filter.Type.ControlledByBound _ -> False
+  Filter.Type.ControlledByPlayer _ -> False
+  Filter.Type.ControlledByRecipient -> False
+  Filter.Type.OwnedBy _ -> False
+  Filter.Type.IsSource -> False
+  Filter.Type.IsBound _ -> False
+  Filter.Type.SameNameAsBound _ -> False
+  Filter.Type.HasChosenName -> False
+  Filter.Type.IsPlayer _ -> False
+  Filter.Type.IsControllerOfBound _ -> False
+  Filter.Type.CardsInGraveyardAtLeast _ -> False
+  Filter.Type.IsAttacking -> False
+  Filter.Type.IsAttackingPlayer _ -> False
+  Filter.Type.DeclaredAttackedThisCombat -> False
+  Filter.Type.IsBlocking -> False
+  Filter.Type.IsBlocked -> False
+  Filter.Type.AttackedThisTurn -> False
+  Filter.Type.DeclaredAttackerThisCombat -> False
+  Filter.Type.DeclaredBlockerThisCombat -> False
+  Filter.Type.MilledThisTurn -> False
+  Filter.Type.DealtDamageThisTurn -> False
+  Filter.Type.IsAttachedToSource -> False
+  Filter.Type.IsHostOfSource -> False
+  Filter.Type.IsToken -> False
+  Filter.Type.IsTapped -> False
+  Filter.Type.IsFaceDown -> False
+  Filter.Type.IsExiledFaceDown -> False
+  Filter.Type.Transformed -> False
+  Filter.Type.IsInZone _ -> False
+  Filter.Type.IsRingBearer -> False
+  Filter.Type.HasDesignation _ -> False
+  Filter.Type.HasCounters _ -> False
+  Filter.Type.HasCountersOfAnyKind -> False
+  Filter.Type.ManaValueAtMost _ -> False
+  Filter.Type.ManaValueIsEven -> False
+  Filter.Type.ManaValueAtMostAmount -> False
+
+-- filterReadsPeers through an affected set. TheseObjects names ids (CR 611.2c)
+-- and Attached reads its source's attachment (CR 303.4m); neither builds a view.
+affectedReadsPeers :: Affected.Affected -> Bool
+affectedReadsPeers a = case a of
+  Affected.TheseObjects _ -> False
+  Affected.Attached -> False
+  Affected.Matching f -> filterReadsPeers f
+  Affected.MatchingAnywhere f -> filterReadsPeers f
+  Affected.MatchingOffBattlefield f -> filterReadsPeers f
+  Affected.AttachedPlayerControls f -> filterReadsPeers f
+
 -- Which aspects a Modification writes -- the other half of the pair above.
 --
 -- The arms that write Keywords: GainKeyword, LoseKeyword, GainEnchant and
@@ -4536,22 +4640,33 @@ projectDeciding admits cands = forObject
                         -- object; an id outside `after` cannot arise, since
                         -- appliedEverywhere maps over the same `running` that
                         -- `boards` is built from.
-                        changesAt after afterView (i, as) (o, p, d, ans) =
+                        --
+                        -- `elsewhere` is the gate that keeps the board-wide ask
+                        -- off the objects it cannot say anything new about. At an
+                        -- object `b` does not apply to, `after` holds the partial
+                        -- `running` already held, so the only way `a`'s answer can
+                        -- move is through a SECOND object's projection -- which
+                        -- affectsGiven reads through `peers` alone, and which
+                        -- affectedReadsPeers over-approximates. `answerFor ans j`
+                        -- is the same expression appliedEverywhere applies `b` on.
+                        changesAt after afterView elsewhere j (i, as) (o, p, d, ans) =
                           let a = NonEmpty.head as
                            in not (decidedAt d a)
+                                && (elsewhere || answerFor ans j)
                                 && appliesTo afterView o d (maybe p fst (Map.lookup o after)) a /= answerFor ans i
                         -- `a` depends on `b` when that holds ANYWHERE: CR 613.8a
                         -- asks about the whole affected SET, which is also how CR
                         -- 613.8b's loop becomes visible. Clause (c)'s CDA
                         -- exclusion needs no test -- a CDA is never a candidate;
                         -- clause (b)'s "existence" half is liveGiven's.
-                        movesSet x@(_, as) (_, bs) =
+                        movesSet x@(_, as) (j, bs) =
                           case movableAspects (NonEmpty.head as) of
                             Nothing -> False
                             Just aspects ->
                               not (Set.disjoint aspects (unitWrites bs))
                                 && let after = appliedEverywhere bs
-                                    in any (changesAt after (viewOfBoard after) x) boards
+                                       elsewhere = affectedReadsPeers (gAffected (NonEmpty.head as))
+                                    in any (changesAt after (viewOfBoard after) elsewhere j x) boards
                         -- CR 613.8a clause (b)'s LAST limb: applying `b` changes
                         -- what `a` does to the things it applies to. Only a
                         -- magnitude can move, so what is compared is the P/T `a`
