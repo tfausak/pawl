@@ -147,9 +147,18 @@ legalRecipients perspective source slot gs =
 --
 -- `bindings` is the ANNOUNCEMENT's whole binding environment -- what its other
 -- slots hold, which a GraveyardScope.InSlot pool is resolved against (see
--- graveyardRecipients), plus the NUMBERS CR 603.2's event stamped, which a CR
--- 202.3 computed bound reads (see slotContext). A whole Binding rather than the
--- recipients alone because the second half is not a recipient at all.
+-- graveyardRecipients), plus the NUMBERS the announcement holds -- CR 603.2's
+-- event amount and CR 601.2b's X alike -- which a CR 202.3 computed bound reads
+-- (see slotContext). A whole Binding rather than the recipients alone because the
+-- second half is not a recipient at all.
+--
+-- `unannounced` says the announcement has not been made AT ALL, which is a
+-- different claim from an empty one: it is CR 700.2a's fillability gate asking
+-- before CR 601.2b, and the only thing it changes is that a computed bound
+-- reading a number that does not exist yet states no bound rather than an
+-- unmeetable one (Filter.boundUnannounced). True at exactly one call site,
+-- fillableModesGiven's; every other caller is judging an announcement that has
+-- been made, however empty.
 legalRecipientsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> TargetSlot -> GameState -> Set Recipient
 legalRecipientsGiven pcs grants pools perspective unannounced bindings source slot gs =
   -- The SAME thunk both halves read, so the whole-board projection is taken at

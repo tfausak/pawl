@@ -1798,6 +1798,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- The same bound read off the ANNOUNCEMENT instead: the amount CR 603.2's own
   -- event stamped, which no board can answer.
   warsingerSpec s registry
+  -- And the SPELL's announcement: CR 601.2b's X, named one step before CR 601.2c
+  -- chooses against it.
   stirTheGraveSpec s registry
 
 razorfinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -2143,11 +2145,13 @@ stirTheGraveSpec s registry =
         pure (stirId, ids, gs1)
    in Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ do
         -- CR 700.2a asked before CR 601.2b exists, as a pair of boards differing in
-        -- exactly one card: the same three Swamps and the same one graveyard card,
-        -- which is a creature on one board and an instant on the other. A gate that
-        -- read the unannounced bound as a bound would refuse BOTH -- mana value 4 is
-        -- not "4 or less" of an X that has not been named -- and a gate that had
-        -- stopped narrowing at all would offer both.
+        -- their one graveyard card: the same three Swamps either way, a mana value
+        -- 4 CREATURE card on one and an instant on the other. A gate that read the
+        -- unannounced bound as a bound would refuse BOTH -- mana value 4 is not "4
+        -- or less" of an X nobody has named -- and a gate that had stopped narrowing
+        -- altogether would offer both. The negative half is carried by the slot's
+        -- card-type conjunct rather than by the bound, which is the point: the
+        -- permissive floor drops the bound and leaves everything else standing.
         Spec.it s "CR 601.2b the castability gate states no bound the announcement has not made" $ do
           (creatureBoard, _, withCreature) <- boardOf ["Russet Wolves"] 3
           (instantBoard, _, withInstant) <- boardOf ["Lightning Bolt"] 3
@@ -2182,11 +2186,11 @@ stirTheGraveSpec s registry =
               let after = S.runPure (stirPlan 0 [tyrantId, wolvesId, boltId]) gs (S.cast S.alice stirId >> Stack.resolveTop)
               Spec.assertEqWith s "no creature card came back" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 0
               Spec.assertEqWith s "CR 601.2: the game returned to before the casting was proposed, so no Swamp is tapped" (S.tappedCount S.alice after) 0
-            _ -> Spec.assertFailure s "fixture should stock alice\'s graveyard with four cards"
+            _ -> Spec.assertFailure s "fixture should stock alice's graveyard with four cards"
 
 -- Announces this X and aims every target slot at the graveyard cards the bound
--- EXCLUDES, falling back to the smallest legal recipient -- warsingerPlan\'s shape,
--- with CR 601.2b\'s announcement in place of the combat that supplied the trigger.
+-- EXCLUDES, falling back to the smallest legal recipient -- warsingerPlan's shape,
+-- with CR 601.2b's announcement in place of the combat that supplied the trigger.
 stirPlan :: Natural.Type.Natural -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 stirPlan x bait p = case p of
   Prompt.ChooseX {} -> x

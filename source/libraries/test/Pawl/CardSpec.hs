@@ -1559,9 +1559,9 @@ modalCountsOffend modal =
 -- both of these sitting on the slot, so the two reads-equal-declares lints below
 -- ask all three.
 modalReadsAnnouncedX :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
-modalReadsAnnouncedX modal =
-  any ((==) SlotCount.AnnouncedX . TargetSlot.count) (Modal.allTargetSlots modal)
-    || any (any (Set.member Binding.variableX . Quantity.slots) . TargetSlot.amount) (Modal.allTargetSlots modal)
+modalReadsAnnouncedX =
+  any (\slot -> TargetSlot.count slot == SlotCount.AnnouncedX || any (Set.member Binding.variableX . Quantity.slots) (TargetSlot.amount slot))
+    . Modal.allTargetSlots
 
 -- Every ReplacementEffect a card AUTHORS: the ones it PRINTS
 -- (Face.replacementEffects, Eon Hub's) and the ones an effect of its own
