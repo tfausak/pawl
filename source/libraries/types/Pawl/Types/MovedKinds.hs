@@ -54,10 +54,13 @@ import qualified Pawl.Types.Quantity as Quantity
 -- counter, would refute that.
 --
 -- @include_extras@ is what makes that run every printing rather than most of
--- one. Without it Scryfall drops the Mystery Booster playtest set, which is where
--- both Oozeavite and Takesies are, and docs\/design.md section 6 ranks a playtest
--- printing above a synthetic. The sweep this one replaced omitted the parameter
--- and so missed exactly the two printings that qualify the claim; see #2706.
+-- one, and it is the parameter every sweep in this neighbourhood needs: without
+-- it Scryfall drops the @unk@ set (Unknown Event, set type @funny@), which is
+-- where both Oozeavite and Takesies are. @include_funny@ adds nothing beyond it,
+-- checked the same day. docs\/design.md section 6 ranks an un-set printing below
+-- a regular one and above a synthetic, so neither is outside "every printing".
+-- The sweep this one replaced omitted the parameter and so missed exactly the two
+-- printings that qualify the claim; see #2706.
 data MovedKinds
   = -- | Fate Transfer's "move all counters": every kind on the first object, the
     -- whole tally of each (CR 122.5).

@@ -6835,7 +6835,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           --
           -- Not implemented: a move whose first side is a GROUP of permanents
           -- rather than one, which Spike Cannibal, Aetherborn Marauder, Slippery
-          -- Bogbonder and Oozeavite all print (#2704).
+          -- Bogbonder and Oozeavite all print (#2704), and a move whose SECOND
+          -- side is one, which Forgotten Ancient prints (#2713).
           --
           -- The `from` half answers CR 702.26b as much as CR 400.7, and both are
           -- proven boards. Pawl.Engine.Phasing spells "treated as though it does

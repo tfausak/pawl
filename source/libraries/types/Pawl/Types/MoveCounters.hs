@@ -14,7 +14,9 @@ import qualified Pawl.Types.SlotName as SlotName
 -- Not implemented: the printed text that DOES name a set on the first side --
 -- Spike Cannibal's "from all creatures", Aetherborn Marauder's "from other
 -- permanents you control", Slippery Bogbonder's "from among creatures you
--- control", Oozeavite's "from other creatures you control" (#2704).
+-- control", Oozeavite's "from other creatures you control" (#2704). Nor the
+-- SECOND side naming one, Forgotten Ancient's "onto other creatures", which asks
+-- for a distribution across the batch rather than a gathering into one (#2713).
 --
 -- `kinds` is WHICH counters cross and how many of each, which the printed text
 -- spells five ways; Pawl.Types.MovedKinds is where the five are set out.
