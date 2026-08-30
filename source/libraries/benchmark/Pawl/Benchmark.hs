@@ -137,13 +137,24 @@ loadNoAuraDeck registry = do
 -- Magic, whose one ability is Affected.Attached.
 --
 -- Ashaya, Soul of the Wild ({3}{G}{G}) and Kormus Bell ({4}) are a CR 613.8a
--- clause (b) pair at layer 4, in both directions. Ashaya's affected set --
--- nontoken creatures you control -- reads card types, and Kormus Bell's layer-4
--- modification writes one (AddCardType Creature onto every Swamp), so a Swamp
--- the Bell animates joins Ashaya's set. Back the other way, Kormus Bell's set
--- reads a subtype and Ashaya writes one (AddLandSubtype Forest), so the aspect
--- screen clears there too and `changesAt` runs on that pair as well. Both cards ADD a
--- subtype rather than setting one, so CR 305.7 never strips Ashaya's
+-- clause (b) pair at layer 4 one way round, and the scenario exercises both
+-- outcomes rather than one.
+--
+-- Bell -> Ashaya is the dependency. Ashaya's affected set -- nontoken creatures
+-- you control -- reads card types, and Kormus Bell's layer-4 modification writes
+-- one (AddCardType Creature onto every Swamp), so a Swamp the Bell animates
+-- joins Ashaya's set.
+--
+-- Ashaya -> Bell is NOT a dependency, and reaching that answer is the other half
+-- of what the scenario exercises. Kormus Bell's set reads a subtype and Ashaya
+-- writes one (AddLandSubtype Forest), so the aspect screen clears here too and
+-- the confirmation runs -- but Ashaya ADDS Forest rather than setting a subtype,
+-- and CR 305.7 keeps a land's existing land types when it gains one in addition,
+-- so applying Ashaya moves no object into or out of `HasSubtype Swamp` and the
+-- confirmation answers no. Both directions take `changesHere` rather than
+-- `changesAt`, neither affected filter reading a peer projection.
+--
+-- Neither card SETS a land subtype, so CR 305.7 never strips Ashaya's
 -- characteristic-defining ability -- which is what rules Blood Moon out as the
 -- partner even though it makes the same cross-object edge: with a set land
 -- subtype in the pairing, every Ashaya cast over a whole match was observed in a
