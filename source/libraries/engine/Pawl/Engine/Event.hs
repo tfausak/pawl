@@ -882,9 +882,10 @@ createEmblem pid card = do
 -- And CR 701.24's shuffle: whether any row that applied carries it. Reported
 -- rather than performed, because a card cannot be shuffled INTO a library it is
 -- not in yet -- the move happens after this returns, so changeZoneAttaching is
--- the earliest moment the action is well defined. The reveal is not here for the
--- mirror-image reason: it acts on the card in the zone it is leaving, so `apply`
--- performs it where that id is still the object's.
+-- the earliest moment the action is well defined. The reveal is not reported
+-- alongside it because it acts on the card in the zone it is leaving, and
+-- `apply` already holds that id -- see the arm there for why that is a
+-- convenience rather than a constraint.
 resolveZoneChange :: Maybe GameState -> ZoneChange -> Game (Maybe ZoneChange, Maybe ObjectId, Bool)
 resolveZoneChange asOf zc = do
   (outcome, _, exiledBy, shuffling) <- applyReplacementsFully asOf Set.empty (ProposedEvent.WouldChangeZone zc)
@@ -1309,12 +1310,15 @@ apply batch candidate event =
   case (ReplacementCandidate.effect candidate, event) of
     (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ toDest revealing _), ProposedEvent.WouldChangeZone zc) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
-      -- CR 701.20a, performed HERE rather than after the move: the card is shown
-      -- in the zone it is leaving, where CR 400.7 has not yet minted the
-      -- incarnation that arrives, so this id is the one the reveal is about.
-      -- Nexus of Fate's "reveal Nexus of Fate and shuffle it into its owner's
-      -- library instead" reads in that order too. The shuffle half cannot be
-      -- here; see resolveZoneChange.
+      -- CR 701.20a: the card is shown in the zone it is LEAVING, so the id the
+      -- reveal names is the departing one rather than the incarnation CR 400.7
+      -- mints on arrival. Here because that is where the loop already has it in
+      -- hand, and because Nexus of Fate's "reveal Nexus of Fate and shuffle it
+      -- into its owner's library instead" reads in that order -- not because
+      -- nowhere else could: changeZoneAttaching still holds `oid` before
+      -- placeObject, and with no reveal trigger and no row that cancels a zone
+      -- change in the pool, the two placements are observationally identical
+      -- today. The shuffle half genuinely cannot be here; see resolveZoneChange.
       --
       -- The OWNER shows it, which is who CR 400.3's destination library belongs
       -- to and, for every row in the pool, who holds the card: a redirect
@@ -3523,9 +3527,12 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
     -- event left for a replacement to choose among. Ordering it after the loop
     -- would answer the same, and not on a claim about Magic: the predicate reads
     -- the object and its CURRENT zone, neither of which any ZoneChangeR rewrites
-    -- -- they rewrite the destination -- and neither of the two things that loop
+    -- -- they rewrite the destination -- and none of the three things that loop
     -- does write on this path touches them: CR 701.20's reveal appends to the
-    -- event log, and Replacement.consume marks a candidate spent.
+    -- event log, Replacement.consume marks a candidate spent, and CR 616.1's
+    -- Replacement.choose writes GameState.lastChoice when two rows differ enough
+    -- to be worth a prompt (Rest in Peace beside Leyline of the Void, or either
+    -- beside Nexus of Fate).
     Just obj | Game.tokenHasLeftTheBattlefield obj -> pure Seq.empty
     Just obj -> do
       let pid = Object.owner obj
