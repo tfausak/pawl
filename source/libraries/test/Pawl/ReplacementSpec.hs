@@ -2820,6 +2820,64 @@ ajaniSteadfastSpec s registry = Spec.describe s "Ajani Steadfast (CR 114.4, CR 6
       Spec.assertEqWith s "setup: alice's other planeswalker holds 8 before any damage" (countersOn CounterKind.Loyalty jace armed) 8
       Spec.assertBool s (not (S.onBattlefield ajani armed)) "CR 704.5i Ajani paid his last loyalty counter for the ultimate and is buried"
       Spec.assertBool s (S.onBattlefield ajani base) "where the unactivated board still has him, at the seven counters he never spent"
+  -- CR 120.4's damage EVENT, whose granularity is one source, one recipient, one
+  -- moment -- and a sentence can name one recipient TWICE. Char ({2}{R} Instant,
+  -- "Char deals 4 damage to any target and 2 damage to you" -- name, cost, type
+  -- line and Oracle text checked against api.scryfall.com 2026-08-30) aimed at
+  -- its own caster is that sentence: CR 608.2f makes its two clauses one action
+  -- processed simultaneously, so alice's 4 and alice's 2 are one event of 6 and
+  -- not two.
+  --
+  -- Nothing in the CR individuates simultaneous damage more finely than by
+  -- source: CR 615.7 puts the allocation question only to damage "by two or more
+  -- applicable SOURCES at the same time", CR 120.4a computes excess against
+  -- "damage from other SOURCES that would be dealt at the same time", and CR
+  -- 120.9 scopes a trigger's "damage dealt" to the sources named. CR 701.14c is
+  -- the rule's own worked instance of the collapse -- a creature that fights
+  -- ITSELF "deals damage to itself equal to TWICE its power", one blow rather
+  -- than its power twice.
+  --
+  -- The emblem is the observer and CR 615.10 is why: its floor applies to each
+  -- applicable event separately, so it is worth exactly the number of events. One
+  -- event of 6 leaves alice 1 damage; two events would leave her 1 apiece.
+  --
+  -- Numbers all distinct -- 4 at the target, 2 at the caster, 6 in one event, the
+  -- floor 1, alice at 9 and bob at 20 -- so no two readings land on the same
+  -- board: one event reads 8, two events 7, an unfloored 3.
+  Spec.it s "CR 120.4 one sentence naming alice twice deals her ONE event, of 6" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    ajaniPrinting <- S.printingOf s registry "Ajani Steadfast"
+    char <- S.printingOf s registry "Char"
+    let base = (S.landsFor mountain S.alice 3 (Setup.emptyGame S.bothPlayers)) {GameState.phase = Phase.PrecombatMain}
+        (ajani, g1) = S.addCreature ajaniPrinting S.alice base
+        (charId, unarmed) = S.addHandCard char S.alice (atLife S.alice 9 (S.addCounter CounterKind.Loyalty 7 ajani g1))
+        armed = loyaltyAbility 2 S.identityAnswer ajaniPrinting ajani unarmed
+        burn victim g = castAndResolve (preferTarget [victim]) g charId
+        aimedAtAlice = burn (Recipient.ToPlayer S.alice) armed
+        aimedAtBob = burn (Recipient.ToPlayer S.bob) armed
+        control = burn (Recipient.ToPlayer S.alice) unarmed
+    -- THE case, and the gameplay-level assertion: 4 and 2 aimed at one recipient
+    -- are 6 in one event, which the emblem floors once. Two events would floor
+    -- twice and take alice to 7.
+    Spec.assertEqWith s "CR 120.3a the sentence's whole 6 is floored once: 9 - 1" (S.lifeOf S.alice aimedAtAlice) (Just 8)
+    Spec.assertEqWith s "and one event was dealt, not two" (fmap DamageEvent.amount (S.damageEventsOf aimedAtAlice)) [1]
+    -- The paired board, differing in exactly the target: aimed at bob the two
+    -- clauses name two recipients and stay two events, so the merge is keyed to
+    -- the RECIPIENT rather than flattening an instruction to one event.
+    Spec.assertEqWith s "aimed at bob the clauses name two recipients: bob's 4 is unfloored, alice's 2 is floored to 1" (S.lifeOf S.bob aimedAtBob, S.lifeOf S.alice aimedAtBob) (Just 16, Just 8)
+    -- Sorted, since what is asserted is that there are TWO events and what each
+    -- came to, not the order the batch happened to be recorded in.
+    Spec.assertEqWith s "so that board deals two events" (List.sort (fmap DamageEvent.amount (S.damageEventsOf aimedAtBob))) [1, 4]
+    -- The unemblemed board, differing in exactly the emblem: the same one event
+    -- of 6 is dealt whole, which is what makes the floor above the only thing
+    -- separating 8 from 3.
+    Spec.assertEqWith s "without the emblem the whole 6 lands: 9 - 6" (S.lifeOf S.alice control) (Just 3)
+    Spec.assertEqWith s "in one event still" (fmap DamageEvent.amount (S.damageEventsOf control)) [6]
+    -- The fixture's own preconditions, after the behaviour so neither can absorb
+    -- a mutation aimed at it.
+    Spec.assertEqWith s "CR 114.2 setup: the ultimate left one emblem in the command zone" (Set.size (GameState.command armed)) 1
+    Spec.assertEqWith s "and the unemblemed board has none" (Set.size (GameState.command unarmed)) 0
+    Spec.assertEqWith s "setup: alice is at 9 before the burn" (S.lifeOf S.alice armed) (Just 9)
   -- The -2, whose two instructions differ in every part: counter kind, the card
   -- type swept, and whether the source itself is included. "Each other" is
   -- spelled Filter.Not Filter.IsSource -- a SWEEP rather than a target, so the

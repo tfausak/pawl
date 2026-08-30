@@ -782,6 +782,41 @@ excessThreshold gs source recipient = do
   Monad.guard (not (null bars))
   pure (minimum bars)
 
+-- CR 120.4's damage EVENT, whose granularity is one source, one recipient, one
+-- moment: the events of ONE instruction that name the same recipient are summed
+-- into one. Char's "4 damage to any target and 2 damage to you", aimed at its own
+-- caster, deals that caster one event of 6.
+--
+-- Nothing in the CR individuates simultaneous damage more finely than by source.
+-- CR 615.7 puts its allocation question only to damage dealt "by two or more
+-- applicable sources at the same time"; CR 120.4a computes excess against "damage
+-- from other sources that would be dealt at the same time"; CR 120.9 scopes a
+-- trigger's "damage dealt" to the sources it names. CR 701.14c is the rule's own
+-- worked instance of this collapse: a creature that fights itself "deals damage
+-- to itself equal to twice its power" -- one blow, not its power twice.
+--
+-- Keyed on the whole event but its amount, so two events merge only when their
+-- source, their recipient, their kind and every CR 702 deal-time rider agree --
+-- the source among them, so this could not merge two dealers' damage even if it
+-- were handed some. The first occurrence keeps its place: the batch's order is
+-- the order its events are offered in when CR 615.7 asks which of them a shield
+-- prevents.
+--
+-- Scoped to ONE instruction, which has exactly one dealer (CR 120.1) and one
+-- moment (CR 608.2f); Pawl.Engine.Resolve's DealDamage arm is the only caller.
+-- Combat must NOT come through here -- two attacking creatures hitting one player
+-- are two sources, so CR 615.10's floor applies to each -- and neither must a
+-- fight, whose two blows have different dealers (CR 701.14a).
+--
+-- Observable, and Pawl.ReplacementSpec's Ajani Steadfast emblem case is the
+-- proof: CR 615.10's floor applies once per event, so 4 and 2 at one recipient
+-- deal 1 as one event and would deal 2 as two.
+oneEventPerRecipient :: [DamageEvent.DamageEvent] -> [DamageEvent.DamageEvent]
+oneEventPerRecipient events =
+  let key event = event {DamageEvent.amount = 0}
+      total event = sum (fmap DamageEvent.amount (filter (\other -> key other == key event) events))
+   in fmap (\event -> event {DamageEvent.amount = total event}) (List.nubBy (\one two -> key one == key two) events)
+
 -- CR 120.4a, the FIRST part of CR 120.4's four-part sequence: "if an effect
 -- that's causing damage to be dealt states that excess damage that would be
 -- dealt to a permanent is dealt to another permanent or player instead, the
