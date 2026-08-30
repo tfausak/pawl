@@ -15,6 +15,12 @@ import qualified Pawl.Types.Keyword as Keyword
 data Duration
   = UntilEndOfTurn -- CR 514.2
   | Indefinite -- CR 611.2a: "lasts until the end of the game" (Magical Hack)
+  | -- | Alchemy's "perpetually" (Pearl Collector). No rule of the CR names it, so
+    -- the printed sentence is the authority; the rest-of-the-game half is
+    -- Indefinite's, and what makes it a separate arm is that the effect FOLLOWS
+    -- its objects across a zone change instead of ending at CR 400.7's new
+    -- object.
+    Perpetual
   | -- | CR 611.2a: "until your next turn" (Hag of Inner Weakness). "Your" is
     -- resolved to a concrete player by Pawl.Engine.Expiry.arm (CR 109.5) -- it cannot
     -- be a PlayerId here, because a printed card does not know one.

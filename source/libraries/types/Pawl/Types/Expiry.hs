@@ -21,6 +21,15 @@ data Expiry
     AtCleanup
   | -- | CR 611.2a: "lasts until the end of the game". No sweep ends it.
     Never
+  | -- | Alchemy's "perpetually", stored. The runtime counterpart of
+    -- Duration.Perpetual, and no sweep ends it -- Never's lifetime exactly.
+    --
+    -- A separate arm from Never all the same, and the reason is IDENTITY rather
+    -- than lifetime, WhenPaid's reason below: Pawl.Engine.Event.perpetuate has to
+    -- find the stored effects a zone change re-anchors, and CR 400.7's default --
+    -- a new object with no memory of the old one -- has to keep ending every
+    -- other effect that named the departing object, Never's included.
+    Perpetual
   | -- | CR 611.2b: "for as long as ...". The PlayerId is CR 109.5's "you", baked
     -- in by Pawl.Engine.Expiry.arm at the moment the effect is stored -- derived from
     -- the effect's controller, never chosen. The duration is ONE continuous

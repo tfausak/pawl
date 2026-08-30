@@ -75,6 +75,9 @@ arm :: Map.Map SlotName PlayerId -> PlayerId -> ObjectId -> Duration -> GameStat
 arm players controller source duration gs = case duration of
   Duration.UntilEndOfTurn -> Just Expiry.AtCleanup
   Duration.Indefinite -> Just Expiry.Never
+  -- Alchemy's "perpetually": Never's lifetime under an arm a zone change can
+  -- find (Pawl.Engine.Event.perpetuate).
+  Duration.Perpetual -> Just Expiry.Perpetual
   Duration.UntilYourNextTurn -> Just (Expiry.AtTurnOf controller)
   -- CR 611.2a: "until the end of your next turn". Two samples, both taken here
   -- and neither ever rewritten: the controller (CR 109.5's "you", as above) and
@@ -112,6 +115,26 @@ arm players controller source duration gs = case duration of
   -- the source's control afterwards.
   Duration.UntilPaid cost -> Just (Expiry.WhenPaid (PaidExpiry.MkPaidExpiry controller cost))
 
+-- Does a stored effect under this duration FOLLOW its objects across a zone
+-- change? CR 400.7's default is no -- the object that arrives is a new object
+-- with no memory of the old one -- and Alchemy's "perpetually" is the one
+-- duration that says otherwise. The only reader is
+-- Pawl.Engine.Event.perpetuate, which cannot ask the question itself: this
+-- module is the only one that may case on Pawl.Types.Expiry.
+--
+-- Never answers False, which is the whole reason Perpetual is a separate arm:
+-- the two share a lifetime and differ here.
+follows :: Expiry -> Bool
+follows expiry = case expiry of
+  Expiry.Perpetual -> True
+  Expiry.AtCleanup -> False
+  Expiry.Never -> False
+  Expiry.While {} -> False
+  Expiry.AtTurnOf _ -> False
+  Expiry.AtEndOfTurnOf _ -> False
+  Expiry.AtEndOf _ -> False
+  Expiry.WhenPaid _ -> False
+
 -- CR 514.2: "until end of turn" and "this turn" effects end during the cleanup
 -- step. Delete-and-recompute (design.md 2.5): dropping the stored entry makes
 -- the next projection revert -- nothing is explicitly undone.
@@ -125,6 +148,8 @@ dropAtCleanup gs =
   let survives expiry = case expiry of
         Expiry.AtCleanup -> False
         Expiry.Never -> True
+        -- Alchemy's "perpetually" lasts for the rest of the game, as Never does.
+        Expiry.Perpetual -> True
         Expiry.While {} -> True
         Expiry.AtTurnOf _ -> True
         -- CR 611.2a: "until the end of your next turn" ends as that turn ends,
@@ -184,6 +209,8 @@ sweepConditional = do
         Expiry.While (While.MkWhile you cond) -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Just you) (Just source)) gs source cond
         Expiry.AtCleanup -> True
         Expiry.Never -> True
+        -- Alchemy's "perpetually" lasts for the rest of the game, as Never does.
+        Expiry.Perpetual -> True
         Expiry.AtTurnOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.AtEndOf _ -> True
@@ -313,6 +340,8 @@ dropAtTurnOf pid gs =
         Expiry.AtTurnOf p -> p /= pid
         Expiry.AtCleanup -> True
         Expiry.Never -> True
+        -- Alchemy's "perpetually" lasts for the rest of the game, as Never does.
+        Expiry.Perpetual -> True
         Expiry.While {} -> True
         Expiry.AtEndOfTurnOf afterTurn -> not (departed && AfterTurn.player afterTurn == pid)
         Expiry.AtEndOf _ -> True
@@ -359,6 +388,8 @@ dropAtEndOf ending gs =
         Expiry.AtEndOf window -> window /= ending
         Expiry.AtCleanup -> True
         Expiry.Never -> True
+        -- Alchemy's "perpetually" lasts for the rest of the game, as Never does.
+        Expiry.Perpetual -> True
         Expiry.While {} -> True
         Expiry.AtTurnOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
@@ -401,6 +432,7 @@ paidExpiries gs =
         Expiry.WhenPaid paidExpiry -> [(source, paidExpiry)]
         Expiry.AtCleanup -> []
         Expiry.Never -> []
+        Expiry.Perpetual -> []
         Expiry.While {} -> []
         Expiry.AtTurnOf _ -> []
         Expiry.AtEndOfTurnOf _ -> []
@@ -438,6 +470,8 @@ dropWhenPaidBy oid gs =
         Expiry.WhenPaid _ -> source /= oid
         Expiry.AtCleanup -> True
         Expiry.Never -> True
+        -- Alchemy's "perpetually" lasts for the rest of the game, as Never does.
+        Expiry.Perpetual -> True
         Expiry.While {} -> True
         Expiry.AtTurnOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True

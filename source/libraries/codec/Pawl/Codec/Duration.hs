@@ -14,6 +14,7 @@ codec =
   Arm.tagged
     [ Arm.nullary "UntilEndOfTurn" Duration.UntilEndOfTurn,
       Arm.nullary "Indefinite" Duration.Indefinite,
+      Arm.nullary "Perpetual" Duration.Perpetual,
       Arm.nullary "UntilYourNextTurn" Duration.UntilYourNextTurn,
       Arm.nullary "UntilEndOfYourNextTurn" Duration.UntilEndOfYourNextTurn,
       Arm.payload "ForAsLongAs" Condition.codec Duration.ForAsLongAs (\x -> case x of Duration.ForAsLongAs y -> Just y; _ -> Nothing),
