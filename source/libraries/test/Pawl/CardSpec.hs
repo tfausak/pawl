@@ -2905,6 +2905,12 @@ withCountersFilters w =
 -- greppable rather than asserted: `counterKindFilters` above the effect
 -- traversals, plus riderFilters and withCountersFilters, is the whole of it
 -- (#2728).
+--
+-- Not implemented: a FRAMING of its own. What this returns is fed to `unframed`
+-- at every position, which is the treatment a printed keyword's filter and a
+-- granted one already get -- and which over-promises, a keyword's filter being
+-- evaluated off a continuous effect with no resolution's slots behind it
+-- (#2730).
 counterKindFilters :: CounterKind.CounterKind Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 counterKindFilters kind = case kind of
   CounterKind.Keyword keyword -> keywordFilters keyword
@@ -5331,6 +5337,10 @@ isBoundCounts card =
 -- and the codec disagree about how many the card holds. The second disjunct is a
 -- REGRESSION FENCE for sameNameAsBoundOffends' reason.
 --
+-- Not implemented: the position a KEYWORD's own filter sits in, which is
+-- `Unframed` and so counted here on the ACCEPTED side, though no resolution's
+-- slots are behind it (#2730).
+--
 -- Only IsBound, of the atoms that read a Context's slots. SameNameAsBound is
 -- fenced to a mode's target slot by its own lint, so a wish's filter already
 -- rejects it; IsControllerOfBound and ControlledByBound are False wherever
@@ -6671,6 +6681,23 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "a cost to attack's counted share is in the sweep"
       (fmap Count.Type.scope (cardCounts (S.combinedFace sphere)))
       [Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)]
+    -- And the newest position of all, planted rather than read off a card: CR
+    -- 122.5's GIVER became an ObjectRef when the first side was widened to a
+    -- group, so a library walk's depth there is a Count position this traversal
+    -- has to reach. No printing can exercise it -- rule 122.5 moves counters
+    -- between two things on the battlefield, so a giver naming a card in a
+    -- library moves nothing -- and the arm reading the moved kinds alone kept
+    -- compiling (#2729).
+    let counted = Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.You))) (Filter.Type.HasCardType CardType.Creature) Aggregation.Members
+        moving =
+          Effect.MoveCounters
+            ( MoveCounters.MkMoveCounters
+                (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Count counted)))
+                (MovedKinds.EveryOfKind CounterKind.PlusOnePlusOne)
+                Nothing
+                (SlotName.MkSlotName (Text.pack "recipient"))
+            )
+    Spec.assertEqWith s "a counter move's giver puts its depth's Count in the sweep" (effectCounts moving) [counted]
   -- CR 208.1 / 208.2: a printed power or toughness box holds a number, or a value
   -- including a star. The type permits any Quantity there, and a computed one
   -- would be evaluated at Projection.baseCharacteristics' seed against a board
