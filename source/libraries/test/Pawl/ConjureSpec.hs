@@ -1,15 +1,21 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+
 -- Covers: Alchemy's conjure keyword action -- Pawl.Types.Conjure and
 -- Pawl.Types.ConjureDestination, Pawl.Engine.Resolve's Effect.Conjure arm, and
 -- Pawl.Engine.Event's conjure and mintCard (the mint CR 400.11c's wish shares,
 -- which Pawl.OutsideTheGameSpec drives from the other side).
 --
--- Gameplay-level throughout: both cases put a printed Emporium Thopterist on the
--- battlefield and begin its controller's upkeep so the printed trigger fires and
--- resolves. The first then CASTS what the conjure put in her hand, which is the
--- point -- conjure creates a CARD and not CR 111.1's token, and a token in a
--- hand would be swept up by CR 111.7 rather than cast.
+-- Gameplay-level throughout: the first two cases put a printed Emporium
+-- Thopterist on the battlefield and begin its controller's upkeep so the printed
+-- trigger fires and resolves; the third declares a printed Toralf's Disciple as
+-- an attacker. Each then CASTS what the conjure created, which is the point --
+-- conjure creates a CARD and not CR 111.1's token, and a token in a hand or a
+-- library would be swept up by CR 111.7 rather than cast.
 module Pawl.ConjureSpec where
 
+import qualified Control.Monad as Monad
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -24,6 +30,8 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Zone as Zone
 
@@ -43,8 +51,11 @@ upkeepOf gs =
 ornithopter :: CardName.CardName
 ornithopter = CardName.MkCardName (Text.pack "Ornithopter")
 
-namedOrnithopters :: Zone.Zone -> GameState.GameState -> [ObjectId.ObjectId]
-namedOrnithopters zone gs = [oid | oid <- Game.zoneMembers zone S.alice gs, S.soleFaceName oid gs == ornithopter]
+lightningBolt :: CardName.CardName
+lightningBolt = CardName.MkCardName (Text.pack "Lightning Bolt")
+
+namedIn :: CardName.CardName -> Zone.Zone -> GameState.GameState -> [ObjectId.ObjectId]
+namedIn name zone gs = [oid | oid <- Game.zoneMembers zone S.alice gs, S.soleFaceName oid gs == name]
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Conjure" $ do
@@ -61,7 +72,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
     thopterist <- S.printingOf s registry "Emporium Thopterist"
     let (_, board) = S.addCreature thopterist S.alice (S.landsInPlay island 1)
         conjured = upkeepOf board
-        inHand = namedOrnithopters Zone.Hand conjured
+        inHand = namedIn ornithopter Zone.Hand conjured
         -- CR 302.1: a creature card is cast from a hand during a main phase with
         -- the stack empty, so `castable` below is asked there rather than in the
         -- upkeep the card arrived in.
@@ -72,7 +83,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
     Spec.assertEqWith
       s
       "the conjured card was cast and is a 2/2 Thopter on the battlefield"
-      (fmap (\oid -> S.powerToughnessOf oid cast_) (namedOrnithopters Zone.Battlefield cast_))
+      (fmap (\oid -> S.powerToughnessOf oid cast_) (namedIn ornithopter Zone.Battlefield cast_))
       [Just (2, 2)]
     Spec.assertEqWith
       s
@@ -96,5 +107,54 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
     Spec.assertEqWith
       s
       "two Ornithopters, and they are two objects"
-      (length (namedOrnithopters Zone.Hand twice))
+      (length (namedIn ornithopter Zone.Hand twice))
       2
+  -- Toralf's Disciple ({2}{R} Creature -- Human Warrior, 3/3, "Haste. Whenever
+  -- Toralf's Disciple attacks, conjure four cards named Lightning Bolt into your
+  -- library, then shuffle."), which is the count and the library destination in
+  -- one printed sentence.
+  --
+  -- bob blocks with a Goblin Piker, so combat deals him nothing and the only
+  -- thing that can move his life total is the Bolt cast below -- three distinct
+  -- numbers (four cards, three damage, one blocker) with no coincidence between
+  -- them.
+  Spec.it s "conjure four into a library puts four drawable, castable Lightning Bolts there" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    disciple <- S.printingOf s registry "Toralf's Disciple"
+    let (combat, _, _) = S.combatBoardOf [disciple] [piker]
+        board = S.landsFor mountain S.alice 1 combat
+        attacked = S.runCombat S.aggressiveAnswer board
+        inLibrary = namedIn lightningBolt Zone.Library attacked
+        inHand = namedIn lightningBolt Zone.Hand attacked
+        -- CR 121.2 takes the TOP card of the library, which is what makes the
+        -- draw evidence about the library rather than about the mint: a card that
+        -- did not reach the ordered pile cannot be drawn out of it.
+        drawn = S.runPure S.identityAnswer attacked (Monad.replicateM_ 4 (Event.drawCardReturning S.alice))
+        drawnBolts = namedIn lightningBolt Zone.Hand drawn
+        main_ = drawn {GameState.phase = Phase.PrecombatMain}
+        -- FILTERED, not hand-built: CR 608.2b re-reads the targets at resolution,
+        -- and a recipient assembled here would be a different one than the prompt
+        -- offered.
+        targetsBob :: Prompt.Prompt r -> r
+        targetsBob p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToPlayer S.bob) . snd) sets
+          _ -> S.identityAnswer p
+        cast_ = case drawnBolts of
+          oid : _ -> S.runPure targetsBob main_ (S.cast S.alice oid >> Stack.resolveTop)
+          [] -> main_
+    Spec.assertEqWith
+      s
+      "four Lightning Bolts in alice's library and none in her hand"
+      (length inLibrary, length inHand)
+      (4, 0)
+    Spec.assertEqWith
+      s
+      "one of them was drawn and cast, so bob took its three damage"
+      (S.lifeOf S.bob cast_)
+      (Just 17)
+    Spec.assertEqWith
+      s
+      "all four were drawable out of the library"
+      (length drawnBolts)
+      4

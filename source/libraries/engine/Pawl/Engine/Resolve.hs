@@ -538,9 +538,9 @@ slotsOf effect = case effect of
   -- the permanent the loop around it bound. So is CR 509.4's blocking rider,
   -- which names the attacker the token enters blocking (Flash Foliage's target).
   Effect.Create (Create.MkCreate quantity _ riders _ creator) -> joinSlots [quantitySlots quantity, playerRefSlots creator, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
-  -- Nothing to read: the conjured card is literal card data, its destination is
+  -- The COUNT only: the conjured card is literal card data, its destination is
   -- a constructor, and the conjurer is the resolving controller.
-  Effect.Conjure {} -> Map.empty
+  Effect.Conjure (Conjure.MkConjure quantity _ _) -> quantitySlots quantity
   -- A READ, unlike Create's slot: the ref names the permanent being copied.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> joinSlots [quantitySlots quantity, objectRefSlots ref, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
   -- Both refs: either may name a slot.
@@ -857,9 +857,9 @@ slotsAreExhaustive effect = case effect of
   -- Its entry riders are not: CR 122.6's count per kind is the effect speaking,
   -- read in the resolution's own slots.
   Effect.Create (Create.MkCreate quantity _ riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
-  -- The conjured card is literal text, Create's token's reason, and this opcode
-  -- carries no Quantity of its own.
-  Effect.Conjure {} -> True
+  -- The conjured card is literal text, Create's token's reason; the COUNT is the
+  -- effect speaking, read in the resolution's own slots.
+  Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
   Effect.BecomeCopy {} -> True
   Effect.CopySpell {} -> True
@@ -1035,7 +1035,7 @@ readsX = any effectReadsX
       Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.DecreaseSpeed d -> Quantity.readsX (SpeedDecrease.quantity d)
       Effect.Create (Create.MkCreate quantity _ riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders)
-      Effect.Conjure {} -> False
+      Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.readsX quantity
       Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> any Quantity.readsX (quantity : riderQuantities riders)
       Effect.BecomeCopy {} -> False
       Effect.CopySpell {} -> False
@@ -1185,9 +1185,10 @@ boundSlots effect = case effect of
   Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ mSlot _ _ _) -> foldMap Set.singleton mSlot
   -- The tokens this Create minted, for CR 603.7c's delayed trigger to name.
   Effect.Create (Create.MkCreate _ _ _ mSlot _) -> foldMap Set.singleton mSlot
-  -- Binds nothing: no printing names the conjured card later in its own
-  -- instruction list, and Pawl.Types.Conjure carries no slot to bind it to
-  -- (#2638).
+  -- Not implemented: Pawl.Types.Conjure carries no slot, so a printing that DOES
+  -- name the conjured card later in its own instruction list (Kari Zev, Crew of
+  -- Two's "if that card is on the battlefield, return it to its owner's hand")
+  -- cannot be transcribed and this binds nothing (#2638).
   Effect.Conjure {} -> Set.empty
   Effect.CreateCopy {} -> Set.empty
   -- Binds nothing: no new object comes into existence.
@@ -5610,14 +5611,29 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- what the CR settles is that the result is a CARD and not CR 111.1's token,
   -- which is what Pawl.Engine.Event.conjure mints.
   --
-  -- Nothing is read off the board, so there is no CR 608.2h snapshot to take and
-  -- no CR 609.3 "as much as possible" case: the card is literal text and the
-  -- destination is a constructor. The conjurer is the resolving CONTROLLER (CR
-  -- 109.5's "you"), which is every printing but Juggernaut Peddler's (#2638).
-  Effect.Conjure (Conjure.MkConjure card destination) -> case destination of
-    -- A hand arrival is no zone change -- the card was in no zone -- so nothing
-    -- triggers and nothing is revealed.
-    ConjureDestination.Hand -> Monad.void (Event.conjure controller card Zone.Hand LibraryPosition.defaultValue)
+  -- The card and the destination are read off no board -- the one is literal
+  -- text and the other a constructor -- but the COUNT is a Quantity, so it takes
+  -- CR 608.2h's snapshot like every other count: evaluated once off the
+  -- pre-effect board, ahead of the minting loop, so a card arriving cannot
+  -- change how many arrive.
+  --
+  -- The conjurer is the resolving CONTROLLER (CR 109.5's "you"). Not implemented:
+  -- a printing that states one instead, which is a shape rather than one card --
+  -- Pawl.Types.Conjure lists the two forms (#2638).
+  Effect.Conjure (Conjure.MkConjure quantity card destination) -> do
+    gs <- State.get
+    let viewOf = effectViewOf source legal gs
+        context = effectContext controller source legal (slotGroups resolving gs)
+        -- Neither arrival is a zone change -- the card was in no zone to leave --
+        -- so nothing triggers and nothing is revealed either way. The library end
+        -- is Pawl.Types.LibraryPosition's default rather than a stated one:
+        -- Pawl.Types.ConjureDestination says why the arm carries no position.
+        zone = case destination of
+          ConjureDestination.Hand -> Zone.Hand
+          ConjureDestination.Library -> Zone.Library
+    case evaluateForRecipient viewOf context gs resolving source controller quantity of
+      Just n | n > 0 -> Monad.replicateM_ (Integer.toIntSaturating n) (Monad.void (Event.conjure controller card zone LibraryPosition.defaultValue))
+      _ -> pure ()
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref entry) -> do
     gs <- State.get
     -- CR 707.2 / 111.3: this many tokens per named permanent, minted through the

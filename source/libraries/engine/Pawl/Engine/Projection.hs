@@ -2202,7 +2202,7 @@ rewriteEffect pairs effect = case effect of
   -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
   -- printed keyword (#1190).
   Effect.Create (Create.MkCreate quantity card riders slot creator) -> Effect.Create (Create.MkCreate (rewriteQuantity pairs quantity) (rewriteCard pairs card) (rewriteEntryRiders pairs riders) slot creator)
-  Effect.Conjure (Conjure.MkConjure card destination) -> Effect.Conjure (Conjure.MkConjure (rewriteCard pairs card) destination)
+  Effect.Conjure (Conjure.MkConjure quantity card destination) -> Effect.Conjure (Conjure.MkConjure (rewriteQuantity pairs quantity) (rewriteCard pairs card) destination)
   -- CR 707.2 excludes text-changing effects from copiable values, so what the
   -- token becomes is not rewritten -- only the ref, the count and the riders'
   -- counter amounts are.

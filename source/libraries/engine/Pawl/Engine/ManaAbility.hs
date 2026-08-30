@@ -29,6 +29,8 @@ import qualified Data.Maybe as Maybe
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.Conjure as Conjure
+import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DealDamage as DealDamage
@@ -371,10 +373,19 @@ movesLibraryCard effect = case effect of
   -- A token is created rather than moved, and CR 111.1 puts it straight onto the
   -- battlefield.
   Effect.Create {} -> False
-  -- A conjured card is created rather than moved, and no library is on either
-  -- end: Pawl.Types.ConjureDestination reaches only the hand today, and a
-  -- library arm would have to answer True here (#2638).
-  Effect.Conjure {} -> False
+  -- A READING rather than a citation: conjure is digital-only, so no rule says
+  -- whether it "moves" a card. Answered by the DESTINATION, because CR 605.1a's
+  -- clause is about a library being one end of the arrival -- a conjured card
+  -- was in no zone, so strictly nothing moves, but a library gains a card, which
+  -- is what the clause exists to keep out of a mana ability. The hand is a
+  -- library no more than the battlefield Create's token below reaches is.
+  --
+  -- Unproven either way: no printing conjures inside an ability that could add
+  -- mana, so no board tells the two answers apart. A regression fence, not a
+  -- test-backed behaviour.
+  Effect.Conjure (Conjure.MkConjure _ _ destination) -> case destination of
+    ConjureDestination.Hand -> False
+    ConjureDestination.Library -> True
   Effect.CreateCopy {} -> False
   -- CR 707.4 says so in as many words: the permanent remains on the
   -- battlefield, so no card moves out of a library or anywhere else.
