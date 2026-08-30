@@ -3835,9 +3835,11 @@ triggerConditionSlots triggerCondition = case triggerCondition of
 --
 -- Reported wherever the atom sits, not only where it is ANSWERED -- which is a
 -- Scope.OverPlayers count's filter and nothing else, Pawl.Types.Filter's own
--- haddock says, every other position leaving it vacuously False. That is the
--- conservative direction: a slot named in one of those other positions is not
--- read at all, so this can only reject a card that was already unwritable.
+-- haddock says, every other position leaving it vacuously False. Within one
+-- card's own text that is the conservative direction, an atom in one of those
+-- other positions naming no slot at all. It says nothing about a position in
+-- ANOTHER object's text, which is read for real in a resolution of its own --
+-- see clashesIn, which is where that boundary is kept (#2735).
 --
 -- Not implemented: the Filter a Keyword carries (CR 702.29e) and the one a
 -- CounterKind hides under a keyword (CR 122.1b). Neither is evaluated with a
@@ -7324,12 +7326,27 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- WRITES a count into rather than reading an object out of.
           Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ _ to) -> [to]
           _ -> []
-        -- The slots a Filter these effects carry reads singly. effectFilters is
-        -- the traversal rather than a new one, and it recurses into a nested
-        -- effect list of its own, so a rider's Filter is reached whether or not
-        -- cardResolutionEffects flattened it -- harmless either way, this being
-        -- a Set.
-        readSinglyInFilters effects = concatMap (filterSlotsReadSingly . snd) (concatMap effectFilters effects)
+        -- The slots a Filter these effects carry reads singly, MINUS the ones a
+        -- card they MINT carries. effectFilters is the traversal rather than a
+        -- new one, and it recurses into a nested effect list of its own, so a
+        -- rider's Filter is reached whether or not cardResolutionEffects
+        -- flattened it -- harmless either way, this being a Set.
+        --
+        -- But it also splices a token's, a conjured card's, an emblem's and a
+        -- meld result's WHOLE card text into its Create, Conjure, CreateEmblem
+        -- and Meld arms, and those Filters are read in a resolution of the
+        -- minted object's own. That is the boundary effectNestedEffects draws in
+        -- so many words, and the one the other two reading sides honour by
+        -- running over cardResolutionEffects; without the subtraction this leg
+        -- would attribute a token's read to the card that created it (#2735).
+        -- effectMintedFaces is this file's traversal for that axis and reaches
+        -- exactly the faces overFaces does at all four of those arms, so the
+        -- subtraction removes the spliced text and nothing else. A MULTISET
+        -- difference, so a slot the CREATING card reads in its own right
+        -- survives the token reading the same one.
+        readSinglyInFilters effects =
+          concatMap (filterSlotsReadSingly . snd) (concatMap effectFilters effects)
+            List.\\ concatMap (filterSlotsReadSingly . snd) (concatMap (cardFilters . snd) (concatMap effectMintedFaces effects))
         -- The two READING sides at once: this resolution's own effects, and the
         -- conditions of the delayed abilities it arms. CR 603.7c is what puts
         -- the second there -- the entry captures the arming resolution's whole
@@ -7371,6 +7388,19 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- (its Tap arm is sourceHosted (objectRefFilters ref)). Nothing about the
         -- opcode matters here: what is on trial is the atom inside the predicate.
         tapping f = Effect.Tap (ObjectRef.EachMatching f)
+        -- CR 111.1's token, whose OWN printed text carries that same predicate:
+        -- Face.enchant is a Filter position cardFilters walks, so effectFilters
+        -- splices it in beside the creating card's. Binds no slot itself --
+        -- Nothing, at a literal one -- so it adds nothing to the binding side.
+        tokenReading f =
+          Effect.Create
+            ( Create.MkCreate
+                (Quantity.Type.Literal 1)
+                (oneFaced (vanillaFace "Soldier" (spellLine CardType.Creature Set.empty Set.empty)) {Face.enchant = [TargetSlot.required Pool.Creatures (Just f)]})
+                EntryRiders.defaultValue
+                Nothing
+                (PlayerRef.Relative PlayerRelation.You)
+            )
         victimSlot = SlotName.MkSlotName (Text.pack "victim")
         discarding = Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard victimSlot (Quantity.Type.Literal 1) (Just destroyedSlot)))
         minting n = Effect.Create (Create.MkCreate (Quantity.Type.Literal n) (oneFaced (vanillaFace "Soldier" (spellLine CardType.Creature Set.empty Set.empty))) EntryRiders.defaultValue (Just destroyedSlot) (PlayerRef.Relative PlayerRelation.You))
@@ -7443,6 +7473,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- bound, so the pair differs in the slot name alone.
     Spec.assertBool s (clashesIn [destruction] [TriggerCondition.PermanentDies (Filter.Type.IsControllerOfBound destroyedSlot)]) "a singular read inside a delayed condition's filter is caught"
     Spec.assertBool s (not (clashesIn [destruction] [TriggerCondition.PermanentDies (Filter.Type.IsControllerOfBound elsewhereSlot)])) "a singular read inside a delayed condition's filter of another slot is left alone"
+    -- The boundary the leg above must not cross: a MINTED object's text is read
+    -- in a resolution of its own, so the token's slot names are not this card's
+    -- (#2735). The pair differs in nothing but whose text the atom sits in --
+    -- the accepted board here and the rejected one four assertions up carry the
+    -- same filter over the same slot.
+    Spec.assertBool s (not (clashes [destruction, tokenReading (Filter.Type.IsControllerOfBound destroyedSlot)])) "a minted token's own filter is not the creating card's read"
+    -- And the subtraction that buys it is a MULTISET one: the creating card's
+    -- own read of the same slot survives the token reading it too. Without this
+    -- leg a set difference would pass the assertion above and silently mask a
+    -- real offender.
+    Spec.assertBool s (clashes [destruction, tapping (Filter.Type.IsControllerOfBound destroyedSlot), tokenReading (Filter.Type.IsControllerOfBound destroyedSlot)]) "the creating card's own read survives a token reading the same slot"
     Spec.assertEqWith s "a group binding is invisible to a singular reader" (fmap (S.nameOf . Printing.card) offenders) []
   -- OwnerChooses asks a player which END of a library a card arrives at (CR
   -- 401.2), and only a library HAS ends -- so on any other destination it would
