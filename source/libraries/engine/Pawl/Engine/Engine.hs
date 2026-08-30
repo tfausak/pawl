@@ -92,7 +92,6 @@ import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import Pawl.Types.Prompt (Prompt)
 import qualified Pawl.Types.Prompt as Prompt
-import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
@@ -737,12 +736,15 @@ placeBorne srcId pending = do
       -- the stack object keeps the printed ability, and CR 608.2b's re-check
       -- bakes again from the same bindings.
       modal = Target.bakeModal (Binding.playerSlots (PendingTrigger.bindings pending)) (TriggeredAbility.modal ability)
-      -- The OBJECT half of the same sentence. A slot that reads a bound OBJECT
-      -- (Harness the Storm's "the same name as that spell") cannot be baked,
-      -- the answer depending on the candidate -- so the bindings are handed to the
+      -- The rest of the same sentence. A slot that reads a bound OBJECT (Harness
+      -- the Storm's "the same name as that spell") cannot be baked, the answer
+      -- depending on the candidate; nor can a CR 202.3 computed bound that reads
+      -- the event's own amount (Venerable Warsinger's "where X is the amount of
+      -- damage this creature dealt to that player"), which is a number the
+      -- candidate is compared against. So the whole environment is handed to the
       -- matcher instead, and to the mode gate as well as the target prompt, both
       -- of which would otherwise see an empty map and admit nothing.
-      bound = fmap (Set.singleton . Recipient.ToObject) (Binding.objectSlots (PendingTrigger.bindings pending))
+      bound = PendingTrigger.bindings pending
       legal = Target.fillableModes (Just controller) bound srcId Map.empty modal gs
       selection = Modal.Type.selection modal
       obj =

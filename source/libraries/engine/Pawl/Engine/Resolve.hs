@@ -688,24 +688,19 @@ modeSlots mode =
       joinSlots (fmap (poolSlot . TargetSlot.pool) (Map.elems (Mode.targetSlots mode))),
       -- And every slot a target slot's own FILTER names -- CR 603.2's "target
       -- artifact or enchantment that player controls".
-      joinSlots (fmap filterSlots (Map.elems (Mode.targetSlots mode)))
+      joinSlots (fmap filterSlots (Map.elems (Mode.targetSlots mode))),
+      -- And every slot its CR 202.3 computed bound names -- Venerable Warsinger's
+      -- "mana value X or less ... where X is the amount of damage this creature
+      -- dealt to that player", whose X is the trigger's own event amount
+      -- (Pawl.Engine.Binding.eventAmount). Target.slotContext is what answers it,
+      -- off the announcement the caller hands over.
+      joinSlots (fmap amountSlots (Map.elems (Mode.targetSlots mode)))
     ]
   where
-    -- The slot's own FILTER and nothing else on it. Its CR 202.3 computed bound
-    -- is a Quantity and so could name a slot, but no card may write one that
-    -- does: Target.slotContext evaluates the bound against CR 113.7's SOURCE
-    -- rather than against the object being announced, and no card binds an
-    -- amount on a source, so a Quantity.InSlot there answers Nothing and the
-    -- atom reading it is vacuously False. Pawl.CardSpec's "no card's computed
-    -- bound reads a slot" is what keeps that true and Pawl.TargetSpec's "a bound
-    -- that names a slot admits nothing at all" is what shows it on a board, so
-    -- folding the bound in here would legitimise the shape rather than catch it.
-    --
-    -- Not implemented: a bound read off the announcement's own bindings, which is
-    -- what would make such a fold right (gap #2666).
     filterSlots =
       maybe Map.empty (Map.fromSet (const SlotArity.One) . Filter.boundSlots)
         . TargetSlot.filter
+    amountSlots = maybe Map.empty quantitySlots . TargetSlot.amount
     -- Every clause's payer: CR 118.12 scopes a resolution cost to its clause.
     payerSlot = maybe Map.empty (playerRefSlots . PayGate.payer) . Clause.payGate
     -- And every clause's ASKER, for its reason: CR 603.5's "may" is scoped to a
@@ -1455,7 +1450,7 @@ targetsAllIllegal oid gs = case Game.lookupObject oid gs of
           legalSlot slot recipients = case Map.lookup slot slots of
             Nothing -> recipients
             -- CR 608.2b's perspective is the SPELL's controller (CR 405.4).
-            Just targetSlot -> Set.filter (\recipient -> Target.stillLegal (Just (spellController obj oid gs)) chosen oid recipient targetSlot gs) recipients
+            Just targetSlot -> Set.filter (\recipient -> Target.stillLegal (Just (spellController obj oid gs)) (Object.bindings obj) oid recipient targetSlot gs) recipients
           legal = Map.mapWithKey legalSlot chosen
           targeted = Map.restrictKeys legal (Map.keysSet slots)
        in -- Measured on the TARGETS chosen, not the slots declared: CR 115.6
@@ -1481,9 +1476,6 @@ resolveSpellWith runSubgame oid = do
         -- CR 608.2b/700.2c: re-validate only the CHOSEN modes' slots.
         let chosenSelection = Binding.modesOf (Object.bindings obj)
             slots = targetSlotsOf obj oid gs face
-            -- The slots as FILLED, which a slot-scoped pool is re-derived
-            -- against (Target.stillLegal).
-            chosen = Binding.targetsOf (Object.bindings obj)
             -- CR 700.2d: the slots the MODES own -- `slots` minus CR 303.4a's
             -- enchant slot.
             modeOwnedSlots = Modal.modesTargetSlots chosenSelection (Face.spell face)
@@ -1493,7 +1485,7 @@ resolveSpellWith runSubgame oid = do
               Nothing -> recipients
               -- Per RECIPIENT and not per slot (CR 608.2b): the slot's surviving
               -- targets are still affected.
-              Just targetSlot -> Set.filter (\recipient -> Target.stillLegal (Just (spellController obj oid gs)) chosen oid recipient targetSlot gs) recipients
+              Just targetSlot -> Set.filter (\recipient -> Target.stillLegal (Just (spellController obj oid gs)) (Object.bindings obj) oid recipient targetSlot gs) recipients
          in if targetsAllIllegal oid gs
               then Event.changeZone oid Zone.Graveyard
               else do
@@ -1642,7 +1634,7 @@ resolveModesWith runSubgame stackId srcId modes = do
             -- CR 608.2b: the perspective is the ABILITY's controller. `srcId`
             -- stays the source (CR 113.7) and may well be gone -- exactly the
             -- case this rule is about. Judged per RECIPIENT.
-            Just targetSlot -> Set.filter (\recipient -> Target.stillLegal (Just effectController) chosen srcId recipient targetSlot gs) recipients
+            Just targetSlot -> Set.filter (\recipient -> Target.stillLegal (Just effectController) (Object.bindings obj) srcId recipient targetSlot gs) recipients
           legal = Map.mapWithKey legalSlot chosen
           -- CR 608.2b's fizzle asks about the TARGETED slots only, measured on
           -- the slots FILLED rather than declared (CR 115.6).

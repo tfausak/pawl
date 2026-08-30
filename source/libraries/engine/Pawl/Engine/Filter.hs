@@ -787,6 +787,19 @@ data Context = MkContext
     -- "CR 709.4a no card asks SameNameAsBound outside a mode's target slot",
     -- the sweep sourcePower's and defendingPlayer's siblings each have.
     slotNames :: Map.Map SlotName.SlotName (Set.Set CardName.CardName),
+    -- CR 603.2: the NUMBERS the surrounding announcement's bindings hold, keyed by
+    -- slot -- "that much" as the trigger's own event stamped it
+    -- (Pawl.Engine.Binding.eventAmount). No Filter atom reads this map; it is a
+    -- channel THROUGH the context to Pawl.Engine.Quantity's InSlot arm, which
+    -- Pawl.Engine.Target.slotContext evaluates a target slot's CR 202.3 computed
+    -- bound in, and which has no other way to reach an announcement that is not on
+    -- the board yet: CR 603.3d chooses targets before the ability object carries
+    -- any binding of its own.
+    --
+    -- Empty in contextFor and contextComparingPower below, so a bound evaluated
+    -- anywhere but a target slot reads no announcement -- the vacuous posture every
+    -- context-relative field here takes.
+    boundAmounts :: Map.Map SlotName.SlotName Natural.Natural,
     -- CR 303.4b's "enchanted": WHICH object the SOURCE is attached to, for the one
     -- atom that compares a candidate against it (IsHostOfSource). The id and not a
     -- view, because the answer is one reading of the source and the same for every
@@ -867,7 +880,7 @@ data Context = MkContext
 -- context from this function and then overlays sourceChosenNames. See that field
 -- above for the lint that keeps a card to that position.
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
+contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, boundAmounts = Map.empty, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -898,7 +911,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
+contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, boundAmounts = Map.empty, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
