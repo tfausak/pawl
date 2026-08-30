@@ -3872,9 +3872,11 @@ designationGathered gs = concatMap fromObject (Set.toList (GameState.battlefield
 -- WHOSE would still have to match a plain write of the same aspect -- an identical
 -- order for a larger type; see #357.
 --
--- That confirmation is board-wide, which is what makes a cross-object row
--- load-bearing rather than a fence: `changesAt` applies the other effect
--- everywhere it applies and re-asks the set through the resulting board.
+-- That confirmation is board-wide wherever it can matter, which is what makes a
+-- cross-object row load-bearing rather than a fence: `changesAt` applies the
+-- other effect everywhere it applies and re-asks the set through the resulting
+-- board, at every object once filterReadsPeers says the filter can read a second
+-- projection and at the objects the other effect applies to otherwise.
 -- Pawl.ProjectionSpec's "CR 613.8a an Aura's host is animated under it" proves it.
 data Aspect
   = Types
@@ -4092,13 +4094,14 @@ filterReadsPeers f = case f of
   -- characteristics CR 301.5 and CR 702.5a compare against is another object.
   Filter.Type.CanHostSubject -> True
   Filter.Type.CanAttachToSubject -> True
-  -- DESCENT, over-declared for the two above's reason: Filter.matches answers this
-  -- atom False outright, Pawl.Engine.Count.bakePerspective having settled it
-  -- between projections, so the nest is not read here at all.
+  -- DESCENT where a flat False would be right: Filter.matches answers this atom
+  -- False outright, Pawl.Engine.Count.bakePerspective having settled it between
+  -- projections, so the nest is not read here at all. Descending only costs the
+  -- re-ask.
   Filter.Type.ControlsMoreThanYou g -> filterReadsPeers g
-  -- DESCENT, where filterReads deliberately does not: CR 708.12's nest is matched
-  -- against the printed card's view rather than a projected one, so False would be
-  -- right, and descending only costs the re-ask.
+  -- DESCENT for the atom above's reason, and where filterReads deliberately does
+  -- not descend: CR 708.12's nest is matched against viewOfCard, which takes no
+  -- `peers` and no board at all.
   Filter.Type.RepresentedByCard g -> filterReadsPeers g
   Filter.Type.And fs -> any filterReadsPeers fs
   Filter.Type.Or fs -> any filterReadsPeers fs
@@ -4685,6 +4688,11 @@ projectDeciding admits cands = forObject
                                 boards
                         -- `b` applied to every object whose set holds it, judged
                         -- against the board as it stands (CR 613.6).
+                        --
+                        -- LAZY in each partial, which is what `changesAt`'s gate
+                        -- rests on: Data.Map.Strict forces a value to WHNF, and
+                        -- WHNF here is the pair, so an object the gate skips never
+                        -- pays the appliesTo or the applyUnit.
                         appliedEverywhere bs =
                           Map.mapWithKey
                             (\o (p, d) -> (if appliesTo view o d p (NonEmpty.head bs) then applyUnit view o p bs else p, d))

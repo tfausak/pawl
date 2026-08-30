@@ -160,9 +160,11 @@ loadNoAuraDeck registry = do
 -- Thirteen cards, not sixty, and that is the whole reason: `resolve` re-projects
 -- every other battlefield object at every movable layer, so the cost climbs far
 -- faster than the deck does. Wall clock for one process running this match and
--- its control back to back, measured at several deck sizes: about 3s at 12
--- cards, 6s at 13, 14s at 14, 24s at 15, 74s at 18, and no result inside twelve
--- minutes at 30.
+-- its control back to back, measured at several deck sizes on the engine as it
+-- stood BEFORE the CR 613.8a gate #2641 added: about 3s at 12 cards, 6s at 13,
+-- 14s at 14, 24s at 15, 74s at 18, and no result inside twelve minutes at 30.
+-- That gate took the 13-card point from 5.696s to 3.394s of tasty-bench mean; the
+-- shape of the ladder is unmeasured since, and the deck stays at 13.
 --
 -- Observed by running the match and reading the final GameState: both decks deck
 -- out on turn 14, and the battlefields differ only by the four permanents the
