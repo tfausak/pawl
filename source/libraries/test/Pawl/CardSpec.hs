@@ -3536,6 +3536,118 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- Filter here either.
   TriggerCondition.ControllerBecomesTarget {} -> []
 
+-- Every SlotName a TriggerCondition names OUTRIGHT. Exhaustive with no
+-- fallthrough, triggerConditionCounts' shape and for its reason: a condition
+-- that gains a slot is named by -Werror rather than silently answering [].
+--
+-- What makes the answer worth having is that the reader is SINGULAR.
+-- Pawl.Engine.Event matches CR 603.7's slot-named condition through
+-- Binding.objectSlots, which is Binding.onlyOne and so declines a slot naming
+-- several objects rather than picking one of them, and which never consults
+-- Binding.groupsOf at all -- so a slot bound as a group is not merely declined
+-- but invisible, and the delayed ability never fires, in silence.
+--
+-- Not implemented: a slot a condition names through a FILTER rather than
+-- outright. Filter.IsBound reads the whole bound set and is no risk; the
+-- singular one beside it is Filter.IsControllerOfBound, whose fence is a Filter
+-- traversal rather than this one (#2711).
+triggerConditionSlots :: TriggerCondition.TriggerCondition -> [SlotName.SlotName]
+triggerConditionSlots triggerCondition = case triggerCondition of
+  TriggerCondition.SelfEnters -> []
+  TriggerCondition.PermanentEnters _ -> []
+  TriggerCondition.StepBegins _ -> []
+  -- CR 603.8's state trigger holds a Condition, which is a pair of Quantities
+  -- and Filters -- no SlotName of its own.
+  TriggerCondition.StateIs _ -> []
+  TriggerCondition.SelfDealsCombatDamageToPlayer -> []
+  TriggerCondition.SelfIsDealtDamage -> []
+  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> []
+  TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
+  TriggerCondition.OpponentLostLifeDuringYourTurn -> []
+  TriggerCondition.SelfCycled -> []
+  TriggerCondition.SelfRevealedForMiracle -> []
+  TriggerCondition.SelfDiscarded -> []
+  TriggerCondition.PlayerDiscards _ -> []
+  TriggerCondition.PlayerCycles _ -> []
+  TriggerCondition.PlayerDrawsNthCard _ -> []
+  TriggerCondition.SelfAttacks _ -> []
+  TriggerCondition.SelfAttacksWithAnother _ -> []
+  TriggerCondition.CreatureAttacksAlone _ -> []
+  TriggerCondition.CreatureAttacksYou -> []
+  TriggerCondition.AttachedPlayerIsAttacked -> []
+  TriggerCondition.PlayerAttacks _ -> []
+  TriggerCondition.PlayerAttacksWith _ -> []
+  TriggerCondition.PlayerAttacksPlayer _ -> []
+  TriggerCondition.SelfAttacksPlayerWithMostLife -> []
+  TriggerCondition.SelfBlocks -> []
+  TriggerCondition.SelfBlocksCreature _ -> []
+  TriggerCondition.SelfBlocksAtLeast _ -> []
+  TriggerCondition.SelfBlocksOneOrMore _ -> []
+  TriggerCondition.SelfBecomesBlocked -> []
+  TriggerCondition.SelfBecomesBlockedBy _ -> []
+  TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> []
+  TriggerCondition.CreatureBecomesBlockedByAtLeast _ -> []
+  TriggerCondition.SelfAttacksUnblocked -> []
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
+  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
+  TriggerCondition.SelfDies -> []
+  TriggerCondition.PermanentDies _ -> []
+  TriggerCondition.PermanentsDie _ -> []
+  TriggerCondition.SelfLeavesTheBattlefield -> []
+  TriggerCondition.PermanentLeavesTheBattlefield _ -> []
+  TriggerCondition.AttachedCreatureDies -> []
+  TriggerCondition.AttachedCreatureBecomesTapped -> []
+  -- CR 702.55a names the haunted creature through the haunting object's own
+  -- attachment rather than through a slot.
+  TriggerCondition.HauntedCreatureDies -> []
+  TriggerCondition.SpellOrAbilityCounters _ -> []
+  TriggerCondition.DamageToPlayerPrevented _ -> []
+  TriggerCondition.SelfPreventsDamage _ -> []
+  TriggerCondition.PlayerGainsLife _ -> []
+  TriggerCondition.PlayersGainLife _ -> []
+  TriggerCondition.PlayerLosesLife _ -> []
+  TriggerCondition.SelfCountersReached _ -> []
+  TriggerCondition.SelfBecomesClassLevel _ -> []
+  TriggerCondition.SelfLastCounterRemoved _ -> []
+  TriggerCondition.SelfCountersRemoved _ -> []
+  TriggerCondition.PermanentsGetCounters _ -> []
+  TriggerCondition.PermanentGetsCounters _ -> []
+  TriggerCondition.SpellCast _ -> []
+  TriggerCondition.SelfCast -> []
+  TriggerCondition.SelfBecomesTargeted _ -> []
+  TriggerCondition.ControllerBecomesTarget _ -> []
+  TriggerCondition.SelfHalfUnlocked _ -> []
+  TriggerCondition.RoomFullyUnlocked _ -> []
+  -- Recursive, for triggerConditionCounts' reason: a branch of an AnyOf may be
+  -- any condition, the slot-named one included.
+  TriggerCondition.AnyOf conditions -> concatMap triggerConditionSlots conditions
+  TriggerCondition.SelfTurnedFaceUp -> []
+  TriggerCondition.SelfTransformedInto _ -> []
+  TriggerCondition.PermanentTurnedFaceUp _ -> []
+  TriggerCondition.PermanentBecomesDesignated _ -> []
+  TriggerCondition.SelfEvolves -> []
+  TriggerCondition.AttachedCreatureMentors -> []
+  TriggerCondition.SelfTrains -> []
+  TriggerCondition.PermanentSacrificed -> []
+  TriggerCondition.SagaFinalChapterTriggers _ -> []
+  TriggerCondition.PlayerBecomesMonarch _ -> []
+  -- CR 603.7's slot-named condition, the one arm with an answer: Ray of
+  -- Command's "when that creature leaves the battlefield or you lose control of
+  -- it" watches the permanent its own spell targeted.
+  TriggerCondition.LoseControlOfBound slot -> [slot]
+  TriggerCondition.RoomEntered _ -> []
+  TriggerCondition.PlayerScries _ -> []
+  TriggerCondition.PlayerSurveils _ -> []
+  TriggerCondition.PlayerRollsDice _ -> []
+  TriggerCondition.PlayerWinsCoinFlip _ -> []
+  TriggerCondition.SelfBecomesPlotted -> []
+  TriggerCondition.PermanentExplores _ -> []
+  TriggerCondition.SelfExerted -> []
+  TriggerCondition.SelfBecomesAttachedBy _ -> []
+  -- CR 603.7c's captured environment is what a reflexive trigger knows, but the
+  -- condition itself admits no event and names nothing.
+  TriggerCondition.Reflexive -> []
+
 -- The Filters a DamagePattern carries -- its source half and its printed
 -- recipient half, the two axes of that type that ARE predicates over an object.
 damagePatternFilters :: DamagePattern.DamagePattern -> [Filter.Type.Filter Keyword.Keyword]
@@ -6019,8 +6131,26 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           modalSlotsOffend
             (Set.union (cardBound card) (Event.eventBindingSlots (TriggeredAbility.condition ability)))
             (TriggeredAbility.modal ability)
-        cardOffends card = any (abilityOffends card) (Map.elems (Face.delayedAbilities card))
+        -- The CONDITION's own slot, which modalSlotsOffend never sees: it walks
+        -- the ability's modes, and CR 603.7's slot-named condition sits beside
+        -- them. A SUBSET rather than the equality above, and against cardBound
+        -- alone: the condition is matched before CR 603.3d puts the ability on
+        -- the stack, so a slot the ability's own mode DECLARES is not yet
+        -- announced, and a slot Event.eventBindingSlots names is bound by the
+        -- match rather than available to it.
+        conditionOffends bound ability = not (Set.isSubsetOf (Set.fromList (triggerConditionSlots (TriggeredAbility.condition ability))) bound)
+        cardOffends card = any (\ability -> abilityOffends card ability || conditionOffends (cardBound card) ability) (Map.elems (Face.delayedAbilities card))
         offenders = filter (anyFace cardOffends . Printing.card) ps
+        watching slot = modalTrigger (TriggerCondition.LoseControlOfBound slot) [lintMode [] []]
+        armed = SlotName.MkSlotName (Text.pack "target")
+        unarmed = SlotName.MkSlotName (Text.pack "elsewhere")
+    -- The condition half is vacuous as a corpus sweep -- Ray of Command is the
+    -- pool's one slot-named condition and it names the slot its own spell
+    -- declares -- so the REJECTING direction is put to a hand-built pair
+    -- differing in the slot name alone, the posture the batch-bound lint below
+    -- takes.
+    Spec.assertBool s (conditionOffends (Set.singleton armed) (watching unarmed)) "a condition naming a slot the card never binds is caught"
+    Spec.assertBool s (not (conditionOffends (Set.singleton armed) (watching armed))) "a condition naming the arming spell's target slot is left alone"
     Spec.assertEqWith s "no dangling delayed-ability slot" (fmap (S.nameOf . Printing.card) offenders) []
   -- A delayed ability may not DECLARE a target slot under a name its own card
   -- already DEFINES, because the two would land in one slot and the reader would
@@ -6704,12 +6834,19 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- A SET -- Relative Opponent's answer, and for its reason: CR 508.6 is
           -- a predicate over the table rather than a name for one seat.
           PlayerRef.Attacking _ -> False
-        -- Every opcode that binds a batch under a name of the card's own: a
-        -- move, CR 701.20e's look, CR 701.20a's reveal, CR 701.17c's mill, CR
-        -- 121.1's draw and CR 701.8's two look-back slots. The first five
-        -- dispatch on how many objects arrived, so each can leave the group
-        -- binding a singular reader cannot see; the destruction's two are group
-        -- bindings unconditionally, so they are plural at any size of sweep.
+        -- WHICH opcodes bind a batch is this enumeration and not this paragraph
+        -- -- readSingly's posture below. An opcode belongs here when
+        -- Pawl.Engine.Resolve hands its slot to `bindObjectsSlot`, and the guard
+        -- on the arm is the CONDITION under which that call is reached: none at
+        -- all where the arm binds a group however few objects it found, and the
+        -- opcode's own plurality test where the arm dispatches on how many
+        -- arrived and takes the single binding for one. Grepping that one
+        -- function in that one file is what makes the list checkable.
+        --
+        -- Nothing reports a `bindObjectsSlot` call added later: this case and
+        -- readSingly both end in `_ -> []`, so a new binder compiles,
+        -- round-trips and sweeps the corpus with no arm on either side. Adding
+        -- one to Resolve means coming back here by hand.
         boundPlurally effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _ _) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
           Effect.LookAt (LookAt.MkLookAt ref slot) | not (movesAtMostOne ref) -> [slot]
@@ -6733,6 +6870,20 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- ever the singular shape -- not even for "destroy target creature".
           Effect.Destroy (Destroy.MkDestroy _ _ _ mBuried mPermanents) ->
             Maybe.maybeToList mBuried <> Maybe.maybeToList mPermanents
+          -- CR 701.9's look-back slot, the destruction's shape and for its
+          -- reason: the counted discard's arm binds the group however few cards
+          -- moved, so no ref test and no count test. Psychic Miasma's "if a land
+          -- card is discarded this way" is what writes it. Discard.These binds
+          -- nothing at all and so is not here.
+          Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard _ _ mDiscarded)) -> Maybe.maybeToList mDiscarded
+          -- CR 111.1's minted tokens, whose plurality is the mill's and the
+          -- draw's -- Resolve.namesEveryToken, which is any count that is not a
+          -- literal one, so a computed count is plural here for the reason a
+          -- computed depth is. At a literal one the arm takes the single
+          -- binding, or asks when CR 614.16 multiplied the count.
+          Effect.Create (Create.MkCreate quantity _ _ mSlot _)
+            | Resolve.namesEveryToken quantity ->
+                Maybe.maybeToList mSlot
           _ -> []
         takesAtMostOne player quantity = case quantity of
           Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
@@ -6754,12 +6905,20 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- singly, which no arm below can see because a PlayerRef sits inside a
         -- payload rather than being one (#2707).
         --
-        -- Not implemented: the reading side stops at Resolve, so the two singular
-        -- readers outside it are unfenced -- Quantity.AgainstSlot and
-        -- Filter.IsControllerOfBound both go through Filter.slotOneObject, which
-        -- declines a group exactly as Binding.onlyOne does. Filter.IsBound reads
-        -- the whole set, but it is a DIFFERENT atom and does nothing for a card
-        -- that wrote either of those two (#2711).
+        -- Not implemented: a singular read that reaches a slot through
+        -- Filter.slotOneObject rather than through Resolve. WHICH those are is
+        -- that function's callers and not this paragraph -- Quantity.AgainstSlot
+        -- and Filter.IsControllerOfBound among them, plus
+        -- Pawl.Engine.Quantity's own PlayerRef.ControllerOfBound arm, which is
+        -- outside Resolve where the paragraph above describes its sibling as
+        -- inside. All of them decline a group exactly as Binding.onlyOne does.
+        -- Filter.IsBound reads the whole set, so it is no risk and no fence for
+        -- the others either (#2711).
+        --
+        -- The condition of a DELAYED ability is a singular reader too, and it is
+        -- fenced: triggerConditionSlots feeds the readsSingly union below, and
+        -- the sweep is over the face rather than over an effect list for that
+        -- reason alone.
         readSingly effect = case effect of
           -- CR 701.14b's pair, which is why both slots count.
           Effect.Fight (Fight.MkFight one two) -> [one, two]
@@ -6790,21 +6949,38 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- WRITES a count into rather than reading an object out of.
           Effect.MoveCounters (MoveCounters.MkMoveCounters from _ _ to) -> [from, to]
           _ -> []
-        clashes effects =
+        -- The two READING sides at once: this resolution's own effects, and the
+        -- conditions of the delayed abilities it arms. CR 603.7c is what puts
+        -- the second there -- the entry captures the arming resolution's whole
+        -- environment, so a slot an earlier clause bound is exactly what the
+        -- condition names -- and DELAYED abilities alone, since a printed
+        -- trigger has no captured environment for a card-authored slot to be in.
+        clashesIn effects conditions =
           not
             . Set.null
             $ Set.intersection
               (Set.fromList (concatMap boundPlurally effects))
-              (Set.fromList (concatMap readSingly effects))
-        offenders = filter (anyFace (clashes . cardResolutionEffects) . Printing.card) ps
+              (Set.union (Set.fromList (concatMap readSingly effects)) (Set.fromList (concatMap triggerConditionSlots conditions)))
+        clashes effects = clashesIn effects []
+        faceClashes card = clashesIn (cardResolutionEffects card) (fmap TriggeredAbility.condition (Map.elems (Face.delayedAbilities card)))
+        offenders = filter (anyFace faceClashes . Printing.card) ps
         binds effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _ _) -> Maybe.isJust mSlot && not (movesAtMostOne ref)
+          _ -> False
+        bindsDiscarded effect = case effect of
+          Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard _ _ mDiscarded)) -> Maybe.isJust mDiscarded
+          _ -> False
+        bindsTokens effect = case effect of
+          Effect.Create (Create.MkCreate quantity _ _ mSlot _) -> Maybe.isJust mSlot && Resolve.namesEveryToken quantity
           _ -> False
         exiledSlot = SlotName.MkSlotName (Text.pack "exiled")
         destroyedSlot = SlotName.MkSlotName (Text.pack "destroyed")
         elsewhereSlot = SlotName.MkSlotName (Text.pack "elsewhere")
         removal slot = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) slot)
         destruction = Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing Nothing (Just destroyedSlot))
+        victimSlot = SlotName.MkSlotName (Text.pack "victim")
+        discarding = Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard victimSlot (Quantity.Type.Literal 1) (Just destroyedSlot)))
+        minting n = Effect.Create (Create.MkCreate (Quantity.Type.Literal n) (oneFaced (vanillaFace "Soldier" (spellLine CardType.Creature Set.empty Set.empty))) EntryRiders.defaultValue (Just destroyedSlot) (PlayerRef.Relative PlayerRelation.You))
     -- Half the rejected shape is in the pool: Act on Impulse binds a group. The
     -- OTHER half is Wild Evocation, whose OfferCast reads a slot a RANDOM reveal
     -- of one card bound -- singular either way, so the two never meet. The
@@ -6813,6 +6989,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- against Eon Hub, and the sweep is a fence against a future card authoring
     -- the shape.
     Spec.assertBool s (any (anyFace (any binds . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding what a plural move minted"
+    -- The same guard for the two arms added to the binding side: an arm no card
+    -- reaches is a fence the corpus sweep can never exercise. Psychic Miasma
+    -- writes the first, and Feral Lightning, Salt Road Skirmish and Thatcher
+    -- Revolt the second.
+    Spec.assertBool s (any (anyFace (any bindsDiscarded . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding what a counted discard moved"
+    Spec.assertBool s (any (anyFace (any bindsTokens . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding a batch of minted tokens"
     Spec.assertBool
       s
       ( clashes
@@ -6835,6 +7017,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- (CR 712.21c).
     Spec.assertBool s (clashes [destruction, Effect.ExileHaunting (ExileHaunting.MkExileHaunting destroyedSlot elsewhereSlot)]) "a slotOne read of a plurally bound slot is caught"
     Spec.assertBool s (not (clashes [destruction, Effect.AttachBound (AttachBound.MkAttachBound destroyedSlot elsewhereSlot)])) "a group-tolerant read of a plurally bound slot is left alone"
+    -- The BINDING side's own two, each against the same singular read and each
+    -- paired with the board that must stay legal. CR 701.9's counted discard
+    -- binds unconditionally, so the pair differs in the slot name; CR 111.1's
+    -- Create binds only where the card says "those tokens", so its pair differs
+    -- in the COUNT alone -- which is what proves the guard rather than the arm.
+    Spec.assertBool s (clashes [discarding, removal destroyedSlot]) "a singular read of a counted discard's slot is caught"
+    Spec.assertBool s (not (clashes [discarding, removal elsewhereSlot])) "a singular read of another slot is left alone beside a discard"
+    Spec.assertBool s (clashes [minting 2, removal destroyedSlot]) "a singular read of a batch of minted tokens is caught"
+    Spec.assertBool s (not (clashes [minting 1, removal destroyedSlot])) "a singular read of ONE minted token is left alone"
+    -- The reading side's other carrier: CR 603.7c hands the arming resolution's
+    -- environment to a delayed ability, whose condition names a slot and reads
+    -- it through Binding.objectSlots. Paired with the same condition over a slot
+    -- the destruction never bound.
+    Spec.assertBool s (clashesIn [destruction] [TriggerCondition.LoseControlOfBound destroyedSlot]) "a delayed condition naming a plurally bound slot is caught"
+    Spec.assertBool s (not (clashesIn [destruction] [TriggerCondition.LoseControlOfBound elsewhereSlot])) "a delayed condition naming another slot is left alone"
     Spec.assertEqWith s "a group binding is invisible to a singular reader" (fmap (S.nameOf . Printing.card) offenders) []
   -- OwnerChooses asks a player which END of a library a card arrives at (CR
   -- 401.2), and only a library HAS ends -- so on any other destination it would
