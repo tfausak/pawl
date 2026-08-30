@@ -160,7 +160,10 @@
                       {
                         "type": "MoveCounters",
                         "value": {
-                          "from": "self",
+                          "from": {
+                            "type": "InSlot",
+                            "value": "self"
+                          },
                           "to": "became"
                         }
                       }

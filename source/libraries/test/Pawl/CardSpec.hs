@@ -4421,8 +4421,10 @@ effectFilters effect = case effect of
   -- The destination only, PutCounters' framing: `from` is a bare SlotName and
   -- carries no Filter.
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ ref) -> sourceHosted (objectRefFilters ref)
-  -- The count only: both slots are bare SlotNames, which carry no Filter.
-  Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> unframed (foldMap quantityFilters (MovedKinds.quantityOf kinds))
+  -- BOTH positions, PutCounters' framing: the first side is an ObjectRef and
+  -- carries Spike Cannibal's "all creatures", where the destination is a bare
+  -- SlotName and carries no Filter.
+  Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds _ _) -> unframed (foldMap quantityFilters (MovedKinds.quantityOf kinds)) <> sourceHosted (objectRefFilters from)
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> unframed (quantityFilters quantity)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
@@ -4660,7 +4662,11 @@ effectObjectRefs effect = case effect of
   Effect.Counter (Counter.MkCounter ref _) -> read_ [ref]
   Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> read_ [ref]
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ ref) -> read_ [ref]
-  Effect.MoveCounters {} -> []
+  -- The first side only: the destination is a bare SlotName. A READ -- CR 122.5
+  -- takes no choice of WHICH object the counters leave, so this arm goes through
+  -- the pure objectRefObjects and a chooser-shaped ref written here would name
+  -- nothing.
+  Effect.MoveCounters (MoveCounters.MkMoveCounters from _ _ _) -> read_ [from]
   Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
@@ -6945,9 +6951,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- CR 122.8's read.
           Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _) -> [from]
           Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ _ slot) -> [slot]
-          -- CR 122.5's pair. Not MoveCounters' third slot, which this opcode
+          -- CR 122.5's DESTINATION alone: the first side is an ObjectRef and goes
+          -- through objectRefObjects, which reads slotGroup and moves counters off
+          -- every member. Not MoveCounters' third slot either, which this opcode
           -- WRITES a count into rather than reading an object out of.
-          Effect.MoveCounters (MoveCounters.MkMoveCounters from _ _ to) -> [from, to]
+          Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ _ to) -> [to]
           _ -> []
         -- The two READING sides at once: this resolution's own effects, and the
         -- conditions of the delayed abilities it arms. CR 603.7c is what puts

@@ -58,6 +58,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   everyKindSpec s registry
   anyNumberSpec s registry
   absentKindSpec s registry
+  groupSourceSpec s registry
 
 -- Which counter the answerer takes, and whether it takes the printed "may" at
 -- all. Pinned by POSITION in the offered list rather than by naming a kind, so
@@ -1034,3 +1035,118 @@ absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each k
         Spec.assertEqWith s "and the Piker kept every counter it had" (finalityTripleOn giverId after) (3, 4, 2)
         Spec.assertEqWith s "and with no absent kind the player was not asked" asked 0
       Nothing -> Spec.assertFailure s "expected Goldberry to offer exactly its one transcribed activated ability"
+
+-- Spike Cannibal {1}{B}{B} Creature - Spike (Exodus; name, cost, type line,
+-- power, toughness and oracle text checked against Scryfall 2026-08-30),
+-- data/cards/spike-cannibal.json:
+--
+--   This creature enters with a +1/+1 counter on it.
+--   When this creature enters, move all +1/+1 counters from all creatures onto
+--   it.
+--
+-- The second line is this group's subject, and the card is why a GROUP-valued
+-- first side exists: "from all creatures" names every creature on the
+-- battlefield rather than one permanent, so a single sentence performs one CR
+-- 122.5 pair per creature. It is also the cheapest producer of that shape --
+-- the kind is printed and the whole tally crosses, so nothing is asked, no
+-- answer is shaped and no distribution is decided.
+--
+-- The counters are its own +1/+1 (CR 122.1a) beside CR 122.1c's shield counter,
+-- which nothing in the sentence names: the shield counters are what tell "all
+-- +1/+1 counters" apart from Fate Transfer's "all counters", and `pairOn` above
+-- is the tally this group reads.
+
+-- Every counter prompt is COUNTED, because what this group asserts about the
+-- arm is that it raises none however many first objects the sweep named: a pure
+-- @Prompt r -> r@ could not say so.
+cannibalAnswer :: Prompt.Prompt r -> State.State Int r
+cannibalAnswer p = case p of
+  Prompt.ChooseMovedCounter {} -> do
+    State.modify' (+ 1)
+    pure (S.identityAnswer p)
+  Prompt.ChooseMovedCounters {} -> do
+    State.modify' (+ 1)
+    pure (S.identityAnswer p)
+  _ -> pure (S.identityAnswer p)
+
+groupSourceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+groupSourceSpec s registry = Spec.describe s "CR 122.5 moving counters off a group of permanents" $ do
+  let -- FOUR permanents bearing +1/+1 counters in four different counts, so
+      -- "took from all of them" is a different number from "took from any one of
+      -- them" and from every partial sweep in between. Two of the three creatures
+      -- are BOB's, since "all creatures" says nothing about control; the Piker
+      -- also bears shield counters, which the printed kind leaves alone; and
+      -- alice's Island is the control leg -- a permanent that is not a creature,
+      -- on the same board, differing from the three givers in card type alone.
+      --
+      -- `stock` is what the case puts on those four, and is the ONLY difference
+      -- between the two boards below.
+      board stock = do
+        island <- S.printingOf s registry "Island"
+        wall <- S.printingOf s registry "Wall of Stone"
+        piker <- S.printingOf s registry "Goblin Piker"
+        cannibal <- S.printingOf s registry "Spike Cannibal"
+        let (aliceWall, g1) = S.addCreature wall S.alice S.threePlayerGame
+            (bobWall, g2) = S.addCreature wall S.bob g1
+            (bobPiker, g3) = S.addCreature piker S.bob g2
+            (aliceIsland, g4) = S.addCreature island S.alice g3
+            (cannibalId, g5) = S.entersWithTrigger cannibal S.alice (stock aliceWall bobWall bobPiker aliceIsland g4)
+            -- The card's own entry rider, supplied by hand: S.addCreature places
+            -- a permanent without running CR 614.1c's replacement, and a 0/0
+            -- Spike Cannibal would be buried by CR 704.5f before its own trigger
+            -- resolved. Pawl.ReplacementSpec is where an entry rider is proven.
+            entered = S.addCounter CounterKind.PlusOnePlusOne 1 cannibalId g5
+        pure (cannibalId, aliceWall, bobWall, bobPiker, aliceIsland, S.settleSba entered)
+      -- Every giver bears +1/+1 counters, in counts nothing else on the board
+      -- repeats; only the Piker bears the kind the sentence does not name.
+      stocked aliceWall bobWall bobPiker aliceIsland =
+        S.addCounter CounterKind.PlusOnePlusOne 6 aliceIsland
+          . S.addCounter CounterKind.Shield 5 bobPiker
+          . S.addCounter CounterKind.PlusOnePlusOne 2 bobPiker
+          . S.addCounter CounterKind.PlusOnePlusOne 3 bobWall
+          . S.addCounter CounterKind.PlusOnePlusOne 4 aliceWall
+      -- The CR 603.6a trigger, placed by the settle and then resolved. The
+      -- narrowest path that shows the behaviour.
+      onStack gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      gathered gs =
+        let ((_, after), asked) = State.runState (Engine.runGame cannibalAnswer gs Stack.resolveTop) 0
+         in (asked, after)
+  -- THE CASE THIS UNIT EXISTS FOR. Every creature on the battlefield is a first
+  -- object of the one sentence, so the destination ends up with the sum of three
+  -- separate tallies plus the one it entered with -- a number no reading that
+  -- moved from a single permanent can produce.
+  Spec.it s "every creature's +1/+1 counters cross at once, whichever seat controls it" $ do
+    (cannibalId, aliceWall, bobWall, bobPiker, aliceIsland, before) <- board stocked
+    let staged = onStack before
+    Spec.assertEqWith s "alice's Wall bears four +1/+1 counters" (pairOn aliceWall before) (4, 0)
+    Spec.assertEqWith s "bob's Wall bears three" (pairOn bobWall before) (3, 0)
+    Spec.assertEqWith s "bob's Piker bears two, beside five shield counters" (pairOn bobPiker before) (2, 5)
+    Spec.assertEqWith s "and the Cannibal bears only the one it entered with" (pairOn cannibalId before) (1, 0)
+    Spec.assertBool s (not (null (GameState.stack staged))) "the Cannibal's enters trigger really was on the stack"
+    let (asked, after) = gathered staged
+    -- THE GAMEPLAY-LEVEL ASSERTIONS, ahead of every proxy: the whole board's
+    -- +1/+1 counters gathered onto one permanent, and each giver emptied.
+    Spec.assertEqWith s "the Cannibal has its own counter plus all nine, and no shield counter" (pairOn cannibalId after) (10, 0)
+    Spec.assertEqWith s "alice's Wall is down every +1/+1 counter it had" (pairOn aliceWall after) (0, 0)
+    Spec.assertEqWith s "so is bob's Wall" (pairOn bobWall after) (0, 0)
+    Spec.assertEqWith s "and so is bob's Piker, its five shield counters untouched" (pairOn bobPiker after) (0, 5)
+    -- The control leg, on the SAME board: a permanent that is not a creature is
+    -- not a first object, so its six +1/+1 counters stay where they are. Without
+    -- it the case above would pass on a sweep that took every +1/+1 counter in
+    -- play whatever bore it.
+    Spec.assertEqWith s "and alice's Island, which is no creature, keeps all six of its own" (pairOn aliceIsland after) (6, 0)
+    Spec.assertEqWith s "and nothing was asked, the card settling the kind, the count and the givers" asked 0
+  -- The same board differing in exactly ONE thing, what the givers bear: with the
+  -- +1/+1 counters off the three creatures, "all +1/+1 counters" finds none on
+  -- any of them and the Cannibal is left with what it entered with. Without this
+  -- pair the case above would pass on a sweep that credited the destination a
+  -- number of its own rather than what it took.
+  Spec.it s "a board whose creatures bear no +1/+1 counter moves nothing and still asks nothing" $ do
+    (cannibalId, aliceWall, bobWall, bobPiker, aliceIsland, before) <- board (\_ _ bobPiker' aliceIsland' -> S.addCounter CounterKind.PlusOnePlusOne 6 aliceIsland' . S.addCounter CounterKind.Shield 5 bobPiker')
+    let (asked, after) = gathered (onStack before)
+    Spec.assertEqWith s "the Cannibal still bears the one counter it entered with" (pairOn cannibalId after) (1, 0)
+    Spec.assertEqWith s "alice's Wall bears none either way" (pairOn aliceWall after) (0, 0)
+    Spec.assertEqWith s "so does bob's" (pairOn bobWall after) (0, 0)
+    Spec.assertEqWith s "bob's Piker keeps the five shield counters the sentence never named" (pairOn bobPiker after) (0, 5)
+    Spec.assertEqWith s "and the Island keeps its six, as in the case above" (pairOn aliceIsland after) (6, 0)
+    Spec.assertEqWith s "and with nothing to move the player was not asked" asked 0

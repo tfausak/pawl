@@ -688,10 +688,10 @@ data Effect card ability
     -- more; CR 122 states no rule making the instruction fail. Passes through no
     -- CR 614.16 gate -- that rule replaces a PLACEMENT.
     RemoveCounters RemoveCounters.RemoveCounters
-  | -- | CR 122.5: move counters from the first slot's permanent onto the second
-    -- slot's. WHICH kinds cross and HOW MANY of each is Pawl.Types.MovedKinds,
-    -- five spellings over one batch per kind; see Pawl.Types.MoveCounters'
-    -- `kinds`.
+  | -- | CR 122.5: move counters from the permanents an ObjectRef names onto the
+    -- one a slot does. WHICH kinds cross and HOW MANY of each is
+    -- Pawl.Types.MovedKinds, six spellings over one batch per kind per pair; see
+    -- Pawl.Types.MoveCounters' `kinds`.
     --
     -- NOT a RemoveCounters beside a PutCounters, which is the whole reason this
     -- arm exists: rule 122.5 makes the pair ATOMIC -- "if either of these actions

@@ -3,6 +3,7 @@
 module Pawl.Codec.MoveCounters where
 
 import qualified Pawl.Codec.MovedKinds as MovedKinds
+import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -19,9 +20,13 @@ import qualified Pawl.Types.Quantity as Quantity
 -- counter" with no kind named. `slot` defaults to Nothing for the same reason:
 -- that is what "move a counter" with nothing looking back at it means, so a card
 -- that says only that writes neither key.
+--
+-- `from` is an ObjectRef and `to` a bare SlotName, which the type's haddock
+-- explains; the two sides are therefore spelled differently on the wire, an
+-- object for the first and a string for the second.
 codec :: Codec.Codec MoveCounters.MoveCounters
 codec = Fields.object $ do
-  from <- Fields.required "from" SlotName.codec MoveCounters.from
+  from <- Fields.required "from" ObjectRef.codec MoveCounters.from
   kinds <- Fields.defaulted "kinds" (MovedKinds.Type.Chosen (Quantity.Literal 1)) MovedKinds.codec MoveCounters.kinds
   slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) MoveCounters.slot
   to <- Fields.required "to" SlotName.codec MoveCounters.to

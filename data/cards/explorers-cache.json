@@ -20,7 +20,10 @@
                       {
                         "type": "MoveCounters",
                         "value": {
-                          "from": "self",
+                          "from": {
+                            "type": "InSlot",
+                            "value": "self"
+                          },
                           "kinds": {
                             "type": "Named",
                             "value": {
