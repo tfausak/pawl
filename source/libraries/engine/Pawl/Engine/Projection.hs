@@ -726,13 +726,21 @@ viewWithLastKnown src gs oid =
 -- Nothing when the object is gone and nothing was filed, which lands on the no-op
 -- every caller gives an unevaluable quantity. The controller and the COUNTERS come
 -- from the record: CR 122.2 made the counters cease to exist with the object.
+--
+-- And so does the OWNER, written over the field viewOfCharacteristics fills: that
+-- function reads CR 108.3 off the live object and answers Nothing for an id naming
+-- nothing (#1069), which is what CR 608.2b wants of a gone TARGET and not what CR
+-- 608.2h wants here. An intervening "if" asking whose zone a dead entrant came out
+-- of (Pawl.Engine.Quantity's EnteredFrom) reads it, and would otherwise take the
+-- whole quantity to Nothing. Proved by Pawl.ConditionSpec's "the entrant killed
+-- between the two checks still grows the Knight".
 viewWithLastKnownAnywhere :: GameState -> Count.ViewOf
 viewWithLastKnownAnywhere gs oid =
   if Map.member oid (GameState.objects gs)
     then fullView gs oid
     else
       fmap
-        (\lk -> viewOfCharacteristics (fullView gs) oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs)
+        (\lk -> (viewOfCharacteristics (fullView gs) oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs) {Filter.owner = Just (LastKnown.owner lk)})
         (Map.lookup oid (GameState.lastKnown gs))
 
 -- CR 608.2h: this object's last known information, and only when the id names

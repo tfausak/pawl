@@ -23,7 +23,7 @@ minimalJson = "{\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
-  -- CR 608.2h, all seven axes. `characteristics` and `copiable` are the same type
+  -- CR 608.2h, all eight axes. `characteristics` and `copiable` are the same type
   -- and hold DIFFERENT values here, because CR 707.2's layer-1-only reading is
   -- exactly what the whole fold loses -- an encoder writing one where the other
   -- belongs would round trip against equal values.
@@ -34,6 +34,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
       LastKnown.MkLastKnown
         { LastKnown.characteristics = ProjectedCharacteristicsSpec.testCharacteristics,
           LastKnown.controller = PlayerId.MkPlayerId 1,
+          LastKnown.owner = PlayerId.MkPlayerId 6,
           LastKnown.source = Source.OfCard (PrintingId.MkPrintingId 2),
           LastKnown.counters = Map.singleton CounterKind.PlusOnePlusOne 3,
           LastKnown.copiable = ProjectedCharacteristicsSpec.minimalCharacteristics,
@@ -42,7 +43,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
         }
       ( " {\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
-          <> ",\"controller\":1,\"source\":{\"type\":\"OfCard\",\"value\":2}"
+          <> ",\"controller\":1,\"owner\":6,\"source\":{\"type\":\"OfCard\",\"value\":2}"
           <> ",\"counters\":[{\"key\":{\"type\":\"PlusOnePlusOne\"},\"value\":3}]"
           <> ",\"copiable\":"
           <> minimalJson
@@ -59,6 +60,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
       LastKnown.MkLastKnown
         { LastKnown.characteristics = ProjectedCharacteristicsSpec.minimalCharacteristics,
           LastKnown.controller = PlayerId.MkPlayerId 4,
+          LastKnown.owner = PlayerId.MkPlayerId 4,
           LastKnown.source = Source.OfToken (PrintingId.MkPrintingId 5),
           LastKnown.counters = Map.empty,
           LastKnown.copiable = ProjectedCharacteristicsSpec.minimalCharacteristics,
@@ -67,7 +69,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
         }
       ( " {\"characteristics\":"
           <> minimalJson
-          <> ",\"controller\":4,\"source\":{\"type\":\"OfToken\",\"value\":5}"
+          <> ",\"controller\":4,\"owner\":4,\"source\":{\"type\":\"OfToken\",\"value\":5}"
           <> ",\"counters\":[]"
           <> ",\"copiable\":"
           <> minimalJson
