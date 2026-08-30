@@ -230,7 +230,8 @@ resolveTopWith runSubgame = do
           -- "that creature" is the entrant at Binding.became, not the source. So
           -- CR 608.2h is owed to that entrant too and the view is the UNSCOPED
           -- one -- an entrant killed while the trigger waited is compared at the
-          -- power and toughness it last had, which is the read this arm alone
+          -- power and toughness it last had, and read for the owner CR 400.3 asks
+          -- of Breathless Knight's clause, which are the reads this arm alone
           -- observes: at gather time the entrant is still there by construction.
           --
           -- CR 303.4b's host rides in beside the slots, and Event.interveningHolds

@@ -726,13 +726,23 @@ viewWithLastKnown src gs oid =
 -- Nothing when the object is gone and nothing was filed, which lands on the no-op
 -- every caller gives an unevaluable quantity. The controller and the COUNTERS come
 -- from the record: CR 122.2 made the counters cease to exist with the object.
+--
+-- And so does the OWNER, written over the field viewOfCharacteristics fills: that
+-- function reads CR 108.3 off the live object and answers Nothing for an id naming
+-- nothing (#1069), which is what CR 608.2b wants of a gone TARGET and not what CR
+-- 608.2h wants here. An intervening "if" asking whose zone a dead entrant came out
+-- of (Pawl.Engine.Quantity's EnteredFrom) reads it, and would otherwise take the
+-- whole quantity to Nothing. Proved by Pawl.ConditionSpec's "the entrant killed
+-- between the two checks still grows the Knight" -- that it answers at all;
+-- substituting the record's controller for its owner leaves that case green, so
+-- WHICH player is a fence (see #1069).
 viewWithLastKnownAnywhere :: GameState -> Count.ViewOf
 viewWithLastKnownAnywhere gs oid =
   if Map.member oid (GameState.objects gs)
     then fullView gs oid
     else
       fmap
-        (\lk -> viewOfCharacteristics (fullView gs) oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs)
+        (\lk -> (viewOfCharacteristics (fullView gs) oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs) {Filter.owner = Just (LastKnown.owner lk)})
         (Map.lookup oid (GameState.lastKnown gs))
 
 -- CR 608.2h: this object's last known information, and only when the id names
@@ -1014,8 +1024,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.controller = controller,
       -- CR 108.3 / 110.2 / 111.2: read off the OBJECT rather than through the
       -- `controller` parameter, since layer 2 has already moved control and
-      -- nothing moves ownership. Nothing for an id naming nothing (CR 608.2h,
-      -- #1069).
+      -- nothing moves ownership. Nothing for an id naming nothing, which CR 608.2b
+      -- wants of a gone target; viewWithLastKnownAnywhere writes CR 608.2h's answer
+      -- over it for the readers owed one (see #1069, whose other half is
+      -- Count.viewOfSnapshot's).
       Filter.owner = fmap Object.owner (Game.lookupObject oid gs),
       -- CR 400.1 off the OBJECT beside its owner, and for `owner`'s reason: CR
       -- 109.3 counts no zone among the characteristics, so no projection carries

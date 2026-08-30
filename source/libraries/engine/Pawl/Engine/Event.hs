@@ -3994,7 +3994,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                         -- `snapshot` is, and the copy binding and face it reads live
                         -- on `obj`, which is about to cease. No third board walk --
                         -- it reads that binding or the printed face and stops.
-                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj) (Object.chosenNames obj)) (GameState.lastKnown g1)
+                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj) (Object.chosenNames obj)) (GameState.lastKnown g1)
                       }
               -- CR 712.21: "If a melded permanent leaves the battlefield, one
               -- permanent leaves the battlefield and two cards are put into the
@@ -5280,7 +5280,7 @@ forgetObject gs oid = case Game.lookupObject oid gs of
         cleared = Game.removeFromZones (Object.owner obj) oid gs
      in cleared
           { GameState.objects = Map.delete oid (GameState.objects cleared),
-            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj) (Object.chosenNames obj)) (GameState.lastKnown cleared)
+            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj) (Object.chosenNames obj)) (GameState.lastKnown cleared)
           }
 
 -- CR 119.3: move one player's life total by this much, and record the CR 608.2i
@@ -14160,10 +14160,11 @@ reactionTriggers events gs = filter (interveningHolds gs) (eventTriggers events 
 -- since left would otherwise be described as one with no characteristics.
 --
 -- Nothing OBSERVES that at this end of the rule, and scoping the view back to the
--- source here leaves the suite green: evolve is the only ability whose "if" reads
--- a slot, and rule 702.100a's entrant is on the battlefield by construction while
--- its own entry is being gathered. So this is a fence keeping the two checks
--- reading alike, not a proved behaviour -- the proved one is Stack's re-check.
+-- source here leaves the suite green: evolve and Breathless Knight are the two
+-- abilities whose "if" reads a slot, and both entrants are on the battlefield by
+-- construction while their own entry is being gathered. So this is a fence keeping
+-- the two checks reading alike, not a proved behaviour -- the proved one is
+-- Stack's re-check.
 interveningHolds :: GameState -> PendingTrigger -> Bool
 interveningHolds gs pending =
   case (TriggeredAbility.intervening (PendingTrigger.ability pending), PendingTrigger.source pending) of

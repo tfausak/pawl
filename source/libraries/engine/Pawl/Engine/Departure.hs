@@ -241,6 +241,9 @@ objectsLeaveWith pid gs =
                 -- ability. The Object.owner fallback is unreachable for the
                 -- reason Event.changeZoneAttaching gives at its own call.
                 (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs))
+                -- CR 108.3, which no projection moves: read straight off the
+                -- object, unlike the controller above.
+                (Object.owner obj)
                 (Object.source obj)
                 (Object.counters obj)
                 (Event.copiedSnapshot oid gs)

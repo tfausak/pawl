@@ -16,7 +16,7 @@ import qualified Pawl.Types.Source as Source
 -- as the object ceases, from the same pre-move state the GameEvent.Moved
 -- snapshot is taken against.
 --
--- Seven things rather than the characteristics alone, because the other six
+-- Eight things rather than the characteristics alone, because the other seven
 -- questions CR 608.2h is asked have no home in that fold. Control is not a
 -- characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
 -- asks of a triggered ability whose source is gone. Neither is the object's
@@ -28,9 +28,11 @@ import qualified Pawl.Types.Source as Source
 -- beside it rather than out of it. The COPIABLE values are the fourth, for the
 -- reason its own field gives. Nor is the ATTACHMENT, the fifth -- CR 109.3
 -- names "what an Aura enchants" as an example of what is not one. Nor are the
--- CHOSEN NAMES, the sixth, for the reason its own field gives.
+-- CHOSEN NAMES, the sixth, for the reason its own field gives. Nor is the
+-- OWNER, the seventh -- CR 109.3's list has no owner either -- for the reason
+-- its own field gives.
 --
--- All seven fields STRICT (!): entries are keyed by an id that no longer exists
+-- All eight fields STRICT (!): entries are keyed by an id that no longer exists
 -- and are never pruned, so an unforced field would be a thunk retaining the whole
 -- pre-move GameState for the rest of the game.
 data LastKnown = MkLastKnown
@@ -40,6 +42,20 @@ data LastKnown = MkLastKnown
     -- Magic was controlled by the thief right up to the moment it died, and
     -- CR 603.3a hands that player its trigger.
     controller :: !PlayerId.PlayerId,
+    -- | CR 108.3: who OWNED it, which CR 110.2 never moves -- so unlike
+    -- `controller` this is the same player the live object carried, filed because
+    -- the object it was read off no longer exists.
+    --
+    -- CR 400.3's reader is what wants it: "your graveyard" names the copy a
+    -- card's owner has, so an intervening "if" asking where a permanent came from
+    -- (Pawl.Engine.Quantity's EnteredFrom and WasCastFrom) needs the owner of an
+    -- entrant CR 603.4 re-checks after it has died. That it is ANSWERABLE is
+    -- proved by Pawl.ConditionSpec's "the entrant killed between the two checks
+    -- still grows the Knight"; WHICH player it names is a regression fence, the
+    -- Knight's clause reading "a graveyard" over every player and so never asking.
+    -- Pawl.Engine.Projection.viewWithLastKnownAnywhere is the one reader, since CR
+    -- 608.2b still wants a blank answer for a gone TARGET.
+    owner :: !PlayerId.PlayerId,
     -- | CR 608.2h: what KIND of object it was and the card behind it -- the same
     -- Object.source the live object carried, copied as it ceased.
     source :: !Source.Source,

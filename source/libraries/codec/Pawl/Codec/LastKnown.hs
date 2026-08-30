@@ -14,12 +14,13 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.LastKnown as LastKnown
 
--- | All seven axes, none derivable from another: the type's own haddock says why
+-- | All eight axes, none derivable from another: the type's own haddock says why
 -- CR 608.2h needs each of them beside the projection.
 codec :: Codec.Codec LastKnown.LastKnown
 codec = Fields.object $ do
   characteristics <- Fields.required "characteristics" ProjectedCharacteristics.codec LastKnown.characteristics
   controller <- Fields.required "controller" PlayerId.codec LastKnown.controller
+  owner <- Fields.required "owner" PlayerId.codec LastKnown.owner
   source <- Fields.required "source" Source.codec LastKnown.source
   counters <- Fields.required "counters" (Common.multiset (CounterKind.codec Keyword.codec)) LastKnown.counters
   copiable <- Fields.required "copiable" ProjectedCharacteristics.codec LastKnown.copiable
@@ -29,6 +30,7 @@ codec = Fields.object $ do
     LastKnown.MkLastKnown
       { LastKnown.characteristics = characteristics,
         LastKnown.controller = controller,
+        LastKnown.owner = owner,
         LastKnown.source = source,
         LastKnown.counters = counters,
         LastKnown.copiable = copiable,

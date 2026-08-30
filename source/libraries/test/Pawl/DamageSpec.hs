@@ -860,6 +860,7 @@ lastKnownRiderSpec s registry =
                 LastKnown.MkLastKnown
                   { LastKnown.characteristics = Projection.project srcId equipped,
                     LastKnown.controller = S.alice,
+                    LastKnown.owner = S.alice,
                     -- The fallback is unreachable: srcId was just minted by
                     -- S.addCreature two bindings above.
                     LastKnown.source = Maybe.fromMaybe (Source.OfCard (PrintingId.MkPrintingId 0)) sorcererSource,
