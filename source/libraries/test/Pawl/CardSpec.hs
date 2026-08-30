@@ -1595,6 +1595,7 @@ replacementEntryEffects replacement = case replacement of
   ReplacementEffect.TurnUpR {} -> []
   ReplacementEffect.UntapR _ -> []
   ReplacementEffect.LifeLossR {} -> []
+  ReplacementEffect.DrawR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 615.5: the additional effect a replacement PRINTS -- DamageR's riders, and
@@ -1616,6 +1617,7 @@ replacementEffectRiders replacement = case replacement of
   ReplacementEffect.TurnUpR {} -> []
   ReplacementEffect.UntapR _ -> []
   ReplacementEffect.LifeLossR {} -> []
+  ReplacementEffect.DrawR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- Every ReplacementEffect one effect authors: the one an Effect.Replace installs
@@ -1785,6 +1787,7 @@ phasePatternOffends replacement = case replacement of
   ReplacementEffect.TurnUpR {} -> False
   ReplacementEffect.UntapR _ -> False
   ReplacementEffect.LifeLossR {} -> False
+  ReplacementEffect.DrawR {} -> False
 
 -- Every replacement shape the codec accepts and no card may author, for
 -- phasePatternOffends' reason and one more. A card cannot name an ObjectId or a
@@ -1826,6 +1829,10 @@ engineOnlyOffends replacement = case replacement of
   -- rewrite that is a printed floor, a printed scaling or a printed instead-clause
   -- name nothing an engine has to bake -- so nothing here is engine-only.
   ReplacementEffect.LifeLossR {} -> False
+  -- Words of Worship writes this arm whole -- CR 109.5's relation and a printed
+  -- amount of life name nothing an engine has to bake -- so nothing here is
+  -- engine-only. LifeLossR's answer, and for its reason.
+  ReplacementEffect.DrawR {} -> False
   ReplacementEffect.TurnUpR {} -> False
 
 -- Is this damage rewrite one the ENGINE mints and no card may print? Three of
@@ -1892,6 +1899,7 @@ turnUpRequiringOffends replacement = case replacement of
   ReplacementEffect.TokenR {} -> False
   ReplacementEffect.UntapR _ -> False
   ReplacementEffect.LifeLossR {} -> False
+  ReplacementEffect.DrawR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- isPhaseR's twin: did the sweep above have anything to look at? A wildcard for
@@ -1920,6 +1928,7 @@ riderWithoutPreventionOffends replacement = case replacement of
   ReplacementEffect.TurnUpR {} -> False
   ReplacementEffect.UntapR _ -> False
   ReplacementEffect.LifeLossR {} -> False
+  ReplacementEffect.DrawR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- CR 615.1a: does this rewrite use the word "prevent"? engineMintedDamage's
@@ -3845,6 +3854,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern _ turnUpRewrite) -> turnUpPattern : turnUpRewriteFilters turnUpRewrite
   ReplacementEffect.UntapR _ -> []
   ReplacementEffect.LifeLossR {} -> []
+  ReplacementEffect.DrawR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 614.9's printed destination, the one Filter a damage REWRITE carries.
