@@ -294,6 +294,7 @@ import qualified Pawl.Codec.PrintingIdSpec
 import qualified Pawl.Codec.PrintingSpec
 import qualified Pawl.Codec.ProductionTagSpec
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec
+import qualified Pawl.Codec.PutCountersFromSpec
 import qualified Pawl.Codec.PutCountersSpec
 import qualified Pawl.Codec.QuantitySpec
 import qualified Pawl.Codec.RecipientSpec
@@ -462,6 +463,7 @@ import qualified Pawl.PlaneswalkerSpec
 import qualified Pawl.PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec
 import qualified Pawl.ProjectionSpec
+import qualified Pawl.PutCounterSpec
 import qualified Pawl.RadSpec
 import qualified Pawl.Registry as Registry
 import qualified Pawl.RegistrySpec
@@ -843,6 +845,7 @@ spec s registry = do
   Pawl.Codec.ProjectedCharacteristicsSpec.spec s
   Pawl.Codec.MoveCountersSpec.spec s
   Pawl.Codec.MovedKindsSpec.spec s
+  Pawl.Codec.PutCountersFromSpec.spec s
   Pawl.Codec.PutCountersSpec.spec s
   Pawl.Codec.QuantitySpec.spec s
   Pawl.Codec.RecipientSpec.spec s
@@ -1018,6 +1021,7 @@ spec s registry = do
   Pawl.RegistrySpec.spec s
   Pawl.ReplaySpec.spec s registry
   Pawl.MoveCounterSpec.spec s registry
+  Pawl.PutCounterSpec.spec s registry
   Pawl.ResolveSpec.spec s registry
   Pawl.RingSpec.spec s registry
   Pawl.RoomSpec.spec s registry

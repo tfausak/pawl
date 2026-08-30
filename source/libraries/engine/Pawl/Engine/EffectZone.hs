@@ -148,6 +148,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.RedirectDamage {} -> Nothing
   Effect.Counter {} -> Nothing
   Effect.PutCounters {} -> Nothing
+  Effect.PutCountersFrom {} -> Nothing
   Effect.RemoveCounters {} -> Nothing
   Effect.MoveCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing

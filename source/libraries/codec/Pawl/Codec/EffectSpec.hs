@@ -106,6 +106,7 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PutCounters as PutCounters
+import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.Regenerability as Regenerability
@@ -993,6 +994,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.MoveCounters (MoveCounters.MkMoveCounters (SlotName.MkSlotName (Text.pack "self")) (MovedKinds.Chosen (Quantity.Literal 1)) Nothing (SlotName.MkSlotName (Text.pack "became"))))
       " {\"type\":\"MoveCounters\",\"value\":{\"from\":\"self\",\"to\":\"became\"}} "
+  -- CR 122.8: a fourth tag, and the only counter opcode whose payload names
+  -- neither a kind nor a count -- the whole tally the read object had is what
+  -- crosses.
+  Spec.it s "PutCountersFrom" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom (SlotName.MkSlotName (Text.pack "self")) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "creature")))))
+      " {\"type\":\"PutCountersFrom\",\"value\":{\"from\":\"self\",\"ref\":{\"type\":\"InSlot\",\"value\":\"creature\"}}} "
   -- CR 122: PutCounters' mirror, and a distinct tag -- a signed amount under one
   -- tag would make the two indistinguishable in a card file.
   Spec.it s "RemoveCounters" $

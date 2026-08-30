@@ -49,6 +49,7 @@ import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PutCounters as PutCounters
+import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
@@ -701,6 +702,15 @@ data Effect card ability
     -- The rule's four impossibilities are checked BEFORE either half runs; see
     -- Pawl.Engine.Resolve's arm for which of them pawl can reach.
     MoveCounters MoveCounters.MoveCounters
+  | -- | CR 122.8: put the counters the slot's object HAD onto the permanents the
+    -- ObjectRef names -- Iron Apprentice's "put those counters on target creature
+    -- you control". The whole per-kind tally crosses, which is why the payload
+    -- names no kind and no Quantity; see Pawl.Types.PutCountersFrom.
+    --
+    -- A PUT and not a MoveCounters: rule 122.8 says the player "doesn't move
+    -- counters from one object to the other", CR 122.2 having already made the
+    -- first object's counters cease.
+    PutCountersFrom PutCountersFrom.PutCountersFrom
   | -- | CR 122 / 107.14: the players the PlayerRef names each get N counters of a
     -- player-counter kind. Subsumes any self-scoped player counter (energy,
     -- experience, rad) as `Relative You`.
