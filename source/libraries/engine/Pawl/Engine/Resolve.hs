@@ -6998,14 +6998,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- nothing and the others in the sweep are untouched: the rule's
           -- all-or-nothing is stated about one pair.
           _ -> pure 0
-    -- The FIRST side is swept as this instruction is reached (CR 608.2c) and
-    -- every read below takes the same pre-sweep snapshot, which is CR 608.2f's
-    -- one action over several objects and Effect.PutCounters' own posture. The
-    -- reads are per-pair values a sibling pair cannot move: the counters on the
-    -- FIRST object, and a prohibition on the destination. The one exception is
-    -- the destination's own tally, which only MovedKinds.EachAbsentKind reads
-    -- and which rule 122.5 settles once for the sentence either way -- see that
-    -- arm below.
+    -- The FIRST side is swept as this instruction is reached (CR 608.2c), and the
+    -- pairs run in the order the sweep hands back -- battlefieldMatching's, which
+    -- is CR 608.2f's APNAP order for the EachMatching arm and one object for
+    -- every other arm the corpus writes.
+    --
+    -- Every read inside movePair takes the same pre-sweep snapshot, which is
+    -- Effect.PutCounters' posture: one evaluation for the whole instruction. What
+    -- makes that sound here rather than a stale read is that each read is a
+    -- per-pair value a sibling pair cannot move -- the counters on the FIRST
+    -- object, and a prohibition on the destination. The one read that is not is
+    -- the destination's own tally, which only MovedKinds.EachAbsentKind takes and
+    -- which rule 122.5 settles once for the sentence either way; no card in the
+    -- corpus writes that arm over a group, so this is a REGRESSION FENCE rather
+    -- than a proven ordering.
     moved <- fmap sum (mapM movePair (objectRefObjects legal resolving controller source gs fromRef))
     -- "Counters moved this way", for a later effect of the same resolution to read
     -- as Quantity.InSlot -- Destroy's `slot` above in every respect, bound onto
