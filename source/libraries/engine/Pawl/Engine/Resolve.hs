@@ -6829,12 +6829,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- the artifact and a targeted creature; Black Panther, Wakandan King
           -- binds a targeted land and a targeted creature; Fate Transfer binds two
           -- targeted creatures; Goldberry, River-Daughter binds a targeted
-          -- permanent and itself). Slippery Bogbonder, whose "from among creatures
-          -- you control" is a GROUP on the first side, is the printing that would
-          -- need more than a pair of slots, and is not in the corpus.
-          -- A slot bound as the ability triggered may name an object CR 400.7 has
-          -- since moved, and a targeted one may have become illegal, which is CR
-          -- 608.2b's re-read in legalOne above.
+          -- permanent and itself). A slot bound as the ability triggered may name
+          -- an object CR 400.7 has since moved, and a targeted one may have become
+          -- illegal, which is CR 608.2b's re-read in legalOne above.
+          --
+          -- Not implemented: a move whose first side is a GROUP of permanents
+          -- rather than one, which Slippery Bogbonder's "from among creatures you
+          -- control" prints (#2704).
           --
           -- The `from` half answers CR 702.26b as much as CR 400.7, and both are
           -- proven boards. Pawl.Engine.Phasing spells "treated as though it does
