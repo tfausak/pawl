@@ -3994,8 +3994,8 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- "a redirected permanent spell carries nothing over" is the
               -- proof.
               Monad.when (dest == Zone.Battlefield) (carryOver carrying oid newId)
-              -- Alchemy's "perpetually", which is CR 400.7's exception no rule
-              -- of the CR states. UNGATED, unlike carryOver above: the printed
+              -- Alchemy's "perpetually", an exception to CR 400.7 that no
+              -- rule of the CR states. UNGATED, unlike carryOver above: the printed
               -- sentence follows the object through every zone change and in
               -- both directions, so the destination decides nothing here and
               -- Pawl.Types.CarryOver is not consulted either -- a perpetual

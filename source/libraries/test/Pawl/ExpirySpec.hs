@@ -6,6 +6,9 @@
 -- 611.2b), and the four gate cards (Master Thief, Hag of Inner Weakness, Jade
 -- Statue, and Soulfire Eruption for "until the END of your next turn").
 --
+-- Alchemy's "perpetually" is here too, at the bottom of the file: it is a
+-- duration in card data like any other, and its producer is Pearl Collector.
+--
 -- The two floating-replacement durations have a printed producer each, at the
 -- bottom of the file: Dovin, Hand of Control's -1 for CR 611.2a's turn-relative
 -- one and Old Fat Spider Can't See Me's chapter II for CR 611.2b's conditional
@@ -1868,7 +1871,9 @@ perpetualSpec s registry = Spec.describe s "Perpetual" $ do
     Spec.assertBool s (not (any Expiry.follows [Expiry.Type.AtCleanup, Expiry.Type.AtTurnOf S.alice, Expiry.Type.AtEndOf PhaseSelector.CombatPhase, Expiry.Type.WhenPaid (blueOfferTo S.alice)])) "and neither does any duration the turn's structure ends"
   -- The whole card at gameplay level. Pearl Collector's {2}{W} grants lifelink
   -- perpetually; the sibling Sorcerer carries the SAME layer-6 grant under
-  -- Expiry.Never, so the pair differs in the expiry arm and nothing else. Both
+  -- Expiry.Never. The two effects differ in their expiry and in their source, and
+  -- the source cannot be what discriminates: Pawl.Engine.Event.perpetuate reads
+  -- the expiry and the affected set, and nothing else. Both
   -- creatures make the same round trip, and lifelink is unobservable in a
   -- graveyard -- CR 702.15b pays off damage a source deals -- so the board reads
   -- it back on the battlefield, off the incarnation that returned.
