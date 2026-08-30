@@ -897,12 +897,8 @@ anyNumberSpec s registry = Spec.describe s "CR 122.5 moving any number of counte
 -- Auxiliary's shape, so no clause of the printed sentence is omitted.
 --
 -- Bioshift prints the same spelling on an instant and is cheaper to drive, but
--- its "another target creature with the same controller" is a filter demanding
--- something of a sibling OBJECT slot, which Filter.ControlledByBound cannot
--- answer -- Binding.playerSlots reads a slot through Recipient.playerOf, so a
--- slot holding a creature bakes to nothing and Filter.matches answers the
--- surviving atom False, leaving the slot with no candidate at all (#2722).
--- Dropping the clause would be weaker than printed.
+-- its "with the same controller" is a demand on a sibling OBJECT slot that no
+-- filter can make, and dropping it would be weaker than printed (#2722).
 --
 -- The counters go on by hand rather than through the printed entry rider, whose
 -- own road is Pawl.ReplacementSpec's: these boards need a tally the printed two
@@ -941,8 +937,8 @@ namedAnyNumberSpec s registry = Spec.describe s "CR 122.5 moving any number of c
       -- name and `counters` is what a case puts on the Bandar; between them they
       -- are the ONLY difference between the boards below.
       --
-      -- Wall of Stone on both ends for everyKindSpec's reason: a 0/8 body is
-      -- unmoved by whatever these boards carry across.
+      -- Wall of Stone at the destination for everyKindSpec's reason: a 0/8 body
+      -- is unmoved by whatever these boards carry onto it.
       board extras counters = do
         forest <- S.printingOf s registry "Forest"
         wall <- S.printingOf s registry "Wall of Stone"

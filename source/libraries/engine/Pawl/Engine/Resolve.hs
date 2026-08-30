@@ -6777,9 +6777,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- +1/+1 counter" and Spike Cannibal's "move all +1/+1 counters"), the
     -- player's when it names none (Agent's Toolkit's "move a counter" and
     -- Resourceful Defense's "move any number of counters"), shared when the card
-    -- names the kind and the player supplies the count (Scrounging Bandar's "move
-    -- any number of +1/+1 counters"), and neither's when
-    -- the card takes them all (Fate Transfer's "move all counters") or reads the
+    -- names the kind and the player supplies the count (Scrounging Bandar's
+    -- "move any number of +1/+1 counters"), and neither's when the card takes
+    -- them all (Fate Transfer's "move all counters") or reads the
     -- DESTINATION for them (Goldberry, River-Daughter's "a counter of each kind
     -- not on Goldberry"), which is what `kinds` holds. HOW MANY first objects
     -- there are is `from`, an ObjectRef: one for every producer that names a
@@ -6986,12 +6986,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                             -- count above what the object holds is clamped to it. A
                             -- filter written here as well would have no observer.
                             fmap (Map.unionsWith (+)) (mapM (uncurry move) (Map.toList answer))
-                      -- Scrounging Bandar's "move any number of +1/+1 counters": the card
-                      -- names the kind and leaves the count to the player, so the
-                      -- prompt above is raised over the ONE kind the card named
-                      -- rather than over every kind the object bears. That is what
-                      -- keeps this arm from being AnyNumber: offering the rest would
-                      -- let the answerer move a counter the card never mentioned.
+                      -- Scrounging Bandar's "move any number of +1/+1
+                      -- counters": the card names the kind and leaves the count
+                      -- to the player, so the prompt above is raised over the ONE
+                      -- kind the card named rather than over every kind the object
+                      -- bears. That is what keeps this arm from being AnyNumber:
+                      -- offering the rest would let the answerer move a counter
+                      -- the card never mentioned.
                       --
                       -- The same prompt and not a bespoke one: its Map is what the
                       -- move could really carry, and a card naming its kind narrows

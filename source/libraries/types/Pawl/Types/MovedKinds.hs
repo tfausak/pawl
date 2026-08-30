@@ -7,32 +7,34 @@ import qualified Pawl.Types.Quantity as Quantity
 -- | WHICH counters a CR 122.5 move carries, and how many of each.
 --
 -- Every arm below is a way the printed text states WHICH counters cross, and
--- rule 122.5 answers each of them differently. Explorer's Cache says "move a +1/+1 counter", which settles the kind on the
--- card, so nothing is asked -- that is 'Named'. Agent's Toolkit says "move a
--- counter", naming none, which leaves WHICH counter moves to the player
--- (Pawl.Types.Prompt's ChooseMovedCounter) -- that is 'Chosen'. Fate Transfer
--- says "move all counters", which names no kind and asks nothing either, because
--- every kind crosses -- that is 'Every'. Resourceful Defense says "move any
--- number of counters", which names neither a kind nor a count and asks for BOTH
--- at once (Pawl.Types.Prompt's ChooseMovedCounters) -- that is 'AnyNumber'.
--- Scrounging Bandar says "move any number of +1\/+1 counters", which names the
--- kind on the card and leaves the count to the player -- that is
--- 'AnyNumberOfKind', 'Named' and 'AnyNumber' each taken half way, and it is why
--- 'AnyNumber' cannot stand in for it: that arm offers every kind the first object
--- bears, so it would let the answerer move a counter the card never named, which
--- is weaker than printed in the answerer's favour. Spike Cannibal says "move all +1/+1 counters", which names the kind on the
--- card and asks nothing either, because the whole tally of that one kind crosses
--- -- that is 'EveryOfKind', 'Named' and 'Every' each taken half way. Goldberry,
--- River-Daughter says "move a counter of each kind not on Goldberry",
--- which names no kind and asks nothing either, because what the DESTINATION
--- already bears is what settles which kinds cross -- that is 'EachAbsentKind',
--- the one arm reading the second object for anything but rule 122.5's own
--- impossibilities. The others are not that one narrowed: rule 122.5's second
--- impossibility ("the first object doesn't have the appropriate kind of counter
--- on it") is the whole of the check under 'Named', is vacuous under 'Chosen' and
--- 'AnyNumber' since the kinds ON the object are what is offered, and under
--- 'Every', 'EveryOfKind', 'AnyNumberOfKind' and 'EachAbsentKind' is what empties
--- the batch rather than what forbids it.
+-- rule 122.5 answers each of them differently. Explorer's Cache says "move a
+-- +1\/+1 counter", which settles the kind on the card, so nothing is asked --
+-- that is 'Named'. Agent's Toolkit says "move a counter", naming none, which
+-- leaves WHICH counter moves to the player (Pawl.Types.Prompt's
+-- ChooseMovedCounter) -- that is 'Chosen'. Fate Transfer says "move all
+-- counters", which names no kind and asks nothing either, because every kind
+-- crosses -- that is 'Every'. Resourceful Defense says "move any number of
+-- counters", which names neither a kind nor a count and asks for BOTH at once
+-- (Pawl.Types.Prompt's ChooseMovedCounters) -- that is 'AnyNumber'. Scrounging
+-- Bandar says "move any number of +1\/+1 counters", which names the kind on the
+-- card and leaves the count to the player -- that is 'AnyNumberOfKind', 'Named'
+-- and 'AnyNumber' each taken half way, and it is why 'AnyNumber' cannot stand
+-- in for it: that arm offers every kind the first object bears, so it would let
+-- the answerer move a counter the card never named, which is weaker than
+-- printed in the answerer's favour. Spike Cannibal says "move all +1\/+1
+-- counters", which names the kind on the card and asks nothing either, because
+-- the whole tally of that one kind crosses -- that is 'EveryOfKind', 'Named'
+-- and 'Every' each taken half way. Goldberry, River-Daughter says "move a
+-- counter of each kind not on Goldberry", which names no kind and asks nothing
+-- either, because what the DESTINATION already bears is what settles which
+-- kinds cross -- that is 'EachAbsentKind', the one arm reading the second
+-- object for anything but rule 122.5's own impossibilities. The others are not
+-- that one narrowed: rule 122.5's second impossibility ("the first object
+-- doesn't have the appropriate kind of counter on it") is the whole of the
+-- check under 'Named', is vacuous under 'Chosen' and 'AnyNumber' since the
+-- kinds ON the object are what is offered, and under 'Every', 'EveryOfKind',
+-- 'AnyNumberOfKind' and 'EachAbsentKind' is what empties the batch rather than
+-- what forbids it.
 --
 -- The count rides on the two arms that HAVE one rather than on a field beside
 -- them, because no other arm has one to carry: "all counters" and "all +1/+1
