@@ -13,9 +13,9 @@ import qualified Pawl.Types.SlotName as SlotName
 -- "move all +1\/+1 counters from all creatures onto it", and every member is then
 -- its own pair against the one destination.
 --
--- Not implemented: the second side naming a set, Forgotten Ancient's "onto other
--- creatures", which spreads one object's counters over a batch and so asks for a
--- distribution rather than a count (#2713).
+-- Not implemented: a set on the SECOND side, Forgotten Ancient's "onto other
+-- creatures", which asks for a distribution across the batch where a set on the
+-- first side asks for a gathering out of it (#2713).
 --
 -- `kinds` is WHICH counters cross and how many of each, which the printed text
 -- spells six ways; Pawl.Types.MovedKinds is where the six are set out.

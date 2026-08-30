@@ -6843,6 +6843,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- become illegal, which is CR 608.2b's re-read in the legalMany inside
               -- objectRefObjects.
               --
+              -- Not implemented: a move whose SECOND side is a group of
+              -- permanents rather than one, which Forgotten Ancient prints
+              -- (#2713).
+              --
               -- The `from` half answers CR 702.26b as much as CR 400.7, and both are
               -- proven boards. Pawl.Engine.Phasing spells "treated as though it does
               -- not exist" by moving the object OUT of GameState.battlefield, while

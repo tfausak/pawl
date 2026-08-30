@@ -720,13 +720,10 @@ everyKindSpec s registry = Spec.describe s "CR 122.5 moving every kind of counte
 -- exists: it names neither the kind nor the count, so ONE answer settles both
 -- and may take one counter of each of two kinds -- where Agent's Toolkit's
 -- printed count of one comes out of the one kind the player picks. NO printing
--- states a fixed count above one without naming a kind: Scryfall
--- oracle:/(^|[^a-z])move [^.]*counter/, 2026-08-30, over every printing ever
--- released, turns up "all counters" (Fate Transfer, The Ozolith, Nexus
--- Mentality), "any number of counters" (this card, Slippery Bogbonder), "one or
--- more counters" (Goldberry, River-Daughter's second ability) and "a counter of
--- each kind not on Goldberry" (its first, the group below), and nothing else
--- above one.
+-- states a fixed count above one without naming a kind. The sweep behind that is
+-- recorded ONCE, on Pawl.Types.MovedKinds, with the Scryfall query, the
+-- include_extras parameter without which it misses two printings, and its date.
+-- The per-arm lists are not restated here: two copies is how one goes stale.
 --
 -- pawl's Resourceful Defense omits the triggered ability entirely. CR 122.8's
 -- placement itself is writable -- Effect.PutCountersFrom, which Iron Apprentice

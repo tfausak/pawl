@@ -42,16 +42,29 @@ import qualified Pawl.Types.Quantity as Quantity
 -- 'AnyNumber' settles nothing and asks WHICH COUNTERS, so a single answer type
 -- would leave one of the two over-specified. 'Chosen' therefore takes its whole
 -- count out of the one kind picked, which is exact for a card that PRINTS a
--- count, since every printing that prints one prints "a counter" -- Scryfall
--- @oracle:\/(^|[^a-z])move [^.]*counter\/@, 2026-08-30, over every printing ever
--- released: the kindless moves carrying more than one counter say "all counters"
--- (Fate Transfer, Nexus Mentality, The Ozolith -- 'Every'), "any number of
--- counters" (Resourceful Defense, Slippery Bogbonder -- 'AnyNumber'), "one or
+-- count, since no printing that prints one prints anything but "a counter" --
+-- Scryfall @oracle:\/(^|[^a-z])move [^.]*counter\/@ with
+-- @unique=cards&include_extras=true@, 2026-08-30, classified by hand. That run's
+-- kindless moves carrying more than one counter say "all counters" (Fate
+-- Transfer, Nexus Mentality, The Ozolith -- 'Every'), "any number of counters"
+-- (Resourceful Defense, Slippery Bogbonder, Oozeavite -- 'AnyNumber'), "one or
 -- more counters" (Goldberry, River-Daughter's second ability, which is that arm
--- with zero excluded and is not written today, #2702) or "a counter of each kind
--- not on Goldberry" (her first -- 'EachAbsentKind'), and NONE of them prints a
--- number. A printing saying "move two counters", where the player could take one
--- +1\/+1 counter and one shield counter, would refute that.
+-- with zero excluded and is not written today, #2702), "a counter of each kind
+-- not on Goldberry" (her first -- 'EachAbsentKind') or "up to one counter from
+-- each permanent" (Takesies, a per-source cap across a batch that no arm states,
+-- gap #2709), and NONE of them prints a count above one -- Takesies' "up to one"
+-- is a cap per source, not a tally. A printing saying "move two counters", where
+-- the player could take one +1\/+1 counter and one shield counter, would refute
+-- that.
+--
+-- @include_extras@ is what makes that run every printing rather than most of
+-- one, and it is the parameter every sweep in this neighbourhood needs: without
+-- it Scryfall drops the @unk@ set (Unknown Event, set type @funny@), which is
+-- where both Oozeavite and Takesies are. @include_funny@ adds nothing beyond it,
+-- checked the same day. docs\/design.md section 6 ranks an un-set printing below
+-- a regular one and above a synthetic, so neither is outside "every printing".
+-- The sweep this one replaced omitted the parameter and so missed exactly the two
+-- printings that qualify the claim; see #2706.
 --
 -- 'EveryOfKind' is not 'Named' with a clever count. Black Panther, Wakandan
 -- King's "all +1\/+1 counters" IS written that way -- a Quantity.AgainstSlot
