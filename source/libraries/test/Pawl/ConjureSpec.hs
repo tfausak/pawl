@@ -148,6 +148,13 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "four Lightning Bolts in alice's library and none in her hand"
       (length inLibrary, length inHand)
       (4, 0)
+    -- The control for the pair below: the Piker ate the attack, so nothing but
+    -- the Bolt can move bob's life total.
+    Spec.assertEqWith
+      s
+      "combat left bob's life alone"
+      (S.lifeOf S.bob attacked)
+      (Just 20)
     Spec.assertEqWith
       s
       "one of them was drawn and cast, so bob took its three damage"
