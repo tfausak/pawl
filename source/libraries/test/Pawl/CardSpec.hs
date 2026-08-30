@@ -1016,10 +1016,10 @@ ownCounts effect = case effect of
   Effect.Counter {} -> []
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
   Effect.PutCountersFrom {} -> []
-  -- BOTH Quantity positions: the count the moved kinds may write, and the one a
-  -- library walk in the GIVER carries -- `from` became an ObjectRef when CR
-  -- 122.5's first side was widened to a group, and an arm reading the kinds alone
-  -- kept compiling (#2729).
+  -- The count the moved kinds may write. CR 122.5's GIVER carries the other one,
+  -- through the ObjectRef it became when the first side was widened to a group,
+  -- and refCounts reaches it from effectCounts above -- an arm reading the kinds
+  -- alone kept compiling (#2729).
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> foldMap quantityCounts (MovedKinds.quantityOf kinds)
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> quantityCounts quantity
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
@@ -4774,6 +4774,8 @@ asksFor asks ref = case asks of
 -- being written so here, and the build breaks until somebody decides. The one
 -- thing -Werror cannot catch is an arm written `[]` that does hold a ref, which
 -- is what the cross-check against effectFilters below is for.
+-- The same positions Resolve.effectObjectRefs names, tagged: a position added
+-- to one belongs in the other, and the two lists are read side by side.
 effectObjectRefs :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Asks, ObjectRef.ObjectRef)]
 effectObjectRefs effect = case effect of
   Effect.AttachTarget {} -> []

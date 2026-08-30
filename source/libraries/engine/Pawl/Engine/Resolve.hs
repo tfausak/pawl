@@ -983,15 +983,17 @@ filterSlotsOf = Map.fromSet (const SlotArity.One) . Filter.boundSlots
 -- Quantity is Quantity.slotsAreExhaustive's half; CR 725.2's ControllerOfSource
 -- reads the trigger-source slot, which is not a target.
 --
--- No wildcard: a new opcode must answer here as well as in slotsOf. The `{}` arms
--- answer a constant, so a new FIELD on one is not forced -- which is why the
--- Quantities nested in this effect's ObjectRefs are taken from effectObjectRefs
--- ahead of the case rather than arm by arm, and why no arm below names one.
+-- The Quantities nested in this effect's ObjectRefs are taken from
+-- effectObjectRefs here rather than arm by arm, so no arm of the case below
+-- names a ref.
 slotsAreExhaustive :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 slotsAreExhaustive effect = all (all Quantity.slotsAreExhaustive . objectRefQuantities) (effectObjectRefs effect) && ownSlotsAreExhaustive effect
 
 -- slotsAreExhaustive's half that is not an ObjectRef's: this opcode's own
 -- fields, and its nested effects through the recursion back into it.
+--
+-- No wildcard: a new opcode must answer here as well as in slotsOf. The `{}`
+-- arms answer a constant, so a new FIELD on one is not forced.
 ownSlotsAreExhaustive :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 ownSlotsAreExhaustive effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> all (Quantity.slotsAreExhaustive . DamagePart.quantity) parts
@@ -1024,8 +1026,8 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.TurnFaceUp _ -> True
   Effect.RemoveFromCombat _ -> True
   Effect.BecomesBlocked _ -> True
-  -- Three of the four whose ref may nest a Quantity; ForEach is the fourth. The
-  -- entry rider nests one too, CR 122.6's count per kind.
+  -- The entry rider nests a Quantity of its own, CR 122.6's count per kind; the
+  -- ref's is effectObjectRefs' above.
   Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> all Quantity.slotsAreExhaustive (riderQuantities riders)
   Effect.Draw (Draw.MkDraw _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
@@ -1074,10 +1076,10 @@ ownSlotsAreExhaustive effect = case effect of
   -- No Quantity at all: CR 122.8 names neither a kind nor a count.
   Effect.PutCountersFrom {} -> True
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
-  -- BOTH Quantity positions: the count the moved kinds may write, and the one a
-  -- library walk in the GIVER carries -- `from` became an ObjectRef when CR
-  -- 122.5's first side was widened to a group, and an arm reading the kinds
-  -- alone kept compiling (#2729).
+  -- The count the moved kinds may write. CR 122.5's GIVER carries the other one,
+  -- through the ObjectRef it became when the first side was widened to a group,
+  -- and it is effectObjectRefs' above -- an arm reading the kinds alone kept
+  -- compiling (#2729).
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> all Quantity.slotsAreExhaustive (MovedKinds.quantityOf kinds)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
