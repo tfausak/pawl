@@ -3686,6 +3686,22 @@ storedBlockRestrictionSpec s registry = Spec.describe s "StoredBlockRestriction"
     Spec.assertBool s (not (Combat.canBlock S.bob victim resolved)) "restricted on the turn it resolved"
     Spec.assertBool s (Combat.canBlock S.bob victim swept) "and blocking again once the turn's cleanup has run"
     Spec.assertEqWith s "with nothing left stored" (GameState.blockProhibitions swept) []
+  -- CR 509.1c is CR 508.1d's textual mirror -- both count the requirements that
+  -- could be obeyed "without disobeying any restrictions" -- and this side
+  -- reaches it by the same route storedAttackRestrictionSpec's last case proves
+  -- one rule over: the prohibition takes the Screen off
+  -- Pawl.Engine.Combat.legalBlockersGiven, which is the candidate list
+  -- Pawl.Engine.BlockRequirement.instances mints against, so the maximum drops to
+  -- zero and declining becomes legal. The control is the SAME Zirda activation
+  -- aimed at alice's attacker, where the Screen must still block.
+  Spec.it s "CR 509.1c a required blocker the restriction covers may decline after all" $ do
+    (restrained, control, wall, attacker) <- zirdaScreenBoards s registry
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty restrained) "the Screen may decline once it can't block"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty control)) "while the control's Screen may not"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton wall (Set.singleton attacker)) control) "which blocking the lone attacker satisfies"
+    Spec.assertEqWith s "nothing is offered on the restricted board" (Combat.legalBlockers S.bob restrained) []
+    Spec.assertEqWith s "and the Screen is offered on the control" (Combat.legalBlockers S.bob control) [wall]
+    Spec.assertEqWith s "with the same lone attacker declared on each" (fmap declaredAttackers [restrained, control]) [[attacker], [attacker]]
 
 -- Alice's Zirda, activated once and resolved, over a board of her own attacker
 -- and two of bob's identical blockers. `pick` chooses which of the three the one
@@ -3711,12 +3727,43 @@ zirdaResolved s registry pick = do
             GameState.priority = Just S.alice
           }
       abilities = Activate.abilitiesFor zirdaId board
-      named = pick attacker victim twin
-      resolved = case abilities of
-        [ability] -> S.runPure (namingTarget named) board (Activate.activateAbility S.alice zirdaId ability >> Stack.resolveTop)
-        _ -> board
+      resolved = activatingZirda zirdaId (pick attacker victim twin) board
   Spec.assertEqWith s "Zirda states exactly one activated ability" (length abilities) 1
   pure (attacker, victim, twin, resolved)
+
+-- The CR 509.1c board: alice's Zirda and one Goblin Piker against bob's lone
+-- Razorgrass Screen ({1} Artifact Creature -- Wall 2/1, "Defender. This creature
+-- blocks each combat if able." -- checked against Scryfall, 2026-08-30), with the
+-- same Zirda activation aimed at the Screen (the first state) and at alice's
+-- attacker (the second). Zirda pays {T}, so it is tapped and attacks on neither,
+-- and attackers are declared after the activation, leaving both boards facing one
+-- Piker.
+zirdaScreenBoards ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (GameState.GameState, GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+zirdaScreenBoards s registry = do
+  zirda <- S.printingOf s registry "Zirda, the Dawnwaker"
+  mountain <- S.printingOf s registry "Mountain"
+  piker <- S.printingOf s registry "Goblin Piker"
+  screen <- S.printingOf s registry "Razorgrass Screen"
+  let (zirdaId, withZirda) = S.addCreature zirda S.alice (S.landsInPlay mountain 2)
+      (attacker, withAttacker) = S.addCreature piker S.alice withZirda
+      (wall, placed) = S.addCreature screen S.bob withAttacker
+      board = mainPhaseFor placed
+      abilities = Activate.abilitiesFor zirdaId board
+      run named = declaringAttackers (activatingZirda zirdaId named board)
+  Spec.assertEqWith s "Zirda states exactly one activated ability" (length abilities) 1
+  pure (run wall, run attacker, wall, attacker)
+
+-- Zirda's one ability, activated and resolved with its target slot aimed at
+-- `named` -- activatingNetter's twin, and the only thing the boards either Zirda
+-- fixture builds differ in.
+activatingZirda :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+activatingZirda zirdaId named board = case Activate.abilitiesFor zirdaId board of
+  [ability] -> S.runPure (namingTarget named) board (Activate.activateAbility S.alice zirdaId ability >> Stack.resolveTop)
+  _ -> board
 
 -- Aim Zirda's one target slot at this permanent, PINNED by filtering the offered
 -- set rather than built from the id: CR 115.1's pool of creatures offers
@@ -3764,13 +3811,14 @@ storedAttackRestrictionSpec s registry = Spec.describe s "StoredAttackRestrictio
     Spec.assertBool s (not (Combat.canAttack S.alice victim resolved)) "restricted on the turn it resolved"
     Spec.assertBool s (Combat.canAttack S.alice victim swept) "and attacking again once the turn's cleanup has run"
     Spec.assertEqWith s "with nothing left stored" (GameState.attackProhibitions swept) []
-  -- The asymmetry with CR 509.1b that this side has and the block side does not:
   -- CR 508.1d counts requirements obeyed "without disobeying any restrictions",
   -- so a stored restriction does not deadlock a Curse of the Nightly Hunt -- it
   -- takes the creature off Pawl.Engine.Combat.legalAttackers, which is the
   -- candidate list Pawl.Engine.AttackRequirement.instances mints against, and the
   -- maximum drops to zero. The control is the SAME Curse and the SAME activation
-  -- aimed at bob's Piker, where declining stays illegal.
+  -- aimed at bob's Piker, where declining stays illegal. CR 509.1c is this
+  -- sentence's mirror, not its opposite: storedBlockRestrictionSpec's last case
+  -- is the same shape one rule over.
   Spec.it s "CR 508.1d a required creature the restriction covers may decline after all" $ do
     -- CR 506.2's defending player has to be stated, because CR 508.1d mints an
     -- instance per (creature, announcement) pair and a board with no defender

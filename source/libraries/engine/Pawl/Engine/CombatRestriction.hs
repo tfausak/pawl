@@ -81,13 +81,18 @@ cantBlock candidates gs =
 -- turn".
 --
 -- blockProhibited's twin one rule over, sharing every argument that function's
--- comment makes, and asymmetric with it in one place the CR names: CR 508.1d's
+-- comment makes and one more the CR states on both sides: CR 508.1d's
 -- maximization counts requirements obeyed "without disobeying any restrictions",
 -- and Pawl.Engine.Combat.attackCeilingGiven gets that for free because its
 -- candidate list is Pawl.Engine.Combat.legalAttackers, already narrowed by this
 -- set. A creature under a stored prohibition therefore excuses a Curse of the
--- Nightly Hunt requirement rather than deadlocking the declaration. CR 509.1c
--- says the same of blocking, but no requirement there reads a set this narrows.
+-- Nightly Hunt requirement rather than deadlocking the declaration. CR 509.1c is
+-- that sentence's mirror and blockProhibited reaches it the same way:
+-- Pawl.Engine.Combat.blockCeilingGiven's candidates are
+-- Pawl.Engine.Combat.legalBlockersGiven, narrowed through `cantBlock`, and
+-- Pawl.Engine.BlockRequirement.instances mints against that narrowed list.
+-- Proved on both sides by Pawl.CombatSpec's StoredAttackRestriction and
+-- StoredBlockRestriction groups.
 --
 -- No CR 508.1c "unless" gate, for blockProhibited's reason: every gate in the
 -- pool is printed beside the restriction it gates, and Pawl.Types.ForbidAttack

@@ -8,7 +8,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- in GameState.blockProhibitions. Zirda, the Dawnwaker's "target creature can't
 -- block this turn" is the producer.
 --
--- Read at Pawl.Engine.CombatRestriction.prohibited, which unions it into
+-- Read at Pawl.Engine.CombatRestriction.blockProhibited, which unions it into
 -- `cantBlock` beside CR 701.35a's detentions -- so CR 509.1b sees one answer and
 -- Pawl.Engine.Combat never learns which of the three roads a restriction took.
 --

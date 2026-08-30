@@ -6240,7 +6240,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     --
     -- Nothing is written onto the permanent itself, and nothing is projected: CR
     -- 613.11 keeps a restriction on a declaration out of the layers, so the row
-    -- is read at Pawl.Engine.CombatRestriction.prohibited and never by a
+    -- is read at Pawl.Engine.CombatRestriction.blockProhibited and never by a
     -- projection.
     State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
       -- CR 611.2b: the duration never started, so nothing is stored.
