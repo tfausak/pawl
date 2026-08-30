@@ -545,13 +545,23 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- Condition.holds collapses to False.
   --
   -- CR 603.4's SECOND check is a regression fence rather than a proved behaviour.
-  -- Both arms answer off the log, so an entrant that has since left reads the
-  -- same fact at either check -- but nothing observes that: the clause is printed
-  -- on two cards (Scryfall o:"if it entered from", 2026-08-30 -- Archfiend's
-  -- Vessel and Prized Amalgam), only the first is in data/cards/, and a Vessel
+  -- Both arms answer off the log, so an entrant that has since left reads the same
+  -- fact at either check, and no card in data/cards/ observes that.
+  --
+  -- The clause is a printed FAMILY, not a card or two: Scryfall o:"entered from",
+  -- 2026-08-30, eight printings, of which seven state it as an intervening "if"
+  -- (Fblthp, the Lost is the eighth, whose "if" opens a second sentence and is
+  -- ordinary English; nothing prints the older "entered the battlefield from"
+  -- wording). Archfiend's Vessel is the one member whose clause and whose effect
+  -- name the SAME object, which is exactly why it cannot refute this: a Vessel
   -- that left the battlefield fails CR 603.6's find and makes no Demon whichever
-  -- way the re-check went. Prized Amalgam is what would refute it, its payload
-  -- naming the source rather than the entrant; it waits on #2500.
+  -- way the re-check answered. Every other member reads the ENTRANT and acts
+  -- elsewhere -- Grist, Voracious Larva transforms Grist, Kotis, Sibsig Champion
+  -- and Breathless Knight put counters on themselves, Prized Amalgam returns its
+  -- own card -- so killing the entrant between the two checks tells a log read
+  -- from a live-board one. Grist is the nearest, its ability functioning from the
+  -- battlefield so that #2500 does not reach it. Not implemented: no such card is
+  -- in the pool (#2687).
   Quantity.EnteredFrom inZone -> do
     oid <- mOid
     pids <- playersOf (InZone.player inZone)
@@ -569,7 +579,15 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   --
   -- The reference is asked of the CASTER and of the owner both, which is the whole
   -- of "you cast it from YOUR graveyard"; the owner half is EnteredFrom's, for CR
-  -- 400.3's reason, and is read the same way for CR 603.4's.
+  -- 400.3's reason, and is read the same way for CR 603.4's. The two conjuncts are
+  -- a regression fence rather than a proved pair: every printing of the clause
+  -- says "you" and "your" of one player, so nothing separates a caster from an
+  -- owner, and no case here does either.
+  --
+  -- An object that reached the battlefield any OTHER way answers 0 rather than
+  -- Nothing, `spells` coming up empty: a permanent put there by an effect was not
+  -- cast at all, which is an answered question and the disjunct's other half
+  -- (EnteredFrom) is what covers it.
   Quantity.WasCastFrom inZone -> do
     oid <- mOid
     pids <- playersOf (InZone.player inZone)

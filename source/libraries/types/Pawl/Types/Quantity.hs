@@ -652,8 +652,8 @@ data Quantity
   | -- | CR 400.7 / 400.3: did the object this quantity is evaluated against enter
     -- the battlefield out of that player's copy of that zone? 1 if so and 0 if not.
     EnteredFrom InZone.InZone
-  | -- | CR 601.2a / 400.3: was the object this quantity is evaluated against cast
-    -- by that player out of that player's copy of that zone? 1 if so and 0 if not.
+  | -- | CR 601.2a / 400.3: did the object this quantity is evaluated against enter
+    -- the battlefield as a spell that player cast out of their copy of that zone?
     WasCastFrom InZone.InZone
   | -- | CR 509.1h / 702.23a: how many creatures are blocking the object this
     -- quantity is evaluated against, BEYOND THE FIRST -- rampage's "for each
