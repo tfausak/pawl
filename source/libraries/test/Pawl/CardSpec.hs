@@ -4654,8 +4654,8 @@ grantedModifications card =
    in deeper (printed <> storedIn (printedCarrierEffects card))
 
 -- The enchant slots this face GRANTS rather than prints: CR 613.1f layer 6's
--- Modification.GainEnchant, which Cloudform and the Licids write and CR 702.103b's
--- bestow grants from the engine. Indexed off grantedModifications above, so both
+-- Modification.GainEnchant, which Cloudform and Gliding Licid write and CR
+-- 702.103b's bestow grants from the engine. Indexed off grantedModifications, so both
 -- roads to a modification are covered -- a printed static ability's and the ones
 -- Effect.ModifyTarget stores, which is the road both cards take.
 grantedEnchantSlots :: Face.Face Card.Type.Card -> [TargetSlot.TargetSlot]
@@ -5234,12 +5234,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Target.slotContext against whatever the announcement happened to seed.
   --
   -- BOTH roads to that slot, printed and granted (enchantSlots), and the granted
-  -- one owes the claim even harder: CR 613.1f hands the ability to the RECEIVER,
-  -- so what answers the slot is the receiver's own announcement
-  -- (Card.modesTargetSlotsGiven) or CR 303.4f's on-entry choice, and the granting
-  -- card cannot name a slot in either. Declaring the name in the granting mode
-  -- would not rescue it, which is why this is a "reads nothing" claim rather than
-  -- a fold into Resolve.slotsOf's ModifyTarget arm.
+  -- one owes the claim even harder: a CR 613.1f grant is a CR 611.2 continuous
+  -- effect that outlives the resolution that wrote it, so nothing that resolution
+  -- bound is in scope when CR 601.2c chooses for a bestowed spell or CR 303.4c's
+  -- state-based action re-reads CR 702.5a against a permanent. Declaring the name
+  -- in the granting mode would not rescue it, which is why this is a "reads
+  -- nothing" claim rather than a fold into Resolve.slotsOf's ModifyTarget arm.
   Spec.it s "an enchant slot reads no slot, printed or granted" $ do
     ps <- S.allPrintings s
     let reads_ face = Set.unions (fmap (Map.keysSet . Resolve.targetSlotSlots) (enchantSlots face))

@@ -693,10 +693,12 @@ durationSlots duration = case duration of
 --   * Face.enchant -- CR 303.4a's enchant slot, declared on the face BESIDE the
 --     modes (Card.enchantSlotMap), so it is in no mode's declared set.
 --   * Modification.GainEnchant -- the same slot GRANTED by a CR 613.1f layer 6
---     effect (Cloudform, the Licids, CR 702.103b's bestow). It ends up on the
---     RECEIVER, whose own announcement CR 601.2c answers it from
---     (Card.modesTargetSlotsGiven), never the granting mode's -- so a name read
---     here could not be answered even if the granting mode declared it.
+--     effect (Cloudform, the Licids, CR 702.103b's bestow). What answers it is
+--     never the granting mode: the grant is a CR 611.2 continuous effect that
+--     outlives the resolution that made it, so by the time CR 601.2c chooses for
+--     a bestowed spell (Card.modesTargetSlotsGiven) or CR 303.4c's state-based
+--     action re-reads CR 702.5a against a permanent, the announcement the grant
+--     was written in is gone. Declaring the name would not rescue it.
 --
 -- The last two are one claim, and Pawl.CardSpec's "an enchant slot reads no slot,
 -- printed or granted" sweep is what states it: neither may read anything.
