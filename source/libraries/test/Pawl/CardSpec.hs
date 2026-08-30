@@ -245,6 +245,7 @@ import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
@@ -544,7 +545,8 @@ quantityCounts quantity = case quantity of
   -- CR 122.1's per-player counter tally, another such scalar.
   Quantity.Type.PlayerCounters {} -> []
   -- CR 122.1's per-OBJECT tally, read off the object the quantity is evaluated
-  -- against: a bare CounterKind with no Count and no Filter beside it.
+  -- against: a CounterKind with no Count beside it. The KIND may carry a Filter
+  -- of its own (CR 122.1b), which quantityKindFilters below is what digs out.
   Quantity.Type.ObjectCounters _ -> []
   -- The kind-agnostic reading of that same tally: not even a CounterKind beside it.
   Quantity.Type.ObjectCountersOfAnyKind -> []
@@ -587,10 +589,16 @@ quantityCounts quantity = case quantity of
 -- descent the shared-zone lint below would sweep past a misauthored inner
 -- scope.
 countCounts :: Count.Type.Count Quantity.Type.Quantity -> [Count.Type.Count Quantity.Type.Quantity]
-countCounts count = case Count.Type.aggregation count of
+countCounts = concatMap quantityCounts . countQuantities
+
+-- The Quantities a Count's AGGREGATION carries: only Greatest has one. Named so
+-- countCounts above and quantityKindFilters below descend through the same field
+-- rather than each spelling the aggregation out.
+countQuantities :: Count.Type.Count Quantity.Type.Quantity -> [Quantity.Type.Quantity]
+countQuantities count = case Count.Type.aggregation count of
   Aggregation.Members -> []
   Aggregation.DistinctCardTypes -> []
-  Aggregation.Greatest quantity -> quantityCounts quantity
+  Aggregation.Greatest quantity -> [quantity]
 
 -- Every Count reachable from a Condition: both sides of a comparison are
 -- Quantities and either may embed one, and a disjunction or a conjunction holds
@@ -939,7 +947,11 @@ effectCounts effect = case effect of
   Effect.Counter {} -> []
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
   Effect.PutCountersFrom {} -> []
-  Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> foldMap quantityCounts (MovedKinds.quantityOf kinds)
+  -- BOTH Quantity positions: the count the moved kinds may write, and the one a
+  -- library walk in the GIVER carries -- `from` became an ObjectRef when CR
+  -- 122.5's first side was widened to a group, and an arm reading the kinds alone
+  -- kept compiling (#2729).
+  Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds _ _) -> refCounts from <> foldMap quantityCounts (MovedKinds.quantityOf kinds)
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> quantityCounts quantity
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
@@ -2877,8 +2889,22 @@ riderFilters riders =
   concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))
     <> concatMap quantityFilters (Map.elems (EntryRiders.counters riders))
 
+-- Both Filter positions a CR 614.1c counter row has, riderFilters' two over the
+-- payload entryRewriteFilters and turnUpRewriteFilters share: the KINDS it is
+-- keyed by and the COUNTS it holds. One function so the two rewrites that carry
+-- the payload cannot sweep different halves of it.
+withCountersFilters :: WithCounters.WithCounters -> [Filter.Type.Filter Keyword.Keyword]
+withCountersFilters w =
+  concatMap counterKindFilters (Map.keys (WithCounters.counters w))
+    <> concatMap quantityFilters (Map.elems (WithCounters.counters w))
+
 -- CR 122.1b: the one counter kind with a Filter under it, since it carries a
 -- whole Keyword. Exhaustive so a new kind with a payload breaks this build.
+--
+-- EVERY card-authored CounterKind position goes through this, and the list is
+-- greppable rather than asserted: `counterKindFilters` above the effect
+-- traversals, plus riderFilters and withCountersFilters, is the whole of it
+-- (#2728).
 counterKindFilters :: CounterKind.CounterKind Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 counterKindFilters kind = case kind of
   CounterKind.Keyword keyword -> keywordFilters keyword
@@ -3271,8 +3297,71 @@ objectRefFilters ref = case ref of
 countFilters :: [Count.Type.Count Quantity.Type.Quantity] -> [Filter.Type.Filter Keyword.Keyword]
 countFilters = fmap Count.Type.filter
 
+-- BOTH axes a Quantity holds card text on: the Filter of every Count reachable
+-- from it, and the Filter a CR 122.1b keyword counter hides under a CounterKind
+-- (#2728). The second is a separate walk because the first goes through
+-- quantityCounts, whose answer is a list of Counts and so cannot carry it.
 quantityFilters :: Quantity.Type.Quantity -> [Filter.Type.Filter Keyword.Keyword]
-quantityFilters = countFilters . quantityCounts
+quantityFilters quantity = countFilters (quantityCounts quantity) <> quantityKindFilters quantity
+
+-- Every Filter a CounterKind inside a Quantity carries. CR 122.1b lets a counter's
+-- kind be a whole Keyword, and a Keyword may hold a Filter (keywordFilters), so
+-- ObjectCounters' kind is card text like any other -- and the shape of the descent
+-- is quantityCounts' above, arm for arm, since a nested Quantity may hide one
+-- wherever a nested Count may.
+--
+-- Exhaustive with no catch-all, this file's discipline for a sum: a new Quantity
+-- arm that comes to carry a CounterKind must be classified here rather than drop
+-- its Filter silently, which is how this position went unswept in the first place.
+quantityKindFilters :: Quantity.Type.Quantity -> [Filter.Type.Filter Keyword.Keyword]
+quantityKindFilters quantity = case quantity of
+  Quantity.Type.Literal _ -> []
+  Quantity.Type.ManaValue -> []
+  Quantity.Type.Power -> []
+  Quantity.Type.Toughness -> []
+  Quantity.Type.InSlot _ -> []
+  Quantity.Type.Star -> []
+  Quantity.Type.Plus (Plus.MkPlus a b) -> quantityKindFilters a <> quantityKindFilters b
+  Quantity.Type.Halved (Halved.MkHalved _ inner) -> quantityKindFilters inner
+  Quantity.Type.Negate a -> quantityKindFilters a
+  -- The Count's own Filter is countFilters' half above; what this half adds is
+  -- the CounterKind a Greatest's per-member Quantity may hide, which is
+  -- countCounts' descent.
+  Quantity.Type.Count count -> concatMap quantityKindFilters (countQuantities count)
+  Quantity.Type.ManaCount _ -> []
+  Quantity.Type.LifeTotal _ -> []
+  Quantity.Type.Speed _ -> []
+  Quantity.Type.IsMonarch _ -> []
+  Quantity.Type.IsStartingPlayer _ -> []
+  Quantity.Type.IsActivePlayer _ -> []
+  Quantity.Type.HasDesignation _ -> []
+  Quantity.Type.ClassLevel -> []
+  Quantity.Type.WasKicked -> []
+  Quantity.Type.SnowWasSpent -> []
+  -- CR 122.1's PER-PLAYER tally, whose kind is a Pawl.Types.PlayerCounterKind --
+  -- a disjoint domain from the object kinds, carrying no Keyword and so no
+  -- Filter. See Pawl.Types.PlayerCounterKind.
+  Quantity.Type.PlayerCounters {} -> []
+  -- The position this whole function exists for: CR 122.1's per-OBJECT tally
+  -- names the kind on the card, and "the number of hexproof-from-Goblins
+  -- counters" would carry a Filter under it.
+  Quantity.Type.ObjectCounters kind -> counterKindFilters kind
+  -- The kind-agnostic reading of that same tally: no CounterKind beside it, so
+  -- nothing to dig out.
+  Quantity.Type.ObjectCountersOfAnyKind -> []
+  Quantity.Type.OpponentsAttacked _ -> []
+  Quantity.Type.CardsDiscardedThisTurn _ -> []
+  Quantity.Type.LifeGainedThisTurn _ -> []
+  Quantity.Type.PlayersDealtDamageThisTurn _ -> []
+  Quantity.Type.SpellsCastLastTurn _ -> []
+  Quantity.Type.DungeonsCompleted _ -> []
+  Quantity.Type.EnteredThisTurn -> []
+  Quantity.Type.EnteredFrom _ -> []
+  Quantity.Type.WasCastFrom _ -> []
+  Quantity.Type.BlockersBeyondFirst -> []
+  -- quantityCounts' descent: aiming the evaluation at another object does not
+  -- stop the payload from naming a kind.
+  Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> quantityKindFilters inner
 
 conditionFilters :: Condition.Type.Condition -> [Filter.Type.Filter Keyword.Keyword]
 conditionFilters = countFilters . conditionCounts
@@ -3509,20 +3598,24 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerGainsLife _ -> []
   TriggerCondition.PlayersGainLife _ -> []
   TriggerCondition.PlayerLosesLife _ -> []
-  -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
-  TriggerCondition.SelfCountersReached {} -> []
+  -- CR 714.2b's threshold names a counter kind, and CR 122.1b's kind may be a
+  -- whole Keyword carrying a Filter -- "whenever the second hexproof-from-
+  -- Goblins counter is put on this permanent" (#2728). The Natural beside it is
+  -- no Filter.
+  TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached kind _) -> counterKindFilters kind
   TriggerCondition.SelfBecomesClassLevel _ -> []
-  -- CR 310.12b carries a counter kind alone.
-  TriggerCondition.SelfLastCounterRemoved _ -> []
+  -- CR 310.12b names a counter kind alone, swept for the arm above's reason.
+  TriggerCondition.SelfLastCounterRemoved kind -> counterKindFilters kind
   -- And so does its any-amount mirror.
-  TriggerCondition.SelfCountersRemoved _ -> []
+  TriggerCondition.SelfCountersRemoved kind -> counterKindFilters kind
   -- CR 603.2c's batch placement carries one, over the permanents the counters
   -- landed on -- swept like PermanentsDie's, so a card's "one or more creatures"
-  -- is not exempt from the corpus filter lints.
-  TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement _ f) -> [f]
+  -- is not exempt from the corpus filter lints. And its KIND beside it, for the
+  -- three arms above's reason.
+  TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind f) -> f : counterKindFilters kind
   -- And its per-permanent scope, whose Filter is read against ONE permanent --
   -- swept all the same, the lints being about the Filter and not the scope.
-  TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement _ f) -> [f]
+  TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement kind f) -> f : counterKindFilters kind
   -- CR 601.2i's "whenever you cast a [type] spell" carries one directly, over
   -- the spell rather than over a permanent.
   TriggerCondition.SpellCast (SpellCast.MkSpellCast f _ _ _) -> [f]
@@ -3958,8 +4051,10 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- of creature cards in all graveyards"), so a Count inside it holds card text on
   -- the same axis EntryRiders' counts do -- riderFilters walks those, and this
   -- walks this.
-  -- EVERY kind's amount, since the row carries a map of them (#2314).
-  EntryRewrite.WithCounters w -> foldMap quantityFilters (Map.elems (WithCounters.counters w))
+  -- EVERY kind's amount, since the row carries a map of them (#2314) -- and
+  -- every KIND, the map's keys being CR 122.1b's, any of which may be a whole
+  -- Keyword carrying a Filter (#2728).
+  EntryRewrite.WithCounters w -> withCountersFilters w
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.Riot -> []
   EntryRewrite.Unleash -> []
@@ -3968,7 +4063,10 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.Tapped -> []
   EntryRewrite.PayLifeOrTapped _ -> []
   EntryRewrite.EntersTransformed -> []
-  EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber f _) -> [f]
+  -- BOTH fields: the permanents the sacrifice may take, and CR 122.1b's kind
+  -- the entering permanent takes one of per sacrifice, which may be a whole
+  -- Keyword carrying a Filter (#2728).
+  EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber f kind) -> f : concatMap counterKindFilters (Maybe.maybeToList kind)
   -- CR 614.1c's as-enters effects hold no Filter of their own; the ones inside
   -- them are reached as ordinary effect filters, through cardResolutionEffects.
   EntryRewrite.RunEffects _ -> []
@@ -3986,7 +4084,7 @@ turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
   -- pool's only authored turn-up rewrite of this shape and their count is a
   -- literal, and walked anyway so the two halves of one payload cannot be swept
   -- differently.
-  TurnUpRewrite.WithCounters w -> foldMap quantityFilters (Map.elems (WithCounters.counters w))
+  TurnUpRewrite.WithCounters w -> withCountersFilters w
   TurnUpRewrite.MayAttachTo f -> [f]
 
 -- CR 614.1c-e: four replacement patterns narrow by a Filter. CounterPattern.onWhat
@@ -4006,7 +4104,12 @@ turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
 -- attachment may land.
 replacementEffectFilters :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Filter.Type.Filter Keyword.Keyword]
 replacementEffectFilters replacementEffect = case replacementEffect of
-  ReplacementEffect.CounterR (CounterR.MkCounterR counterPattern _) -> [CounterPattern.onWhat counterPattern]
+  -- BOTH of the pattern's Filter-bearing fields: the permanents it watches, and
+  -- CR 122.1b's kind, which may be a whole Keyword carrying a Filter (#2728).
+  -- `whichKind` is a Maybe, and Nothing there is Doubling Season's ANY kind
+  -- rather than a kind holding nothing.
+  ReplacementEffect.CounterR (CounterR.MkCounterR counterPattern _) ->
+    CounterPattern.onWhat counterPattern : concatMap counterKindFilters (Maybe.maybeToList (CounterPattern.whichKind counterPattern))
   ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern _ _ _) -> [ZoneChangePattern.whatObject zoneChangePattern]
   ReplacementEffect.EntryR (EntryR.MkEntryR entryPattern entryRewrite) -> entryPattern : entryRewriteFilters entryRewrite
   -- CR 615.1's shields narrow by their source, which is a Filter over the object
@@ -4414,18 +4517,23 @@ effectFilters effect = case effect of
   -- Swift Silence's "all other spells" is an ObjectRef Filter like Destroy's,
   -- so the lint reaches it.
   Effect.Counter (Counter.MkCounter ref _) -> sourceHosted (objectRefFilters ref)
-  -- BOTH positions: the ObjectRef carries Renegade Krasis' "each other creature
-  -- you control with a +1/+1 counter on it", and a Filter there would otherwise
-  -- escape the lint.
-  Effect.PutCounters (PutCounters.MkPutCounters _ quantity ref) -> unframed (quantityFilters quantity) <> sourceHosted (objectRefFilters ref)
+  -- All THREE positions: the ObjectRef carries Renegade Krasis' "each other
+  -- creature you control with a +1/+1 counter on it", and a Filter there would
+  -- otherwise escape the lint; the count is a Quantity like any other; and CR
+  -- 122.1b's kind may be a whole Keyword with a Filter under it (#2728).
+  Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) -> unframed (counterKindFilters kind <> quantityFilters quantity) <> sourceHosted (objectRefFilters ref)
   -- The destination only, PutCounters' framing: `from` is a bare SlotName and
   -- carries no Filter.
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ ref) -> sourceHosted (objectRefFilters ref)
-  -- BOTH positions, PutCounters' framing: the first side is an ObjectRef and
+  -- THREE positions, PutCounters' framing: the first side is an ObjectRef and
   -- carries Spike Cannibal's "all creatures", where the destination is a bare
-  -- SlotName and carries no Filter.
-  Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds _ _) -> unframed (foldMap quantityFilters (MovedKinds.quantityOf kinds)) <> sourceHosted (objectRefFilters from)
-  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> unframed (quantityFilters quantity)
+  -- SlotName and carries no Filter. The moved kinds hold both of the others --
+  -- a count under the two arms that write one (MovedKinds.quantityOf) and CR
+  -- 122.1b's kind under the three that name one (MovedKinds.kindOf, #2728).
+  Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds _ _) -> unframed (foldMap counterKindFilters (MovedKinds.kindOf kinds) <> foldMap quantityFilters (MovedKinds.quantityOf kinds)) <> sourceHosted (objectRefFilters from)
+  -- The count and CR 122.1b's kind, PutCounters' two unframed positions: the
+  -- slot beside them is a bare SlotName and carries no Filter.
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity _) -> unframed (counterKindFilters kind <> quantityFilters quantity)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
   Effect.PayAnyEnergy _ -> []
@@ -4877,12 +4985,17 @@ activatedAbilityFilters ability =
 --
 -- The remaining fields hold none: `name`, `manaCost`, `typeLine`, `loyalty`,
 -- `defense`, `colorIndicator`, `counterability`, `castingPermissions` and
--- `castingRestrictions`. That is checkable rather than
--- asserted: exactly sixteen modules under Pawl.Types import Pawl.Types.Filter --
--- Affected, CostComponent, Count, CounterPattern, Effect, EntryRewrite, Keyword,
--- MillTally, ObjectRef, PlayerEffect, Prompt, ReplacementEffect, TargetSlot,
--- TriggerCondition, TurnUpRewrite and ZoneChangePattern -- and nothing those nine
--- fields reach is one of them.
+-- `castingRestrictions`. That is checkable rather than asserted: none of the
+-- types those nine fields reach imports Pawl.Types.Filter, which
+-- `grep -rl 'import qualified Pawl.Types.Filter' source/libraries/types/` over
+-- each one's closure answers.
+--
+-- The import graph is a NECESSARY condition and not a sufficient one, and CR
+-- 122.1b's keyword counter is why: Pawl.Types.CounterKind is parametric in its
+-- keyword and so imports no Filter, yet every card-side use instantiates it at
+-- Pawl.Types.Keyword, which does. A type parameterised over a Filter-bearing
+-- type is invisible to the grep, so each such carrier is walked by hand instead
+-- -- counterKindFilters' callers above are the whole set (#2728).
 --
 -- The two lists together are the whole record.
 --
@@ -4917,6 +5030,10 @@ cardFilters card =
         <> concatMap attachRestrictionFilters (Face.attachRestrictions card)
         <> concatMap (affectedFilters . EntryRestriction.affected) (Face.entryRestrictions card)
         <> concatMap (affectedFilters . CounterRestriction.affected) (Face.counterRestrictions card)
+        -- And the KIND the prohibition names (Melira, Sylvok Outcast's -1/-1
+        -- counters), which may be a whole Keyword carrying a Filter (CR 122.1b,
+        -- #2728). Nothing there is Solemnity's "counters" -- any kind at all.
+        <> concatMap (concatMap counterKindFilters . Maybe.maybeToList . CounterRestriction.kind) (Face.counterRestrictions card)
     )
     <> concatMap printedReplacementFilters (Face.replacementEffects card)
     <> concatMap staticAbilityFilters (Face.staticAbilities card)
@@ -8082,6 +8199,91 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let destroying = base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing Nothing)]}
     Spec.assertEqWith s "the same atom over objects is not" (isBoundCounts destroying) (0, 1)
     Spec.assertBool s (not (isBoundOffends destroying)) "and the lint accepts it"
+  -- CR 122.1b lets a counter's KIND be a whole Keyword, and a keyword may carry a
+  -- Filter of its own -- CR 702.11d's "hexproof from Goblins", CR 702.29e's
+  -- typecycling predicate, the components of any Cost a keyword names. So every
+  -- card-authored counter-kind position holds card text, and the traversals above
+  -- have to walk it or the position lints read the wrong number.
+  --
+  -- What that cost, exactly: NOT silence. Every position lint above carries a
+  -- codec cross-check -- "the traversal and the codec disagree" -- and a Filter
+  -- the traversal cannot see makes both counts zero against a non-zero
+  -- `jsonAtoms`, so the card was rejected all the same. What was wrong is the
+  -- CLASSIFICATION: the offence reported was a blind spot in cardFilters rather
+  -- than the atom's position, and an atom that was legitimately placed would have
+  -- been rejected by the same arithmetic. #2728 records the enumeration; this is
+  -- what holds it.
+  --
+  -- Proved position by position on the TRAVERSALS rather than on the offence
+  -- boolean, which was True before this walk existed and is True after it.
+  Spec.it s "CR 122.1b a Filter under a keyword counter is walked at every counter-kind position" $ do
+    let -- Buried under all three combinators, so a walk reading only the top of a
+        -- keyword's own Filter would miss it.
+        buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.CanAttachToSubject]]
+        kind = CounterKind.Keyword (Keyword.Hexproof (Just buried))
+        one = Quantity.Type.Literal 1
+        slot = SlotName.MkSlotName (Text.pack "target")
+        anywhere = ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)
+        riders = EntryRiders.defaultValue {EntryRiders.counters = Map.singleton kind one}
+        holds :: [Filter.Type.Filter Keyword.Keyword] -> Bool
+        holds = elem buried
+        -- Every position a card may write a CounterKind in, each named for the
+        -- traversal that has to reach it. An arm that stops digging names itself.
+        walked =
+          [ ("EntryRiders' kinds", holds (riderFilters riders)),
+            ("Effect.PutCounters' kind", holds (fmap snd (effectFilters (Effect.PutCounters (PutCounters.MkPutCounters kind one anywhere))))),
+            ("Effect.RemoveCounters' kind", holds (fmap snd (effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind one slot))))),
+            ("Effect.MoveCounters' kinds", holds (fmap snd (effectFilters (Effect.MoveCounters (MoveCounters.MkMoveCounters anywhere (MovedKinds.Named kind one) Nothing slot))))),
+            ("Quantity.ObjectCounters' kind", holds (quantityFilters (Quantity.Type.ObjectCounters kind))),
+            ("CR 714.2b's threshold", holds (triggerConditionFilters (TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached kind 2)))),
+            ("CR 310.12b's last removal", holds (triggerConditionFilters (TriggerCondition.SelfLastCounterRemoved kind))),
+            ("its any-amount mirror", holds (triggerConditionFilters (TriggerCondition.SelfCountersRemoved kind))),
+            ("CR 603.2c's per-permanent placement", holds (triggerConditionFilters (TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement kind (Filter.Type.HasCardType CardType.Creature))))),
+            ("CR 603.2c's batch placement", holds (triggerConditionFilters (TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind (Filter.Type.HasCardType CardType.Creature))))),
+            ("CR 614.1's scaling pattern", holds (replacementEffectFilters (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern (Just kind) CounterSubject.ByAnything ControllerRelation.Yours (Filter.Type.HasCardType CardType.Creature) Nothing) (Scaling.AddMore 1))))),
+            ("CR 614.1c's as-enters sacrifice", holds (entryRewriteFilters (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber (Filter.Type.HasCardType CardType.Creature) (Just kind))))),
+            ("CR 614.1c's as-enters counters", holds (entryRewriteFilters (EntryRewrite.WithCounters (WithCounters.one kind one)))),
+            ("CR 614.1e's turn-up counters", holds (turnUpRewriteFilters (TurnUpRewrite.WithCounters (WithCounters.one kind one))))
+          ]
+    -- Ordered FIRST, and the assertion this case exists for: every position digs
+    -- the keyword's Filter out. A dropped arm reddens under its own label.
+    Spec.assertEqWith s "every counter-kind position is walked" walked (fmap (fmap (const True)) walked)
+    -- The pair that differs in exactly ONE thing: the same positions carrying a
+    -- kind that is not a keyword hand back no Filter at all, so what the row above
+    -- reports is the KIND's payload rather than a walk that returns everything.
+    let plain = CounterKind.PlusOnePlusOne
+    Spec.assertEqWith
+      s
+      "a kind carrying no keyword contributes nothing"
+      ( counterKindFilters plain,
+        fmap snd (effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters plain one slot))),
+        quantityFilters (Quantity.Type.ObjectCounters plain),
+        triggerConditionFilters (TriggerCondition.SelfLastCounterRemoved plain)
+      )
+      ([], [], [], [])
+    -- And the whole road, end to end, at the ONE position no traversal above
+    -- reaches on its own: a CR 122.6 prohibition names its kind on the Face
+    -- record, so cardFilters' own fold is what has to carry it. The atom is
+    -- CanAttachToSubject, answerable only inside a search (CR 701.3a), so the
+    -- counts say the traversal found it and filed it OUTSIDE one -- where before
+    -- this walk both counts read zero and only the codec cross-check objected.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base = S.combinedFace piker
+        prohibiting =
+          base
+            { Face.counterRestrictions =
+                [CounterRestriction.MkCounterRestriction (Affected.Matching (Filter.Type.HasCardType CardType.Creature)) (Just kind)]
+            }
+    Spec.assertEqWith s "a prohibition's kind is counted outside a search" (canAttachToSubjectCounts prohibiting) (0, 1)
+    -- NOT vacuous: the codec sees exactly one atom in that face, so the pair above
+    -- is being compared against a real occurrence rather than against nothing.
+    Spec.assertEqWith s "and the codec agrees there is one" (jsonAtoms canAttachToSubjectTag (Codec.encode (Face.Codec.codec Card.codec) prohibiting)) 1
+    Spec.assertBool s (canAttachToSubjectOffends prohibiting) "and the lint says so"
+    -- The pair that differs in one thing again: the same prohibition over a
+    -- plain kind carries no atom, so the face is accepted.
+    let plainly = base {Face.counterRestrictions = [CounterRestriction.MkCounterRestriction (Affected.Matching (Filter.Type.HasCardType CardType.Creature)) (Just plain)]}
+    Spec.assertEqWith s "a prohibition naming a plain kind carries none" (canAttachToSubjectCounts plainly) (0, 0)
+    Spec.assertBool s (not (canAttachToSubjectOffends plainly)) "and the lint accepts it"
   -- The two source-power comparisons are answerable only where the CONTEXT
   -- supplies a source power: Filter.Context.sourcePower is filled by
   -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.134a), by

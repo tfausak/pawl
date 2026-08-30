@@ -59,6 +59,8 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.MoveCounters as MoveCounters
+import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -2775,6 +2777,35 @@ communeWithLavaSpec s registry =
               Resolve.slotsAreExhaustive (damageDepthOf (Quantity.LifeTotal (PlayerRef.InSlot slot)))
             )
             (Map.singleton slot SlotArity.One, True, False)
+          -- And the same three off CR 122.5's GIVER, which is the seam's newest
+          -- reader: `from` was a bare SlotName until it was widened to a whole
+          -- ObjectRef, and two of the three arms above kept compiling while
+          -- reading only the moved kinds' count -- so a depth nested in the giver
+          -- was invisible to both (#2729). The moved kinds are EveryOfKind, which
+          -- writes no count of its own, so every answer here is the ref's depth.
+          let giverDepthOf q =
+                Effect.MoveCounters
+                  ( MoveCounters.MkMoveCounters
+                      (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) q))
+                      (MovedKinds.EveryOfKind CounterKind.PlusOnePlusOne)
+                      Nothing
+                      (SlotName.MkSlotName (Text.pack "recipient"))
+                  )
+          Spec.assertEqWith
+            s
+            "a counter move's giver reports its depth's slot, X read and exhaustiveness alike"
+            ( Resolve.slotsOf (giverDepthOf (Quantity.InSlot slot)),
+              Resolve.readsX [giverDepthOf (Quantity.InSlot Binding.variableX)],
+              Resolve.slotsAreExhaustive (giverDepthOf (Quantity.LifeTotal (PlayerRef.InSlot slot)))
+            )
+            (Map.fromList [(slot, SlotArity.One), (SlotName.MkSlotName (Text.pack "recipient"), SlotArity.One)], True, False)
+          Spec.assertEqWith
+            s
+            "and a literal depth reads no X and states its slots whole, so the answers are the depth's"
+            ( Resolve.readsX [giverDepthOf (Quantity.Literal 3)],
+              Resolve.slotsAreExhaustive (giverDepthOf (Quantity.Literal 3))
+            )
+            (False, True)
 
 -- alice is mid-combat with one creature per printing in `mine`, bob defends with
 -- one per printing in `theirs`, and alice holds a Trumpet Blast plus exactly the

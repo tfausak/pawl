@@ -142,3 +142,19 @@ quantityOf x = case x of
   AnyNumberOfKind _ -> Nothing
   EachAbsentKind -> Nothing
   UpToOneChosen -> Nothing
+
+-- | The kind the CARD names, for a caller that reads every CounterKind an effect
+-- holds -- 'quantityOf''s sibling, one field over. 'Nothing' wherever the card
+-- writes no kind down: 'Every' reads the first object's whole tally,
+-- 'EachAbsentKind' reads the destination's, and 'Chosen', 'AnyNumber' and
+-- 'UpToOneChosen' ask the player.
+kindOf :: MovedKinds -> Maybe (CounterKind.CounterKind Keyword.Keyword)
+kindOf x = case x of
+  Every -> Nothing
+  Named kind _ -> Just kind
+  EveryOfKind kind -> Just kind
+  Chosen _ -> Nothing
+  AnyNumber -> Nothing
+  AnyNumberOfKind kind -> Just kind
+  EachAbsentKind -> Nothing
+  UpToOneChosen -> Nothing
