@@ -308,7 +308,9 @@ enteredFromSpec s registry =
 -- stricter one, so a creature cast out of an OPPONENT's graveyard does not grow
 -- the Knight (#2689). The EnteredFrom half needs no such call and is exact:
 -- EachPlayer makes its owner conjunct vacuous, which is the printed "a
--- graveyard", and every case below drives that half.
+-- graveyard", and every case below drives that half. The last case drives the
+-- WasCastFrom disjunct's negative -- the Skeleton is cast from a HAND -- and
+-- Archfiend's Vessel above is where its positive is proved.
 --
 -- Reassembling Skeleton supplies the entrant: "{1}{B}: Return this card from your
 -- graveyard to the battlefield tapped" is one activation, so the entry comes out
@@ -339,8 +341,9 @@ interveningRecheckSpec s registry =
           S.soleFaceName oid gs == S.printingName skeleton
         ]
       sizeOf oid gs = (Projection.powerOf oid gs, Projection.toughnessOf oid gs)
-      -- One damage on a 1/1 and a CR 704 pass: the entrant dies where it stands,
-      -- with the Knight's trigger already on the stack and untouched.
+      -- One damage on a 1/1 and a state-based-action pass: CR 704.5g destroys the
+      -- entrant where it stands, with the Knight's trigger already on the stack
+      -- and untouched.
       kill oid gs = S.settleSba (S.markDamage oid 1 gs)
       -- Activate the Skeleton's graveyard ability, resolve it, and settle so CR
       -- 603.3 has placed whatever the entry triggered.
