@@ -13,6 +13,10 @@ module Pawl.Types.CarryOver where
 -- cannot tell apart at a call site.
 --
 -- Carried is Pawl.Engine.Stack's two permanent-spell branches and nothing else.
+-- The other road that survives a zone change does not come through here at all:
+-- Alchemy's "perpetually" (Pawl.Engine.Event.perpetuate) re-anchors its effects
+-- at every move, gated on the effect's own duration rather than on the move.
+--
 -- Not implemented: CR 400.7b (static-ability ability grants, CR 611.3d), the one
 -- exception this carrier still owes beside the two it makes; a static grant is
 -- derived on every projection rather than stored, so no constructor here could

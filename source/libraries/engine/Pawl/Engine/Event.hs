@@ -4260,7 +4260,8 @@ rewatch oldId newId row = case ActiveReplacement.effect row of
 -- authority -- so the citation here is for what the rules DO settle: CR 400.7
 -- makes the arriving object a new one with no memory of the old, which is why
 -- every other stored effect is left pointing at an id nothing answers to, and CR
--- 611.2c is why the set can be rewritten at all rather than re-derived.
+-- 611.2c is why there is a FIXED id set here to rewrite rather than a filter to
+-- re-derive. Neither rule licenses the rewrite; only the printed word does.
 --
 -- carryOver's shape and reanchor's rewrite, with two differences. It is not
 -- gated on Pawl.Types.CarryOver or on the destination, because the sentence
