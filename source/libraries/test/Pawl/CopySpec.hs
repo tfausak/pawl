@@ -1388,14 +1388,17 @@ announcing x recipient p = case p of
 -- is reachable, the mana value 3 card is not, and a bound left unanswered would
 -- have admitted neither and elided CR 707.10c's prompt altogether.
 --
--- THE NUMBER HAS TWO ROADS HERE, and each is sufficient on its own, so neither
--- has a mutation of its own: Quantity.InSlot asks the object the evaluation names
--- BEFORE the context (Quantity.evaluateAgainst's `boundOn announcedOn`), and the
--- copy is that object and already carries the announcement CR 707.10 copied,
--- while Resolve.chooseNewTargetsFor also seeds those bindings into
--- Filter.boundAmounts. Neutralizing either alone leaves this group green;
--- widening Filter's ManaValueAtMostAmount arm reddens the second case, which is
--- what makes this a proof of the BOUND rather than of either road.
+-- THE NUMBER HAS TWO ROADS HERE, and the OBJECT one answers first, so the seed
+-- has no mutation of its own: Quantity.InSlot asks the object the evaluation
+-- names before it asks the context, and for a copy that object is the
+-- announcement's own holder -- CR 707.10 stamped the value of X onto it, and
+-- slotContext evaluates the bound with the copy's id, so `mOid >>= boundOn` is
+-- what fires. Resolve.chooseNewTargetsFor also seeds those bindings into
+-- Filter.boundAmounts, which is the CR-correct channel and the one every other
+-- slot atom reads, but for the X it is dead code: neutralizing the seed leaves
+-- this group green. Widening Filter's ManaValueAtMostAmount arm reddens the
+-- second case, which is what makes this a proof of the BOUND rather than of
+-- either road.
 stirCopySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 stirCopySpec s registry =
   let boardOf = do
