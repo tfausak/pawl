@@ -143,28 +143,31 @@ loadNoAuraDeck registry = do
 -- the Bell animates joins Ashaya's set. Back the other way, Kormus Bell's set
 -- reads a subtype and Ashaya writes one (AddLandSubtype Forest), so the aspect
 -- screen clears there too and `changesAt` runs on that pair as well, even though
--- adding Forest never removes Swamp and the answer is False. Neither card kills
--- the other: both modifications ADD, so CR 305.7 never strips Ashaya's
+-- adding Forest never removes Swamp and the answer is False. Both cards ADD a
+-- subtype rather than setting one, so CR 305.7 never strips Ashaya's
 -- characteristic-defining ability -- which is what rules Blood Moon out as the
--- partner, since a set land subtype takes Ashaya's own P/T away and the
--- state-based actions bury it the turn it lands.
+-- partner even though it makes the same cross-object edge: with a set land
+-- subtype in the pairing, every Ashaya cast over a whole match was observed in a
+-- graveyard at the end of it, so the edge would exist for a turn rather than for
+-- the game.
 --
 -- Deck order is the same forced sequence loadControlDeck describes: "Ashaya,
 -- Soul of the Wild" < "Darksteel Myr" < "Forest" < "Kormus Bell" < "Swamp", so
 -- the opening hand is the Ashaya, both Myr and four of the five Forests, the
--- Bell arrives on the sixth draw, and both statics are on the battlefield for
--- most of the game rather than for its last turn.
+-- Bell is the second card drawn, and both statics are on the battlefield from
+-- the middle of the game rather than for its last turn.
 --
--- Thirteen cards, not sixty, and that is the whole reason: measured by running
--- the same match at several deck sizes, the game costs 3.4s at 12 cards, 6.3s
--- here, 13.7s at 14, 23.6s at 15, 74s at 18 and did not finish in twelve minutes
--- at 30. `resolve` re-projects every other battlefield object at every movable
--- layer, so the scenario has to be kept small to stay a benchmark.
+-- Thirteen cards, not sixty, and that is the whole reason: `resolve` re-projects
+-- every other battlefield object at every movable layer, so the cost climbs far
+-- faster than the deck does. Wall clock for one process running this match and
+-- its control back to back, measured at several deck sizes: about 3s at 12
+-- cards, 6s at 13, 14s at 14, 24s at 15, 74s at 18, and no result inside twelve
+-- minutes at 30.
 --
 -- Observed by running the match and reading the final GameState: both decks deck
 -- out on turn 14, and the battlefields differ only by the four permanents the
--- statics themselves are -- 21 here against 17 there, with 10 Forests, 3 Swamps
--- and 4 Darksteel Myr on both.
+-- statics themselves are -- 21 here against 17 there, both boards carrying the
+-- same 10 Forests, 3 Swamps and 4 Darksteel Myr.
 loadDependentDeck :: Registry.Registry IO -> IO Deck.Deck
 loadDependentDeck registry = do
   ashaya <- fetchOrThrow registry "Ashaya, Soul of the Wild"
@@ -182,7 +185,7 @@ loadDependentDeck registry = do
 -- the reason loadNoAuraDeck gives: its number folds what the dependency scan
 -- costs together with what the board costs. Deck size holds the game length
 -- fixed (both deck out on turn 14) and the land count holds the workload fixed
--- (10 Forests and 3 Swamps a side either way).
+-- (10 Forests and 3 Swamps across the two seats either way).
 loadIndependentDeck :: Registry.Registry IO -> IO Deck.Deck
 loadIndependentDeck registry = do
   myr <- fetchOrThrow registry "Darksteel Myr"
