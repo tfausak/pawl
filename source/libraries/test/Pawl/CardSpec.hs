@@ -151,6 +151,7 @@ import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GameState as GameState
@@ -957,6 +958,7 @@ effectCounts effect = case effect of
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationCounts duration
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) -> durationCounts duration
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) -> durationCounts duration
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _) -> durationCounts duration
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationCounts duration
   Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
@@ -1251,6 +1253,7 @@ effectNestedEffects effect = case effect of
   Effect.RequireBlock {} -> []
   Effect.CantBeRegenerated {} -> []
   Effect.ForbidBlock {} -> []
+  Effect.ForbidAttack {} -> []
   Effect.RequireAttack {} -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
@@ -1733,6 +1736,7 @@ effectReplacements effect = case effect of
   Effect.RequireBlock {} -> []
   Effect.CantBeRegenerated {} -> []
   Effect.ForbidBlock {} -> []
+  Effect.ForbidAttack {} -> []
   Effect.RequireAttack {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.Designate (Designate.MkDesignate _ _) -> []
@@ -2538,6 +2542,7 @@ effectMintedFaces effect = case effect of
   Effect.RequireBlock {} -> []
   Effect.CantBeRegenerated {} -> []
   Effect.ForbidBlock {} -> []
+  Effect.ForbidAttack {} -> []
   Effect.RequireAttack {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.Designate (Designate.MkDesignate _ _) -> []
@@ -4318,6 +4323,7 @@ effectFilters effect = case effect of
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration ref) -> unframed (durationFilters duration) <> sourceHosted (objectRefFilters ref)
   -- CantBeRegenerated's arm, the same one axis.
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration ref) -> unframed (durationFilters duration) <> sourceHosted (objectRefFilters ref)
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration ref) -> unframed (durationFilters duration) <> sourceHosted (objectRefFilters ref)
   -- RequireBlock's arm one axis over. The PlayerRef carries no Filter.
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration attacker _) -> unframed (durationFilters duration) <> sourceHosted (objectRefFilters attacker)
   -- CR 114.2's emblem is a whole card too.
@@ -4555,6 +4561,7 @@ effectObjectRefs effect = case effect of
   Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> read_ [blocker, attacker]
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated _ ref) -> read_ [ref]
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> read_ [ref]
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ ref) -> read_ [ref]
   Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> read_ [attacker]
   Effect.CreateEmblem {} -> []
   Effect.BecomeMonarch {} -> []

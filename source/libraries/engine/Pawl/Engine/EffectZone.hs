@@ -177,6 +177,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.RequireBlock {} -> Nothing
   Effect.CantBeRegenerated {} -> Nothing
   Effect.ForbidBlock {} -> Nothing
+  Effect.ForbidAttack {} -> Nothing
   Effect.RequireAttack {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
