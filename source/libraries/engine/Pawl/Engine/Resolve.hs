@@ -5625,9 +5625,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
         -- Neither arrival is a zone change -- the card was in no zone to leave --
-        -- so nothing triggers and nothing is revealed either way. The library end
-        -- is Pawl.Types.LibraryPosition's default rather than a stated one:
-        -- Pawl.Types.ConjureDestination says why the arm carries no position.
+        -- so nothing triggers and nothing is revealed either way.
+        --
+        -- Not implemented: a stated library position. Every arrival takes
+        -- LibraryPosition.defaultValue, which is the BOTTOM, and the printings
+        -- that state an end all say the TOP -- Pawl.Types.ConjureDestination's
+        -- Library arm names them and says why none of them is in data/cards/
+        -- (#2638).
         zone = case destination of
           ConjureDestination.Hand -> Zone.Hand
           ConjureDestination.Library -> Zone.Library
