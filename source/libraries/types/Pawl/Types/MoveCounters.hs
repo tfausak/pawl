@@ -20,7 +20,9 @@ import qualified Pawl.Types.SlotName as SlotName
 -- `kinds` is WHICH counters cross and how many of each, which the printed text
 -- spells six ways; Pawl.Types.MovedKinds is where the six are set out.
 --
--- ONE batch per kind per pair is what crosses. Rule 122.5 never speaks of more
+-- ONE batch per kind is what crosses -- one REMOVAL of it per first object, and
+-- one PLACEMENT of it for the whole instruction, CR 608.2f processing an action
+-- taken on several objects simultaneously. Rule 122.5 never speaks of more
 -- than one counter, so it does not settle the batch on its own; what does is that
 -- each of its four impossibilities is an object-level or kind-level property (the
 -- two objects being one, the appropriate kind absent, the destination refusing
