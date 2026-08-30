@@ -985,6 +985,12 @@ milledIt oid event = case event of
 -- 608.2h's record of one, and only the caller knows how deep the fold it stands
 -- in has got. `peers` must be a bounded reader -- a full projection taken here
 -- re-enters gather, whose CR 604.2 gate is object-independent, and loops.
+--
+-- A FENCE the compiler cannot keep: filterReadsPeers enumerates the fields filled
+-- through `peers` below, so filling a new one -- or repointing an existing one at
+-- `peers` -- means giving the atom that reads it a True arm there. Nothing warns
+-- if you do not; CR 613.8a's cheap arm in projectDeciding would just start
+-- skipping real dependencies.
 viewOfCharacteristics :: Count.ViewOf -> ObjectId -> ProjectedCharacteristics -> Maybe PlayerId.PlayerId -> Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> GameState -> Filter.View
 viewOfCharacteristics peers oid pc controller counters gs =
   Filter.MkView
@@ -3872,10 +3878,11 @@ designationGathered gs = concatMap fromObject (Set.toList (GameState.battlefield
 -- WHOSE would still have to match a plain write of the same aspect -- an identical
 -- order for a larger type; see #357.
 --
--- That confirmation is board-wide, which is what makes a cross-object row
--- load-bearing rather than a fence: `changesAt` applies the other effect
--- everywhere it applies and re-asks the set through the resulting board.
--- Pawl.ProjectionSpec's "CR 613.8a an Aura's host is animated under it" proves it.
+-- That confirmation goes board-wide once filterReadsPeers says the filter can
+-- read a second projection, which is what makes a cross-object row load-bearing
+-- rather than a fence: `changesAt` applies the other effect everywhere it applies
+-- and re-asks the set through the resulting board. Pawl.ProjectionSpec's "CR
+-- 613.8a an Aura's host is animated under it" proves it.
 data Aspect
   = Types
   | Subtypes
@@ -4063,6 +4070,111 @@ filterReads f = case f of
   Filter.Type.And fs -> foldMap filterReads fs
   Filter.Type.Or fs -> foldMap filterReads fs
   Filter.Type.Not g -> filterReads g
+
+-- Whether a Filter's answer can turn on ANOTHER object's projection. Exactly the
+-- five Filter.View fields viewOfCharacteristics fills through `peers` --
+-- attachedToView, attachedViews, attackingPlaneswalkerController,
+-- attackingBattleProtector and nonManaActivatedAbility -- since Filter.matches
+-- reads no other channel into a second object and every other field of that view
+-- comes from the candidate's own partial or from the GameState, which no layer
+-- writes.
+--
+-- What it buys is which arm of `movesSet` runs: a filter answering False here
+-- reads exactly what it read before the other effect was applied, at every object
+-- that effect did not land on, so `changesHere` asks only where it did land.
+-- Exhaustive, and over-approximating is the safe direction -- a True costs the
+-- board-wide re-ask, a wrong False loses a dependency.
+filterReadsPeers :: Filter.Type.Filter Keyword.Type.Keyword -> Bool
+filterReadsPeers f = case f of
+  -- The four atoms that read a peer view directly.
+  Filter.Type.AttachedTo _ -> True
+  Filter.Type.HasAttached _ -> True
+  Filter.Type.IsAttackingPlaneswalker _ -> True
+  Filter.Type.IsAttackingBattle _ -> True
+  -- The fifth: abilitiesFromCharacteristics runs CR 604.2's gate through
+  -- Condition.holds, which takes `peers` to any object at all (#2633).
+  Filter.Type.HasNonManaActivatedAbility -> True
+  -- Over-declared, as filterReads over-declares the same two: viewOfCharacteristics
+  -- answers both False outright, so no board can move them, but the subject whose
+  -- characteristics CR 301.5 and CR 702.5a compare against is another object.
+  Filter.Type.CanHostSubject -> True
+  Filter.Type.CanAttachToSubject -> True
+  -- DESCENT where a flat False would be right: Filter.matches answers this atom
+  -- False outright, Pawl.Engine.Count.bakePerspective having settled it between
+  -- projections, so the nest is not read here at all. Descending only costs the
+  -- re-ask.
+  Filter.Type.ControlsMoreThanYou g -> filterReadsPeers g
+  -- DESCENT for the atom above's reason, and where filterReads deliberately does
+  -- not descend: CR 708.12's nest is matched against viewOfCard, which takes no
+  -- `peers` and no board at all.
+  Filter.Type.RepresentedByCard g -> filterReadsPeers g
+  Filter.Type.And fs -> any filterReadsPeers fs
+  Filter.Type.Or fs -> any filterReadsPeers fs
+  Filter.Type.Not g -> filterReadsPeers g
+  -- Everything below reads the candidate's own view field, or the Context, or the
+  -- GameState -- never a second projection.
+  Filter.Type.HasCardType _ -> False
+  Filter.Type.HasSupertype _ -> False
+  Filter.Type.HasColor _ -> False
+  Filter.Type.HasSubtype _ -> False
+  Filter.Type.HasName _ -> False
+  Filter.Type.HasKeyword _ -> False
+  Filter.Type.HasKeywordFamily _ -> False
+  Filter.Type.PowerAtLeast _ -> False
+  Filter.Type.PowerAtMost _ -> False
+  -- The SOURCE's power arrives on the Context, which affectsGiven builds with
+  -- Filter.contextFor -- no projection of a second object is read.
+  Filter.Type.PowerLessThanSource -> False
+  Filter.Type.PowerGreaterThanSource -> False
+  Filter.Type.ControlledBy _ -> False
+  Filter.Type.ControlledByDefendingPlayer -> False
+  Filter.Type.ControlledByBound _ -> False
+  Filter.Type.ControlledByPlayer _ -> False
+  Filter.Type.ControlledByRecipient -> False
+  Filter.Type.OwnedBy _ -> False
+  Filter.Type.IsSource -> False
+  Filter.Type.IsBound _ -> False
+  Filter.Type.SameNameAsBound _ -> False
+  Filter.Type.HasChosenName -> False
+  Filter.Type.IsPlayer _ -> False
+  Filter.Type.IsControllerOfBound _ -> False
+  Filter.Type.CardsInGraveyardAtLeast _ -> False
+  Filter.Type.IsAttacking -> False
+  Filter.Type.IsAttackingPlayer _ -> False
+  Filter.Type.DeclaredAttackedThisCombat -> False
+  Filter.Type.IsBlocking -> False
+  Filter.Type.IsBlocked -> False
+  Filter.Type.AttackedThisTurn -> False
+  Filter.Type.DeclaredAttackerThisCombat -> False
+  Filter.Type.DeclaredBlockerThisCombat -> False
+  Filter.Type.MilledThisTurn -> False
+  Filter.Type.DealtDamageThisTurn -> False
+  Filter.Type.IsAttachedToSource -> False
+  Filter.Type.IsHostOfSource -> False
+  Filter.Type.IsToken -> False
+  Filter.Type.IsTapped -> False
+  Filter.Type.IsFaceDown -> False
+  Filter.Type.IsExiledFaceDown -> False
+  Filter.Type.Transformed -> False
+  Filter.Type.IsInZone _ -> False
+  Filter.Type.IsRingBearer -> False
+  Filter.Type.HasDesignation _ -> False
+  Filter.Type.HasCounters _ -> False
+  Filter.Type.HasCountersOfAnyKind -> False
+  Filter.Type.ManaValueAtMost _ -> False
+  Filter.Type.ManaValueIsEven -> False
+  Filter.Type.ManaValueAtMostAmount -> False
+
+-- filterReadsPeers through an affected set. TheseObjects names ids (CR 611.2c)
+-- and Attached reads its source's attachment (CR 303.4m); neither builds a view.
+affectedReadsPeers :: Affected.Affected -> Bool
+affectedReadsPeers a = case a of
+  Affected.TheseObjects _ -> False
+  Affected.Attached -> False
+  Affected.Matching f -> filterReadsPeers f
+  Affected.MatchingAnywhere f -> filterReadsPeers f
+  Affected.MatchingOffBattlefield f -> filterReadsPeers f
+  Affected.AttachedPlayerControls f -> filterReadsPeers f
 
 -- Which aspects a Modification writes -- the other half of the pair above.
 --
@@ -4535,23 +4647,40 @@ projectDeciding admits cands = forObject
                         -- board is built once per PAIR rather than once per
                         -- object; an id outside `after` cannot arise, since
                         -- appliedEverywhere maps over the same `running` that
-                        -- `boards` is built from.
+                        -- `boards` is built from. Reached only when `a`'s filter
+                        -- can read a second projection -- changesHere below is the
+                        -- other case.
                         changesAt after afterView (i, as) (o, p, d, ans) =
                           let a = NonEmpty.head as
                            in not (decidedAt d a)
                                 && appliesTo afterView o d (maybe p fst (Map.lookup o after)) a /= answerFor ans i
+                        -- The same question where `a`'s affected set reads no
+                        -- SECOND projection (affectedReadsPeers): applying `b`
+                        -- then moves `a`'s answer only where `b` landed, since
+                        -- everywhere else the partial `a` is judged against is the
+                        -- one it was already judged against; and `view` answers
+                        -- there for the running board, since a filter that reads
+                        -- no peer cannot tell the two views apart. So this is
+                        -- changesAt with the board-wide application dropped --
+                        -- which is what keeps the scan off `reachable`.
+                        changesHere bs j (i, as) (o, p, d, ans) =
+                          let a = NonEmpty.head as
+                           in not (decidedAt d a)
+                                && answerFor ans j
+                                && appliesTo view o d (applyUnit view o p bs) a /= answerFor ans i
                         -- `a` depends on `b` when that holds ANYWHERE: CR 613.8a
                         -- asks about the whole affected SET, which is also how CR
                         -- 613.8b's loop becomes visible. Clause (c)'s CDA
                         -- exclusion needs no test -- a CDA is never a candidate;
                         -- clause (b)'s "existence" half is liveGiven's.
-                        movesSet x@(_, as) (_, bs) =
+                        movesSet x@(_, as) (j, bs) =
                           case movableAspects (NonEmpty.head as) of
                             Nothing -> False
                             Just aspects ->
                               not (Set.disjoint aspects (unitWrites bs))
-                                && let after = appliedEverywhere bs
-                                    in any (changesAt after (viewOfBoard after) x) boards
+                                && if affectedReadsPeers (gAffected (NonEmpty.head as))
+                                  then let after = appliedEverywhere bs in any (changesAt after (viewOfBoard after) x) boards
+                                  else any (changesHere bs j x) boards
                         -- CR 613.8a clause (b)'s LAST limb: applying `b` changes
                         -- what `a` does to the things it applies to. Only a
                         -- magnitude can move, so what is compared is the P/T `a`
