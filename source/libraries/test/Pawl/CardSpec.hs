@@ -7458,6 +7458,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- No subtraction of a minted object's text, which readSinglyInFilters
         -- needs: neither traversal descends into the card a Create or a Conjure
         -- carries, so nothing a token prints is attributed to its creator.
+        --
+        -- Not implemented: the same arm written as CR 118.12a's payer or CR
+        -- 603.5's asker, which sit on a CLAUSE and so are in neither traversal
+        -- (#2743).
         readSinglyInPlayerRefs effects =
           [ slot
           | effect <- effects,
