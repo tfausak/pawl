@@ -599,8 +599,14 @@ applies gs event candidate =
         -- narrow by, and no `admits` beside it: rule 614.11's first sentence
         -- makes the row apply even when the library is empty, so there is no
         -- board on which the rewrite would change nothing.
+        --
+        -- Read off the CANDIDATE, the ZoneChangeR arm's posture and not the three
+        -- src-derived arms below it: the only producer installs a FLOATING row
+        -- from an activated ability, so its "you" was baked when the ability
+        -- resolved and survives the source leaving the battlefield or changing
+        -- hands. See matchesCandidatePlayer (#2662).
         (ReplacementEffect.DrawR pat, ProposedEvent.WouldDraw pid) ->
-          matchesPlayer gs src (DrawR.whose pat) pid
+          matchesCandidatePlayer (ReplacementCandidate.controller candidate) (DrawR.whose pat) pid
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
         -- MISMATCHED class, where False is the correct answer rather than a
@@ -833,6 +839,30 @@ matchesPlayer gs src rel pid = case rel of
   ControllerRelation.Yours -> Projection.controllerOf src gs == Just pid
   ControllerRelation.Opponents -> case Projection.controllerOf src gs of
     Just you -> pid /= you
+    Nothing -> False
+
+-- matchesPlayer's twin for a row whose "you" is the CANDIDATE's rather than a
+-- fresh projection of its source -- the shape matchesZoneOwner already takes, and
+-- for the argument written out there: a permanent's row derives its controller
+-- live, while a FLOATING row baked one at installation because CR 608.2n has
+-- already moved its source to another zone as a new object (CR 400.7). Reading
+-- the source live instead unscopes such a row the moment the source leaves the
+-- battlefield, and hands it to the new controller on a control change.
+--
+-- Nothing matches nothing, matchesZoneOwner's posture: an effect with no
+-- controller states no relation it could satisfy, and has no opponents either.
+--
+-- The three arms still on matchesPlayer -- CounterR, TokenR, LifeLossR -- are
+-- equivalent to this today and are left alone: every producer of theirs is a
+-- permanent's static ability, whose source is on the battlefield whenever the row
+-- is consulted. DrawR is the first ControllerRelation pattern whose producer
+-- installs a floating row, which is where the two readings come apart (#2662).
+matchesCandidatePlayer :: Maybe PlayerId -> ControllerRelation -> PlayerId -> Bool
+matchesCandidatePlayer you rel pid = case rel of
+  ControllerRelation.Anyones -> True
+  ControllerRelation.Yours -> you == Just pid
+  ControllerRelation.Opponents -> case you of
+    Just mine -> pid /= mine
     Nothing -> False
 
 -- CR 109.5 / 614.1: does `oid` satisfy this pattern's controller relation, read
