@@ -16,6 +16,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
@@ -23,17 +24,21 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -57,6 +62,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   batchSpec s registry
   everyKindSpec s registry
   anyNumberSpec s registry
+  namedAnyNumberSpec s registry
   absentKindSpec s registry
   groupSourceSpec s registry
 
@@ -873,6 +879,128 @@ anyNumberSpec s registry = Spec.describe s "CR 122.5 moving any number of counte
         Spec.assertEqWith s "and the first still bears nothing" (tripleOn giverId after) (0, 0, 0)
         Spec.assertEqWith s "and with no kind to offer the player was not asked" asked 0
       Nothing -> Spec.assertFailure s "expected Resourceful Defense to offer exactly its one printed activated ability"
+
+-- Scrounging Bandar {1}{G} Creature - Cat Monkey 0/0 (Commander Legends; name,
+-- cost, type line, power, toughness and oracle text checked against Scryfall
+-- 2026-08-30), data/cards/scrounging-bandar.json:
+--
+--   This creature enters with two +1/+1 counters on it.
+--   At the beginning of your upkeep, you may move any number of +1/+1 counters
+--   from this creature onto another target creature.
+--
+-- The second line is this group's subject, and the card is why "any number of a
+-- named kind" exists: the card settles the KIND and leaves the COUNT open, so the
+-- prompt is raised over the one kind the card named -- where Resourceful
+-- Defense's "any number of counters" offers every kind the first creature bears,
+-- which here would let the answerer move a shield counter Scrounging Bandar never
+-- mentions. Its "another target creature" is Filter.Not Filter.IsSource, Joraga
+-- Auxiliary's shape, so no clause of the printed sentence is omitted.
+--
+-- Bioshift prints the same spelling on an instant and is cheaper to drive, but
+-- its "with the same controller" is a demand on a sibling OBJECT slot that no
+-- filter can make, and dropping it would be weaker than printed (#2722).
+--
+-- The counters go on by hand rather than through the printed entry rider, whose
+-- own road is Pawl.ReplacementSpec's: these boards need a tally the printed two
+-- cannot give -- three of the named kind beside two of another -- so that "any
+-- number of +1/+1 counters" is a different board from "all the +1/+1 counters"
+-- and from "any number of counters" at once. The Bandar is a printed 0/0 and its
+-- own +1/+1 counters are what keep it off CR 704.5f, so every board below leaves
+-- it at least one.
+bandarAnswer ::
+  ObjectId.ObjectId ->
+  Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural ->
+  Prompt.Prompt r ->
+  State.State Int r
+bandarAnswer taker wanted p = case p of
+  -- The printed "you may", taken every time: a declined trigger would move
+  -- nothing for a reason no case here is about.
+  Prompt.ChooseOptional {} -> pure OptionalDecision.Exercises
+  -- CR 603.3d's one target slot, FILTERED out of what the engine offered rather
+  -- than built by hand, so CR 608.2b's re-read at resolution finds what was named
+  -- -- aimingTransfer's posture.
+  Prompt.ChooseTargets _ _ _ asked ->
+    pure (Map.map (Set.filter ((==) (Just taker) . Recipient.objectOf) . snd) asked)
+  -- Answered VERBATIM rather than derived from what is offered, so an answerer
+  -- cannot repair a mutation by re-deriving a legal answer, and COUNTED, because
+  -- one case below asserts that nothing was asked.
+  Prompt.ChooseMovedCounters {} -> do
+    State.modify' (+ 1)
+    pure wanted
+  _ -> pure (S.identityAnswer p)
+
+namedAnyNumberSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+namedAnyNumberSpec s registry = Spec.describe s "CR 122.5 moving any number of counters of the kind the card names" $ do
+  let -- alice: a Forest, her Scrounging Bandar and a Wall of Stone for the trigger
+      -- to aim at; bob a second Wall, so the one target slot is offered more
+      -- candidates than it needs. `extras` seats a further printing under alice by
+      -- name and `counters` is what a case puts on the Bandar; between them they
+      -- are the ONLY difference between the boards below.
+      --
+      -- Wall of Stone at the destination for everyKindSpec's reason: a 0/8 body
+      -- is unmoved by whatever these boards carry onto it.
+      board extras counters = do
+        forest <- S.printingOf s registry "Forest"
+        wall <- S.printingOf s registry "Wall of Stone"
+        bandar <- S.printingOf s registry "Scrounging Bandar"
+        seats <- mapM (S.printingOf s registry) extras
+        let (bandarId, g1) = S.addCreature bandar S.alice (S.landsInPlay forest 1)
+            (takerId, g2) = S.addCreature wall S.alice g1
+            (_, g3) = S.addCreature wall S.bob g2
+            seated = foldl (\gs p -> snd (S.addCreature p S.alice gs)) g3 seats
+        pure (bandarId, takerId, counters bandarId seated)
+      -- alice's upkeep begins, the printed trigger goes on the stack and resolves
+      -- -- Pawl.CounterspellSpec's bitterblossomChain, with the prompt count
+      -- threaded so a case whose point is that NOTHING was asked can say so.
+      upkeep = Phase.Beginning BeginningStep.Upkeep
+      begin wanted (bandarId, takerId, ready) =
+        let begun =
+              Event.recordEvent
+                (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice))
+                (ready {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+            run = Engine.runGame (bandarAnswer takerId wanted) begun (Engine.settleForPriority >> Engine.priorityLoop)
+            ((_, after), asked) = State.runState run 0
+         in (bandarId, takerId, asked, after)
+      stocked oid = S.addCounter CounterKind.Shield 2 oid . S.addCounter CounterKind.PlusOnePlusOne 3 oid
+      -- Names both kinds, so the arm's own filter is what keeps the shield
+      -- counters home. An arm reading MovedKinds.AnyNumber would honour both.
+      both :: Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural
+      both = Map.fromList [(CounterKind.PlusOnePlusOne, 2), (CounterKind.Shield, 2)]
+  -- THE CASE THIS UNIT EXISTS FOR. Two of the three +1/+1 counters cross -- fewer
+  -- than the pile holds, so this is not "all the +1/+1 counters" -- and the two
+  -- shield counters the same answer named do not, so it is not "any number of
+  -- counters" either.
+  Spec.it s "the card settles the kind and the player settles the count" $ do
+    built <- board [] stocked
+    let (bandarId, takerId, before) = built
+    Spec.assertEqWith s "the Bandar bears three +1/+1 counters and two shield counters" (tripleOn bandarId before) (3, 2, 0)
+    Spec.assertEqWith s "and the Wall bears none of any kind" (tripleOn takerId before) (0, 0, 0)
+    let (_, _, asked, after) = begin both built
+    -- THE GAMEPLAY-LEVEL ASSERTIONS, ahead of the prompt count.
+    Spec.assertEqWith s "two +1/+1 counters crossed and no shield counter did" (tripleOn takerId after) (2, 0, 0)
+    Spec.assertEqWith s "and the Bandar kept its third +1/+1 counter and both shield counters" (tripleOn bandarId after) (1, 2, 0)
+    Spec.assertEqWith s "the player was asked how many of the one kind" asked 1
+  -- The same board differing in exactly ONE thing, the answer: none. "Any number"
+  -- includes none, so the counters stay where they are and the question was still
+  -- a question -- without this pair the case above would pass on an arm that moved
+  -- whatever it liked.
+  Spec.it s "and an answer naming none leaves every counter where it was" $ do
+    built <- board [] stocked
+    let (bandarId, takerId, asked, after) = begin Map.empty built
+    Spec.assertEqWith s "the Wall received nothing" (tripleOn takerId after) (0, 0, 0)
+    Spec.assertEqWith s "and the Bandar kept all five counters" (tripleOn bandarId after) (3, 2, 0)
+    Spec.assertEqWith s "and it was asked anyway, none being one of the numbers" asked 1
+  -- CR 122.5's third impossibility over the ONE kind the card names: alice's
+  -- Solemnity refuses every counter on a creature, so there is no number the
+  -- answer could give that would move anything, and the engine asks nothing. The
+  -- same board as the headline and the same answer, differing in that one
+  -- permanent.
+  Spec.it s "CR 122.5 a destination that refuses the named kind is not asked about" $ do
+    built <- board ["Solemnity"] stocked
+    let (bandarId, takerId, asked, after) = begin both built
+    Spec.assertEqWith s "the Wall received nothing, Solemnity refusing it" (tripleOn takerId after) (0, 0, 0)
+    Spec.assertEqWith s "and the Bandar kept all five counters" (tripleOn bandarId after) (3, 2, 0)
+    Spec.assertEqWith s "and with the card's one kind unmovable the player was not asked" asked 0
 
 -- Goldberry, River-Daughter {1}{U} Legendary Creature - Nymph (The Lord of the
 -- Rings: Tales of Middle-earth; name, cost, type line, power, toughness and
