@@ -7,7 +7,8 @@
 -- two CR 606.4 loyalty cost components and CR 606.5's combining of them,
 -- Pawl.Engine.Activate's CR 606.3 gate,
 -- Pawl.Engine.Sba's CR 704.5i zero-loyalty state-based action, Pawl.Engine.Target's
--- CR 115.4 "any target" pool, and Pawl.Engine.Damage's CR 306.8 / CR 120.3c
+-- CR 115.4 "any target" and CR 115.2 "player or planeswalker" pools -- the two
+-- pools that offer a planeswalker at all -- and Pawl.Engine.Damage's CR 306.8 / CR 120.3c
 -- loyalty removal -- which Pawl.Engine.Event records as a GameEvent.CountersRemoved
 -- alongside Pawl.Engine.Cost's.
 --
@@ -175,6 +176,22 @@ burnAtJace island mountain jace burn =
       (_, withMountain) = S.addCreature mountain S.alice board
       (burnId, gs) = S.addHandCard burn S.alice withMountain
    in (jaceId, burnId, gs)
+
+-- burnAtJace's board with two Goblin Pikers of alice's added. They do double duty:
+-- Goblin War Strike's damage is the number of Goblins their controller has, and a
+-- pool widened to CR 115.4's four-way is exactly what would offer them as targets.
+-- Two rather than one, so the damage the Strike deals is neither Jace's printed
+-- loyalty nor zero.
+strikeAtJace ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+strikeAtJace island mountain jace strike piker =
+  let (jaceId, strikeId, gs) = burnAtJace island mountain jace strike
+   in (jaceId, strikeId, List.foldl' (\g p -> snd (S.addCreature p S.alice g)) gs [piker, piker])
 
 -- How many cards of a given name are in alice's graveyard.
 graveyardCount :: String -> GameState.GameState -> Int
@@ -462,6 +479,46 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     -- battlefield, so widening the pool to planeswalkers must not have widened
     -- it to permanents.
     Spec.assertEqWith s "and nothing else on the battlefield is" (fmap (Set.size . Set.filter (Maybe.isJust . Recipient.objectOf)) offered) (Just 1)
+
+  -- The OTHER pool that offers a planeswalker, and the pair is the point: CR
+  -- 115.2's default already admits a permanent, and its clause (a) adds "or a
+  -- player", so a card can name both in one slot without reaching rule 115.4's
+  -- four-way at all. Goblin War Strike {R} Sorcery
+  -- -- "Goblin War Strike deals damage to target player or planeswalker equal to
+  -- the number of Goblins you control" (checked against Scryfall) -- is that
+  -- card, and Pool.PlayersAndPlaneswalkers is its slot.
+  --
+  -- Read off the Strike's OWN committed slot, as the case above is, so what is
+  -- under test is the pool the card data selects.
+  Spec.it s "CR 115.2 a 'player or planeswalker' spell offers neither Goblin" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    jace <- S.printingOf s registry "Jace Beleren"
+    goblinWarStrike <- S.printingOf s registry "Goblin War Strike"
+    goblinPiker <- S.printingOf s registry "Goblin Piker"
+    let (jaceId, _, gs) = strikeAtJace island mountain jace goblinWarStrike goblinPiker
+        offered = fmap (\theSlot -> Target.legalRecipients (Just S.alice) S.noSource theSlot gs) (S.spellTargetSlot goblinWarStrike)
+    -- FIRST, because it is the one assertion that tells this pool from either
+    -- neighbour: CR 115.4's pool would offer alice's two Goblins alongside Jace,
+    -- and a players-only pool would offer no object at all.
+    Spec.assertEqWith s "exactly one object is offered, so the two Goblins are not" (fmap (Set.size . Set.filter (Maybe.isJust . Recipient.objectOf)) offered) (Just 1)
+    Spec.assertEqWith s "and that object is the planeswalker" (fmap (Set.member (Recipient.ToPlaneswalker jaceId)) offered) (Just True)
+    Spec.assertEqWith s "and both players are offered too" (fmap (Set.isSubsetOf (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob])) offered) (Just True)
+
+  -- And the pool is load-bearing all the way to the damage: the Strike is cast at
+  -- the planeswalker and resolved, so CR 306.8 removes loyalty rather than a
+  -- player losing life. NOT settled, for burnResolved's reason.
+  Spec.it s "CR 306.8 a Goblin War Strike aimed at the planeswalker removes its loyalty" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    jace <- S.printingOf s registry "Jace Beleren"
+    goblinWarStrike <- S.printingOf s registry "Goblin War Strike"
+    goblinPiker <- S.printingOf s registry "Goblin Piker"
+    let (jaceId, strikeId, gs) = strikeAtJace island mountain jace goblinWarStrike goblinPiker
+        resolved = burnResolved jaceId strikeId gs
+    Spec.assertEqWith s "CR 306.8: two Goblins, so 3 - 2" (S.counterOf CounterKind.Loyalty jaceId resolved) 1
+    Spec.assertEqWith s "and no life was lost: alice" (S.lifeOf S.alice resolved) (Just 20)
+    Spec.assertEqWith s "and bob" (S.lifeOf S.bob resolved) (Just 20)
 
   Spec.it s "CR 306.8 Lightning Bolt's 3 damage removes all three loyalty counters, and CR 704.5i buries Jace" $ do
     island <- S.printingOf s registry "Island"
