@@ -691,6 +691,17 @@ modeSlots mode =
       joinSlots (fmap filterSlots (Map.elems (Mode.targetSlots mode)))
     ]
   where
+    -- The slot's own FILTER and nothing else on it. Its CR 202.3 computed bound
+    -- is a Quantity and so could name a slot, but no card may write one that
+    -- does: a target slot is matched before the announcement exists, and
+    -- Target.slotContext evaluates the bound against CR 113.7's source, so a
+    -- Quantity.InSlot there answers Nothing and the atom reading it is vacuously
+    -- False. Pawl.CardSpec's "no card's computed bound reads a slot" is what
+    -- keeps that true and Pawl.TargetSpec's "a bound that names a slot admits
+    -- nothing at all" is what shows it on a board, so folding the bound in here
+    -- would legitimise the shape rather than catch it. Not implemented: a bound
+    -- read off the announcement's own bindings, which is what would make such a
+    -- fold right (gap #2666).
     filterSlots =
       maybe Map.empty (Map.fromSet (const SlotArity.One) . Filter.boundSlots)
         . TargetSlot.filter
