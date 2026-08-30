@@ -1756,6 +1756,112 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
 -- where one of the two players holds both roles, and because a downward set, an
 -- upward set and a self-set have to be read off one board to prove the row
 -- discriminates rather than that three boards differ.
+-- CR 614.11 / 121.6: Words of Worship ({2}{W} Enchantment, "{1}: The next time
+-- you would draw a card this turn, you gain 5 life instead" -- name, cost, type
+-- line and Oracle text checked against api.scryfall.com 2026-08-29).
+--
+-- The pool's one DrawR producer, and the card-draw event class end to end: an
+-- activated ability installs a floating row (CR 614.3) with Uses.Once and an
+-- end-of-turn duration, and the next draw is replaced rather than rewritten --
+-- CR 614.6's "it never happens", so no card leaves the library and CR 121.2's
+-- tally does not move.
+--
+-- Every case is a PAIR of boards differing in one thing: whether the ability was
+-- activated. Nothing else about the board changes, so "the draw was replaced" and
+-- "she drew normally" are told apart by the life total AND the hand.
+--
+-- Every number is distinct -- 20 life, a gain of 5, two library cards, one card
+-- drawn -- so no two readings land on the same total.
+wordsOfWorshipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $ do
+  Spec.it s "CR 614.6 the draw never happens: alice gains 5 and her hand and library are untouched" $ do
+    plains <- S.printingOf s registry "Plains"
+    wordsOfWorship <- S.printingOf s registry "Words of Worship"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (armed, _) = wordsBoard plains wordsOfWorship piker True
+        after = S.runPure S.identityAnswer armed (Event.drawCard S.alice)
+    Spec.assertEqWith s "CR 614.1a alice is at 25, so the row applied" (S.lifeOf S.alice after) (Just 25)
+    Spec.assertEqWith s "CR 614.6 nothing reached her hand" (S.handSize S.alice after) 0
+    Spec.assertEqWith s "CR 614.6 and nothing left her library" (length (Game.zoneMembers Zone.Library S.alice after)) 2
+  -- The CONTROL: the same board with the ability never activated, so the only
+  -- difference is the floating row.
+  Spec.it s "CR 121.1 with no row installed the same board draws normally" $ do
+    plains <- S.printingOf s registry "Plains"
+    wordsOfWorship <- S.printingOf s registry "Words of Worship"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (unarmed, _) = wordsBoard plains wordsOfWorship piker False
+        after = S.runPure S.identityAnswer unarmed (Event.drawCard S.alice)
+    Spec.assertEqWith s "she gained nothing" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "CR 121.1 and drew the card" (S.handSize S.alice after) 1
+    Spec.assertEqWith s "which came off her library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+  -- CR 614.3 / 614.1a: "the NEXT time", which is Uses.Once on the carrier. The
+  -- second draw of the same turn is an ordinary draw.
+  Spec.it s "CR 614.3 the row is used up, so the second draw of the turn is ordinary" $ do
+    plains <- S.printingOf s registry "Plains"
+    wordsOfWorship <- S.printingOf s registry "Words of Worship"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (armed, _) = wordsBoard plains wordsOfWorship piker True
+        after = S.runPure S.identityAnswer armed (Event.drawCard S.alice >> Event.drawCard S.alice)
+    Spec.assertEqWith s "CR 614.3 the second draw gained nothing more" (S.lifeOf S.alice after) (Just 25)
+    Spec.assertEqWith s "CR 121.1 and put one card in her hand" (S.handSize S.alice after) 1
+  -- CR 614.11's first sentence: "these effects are applied even if no cards could
+  -- be drawn because there are no cards in the affected player's library". The
+  -- funnel therefore proposes the event BEFORE it looks at the library, and a
+  -- player whose library is empty gains the life instead of attempting the draw
+  -- CR 104.3c would kill her for.
+  Spec.it s "CR 614.11 an empty library still gets the life, and no failed draw is recorded" $ do
+    plains <- S.printingOf s registry "Plains"
+    wordsOfWorship <- S.printingOf s registry "Words of Worship"
+    let (armed, _) = emptyLibraryBoard plains wordsOfWorship True
+        after = S.runPure S.identityAnswer armed (Event.drawCard S.alice)
+    Spec.assertEqWith s "CR 614.11 the row applied off an empty library" (S.lifeOf S.alice after) (Just 25)
+    Spec.assertBool s (not (Set.member S.alice (GameState.drewFromEmpty after))) "CR 104.3c no draw was attempted, so nothing is owed"
+  -- The CONTROL for the case above, on the same empty library.
+  Spec.it s "CR 104.3c with no row the same empty library records the failed draw" $ do
+    plains <- S.printingOf s registry "Plains"
+    wordsOfWorship <- S.printingOf s registry "Words of Worship"
+    let (unarmed, _) = emptyLibraryBoard plains wordsOfWorship False
+        after = S.runPure S.identityAnswer unarmed (Event.drawCard S.alice)
+    Spec.assertEqWith s "she gained nothing" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertBool s (Set.member S.alice (GameState.drewFromEmpty after)) "CR 104.3c and the failed draw is on the books"
+  -- CR 109.5's "you": the pattern is ControllerRelation.Yours, so bob's draw is
+  -- not alice's, and the row is still there afterwards.
+  Spec.it s "CR 109.5 the row watches its controller's draws and nobody else's" $ do
+    plains <- S.printingOf s registry "Plains"
+    wordsOfWorship <- S.printingOf s registry "Words of Worship"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (armed, _) = wordsBoard plains wordsOfWorship piker True
+        stocked = snd (S.addLibraryCard piker S.bob armed)
+        after = S.runPure S.identityAnswer stocked (Event.drawCard S.bob)
+    Spec.assertEqWith s "CR 121.1 bob drew his card" (S.handSize S.bob after) 1
+    Spec.assertEqWith s "CR 109.5 and alice gained nothing off his draw" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "CR 614.3 the row is unspent" (length (GameState.replacements after)) 1
+
+-- alice with a Plains, a Words of Worship and two library cards, with the
+-- ability activated and resolved when `arm` is True and untouched when it is
+-- False. One builder for both legs, so the two boards differ in that alone.
+wordsBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (GameState.GameState, ObjectId.ObjectId)
+wordsBoard plains wordsOfWorship stock arm =
+  let base = S.landsInPlay plains 1
+      (words_, g1) = S.addCreature wordsOfWorship S.alice base
+      g2 = snd (S.addLibraryCard stock S.alice (snd (S.addLibraryCard stock S.alice g1)))
+      final =
+        if arm
+          then S.runPure S.identityAnswer g2 (Activate.activateAbility S.alice words_ (theAbility wordsOfWorship) >> Stack.resolveTop)
+          else g2
+   in (final, words_)
+
+-- wordsBoard with no library at all, which is CR 614.11's own board.
+emptyLibraryBoard :: Printing.Printing -> Printing.Printing -> Bool -> (GameState.GameState, ObjectId.ObjectId)
+emptyLibraryBoard plains wordsOfWorship arm =
+  let base = S.landsInPlay plains 1
+      (words_, g1) = S.addCreature wordsOfWorship S.alice base
+      final =
+        if arm
+          then S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice words_ (theAbility wordsOfWorship) >> Stack.resolveTop)
+          else g1
+   in (final, words_)
+
 bloodletterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 / 119.5)" $ do
   -- CR 119.4's second sentence is the whole of this case: "If a player pays life,
@@ -5942,6 +6048,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
   worshipSpec s registry
+  wordsOfWorshipSpec s registry
   bloodletterSpec s registry
   ashiokSpec s registry
   divineDeflectionSpec s registry

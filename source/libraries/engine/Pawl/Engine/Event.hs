@@ -106,6 +106,8 @@ import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
+import qualified Pawl.Types.DrawR as DrawR
+import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EntryFlip as EntryFlip
@@ -2367,6 +2369,27 @@ apply batch candidate event =
             pure Nothing
     -- Unreachable: `applies` admits LifeLossR only against WouldLoseLife.
     (ReplacementEffect.LifeLossR {}, _) -> pure (Just event)
+    -- CR 614.6 with CR 614.11: Words of Worship's "the next time you would draw a
+    -- card this turn, you gain 5 life instead". The draw NEVER HAPPENS -- no card
+    -- leaves the library, no GameEvent.Drew is recorded and CR 121.2's tally does
+    -- not move -- so this arm cancels rather than rewriting.
+    --
+    -- Rule 614.11's first sentence is why the funnel proposes the event before it
+    -- looks at the library: the row applies "even if no cards could be drawn
+    -- because there are no cards in the affected player's library", so a player
+    -- drawing off an empty library gains the life and never attempts the draw CR
+    -- 104.3c would kill them for.
+    --
+    -- The life goes to the player the EVENT named. See Pawl.Types.DrawRewrite for
+    -- why that is the same seat as CR 109.5's "you" on every printing of this
+    -- shape.
+    (ReplacementEffect.DrawR (DrawR.MkDrawR _ rewrite), ProposedEvent.WouldDraw pid) -> case rewrite of
+      DrawRewrite.GainLife n -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        changeLife pid (toInteger n)
+        pure Nothing
+    -- Unreachable: `applies` admits DrawR only against WouldDraw.
+    (ReplacementEffect.DrawR {}, _) -> pure (Just event)
     -- CR 122.6/614.1: Hardened Scales/Doubling Season scale a counter placement.
     (ReplacementEffect.CounterR (CounterR.MkCounterR _ scaling), ProposedEvent.WouldPutCounters cause oid kind n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
@@ -5170,9 +5193,30 @@ forgetObject gs oid = case Game.lookupObject oid gs of
             GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj) (Object.chosenNames obj)) (GameState.lastKnown cleared)
           }
 
--- CR 121.1, one card at a time per CR 121.2. An empty library records the failed
--- draw, which CR 704.5b makes a loss at the next state-based-action check. Shared
--- by the draw step, opening hands and the Draw effect.
+-- CR 119.3: move one player's life total by this much, and record the CR 608.2i
+-- event of the matching sign. The write LoseLife, GainLife and
+-- ExchangeLifeTotals share, so a life total moves in exactly one place.
+--
+-- In this module rather than beside those opcodes because a REPLACEMENT gains
+-- life too -- Words of Worship's DrawRewrite.GainLife -- and Pawl.Engine.Resolve
+-- is above this one, so an arm of `apply` could not have called it there.
+--
+-- A zero delta writes nothing at all: CR 119.9 says so for the gain side, and the
+-- loss side takes the same posture.
+changeLife :: PlayerId -> Integer -> Game ()
+changeLife pid delta =
+  Monad.when (delta /= 0) . State.modify' $
+    recordEvent
+      ( if delta > 0
+          then GameEvent.LifeGained (LifeChange.MkLifeChange pid (Integer.toNaturalSaturating delta))
+          else GameEvent.LifeLost (LifeChange.MkLifeChange pid (Integer.toNaturalSaturating (negate delta)))
+      )
+      . (\g -> g {GameState.players = Map.adjust (\p -> p {Player.life = Player.life p + delta}) pid (GameState.players g)})
+
+-- CR 121.1, one card at a time per CR 121.2, with CR 614's say first (CR 121.6).
+-- An empty library records the failed draw, which CR 704.5b makes a loss at the
+-- next state-based-action check. Shared by the draw step, opening hands and the
+-- Draw effect.
 --
 -- The tally and the event are for CR 121.2's "individual card draws": each draw
 -- is its own event, carrying which of this player's draws this turn it was, so a
@@ -5191,11 +5235,26 @@ drawCard pid = Monad.void (drawCardReturning pid)
 -- for CR 121.1's "and reveal IT" (#1899): Just the id the card ARRIVED in the hand
 -- under (CR 400.7), which is where a later clause of the same resolution names it.
 --
--- Nothing where there is no such card -- an empty library (CR 104.3c is then the
--- whole of what happened) or a move a replacement effect cancelled -- so a caller
--- binding the answer binds nothing rather than binding a card that is not there.
+-- Nothing where there is no such card -- a draw a replacement took (CR 614.6), an
+-- empty library (CR 104.3c is then the whole of what happened), or a move a
+-- replacement effect cancelled -- so a caller binding the answer binds nothing
+-- rather than binding a card that is not there.
 drawCardReturning :: PlayerId -> Game (Maybe ObjectId)
 drawCardReturning pid = do
+  outcome <- applyReplacements (ProposedEvent.WouldDraw pid)
+  case outcome >>= Replacement.asDraw of
+    -- CR 614.6: a replacement took the draw, so it never happens. The row has
+    -- already done its own work; nothing is left to do here and nothing is
+    -- recorded.
+    Nothing -> pure Nothing
+    Just drawer -> performDraw drawer
+
+-- The draw itself, once CR 616.1's loop has left it standing. Split out so that
+-- rule 614.11's ordering is visible: the proposal above runs BEFORE the library
+-- is looked at, which is what makes a row apply "even if no cards could be drawn
+-- because there are no cards in the affected player's library".
+performDraw :: PlayerId -> Game (Maybe ObjectId)
+performDraw pid = do
   gs <- State.get
   case Game.zoneMembers Zone.Library pid gs of
     [] -> do

@@ -21,6 +21,8 @@ import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.DrawR as DrawR
+import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -169,6 +171,13 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
           )
       )
       " {\"type\":\"LifeLossR\",\"value\":{\"matching\":{\"whose\":{\"type\":\"Yours\"},\"whichCause\":{\"type\":\"ByDamage\"}},\"rewrite\":{\"type\":\"LeaveAtLeast\",\"value\":1}}} "
+  -- CR 614.11 / 121.6: Words of Worship, the one DrawR producer.
+  Spec.it s "DrawR (Words of Worship)" $
+    Common.assertCodec
+      s
+      codec
+      (ReplacementEffect.DrawR (DrawR.MkDrawR ControllerRelation.Yours (DrawRewrite.GainLife 5)))
+      " {\"type\":\"DrawR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"GainLife\",\"value\":5}}} "
   -- A fixed kind, a real filter, and CR 614.16's AddMore.
   Spec.it s "CounterR (Hardened Scales)" $
     Common.assertCodec

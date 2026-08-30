@@ -3,6 +3,7 @@ module Pawl.Types.ReplacementEffect where
 import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.LifeLossR as LifeLossR
 import qualified Pawl.Types.PhasePattern as PhasePattern
@@ -114,5 +115,15 @@ data ReplacementEffect effect
     -- half of it, and the pattern's cause field is what keeps the arm off CR
     -- 119.3's other roads.
     LifeLossR LifeLossR.LifeLossR
+  | -- | CR 614.11 / 121.6: "the next time you would draw a card this turn, you
+    -- gain 5 life instead" (Words of Worship). A separate arm from ZoneChangeR
+    -- because CR 121.5 parts the two: a card an effect moves from a library to a
+    -- hand without the word "draw" has not been drawn, so a row watching that
+    -- move is a different claim from one watching the draw.
+    --
+    -- Carries no "next", for PhaseR's reason: CR 614.3's used-up count is
+    -- Uses.Once on the carrier, which is what lets a one-shot shield and an
+    -- unbounded one share this constructor.
+    DrawR DrawR.DrawR
   | PhaseR PhasePattern.PhasePattern
   deriving (Eq, Ord, Show)
