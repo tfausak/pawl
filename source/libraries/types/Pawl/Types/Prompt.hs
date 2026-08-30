@@ -248,10 +248,12 @@ data Prompt r where
   -- | CR 122.5: WHICH counters a move takes off the first object, and how many
   -- of each (Resourceful Defense's "move any number of counters from target
   -- permanent you control onto a second target permanent you control"). Raised
-  -- where the card leaves both the kind and the count open, which is what
-  -- separates it from ChooseMovedCounter above: that prompt asks which of two or
-  -- more kinds a printed count comes out of, where this one lets one answer
-  -- spread across kinds.
+  -- wherever the card leaves the COUNT open, which is what separates it from
+  -- ChooseMovedCounter above: that prompt asks which of two or more kinds a
+  -- printed count comes out of, where this one asks how many of each offered kind
+  -- crosses. A card naming its kind and no count (Scrounging Bandar's "move any
+  -- number of +1\/+1 counters") is this prompt over a single key rather than a
+  -- prompt of its own, the offered Map being the pre-filter either way.
   --
   -- The first ObjectId is the object the counters leave, the second the object
   -- they land on; the Map is what the first object HAS, engine-pre-filtered to

@@ -20,8 +20,9 @@ import qualified Pawl.Types.MovedKinds as MovedKinds
 -- the loser's wire spelling stops matching the schema the corpus is checked
 -- against.
 --
--- The whole-tally arm's payload is that same CounterKind codec: a kind is a kind
--- however the sentence settles its count.
+-- The whole-tally and any-number-of-a-kind arms share that same CounterKind
+-- codec: a kind is a kind however the sentence settles its count, and a second
+-- codec for the type would collide with this one in the schema's definitions.
 codec :: Codec.Codec MovedKinds.MovedKinds
 codec =
   Arm.tagged
@@ -30,6 +31,7 @@ codec =
       Arm.payload "EveryOfKind" (CounterKind.codec Keyword.codec) MovedKinds.EveryOfKind (\x -> case x of MovedKinds.EveryOfKind kind -> Just kind; _ -> Nothing),
       Arm.payload "Chosen" Quantity.codec MovedKinds.Chosen (\x -> case x of MovedKinds.Chosen quantity -> Just quantity; _ -> Nothing),
       Arm.nullary "AnyNumber" MovedKinds.AnyNumber,
+      Arm.payload "AnyNumberOfKind" (CounterKind.codec Keyword.codec) MovedKinds.AnyNumberOfKind (\x -> case x of MovedKinds.AnyNumberOfKind kind -> Just kind; _ -> Nothing),
       Arm.nullary "EachAbsentKind" MovedKinds.EachAbsentKind,
       Arm.nullary "UpToOneChosen" MovedKinds.UpToOneChosen
     ]

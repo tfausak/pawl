@@ -690,7 +690,7 @@ data Effect card ability
     RemoveCounters RemoveCounters.RemoveCounters
   | -- | CR 122.5: move counters from the permanents an ObjectRef names onto the
     -- one a slot does. WHICH kinds cross and HOW MANY of each is
-    -- Pawl.Types.MovedKinds, a spelling per arm over one batch per kind; see
+    -- Pawl.Types.MovedKinds, every printed spelling over one batch per kind; see
     -- Pawl.Types.MoveCounters' `kinds`.
     --
     -- NOT a RemoveCounters beside a PutCounters, which is the whole reason this
