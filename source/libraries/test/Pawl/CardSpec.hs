@@ -2840,12 +2840,12 @@ canHostSubjects predicate = case predicate of
   -- projection's keyword map, so what is inside the keyword is compared and not
   -- run -- but still a Filter position a card author can write the atom into,
   -- which is the only thing this lint is about.
-  Filter.Type.HasKeyword keyword -> sum (fmap canHostSubjects (keywordFilters keyword))
+  Filter.Type.HasKeyword keyword -> sum (fmap (canHostSubjects . snd) (keywordFilters keyword))
   -- CR 122.1b's keyword counter carries a whole Keyword, so a Filter can hide one
   -- level further down than the atom above -- and this lint is about the
   -- positions, not about which of them a card has used.
   Filter.Type.HasCounters kind -> case kind of
-    CounterKind.Keyword keyword -> sum (fmap canHostSubjects (keywordFilters keyword))
+    CounterKind.Keyword keyword -> sum (fmap (canHostSubjects . snd) (keywordFilters keyword))
     CounterKind.PlusOnePlusOne -> 0
     CounterKind.MinusOneMinusOne -> 0
     CounterKind.Loyalty -> 0
@@ -2953,7 +2953,7 @@ canHostSubjects predicate = case predicate of
 -- 122.6, each a Quantity, which may carry a Count whose Filter is card text).
 -- One function so the three effect arms that carry a rider cannot sweep
 -- different halves of it.
-riderFilters :: EntryRiders.EntryRiders Quantity.Type.Quantity -> [Filter.Type.Filter Keyword.Keyword]
+riderFilters :: EntryRiders.EntryRiders Quantity.Type.Quantity -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 riderFilters riders =
   concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))
     <> concatMap quantityFilters (Map.elems (EntryRiders.counters riders))
@@ -2964,7 +2964,7 @@ riderFilters riders =
 -- riderFilters' two, over the payload entryRewriteFilters and
 -- turnUpRewriteFilters share -- one function so the two rewrites that carry it
 -- cannot sweep different halves.
-withCountersFilters :: WithCounters.WithCounters -> [Filter.Type.Filter Keyword.Keyword]
+withCountersFilters :: WithCounters.WithCounters -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 withCountersFilters w =
   concatMap counterKindFilters (Map.keys (WithCounters.counters w))
     <> concatMap quantityFilters (Map.elems (WithCounters.counters w))
@@ -2977,12 +2977,11 @@ withCountersFilters w =
 -- traversals, plus riderFilters and withCountersFilters, is the whole of it
 -- (#2728).
 --
--- Not implemented: a FRAMING of its own. What this returns is fed to `unframed`
--- at every position, which is the treatment a printed keyword's filter and a
--- granted one already get -- and which over-promises, a keyword's filter being
--- evaluated off a continuous effect with no resolution's slots behind it
--- (#2730).
-counterKindFilters :: CounterKind.CounterKind Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
+-- Tagged pairs and not bare Filters, so that CR 122.1b's keyword counter carries
+-- KeywordFramed out through every quoting position rather than inheriting the
+-- promise of whichever one quoted it -- `frame` below fills in only the
+-- positions still Unframed.
+counterKindFilters :: CounterKind.CounterKind Keyword.Keyword -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 counterKindFilters kind = case kind of
   CounterKind.Keyword keyword -> keywordFilters keyword
   CounterKind.PlusOnePlusOne -> []
@@ -2999,8 +2998,8 @@ counterKindFilters kind = case kind of
   CounterKind.Hone -> []
   CounterKind.Named _ -> []
 
-keywordFilters :: Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
-keywordFilters keyword = case keyword of
+keywordFilters :: Keyword.Keyword -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+keywordFilters keyword = keywordFramed $ case keyword of
   Keyword.Cycling (Cycling.MkCycling cost mFilter) -> costFilters cost <> Maybe.maybeToList mFilter
   Keyword.Flashback cost -> costFilters cost
   -- CR 702.103a: the bestow cost, whose components may hold a Filter exactly as
@@ -3256,9 +3255,9 @@ costComponentFilters component = case component of
 
 -- The Filter narrowing a target slot's CR 115 pool -- "target creature with
 -- flying" -- and CR 303.4a's enchant slot, which is a TargetSlot too.
-targetSlotFilters :: TargetSlot.TargetSlot -> [Filter.Type.Filter Keyword.Keyword]
+targetSlotFilters :: TargetSlot.TargetSlot -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 targetSlotFilters slot =
-  Maybe.maybeToList (TargetSlot.filter slot)
+  unframed (Maybe.maybeToList (TargetSlot.filter slot))
     -- CR 202.3's computed bound is a Quantity, and a Quantity reaches a Count and
     -- so a Filter -- so the slot's `amount` is a Filter position like any other
     -- and has to be swept, or the cross-checks below would report an atom buried
@@ -3282,9 +3281,9 @@ affectedFilters affected = case affected of
 -- through its Quantity (Sphere of Safety counts "enchantments you control"), and
 -- the Fixed arm through its cost's components (Exalted Dragon sacrifices "a
 -- land").
-perCreatureFilters :: PerCreature.PerCreature -> [Filter.Type.Filter Keyword.Keyword]
+perCreatureFilters :: PerCreature.PerCreature -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 perCreatureFilters perCreature = case perCreature of
-  PerCreature.Fixed cost -> costFilters cost
+  PerCreature.Fixed cost -> unframed (costFilters cost)
   PerCreature.Counted quantity -> quantityFilters quantity
 
 objectRefFilters :: ObjectRef.ObjectRef -> [Filter.Type.Filter Keyword.Keyword]
@@ -3378,8 +3377,8 @@ countFilters = fmap Count.Type.filter
 -- from it, and the Filter a CR 122.1b keyword counter hides under a CounterKind
 -- (#2728). The second is a separate walk because the first goes through
 -- quantityCounts, whose answer is a list of Counts and so cannot carry it.
-quantityFilters :: Quantity.Type.Quantity -> [Filter.Type.Filter Keyword.Keyword]
-quantityFilters quantity = countFilters (quantityCounts quantity) <> quantityKindFilters quantity
+quantityFilters :: Quantity.Type.Quantity -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+quantityFilters quantity = unframed (countFilters (quantityCounts quantity)) <> quantityKindFilters quantity
 
 -- Every Filter a CounterKind inside a Quantity carries. CR 122.1b lets a counter's
 -- kind be a whole Keyword, and a Keyword may hold a Filter (keywordFilters), so
@@ -3390,7 +3389,7 @@ quantityFilters quantity = countFilters (quantityCounts quantity) <> quantityKin
 -- Exhaustive with no catch-all, this file's discipline for a sum: a new Quantity
 -- arm that comes to carry a CounterKind must be classified here rather than drop
 -- its Filter silently, which is how this position went unswept in the first place.
-quantityKindFilters :: Quantity.Type.Quantity -> [Filter.Type.Filter Keyword.Keyword]
+quantityKindFilters :: Quantity.Type.Quantity -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 quantityKindFilters quantity = case quantity of
   Quantity.Type.Literal _ -> []
   Quantity.Type.ManaValue -> []
@@ -3471,7 +3470,7 @@ durationFilters duration =
 -- A Modification reaches a Filter two ways: through its layer-7 quantities (a
 -- Count) and through the keyword a layer-6 grant hands out or takes away (CR
 -- 702.29e again).
-modificationFilters :: Projection.Modification -> [Filter.Type.Filter Keyword.Keyword]
+modificationFilters :: Projection.Modification -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 modificationFilters modification = case modification of
   Modification.GainKeyword keyword -> keywordFilters keyword
   -- Payload-free, so there is no Filter to sweep -- see modificationCounts.
@@ -3522,18 +3521,19 @@ modificationFilters modification = case modification of
 -- host, and the affected set beside it is not.
 staticAbilityFilters :: StaticAbility.StaticAbility Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 staticAbilityFilters ability =
-  unframed
-    ( affectedFilters (StaticAbility.affected ability)
-        <> concatMap durationFilters (Maybe.maybeToList (StaticAbility.lingers ability))
+  frame
+    Unframed
+    ( unframed (affectedFilters (StaticAbility.affected ability))
+        <> unframed (concatMap durationFilters (Maybe.maybeToList (StaticAbility.lingers ability)))
         <> concatMap modificationFilters (StaticAbility.modifications ability)
     )
     <> sourceHosted (concatMap conditionFilters (Maybe.maybeToList (StaticAbility.condition ability)))
 
 -- CR 603.6a's "whenever [a permanent] enters" carries one directly; CR 603.8's
 -- state trigger carries one through its Condition's Counts.
-triggerConditionFilters :: TriggerCondition.TriggerCondition -> [Filter.Type.Filter Keyword.Keyword]
+triggerConditionFilters :: TriggerCondition.TriggerCondition -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 triggerConditionFilters triggerCondition = case triggerCondition of
-  TriggerCondition.PermanentEnters f -> [f]
+  TriggerCondition.PermanentEnters f -> unframed [f]
   -- CR 709.5h names a half by name; nothing about the door is a Filter.
   TriggerCondition.SelfHalfUnlocked _ -> []
   -- CR 709.5i names a PlayerRelation; nothing about it is a Filter.
@@ -3547,9 +3547,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfTransformedInto _ -> []
   -- Its watcher-scoped sibling carries one, and Aven Farseer's is the trivial
   -- `And []` -- which this sweep must still see, an empty Filter being a Filter.
-  TriggerCondition.PermanentTurnedFaceUp f -> [f]
+  TriggerCondition.PermanentTurnedFaceUp f -> unframed [f]
   -- CR 702.112b's carries one too -- Valeron Wardens' "a creature you control".
-  TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated _ f) -> [f]
+  TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated _ f) -> unframed [f]
   TriggerCondition.SelfEvolves -> []
   -- CR 702.134c's carries none either: "equipped creature" is CR 301.5f's one
   -- permanent rather than a class of them, and "a creature" narrows by nothing.
@@ -3567,14 +3567,14 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 603.3b's names a PlayerRelation; the Saga is found through CR 714.2d's
   -- final chapter number rather than through a Filter.
   TriggerCondition.SagaFinalChapterTriggers _ -> []
-  TriggerCondition.PermanentDies f -> [f]
+  TriggerCondition.PermanentDies f -> unframed [f]
   -- CR 603.2c's batch reading of the same written form carries the same Filter,
   -- so it is swept the same way -- answering [] here would exempt Vengeful
   -- Townsfolk's "other creatures you control" from every corpus filter lint.
-  TriggerCondition.PermanentsDie f -> [f]
+  TriggerCondition.PermanentsDie f -> unframed [f]
   -- CR 603.6c's bystander form carries the same kind of Filter one rule wider.
-  TriggerCondition.PermanentLeavesTheBattlefield f -> [f]
-  TriggerCondition.StateIs condition -> conditionFilters condition
+  TriggerCondition.PermanentLeavesTheBattlefield f -> unframed [f]
+  TriggerCondition.StateIs condition -> unframed (conditionFilters condition)
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
@@ -3583,16 +3583,16 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfIsDealtDamage -> []
   -- Its watcher-scoped sibling carries one -- Tovolar's "a Wolf or Werewolf you
   -- control", which the card lint must sweep.
-  TriggerCondition.PermanentDealsCombatDamageToPlayer f -> [f]
+  TriggerCondition.PermanentDealsCombatDamageToPlayer f -> unframed [f]
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
   TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
   -- CR 702.149a names a quality the OTHER attackers must have, so this one DOES
   -- carry a Filter -- "power greater than this creature's power".
-  TriggerCondition.SelfAttacksWithAnother f -> [f]
+  TriggerCondition.SelfAttacksWithAnother f -> unframed [f]
   -- CR 506.5's condition names a quality the ATTACKER must have, so it carries a
   -- Filter -- rule 702.83a's "a creature you control".
-  TriggerCondition.CreatureAttacksAlone f -> [f]
+  TriggerCondition.CreatureAttacksAlone f -> unframed [f]
   -- CR 508.3a's second sentence names no quality of the attacker -- CR 508.1a has
   -- already made it a creature -- so this one carries no Filter to traverse.
   TriggerCondition.CreatureAttacksYou -> []
@@ -3605,7 +3605,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerAttacks _ -> []
   -- CR 508.3c names a quality the declared creatures must have, so this one DOES
   -- carry a Filter -- Hermes, Overseer of Elpis' "Birds".
-  TriggerCondition.PlayerAttacksWith payload -> [PlayerAttacksWith.filter payload]
+  TriggerCondition.PlayerAttacksWith payload -> unframed [PlayerAttacksWith.filter payload]
   -- CR 508.3e names two players and no quality of anything, so no Filter --
   -- rule 508.3d's answer, twice over.
   TriggerCondition.PlayerAttacksPlayer {} -> []
@@ -3615,18 +3615,18 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfBlocks -> []
   -- CR 509.3b names a quality the attacker blocked must have, so this one DOES
   -- carry a Filter -- Netcaster Spider's "with flying".
-  TriggerCondition.SelfBlocksCreature f -> [f]
+  TriggerCondition.SelfBlocksCreature f -> unframed [f]
   TriggerCondition.SelfBlocksAtLeast _ -> []
   -- CR 509.3e's filtered form names a quality the attackers blocked must have,
   -- so this one DOES carry a Filter.
-  TriggerCondition.SelfBlocksOneOrMore f -> [f]
+  TriggerCondition.SelfBlocksOneOrMore f -> unframed [f]
   TriggerCondition.SelfBecomesBlocked -> []
   -- CR 509.3d names a quality the blocker must have, so this one DOES carry a
   -- Filter -- rule 702.25a's "without flanking".
-  TriggerCondition.SelfBecomesBlockedBy f -> [f]
+  TriggerCondition.SelfBecomesBlockedBy f -> unframed [f]
   -- The same rule's attacking-side form, whose Filter is a predicate over the
   -- blockers -- Serra Inquisitors' "black".
-  TriggerCondition.SelfBecomesBlockedByOneOrMore f -> [f]
+  TriggerCondition.SelfBecomesBlockedByOneOrMore f -> unframed [f]
   -- The same rule read by a bystander names a quality of nothing: whom the
   -- attacker attacked is a PlayerRelation and the blockers are only counted, so
   -- there is no Filter here.
@@ -3653,12 +3653,12 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfBecomesPlotted -> []
   -- CR 701.44b DOES carry one, a predicate over the explorer -- Wildgrowth
   -- Walker's "a creature you control" -- which the card lint must sweep.
-  TriggerCondition.PermanentExplores f -> [f]
+  TriggerCondition.PermanentExplores f -> unframed [f]
   -- CR 701.43d carries nothing, so no Filter either.
   TriggerCondition.SelfExerted -> []
   -- CR 701.3a's carries one over the ATTACHMENT -- Bramble Elemental's "an
   -- Aura" -- which this sweep must see for PermanentTurnedFaceUp's reason.
-  TriggerCondition.SelfBecomesAttachedBy f -> [f]
+  TriggerCondition.SelfBecomesAttachedBy f -> unframed [f]
   -- CR 603.12's carries nothing, so no Filter either.
   TriggerCondition.Reflexive -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
@@ -3671,7 +3671,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- Rule 615.13's other reading DOES carry one, a predicate over the damage's
   -- source -- Samite Ministration's "black or red" -- which this sweep must see
   -- for PermanentExplores' reason.
-  TriggerCondition.SelfPreventsDamage f -> [f]
+  TriggerCondition.SelfPreventsDamage f -> unframed [f]
   TriggerCondition.PlayerGainsLife _ -> []
   TriggerCondition.PlayersGainLife _ -> []
   TriggerCondition.PlayerLosesLife _ -> []
@@ -3689,13 +3689,13 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- landed on -- swept like PermanentsDie's, so a card's "one or more creatures"
   -- is not exempt from the corpus filter lints. And its KIND beside it, for the
   -- three arms above's reason.
-  TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind f) -> f : counterKindFilters kind
+  TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind f) -> unframed [f] <> counterKindFilters kind
   -- And its per-permanent scope, whose Filter is read against ONE permanent --
   -- swept all the same, the lints being about the Filter and not the scope.
-  TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement kind f) -> f : counterKindFilters kind
+  TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement kind f) -> unframed [f] <> counterKindFilters kind
   -- CR 601.2i's "whenever you cast a [type] spell" carries one directly, over
   -- the spell rather than over a permanent.
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast f _ _ _) -> [f]
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast f _ _ _) -> unframed [f]
   -- "This spell" names the bearer and needs no Filter to say so.
   TriggerCondition.SelfCast -> []
   -- Rule 702.21a names the bearer as well, and asks only a relation of the
@@ -3841,10 +3841,11 @@ triggerConditionSlots triggerCondition = case triggerCondition of
 -- ANOTHER object's text, which is read for real in a resolution of its own --
 -- see clashesIn, which is where that boundary is kept (#2735).
 --
--- Not implemented: the Filter a Keyword carries (CR 702.29e) and the one a
--- CounterKind hides under a keyword (CR 122.1b). Neither is evaluated with a
--- resolution's bindings behind it at all, so an atom written there is
--- unanswerable for a reason of its own (#2730).
+-- NOT descended into: the Filter a Keyword carries (CR 702.29e) and the one a
+-- CounterKind hides under a keyword (CR 122.1b). Sound rather than elided --
+-- keywordFilters tags both KeywordFramed, a position whose evaluator supplies no
+-- slots at all, so nothing there reads a slot singly or plurally and there is no
+-- clash to report.
 filterSlotsReadSingly :: Filter.Type.Filter Keyword.Keyword -> [SlotName.SlotName]
 filterSlotsReadSingly predicate = case predicate of
   Filter.Type.HasCardType _ -> []
@@ -3852,7 +3853,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.HasColor _ -> []
   Filter.Type.HasSubtype _ -> []
   Filter.Type.HasName _ -> []
-  -- The keyword's own Filter, left alone for the reason above (#2730).
+  -- The keyword's own Filter, left alone for the reason above.
   Filter.Type.HasKeyword _ -> []
   Filter.Type.HasKeywordFamily _ -> []
   Filter.Type.PowerAtLeast _ -> []
@@ -3914,7 +3915,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.IsRingBearer -> []
   Filter.Type.HasDesignation _ -> []
   -- The kind may be a whole Keyword hiding a Filter, left alone for the reason
-  -- the keyword atom above is (#2730).
+  -- the keyword atom above is.
   Filter.Type.HasCounters _ -> []
   Filter.Type.HasCountersOfAnyKind -> []
   Filter.Type.HasNonManaActivatedAbility -> []
@@ -4212,17 +4213,17 @@ storedPlayerScope effect = case effect of
 -- reveal carries a third, over a CARD IN A HAND (Rustic Clachan's "a Kithkin
 -- card"). CR 707.5's copy choice carries a fourth, over permanents on the
 -- battlefield (Copy Enchantment's "any enchantment"). None of the four is framed.
-entryRewriteFilters :: EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Filter.Type.Filter Keyword.Keyword]
+entryRewriteFilters :: EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 entryRewriteFilters entryRewrite = case entryRewrite of
-  EntryRewrite.ChooseCardNames f -> [f]
-  EntryRewrite.RevealOrTapped f -> [f]
+  EntryRewrite.ChooseCardNames f -> unframed [f]
+  EntryRewrite.RevealOrTapped f -> unframed [f]
   -- CR 707.5's eligible set -- Clone's "any creature", Copy Enchantment's "any
   -- enchantment" -- is a criterion over permanents on the battlefield, so it
   -- belongs in this walk. CR 707.9's exceptions beside it carry no Filter: an
   -- "except ..." clause states values, never a criterion over objects
   -- (Pawl.Types.CopyException imports no Filter, which is what keeps that
   -- honest), and neither does the CR 614.1d `tapped` flag beside them (Vesuva).
-  EntryRewrite.AsCopy (AsCopy.MkAsCopy f _ _) -> [f]
+  EntryRewrite.AsCopy (AsCopy.MkAsCopy f _ _) -> unframed [f]
   EntryRewrite.ChoiceOf _ -> []
   EntryRewrite.ChoiceByCoinFlip _ -> []
   EntryRewrite.ChooseColor -> []
@@ -4248,7 +4249,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- BOTH fields: the permanents the sacrifice may take, and CR 122.1b's kind
   -- the entering permanent takes one of per sacrifice, which may be a whole
   -- Keyword carrying a Filter (#2728).
-  EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber f kind) -> f : concatMap counterKindFilters (Maybe.maybeToList kind)
+  EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber f kind) -> unframed [f] <> concatMap counterKindFilters (Maybe.maybeToList kind)
   -- CR 614.1c's as-enters effects hold no Filter of their own; the ones inside
   -- them are reached as ordinary effect filters, through cardResolutionEffects.
   EntryRewrite.RunEffects _ -> []
@@ -4258,8 +4259,9 @@ entryRewriteFilters entryRewrite = case entryRewrite of
 -- attach is what it describes: the enchant-ability narrowing is added by
 -- Pawl.Engine.Attach.turnUpHosts because rule 303.4k mandates it, so a card
 -- writing Filter.CanHostSubject here would be stating a rule rather than its own
--- text. That is why this list feeds `unframed` with every other position.
-turnUpRewriteFilters :: TurnUpRewrite.TurnUpRewrite -> [Filter.Type.Filter Keyword.Keyword]
+-- text. That is why this position is tagged like any other rather than as an
+-- attach destination.
+turnUpRewriteFilters :: TurnUpRewrite.TurnUpRewrite -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
   -- entryRewriteFilters' WithCounters arm, on the rewrite that shares the payload.
   -- Vacuous over `data/cards/` while Bubble Smuggler's four +1/+1 counters are the
@@ -4267,7 +4269,7 @@ turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
   -- literal count, so neither half carries a Filter -- and walked anyway so the
   -- two halves of one payload cannot be swept differently.
   TurnUpRewrite.WithCounters w -> withCountersFilters w
-  TurnUpRewrite.MayAttachTo f -> [f]
+  TurnUpRewrite.MayAttachTo f -> unframed [f]
 
 -- CR 614.1c-e: four replacement patterns narrow by a Filter. CounterPattern.onWhat
 -- is "one or more counters would be put on a creature YOU control"; EntryR's
@@ -4284,16 +4286,16 @@ turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
 -- turnUpRewriteFilters above say which cards a name choice inside it may name,
 -- which permanents an as-enters sacrifice may take, and where CR 303.4k's
 -- attachment may land.
-replacementEffectFilters :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Filter.Type.Filter Keyword.Keyword]
+replacementEffectFilters :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 replacementEffectFilters replacementEffect = case replacementEffect of
   -- BOTH of the pattern's Filter-bearing fields: the permanents it watches, and
   -- CR 122.1b's kind, which may be a whole Keyword carrying a Filter (#2728).
   -- `whichKind` is a Maybe, and Nothing there is Doubling Season's ANY kind
   -- rather than a kind holding nothing.
   ReplacementEffect.CounterR (CounterR.MkCounterR counterPattern _) ->
-    CounterPattern.onWhat counterPattern : concatMap counterKindFilters (Maybe.maybeToList (CounterPattern.whichKind counterPattern))
-  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern _ _ _) -> [ZoneChangePattern.whatObject zoneChangePattern]
-  ReplacementEffect.EntryR (EntryR.MkEntryR entryPattern entryRewrite) -> entryPattern : entryRewriteFilters entryRewrite
+    unframed [CounterPattern.onWhat counterPattern] <> concatMap counterKindFilters (Maybe.maybeToList (CounterPattern.whichKind counterPattern))
+  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern _ _ _) -> unframed [ZoneChangePattern.whatObject zoneChangePattern]
+  ReplacementEffect.EntryR (EntryR.MkEntryR entryPattern entryRewrite) -> unframed [entryPattern] <> entryRewriteFilters entryRewrite
   -- CR 615.1's shields narrow by their source, which is a Filter over the object
   -- dealing the damage (Luminesce's "black sources and red sources", Galvanic
   -- Blast's `IsSource`), and by their printed RECIPIENT, which is a second
@@ -4303,10 +4305,10 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   -- The REWRITE holds one too, on a third axis: CR 614.9's printed destination
   -- (Pariah's "enchanted creature"), which damageRewriteFilters below answers.
   ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern rewrite _) ->
-    DamagePattern.whatSource damagePattern : Maybe.maybeToList (DamagePattern.whatRecipient damagePattern) <> damageRewriteFilters rewrite
+    unframed (DamagePattern.whatSource damagePattern : Maybe.maybeToList (DamagePattern.whatRecipient damagePattern) <> damageRewriteFilters rewrite)
   ReplacementEffect.DestructionR _ -> []
   ReplacementEffect.TokenR {} -> []
-  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern _ turnUpRewrite) -> turnUpPattern : turnUpRewriteFilters turnUpRewrite
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern _ turnUpRewrite) -> unframed [turnUpPattern] <> turnUpRewriteFilters turnUpRewrite
   ReplacementEffect.UntapR _ -> []
   ReplacementEffect.LifeLossR {} -> []
   ReplacementEffect.DrawR {} -> []
@@ -4341,7 +4343,7 @@ damageRewriteFilters rewrite = case rewrite of
 printedReplacementFilters :: PrintedReplacement.PrintedReplacement (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 printedReplacementFilters printedReplacement =
   unframed (foldMap conditionFilters (PrintedReplacement.condition printedReplacement))
-    <> replacementRowFramed (replacementEffectFilters (PrintedReplacement.effect printedReplacement))
+    <> frame ReplacementRowFramed (replacementEffectFilters (PrintedReplacement.effect printedReplacement))
 
 -- Both the subject and CR 508.1c's "unless some condition is met": Blind-Spot
 -- Giant's gate carries `Not IsSource`, which is as much card data as the affected
@@ -4388,11 +4390,11 @@ blockRequirementFilters requirement =
 -- All three of a blocking permission's Filter positions: the subject it names, CR
 -- 604.2's "as long as" gate beside it (Entourage of Trest), and the counted arity
 -- (Kemba's Legion).
-blockPermissionFilters :: BlockPermission.BlockPermission -> [Filter.Type.Filter Keyword.Keyword]
+blockPermissionFilters :: BlockPermission.BlockPermission -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 blockPermissionFilters permission =
-  affectedFilters (BlockPermission.affected permission)
+  unframed (affectedFilters (BlockPermission.affected permission))
     <> foldMap quantityFilters (BlockPermission.additional permission)
-    <> foldMap conditionFilters (BlockPermission.while permission)
+    <> unframed (foldMap conditionFilters (BlockPermission.while permission))
 
 -- WHICH position of a card's text a Filter sits in, for the three lints that are
 -- about position rather than about the atom. Each atom they police is answered
@@ -4431,6 +4433,9 @@ blockPermissionFilters permission =
 --     this one, for a reason that is about the lints and not about the rule:
 --     `hostFramed` treats the two alike, and only the ObjectRef twin lint tells
 --     them apart.
+--   * KeywordFramed -- a KEYWORD's own Filter, wherever the keyword is written.
+--     The one tag applied by the leaf that PRODUCES the Filter rather than by
+--     the position that quotes it, which `frame` below is what keeps.
 --   * Unframed -- everything else.
 --
 -- CR 303.4a's enchant slot (Face.enchant) is Unframed rather than InTargetSlot,
@@ -4477,6 +4482,20 @@ data Framing
     -- one empty that every other position fills -- `identity` -- so
     -- Filter.IsBound is a silent False there and nowhere else.
     OutsideTheGameFramed
+  | -- | A KEYWORD's own Filter -- CR 702.29e's typecycling predicate, CR 702.11d's
+    -- "hexproof from", a cost-carrying keyword's CostComponent.Sacrifice, and CR
+    -- 122.1b's keyword counter, which carries a whole Keyword. Read off a
+    -- continuous effect or off the printed face through
+    -- Pawl.Engine.Filter.contextFor, which fills neither the resolution's slots
+    -- nor the source's host, so it supplies strictly less than Unframed's
+    -- positions do rather than more.
+    --
+    -- The one constructor applied at the LEAF that produces the Filter rather
+    -- than at the position that quotes it, which is what `frame` below exists
+    -- for: a keyword counter's Filter is reached through counterKindFilters from
+    -- positions that are themselves framed, and the quoting position's promise is
+    -- not the keyword's.
+    KeywordFramed
   deriving (Eq, Ord, Show)
 
 -- Does this position's evaluator supply CR 303.4b's host? Two constructors
@@ -4490,6 +4509,7 @@ hostFramed framing = case framing of
   InTargetSlot -> False
   SearchFramed -> False
   OutsideTheGameFramed -> False
+  KeywordFramed -> False
 
 -- Tag a Filter position as UNFRAMED -- one none of the framings above applies
 -- to, which is every position in the type except the ones they name.
@@ -4505,11 +4525,6 @@ unframed = fmap ((,) Unframed)
 sourceHosted :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 sourceHosted = fmap ((,) SourceHostFramed)
 
--- Tag a Filter position as a CR 614.1 replacement ROW's -- SourceHostFramed's
--- twin, kept apart from it for the reason that constructor gives.
-replacementRowFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
-replacementRowFramed = fmap ((,) ReplacementRowFramed)
-
 -- Tag a Filter position as a SEARCH's, the one position whose evaluator supplies
 -- Filter.View.canAttachToSubject (CR 701.3a from the candidate's side).
 searchFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
@@ -4519,6 +4534,24 @@ searchFramed = fmap ((,) SearchFramed)
 -- face rather than against an object (CR 400.11c).
 outsideTheGameFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 outsideTheGameFramed = fmap ((,) OutsideTheGameFramed)
+
+-- Tag a Filter position as a KEYWORD's own. The only tag applied at the leaf
+-- that produces the Filter, keywordFilters, rather than at a quoting position.
+keywordFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+keywordFramed = fmap ((,) KeywordFramed)
+
+-- Apply a quoting position's Framing to filters that are ALREADY tagged, filling
+-- in only the ones still Unframed. The lifts above take a bare list, which is
+-- the shape of a traversal that cannot reach a keyword; the traversals that can
+-- reach one hand back tagged pairs, and a deeper tag wins because the deeper
+-- position is the one whose evaluator actually reads the Filter.
+--
+-- KeywordFramed is the only tag any of those traversals produces, so "a deeper
+-- tag wins" has exactly one case today; it is written as the general rule
+-- because the alternative -- letting the quoting position overwrite -- is the
+-- narrowing this replaced, see #2730 and #2733.
+frame :: Framing -> [(Framing, Filter.Type.Filter Keyword.Keyword)] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+frame framing = fmap (\(inner, f) -> (if inner == Unframed then framing else inner, f))
 
 -- Both predicates a CR 106.6 restriction can carry. Its own type has two fields
 -- and no traversal, so a lint that reached only one of them would go quiet on
@@ -4565,9 +4598,9 @@ effectFilters effect = case effect of
   -- AttachTarget's; CR 303.4d only moves whose choice it is.
   Effect.AttachTargetToEach (AttachTarget.MkAttachTarget _ f) -> [(AttachDestination, f)]
   -- The dealer is a SlotName and carries no Filter.
-  Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> foldMap (\part -> sourceHosted (objectRefFilters (DamagePart.ref part)) <> unframed (quantityFilters (DamagePart.quantity part))) parts
+  Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> foldMap (\part -> sourceHosted (objectRefFilters (DamagePart.ref part)) <> frame Unframed (quantityFilters (DamagePart.quantity part))) parts
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
-    unframed (durationFilters duration <> modificationFilters modification) <> sourceHosted (objectRefFilters ref)
+    unframed (durationFilters duration) <> frame Unframed (modificationFilters modification) <> sourceHosted (objectRefFilters ref)
   Effect.ChangeText {} -> []
   -- CR 106.6's two clauses, and every predicate in them: the restriction's cast
   -- half, its activation half, and the rider's condition are each an ordinary
@@ -4599,18 +4632,18 @@ effectFilters effect = case effect of
   Effect.ExileThisSpell -> []
   -- Only the count's Filters: rule 701.39a describes the candidate pool, so no
   -- Filter on the card names it.
-  Effect.Bolster quantity -> unframed (quantityFilters quantity)
+  Effect.Bolster quantity -> frame Unframed (quantityFilters quantity)
   -- Only the count's Filters: rule 701.47a describes the candidate pool, so no
   -- Filter on the card names it.
-  Effect.Amass (Amass.MkAmass quantity _) -> unframed (quantityFilters quantity)
+  Effect.Amass (Amass.MkAmass quantity _) -> frame Unframed (quantityFilters quantity)
   -- Only the count's Filters: rule 701.68a describes the candidate pool, so no
   -- Filter on the card names it, and a PlayerRef carries none either -- Draw's
   -- arm below answers the same way.
-  Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
+  Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
-  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ f quantity) -> unframed (f : quantityFilters quantity)
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ f quantity) -> unframed [f] <> frame Unframed (quantityFilters quantity)
   -- CR 727.5's exemption is an ObjectRef like every other, and Karn Liberated's
   -- "all non-Aura permanent cards exiled with Karn" states characteristics in it
   -- -- so an empty list here took a Filter a card author writes out of the lint.
@@ -4625,40 +4658,40 @@ effectFilters effect = case effect of
   -- -- a keys-only sweep would leave the counts unlinted. Swept for the reason
   -- canHostSubjects sweeps the same shape -- the lint is about the positions a
   -- card author can write, not about which of them the pool has used.
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _ _) -> sourceHosted (objectRefFilters ref) <> unframed (riderFilters riders)
-  Effect.Draw (Draw.MkDraw _ quantity _) -> unframed (quantityFilters quantity)
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _ _) -> sourceHosted (objectRefFilters ref) <> frame Unframed (riderFilters riders)
+  Effect.Draw (Draw.MkDraw _ quantity _) -> frame Unframed (quantityFilters quantity)
   -- The tally's Filter is a position a card author writes, so the lint reaches
   -- it: rule 728.1's "nonland card" is one of these.
-  Effect.Mill (Mill.MkMill _ quantity mTally _) -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
+  Effect.Mill (Mill.MkMill _ quantity mTally _) -> frame Unframed (quantityFilters quantity) <> unframed (fmap MillTally.filter (Maybe.maybeToList mTally))
   -- The ObjectRef's Filter is a position a card author writes, so the lint
   -- reaches it, as Explore's does. Both halves of CR 701.20 answer alike.
   Effect.Reveal (Reveal.MkReveal ref _) -> sourceHosted (objectRefFilters ref)
   Effect.LookAt (LookAt.MkLookAt ref _) -> sourceHosted (objectRefFilters ref)
-  Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
-  Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
-  Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
+  Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
+  Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
+  Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   -- The ObjectRef's Filter is a position a card author writes, so the lint
   -- reaches it, as PutCounters' does.
   Effect.Explore ref -> sourceHosted (objectRefFilters ref)
   -- The These arm's ref carries a Filter a card author writes -- Amnesia's
   -- "nonland" -- so the lint reaches it, as Reveal's does.
   Effect.Discard subject -> case subject of
-    Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> unframed (quantityFilters quantity)
+    Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> frame Unframed (quantityFilters quantity)
     Discard.These ref -> sourceHosted (objectRefFilters ref)
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
-  Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
+  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
+  Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.ExchangeLifeTotals _ -> []
-  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
+  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.RedistributeLifeTotals -> []
-  Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
-  Effect.DecreaseSpeed d -> unframed (quantityFilters (SpeedDecrease.quantity d))
+  Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
+  Effect.DecreaseSpeed d -> frame Unframed (quantityFilters (SpeedDecrease.quantity d))
   -- CR 111.1's token is a whole card, and every Filter position it has is one a
   -- card author can write -- the same nesting Pawl.Codec's round trip walks.
-  Effect.Create (Create.MkCreate quantity card riders _ _) -> unframed (quantityFilters quantity <> riderFilters riders) <> overFaces cardFilters card
-  Effect.Conjure (Conjure.MkConjure quantity card _) -> unframed (quantityFilters quantity) <> overFaces cardFilters card
+  Effect.Create (Create.MkCreate quantity card riders _ _) -> frame Unframed (quantityFilters quantity <> riderFilters riders) <> overFaces cardFilters card
+  Effect.Conjure (Conjure.MkConjure quantity card _) -> frame Unframed (quantityFilters quantity) <> overFaces cardFilters card
   -- An EachMatching ref's Filter is card text like RequireBlock's below, and the
   -- count's and the riders' Filters are as much card text as Create's.
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> unframed (quantityFilters quantity <> riderFilters riders) <> sourceHosted (objectRefFilters ref)
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> frame Unframed (quantityFilters quantity <> riderFilters riders) <> sourceHosted (objectRefFilters ref)
   -- BOTH refs, RequireBlock's arm below: each EachMatching Filter is card text.
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> sourceHosted (objectRefFilters original <> objectRefFilters subject)
   -- The one ref, CreateCopy's arm above: an EachMatching Filter is card text.
@@ -4667,7 +4700,7 @@ effectFilters effect = case effect of
   -- stored row is read through the same
   -- Pawl.Engine.Replacement.candidateContext a printed one is, where the
   -- duration and the CR 604.2 clause beside it are not.
-  Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> unframed (durationFilters duration <> foldMap conditionFilters condition) <> replacementRowFramed (replacementEffectFilters replacement) <> concatMap effectFilters (replacementEffectRiders replacement)
+  Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> unframed (durationFilters duration <> foldMap conditionFilters condition) <> frame ReplacementRowFramed (replacementEffectFilters replacement) <> concatMap effectFilters (replacementEffectRiders replacement)
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- The rider's Filters too, for CR 615.5. This is the traversal that dropped
   -- landwalk's payload once, so a nested effect list is exactly what it must not
@@ -4677,7 +4710,7 @@ effectFilters effect = case effect of
   -- against each candidate's own view (Projection.viewOfObject), the way
   -- Replacement.matchesDamageSource evaluates the shield's rechecked half.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ ref whatRecipient _ chosenSource quantity rider) ->
-    unframed (durationFilters duration <> quantityFilters quantity <> Maybe.maybeToList chosenSource <> Maybe.maybeToList whatRecipient) <> sourceHosted (foldMap objectRefFilters ref) <> concatMap effectFilters rider
+    unframed (durationFilters duration) <> frame Unframed (quantityFilters quantity) <> unframed (Maybe.maybeToList chosenSource <> Maybe.maybeToList whatRecipient) <> sourceHosted (foldMap objectRefFilters ref) <> concatMap effectFilters rider
   -- CR 609.7b's property-named source is UNFRAMED for the chosen source's
   -- reason: Pawl.Engine.Replacement.matchesDamageSource evaluates it against the
   -- damage's own source, not against this card's frame.
@@ -4703,7 +4736,7 @@ effectFilters effect = case effect of
   -- creature you control with a +1/+1 counter on it", and a Filter there would
   -- otherwise escape the lint; the count is a Quantity like any other; and CR
   -- 122.1b's kind may be a whole Keyword with a Filter under it (#2728).
-  Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) -> unframed (counterKindFilters kind <> quantityFilters quantity) <> sourceHosted (objectRefFilters ref)
+  Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) -> frame Unframed (counterKindFilters kind <> quantityFilters quantity) <> sourceHosted (objectRefFilters ref)
   -- The destination only, PutCounters' framing: `from` is a bare SlotName and
   -- carries no Filter.
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ ref) -> sourceHosted (objectRefFilters ref)
@@ -4712,12 +4745,12 @@ effectFilters effect = case effect of
   -- SlotName and carries no Filter. The moved kinds hold both of the others --
   -- a count under the two arms that write one (MovedKinds.quantityOf) and CR
   -- 122.1b's kind under the three that name one (MovedKinds.kindOf, #2728).
-  Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds _ _) -> unframed (foldMap counterKindFilters (MovedKinds.kindOf kinds) <> foldMap quantityFilters (MovedKinds.quantityOf kinds)) <> sourceHosted (objectRefFilters from)
+  Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds _ _) -> frame Unframed (foldMap counterKindFilters (MovedKinds.kindOf kinds) <> foldMap quantityFilters (MovedKinds.quantityOf kinds)) <> sourceHosted (objectRefFilters from)
   -- The count and CR 122.1b's kind, PutCounters' two unframed positions: the
   -- slot beside them is a bare SlotName and carries no Filter.
-  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity _) -> unframed (counterKindFilters kind <> quantityFilters quantity)
-  Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
-  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity _) -> frame Unframed (counterKindFilters kind <> quantityFilters quantity)
+  Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
+  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.PayAnyEnergy _ -> []
   Effect.Tap ref -> sourceHosted (objectRefFilters ref)
   Effect.Untap ref -> sourceHosted (objectRefFilters ref)
@@ -4764,7 +4797,7 @@ effectFilters effect = case effect of
   Effect.ChooseOpponent _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
   -- CR 706.2's modifier is a Quantity, so its filters are reachable here.
-  Effect.RollDie rollDie -> unframed (foldMap quantityFilters (RollDie.modifier rollDie))
+  Effect.RollDie rollDie -> frame Unframed (foldMap quantityFilters (RollDie.modifier rollDie))
   Effect.FlipCoin {} -> []
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> sourceHosted (objectRefFilters ref)
@@ -5036,7 +5069,7 @@ modalFilters modal =
           <> unframed (concatMap conditionFilters (modeClauseConditions mode))
           -- THE target-slot-framed position: a mode's own slot, matched by
           -- Pawl.Engine.Target.admittedGiven at both of CR 115's moments.
-          <> fmap ((,) InTargetSlot) (concatMap targetSlotFilters (Map.elems (Mode.targetSlots mode)))
+          <> frame InTargetSlot (concatMap targetSlotFilters (Map.elems (Mode.targetSlots mode)))
     )
     (Modal.modes modal)
 
@@ -5115,7 +5148,7 @@ enchantSlots card = Face.enchant card <> grantedEnchantSlots card
 
 triggeredAbilityFilters :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 triggeredAbilityFilters ability =
-  unframed (triggerConditionFilters (TriggeredAbility.condition ability))
+  frame Unframed (triggerConditionFilters (TriggeredAbility.condition ability))
     -- THE CR 603.4 position: Pawl.Engine.Event.interveningHolds and
     -- Pawl.Engine.Stack's CR 608.2a re-check both supply the source's host here,
     -- and the trigger CONDITION above them is matched by Event.matchesTrigger,
@@ -5190,30 +5223,31 @@ activatedAbilityFilters ability =
 -- codec cross-check in canHostSubjectOffends is for.
 cardFilters :: Face.Face Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 cardFilters card =
-  unframed
+  frame
+    Unframed
     ( concatMap keywordFilters (Set.toList (Face.keywords card))
         <> concatMap quantityFilters (Maybe.maybeToList (Face.characteristicPT card))
         <> concatMap quantityFilters (Maybe.maybeToList (Face.maximumX card))
         <> concatMap (\(Power.MkPower quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.power card))
         <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.toughness card))
         <> concatMap targetSlotFilters (Face.enchant card)
-        <> concatMap costComponentFilters (Face.additionalCosts card)
-        <> concatMap alternativeCostFilters (Face.alternativeCosts card)
+        <> concatMap (unframed . costComponentFilters) (Face.additionalCosts card)
+        <> concatMap (unframed . alternativeCostFilters) (Face.alternativeCosts card)
         <> concatMap (quantityFilters . CostReduction.perEach) (Face.costReductions card)
-        <> concatMap specialActionFilters (Face.specialActions card)
-        <> concatMap blockRequirementFilters (Face.blockRequirements card)
+        <> concatMap (unframed . specialActionFilters) (Face.specialActions card)
+        <> concatMap (unframed . blockRequirementFilters) (Face.blockRequirements card)
         <> concatMap blockPermissionFilters (Face.blockPermissions card)
-        <> concatMap attackRequirementFilters (Face.attackRequirements card)
-        <> concatMap (affectedFilters . AttackCost.subject) (Face.attackCosts card)
+        <> concatMap (unframed . attackRequirementFilters) (Face.attackRequirements card)
+        <> concatMap (unframed . affectedFilters . AttackCost.subject) (Face.attackCosts card)
         <> concatMap (perCreatureFilters . AttackCost.perAttacker) (Face.attackCosts card)
-        <> concatMap (affectedFilters . BlockCost.subject) (Face.blockCosts card)
+        <> concatMap (unframed . affectedFilters . BlockCost.subject) (Face.blockCosts card)
         <> concatMap (perCreatureFilters . BlockCost.perBlocker) (Face.blockCosts card)
-        <> concatMap combatRestrictionFilters (Face.combatRestrictions card)
-        <> concatMap (affectedFilters . SacrificeRestriction.affected) (Face.sacrificeRestrictions card)
-        <> concatMap (affectedFilters . UntapRestriction.affected) (Face.untapRestrictions card)
-        <> concatMap attachRestrictionFilters (Face.attachRestrictions card)
-        <> concatMap (affectedFilters . EntryRestriction.affected) (Face.entryRestrictions card)
-        <> concatMap (affectedFilters . CounterRestriction.affected) (Face.counterRestrictions card)
+        <> concatMap (unframed . combatRestrictionFilters) (Face.combatRestrictions card)
+        <> concatMap (unframed . affectedFilters . SacrificeRestriction.affected) (Face.sacrificeRestrictions card)
+        <> concatMap (unframed . affectedFilters . UntapRestriction.affected) (Face.untapRestrictions card)
+        <> concatMap (unframed . attachRestrictionFilters) (Face.attachRestrictions card)
+        <> concatMap (unframed . affectedFilters . EntryRestriction.affected) (Face.entryRestrictions card)
+        <> concatMap (unframed . affectedFilters . CounterRestriction.affected) (Face.counterRestrictions card)
         -- And the KIND the prohibition names (Melira, Sylvok Outcast's -1/-1
         -- counters), which may be a whole Keyword carrying a Filter (CR 122.1b,
         -- #2728). Nothing there is Solemnity's "counters" -- any kind at all.
@@ -5493,14 +5527,15 @@ hostOfSourceOffends card =
 isBoundTag :: Text.Text
 isBoundTag = Text.pack "IsBound"
 
--- How many CR 115.10a bound-object atoms this card carries inside a WISH's
--- filter, and how many anywhere else. The FIRST number is the offence here,
--- which is the sibling position lints turned around: the atom is answerable in
--- every position whose evaluator supplies the resolution's slots, and
--- unanswerable in the one whose candidates are not objects.
+-- How many CR 115.10a bound-object atoms this card carries in a position with no
+-- resolution behind it -- a WISH's filter, or a KEYWORD's own -- and how many
+-- anywhere else. The FIRST number is the offence here, which is the sibling
+-- position lints turned around: the atom is answerable in every position whose
+-- evaluator supplies the resolution's slots, and unanswerable in the two that
+-- supply none.
 isBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
 isBoundCounts card =
-  let total wanted = sum [filterAtoms isBoundTag f | (framing, f) <- cardFilters card, (framing == OutsideTheGameFramed) == wanted]
+  let total wanted = sum [filterAtoms isBoundTag f | (framing, f) <- cardFilters card, elem framing [OutsideTheGameFramed, KeywordFramed] == wanted]
    in (total True, total False)
 
 -- CR 400.11c's candidates are cards outside the game, which no spell or ability
@@ -5514,10 +5549,6 @@ isBoundCounts card =
 -- around: the traversal found the atom inside a wish's filter, or the traversal
 -- and the codec disagree about how many the card holds. The second disjunct is a
 -- REGRESSION FENCE for sameNameAsBoundOffends' reason.
---
--- Not implemented: the position a KEYWORD's own filter sits in, which is
--- `Unframed` and so counted here on the ACCEPTED side, though no resolution's
--- slots are behind it (#2730).
 --
 -- Only IsBound, of the atoms that read a Context's slots. SameNameAsBound is
 -- fenced to a mode's target slot by its own lint, so a wish's filter already
@@ -7364,7 +7395,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                   [ Set.fromList (concatMap readSingly effects),
                     Set.fromList (readSinglyInFilters effects),
                     Set.fromList (concatMap triggerConditionSlots conditions),
-                    Set.fromList (concatMap (concatMap filterSlotsReadSingly . triggerConditionFilters) conditions)
+                    Set.fromList (concatMap (concatMap (filterSlotsReadSingly . snd) . triggerConditionFilters) conditions)
                   ]
               )
         clashes effects = clashesIn effects []
@@ -8254,12 +8285,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- The traversal reaches a Filter position no effect, target slot or affected
     -- set would have led it to: CR 702.29e's typecycling predicate, on a real
     -- card. Its absence would not show up in the sweep above, because Ash Barrens
-    -- does not author the atom -- only in this.
+    -- does not author the atom -- only in this. KeywordFramed and not Unframed:
+    -- the tag is applied by keywordFilters at the leaf, so a printed keyword's
+    -- own filter carries it whatever field quoted the keyword.
     barrens <- S.printingOf s registry "Ash Barrens"
     Spec.assertBool
       s
       ( elem
-          (Unframed, Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic])
+          (KeywordFramed, Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic])
           (cardFilters (S.combinedFace barrens))
       )
       "CR 702.29e landcycling's filter is a position the sweep walks"
@@ -8524,6 +8557,97 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let destroying = base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing Nothing)]}
     Spec.assertEqWith s "the same atom over objects is not" (isBoundCounts destroying) (0, 1)
     Spec.assertBool s (not (isBoundOffends destroying)) "and the lint accepts it"
+  -- CR 702 / CR 122.1b: a keyword's own Filter is read off a continuous effect or
+  -- off the printed face, through Pawl.Engine.Filter.contextFor, which fills
+  -- neither the resolution's slots nor the source's host. keywordFilters tags it
+  -- KeywordFramed at the LEAF that produces it rather than at the position that
+  -- quotes it, so a quoting position's promise is not inherited by the keyword's
+  -- text -- which matters because counterKindFilters is reached from positions
+  -- that promise more than a keyword can keep: a CR 614.1 replacement ROW, whose
+  -- `hostFramed` is True, and a MODE's target-slot amount, which is InTargetSlot.
+  Spec.it s "CR 702 a keyword's own filter is framed by the keyword and not by whatever quotes it" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base = S.combinedFace piker
+        slot = SlotName.MkSlotName (Text.pack "target")
+        creatures = Filter.Type.HasCardType CardType.Creature
+        -- Buried under all three combinators at every plant, so a lint reading
+        -- only the top of a Filter would miss each one.
+        bury atom = Filter.Type.And [Filter.Type.Or [creatures, Filter.Type.Not atom]]
+        boundAtom = bury (Filter.Type.IsBound slot)
+        hostAtom = bury Filter.Type.IsHostOfSource
+        nameAtom = bury (Filter.Type.SameNameAsBound slot)
+        keywordOf f = Keyword.Hexproof (Just f)
+        kindOf f = CounterKind.Keyword (keywordOf f)
+        plain = CounterKind.PlusOnePlusOne
+        prohibiting kind = [CounterRestriction.MkCounterRestriction (Affected.Matching creatures) (Just kind)]
+        granting keyword =
+          [ StaticAbility.MkStaticAbility
+              (Affected.Matching creatures)
+              Nothing
+              Set.empty
+              Nothing
+              (NonEmpty.singleton (Modification.GainKeyword keyword))
+          ]
+        scaling kind onWhat =
+          [ PrintedReplacement.MkPrintedReplacement
+              Nothing
+              (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern (Just kind) CounterSubject.ByAnything ControllerRelation.Yours onWhat Nothing) (Scaling.AddMore 1)))
+              Set.empty
+              Nothing
+          ]
+        spellOf targetSlot =
+          Modal.MkModal
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton slot targetSlot)))
+            (ModeSelection.ChooseExactly 1)
+        counting kind f = spellOf (TargetSlot.withAmount (Quantity.Type.ObjectCounters kind) (TargetSlot.required Pool.Creatures f))
+    -- Ordered FIRST, and CR 115.10a's half of the claim: the atom whose offence
+    -- is the mirror of the others' is rejected at all three sites a keyword's
+    -- Filter is reached from. A site that lost the tag reddens under its own
+    -- label rather than under a total.
+    let sited =
+          [ ("CR 702.11d's printed keyword", isBoundCounts (base {Face.keywords = Set.singleton (keywordOf boundAtom)})),
+            ("CR 613's granted keyword", isBoundCounts (base {Face.staticAbilities = granting (keywordOf boundAtom)})),
+            ("CR 122.1b's keyword counter", isBoundCounts (base {Face.counterRestrictions = prohibiting (kindOf boundAtom)}))
+          ]
+    Spec.assertEqWith s "IsBound under a keyword is an offence at every site that reaches one" sited (fmap (fmap (const (1, 0))) sited)
+    -- The pair that differs in exactly ONE thing: the same prohibition, the same
+    -- buried atom, moved off the KIND and onto the affected set beside it -- an
+    -- ordinary unframed position, where the resolution's slots are supplied and
+    -- the atom is accepted. So the lint is reading the keyword and not rejecting
+    -- every plant.
+    let besideIt = base {Face.counterRestrictions = [CounterRestriction.MkCounterRestriction (Affected.Matching boundAtom) (Just plain)]}
+    Spec.assertEqWith s "the same atom beside the kind rather than under it is not" (isBoundCounts besideIt) (0, 1)
+    Spec.assertBool s (not (isBoundOffends besideIt)) "and the lint accepts it"
+    -- CR 303.4b, the first position #2733 named: a CR 614.1 replacement row's own
+    -- Filters ARE read with the source's host supplied, and the keyword counter
+    -- inside one is not.
+    let rowKeyword = base {Face.replacementEffects = scaling (kindOf hostAtom) creatures}
+        rowItself = base {Face.replacementEffects = scaling plain hostAtom}
+    Spec.assertEqWith s "IsHostOfSource under a replacement row's keyword counter is an offence" (hostOfSourceCounts rowKeyword) (0, 1)
+    Spec.assertBool s (hostOfSourceOffends rowKeyword) "and the lint says so"
+    Spec.assertEqWith s "the same atom in the row's own pattern is not" (hostOfSourceCounts rowItself) (1, 0)
+    Spec.assertBool s (not (hostOfSourceOffends rowItself)) "and the lint accepts it"
+    -- CR 709.4a, the second: a MODE's target slot IS matched with the bound names
+    -- supplied, and the keyword counter inside the slot's CR 202.3 amount is not.
+    let amountKeyword = base {Face.spell = counting (kindOf nameAtom) Nothing}
+        slotItself = base {Face.spell = counting plain (Just nameAtom)}
+    Spec.assertEqWith s "SameNameAsBound under a slot amount's keyword counter is an offence" (sameNameAsBoundCounts amountKeyword) (0, 1)
+    Spec.assertBool s (sameNameAsBoundOffends amountKeyword) "and the lint says so"
+    Spec.assertEqWith s "the same atom in the slot's own filter is not" (sameNameAsBoundCounts slotItself) (1, 0)
+    Spec.assertBool s (not (sameNameAsBoundOffends slotItself)) "and the lint accepts it"
+    -- NOT vacuous: the codec sees exactly one atom in each of the six faces, so
+    -- every pair above is a comparison against a real occurrence rather than
+    -- against nothing -- and a (0, 0) from a traversal that stopped digging would
+    -- fail the cross-check inside each lint rather than pass quietly.
+    let encoded tag card = jsonAtoms tag (Codec.encode (Face.Codec.codec Card.codec) card)
+        authored =
+          [ ("IsBound beside the kind", encoded isBoundTag besideIt),
+            ("IsHostOfSource under the row's keyword counter", encoded hostOfSourceTag rowKeyword),
+            ("IsHostOfSource in the row's own pattern", encoded hostOfSourceTag rowItself),
+            ("SameNameAsBound under the amount's keyword counter", encoded sameNameAsBoundTag amountKeyword),
+            ("SameNameAsBound in the slot's own filter", encoded sameNameAsBoundTag slotItself)
+          ]
+    Spec.assertEqWith s "each planted face encodes exactly one atom" authored (fmap (fmap (const 1)) authored)
   -- CR 122.1b lets a counter's KIND be a whole Keyword, and a keyword may carry a
   -- Filter of its own -- CR 702.11d's "hexproof from Goblins", CR 702.29e's
   -- typecycling predicate, the components of any Cost a keyword names. So every
@@ -8550,15 +8674,15 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         slot = SlotName.MkSlotName (Text.pack "target")
         anywhere = ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)
         riders = EntryRiders.defaultValue {EntryRiders.counters = Map.singleton kind one}
-        holds :: [Filter.Type.Filter Keyword.Keyword] -> Bool
-        holds = elem buried
+        holds :: [(Framing, Filter.Type.Filter Keyword.Keyword)] -> Bool
+        holds = elem buried . fmap snd
         -- Every position a card may write a CounterKind in, each named for the
         -- traversal that has to reach it. An arm that stops digging names itself.
         walked =
           [ ("EntryRiders' kinds", holds (riderFilters riders)),
-            ("Effect.PutCounters' kind", holds (fmap snd (effectFilters (Effect.PutCounters (PutCounters.MkPutCounters kind one anywhere))))),
-            ("Effect.RemoveCounters' kind", holds (fmap snd (effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind one slot))))),
-            ("Effect.MoveCounters' kinds", holds (fmap snd (effectFilters (Effect.MoveCounters (MoveCounters.MkMoveCounters anywhere (MovedKinds.Named kind one) Nothing slot))))),
+            ("Effect.PutCounters' kind", holds (effectFilters (Effect.PutCounters (PutCounters.MkPutCounters kind one anywhere)))),
+            ("Effect.RemoveCounters' kind", holds (effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind one slot)))),
+            ("Effect.MoveCounters' kinds", holds (effectFilters (Effect.MoveCounters (MoveCounters.MkMoveCounters anywhere (MovedKinds.Named kind one) Nothing slot)))),
             ("Quantity.ObjectCounters' kind", holds (quantityFilters (Quantity.Type.ObjectCounters kind))),
             ("CR 714.2b's threshold", holds (triggerConditionFilters (TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached kind 2)))),
             ("CR 310.12b's last removal", holds (triggerConditionFilters (TriggerCondition.SelfLastCounterRemoved kind))),
@@ -8581,7 +8705,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       "a kind carrying no keyword contributes nothing"
       ( counterKindFilters plain,
-        fmap snd (effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters plain one slot))),
+        effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters plain one slot)),
         quantityFilters (Quantity.Type.ObjectCounters plain),
         triggerConditionFilters (TriggerCondition.SelfLastCounterRemoved plain)
       )
