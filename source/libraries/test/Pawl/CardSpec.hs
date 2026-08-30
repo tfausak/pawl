@@ -123,6 +123,7 @@ import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.Cycling as Cycling
+import qualified Pawl.Types.DamageDirection as DamageDirection
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePart as DamagePart
 import qualified Pawl.Types.DamagePattern as DamagePattern
@@ -177,6 +178,7 @@ import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaRider as ManaRider
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Meld as Meld
@@ -264,6 +266,7 @@ import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
@@ -497,10 +500,71 @@ cardSpec s = Spec.describe s "Card" $ do
 -- Every Count reachable from an ObjectRef, through the Quantities it carries.
 -- Delegated to Resolve.objectRefQuantities so this traversal and the engine's two
 -- static-analysis passes (Resolve.slotsAreExhaustive, Resolve.readsX) cannot
--- disagree about which arms hold a number: today that is
--- ObjectRef.TopOfLibrary's depth alone.
+-- disagree about which ARMS of an ObjectRef hold a number -- today that is
+-- ObjectRef.TopOfLibrary's depth alone -- as Resolve.effectObjectRefs keeps the
+-- three from disagreeing about which OPCODES hold a ref.
 refCounts :: ObjectRef.ObjectRef -> [Count.Type.Count Quantity.Type.Quantity]
 refCounts = concatMap quantityCounts . Resolve.objectRefQuantities
+
+-- One planted effect per position an ObjectRef sits in, each ref naming its own
+-- position, paired with what Resolve.effectObjectRefs owes back. The traversal
+-- reads neither type parameter, so these are built at `Effect () ()`.
+--
+-- Written out rather than derived because there is nothing to derive it from:
+-- the compiler forces an arm per OPCODE, not a ref per FIELD, so a second ref
+-- field on a payload that already has one would answer with the first alone and
+-- compile. This list is where that shows up.
+objectRefPositions :: [(String, Effect.Effect () (), [ObjectRef.ObjectRef])]
+objectRefPositions =
+  [ ("deal-damage", Effect.DealDamage (DealDamage.MkDealDamage (Seq.fromList [DamagePart.MkDamagePart (plantedRef "dd1") (Quantity.Type.Literal 1), DamagePart.MkDamagePart (plantedRef "dd2") (Quantity.Type.Literal 1)]) Nothing Nothing), [plantedRef "dd1", plantedRef "dd2"]),
+    ("modify-target", Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Flying) (plantedRef "mt")), [plantedRef "mt"]),
+    ("restart-game", Effect.RestartGame (Just (plantedRef "rg")), [plantedRef "rg"]),
+    ("destroy", Effect.Destroy (Destroy.MkDestroy (plantedRef "de") Regenerability.Regenerable Nothing Nothing Nothing), [plantedRef "de"]),
+    ("move-to-zone", Effect.MoveToZone (MoveToZone.MkMoveToZone (plantedRef "mz") Zone.Exile plainRiders Nothing Nothing LibraryPlacement.OwnerChooses Nothing), [plantedRef "mz"]),
+    ("reveal", Effect.Reveal (Reveal.MkReveal (plantedRef "rv") Nothing), [plantedRef "rv"]),
+    ("look-at", Effect.LookAt (LookAt.MkLookAt (plantedRef "la") (SlotName.MkSlotName (Text.pack "seen"))), [plantedRef "la"]),
+    ("explore", Effect.Explore (plantedRef "ex"), [plantedRef "ex"]),
+    ("discard-these", Effect.Discard (Discard.These (plantedRef "di")), [plantedRef "di"]),
+    ("create-copy", Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Type.Literal 1) (plantedRef "cc") plainRiders), [plantedRef "cc"]),
+    ("become-copy", Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (plantedRef "bc-original") (plantedRef "bc-subject")), [plantedRef "bc-original", plantedRef "bc-subject"]),
+    ("copy-spell", Effect.CopySpell (CopySpell.MkCopySpell (plantedRef "cs") False), [plantedRef "cs"]),
+    ("prevent-next-damage", Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pn")) Nothing Nothing Nothing (Quantity.Type.Literal 1) Seq.empty), [plantedRef "pn"]),
+    ("prevent-all-damage", Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (plantedRef "pa") DamageDirection.DealtTo Nothing (Filter.Type.And []) Seq.empty), [plantedRef "pa"]),
+    ("redirect-damage", Effect.RedirectDamage (RedirectDamage.MkRedirectDamage Duration.UntilEndOfTurn Nothing (plantedRef "rd-from") (plantedRef "rd-to") Nothing), [plantedRef "rd-from", plantedRef "rd-to"]),
+    ("counter", Effect.Counter (Counter.MkCounter (plantedRef "co") Nothing), [plantedRef "co"]),
+    ("put-counters", Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) (plantedRef "pc")), [plantedRef "pc"]),
+    ("move-counters", Effect.MoveCounters (MoveCounters.MkMoveCounters (plantedRef "mc") MovedKinds.Every Nothing (SlotName.MkSlotName (Text.pack "taker"))), [plantedRef "mc"]),
+    ("put-counters-from", Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom (SlotName.MkSlotName (Text.pack "giver")) (plantedRef "pf")), [plantedRef "pf"]),
+    ("tap", Effect.Tap (plantedRef "ta"), [plantedRef "ta"]),
+    ("untap", Effect.Untap (plantedRef "un"), [plantedRef "un"]),
+    ("detain", Effect.Detain (plantedRef "dt"), [plantedRef "dt"]),
+    ("goad", Effect.Goad (plantedRef "go"), [plantedRef "go"]),
+    ("does-not-untap-next", Effect.DoesNotUntapNext (plantedRef "du"), [plantedRef "du"]),
+    ("transform", Effect.Transform (plantedRef "tr"), [plantedRef "tr"]),
+    ("convert", Effect.Convert (plantedRef "cv"), [plantedRef "cv"]),
+    ("meld", Effect.Meld (Meld.MkMeld (plantedRef "me") ()), [plantedRef "me"]),
+    ("phase-out", Effect.PhaseOut (plantedRef "po"), [plantedRef "po"]),
+    ("turn-face-down", Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown (plantedRef "tf") FaceDownCharacteristics.defaultValue), [plantedRef "tf"]),
+    ("remove-from-combat", Effect.RemoveFromCombat (plantedRef "rc"), [plantedRef "rc"]),
+    ("gain-control", Effect.GainControl (DurationRef.MkDurationRef Duration.UntilEndOfTurn (plantedRef "gc")), [plantedRef "gc"]),
+    ("require-block", Effect.RequireBlock (RequireBlock.MkRequireBlock Duration.UntilEndOfTurn (plantedRef "rb-blocker") (plantedRef "rb-attacker")), [plantedRef "rb-blocker", plantedRef "rb-attacker"]),
+    ("cant-be-regenerated", Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated Duration.UntilEndOfTurn (plantedRef "cb")), [plantedRef "cb"]),
+    ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (plantedRef "ra") (PlayerRef.Relative PlayerRelation.You)), [plantedRef "ra"]),
+    ("forbid-block", Effect.ForbidBlock (ForbidBlock.MkForbidBlock Duration.UntilEndOfTurn (plantedRef "fb")), [plantedRef "fb"]),
+    ("forbid-attack", Effect.ForbidAttack (ForbidAttack.MkForbidAttack Duration.UntilEndOfTurn (plantedRef "fa")), [plantedRef "fa"]),
+    ("unsuspect", Effect.Unsuspect (plantedRef "us"), [plantedRef "us"]),
+    ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (plantedRef "sl")), [plantedRef "sl"]),
+    ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (plantedRef "gp") ManaSpending.AsProduced), [plantedRef "gp"]),
+    ("make-plotted", Effect.MakePlotted (plantedRef "mp"), [plantedRef "mp"]),
+    ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") (SlotName.MkSlotName (Text.pack "each")) Seq.empty), [plantedRef "fe"])
+  ]
+  where
+    plainRiders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Nothing}
+
+-- The ref plantedRef at one position, named for it so a position answering with
+-- another position's ref is visible rather than merely absent.
+plantedRef :: String -> ObjectRef.ObjectRef
+plantedRef = ObjectRef.InSlot . SlotName.MkSlotName . Text.pack
 
 -- Every Count reachable from a Quantity: a leaf Count directly, or one nested
 -- through Plus's two children (CR 208.2 composition -- a printed 1+*) or
@@ -845,173 +909,173 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- no Count either.
   TriggerCondition.ControllerBecomesTarget {} -> []
 
--- Every Count reachable from one effect: its own Quantity/Duration fields,
--- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
--- card (the same nesting Pawl.Codec's round trip walks).
+-- Every Count reachable from one effect: the Quantities nested in its
+-- ObjectRefs, its own Quantity/Duration fields, and -- for Create/CreateEmblem
+-- -- every Count in the embedded token/emblem card (the same nesting
+-- Pawl.Codec's round trip walks).
+--
+-- The refs come off Resolve.effectObjectRefs ahead of the case, so no arm below
+-- names one and this traversal cannot fall behind the engine's two
+-- static-analysis passes about which opcodes hold a ref.
 effectCounts :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Count.Type.Count Quantity.Type.Quantity]
-effectCounts effect = case effect of
-  Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> concatMap (quantityCounts . DamagePart.quantity) parts
-  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationCounts duration <> modificationCounts modification
-  Effect.ChangeText {} -> []
-  Effect.AddMana _ -> []
-  -- The search's count is a Quantity like any other -- Explosive Vegetation's
-  -- "up to two" -- so its Counts are reachable from here. A search stating no
-  -- count (Mana Severance) has none to reach.
-  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> foldMap quantityCounts quantity
-  Effect.ExileAllGraveyards -> []
-  Effect.Proliferate -> []
-  Effect.ChooseCardName _ -> []
-  Effect.FromOutsideTheGame _ -> []
-  Effect.ExileThisSpell -> []
-  -- Bolster's N is a Quantity like the Search's above, so its Counts are
-  -- reachable from here.
-  Effect.Bolster quantity -> quantityCounts quantity
-  -- Amass's N is a Quantity like the Search's above, so its Counts are reachable
-  -- from here.
-  Effect.Amass (Amass.MkAmass quantity _) -> quantityCounts quantity
-  -- Blight's N is a Quantity like bolster's above, so its Counts are reachable
-  -- from here.
-  Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
-  Effect.TemptWithTheRing -> []
-  Effect.Venture {} -> []
-  Effect.ExileHandThenDraw -> []
-  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> quantityCounts quantity
-  Effect.RestartGame _ -> []
-  Effect.ControlPlayerNextTurn _ -> []
-  Effect.Destroy {} -> []
-  Effect.Sacrifice _ -> []
-  -- A Quantity nested in the ObjectRef: rule 701.20a's reveal, rule 701.20e's
-  -- look, a zone move and CR 608.2f's ForEach each name their cards through one,
-  -- and ObjectRef.TopOfLibrary's depth is a Quantity that may hold a Count.
-  -- Resolve.objectRefQuantities is what recovers it, so a second ObjectRef arm
-  -- gaining a Quantity answers there rather than here -- and that function is
-  -- also where the four opcodes that route their ref are named.
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _ _) -> refCounts ref
-  Effect.Draw (Draw.MkDraw _ quantity _) -> quantityCounts quantity
-  Effect.Mill (Mill.MkMill _ quantity _ _) -> quantityCounts quantity
-  Effect.Reveal (Reveal.MkReveal ref _) -> refCounts ref
-  Effect.LookAt (LookAt.MkLookAt ref _) -> refCounts ref
-  Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
-  Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
-  Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
-  -- No Quantity at all: rule 701.44a's counter is a literal one and its card is
-  -- the one on top, so there is no number a card author writes.
-  Effect.Explore {} -> []
-  Effect.Discard subject -> case subject of
-    Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> quantityCounts quantity
-    Discard.These ref -> refCounts ref
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
-  Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
-  Effect.ExchangeLifeTotals _ -> []
-  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
-  Effect.RedistributeLifeTotals -> []
-  Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
-  -- The floor beside it is a printed literal and holds no Count.
-  Effect.DecreaseSpeed d -> quantityCounts (SpeedDecrease.quantity d)
-  Effect.Create (Create.MkCreate quantity card _ _ _) -> quantityCounts quantity <> overFaces cardCounts card
-  Effect.Conjure (Conjure.MkConjure quantity card _) -> quantityCounts quantity <> overFaces cardCounts card
-  -- No embedded card -- the copied permanent supplies the text -- but the count
-  -- is card data like Create's. The riders are skipped for the reason Create's
-  -- arm above skips its own: a rider count is a Quantity, and effectFilters below
-  -- is where a Filter under one is swept.
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ _) -> quantityCounts quantity
-  -- Neither a Quantity nor a Duration, so no Count can hide here; the refs'
-  -- Filters are effectFilters' business below.
-  Effect.BecomeCopy {} -> []
-  -- CR 707.10 copies one spell per named object and prints no count, so the
-  -- BecomeCopy arm above answers for this too.
-  Effect.CopySpell {} -> []
-  -- The Condition is Galvanic Blast's and Synthetic Voltaic Surge's "if you
-  -- control three or more artifacts", and its Counts are as much card data as a
-  -- Duration's.
-  Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> durationCounts duration <> foldMap conditionCounts condition <> concatMap effectCounts (replacementEffectRiders replacement)
-  -- CR 614.10a's "next" is a use count, not a Duration and not a Quantity.
-  Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
-  -- CR 615.5's rider is an effect list a card authors, so its Counts are this
-  -- card's Counts -- the same recursion Create takes into a minted token.
-  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity rider) -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ rider) -> durationCounts duration <> concatMap effectCounts rider
-  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _ _) -> durationCounts duration
-  -- CR 708.2's listed characteristics are card data, so the listed power and
-  -- toughness are walked for the reason Create's minted face is. The listed type
-  -- line holds no Quantity.
-  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown _ listed) ->
-    concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (FaceDownCharacteristics.power listed))
-      <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (FaceDownCharacteristics.toughness listed))
-  -- CR 708.8 has the permanent regain its own values, so this one lists nothing.
-  Effect.TurnFaceUp _ -> []
-  -- CR 701.14a fixes both amounts at the fighters' own powers, so no Quantity.
-  Effect.Fight _ -> []
-  Effect.RemoveFromCombat _ -> []
-  Effect.BecomesBlocked _ -> []
-  Effect.Counter {} -> []
-  Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
-  Effect.PutCountersFrom {} -> []
-  -- BOTH Quantity positions: the count the moved kinds may write, and the one a
-  -- library walk in the GIVER carries -- `from` became an ObjectRef when CR
-  -- 122.5's first side was widened to a group, and an arm reading the kinds alone
-  -- kept compiling (#2729).
-  Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds _ _) -> refCounts from <> foldMap quantityCounts (MovedKinds.quantityOf kinds)
-  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> quantityCounts quantity
-  Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
-  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
-  Effect.PayAnyEnergy _ -> []
-  Effect.Tap _ -> []
-  Effect.Untap _ -> []
-  Effect.Detain _ -> []
-  Effect.Goad _ -> []
-  Effect.MakePlotted _ -> []
-  Effect.DoesNotUntapNext _ -> []
-  Effect.Transform _ -> []
-  Effect.Convert _ -> []
-  -- CR 701.42a's combined back face, Create's token one opcode over: card data
-  -- nested in card data, so its own counts are swept.
-  Effect.Meld (Meld.MkMeld _ card) -> overFaces cardCounts card
-  Effect.PhaseOut _ -> []
-  Effect.AddPhases _ -> []
-  Effect.EndTurn -> []
-  Effect.EndCombatPhase -> []
-  Effect.GainControl (DurationRef.MkDurationRef duration _) -> durationCounts duration
-  Effect.ArmDelayedTrigger {} -> []
-  Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) -> durationCounts duration
-  Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationCounts duration
-  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) -> durationCounts duration
-  Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) -> durationCounts duration
-  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _) -> durationCounts duration
-  Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationCounts duration
-  Effect.CreateEmblem card -> overFaces cardCounts card
-  Effect.BecomeMonarch _ -> []
-  Effect.Designate (Designate.MkDesignate _ _) -> []
-  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
-  Effect.Unsuspect _ -> []
-  Effect.SetHalfLocked {} -> []
-  Effect.Evolve _ -> []
-  Effect.Mentor _ -> []
-  Effect.Train _ -> []
-  Effect.ItBecomes _ -> []
-  Effect.ExileUntilMonarch _ -> []
-  Effect.ExileHaunting {} -> []
-  Effect.Attach _ -> []
-  Effect.AttachTarget {} -> []
-  Effect.AttachTargetToEach {} -> []
-  Effect.AttachBound {} -> []
-  Effect.PlaySubgame _ -> []
-  Effect.ChooseOpponent _ -> []
-  Effect.ChooseOpponentAtRandom _ -> []
-  -- CR 706.2's modifier is a Quantity, so its Counts are reachable here.
-  Effect.RollDie rollDie -> foldMap quantityCounts (RollDie.modifier rollDie)
-  Effect.FlipCoin {} -> []
-  Effect.TakeExtraTurn {} -> []
-  Effect.ShuffleIntoLibrary {} -> []
-  Effect.Shuffle {} -> []
-  Effect.OfferCast {} -> []
-  -- The Duration's Condition, exactly as GainControl's: Victor Mancha, Runaway's
-  -- "for as long as you control this creature" is a Count, and dropping it here
-  -- would take its Filters out of the lint with it.
-  Effect.GrantPlayFromExile grant -> durationCounts (GrantPlayFromExile.duration grant)
-  -- CR 608.2f's body is an effect list a card authors, so its Counts are this
-  -- card's -- the rider's recursion one opcode over.
-  Effect.ForEach (ForEach.MkForEach ref _ body) -> refCounts ref <> concatMap effectCounts body
+effectCounts effect =
+  concatMap refCounts (Resolve.effectObjectRefs effect) <> case effect of
+    Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> concatMap (quantityCounts . DamagePart.quantity) parts
+    Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationCounts duration <> modificationCounts modification
+    Effect.ChangeText {} -> []
+    Effect.AddMana _ -> []
+    -- The search's count is a Quantity like any other -- Explosive Vegetation's
+    -- "up to two" -- so its Counts are reachable from here. A search stating no
+    -- count (Mana Severance) has none to reach.
+    Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> foldMap quantityCounts quantity
+    Effect.ExileAllGraveyards -> []
+    Effect.Proliferate -> []
+    Effect.ChooseCardName _ -> []
+    Effect.FromOutsideTheGame _ -> []
+    Effect.ExileThisSpell -> []
+    -- Bolster's N is a Quantity like the Search's above, so its Counts are
+    -- reachable from here.
+    Effect.Bolster quantity -> quantityCounts quantity
+    -- Amass's N is a Quantity like the Search's above, so its Counts are reachable
+    -- from here.
+    Effect.Amass (Amass.MkAmass quantity _) -> quantityCounts quantity
+    -- Blight's N is a Quantity like bolster's above, so its Counts are reachable
+    -- from here.
+    Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+    Effect.TemptWithTheRing -> []
+    Effect.Venture {} -> []
+    Effect.ExileHandThenDraw -> []
+    Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> quantityCounts quantity
+    Effect.RestartGame _ -> []
+    Effect.ControlPlayerNextTurn _ -> []
+    Effect.Destroy {} -> []
+    Effect.Sacrifice _ -> []
+    Effect.MoveToZone {} -> []
+    Effect.Draw (Draw.MkDraw _ quantity _) -> quantityCounts quantity
+    Effect.Mill (Mill.MkMill _ quantity _ _) -> quantityCounts quantity
+    Effect.Reveal {} -> []
+    Effect.LookAt {} -> []
+    Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+    Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+    Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+    -- No Quantity at all: rule 701.44a's counter is a literal one and its card is
+    -- the one on top, so there is no number a card author writes.
+    Effect.Explore {} -> []
+    Effect.Discard subject -> case subject of
+      Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> quantityCounts quantity
+      Discard.These {} -> []
+    Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+    Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+    Effect.ExchangeLifeTotals _ -> []
+    Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+    Effect.RedistributeLifeTotals -> []
+    Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+    -- The floor beside it is a printed literal and holds no Count.
+    Effect.DecreaseSpeed d -> quantityCounts (SpeedDecrease.quantity d)
+    Effect.Create (Create.MkCreate quantity card _ _ _) -> quantityCounts quantity <> overFaces cardCounts card
+    Effect.Conjure (Conjure.MkConjure quantity card _) -> quantityCounts quantity <> overFaces cardCounts card
+    -- No embedded card -- the copied permanent supplies the text -- but the count
+    -- is card data like Create's. The riders are skipped for the reason Create's
+    -- arm above skips its own: a rider count is a Quantity, and effectFilters below
+    -- is where a Filter under one is swept.
+    Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ _) -> quantityCounts quantity
+    -- Neither a Quantity nor a Duration, so no Count can hide here; the refs'
+    -- Filters are effectFilters' business below.
+    Effect.BecomeCopy {} -> []
+    -- CR 707.10 copies one spell per named object and prints no count, so the
+    -- BecomeCopy arm above answers for this too.
+    Effect.CopySpell {} -> []
+    -- The Condition is Galvanic Blast's and Synthetic Voltaic Surge's "if you
+    -- control three or more artifacts", and its Counts are as much card data as a
+    -- Duration's.
+    Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> durationCounts duration <> foldMap conditionCounts condition <> concatMap effectCounts (replacementEffectRiders replacement)
+    -- CR 614.10a's "next" is a use count, not a Duration and not a Quantity.
+    Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
+    -- CR 615.5's rider is an effect list a card authors, so its Counts are this
+    -- card's Counts -- the same recursion Create takes into a minted token.
+    Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity rider) -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
+    Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ rider) -> durationCounts duration <> concatMap effectCounts rider
+    Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _ _) -> durationCounts duration
+    -- CR 708.2's listed characteristics are card data, so the listed power and
+    -- toughness are walked for the reason Create's minted face is. The listed type
+    -- line holds no Quantity.
+    Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown _ listed) ->
+      concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (FaceDownCharacteristics.power listed))
+        <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (FaceDownCharacteristics.toughness listed))
+    -- CR 708.8 has the permanent regain its own values, so this one lists nothing.
+    Effect.TurnFaceUp _ -> []
+    -- CR 701.14a fixes both amounts at the fighters' own powers, so no Quantity.
+    Effect.Fight _ -> []
+    Effect.RemoveFromCombat _ -> []
+    Effect.BecomesBlocked _ -> []
+    Effect.Counter {} -> []
+    Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
+    Effect.PutCountersFrom {} -> []
+    -- BOTH Quantity positions: the count the moved kinds may write, and the one a
+    -- library walk in the GIVER carries -- `from` became an ObjectRef when CR
+    -- 122.5's first side was widened to a group, and an arm reading the kinds alone
+    -- kept compiling (#2729).
+    Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> foldMap quantityCounts (MovedKinds.quantityOf kinds)
+    Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> quantityCounts quantity
+    Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
+    Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
+    Effect.PayAnyEnergy _ -> []
+    Effect.Tap _ -> []
+    Effect.Untap _ -> []
+    Effect.Detain _ -> []
+    Effect.Goad _ -> []
+    Effect.MakePlotted _ -> []
+    Effect.DoesNotUntapNext _ -> []
+    Effect.Transform _ -> []
+    Effect.Convert _ -> []
+    -- CR 701.42a's combined back face, Create's token one opcode over: card data
+    -- nested in card data, so its own counts are swept.
+    Effect.Meld (Meld.MkMeld _ card) -> overFaces cardCounts card
+    Effect.PhaseOut _ -> []
+    Effect.AddPhases _ -> []
+    Effect.EndTurn -> []
+    Effect.EndCombatPhase -> []
+    Effect.GainControl (DurationRef.MkDurationRef duration _) -> durationCounts duration
+    Effect.ArmDelayedTrigger {} -> []
+    Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) -> durationCounts duration
+    Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationCounts duration
+    Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) -> durationCounts duration
+    Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) -> durationCounts duration
+    Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _) -> durationCounts duration
+    Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationCounts duration
+    Effect.CreateEmblem card -> overFaces cardCounts card
+    Effect.BecomeMonarch _ -> []
+    Effect.Designate (Designate.MkDesignate _ _) -> []
+    Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
+    Effect.Unsuspect _ -> []
+    Effect.SetHalfLocked {} -> []
+    Effect.Evolve _ -> []
+    Effect.Mentor _ -> []
+    Effect.Train _ -> []
+    Effect.ItBecomes _ -> []
+    Effect.ExileUntilMonarch _ -> []
+    Effect.ExileHaunting {} -> []
+    Effect.Attach _ -> []
+    Effect.AttachTarget {} -> []
+    Effect.AttachTargetToEach {} -> []
+    Effect.AttachBound {} -> []
+    Effect.PlaySubgame _ -> []
+    Effect.ChooseOpponent _ -> []
+    Effect.ChooseOpponentAtRandom _ -> []
+    -- CR 706.2's modifier is a Quantity, so its Counts are reachable here.
+    Effect.RollDie rollDie -> foldMap quantityCounts (RollDie.modifier rollDie)
+    Effect.FlipCoin {} -> []
+    Effect.TakeExtraTurn {} -> []
+    Effect.ShuffleIntoLibrary {} -> []
+    Effect.Shuffle {} -> []
+    Effect.OfferCast {} -> []
+    -- The Duration's Condition, exactly as GainControl's: Victor Mancha, Runaway's
+    -- "for as long as you control this creature" is a Count, and dropping it here
+    -- would take its Filters out of the lint with it.
+    Effect.GrantPlayFromExile grant -> durationCounts (GrantPlayFromExile.duration grant)
+    -- CR 608.2f's body is an effect list a card authors, so its Counts are this
+    -- card's -- the rider's recursion one opcode over.
+    Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectCounts body
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
@@ -5730,6 +5794,48 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             (Text.pack stem)
       )
       stems
+  -- The checks that read a card's NUMBERS each descend into an effect's
+  -- ObjectRefs, and they do it in one place: Resolve.effectObjectRefs. Which
+  -- positions that traversal owes is what this case pins, planted rather than
+  -- read off a card because a nested Quantity lives only in a library walk's
+  -- depth and a library walk under most of these opcodes is a card-data error
+  -- rather than a printing.
+  Spec.it s "every ObjectRef-taking opcode reports the refs it holds" $ do
+    Spec.assertBool s (not (null objectRefPositions)) "the planted positions are not empty"
+    Spec.assertEqWith
+      s
+      "each planted position answers with its own ref"
+      (fmap (\(label, effect, _) -> (label, Resolve.effectObjectRefs effect)) objectRefPositions)
+      (fmap (\(label, _, refs) -> (label, refs)) objectRefPositions)
+  -- And the three readers of a nested Quantity take their refs from there,
+  -- shown at an opcode that routed none of its own: Destroy's ref reached
+  -- slotsOf and nothing else, so all three answered a constant for it.
+  Spec.it s "CR 107.3 a depth nested in an opcode's ref reaches all three checks" $ do
+    let ghost = SlotName.MkSlotName (Text.pack "ghost")
+        destroying q = Effect.Destroy (Destroy.MkDestroy (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) q)) Regenerability.Regenerable Nothing Nothing Nothing)
+        tally = Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Hand (PlayerRef.Relative PlayerRelation.You))) (Filter.Type.And []) Aggregation.Members
+    Spec.assertEqWith
+      s
+      "CR 603.3b a depth hiding a target slot is not exhaustively reported"
+      (Resolve.slotsAreExhaustive (destroying (Quantity.Type.LifeTotal (PlayerRef.InSlot ghost))))
+      False
+    Spec.assertEqWith
+      s
+      "CR 107.3 a depth reading X makes the effect an X reader"
+      (Resolve.readsX [destroying (Quantity.Type.InSlot Binding.variableX)])
+      True
+    Spec.assertEqWith
+      s
+      "a Count in the depth reaches the shared-zone-scope lint"
+      (effectCounts (destroying (Quantity.Type.Count tally)))
+      [tally]
+    -- The negative, one thing changed: a literal depth holds no slot, no X and
+    -- no Count, so each answer above is the depth's and not the arm's.
+    Spec.assertEqWith
+      s
+      "and a literal depth fires none of the three"
+      (Resolve.slotsAreExhaustive (destroying (Quantity.Type.Literal 3)), Resolve.readsX [destroying (Quantity.Type.Literal 3)], effectCounts (destroying (Quantity.Type.Literal 3)))
+      (True, False, [])
   Spec.it s "the lint itself catches a dangling reference" $
     let bad = Map.keysSet (Resolve.slotsOf (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (DamagePart.MkDamagePart (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost"))) (Quantity.Type.Literal 3))) Nothing Nothing)))
      in Spec.assertBool s (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSlot.TargetSlot)) "misauthored card detected"

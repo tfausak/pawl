@@ -34,6 +34,10 @@
 # Avoid `TupleSections` extension.
 - ignore: {name: "Use tuple-section"}
 
+# A traversal whose job is to be revisited when a payload gains a field cannot
+# write `{}`, which is what this hint asks for.
+- ignore: {name: "Use record patterns", within: Pawl.Engine.Resolve.objectRefQuantities}
+
 # Prefer using monomorphic, total conversion functions.
 - functions:
   - name: fromIntegral
