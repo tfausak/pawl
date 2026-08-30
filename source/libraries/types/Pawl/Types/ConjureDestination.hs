@@ -39,10 +39,10 @@ data ConjureDestination
     -- The resolver hands 'Pawl.Types.LibraryPosition.defaultValue' to every
     -- arrival, and that is the BOTTOM -- the opposite end from the one every
     -- printing above names. Nothing is red because none of those printings is in
-    -- @data\/cards\/@: Jewel Mine Overseer and Pampered Loamfrill are held out by
-    -- Alchemy\'s perpetual rider (#2648), Pampered Loamfrill also by conjuring a
-    -- duplicate (#2643), and this arm\'s own producer shuffles immediately, which
-    -- makes the end unobservable there. Pampered Loamfrill is the one that would
-    -- OBSERVE it, since it never shuffles (#2638).
+    -- @data\/cards\/@: Jewel Mine Overseer\'s rider has to NAME the seven cards it
+    -- conjured, which wants them bound to a slot (#2638), Pampered Loamfrill
+    -- conjures a duplicate (#2643), and this arm\'s own producer shuffles
+    -- immediately, which makes the end unobservable there. Pampered Loamfrill is
+    -- the one that would OBSERVE it, since it never shuffles (#2638).
     Library
   deriving (Bounded, Enum, Eq, Ord, Show)
