@@ -682,9 +682,9 @@ viewOfSnapshot mController isToken counters snapshot =
       Filter.manaValue = PC.manaValue snapshot,
       Filter.controller = mController,
       -- CR 108.3: an owner is read off an OBJECT, and a ProjectedCharacteristics
-      -- carries none. Unlike `counters` below, which the arm supplies off CR
-      -- 608.2h's record, there is nowhere to source this from: that record would
-      -- be the place to keep it, but no field of it holds one (#1069).
+      -- carries none. Not implemented: `counters` below is supplied by the arm off
+      -- CR 608.2h's record, and an owner could ride the same way now that
+      -- LastKnown.owner holds one, but no arm passes it (#1069).
       Filter.owner = Nothing,
       -- CR 400.1: a snapshot records characteristics (CR 608.2h) and no zone, and
       -- the object it was taken of has since moved or ceased to exist, so IsInZone

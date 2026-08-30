@@ -538,30 +538,35 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   --
   -- WHOSE copy is the entrant's OWNER: CR 400.3 sends a card to its owner's copy
   -- of a per-player zone, so the graveyard it left was its owner's. That is read
-  -- through the INJECTED VIEW rather than off the board: CR 603.4 re-checks an intervening "if" on resolution, by
-  -- which time the entrant may be gone, and Event.interveningHolds and Stack's
-  -- re-check both inject Projection.viewWithLastKnownAnywhere so CR 608.2h still
-  -- answers. A view that cannot describe the object at all is Nothing, which
-  -- Condition.holds collapses to False.
+  -- through the INJECTED VIEW rather than off the board: CR 603.4 re-checks an
+  -- intervening "if" on resolution, by which time the entrant may be gone, and
+  -- Event.interveningHolds and Stack's re-check both inject
+  -- Projection.viewWithLastKnownAnywhere so CR 608.2h still answers. A view that
+  -- cannot describe the object at all is Nothing, which Condition.holds collapses
+  -- to False. That view has to answer the OWNER as well as the characteristics,
+  -- which is what LastKnown.owner is for.
   --
-  -- CR 603.4's SECOND check is a regression fence rather than a proved behaviour.
-  -- Both arms answer off the log, so an entrant that has since left reads the same
-  -- fact at either check, and no card in data/cards/ observes that.
+  -- CR 608.2i is why the log read is the rule and not a convenience: an entry is a
+  -- completed action, and a check needing information about one finds its object
+  -- wherever it now is so long as it takes no action on it -- which this clause,
+  -- whose effect acts elsewhere, does not. So the second check can never answer
+  -- differently from the first, and what a board can observe is that it reads the
+  -- LOG. Breathless Knight proves it in Pawl.ConditionSpec: kill the entrant with
+  -- the trigger on the stack and the +1/+1 counter still lands.
   --
   -- The clause is a printed FAMILY, not a card or two: Scryfall o:"entered from",
   -- 2026-08-30, eight printings, of which seven state it as an intervening "if"
   -- (Fblthp, the Lost is the eighth, whose "if" opens a second sentence and is
   -- ordinary English; nothing prints the older "entered the battlefield from"
   -- wording). Archfiend's Vessel is the one member whose clause and whose effect
-  -- name the SAME object, which is exactly why it cannot refute this: a Vessel
+  -- name the SAME object, which is exactly why it cannot observe this: a Vessel
   -- that left the battlefield fails CR 603.6's find and makes no Demon whichever
   -- way the re-check answered. Every other member reads the ENTRANT and acts
   -- elsewhere -- Grist, Voracious Larva transforms Grist, Kotis, Sibsig Champion
-  -- and Breathless Knight put counters on themselves, Prized Amalgam returns its
-  -- own card -- so killing the entrant between the two checks tells a log read
-  -- from a live-board one. Grist is the nearest, its ability functioning from the
-  -- battlefield so that #2500 does not reach it. Not implemented: no such card is
-  -- in the pool (#2687).
+  -- and Breathless Knight put counters on themselves, Celes, Rune Knight puts one
+  -- on each creature you control, Extraordinary Journey draws you a card, Prized
+  -- Amalgam returns its own card -- so killing the entrant between the two checks
+  -- tells a log read from a live-board one.
   Quantity.EnteredFrom inZone -> do
     oid <- mOid
     pids <- playersOf (InZone.player inZone)
@@ -579,10 +584,10 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   --
   -- The reference is asked of the CASTER and of the owner both, which is the whole
   -- of "you cast it from YOUR graveyard"; the owner half is EnteredFrom's, for CR
-  -- 400.3's reason, and is read the same way for CR 603.4's. The two conjuncts are
-  -- a regression fence rather than a proved pair: every printing of the clause
-  -- says "you" and "your" of one player, so nothing separates a caster from an
-  -- owner, and no case here does either.
+  -- 400.3's reason, and is read the same way for CR 603.4's. Not implemented:
+  -- printings that separate the two -- Breathless Knight's "you cast it from A
+  -- graveyard" among them -- have no exact spelling, and data/cards/ takes the
+  -- stricter reading for the Knight (#2689).
   --
   -- An object that reached the battlefield any OTHER way answers 0 rather than
   -- Nothing, `spells` coming up empty: a permanent put there by an effect was not

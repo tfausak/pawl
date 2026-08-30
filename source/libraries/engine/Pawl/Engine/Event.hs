@@ -14160,10 +14160,11 @@ reactionTriggers events gs = filter (interveningHolds gs) (eventTriggers events 
 -- since left would otherwise be described as one with no characteristics.
 --
 -- Nothing OBSERVES that at this end of the rule, and scoping the view back to the
--- source here leaves the suite green: evolve is the only ability whose "if" reads
--- a slot, and rule 702.100a's entrant is on the battlefield by construction while
--- its own entry is being gathered. So this is a fence keeping the two checks
--- reading alike, not a proved behaviour -- the proved one is Stack's re-check.
+-- source here leaves the suite green: evolve and Breathless Knight are the two
+-- abilities whose "if" reads a slot, and both entrants are on the battlefield by
+-- construction while their own entry is being gathered. So this is a fence keeping
+-- the two checks reading alike, not a proved behaviour -- the proved one is
+-- Stack's re-check.
 interveningHolds :: GameState -> PendingTrigger -> Bool
 interveningHolds gs pending =
   case (TriggeredAbility.intervening (PendingTrigger.ability pending), PendingTrigger.source pending) of

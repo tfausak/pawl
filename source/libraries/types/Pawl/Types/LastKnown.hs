@@ -49,10 +49,12 @@ data LastKnown = MkLastKnown
     -- CR 400.3's reader is what wants it: "your graveyard" names the copy a
     -- card's owner has, so an intervening "if" asking where a permanent came from
     -- (Pawl.Engine.Quantity's EnteredFrom and WasCastFrom) needs the owner of an
-    -- entrant CR 603.4 re-checks after it has died. Proved by
-    -- Pawl.ConditionSpec's "the entrant killed between the two checks still grows
-    -- the Knight"; Pawl.Engine.Projection.viewWithLastKnownAnywhere is the one
-    -- reader, since CR 608.2b still wants a blank answer for a gone TARGET.
+    -- entrant CR 603.4 re-checks after it has died. That it is ANSWERABLE is
+    -- proved by Pawl.ConditionSpec's "the entrant killed between the two checks
+    -- still grows the Knight"; WHICH player it names is a regression fence, the
+    -- Knight's clause reading "a graveyard" over every player and so never asking.
+    -- Pawl.Engine.Projection.viewWithLastKnownAnywhere is the one reader, since CR
+    -- 608.2b still wants a blank answer for a gone TARGET.
     owner :: !PlayerId.PlayerId,
     -- | CR 608.2h: what KIND of object it was and the card behind it -- the same
     -- Object.source the live object carried, copied as it ceased.

@@ -733,7 +733,9 @@ viewWithLastKnown src gs oid =
 -- 608.2h wants here. An intervening "if" asking whose zone a dead entrant came out
 -- of (Pawl.Engine.Quantity's EnteredFrom) reads it, and would otherwise take the
 -- whole quantity to Nothing. Proved by Pawl.ConditionSpec's "the entrant killed
--- between the two checks still grows the Knight".
+-- between the two checks still grows the Knight" -- that it answers at all;
+-- substituting the record's controller for its owner leaves that case green, so
+-- WHICH player is a fence (see #1069).
 viewWithLastKnownAnywhere :: GameState -> Count.ViewOf
 viewWithLastKnownAnywhere gs oid =
   if Map.member oid (GameState.objects gs)
@@ -1022,8 +1024,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.controller = controller,
       -- CR 108.3 / 110.2 / 111.2: read off the OBJECT rather than through the
       -- `controller` parameter, since layer 2 has already moved control and
-      -- nothing moves ownership. Nothing for an id naming nothing (CR 608.2h,
-      -- #1069).
+      -- nothing moves ownership. Nothing for an id naming nothing, which CR 608.2b
+      -- wants of a gone target; viewWithLastKnownAnywhere writes CR 608.2h's answer
+      -- over it for the readers owed one (see #1069, whose other half is
+      -- Count.viewOfSnapshot's).
       Filter.owner = fmap Object.owner (Game.lookupObject oid gs),
       -- CR 400.1 off the OBJECT beside its owner, and for `owner`'s reason: CR
       -- 109.3 counts no zone among the characteristics, so no projection carries
