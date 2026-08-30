@@ -5,6 +5,7 @@ import qualified Pawl.Codec.Count as Count
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
 import qualified Pawl.Codec.Halved as Halved
+import qualified Pawl.Codec.InZone as InZone
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ManaCount as ManaCount
 import qualified Pawl.Codec.PlayerCounterTally as PlayerCounterTally
@@ -104,6 +105,11 @@ codec =
       -- there is nothing on the wire: the turn is the log's extent rather than a
       -- window a card could state, as for CardsDiscardedThisTurn above.
       Arm.nullary "EnteredThisTurn" Quantity.EnteredThisTurn,
+      -- CR 400.7's origin zone and CR 601.2a's cast zone, each with the InZone a
+      -- Count's scope carries -- so Pawl.Codec.InZone.undividedShared rejects a
+      -- shared zone scoped to one player here exactly as it does there.
+      Arm.payload "EnteredFrom" InZone.codec Quantity.EnteredFrom (\x -> case x of Quantity.EnteredFrom y -> Just y; _ -> Nothing),
+      Arm.payload "WasCastFrom" InZone.codec Quantity.WasCastFrom (\x -> case x of Quantity.WasCastFrom y -> Just y; _ -> Nothing),
       -- CR 509.1h's declaration read against the object the quantity is aimed at,
       -- so there is nothing on the wire at all -- Power's shape rather than
       -- ObjectCounters'.

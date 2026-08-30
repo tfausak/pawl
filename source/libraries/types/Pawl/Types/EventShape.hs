@@ -17,8 +17,9 @@ import qualified Pawl.Types.MovedBetween as MovedBetween
 -- about a population of objects, since a member of this fold is a Filter view of
 -- an object and the unit counted is an EVENT. Those questions are
 -- Pawl.Types.Quantity arms instead -- CardsDiscardedThisTurn,
--- PlayersDealtDamageThisTurn and EnteredThisTurn -- each of which reads
--- GameState.events directly through a Pawl.Engine.Game accessor.
+-- PlayersDealtDamageThisTurn, EnteredThisTurn, EnteredFrom and WasCastFrom among
+-- them -- each of which reads GameState.events directly through a
+-- Pawl.Engine.Game accessor.
 data EventShape
   = -- | CR 700.4: "dies" is MovedBetween Battlefield Graveyard.
     MovedBetween MovedBetween.MovedBetween
