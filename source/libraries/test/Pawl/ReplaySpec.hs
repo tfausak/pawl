@@ -44,6 +44,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Mana as Mana.Type
@@ -1185,6 +1186,28 @@ combatReplaySpec s =
             "the head"
             (Replay.defaultAnswer (Prompt.ChooseMovedCounter decider S.alice oid (ObjectId.MkObjectId 9) (CounterKind.PlusOnePlusOne NonEmpty.:| [CounterKind.Shield])))
             CounterKind.PlusOnePlusOne
+        -- CR 122.5 again, for the move that names neither a kind nor a count: the
+        -- answer is a tally PER KIND, so a transcript has to carry the whole map
+        -- and not the one kind ChooseMovedCounter's does.
+        Spec.it s "ChooseMovedCounters round-trips through the transcript" $ do
+          let tally :: [(CounterKind.CounterKind Keyword.Keyword, Natural.Natural)] -> Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural
+              tally = Map.fromList
+              offered = tally [(CounterKind.PlusOnePlusOne, 3), (CounterKind.Shield, 2)]
+              spread = tally [(CounterKind.PlusOnePlusOne, 1), (CounterKind.Shield, 1)]
+              oneKind = tally [(CounterKind.Shield, 2)]
+              p = Prompt.ChooseMovedCounters decider S.alice oid (ObjectId.MkObjectId 9) offered
+          Spec.assertEqWith s "an answer spread across both kinds round trips" (Replay.decode p (Replay.encode p spread)) (Just spread)
+          -- Discriminating: a decode that ignored the response would answer the
+          -- case above whatever was encoded.
+          Spec.assertEqWith s "and one naming a single kind round trips as itself" (Replay.decode p (Replay.encode p oneKind)) (Just oneKind)
+        Spec.it s "a short any-number transcript moves nothing" $
+          -- CR 122.5: "any number" includes none, so the quiet answer is always
+          -- legal and leaves the board where a short transcript found it.
+          Spec.assertEqWith
+            s
+            "the empty tally"
+            (Replay.defaultAnswer (Prompt.ChooseMovedCounters decider S.alice oid (ObjectId.MkObjectId 9) (Map.singleton CounterKind.PlusOnePlusOne (3 :: Natural.Natural))))
+            Map.empty
         -- CR 701.68a: which creature a blighting player put the counters on is a
         -- decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseBlight round-trips through the transcript" $ do
