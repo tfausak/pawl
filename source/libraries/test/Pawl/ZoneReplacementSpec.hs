@@ -7,6 +7,8 @@
 -- fed to is Pawl.ReplacementSpec.
 module Pawl.ZoneReplacementSpec where
 
+import qualified Data.List as List
+import qualified Data.Maybe as Maybe
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Setup as Setup
@@ -15,8 +17,12 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Zone as Zone
 
 -- Nexus of Fate (M19 306) is the pool's producer: "If Nexus of Fate would be put
@@ -26,11 +32,29 @@ import qualified Pawl.Types.Zone as Zone
 -- including while it's resolving" -- so the card states every zone (CR 113.6b)
 -- and the cases below drive the hand, the library and the stack with it.
 --
--- Not implemented: the reveal and the shuffle. Pawl.Types.ZoneChangeR names a
--- destination zone and nothing else, so the card lands at
--- Pawl.Types.LibraryPosition.defaultValue -- the bottom -- unrevealed (#2591).
--- Both omissions are stricter than the printing rather than looser, which is why
--- the card is committed as it is.
+-- The card's two riders -- CR 701.20's reveal and CR 701.24's shuffle -- are
+-- Pawl.Types.ZoneChangeR's `revealing` and `shuffling`, proved by the last two
+-- cases below.
+--
+-- An HONEST interpreter for CR 701.24a's randomness: a genuine permutation of
+-- what it was offered, which is what makes the shuffle observable at all --
+-- S.identityAnswer hands the order straight back, so a library it shuffled and
+-- one it did not are the same list.
+reversingShuffle :: Prompt.Prompt r -> r
+reversingShuffle p = case p of
+  Prompt.Shuffle ids -> reverse ids
+  _ -> S.identityAnswer p
+
+-- Which objects a CR 701.20a reveal has shown, in the order the log holds them.
+revealed :: GameState.GameState -> [ObjectId.ObjectId]
+revealed gs =
+  Maybe.mapMaybe
+    ( \event -> case event of
+        GameEvent.Revealed (Revealed.MkRevealed _ oid _ _) -> Just oid
+        _ -> Nothing
+    )
+    (S.eventsOf gs)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- CR 113.6b from a HIDDEN zone (CR 400.2), which CR 113.6's own defaults never
@@ -39,9 +63,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- A discard rather than a bare zone move, because CR 701.9a's action is the
   -- harder road -- a discard whose move CR 614.6 sends elsewhere is still a
   -- discard -- and Pawl.Engine.Event.discard is the funnel every discard goes
-  -- through. CR 701.9c is what the missing reveal costs: a card discarded into a
-  -- hidden zone unrevealed has undefined characteristics, which pawl does not
-  -- model either way (#2591).
+  -- through. CR 701.9c is why the card's reveal is not cosmetic: a card discarded
+  -- into a hidden zone unrevealed has all its characteristics considered
+  -- undefined, and the row's `revealing` is the branch of that rule Nexus of
+  -- Fate takes. Nothing in pawl models undefined characteristics either way, so
+  -- the case below reads the reveal off the log rather than off the card.
   Spec.it s "CR 113.6b a stated row functions from the hand, so a discard lands in the library" $ do
     nexus <- S.printingOf s registry "Nexus of Fate"
     let (nexusId, gs) = S.addHandCard nexus S.alice (Setup.emptyGame S.bothPlayers)
@@ -97,3 +123,51 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice (binned inGraveyard))) 0
     Spec.assertEqWith s "CR 113.6's default: the same enchantment on the battlefield exiles it instead" (length (Game.zoneMembers Zone.Exile S.alice (binned onBattlefield))) 1
     Spec.assertEqWith s "so that graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice (binned onBattlefield))) 0
+  -- CR 701.24a: the redirect does not merely put the card into the library, it
+  -- shuffles that library. A pair of boards differing in ONE thing -- which card
+  -- alice discards -- because the discard funnel itself never shuffles, so a
+  -- library reversed on the control leg would mean the shuffle came from
+  -- somewhere other than Nexus of Fate's row.
+  --
+  -- Three library cards, so the reversal is a different list from the original;
+  -- and the redirect puts the Nexus at Pawl.Types.LibraryPosition.defaultValue,
+  -- the bottom, so a wrongly-unshuffled library ends with it LAST and the
+  -- shuffled one ends with it FIRST. That is what makes the assertion able to
+  -- differ.
+  --
+  -- The arriving card is found by ELIMINATION rather than by id: CR 400.7 mints
+  -- a new incarnation on the way into the library, so the id alice discarded
+  -- names nothing there.
+  Spec.it s "CR 701.24a the redirect shuffles the library it moved the card into" $ do
+    nexus <- S.printingOf s registry "Nexus of Fate"
+    piker <- S.printingOf s registry "Goblin Piker"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    let (_, g1) = S.addLibraryCard island S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addLibraryCard mountain S.alice g1
+        (_, g3) = S.addLibraryCard forest S.alice g2
+        (nexusId, g4) = S.addHandCard nexus S.alice g3
+        (pikerId, gs) = S.addHandCard piker S.alice g4
+        stock = Game.zoneMembers Zone.Library S.alice gs
+        discarding oid = S.runPure reversingShuffle gs (Event.discard DiscardCause.Ordinary S.alice oid)
+        after = discarding nexusId
+        control = discarding pikerId
+    Spec.assertEqWith s "CR 701.24a the arriving card is on TOP, which only a shuffle of the library it was put at the bottom of could do" (fmap (`List.elem` stock) (Game.zoneMembers Zone.Library S.alice after)) [False, True, True, True]
+    Spec.assertEqWith s "and the three cards already there are in the order the interpreter's permutation named" (drop 1 (Game.zoneMembers Zone.Library S.alice after)) (reverse stock)
+    Spec.assertEqWith s "the control: a card with no such row is discarded, and that library keeps the order it had" (Game.zoneMembers Zone.Library S.alice control) stock
+    Spec.assertEqWith s "the fixture really stocked three cards for the reversal to move" (length stock) 3
+    Spec.assertEqWith s "and the control card really was discarded" (length (Game.zoneMembers Zone.Graveyard S.alice control)) 1
+  -- CR 701.20a: the same redirect shows the card. The same pair, since
+  -- Pawl.Engine.Event.discard reveals nothing on its own -- CR 701.9c is what
+  -- the reveal buys, a card discarded into a hidden zone unrevealed having
+  -- undefined characteristics.
+  Spec.it s "CR 701.20a the redirect reveals the card it moves" $ do
+    nexus <- S.printingOf s registry "Nexus of Fate"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (nexusId, g1) = S.addHandCard nexus S.alice (Setup.emptyGame S.bothPlayers)
+        (pikerId, gs) = S.addHandCard piker S.alice g1
+        discarding oid = S.runPure reversingShuffle gs (Event.discard DiscardCause.Ordinary S.alice oid)
+    Spec.assertEqWith s "CR 701.20a the Nexus was shown, under the id it had in the zone it left" (revealed (discarding nexusId)) [nexusId]
+    Spec.assertEqWith s "the control: discarding a card with no such row shows nobody anything" (revealed (discarding pikerId)) []
+    Spec.assertEqWith s "and the control card really was discarded" (length (Game.zoneMembers Zone.Graveyard S.alice (discarding pikerId))) 1

@@ -876,14 +876,21 @@ createEmblem pid card = do
 -- Also reports CR 607.2b's link: the object whose replacement effect is what made
 -- the destination exile, or Nothing when the move was headed there on its own
 -- instruction. The caller files it once the arriving incarnation has an id.
-resolveZoneChange :: Maybe GameState -> ZoneChange -> Game (Maybe ZoneChange, Maybe ObjectId)
+--
+-- And CR 701.24's shuffle: whether any row that applied carries it. Reported
+-- rather than performed, because a card cannot be shuffled INTO a library it is
+-- not in yet -- the move happens after this returns, so changeZoneAttaching is
+-- the earliest moment the action is well defined. The reveal is not here for the
+-- mirror-image reason: it acts on the card in the zone it is leaving, so `apply`
+-- performs it where that id is still the object's.
+resolveZoneChange :: Maybe GameState -> ZoneChange -> Game (Maybe ZoneChange, Maybe ObjectId, Bool)
 resolveZoneChange asOf zc = do
-  (outcome, _, exiledBy) <- applyReplacementsFully asOf Set.empty (ProposedEvent.WouldChangeZone zc)
+  (outcome, _, exiledBy, shuffling) <- applyReplacementsFully asOf Set.empty (ProposedEvent.WouldChangeZone zc)
   case outcome >>= Replacement.asZoneChange of
-    Nothing -> pure (Nothing, exiledBy)
+    Nothing -> pure (Nothing, exiledBy, shuffling)
     Just settled -> do
       redirected <- offerCommandZone settled
-      pure (Just redirected, exiledBy)
+      pure (Just redirected, exiledBy, shuffling)
 
 -- CR 903.9b: "if a commander would be put into its owner's hand or library from
 -- anywhere, its owner may put it into the command zone instead". The question;
@@ -1057,7 +1064,7 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --      for the floating one, and the AMOUNT half by its Squad Captain.
 applyReplacementsIn :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
 applyReplacementsIn asOf batch event = do
-  (outcome, _, _) <- applyReplacementsFully asOf batch event
+  (outcome, _, _, _) <- applyReplacementsFully asOf batch event
   pure outcome
 
 -- The same loop, answering CR 615.13's second question as well: WHICH prevention
@@ -1069,19 +1076,20 @@ applyReplacementsIn asOf batch event = do
 -- would be threading a value it knows is empty.
 applyReplacementsReporting :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention])
 applyReplacementsReporting asOf batch event = do
-  (outcome, prevented, _) <- applyReplacementsFully asOf batch event
+  (outcome, prevented, _, _) <- applyReplacementsFully asOf batch event
   pure (outcome, prevented)
 
--- The loop itself, with both of the side answers its two classes of caller want:
--- CR 615.13's preventions, and CR 607.2b's "which object's replacement effect is
--- what exiled this". Each is empty or Nothing for every event class but one --
--- damage for the first, zone changes for the second -- which is why the three
--- entries above and around it exist rather than one wide return everywhere.
-applyReplacementsFully :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention], Maybe ObjectId)
-applyReplacementsFully asOf batch = loop asOf batch Set.empty [] Nothing
+-- The loop itself, with the side answers its two classes of caller want: CR
+-- 615.13's preventions, CR 607.2b's "which object's replacement effect is what
+-- exiled this", and CR 701.24's "did a row that applied say to shuffle". Each is
+-- empty, Nothing or False for every event class but one -- damage for the first,
+-- zone changes for the other two -- which is why the three entries above and
+-- around it exist rather than one wide return everywhere.
+applyReplacementsFully :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention], Maybe ObjectId, Bool)
+applyReplacementsFully asOf batch = loop asOf batch Set.empty [] Nothing False
 
-loop :: Maybe GameState -> Set ObjectId -> Set CandidateId -> [Prevention] -> Maybe ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention], Maybe ObjectId)
-loop asOf batch applied prevented exiledBy event = do
+loop :: Maybe GameState -> Set ObjectId -> Set CandidateId -> [Prevention] -> Maybe ObjectId -> Bool -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention], Maybe ObjectId, Bool)
+loop asOf batch applied prevented exiledBy shuffling event = do
   gs <- State.get
   -- From scratch each iteration: collect against the CURRENT state (or, for a
   -- CR 608.2f batch, the state the batch began in), minus CR 614.5's
@@ -1110,13 +1118,13 @@ loop asOf batch applied prevented exiledBy event = do
       fresh = filter (\candidate -> unused candidate && notSibling candidate) (Replacement.applicable asOf gs event)
   case Replacement.highestBucket fresh of
     -- CR 616.1f / 614.6: no candidate remains, so the surviving event happens.
-    [] -> pure (Just event, prevented, exiledBy)
+    [] -> pure (Just event, prevented, exiledBy, shuffling)
     bucket -> do
       picked <- Replacement.choose gs event bucket
       case picked of
         -- Unreachable: highestBucket returns [] for an empty input, so `bucket`
         -- is non-empty and `choose` always picks. Total rather than partial.
-        Nothing -> pure (Just event, prevented, exiledBy)
+        Nothing -> pure (Just event, prevented, exiledBy, shuffling)
         Just candidate -> do
           -- CR 615.12: the chosen effect is a prevention effect and this damage
           -- can't be prevented (Spider-Punk), so it is APPLIED and prevents none
@@ -1159,8 +1167,8 @@ loop asOf batch applied prevented exiledBy event = do
           -- SetAmount and Scale shrink an event without preventing a point of it.
           let prevented1 = prevented <> Maybe.maybeToList (Replacement.preventionBy inert candidate event outcome)
           case outcome of
-            Nothing -> pure (Nothing, prevented1, exiledBy)
-            Just rewritten -> loop asOf batch (Set.insert (ReplacementCandidate.identity candidate) applied) prevented1 (exiledByAfter candidate event rewritten exiledBy) rewritten
+            Nothing -> pure (Nothing, prevented1, exiledBy, shuffling)
+            Just rewritten -> loop asOf batch (Set.insert (ReplacementCandidate.identity candidate) applied) prevented1 (exiledByAfter candidate event rewritten exiledBy) (shuffling || shufflesAfter candidate) rewritten
 
 -- CR 607.2b's link, read OUTSIDE `apply` from the event before and after --
 -- `preventionBy`'s posture above, for its reason: no arm of that fold has to
@@ -1188,6 +1196,20 @@ loop asOf batch applied prevented exiledBy event = do
 --
 -- No case on effect identity: the question is a proposed event's destination
 -- ZONE, and the answer is the row's source object.
+-- CR 701.24: did the row that just applied say to shuffle? Read off the
+-- candidate rather than off the event, unlike `exiledByAfter` above, because a
+-- shuffle leaves no mark on the proposed event for a before/after diff to find.
+--
+-- Once True, always True: an accumulator, so a second redirect that names no
+-- shuffle cannot take back the first one's. CR 701.24c is why -- the library is
+-- shuffled even once the object has been moved elsewhere.
+--
+-- A CLASSIFICATION of the row, not a test of which card it came from.
+shufflesAfter :: ReplacementCandidate -> Bool
+shufflesAfter candidate = case ReplacementCandidate.effect candidate of
+  ReplacementEffect.ZoneChangeR zoneChangeR -> ZoneChangeR.shuffling zoneChangeR
+  _ -> False
+
 exiledByAfter :: ReplacementCandidate -> ProposedEvent -> ProposedEvent -> Maybe ObjectId -> Maybe ObjectId
 exiledByAfter candidate before after exiledBy =
   case (fmap ZoneChange.to (Replacement.asZoneChange before), fmap ZoneChange.to (Replacement.asZoneChange after)) of
@@ -1271,8 +1293,25 @@ applyInertly candidate rewrite event = do
 apply :: Set ObjectId -> ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent)
 apply batch candidate event =
   case (ReplacementCandidate.effect candidate, event) of
-    (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ toDest), ProposedEvent.WouldChangeZone zc) -> do
+    (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ toDest revealing _), ProposedEvent.WouldChangeZone zc) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
+      -- CR 701.20a, performed HERE rather than after the move: the card is shown
+      -- in the zone it is leaving, where CR 400.7 has not yet minted the
+      -- incarnation that arrives, so this id is the one the reveal is about.
+      -- Nexus of Fate's "reveal Nexus of Fate and shuffle it into its owner's
+      -- library instead" reads in that order too. The shuffle half cannot be
+      -- here; see resolveZoneChange.
+      --
+      -- The OWNER shows it, which is who CR 400.3's destination library belongs
+      -- to and, for every row in the pool, who holds the card: a redirect
+      -- naming Filter.IsSource acts on a card that is nobody's permanent in the
+      -- hidden zones this fires from, so Projection.controllerOf would answer
+      -- the owner anyway. A row redirecting an opponent's permanent while
+      -- revealing it would separate the two, and none is printed.
+      Monad.when revealing $ do
+        gs <- State.get
+        Monad.forM_ (Game.lookupObject (ZoneChange.departed zc) gs) $ \obj ->
+          reveal RevealCause.Ordinary (Object.owner obj) (ZoneChange.departed zc)
       pure (Just (ProposedEvent.WouldChangeZone zc {ZoneChange.to = toDest}))
     -- Unreachable: `applies` admits ZoneChangeR only against WouldChangeZone.
     (ReplacementEffect.ZoneChangeR {}, _) -> pure (Just event)
@@ -3450,9 +3489,9 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
     -- event left for a replacement to choose among. Ordering it after the loop
     -- would answer the same, and not on a claim about Magic: the predicate reads
     -- the object and its CURRENT zone, neither of which any ZoneChangeR rewrites
-    -- -- they rewrite the destination -- and that loop leaves the board alone on
-    -- this path (see resolveZoneChange, which restricts it to ZoneChangeR
-    -- candidates, so the one state-writing arm is out of reach).
+    -- -- they rewrite the destination -- and neither of the two things that loop
+    -- does write on this path touches them: CR 701.20's reveal appends to the
+    -- event log, and Replacement.consume marks a candidate spent.
     Just obj | Game.tokenHasLeftTheBattlefield obj -> pure Seq.empty
     Just obj -> do
       let pid = Object.owner obj
@@ -3502,15 +3541,15 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
       -- the PRE-MOVE state. CR 614.6: the modified event is what actually happens.
       --
       -- `obj` and `snapshot` are read before this runs and still used after it
-      -- returns, which is sound despite Replacement's AsCopy arm calling
-      -- State.modify': this is a WouldChangeZone loop, restricted to ZoneChangeR
-      -- candidates, so it cannot reach the EntryR arm AsCopy lives under -- and
-      -- `gs` and `lki` are immutable values, so no downstream modify' can change
-      -- what `snapshot` captured. Extending either loop to mutate state these bindings
-      -- read would mean re-deriving them after that loop.
+      -- returns, which is sound despite the loop writing state -- Replacement's
+      -- AsCopy arm calls State.modify', and the ZoneChangeR arm records CR
+      -- 701.20's reveal: `gs` and `lki` are immutable values, so no downstream
+      -- modify' can change what `snapshot` captured. Extending either loop to
+      -- mutate state these bindings read would mean re-deriving them after that
+      -- loop.
       --
       -- Both ids are `oid` in the PROPOSED event: nothing has moved yet.
-      (resolved, exiledBy) <- resolveZoneChange asOf (ZoneChange.MkZoneChange oid oid fromZone requestedDest)
+      (resolved, exiledBy, shuffling) <- resolveZoneChange asOf (ZoneChange.MkZoneChange oid oid fromZone requestedDest)
       case resolved of
         -- CR 614.6: nothing survived the loop, so no zone change happens. No
         -- producer today -- no ReplacementEffect in data/cards cancels a zone
@@ -4007,6 +4046,21 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- permanent became BOTH cards, so a perpetual effect follows the
               -- arrangement's trailing card too.
               perpetuate oid arrivals
+              -- CR 701.24a: the redirect said to shuffle the card into a library,
+              -- and it is in one now -- the earliest point at which "shuffle it
+              -- into its owner's library" is a whole action rather than half of
+              -- one. AFTER placeObject for that reason, and before the Moved
+              -- event so nothing outside the move sees an unshuffled library.
+              --
+              -- Ungated on the settled destination, which is CR 701.24c and CR
+              -- 701.24d rather than a shortcut: the library is shuffled even when
+              -- the object is not in it. Unreachable today in any case -- no row
+              -- in data/cards/ watches a destination another row has already
+              -- moved into a library.
+              --
+              -- The OWNER's library, CR 400.3: every zone this funnel places into
+              -- is keyed by owner, and `pid` is the id placeObject was handed.
+              Monad.when shuffling (shuffleLibrary pid)
               -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
               -- nowhere else. CR 616.1g's nesting of one event inside another is
               -- expressed as call nesting rather than a field. `batch` is the
@@ -5335,6 +5389,25 @@ discardReturning cause pid oid = do
 -- OUTCOME right -- the status is back to FaceUp -- but no caller reaches this
 -- funnel, so nothing can trigger on it, and the snapshot such a reveal would
 -- record is unsettled for the same reason nothing reads it (#921).
+-- Ask the interpreter to shuffle this player's library (CR 103.3 / 701.24).
+--
+-- Here rather than in Pawl.Engine.Mulligan, which is where it used to live, so
+-- that a library is randomized in exactly one place now that a CR 614.6 redirect
+-- shuffles one (see changeZoneAttaching). Pawl.Engine.Mulligan sits ABOVE this
+-- module, so the setup callers reach down to it and this one does not have to
+-- reach up.
+shuffleLibrary :: PlayerId -> Game ()
+shuffleLibrary pid = do
+  gs <- State.get
+  let ids = Game.zoneMembers Zone.Library pid gs
+  answer <- Game.ask (Prompt.Shuffle ids)
+  let shuffled = Game.honourShuffle ids answer
+  -- modify' rather than putting `gs` back: it was read before the prompt, and a
+  -- prompt may write state -- Game.choose writes GameState.lastChoice. This one
+  -- does not (Prompt.Shuffle is bare, being randomness rather than a choice),
+  -- so this is defending the invariant rather than fixing a live bug.
+  State.modify' (\g -> g {GameState.library = Map.insert pid (Seq.fromList shuffled) (GameState.library g)})
+
 reveal :: RevealCause.RevealCause -> PlayerId -> ObjectId -> Game ()
 reveal cause pid oid = do
   gs <- State.get

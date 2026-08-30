@@ -5112,6 +5112,8 @@ finalityOf oid gs =
                   ZoneChangePattern.whatObject = Filter.Type.IsSource
                 }
               Zone.Exile
+              False
+              False
           )
       ]
 

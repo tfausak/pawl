@@ -5,6 +5,7 @@ module Pawl.Codec.ZoneChangeR where
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Codec.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
@@ -14,8 +15,12 @@ codec :: Codec.Codec ZoneChangeR.ZoneChangeR
 codec = Fields.object $ do
   matching <- Fields.required "matching" ZoneChangePattern.codec ZoneChangeR.matching
   destination <- Fields.required "destination" Zone.codec ZoneChangeR.destination
+  revealing <- Fields.defaulted "revealing" False Common.boolean ZoneChangeR.revealing
+  shuffling <- Fields.defaulted "shuffling" False Common.boolean ZoneChangeR.shuffling
   pure
     ZoneChangeR.MkZoneChangeR
       { ZoneChangeR.matching = matching,
-        ZoneChangeR.destination = destination
+        ZoneChangeR.destination = destination,
+        ZoneChangeR.revealing = revealing,
+        ZoneChangeR.shuffling = shuffling
       }

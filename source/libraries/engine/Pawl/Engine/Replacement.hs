@@ -456,7 +456,7 @@ applies gs event candidate =
         -- A pattern naming NO destination admits every one, which is CR 702.34a's
         -- "instead of putting it anywhere else"; the destinations are not
         -- enumerated, so this is a Maybe rather than a set of zones.
-        (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _), ProposedEvent.WouldChangeZone zc) ->
+        (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _ _ _), ProposedEvent.WouldChangeZone zc) ->
           maybe True (== ZoneChange.to zc) (ZoneChangePattern.whenDestination pat)
             && matchesZoneOwner gs (ReplacementCandidate.controller candidate) (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
             && matchesFiltered gs candidate (ZoneChangePattern.whatObject pat) (ZoneChange.object zc)
@@ -1289,8 +1289,10 @@ bucketOfEffect re = case re of
 -- instead of a build failure.
 readsApplier :: ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Bool
 readsApplier re = case re of
-  -- The destination zone is the effect's own second field, and the pattern is
-  -- matched before Event.apply runs (Rest in Peace, Leyline of the Void).
+  -- The destination zone is the effect's own field, and the pattern is matched
+  -- before Event.apply runs (Rest in Peace, Leyline of the Void). CR 701.20's
+  -- reveal rider does not change the answer: it shows the MOVING object's owner
+  -- (CR 400.3), never the row's controller.
   ReplacementEffect.ZoneChangeR {} -> False
   -- CR 707.5 / 109.5: Clone's "you" is the ENTERING object's controller, read
   -- live off the board at CR 614.12a's moment, not the candidate's -- so two

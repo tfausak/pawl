@@ -15,6 +15,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Replay as Replay
@@ -538,14 +539,14 @@ trustedAnswerSpec s registry =
           (b, gs) = S.addLibraryCard forest S.alice g1
           -- The interpreter returns one card twice: a library that would gain a
           -- card and lose one.
-          after = S.runPure (shuffleAnswering [a, a]) gs (Mulligan.shuffleLibrary S.alice)
+          after = S.runPure (shuffleAnswering [a, a]) gs (Event.shuffleLibrary S.alice)
       Spec.assertEqWith s "the library still holds both cards, once each" (List.sort (Game.zoneMembers Zone.Library S.alice after)) [a, b]
     Spec.it s "#222 a shuffle answer naming a card that was never there is refused" $ do
       forest <- S.printingOf s registry "Forest"
       let (a, g1) = S.addLibraryCard forest S.alice (Setup.emptyGame S.bothPlayers)
           (b, gs) = S.addLibraryCard forest S.alice g1
           phantom = ObjectId.MkObjectId 9999
-          after = S.runPure (shuffleAnswering [a, phantom]) gs (Mulligan.shuffleLibrary S.alice)
+          after = S.runPure (shuffleAnswering [a, phantom]) gs (Event.shuffleLibrary S.alice)
       Spec.assertEqWith s "no invented card entered the library" (List.sort (Game.zoneMembers Zone.Library S.alice after)) [a, b]
     -- The control: an honest permutation IS honoured, so the guard cannot pass
     -- by ignoring every answer.
@@ -554,7 +555,7 @@ trustedAnswerSpec s registry =
       let (a, g1) = S.addLibraryCard forest S.alice (Setup.emptyGame S.bothPlayers)
           (b, gs) = S.addLibraryCard forest S.alice g1
           before = Game.zoneMembers Zone.Library S.alice gs
-          after = S.runPure reversingShuffle gs (Mulligan.shuffleLibrary S.alice)
+          after = S.runPure reversingShuffle gs (Event.shuffleLibrary S.alice)
       Spec.assertEqWith s "the fixture really has two cards" (List.sort before) [a, b]
       Spec.assertEqWith s "the order is the reversal the interpreter asked for" (Game.zoneMembers Zone.Library S.alice after) (reverse before)
 

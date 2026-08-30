@@ -35,7 +35,6 @@ import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.MoveDuration as MoveDuration
-import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Plot as Plot
@@ -1718,7 +1717,7 @@ playSubgame = do
   -- CR 729.5: each player who was IN the subgame takes the traditional cards they
   -- own back to their main-game library and shuffles.
   seated <- State.gets Game.stillPlayingInOrder
-  Monad.forM_ seated Mulligan.shuffleLibrary
+  Monad.forM_ seated Event.shuffleLibrary
   pure result
 
 playFrom :: NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game Result

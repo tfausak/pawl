@@ -23,8 +23,29 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangeR" $ do
                   ZoneChangePattern.whatObject = Filter.And [],
                   ZoneChangePattern.whoseObject = ControllerRelation.Anyones
                 },
-            ZoneChangeR.destination = Zone.Exile
+            ZoneChangeR.destination = Zone.Exile,
+            ZoneChangeR.revealing = False,
+            ZoneChangeR.shuffling = False
           }
       )
       " {\"matching\":{\"whenDestination\":{\"type\":\"Graveyard\"}},\"destination\":{\"type\":\"Exile\"}} "
+  -- CR 701.20 / 701.24: Nexus of Fate's shape, where both riders are written
+  -- out rather than defaulted away.
+  Spec.it s "MkZoneChangeR with both riders" $
+    Common.assertCodec
+      s
+      ZoneChangeR.codec
+      ( ZoneChangeR.MkZoneChangeR
+          { ZoneChangeR.matching =
+              ZoneChangePattern.MkZoneChangePattern
+                { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
+                  ZoneChangePattern.whatObject = Filter.IsSource,
+                  ZoneChangePattern.whoseObject = ControllerRelation.Anyones
+                },
+            ZoneChangeR.destination = Zone.Library,
+            ZoneChangeR.revealing = True,
+            ZoneChangeR.shuffling = True
+          }
+      )
+      " {\"matching\":{\"whenDestination\":{\"type\":\"Graveyard\"},\"whatObject\":{\"type\":\"IsSource\"}},\"destination\":{\"type\":\"Library\"},\"revealing\":true,\"shuffling\":true} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ZoneChangeR.codec

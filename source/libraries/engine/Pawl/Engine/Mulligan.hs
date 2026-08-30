@@ -4,7 +4,6 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural
 import qualified Pawl.Engine.Condition as Condition
@@ -35,19 +34,6 @@ import qualified Pawl.Types.Zone as Zone
 -- the rules keep apart.
 openingHand :: Int
 openingHand = 7
-
--- Ask the interpreter to shuffle this player's library (CR 103.3 / 701.24).
-shuffleLibrary :: PlayerId -> Game ()
-shuffleLibrary pid = do
-  gs <- State.get
-  let ids = Game.zoneMembers Zone.Library pid gs
-  answer <- Game.ask (Prompt.Shuffle ids)
-  let shuffled = Game.honourShuffle ids answer
-  -- modify' rather than putting `gs` back: it was read before the prompt, and a
-  -- prompt may write state -- Game.choose writes GameState.lastChoice. This one
-  -- does not (Prompt.Shuffle is bare, being randomness rather than a choice),
-  -- so this is defending the invariant rather than fixing a live bug.
-  State.modify' (\g -> g {GameState.library = Map.insert pid (Seq.fromList shuffled) (GameState.library g)})
 
 -- CR 103.5: draw opening hands, then run the declaration/mulligan/bottom round
 -- loop to completion. Assumes each player's library is already built and
@@ -284,7 +270,7 @@ takeMulligan :: Map.Map PlayerId Numeric.Natural.Natural -> PlayerId -> Game (Ma
 takeMulligan counts pid = do
   handIds <- State.gets (Game.zoneMembers Zone.Hand pid)
   Monad.forM_ handIds (\oid -> Event.changeZone oid Zone.Library)
-  shuffleLibrary pid
+  Event.shuffleLibrary pid
   Monad.replicateM_ openingHand (Event.drawCard pid)
   -- The SAME offer the declaration prompt reported -- offerFor is a pure
   -- function of `counts`, `pid` and the seat roster, none of which the redraw

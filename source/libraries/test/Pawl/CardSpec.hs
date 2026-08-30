@@ -1941,6 +1941,29 @@ preventsDamage rewrite = case rewrite of
 hasRider :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 hasRider = not . null . replacementEffectRiders
 
+-- CR 701.24a shuffles a LIBRARY, so a redirect saying to shuffle has to be
+-- sending the card into one. The type cannot say that -- the destination and the
+-- rider are two independent fields -- so card data is held to it here, as CR
+-- 615.5's rider is one lint up.
+shufflingOutsideLibraryOffends :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+shufflingOutsideLibraryOffends replacement = case replacement of
+  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ destination _ shuffling) -> shuffling && destination /= Zone.Library
+  ReplacementEffect.DamageR {} -> False
+  ReplacementEffect.CounterR {} -> False
+  ReplacementEffect.EntryR {} -> False
+  ReplacementEffect.DestructionR _ -> False
+  ReplacementEffect.TokenR {} -> False
+  ReplacementEffect.TurnUpR {} -> False
+  ReplacementEffect.UntapR _ -> False
+  ReplacementEffect.LifeLossR {} -> False
+  ReplacementEffect.PhaseR _ -> False
+
+-- The non-vacuity half of shufflingOutsideLibraryOffends' lint, isPhaseR's shape.
+hasZoneChangeRider :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
+hasZoneChangeRider replacement = case replacement of
+  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ _ revealing shuffling) -> revealing || shuffling
+  _ -> False
+
 -- The non-vacuity half of engineOnlyOffends' lint, isPhaseR's shape.
 isDamageR :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 isDamageR replacement = case replacement of
@@ -3828,7 +3851,7 @@ turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
 replacementEffectFilters :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Filter.Type.Filter Keyword.Keyword]
 replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.CounterR (CounterR.MkCounterR counterPattern _) -> [CounterPattern.onWhat counterPattern]
-  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern _) -> [ZoneChangePattern.whatObject zoneChangePattern]
+  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern _ _ _) -> [ZoneChangePattern.whatObject zoneChangePattern]
   ReplacementEffect.EntryR (EntryR.MkEntryR entryPattern entryRewrite) -> entryPattern : entryRewriteFilters entryRewrite
   -- CR 615.1's shields narrow by their source, which is a Filter over the object
   -- dealing the damage (Luminesce's "black sources and red sources", Galvanic
@@ -6990,6 +7013,26 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any hasRider printed) "setup: the Capridor prints a rider to move"
     Spec.assertBool s (not (any riderWithoutPreventionOffends printed)) "the real Capridor hangs it off a prevention"
     Spec.assertBool s (any (riderWithoutPreventionOffends . unprevent) printed) "and the same rider on a doubling is rejected"
+  -- CR 701.24a: the shuffle rider randomizes a library, so the redirect carrying
+  -- it has to name one. See shufflingOutsideLibraryOffends.
+  Spec.it s "no card shuffles a redirect that does not send the card into a library" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace (any shufflingOutsideLibraryOffends . cardReplacementEffects) . Printing.card) ps
+    -- Guards against a vacuous sweep: Nexus of Fate is the card that prints a
+    -- zone-change rider at all.
+    Spec.assertBool s (any (anyFace (any hasZoneChangeRider . cardReplacementEffects) . Printing.card) ps) "the pool has a card printing a CR 701.20 or CR 701.24 rider on a redirect"
+    Spec.assertEqWith s "and every shuffle among them lands in a library" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The rejecting direction, proven against Nexus of Fate rather than a card
+  -- file, exactly as the pair above is.
+  Spec.it s "the lint itself catches a shuffle rider on a redirect into another zone" $ do
+    nexus <- S.printingOf s registry "Nexus of Fate"
+    let printed = cardReplacementEffects (S.combinedFace nexus)
+        toExile replacement = case replacement of
+          ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern _ revealing shuffling) -> ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern Zone.Exile revealing shuffling)
+          other -> other
+    Spec.assertBool s (any hasZoneChangeRider printed) "setup: the Nexus prints both riders to move"
+    Spec.assertBool s (not (any shufflingOutsideLibraryOffends printed)) "the real Nexus shuffles into a library"
+    Spec.assertBool s (any (shufflingOutsideLibraryOffends . toExile) printed) "and the same rider on a redirect to exile is rejected"
   -- The same shape one axis over, and the thing that makes
   -- Pawl.Engine.PlayerEffect.unpreventable's board fold EXACT rather than
   -- approximate. See unpreventableScopeOffends.

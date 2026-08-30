@@ -39,7 +39,6 @@ import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.MoveDuration as MoveDuration
-import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.OutsideTheGame as OutsideTheGame
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
@@ -750,7 +749,7 @@ conditionSlots condition = case condition of
 -- slotsAreExhaustive's Replace arm.
 replacementPatternSlots :: ReplacementEffect.ReplacementEffect (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Map.Map SlotName SlotArity
 replacementPatternSlots re = case re of
-  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _) -> filterSlotsOf (ZoneChangePattern.whatObject pat)
+  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _ _ _) -> filterSlotsOf (ZoneChangePattern.whatObject pat)
   ReplacementEffect.EntryR (EntryR.MkEntryR pat _) -> filterSlotsOf pat
   ReplacementEffect.DamageR (DamageR.MkDamageR pat rewrite _) ->
     joinTwo
@@ -4853,7 +4852,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.forM_ targets $ \target -> Monad.void (Event.changeZoneReturning target Zone.Library)
     -- APNAP (CR 608.2f), which is what makes the ORDER of the Prompt.Shuffle calls
     -- a fact about the rules rather than about PlayerId's Ord.
-    Monad.forM_ (filter (`Set.member` owners) (Game.apnapOrder gs)) Mulligan.shuffleLibrary
+    Monad.forM_ (filter (`Set.member` owners) (Game.apnapOrder gs)) Event.shuffleLibrary
   -- CR 701.24a alone: randomize the named libraries so no player knows their
   -- order. Nothing moves, so there is no changeZone call and no CR 616.1
   -- opportunity -- the cards a "then shuffle" follows are still the objects they
@@ -4866,7 +4865,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Shuffle ref -> do
     gs <- State.get
     let named = Set.fromList (playerRefPlayers legal controller gs ref)
-    Monad.forM_ (filter (`Set.member` named) (Game.apnapOrder gs)) Mulligan.shuffleLibrary
+    Monad.forM_ (filter (`Set.member` named) (Game.apnapOrder gs)) Event.shuffleLibrary
   Effect.OfferCast (OfferCast.MkOfferCast slot caster optionality offer) -> do
     gs <- State.get
     -- CR 608.2g names "a player", and a reference resolving to nobody offers the
