@@ -3558,6 +3558,17 @@ chooseNewTargetsFor controller copyId = do
           -- announced X (Stir the Grave) is answered off the SAME number the
           -- original was, because CR 707.10c changes targets and nothing else.
           --
+          -- A REGRESSION FENCE rather than a proven line, and the honest reason is
+          -- that the announced X reaches the bound a second way: Quantity.InSlot
+          -- asks the object the evaluation names before it asks the context, and
+          -- for a copy that object IS the announcement's holder. So the behaviour
+          -- Pawl.CopySpec's stirCopySpec proves stands with this seed empty too,
+          -- and what the seed adds is every OTHER slot atom -- Filter's
+          -- SameNameAsBound and IsBound, a GraveyardScope.InSlot pool -- reading a
+          -- binding of the copy's that is not one of the re-chosen slots. Nothing
+          -- drives that half: stirCopySpec is the only case that copies a spell
+          -- whose slot reads the announcement at all, and its slot reads the X.
+          --
           -- The slots being re-chosen are dropped from it. They are not decisions
           -- the copy keeps -- this call is choosing them -- so a sibling read must
           -- not be answered off the target it is about to replace, and CR 601.2c's

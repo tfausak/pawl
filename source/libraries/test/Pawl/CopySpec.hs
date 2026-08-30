@@ -1381,13 +1381,21 @@ announcing x recipient p = case p of
 -- that same announcement, which is what Resolve.chooseNewTargetsFor seeds from
 -- Object.bindings.
 --
--- One graveyard, four cards, THREE readings of it. alice announces X = 2 and
--- names the Piker; the copy is then offered the Evangel (the other mana value 2
--- creature card) and nothing else -- a seed that never reached the bound offers
--- NOTHING, which elides CR 707.10c's prompt altogether and leaves the copy on the
--- Piker, and a bound that had stopped narrowing offers the mana value 3 and 4
--- cards too. The pair below differs in exactly one thing: which recipient the
--- copy's prompt is pinned to.
+-- One graveyard, four cards. alice announces X = 2 and names the Piker; the copy
+-- is then offered the Evangel (the other mana value 2 creature card) and nothing
+-- else. The pair below differs in exactly one thing -- which recipient the copy's
+-- prompt is pinned to -- and between them they fix the number at 2: the Evangel
+-- is reachable, the mana value 3 card is not, and a bound left unanswered would
+-- have admitted neither and elided CR 707.10c's prompt altogether.
+--
+-- THE NUMBER HAS TWO ROADS HERE, and each is sufficient on its own, so neither
+-- has a mutation of its own: Quantity.InSlot asks the object the evaluation names
+-- BEFORE the context (Quantity.evaluateAgainst's `boundOn announcedOn`), and the
+-- copy is that object and already carries the announcement CR 707.10 copied,
+-- while Resolve.chooseNewTargetsFor also seeds those bindings into
+-- Filter.boundAmounts. Neutralizing either alone leaves this group green;
+-- widening Filter's ManaValueAtMostAmount arm reddens the second case, which is
+-- what makes this a proof of the BOUND rather than of either road.
 stirCopySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 stirCopySpec s registry =
   let boardOf = do
@@ -1422,21 +1430,24 @@ stirCopySpec s registry =
                   Spec.assertEqWith s "the mana value 3 card stayed in the graveyard" (S.countOnBattlefieldByName (cardNamed "Kalakscion, Hunger Tyrant") S.alice after) 0
                   Spec.assertEqWith s "and everything resolved" (length (GameState.stack after)) 0
             _ -> Spec.assertFailure s "fixture should stock alice's graveyard with four cards"
-        -- The same board, the same announcement, one recipient different: mana
-        -- value 4 is outside an announced 2, so it is never offered, the answer
-        -- names a recipient it was not shown, and reject-not-repair leaves the
-        -- copy on the Piker. A seed that had widened the bound instead of
-        -- reaching it reads this as the Wolves arriving.
+        -- The same board, the same announcement, one recipient different: the
+        -- mana value 3 card is the FIRST one an announced 2 excludes, so pinning
+        -- the copy there is what fixes the number at 2 rather than at any bound
+        -- the Evangel also satisfies. It is never offered, the answer names a
+        -- recipient it was not shown, and reject-not-repair leaves the copy on the
+        -- Piker. A bound that had stopped narrowing reads this as the Tyrant
+        -- arriving.
         Spec.it s "CR 707.10c a card the copied X does not reach is not offered" $ do
           (stirId, twincastId, ids, board) <- boardOf
           case ids of
-            [pikerId, _, _, wolvesId] ->
-              case play (Recipient.ToObject wolvesId) pikerId stirId twincastId board of
+            [pikerId, _, tyrantId, _] ->
+              case play (Recipient.ToObject tyrantId) pikerId stirId twincastId board of
                 Nothing -> Spec.assertFailure s "Stir the Grave never reached the stack"
                 Just after -> do
-                  Spec.assertEqWith s "the mana value 4 creature card is still in the graveyard" (S.countOnBattlefieldByName (cardNamed "Russet Wolves") S.alice after) 0
+                  Spec.assertEqWith s "the mana value 3 creature card is still in the graveyard" (S.countOnBattlefieldByName (cardNamed "Kalakscion, Hunger Tyrant") S.alice after) 0
+                  Spec.assertEqWith s "nor did the mana value 4 one move" (S.countOnBattlefieldByName (cardNamed "Russet Wolves") S.alice after) 0
                   Spec.assertEqWith s "the copy kept the Piker, which the original had also named, so it came back once" (S.countOnBattlefieldByName (cardNamed "Goblin Piker") S.alice after) 1
-                  Spec.assertEqWith s "no other graveyard card came back" (S.countOnBattlefieldByName (cardNamed "Cabal Evangel") S.alice after) 0
+                  Spec.assertEqWith s "and no other graveyard card came back" (S.countOnBattlefieldByName (cardNamed "Cabal Evangel") S.alice after) 0
                   Spec.assertEqWith s "and everything resolved" (length (GameState.stack after)) 0
             _ -> Spec.assertFailure s "fixture should stock alice's graveyard with four cards"
 
