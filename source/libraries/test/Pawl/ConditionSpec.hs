@@ -202,9 +202,17 @@ enteredFromSpec s registry =
   let cast pid oid gs = S.runPure S.identityAnswer gs (S.cast pid oid)
       resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
       settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
-      -- Cast it, resolve it, let CR 603.3 place whatever it triggered, resolve
-      -- that too. The second resolveTop is what runs the Vessel's ability.
-      play pid oid gs = resolveTop (settle (resolveTop (cast pid oid gs)))
+      -- Cast it and drain the stack, settling before each resolution so CR 603.3
+      -- has placed whatever the last one triggered. Draining rather than
+      -- resolving twice is what lets the DEMON COUNT answer: two Vessels
+      -- triggering leave two abilities on the stack, and a single resolveTop
+      -- would run one of them and read the same one token either way.
+      drain n gs =
+        let settled = settle gs
+         in if n <= (0 :: Int) || null (GameState.stack settled)
+              then settled
+              else drain (n - 1) (resolveTop settled)
+      play pid oid gs = drain 8 (cast pid oid gs)
       ownerOf oid gs = fmap Object.owner (Map.lookup oid (GameState.objects gs))
       vesselsOwnedBy pid vessel gs =
         [ oid
@@ -248,7 +256,7 @@ enteredFromSpec s registry =
           will <- S.printingOf s registry "Yawgmoth's Will"
           let (start, willId) = S.handOne will (S.landsInPlay swamp 4)
               (vesselId, staged) = S.addGraveyardCard vessel S.alice start
-              permitted = resolveTop (cast S.alice willId staged)
+              permitted = drain 8 (cast S.alice willId staged)
               after = play S.alice vesselId permitted
           Spec.assertBool s (S.castable S.alice vesselId permitted) "Yawgmoth's Will made the Vessel castable from the graveyard"
           oneDemon after
@@ -259,7 +267,7 @@ enteredFromSpec s registry =
           will <- S.printingOf s registry "Yawgmoth's Will"
           let (start, willId) = S.handOne will (S.landsInPlay swamp 4)
               (vesselId, staged) = S.addHandCard vessel S.alice start
-              permitted = resolveTop (cast S.alice willId staged)
+              permitted = drain 8 (cast S.alice willId staged)
               after = play S.alice vesselId permitted
           Spec.assertEqWith s "CR 603.4 the clause is false, so no Demon" (length (S.tokensOf after)) 0
           Spec.assertEqWith s "and the Vessel stayed on the battlefield" (length (vesselsOwnedBy S.alice vessel after)) 1

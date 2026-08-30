@@ -543,6 +543,15 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- re-check both inject Projection.viewWithLastKnownAnywhere so CR 608.2h still
   -- answers. A view that cannot describe the object at all is Nothing, which
   -- Condition.holds collapses to False.
+  --
+  -- CR 603.4's SECOND check is a regression fence rather than a proved behaviour.
+  -- Both arms answer off the log, so an entrant that has since left reads the
+  -- same fact at either check -- but nothing observes that: the clause is printed
+  -- on two cards (Scryfall o:"if it entered from", 2026-08-30 -- Archfiend's
+  -- Vessel and Prized Amalgam), only the first is in data/cards/, and a Vessel
+  -- that left the battlefield fails CR 603.6's find and makes no Demon whichever
+  -- way the re-check went. Prized Amalgam is what would refute it, its payload
+  -- naming the source rather than the entrant; it waits on #2500.
   Quantity.EnteredFrom inZone -> do
     oid <- mOid
     pids <- playersOf (InZone.player inZone)
