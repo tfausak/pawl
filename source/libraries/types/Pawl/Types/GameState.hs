@@ -417,7 +417,7 @@ data GameState = MkGameState
     unregeneratables :: [ActiveUnregeneratable.ActiveUnregeneratable],
     -- | CR 509.1b / 611.1: stored BLOCKING RESTRICTIONS from resolutions (Zirda,
     -- the Dawnwaker), each with an expiry the Pawl.Engine.Expiry sweeps consult.
-    -- Read at Pawl.Engine.CombatRestriction.prohibited, which unions them into
+    -- Read at Pawl.Engine.CombatRestriction.blockProhibited, which unions them into
     -- that module's `cantBlock`. A permanent's printed restrictions are NOT here
     -- -- Pawl.Engine.CombatRestriction.inForce re-derives those live off the
     -- battlefield.
