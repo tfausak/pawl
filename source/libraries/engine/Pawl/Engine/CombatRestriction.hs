@@ -59,8 +59,8 @@ cantAttack :: [ObjectId] -> GameState -> Set ObjectId
 cantAttack candidates gs = Set.union (restricted attacking candidates gs) (detained candidates gs)
 
 -- CR 509.1b: which of `candidates` an effect in force right now says CAN'T
--- BLOCK. Pacifism's second half, Blind-Spot Giant's when its gate is shut, and CR
--- 701.35a's second clause.
+-- BLOCK. Pacifism's second half, Blind-Spot Giant's when its gate is shut, CR
+-- 701.35a's second clause, and Zirda, the Dawnwaker's stored restriction.
 cantBlock :: [ObjectId] -> GameState -> Set ObjectId
 cantBlock candidates gs =
   Set.unions
@@ -78,9 +78,9 @@ cantBlock candidates gs =
 -- it opts out of the liveness checks, the CR 612.1 word swap and the CR 305.7 /
 -- CR 613.1f ability gates that every printed row passes -- and it names no
 -- Pawl.Types.Affected either, because the ref was read once at resolution and
--- Pawl.Engine.Resolve stored the ids it named. The extra reason is the "unless":
--- CR 509.1b's second clause is a property of PRINTED text, and a resolution
--- states its restriction flat, so there is no gate to ask.
+-- Pawl.Engine.Resolve stored the ids it named. The extra reason is CR 509.1b's
+-- "unless": every gate in the pool is printed beside the restriction it gates,
+-- and Pawl.Types.ForbidBlock states none, so there is nothing here to ask.
 --
 -- Outside the layer system, which is CR 613.11 -- a restriction on a declaration
 -- modifies the rules rather than an object's characteristics, so no

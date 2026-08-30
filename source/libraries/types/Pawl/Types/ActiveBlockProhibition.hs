@@ -30,9 +30,8 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- cannot conflict -- CR 509.1b has no degrees.
 --
 -- No `controller`, where ActivePlayerEffect stores one: the restriction names no
--- player, so CR 109.5's "you" is never asked of it. Its "unless" gate is absent
--- for the same reason the printed carrier has none -- a resolution's restriction
--- is stated flat, and CR 508.1c's second clause is a property of printed text.
+-- player, so CR 109.5's "you" is never asked of it, and no CR 509.1b "unless"
+-- gate, because Pawl.Types.ForbidBlock states none for it to carry.
 --
 -- Runtime-only: card data writes the printed carrier, never one of these. It
 -- does have a codec (Pawl.Codec.ActiveBlockProhibition), because a game in
