@@ -7605,9 +7605,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- bound, so the pair differs in the slot name alone.
     Spec.assertBool s (clashesIn [destruction] [TriggerCondition.PermanentDies (Filter.Type.IsControllerOfBound destroyedSlot)]) "a singular read inside a delayed condition's filter is caught"
     Spec.assertBool s (not (clashesIn [destruction] [TriggerCondition.PermanentDies (Filter.Type.IsControllerOfBound elsewhereSlot)])) "a singular read inside a delayed condition's filter of another slot is left alone"
-    -- The reading side's fourth carrier: a PlayerRef an opcode holds, where CR
-    -- 608.2h's ControllerOfBound names an OBJECT slot and reads it through
-    -- Resolve.playerRefPlayers' legalOne. Three boards differing in one thing
+    -- The PlayerRef carrier, where CR 608.2h's ControllerOfBound names an OBJECT
+    -- slot and reads it through Resolve.playerRefPlayers' legalOne. Three boards
+    -- differing in one thing
     -- each -- the ARM against the group-tolerant PlayerRef.EachInSlot, which is
     -- what proves the walk reads Resolve.playerRefSlots' arity rather than
     -- reporting every slot a reference names, and the SLOT against a name the
