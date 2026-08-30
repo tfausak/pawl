@@ -985,6 +985,12 @@ milledIt oid event = case event of
 -- 608.2h's record of one, and only the caller knows how deep the fold it stands
 -- in has got. `peers` must be a bounded reader -- a full projection taken here
 -- re-enters gather, whose CR 604.2 gate is object-independent, and loops.
+--
+-- A FENCE the compiler cannot keep: filterReadsPeers enumerates the fields filled
+-- through `peers` below, so filling a new one -- or repointing an existing one at
+-- `peers` -- means giving the atom that reads it a True arm there. Nothing warns
+-- if you do not; CR 613.8a's cheap arm in projectDeciding would just start
+-- skipping real dependencies.
 viewOfCharacteristics :: Count.ViewOf -> ObjectId -> ProjectedCharacteristics -> Maybe PlayerId.PlayerId -> Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> GameState -> Filter.View
 viewOfCharacteristics peers oid pc controller counters gs =
   Filter.MkView
