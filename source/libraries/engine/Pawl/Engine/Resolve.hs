@@ -411,9 +411,10 @@ objectRefSlots ref = case ref of
   ObjectRef.ChosenPermanent _ -> Map.empty
 
 -- The Quantities an ObjectRef carries: the two library walks' counts.
--- Exhaustive, no wildcard: slotsAreExhaustive, readsX and Pawl.CardSpec's Count traversal all
--- reach a nested Quantity through this, and their own ObjectRef-taking arms are
--- written `{}` and answer a constant.
+-- Exhaustive, no wildcard: slotsAreExhaustive, readsX and Pawl.CardSpec's Count
+-- traversal all reach a nested Quantity through this, and their own arms
+-- name the ref rather than writing `{}` -- which is what a widened field needs,
+-- since `{}` keeps compiling when a SlotName becomes an ObjectRef (#2729).
 objectRefQuantities :: ObjectRef -> [Quantity.Type.Quantity]
 objectRefQuantities ref = case ref of
   ObjectRef.InSlot _ -> []
@@ -856,8 +857,8 @@ filterSlotsOf = Map.fromSet (const SlotArity.One) . Filter.boundSlots
 -- reads the trigger-source slot, which is not a target.
 --
 -- No wildcard: a new opcode must answer here as well as in slotsOf. The `{}` arms
--- answer a constant, so a new FIELD on one is not forced -- hence the four
--- ObjectRef-taking opcodes routed through objectRefQuantities.
+-- answer a constant, so a new FIELD on one is not forced -- hence every
+-- ObjectRef-taking opcode is routed through objectRefQuantities by hand.
 slotsAreExhaustive :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 slotsAreExhaustive effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> all (\part -> all Quantity.slotsAreExhaustive (DamagePart.quantity part : objectRefQuantities (DamagePart.ref part))) parts
@@ -940,7 +941,11 @@ slotsAreExhaustive effect = case effect of
   -- No Quantity at all: CR 122.8 names neither a kind nor a count.
   Effect.PutCountersFrom {} -> True
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
-  Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> all Quantity.slotsAreExhaustive (MovedKinds.quantityOf kinds)
+  -- BOTH Quantity positions: the count the moved kinds may write, and the one a
+  -- library walk in the GIVER carries -- `from` became an ObjectRef when CR
+  -- 122.5's first side was widened to a group, and an arm reading the kinds
+  -- alone kept compiling (#2729).
+  Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds _ _) -> all Quantity.slotsAreExhaustive (objectRefQuantities from <> Maybe.maybeToList (MovedKinds.quantityOf kinds))
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.PayAnyEnergy _ -> True
@@ -1013,8 +1018,8 @@ slotsAreExhaustive effect = case effect of
   Effect.Shuffle {} -> True
   Effect.OfferCast {} -> True
   Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant)
-  -- PreventNextDamage's answer for the body, plus the fourth ObjectRef-taking
-  -- opcode's ref: a PlayerRef nested in the DEPTH is one slotsOf cannot see.
+  -- PreventNextDamage's answer for the body, plus its own ref's: a PlayerRef
+  -- nested in the DEPTH is one slotsOf cannot see.
   Effect.ForEach (ForEach.MkForEach ref _ body) -> all Quantity.slotsAreExhaustive (objectRefQuantities ref) && all slotsAreExhaustive body
 
 -- CR 611.2b: only ForAsLongAs reads anything, through its Condition.
@@ -1044,8 +1049,9 @@ conditionSlotsAreExhaustive condition = case condition of
 --
 -- NOTE: when an opcode gains a Quantity FIELD, add its arm here by hand. A new
 -- OPCODE the compiler forces, this case being exhaustive; widening an existing
--- one it does not, since an arm written `{} -> False` keeps compiling. The four
--- ObjectRef-taking opcodes route through objectRefQuantities for that reason.
+-- one it does not, since an arm written `{} -> False` keeps compiling. Every
+-- ObjectRef-taking opcode routes through objectRefQuantities for that reason,
+-- and one of them was widened without its arm being revisited (#2729).
 readsX :: [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Bool
 readsX = any effectReadsX
   where
@@ -1115,7 +1121,7 @@ readsX = any effectReadsX
       Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
       Effect.PutCountersFrom {} -> False
       Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.readsX quantity
-      Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> any Quantity.readsX (MovedKinds.quantityOf kinds)
+      Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds _ _) -> any Quantity.readsX (objectRefQuantities from <> Maybe.maybeToList (MovedKinds.quantityOf kinds))
       Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
       Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
       -- CR 107.14's amount is asked for as the spell resolves, never CR
