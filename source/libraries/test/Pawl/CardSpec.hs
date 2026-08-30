@@ -4653,6 +4653,25 @@ grantedModifications card =
           else modifications <> deeper (storedIn (effectsOf modifications))
    in deeper (printed <> storedIn (printedCarrierEffects card))
 
+-- The enchant slots this face GRANTS rather than prints: CR 613.1f layer 6's
+-- Modification.GainEnchant, which Cloudform and the Licids write and CR 702.103b's
+-- bestow grants from the engine. Indexed off grantedModifications above, so both
+-- roads to a modification are covered -- a printed static ability's and the ones
+-- Effect.ModifyTarget stores, which is the road both cards take.
+grantedEnchantSlots :: Face.Face Card.Type.Card -> [TargetSlot.TargetSlot]
+grantedEnchantSlots card =
+  [ slot
+  | Modification.GainEnchant slot <- grantedModifications card
+  ]
+
+-- Every enchant slot a face declares, by either road. Pawl.Engine.Projection
+-- seeds ProjectedCharacteristics.enchant from Face.enchant and appends the grants
+-- to it, and Pawl.Engine.Card.foldEnchant conjoins the result into the one slot CR
+-- 601.2c answers -- so a lint reading only the printed half judges only half the
+-- text that reaches that slot.
+enchantSlots :: Face.Face Card.Type.Card -> [TargetSlot.TargetSlot]
+enchantSlots card = Face.enchant card <> grantedEnchantSlots card
+
 triggeredAbilityFilters :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 triggeredAbilityFilters ability =
   unframed (triggerConditionFilters (TriggeredAbility.condition ability))
@@ -5213,19 +5232,27 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- say. What it fences is a pool, filter or CR 202.3 computed bound naming a
   -- slot: it would compile, pass every lint here, and then be judged in
   -- Target.slotContext against whatever the announcement happened to seed.
-  Spec.it s "an Aura's enchant slot reads no slot" $ do
+  --
+  -- BOTH roads to that slot, printed and granted (enchantSlots), and the granted
+  -- one owes the claim even harder: CR 613.1f hands the ability to the RECEIVER,
+  -- so what answers the slot is the receiver's own announcement
+  -- (Card.modesTargetSlotsGiven) or CR 303.4f's on-entry choice, and the granting
+  -- card cannot name a slot in either. Declaring the name in the granting mode
+  -- would not rescue it, which is why this is a "reads nothing" claim rather than
+  -- a fold into Resolve.slotsOf's ModifyTarget arm.
+  Spec.it s "an enchant slot reads no slot, printed or granted" $ do
     ps <- S.allPrintings s
-    let reads_ face = Set.unions (fmap (Map.keysSet . Resolve.targetSlotSlots) (Face.enchant face))
+    let reads_ face = Set.unions (fmap (Map.keysSet . Resolve.targetSlotSlots) (enchantSlots face))
         offenders = filter (anyFace (not . Set.null . reads_) . Printing.card) ps
-    -- The guard, because a pool with no enchant slot at all would pass saying
-    -- nothing.
-    Spec.assertBool
-      s
-      (any (anyFace (not . null . Face.enchant) . Printing.card) ps)
-      "the pool prints an enchant slot"
+        prints field = any (anyFace (not . null . field) . Printing.card) ps
+    -- One guard per road, because a pool with no enchant slot at all would pass
+    -- saying nothing -- and a pool that only PRINTS them would say nothing about
+    -- the granted half.
+    Spec.assertBool s (prints Face.enchant) "the pool prints an enchant slot"
+    Spec.assertBool s (prints grantedEnchantSlots) "the pool grants an enchant slot"
     Spec.assertEqWith s "no enchant slot names a slot" (fmap (S.nameOf . Printing.card) offenders) []
-  -- The REJECTING direction, against a printed Aura restated rather than a card
-  -- file, as the hand-action lint below does it. Filter.IsBound is the atom, since
+  -- The REJECTING direction, against printed Auras restated rather than card
+  -- files, as the hand-action lint below does it. Filter.IsBound is the atom, since
   -- Filter.boundSlots is one of the three folds targetSlotSlots joins.
   Spec.it s "the lint itself catches an enchant slot naming a slot" $ do
     pacifism <- S.printingOf s registry "Pacifism"
@@ -5235,6 +5262,22 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         reads_ slots = Set.unions (fmap (Map.keysSet . Resolve.targetSlotSlots) slots)
     Spec.assertEqWith s "the real Pacifism's enchant slot reads nothing" (reads_ (Face.enchant face)) Set.empty
     Spec.assertEqWith s "a filter naming a slot is reported" (reads_ named) (Set.singleton stray)
+  -- And the same rejection on the GRANTED road, which is a separate case because
+  -- it is a separate reader: Gliding Licid prints no enchant ability at all and
+  -- writes CR 613.1f's grant from an activated ability's Effect.ModifyTarget, so
+  -- the slot arrives through grantedModifications and nothing else.
+  Spec.it s "the lint itself catches a granted enchant slot naming a slot" $ do
+    licid <- S.printingOf s registry "Gliding Licid"
+    let face = S.combinedFace licid
+        stray = SlotName.MkSlotName (Text.pack "stray")
+        named = fmap (\slot -> slot {TargetSlot.filter = Just (Filter.Type.IsBound stray)}) (enchantSlots face)
+        reads_ slots = Set.unions (fmap (Map.keysSet . Resolve.targetSlotSlots) slots)
+    -- FIRST, because it is the whole of what this case proves: drop the granted
+    -- road from enchantSlots and there is no slot left to plant a filter on, so
+    -- this reads Set.empty. The two below are preconditions on the fixture.
+    Spec.assertEqWith s "a granted enchant slot naming a slot is reported" (reads_ named) (Set.singleton stray)
+    Spec.assertEqWith s "Gliding Licid prints no enchant ability" (Face.enchant face) []
+    Spec.assertEqWith s "the real granted slot reads nothing" (reads_ (enchantSlots face)) Set.empty
   -- The same equality over the two PREGAME windows, which the sweep above does not
   -- reach: Card.allEffects is the spell's modes, and CR 103.5b's and CR 103.6's
   -- actions hang off Pawl.Types.Face beside it. See handActionSlotsOffend for why
