@@ -4283,10 +4283,10 @@ rewatch oldId newId row = case ActiveReplacement.effect row of
 -- battlefield, it finds both cards ... if that effect causes actions to be taken
 -- upon those cards, the same actions are taken upon each of them". Following an
 -- object across the zone change is finding what it became, so a CR 712.21a
--- arrangement's trailing card is named as well as its leading one. That is the
--- one place this parts company with carryOver beside it, which names the head
--- alone because CR 400.7a's exception is about the permanent a SPELL becomes and
--- a spell melds into nothing. Pawl.MeldSpec's Pearl Collector case is the proof.
+-- arrangement's trailing card is named as well as its leading one. That is a
+-- THIRD difference from carryOver beside it, which names the head alone because
+-- CR 400.7a's exception is about the permanent a SPELL becomes and a spell melds
+-- into nothing. Pawl.MeldSpec's Pearl Collector case is the proof.
 perpetuate :: ObjectId -> Seq.Seq ObjectId -> Game ()
 perpetuate oldId newIds =
   State.modify' $ \gs ->
@@ -4300,11 +4300,13 @@ perpetuate oldId newIds =
         then reanchor oldId arrivals eff
         else eff
 
--- carryOver's per-effect half: swap oldId for the arriving ids in a locked
--- affected set that names it, and leave every other effect alone. A SET of new
--- ids rather than one, because CR 712.21's split makes a single departure into
--- two arrivals; carryOver passes a singleton, since the road it gates is the one
--- a melded permanent cannot take.
+-- carryOver's and perpetuate's per-effect half: swap oldId for the arriving ids
+-- in a locked affected set that names it, and leave every other effect alone. A
+-- SET of new ids rather than one, because CR 712.21's split makes a single
+-- departure into two arrivals; carryOver passes a singleton, since the road it
+-- gates is the one a melded permanent cannot take -- CR 712.21's own condition is
+-- a departure FROM the battlefield, and carryOver runs only for an arrival ONTO
+-- it.
 reanchor :: ObjectId -> Set ObjectId -> ContinuousEffect.ContinuousEffect Card -> ContinuousEffect.ContinuousEffect Card
 reanchor oldId newIds eff = case ContinuousEffect.affected eff of
   Affected.TheseObjects oids

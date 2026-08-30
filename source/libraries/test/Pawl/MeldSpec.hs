@@ -633,7 +633,10 @@ spec s registry = Spec.describe s "Meld" $ do
   -- leaves the Garrison trailing. The Garrison is also the only half that can
   -- observe lifelink, since CR 702.15b pays off damage its source deals and the
   -- Battlements is a land. [0, 1] is the leading-card control beside it, and the
-  -- two boards differ in nothing else.
+  -- two boards differ in nothing else. That the arrangement is honoured AT ALL is
+  -- the CR 712.21a library case below, which reads two different cards back off
+  -- the same two permutations; what this case adds is that the perpetual effect
+  -- reaches whichever card the arrangement left second.
   --
   -- The damage is built through Pawl.Engine.Damage.damageEvent rather than driven
   -- through a combat step, which is the narrowest path that shows it: that
