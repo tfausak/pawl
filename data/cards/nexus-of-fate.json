@@ -41,7 +41,9 @@
                 "whenDestination": {
                   "type": "Graveyard"
                 }
-              }
+              },
+              "revealing": true,
+              "shuffling": true
             }
           },
           "functionsFrom": [

@@ -27,6 +27,8 @@ effect =
             ZoneChangePattern.whoseObject = ControllerRelation.Anyones
           }
         Zone.Exile
+        False
+        False
     )
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()

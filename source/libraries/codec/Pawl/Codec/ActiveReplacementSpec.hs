@@ -41,6 +41,8 @@ effect =
             ZoneChangePattern.whoseObject = ControllerRelation.Anyones
           }
         Zone.Exile
+        False
+        False
     )
 
 effectJson :: String
