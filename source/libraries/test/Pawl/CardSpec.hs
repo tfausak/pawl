@@ -6813,18 +6813,18 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ]
       )
       "a singular read of a plurally bound slot is caught"
-    -- The reader OfferCast is not, against the binder MoveToZone is not: the
-    -- enumeration above is the lint, so a slot only OfferCast could name would
-    -- leave every other one-object instruction unfenced. Paired with the board
-    -- below, which differs in the slot name alone, so the catch is the
-    -- intersection rather than `clashes` answering True for anything.
+    -- Neither OfferCast nor MoveToZone is the only half. The enumeration above IS
+    -- the lint, so a fence only OfferCast's slot could trip would leave every
+    -- other one-object instruction open. Paired with the board below, which
+    -- differs in the slot name alone, so what catches is the intersection rather
+    -- than `clashes` answering True for any two effects.
     Spec.assertBool s (clashes [destruction, removal destroyedSlot]) "a singular read outside OfferCast is caught"
     Spec.assertBool s (not (clashes [destruction, removal elsewhereSlot])) "a singular read of another slot is left alone"
-    -- The other funnel, slotOne, on the same board: ExileHaunting's haunting card
-    -- is read through it rather than through legalOne. Paired with AttachBound,
-    -- whose FIRST slot is the group-tolerant one -- objectRefObjects attaches
-    -- every member (CR 712.21c) -- so the two opcodes take the same pair of slot
-    -- names and only the second is an offender.
+    -- The other funnel on the same board: ExileHaunting's haunting card is read
+    -- through slotOne rather than through legalOne. Paired with AttachBound,
+    -- which takes the same two slot names and is NOT an offender -- its first
+    -- slot goes through objectRefObjects, which attaches every member of a group
+    -- (CR 712.21c).
     Spec.assertBool s (clashes [destruction, Effect.ExileHaunting (ExileHaunting.MkExileHaunting destroyedSlot elsewhereSlot)]) "a slotOne read of a plurally bound slot is caught"
     Spec.assertBool s (not (clashes [destruction, Effect.AttachBound (AttachBound.MkAttachBound destroyedSlot elsewhereSlot)])) "a group-tolerant read of a plurally bound slot is left alone"
     Spec.assertEqWith s "a group binding is invisible to a singular reader" (fmap (S.nameOf . Printing.card) offenders) []
