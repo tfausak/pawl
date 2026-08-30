@@ -49,9 +49,9 @@ import qualified Pawl.Types.Quantity as Quantity
 -- not on Goldberry" (her first -- 'EachAbsentKind') or "up to one counter from
 -- each permanent" (Takesies, a per-source cap across a batch that no arm states,
 -- gap #2709), and NONE of them prints a count above one -- Takesies' "up to one"
--- is a cap per source, not a tally. A printing saying "move two
--- counters", where the player could take one +1\/+1 counter and one shield
--- counter, would refute that.
+-- is a cap per source, not a tally. A printing saying "move two counters", where
+-- the player could take one +1\/+1 counter and one shield counter, would refute
+-- that.
 --
 -- @include_extras@ is what makes that run every printing rather than most of
 -- one, and it is the parameter every sweep in this neighbourhood needs: without
