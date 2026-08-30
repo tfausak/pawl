@@ -1808,22 +1808,22 @@ wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $
   -- be drawn because there are no cards in the affected player's library". The
   -- funnel therefore proposes the event BEFORE it looks at the library, and a
   -- player whose library is empty gains the life instead of attempting the draw
-  -- CR 104.3c would kill her for.
+  -- CR 121.4 and CR 704.5b would kill her for.
   Spec.it s "CR 614.11 an empty library still gets the life, and no failed draw is recorded" $ do
     plains <- S.printingOf s registry "Plains"
     wordsOfWorship <- S.printingOf s registry "Words of Worship"
     let (armed, _) = emptyLibraryBoard plains wordsOfWorship True
         after = S.runPure S.identityAnswer armed (Event.drawCard S.alice)
     Spec.assertEqWith s "CR 614.11 the row applied off an empty library" (S.lifeOf S.alice after) (Just 25)
-    Spec.assertBool s (not (Set.member S.alice (GameState.drewFromEmpty after))) "CR 104.3c no draw was attempted, so nothing is owed"
+    Spec.assertBool s (not (Set.member S.alice (GameState.drewFromEmpty after))) "CR 121.4 no draw was attempted, so nothing is owed"
   -- The CONTROL for the case above, on the same empty library.
-  Spec.it s "CR 104.3c with no row the same empty library records the failed draw" $ do
+  Spec.it s "CR 121.4 with no row the same empty library records the failed draw" $ do
     plains <- S.printingOf s registry "Plains"
     wordsOfWorship <- S.printingOf s registry "Words of Worship"
     let (unarmed, _) = emptyLibraryBoard plains wordsOfWorship False
         after = S.runPure S.identityAnswer unarmed (Event.drawCard S.alice)
     Spec.assertEqWith s "she gained nothing" (S.lifeOf S.alice after) (Just 20)
-    Spec.assertBool s (Set.member S.alice (GameState.drewFromEmpty after)) "CR 104.3c and the failed draw is on the books"
+    Spec.assertBool s (Set.member S.alice (GameState.drewFromEmpty after)) "CR 704.5b and the failed draw is on the books"
   -- CR 109.5's "you": the pattern is ControllerRelation.Yours, so bob's draw is
   -- not alice's, and the row is still there afterwards.
   --

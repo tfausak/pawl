@@ -2378,7 +2378,7 @@ apply batch candidate event =
     -- looks at the library: the row applies "even if no cards could be drawn
     -- because there are no cards in the affected player's library", so a player
     -- drawing off an empty library gains the life and never attempts the draw CR
-    -- 104.3c would kill them for.
+    -- 121.4 and CR 704.5b would kill them for.
     --
     -- The life goes to the player the EVENT named, which for the producer in the
     -- pool is the same seat as CR 109.5's "you"; see Pawl.Types.DrawRewrite.
