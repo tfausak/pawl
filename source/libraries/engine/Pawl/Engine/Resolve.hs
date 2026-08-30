@@ -683,7 +683,7 @@ durationSlots duration = case duration of
 -- Its own function because a target slot is declared in TWO places and both have
 -- to be swept: on a mode (Mode.targetSlots, folded by modeSlots below) and on the
 -- FACE beside the modes, which is CR 303.4a's enchant slot (Card.enchantSlotMap).
--- Pawl.CardSpec's "an enchant slot reads no slot" sweep is the second reader.
+-- Pawl.CardSpec's "an Aura's enchant slot reads no slot" sweep is the second reader.
 targetSlotSlots :: TargetSlot.TargetSlot -> Map.Map SlotName SlotArity
 targetSlotSlots slot =
   joinSlots

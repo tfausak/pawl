@@ -5194,16 +5194,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "no dangling or unused slots" (fmap (S.nameOf . Printing.card) offenders) []
   -- The ENCHANT half, which the sweep above cannot reach: CR 303.4a's slot is
   -- declared on the FACE beside the modes (Card.enchantSlotMap), so it is in no
-  -- mode's targetSlots and Resolve.modeSlots never folds it (#2673).
+  -- mode's targetSlots and Resolve.modeSlots never folds it.
   --
-  -- A one-sided claim rather than the equality above, and the asymmetry is the
-  -- rule's: an enchant slot is not DECLARED alongside anything that could read it
-  -- back -- CR 303.4a fixes what an Aura enchants and CR 303.4e answers it through
-  -- Binding.enchantedPermanent, not through the slot map a mode compares against --
-  -- so "reads nothing" is the whole of what there is to say. What it fences is a
-  -- pool, filter or CR 202.3 computed bound naming a slot: it would compile, pass
-  -- every lint here, and then be judged in Target.slotContext against whatever the
-  -- announcement happened to seed.
+  -- A one-sided claim rather than the equality above, and the asymmetry is where
+  -- the slot is DECLARED: CR 303.4a puts it on the enchant ability, beside the
+  -- modes rather than in one, so there is no mode whose declared set it belongs to
+  -- and nothing for an equality to compare it against. What CR 601.2c answers it
+  -- with is bound under Card.enchantSlot like any other target (Pawl.Engine.Stack
+  -- reads it back from there), so "reads nothing" is the whole of what there is to
+  -- say. What it fences is a pool, filter or CR 202.3 computed bound naming a
+  -- slot: it would compile, pass every lint here, and then be judged in
+  -- Target.slotContext against whatever the announcement happened to seed.
   Spec.it s "an Aura's enchant slot reads no slot" $ do
     ps <- S.allPrintings s
     let reads_ face = Set.unions (fmap (Map.keysSet . Resolve.targetSlotSlots) (Face.enchant face))
