@@ -70,12 +70,13 @@ data TargetSlot = MkTargetSlot
     -- Pawl.CardSpec's position lint is what keeps a card from writing one into a
     -- slot that names no amount.
     --
-    -- Not implemented: a bound that reads a SLOT. Pawl.Engine.Target.slotContext
-    -- evaluates this against CR 113.7's source, which carries no announcement
-    -- binding, so such a quantity answers Nothing and the atom reading it is
-    -- vacuously False; Pawl.CardSpec's "no card's computed bound reads a slot"
-    -- rejects one and Pawl.TargetSpec's "a bound that names a slot admits nothing
-    -- at all" is the board it rests on (gap #2666).
+    -- A bound that reads a SLOT is answered off the ANNOUNCEMENT rather than off
+    -- CR 113.7's source, which carries no such binding: Pawl.Engine.Target's
+    -- slotContext hands the environment to Pawl.Engine.Quantity through
+    -- Filter.Context's boundAmounts. Venerable Warsinger's "where X is the amount
+    -- of damage this creature dealt to that player" is the printed shape, and
+    -- Pawl.TargetSpec's "CR 603.2 whole card: the bound is the damage the event
+    -- carried" is what proves it on a board.
     amount :: Maybe Quantity.Quantity
   }
   deriving (Eq, Ord, Show)

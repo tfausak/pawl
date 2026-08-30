@@ -57,6 +57,7 @@
 -- the stack.
 module Pawl.TargetSpec where
 
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -64,6 +65,7 @@ import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural.Type
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -81,6 +83,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Face as Face
@@ -92,7 +95,10 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -1789,6 +1795,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- CR 202.3's bound read off the BOARD rather than off the card, which no Filter
   -- could state before Pawl.Types.TargetSlot grew its `amount`; see #2538.
   celestineSpec s registry
+  -- The same bound read off the ANNOUNCEMENT instead: the amount CR 603.2's own
+  -- event stamped, which no board can answer.
+  warsingerSpec s registry
 
 razorfinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 razorfinSpec s registry = Spec.describe s "HasCountersOfAnyKind (CR 122.1)" $ do
@@ -1973,18 +1982,19 @@ celestineSpec s registry = Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ 
           "while the same graveyard at 4 gained offers both"
           (Target.legalRecipients (Just S.alice) S.noSource theSlot atFour)
           (Set.fromList [Recipient.ToObject pikerId, Recipient.ToObject wolvesId])
-  -- The bound a card may NOT write, and the reason Pawl.CardSpec's "no card's
-  -- computed bound reads a slot" keeps it out: a Quantity naming a SLOT. CR 601.2c
-  -- matches the slot as the ability is announced, and slotContext evaluates the
-  -- bound against CR 113.7's source -- a permanent, which carries no announcement
-  -- binding -- so Quantity.InSlot answers Nothing and the atom is vacuously False.
+  -- CR 202.3's bound read off the ANNOUNCEMENT rather than off the board: a
+  -- Quantity naming a SLOT. CR 601.2c matches the slot as the ability is
+  -- announced -- CR 603.3d importing that rule for a trigger -- and slotContext
+  -- evaluates the bound against CR 113.7's source, a permanent that carries no
+  -- announcement binding, so the answer has to come from the environment the
+  -- caller hands over (Filter.Context's boundAmounts).
   --
-  -- The pair differs in exactly one thing, the Quantity in the SAME slot on the
-  -- SAME board, and the source is a real permanent rather than S.noSource so that
-  -- the empty answer is the bound talking and not a missing object. "thatMuch" is
-  -- Pawl.Engine.Binding.eventAmount, the name a triggered ability's own CR 603.2
-  -- event stamps -- the reading a card author would reach for first.
-  Spec.it s "CR 202.3 a bound that names a slot admits nothing at all" $ do
+  -- Three boards differing in exactly one thing, the seed on the SAME slot over
+  -- the SAME graveyard: an announcement of 2, one of 4, and one binding nothing.
+  -- "thatMuch" is Pawl.Engine.Binding.eventAmount, the name a triggered ability's
+  -- own CR 603.2 event stamps -- warsingerSpec below is the printed card, driven
+  -- through combat.
+  Spec.it s "CR 603.2 a bound naming a slot reads the announcement's amount" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     wolves <- S.printingOf s registry "Russet Wolves"
     bolt <- S.printingOf s registry "Lightning Bolt"
@@ -1992,14 +2002,106 @@ celestineSpec s registry = Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ 
     case triggerTargetSlot celestine of
       Nothing -> Spec.assertFailure s "Celestine should declare one triggered ability with one target slot"
       Just theSlot -> do
-        let (pikerId, wolvesId, _, atFour) = celestineGraveyard piker wolves bolt 4
-            (sourceId, board) = S.addCreature piker S.alice atFour
+        -- No life gained, so the printed Quantity this slot replaces would admit
+        -- nothing: every offer below is the seeded amount talking.
+        let (pikerId, wolvesId, _, noGain) = celestineGraveyard piker wolves bolt 0
+            (sourceId, board) = S.addCreature piker S.alice noGain
+            name = SlotName.MkSlotName (Text.pack "target")
             slotted = theSlot {TargetSlot.amount = Just (Quantity.Type.InSlot Binding.eventAmount)}
-            legal slot = Target.legalRecipients (Just S.alice) sourceId slot board
-        Spec.assertEqWith s "a bound naming a slot admits nothing" (legal slotted) Set.empty
-        Spec.assertEqWith
-          s
-          "while the printed bound on the same slot and board offers both graveyard creatures"
-          (legal theSlot)
-          (Set.fromList [Recipient.ToObject pikerId, Recipient.ToObject wolvesId])
-        Spec.assertBool s (not (Set.member (Recipient.ToObject sourceId) (legal theSlot))) "the source itself is on the battlefield, so the graveyard pool leaves it out"
+            offer seed = Map.findWithDefault Set.empty name (Target.legalSets (Just S.alice) seed sourceId (Map.singleton name slotted) board)
+            announcing n = Map.singleton Binding.eventAmount (Binding.toAmount n)
+        Spec.assertEqWith s "an announcement of 2 reaches the mana value 2 card alone" (offer (announcing 2)) (Set.singleton (Recipient.ToObject pikerId))
+        Spec.assertEqWith s "and one of 4 reaches the mana value 4 card as well" (offer (announcing 4)) (Set.fromList [Recipient.ToObject pikerId, Recipient.ToObject wolvesId])
+        Spec.assertEqWith s "while an announcement binding no amount admits nothing" (offer Map.empty) Set.empty
+        Spec.assertBool s (not (Set.member (Recipient.ToObject sourceId) (offer (announcing 4)))) "the source itself is on the battlefield, so the graveyard pool leaves it out"
+
+-- Venerable Warsinger ({1}{R}{W} Creature -- Spirit Cleric 3/3, Oracle text
+-- verified against Scryfall): "Vigilance, trample / Whenever this creature deals
+-- combat damage to a player, you may return target creature card with mana value
+-- X or less from your graveyard to the battlefield, where X is the amount of
+-- damage this creature dealt to that player."
+--
+-- THE card the announcement-read bound was waiting for, and the one celestineSpec
+-- cannot reach: Celestine's X is a fact about the BOARD, so its slot is
+-- answerable against CR 113.7's source alone. This X is a fact about the
+-- ANNOUNCEMENT -- the amount CR 603.2's event stamped under
+-- Pawl.Engine.Binding.eventAmount -- and CR 603.3d chooses the target before the
+-- ability object on the stack carries any binding at all, so nothing on the board
+-- can answer it.
+--
+-- THREE DISTINCT READINGS of one board, so the offered set names one and rejects
+-- two. A -1/-1 counter makes the Warsinger a 2/2 before it connects, so the event
+-- carries 2 rather than the printed 3, and alice's graveyard holds a creature card
+-- at each of mana value 2, 3 and 4:
+--
+--   * the event's amount (2) admits the Piker alone -- the printed rule;
+--   * the source's printed power (3) would admit the Tyrant too;
+--   * a bound that went unanswered admits nothing, which is CR 603.3d's removal.
+--
+-- The answerer PREFERS every card the rule excludes, so a widened bound is
+-- observable as a different permanent arriving rather than as nothing happening --
+-- a Lightning Bolt UNDER every bound among them, since it is kept out by the And's
+-- other conjunct alone and a filter that had stopped narrowing by card type would
+-- otherwise be invisible (the fallback takes the smallest legal recipient, which
+-- is the Piker either way).
+--
+-- THREE SEATS, so "your graveyard" (CR 109.5's you, alice) is a different zone
+-- from the damaged player's.
+warsingerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+warsingerSpec s registry =
+  let board = do
+        warsinger <- S.printingOf s registry "Venerable Warsinger"
+        piker <- S.printingOf s registry "Goblin Piker"
+        tyrant <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
+        wolves <- S.printingOf s registry "Russet Wolves"
+        bolt <- S.printingOf s registry "Lightning Bolt"
+        let (gs0, mine, _, _) = S.threePlayerCombat [warsinger] [] []
+            (pikerId, g1) = S.addGraveyardCard piker S.alice gs0
+            (tyrantId, g2) = S.addGraveyardCard tyrant S.alice g1
+            (wolvesId, g3) = S.addGraveyardCard wolves S.alice g2
+            (boltId, g4) = S.addGraveyardCard bolt S.alice g3
+            shrunk = List.foldl' (flip (S.addCounter CounterKind.MinusOneMinusOne 1)) g4 mine
+            -- The same seam questingBeastSpec uses: the declarations run as
+            -- steps, the damage is dealt by hand, and settleForPriority places
+            -- the trigger -- so `placed` is the state with the ability on the
+            -- stack and its target already chosen.
+            atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) (warsingerPlan [tyrantId, wolvesId, boltId]) shrunk
+            fought = S.runPure (warsingerPlan [tyrantId, wolvesId, boltId]) atDamage Damage.dealCombatDamage
+            placed = S.runPure (warsingerPlan [tyrantId, wolvesId, boltId]) fought Engine.settleForPriority
+        pure (mine, pikerId, shrunk, placed, S.runPure (warsingerPlan [tyrantId, wolvesId, boltId]) placed Engine.priorityLoop)
+   in Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ do
+        -- THE proving case, at gameplay level: which card came back.
+        Spec.it s "CR 603.2 whole card: the bound is the damage the event carried" $ do
+          (mine, _, before, _, after) <- board
+          case mine of
+            [warsingerId] -> do
+              Spec.assertEqWith s "CR 202.3: the mana value 2 creature card is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
+              Spec.assertEqWith s "and the mana value 3 one the answerer preferred is not" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Kalakscion, Hunger Tyrant")) S.alice after) 0
+              Spec.assertEqWith s "nor the mana value 4 one" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Russet Wolves")) S.alice after) 0
+              Spec.assertEqWith s "nor the instant under every bound" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Lightning Bolt")) S.alice after) 0
+              -- The fixture's own preconditions, asserted rather than assumed.
+              Spec.assertEqWith s "the -1/-1 counter makes the Warsinger a 2/2 before it connects" (S.powerToughnessOf warsingerId before) (Just (2, 2))
+              Spec.assertEqWith s "CR 510.1b: bob took the Warsinger's 2" (S.lifeOf S.bob after) (Just 18)
+            _ -> Spec.assertFailure s "fixture should give alice one Warsinger"
+        -- The announcement itself, read off the placed ability rather than
+        -- inferred from what happened -- so this says what the event stamped and
+        -- what the slot ADMITTED against it.
+        Spec.it s "CR 603.3d the slot admits only the card the event's amount reaches" $ do
+          (_, pikerId, _, placed, _) <- board
+          case GameState.stack placed of
+            [abilityId] -> do
+              let bindings = maybe Map.empty Object.bindings (Game.lookupObject abilityId placed)
+              Spec.assertEqWith s "the graveyard card the event's 2 reaches is the one target chosen" (Map.lookup (SlotName.MkSlotName (Text.pack "target")) (Binding.targetsOf bindings)) (Just (Set.singleton (Recipient.ToObject pikerId)))
+              Spec.assertEqWith s "and the event stamped 2 under CR 603.2's own slot" (Binding.amountOf Binding.eventAmount bindings) (Just 2)
+            _ -> Spec.assertFailure s "fixture should place exactly one trigger"
+
+-- Attacks bob, takes the printed "may", and aims every target slot at the
+-- graveyard cards the rule EXCLUDES -- falling back to the smallest legal
+-- recipient, which is what makes a widened bound observable as a different
+-- permanent arriving.
+warsingerPlan :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+warsingerPlan bait p = case p of
+  Prompt.ChooseDefender {} -> S.bob
+  Prompt.ChooseTargets _ _ _ asked -> S.preferring (maybe False (`elem` bait) . Recipient.objectOf) asked
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.aggressiveAnswer p

@@ -57,7 +57,9 @@ data Quantity
     -- Bane of Progress' "for each permanent destroyed this way". Read from the
     -- binding environment of whichever object the evaluation is aimed at; for
     -- Pawl.Engine.Resolve, the effect's SOURCE, which is the same object the
-    -- producing effect wrote to.
+    -- producing effect wrote to -- or, for a target slot's CR 202.3 bound, off
+    -- the announcement Pawl.Engine.Filter.Context carries, there being no object
+    -- to aim at yet (CR 603.3d).
     --
     -- Named InSlot rather than Bound because PlayerRef.InSlot and
     -- ObjectRef.InSlot already spell "read the binding at this slot" that way.

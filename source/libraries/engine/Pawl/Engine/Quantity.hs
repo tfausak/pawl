@@ -118,11 +118,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- CR 208.1's other half, read off the same view and Nothing in the same places.
   Quantity.Toughness -> mView >>= Filter.toughness
   -- A value bound into the slot, read off the effect's SOURCE, then off the
-  -- object on the stack, and last out of the ambient channel. Nothing when none
-  -- of the three holds an amount: the producing effect has not run, or bound
-  -- nothing.
+  -- object on the stack, then out of the announcement the context carries, and
+  -- last out of the ambient channel. Nothing when none of the four holds an
+  -- amount: the producing effect has not run, or bound nothing.
   --
-  -- THREE places because there are three writers, each of which puts its value
+  -- FOUR places because there are four writers, each of which puts its value
   -- where that value belongs:
   --
   --   * Resolve.bindAmountSlot writes to the SOURCE, mid-resolution -- Bane of
@@ -133,11 +133,20 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   --     "that much", the amount a life gain (CR 119.9) or a life loss (CR 119.3)
   --     supplied; and Shroofus Sproutsire's "that many", the combat damage CR
   --     510.2 dealt a player.
+  --   * Target.slotContext writes Filter.Context's boundAmounts, for the span of
+  --     one CR 202.3 computed bound on a target slot -- Venerable Warsinger's
+  --     "mana value X or less ... where X is the amount of damage this creature
+  --     dealt to that player". CR 603.3d chooses that target BEFORE the ability
+  --     object carries any binding of its own, so the reading above cannot reach
+  --     the very bindings CR 603.2's event already supplied; the caller hands
+  --     them over instead. Read after both object readings, so neither is
+  --     disturbed, and it can collide with neither -- the map is empty except
+  --     while a target slot's bound is being evaluated.
   --   * Resolve.runPreventionRider writes GameState.ambientAmounts, for the span
   --     of one CR 615.5 rider -- Inkshield's "for each 1 damage prevented this
   --     way". That writer has NO object to bind to: the shielded recipient can be
-  --     a player, and CR 400.7 replaced the installing spell. Read LAST, so
-  --     neither reading above is disturbed, and it can collide with neither: the
+  --     a player, and CR 400.7 replaced the installing spell. Read LAST, so no
+  --     reading above is disturbed, and it can collide with none of them: the
   --     map is empty except while a rider runs, and a rider's own effects are the
   --     only readers alive then.
   --
@@ -158,7 +167,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- permanent never carries the X its spell was cast for.
   Quantity.InSlot slot ->
     let boundOn holder = Game.lookupObject holder gs >>= Binding.amountOf slot . Object.bindings
-     in fmap toInteger ((mOid >>= boundOn) <|> boundOn announcedOn <|> Map.lookup slot (GameState.ambientAmounts gs))
+     in fmap toInteger ((mOid >>= boundOn) <|> boundOn announcedOn <|> Map.lookup slot (Filter.boundAmounts context) <|> Map.lookup slot (GameState.ambientAmounts gs))
   -- CR 208.2: a bare star has no value of its own. Both readers of a
   -- characteristic-defining P/T substitute the object's quantity for it first,
   -- through Projection.seedCharacteristicPT at the projection's seed
