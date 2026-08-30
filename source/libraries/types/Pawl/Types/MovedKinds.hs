@@ -31,22 +31,21 @@ import qualified Pawl.Types.Quantity as Quantity
 -- object for anything but rule 122.5's own impossibilities. The others are not
 -- that one narrowed: rule 122.5's second impossibility ("the first object
 -- doesn't have the appropriate kind of counter on it") is the whole of the
--- check under 'Named', is vacuous under 'Chosen' and 'AnyNumber' since the
--- kinds ON the object are what is offered and under 'UpToOneChosen' for that
--- same reason, and under 'Every', 'EveryOfKind',
--- 'AnyNumberOfKind' and 'EachAbsentKind' is what empties the batch rather than
--- what forbids it.
+-- check under 'Named', is vacuous under 'Chosen', 'AnyNumber' and
+-- 'UpToOneChosen' since the kinds ON the object are what is offered, and under
+-- 'Every', 'EveryOfKind', 'AnyNumberOfKind' and 'EachAbsentKind' is what
+-- empties the batch rather than what forbids it.
 --
 -- Takesies says "move up to one counter from each permanent", which names no
 -- kind and asks the player which one -- 'Chosen''s question -- but lets the
 -- answer be NONE, and that is 'UpToOneChosen'. The PER-SOURCE half of that
--- sentence is not what makes it its own arm, though the issue that filed it
--- read it that way (see #2709): Pawl.Types.MoveCounters' `from` is an ObjectRef, so
+-- sentence is not what makes it its own arm, though the issue that filed it read
+-- it that way (see #2709): Pawl.Types.MoveCounters' `from` is an ObjectRef, so
 -- every arm here is already performed once per first object, and 'Chosen' with a
 -- count of one would take one counter off each permanent too. What no arm could
 -- say is "UP TO": rule 122.5's move happens wherever it is possible, so a card
--- that lets the player leave a given first object alone is asking a question none
--- of the others ask -- #2702's zero-versus-one, read the other way round.
+-- that lets the player leave a given first object alone is asking a question
+-- none of the others ask -- #2702's zero-versus-one, read the other way round.
 --
 -- The count rides on the two arms that HAVE one rather than on a field beside
 -- them, because no other arm has one to carry: "all counters" and "all +1/+1

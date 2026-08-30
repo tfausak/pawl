@@ -1310,11 +1310,18 @@ groupSourceSpec s registry = Spec.describe s "CR 122.5 moving counters off a gro
 --   Fuse (You may cast one or both halves of this card from your hand.)
 --
 -- The first line is this group's subject, and the card is the only printing that
--- writes it -- Pawl.Types.MovedKinds' haddock has the sweep. "Up to one" is what
+-- writes it -- Pawl.Types.MovedKinds' haddock records that sweep, its query and
+-- its date, and the card that would refute it. "Up to one" is what
 -- no other arm can say: rule 122.5 moves a counter wherever it can, so a player
 -- who may leave a given first object alone is being asked a question 'Chosen'
 -- has no room for. The PER-SOURCE part is not new, `from` having been an
 -- ObjectRef since #2717.
+--
+-- "Each permanent" narrows by nothing, so the card writes ObjectRef.EachMatching
+-- over an EMPTY Filter.And -- a conjunction of no conditions, true of every
+-- candidate. That arm sweeps the battlefield, and CR 110.1 makes every object on
+-- the battlefield a permanent, so the empty conjunction is the sentence rather
+-- than a filter left unwritten.
 --
 -- Not implemented: fuse, so the card cannot be cast as both halves at once, and
 -- the Backsies half's "Until end of turn, treat all counters as -1/-1 counters",
@@ -1349,7 +1356,7 @@ upToOneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n (
 upToOneSpec s registry = Spec.describe s "CR 122.5 moving up to one counter off each permanent" $ do
   let -- FOUR permanents bearing counters in counts nothing else on the board
       -- repeats, spread over all three seats, since "each permanent" says
-      -- nothing about control -- and three of the four bear MORE THAN ONE
+      -- nothing about control -- and every one of them bears MORE THAN ONE
       -- counter, which is what makes "one from each" a different board from
       -- "all from each". Two of them bear two KINDS, which is what makes the
       -- kind the player's to pick rather than the only one there is.
@@ -1431,7 +1438,7 @@ upToOneSpec s registry = Spec.describe s "CR 122.5 moving up to one counter off 
     Spec.assertEqWith s "so does carol's Piker" (pairOn carolPiker after) (6, 0)
     Spec.assertEqWith s "so does carol's Wall" (pairOn carolWall after) (7, 0)
     Spec.assertEqWith s "and the destination is left with the nine shield counters it started with" (pairOn destination after) (0, 9)
-    Spec.assertEqWith s "and the player was asked about the same four permanents, having answered all four differently" asked 4
+    Spec.assertEqWith s "and the same four permanents were asked about, the count being the one thing this board shares with the case above" asked 4
   -- CR 608.2f's FIRST branch, made observable, and the reason a test of the
   -- givers alone would not settle it: Hardened Scales grows each placement of one
   -- or more +1/+1 counters onto a creature alice controls by one (CR 614.16), so
