@@ -2380,9 +2380,8 @@ apply batch candidate event =
     -- drawing off an empty library gains the life and never attempts the draw CR
     -- 104.3c would kill them for.
     --
-    -- The life goes to the player the EVENT named. See Pawl.Types.DrawRewrite for
-    -- why that is the same seat as CR 109.5's "you" on every printing of this
-    -- shape.
+    -- The life goes to the player the EVENT named, which for the producer in the
+    -- pool is the same seat as CR 109.5's "you"; see Pawl.Types.DrawRewrite.
     (ReplacementEffect.DrawR (DrawR.MkDrawR _ rewrite), ProposedEvent.WouldDraw pid) -> case rewrite of
       DrawRewrite.GainLife n -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
