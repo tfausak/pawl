@@ -1871,7 +1871,7 @@ wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $
     plains <- S.printingOf s registry "Plains"
     wordsOfWorship <- S.printingOf s registry "Words of Worship"
     piker <- S.printingOf s registry "Goblin Piker"
-    let armed = wordsBoard plains wordsOfWorship piker True
+    let (armed, _) = wordsBoard plains wordsOfWorship piker True
         after = S.runPure S.identityAnswer armed (Event.drawCard S.alice)
     Spec.assertEqWith s "CR 614.1a alice is at 25, so the row applied" (S.lifeOf S.alice after) (Just 25)
     Spec.assertEqWith s "CR 614.6 nothing reached her hand" (S.handSize S.alice after) 0
@@ -1882,7 +1882,7 @@ wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $
     plains <- S.printingOf s registry "Plains"
     wordsOfWorship <- S.printingOf s registry "Words of Worship"
     piker <- S.printingOf s registry "Goblin Piker"
-    let unarmed = wordsBoard plains wordsOfWorship piker False
+    let (unarmed, _) = wordsBoard plains wordsOfWorship piker False
         after = S.runPure S.identityAnswer unarmed (Event.drawCard S.alice)
     Spec.assertEqWith s "she gained nothing" (S.lifeOf S.alice after) (Just 20)
     Spec.assertEqWith s "CR 121.1 and drew the card" (S.handSize S.alice after) 1
@@ -1893,7 +1893,7 @@ wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $
     plains <- S.printingOf s registry "Plains"
     wordsOfWorship <- S.printingOf s registry "Words of Worship"
     piker <- S.printingOf s registry "Goblin Piker"
-    let armed = wordsBoard plains wordsOfWorship piker True
+    let (armed, _) = wordsBoard plains wordsOfWorship piker True
         after = S.runPure S.identityAnswer armed (Event.drawCard S.alice >> Event.drawCard S.alice)
     Spec.assertEqWith s "CR 614.3 the second draw gained nothing more" (S.lifeOf S.alice after) (Just 25)
     Spec.assertEqWith s "CR 121.1 and put one card in her hand" (S.handSize S.alice after) 1
@@ -1927,7 +1927,7 @@ wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $
     plains <- S.printingOf s registry "Plains"
     wordsOfWorship <- S.printingOf s registry "Words of Worship"
     piker <- S.printingOf s registry "Goblin Piker"
-    let armed = wordsBoard plains wordsOfWorship piker True
+    let (armed, _) = wordsBoard plains wordsOfWorship piker True
         stocked = snd (S.addLibraryCard piker S.bob armed)
         after = S.runPure S.identityAnswer stocked (Event.drawCard S.bob)
     Spec.assertEqWith s "CR 109.5 bob's draw is not alice's, so the rewrite never ran" (S.lifeOf S.bob after) (Just 20)
@@ -1935,17 +1935,59 @@ wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $
     Spec.assertEqWith s "alice gained nothing either" (S.lifeOf S.alice after) (Just 20)
     Spec.assertEqWith s "CR 614.3 the row is unspent" (length (GameState.replacements after)) 1
 
+  -- CR 614.3 / 608.2: the row is an effect of a resolution that has ENDED, so its
+  -- CR 109.5 "you" was fixed when the ability resolved. Destroying the
+  -- enchantment afterwards does not give the draw back.
+  --
+  -- What this discriminates is reading the relation off the candidate's baked
+  -- controller against re-projecting the source: CR 400.7 makes the destroyed
+  -- enchantment a new object in a graveyard, Projection.controllerOf answers
+  -- Nothing for the id the row still carries, and a live reading silently stops
+  -- matching (#2662).
+  --
+  -- LIFE first, and it cannot pass for the wrong reason: the rewrite gains to the
+  -- player the event named, who is alice on either reading, so 25 is reachable
+  -- only if the row applied to her draw at all.
+  Spec.it s "CR 614.3 the row outlives its source leaving the battlefield" $ do
+    plains <- S.printingOf s registry "Plains"
+    wordsOfWorship <- S.printingOf s registry "Words of Worship"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (armed, enchantment) = wordsBoard plains wordsOfWorship piker True
+        gone = S.runPure S.identityAnswer armed (Event.destroy Regenerability.Regenerable [enchantment])
+        after = S.runPure S.identityAnswer gone (Event.drawCard S.alice)
+    Spec.assertBool s (not (Set.member enchantment (GameState.battlefield gone))) "setup: the enchantment really left the battlefield"
+    Spec.assertEqWith s "CR 614.3 the row still applied, so alice is at 25" (S.lifeOf S.alice after) (Just 25)
+    Spec.assertEqWith s "CR 614.6 and the draw still never happened" (S.handSize S.alice after) 0
+  -- The same field one reading over: a CONTROL CHANGE. Confiscate ({4}{U}{U}
+  -- Aura, "Enchant permanent / You control enchanted permanent") hands bob the
+  -- enchantment, and the row stays alice's -- a live reading would answer bob and
+  -- stop matching her draw.
+  Spec.it s "CR 109.5 the row stays with the player who activated it, not the enchantment" $ do
+    plains <- S.printingOf s registry "Plains"
+    wordsOfWorship <- S.printingOf s registry "Words of Worship"
+    confiscate <- S.printingOf s registry "Confiscate"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (armed, enchantment) = wordsBoard plains wordsOfWorship piker True
+        (aura, g1) = S.addCreature confiscate S.bob armed
+        stolen = S.attachTo aura (Recipient.ToObject enchantment) g1
+        after = S.runPure S.identityAnswer stolen (Event.drawCard S.alice)
+    Spec.assertEqWith s "setup: bob really controls the enchantment now" (Projection.controllerOf enchantment stolen) (Just S.bob)
+    Spec.assertEqWith s "CR 109.5 the row is still alice's, so she is at 25" (S.lifeOf S.alice after) (Just 25)
+    Spec.assertEqWith s "CR 614.6 and her draw still never happened" (S.handSize S.alice after) 0
+
 -- alice with a Plains, a Words of Worship and two library cards, with the
 -- ability activated and resolved when `arm` is True and untouched when it is
 -- False. One builder for both legs, so the two boards differ in that alone.
-wordsBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> GameState.GameState
+wordsBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (GameState.GameState, ObjectId.ObjectId)
 wordsBoard plains wordsOfWorship stock arm =
   let base = S.landsInPlay plains 1
       (enchantment, g1) = S.addCreature wordsOfWorship S.alice base
       g2 = snd (S.addLibraryCard stock S.alice (snd (S.addLibraryCard stock S.alice g1)))
-   in if arm
-        then S.runPure S.identityAnswer g2 (Activate.activateAbility S.alice enchantment (theAbility wordsOfWorship) >> Stack.resolveTop)
-        else g2
+      final =
+        if arm
+          then S.runPure S.identityAnswer g2 (Activate.activateAbility S.alice enchantment (theAbility wordsOfWorship) >> Stack.resolveTop)
+          else g2
+   in (final, enchantment)
 
 -- wordsBoard with no library at all, which is CR 614.11's own board.
 emptyLibraryBoard :: Printing.Printing -> Printing.Printing -> Bool -> GameState.GameState
