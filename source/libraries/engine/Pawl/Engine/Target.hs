@@ -1351,8 +1351,10 @@ bakeSlots players = fmap (bakeSlot players)
 -- bindings through PlayerRef.InSlot exactly as a Filter names them through
 -- ControlledByBound. An unbaked one would be unanswerable where the filter beside
 -- it is answerable. A REGRESSION FENCE rather than a proved behaviour: no
--- committed bound holds a PlayerRef at all -- two name Quantity.LifeGainedThisTurn
--- and one a Quantity.InSlot -- so no board today tells the two readings apart.
+-- committed bound holds a PlayerRef.InSlot -- two name Quantity.LifeGainedThisTurn
+-- against a PlayerRef.Relative, which baking leaves alone, and one a
+-- Quantity.InSlot, which carries no PlayerRef at all -- so no board today tells
+-- the two readings apart.
 bakeSlot :: Map SlotName PlayerId -> TargetSlot -> TargetSlot
 bakeSlot players slot =
   slot
