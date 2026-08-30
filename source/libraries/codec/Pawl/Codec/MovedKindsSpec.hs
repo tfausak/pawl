@@ -30,6 +30,16 @@ spec s = Spec.describe s "Pawl.Codec.MovedKinds" $ do
       MovedKinds.codec
       (MovedKinds.Named (CounterKind.Keyword Keyword.Flying) (Quantity.Literal 2))
       " {\"type\":\"Named\",\"value\":{\"count\":{\"type\":\"Literal\",\"value\":2},\"kind\":{\"type\":\"Keyword\",\"value\":{\"type\":\"Flying\"}}}} "
+  -- Spike Cannibal's "move all +1/+1 counters": the kind is all there is to say,
+  -- the count being the whole tally the first object bears. Arm.tagged compiles
+  -- with no arm for a constructor and answers Nothing on encode (#2262), so this
+  -- case is what forces one.
+  Spec.it s "EveryOfKind carries only its kind" $
+    Common.assertCodec
+      s
+      MovedKinds.codec
+      (MovedKinds.EveryOfKind CounterKind.PlusOnePlusOne)
+      " {\"type\":\"EveryOfKind\",\"value\":{\"type\":\"PlusOnePlusOne\"}} "
   -- Agent's Toolkit's "move a counter": the count is all there is to say, the
   -- kind being the player's to pick.
   Spec.it s "Chosen carries only its count" $

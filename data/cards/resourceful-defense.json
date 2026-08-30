@@ -29,7 +29,10 @@
                       {
                         "type": "MoveCounters",
                         "value": {
-                          "from": "from",
+                          "from": {
+                            "type": "InSlot",
+                            "value": "from"
+                          },
                           "kinds": {
                             "type": "AnyNumber"
                           },

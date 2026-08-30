@@ -2,7 +2,9 @@
 
 module Pawl.Codec.MovedKinds where
 
+import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.EntryRiders as EntryRiders
+import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -17,11 +19,15 @@ import qualified Pawl.Types.MovedKinds as MovedKinds
 -- type's Typeable name, so two codecs for one type quietly share one name and
 -- the loser's wire spelling stops matching the schema the corpus is checked
 -- against.
+--
+-- The whole-tally arm's payload is that same CounterKind codec: a kind is a kind
+-- however the sentence settles its count.
 codec :: Codec.Codec MovedKinds.MovedKinds
 codec =
   Arm.tagged
     [ Arm.nullary "Every" MovedKinds.Every,
       Arm.payload "Named" EntryRiders.counter (uncurry MovedKinds.Named) (\x -> case x of MovedKinds.Named kind quantity -> Just (kind, quantity); _ -> Nothing),
+      Arm.payload "EveryOfKind" (CounterKind.codec Keyword.codec) MovedKinds.EveryOfKind (\x -> case x of MovedKinds.EveryOfKind kind -> Just kind; _ -> Nothing),
       Arm.payload "Chosen" Quantity.codec MovedKinds.Chosen (\x -> case x of MovedKinds.Chosen quantity -> Just quantity; _ -> Nothing),
       Arm.nullary "AnyNumber" MovedKinds.AnyNumber,
       Arm.nullary "EachAbsentKind" MovedKinds.EachAbsentKind
