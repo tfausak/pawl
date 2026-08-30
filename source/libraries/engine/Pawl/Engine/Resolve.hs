@@ -58,6 +58,7 @@ import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
+import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
@@ -147,6 +148,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -605,6 +607,8 @@ slotsOf effect = case effect of
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ affected _) -> affectedPlayersSlots affected
   Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> joinTwo (objectRefSlots blocker) (objectRefSlots attacker)
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated _ ref) -> objectRefSlots ref
+  -- CantBeRegenerated's arm, the same one axis.
+  Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> objectRefSlots ref
   Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker defender) -> joinTwo (objectRefSlots attacker) (playerRefSlots defender)
   Effect.CreateEmblem {} -> Map.empty
   -- CR 725.1's crown names a target slot only in the InSlot arm.
@@ -939,6 +943,9 @@ slotsAreExhaustive effect = case effect of
   -- RequireBlock's reason, one axis narrower.
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  -- CantBeRegenerated's reason again.
+  Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) ->
+    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- RequireBlock's reason, one axis over.
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
@@ -1099,6 +1106,7 @@ readsX = any effectReadsX
       Effect.AffectPlayers {} -> False
       Effect.RequireBlock {} -> False
       Effect.CantBeRegenerated {} -> False
+      Effect.ForbidBlock {} -> False
       Effect.RequireAttack {} -> False
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
@@ -1338,6 +1346,7 @@ boundSlots effect = case effect of
   Effect.AffectPlayers {} -> Set.empty
   Effect.RequireBlock {} -> Set.empty
   Effect.CantBeRegenerated {} -> Set.empty
+  Effect.ForbidBlock {} -> Set.empty
   Effect.RequireAttack {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
@@ -6202,6 +6211,32 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               | object <- objects
               ]
          in gs1 {GameState.unregeneratables = stored <> GameState.unregeneratables gs1}
+  Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration ref) ->
+    -- CR 509.1b / 611.1: store one restriction per permanent the ref names.
+    -- CantBeRegenerated above is the model and its arguments carry over: the ref
+    -- is enumerated ONCE, for the CR 608.2f simultaneity objectRefObjects buys,
+    -- and an illegal slot (CR 608.2b) stores nothing, which is Zirda's fizzle.
+    --
+    -- Nothing is written onto the permanent itself, and nothing is projected: CR
+    -- 613.11 keeps a restriction on a declaration out of the layers, so the row
+    -- is read at Pawl.Engine.CombatRestriction.prohibited and never by a
+    -- projection.
+    State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+      -- CR 611.2b: the duration never started, so nothing is stored.
+      Nothing -> gs
+      Just expiry ->
+        let objects = objectRefObjects legal resolving controller source gs ref
+            (ts, gs1) = Game.freshTimestamp gs
+            stored =
+              [ ActiveBlockProhibition.MkActiveBlockProhibition
+                  { ActiveBlockProhibition.source = source,
+                    ActiveBlockProhibition.timestamp = ts,
+                    ActiveBlockProhibition.expiry = expiry,
+                    ActiveBlockProhibition.object = object
+                  }
+              | object <- objects
+              ]
+         in gs1 {GameState.blockProhibitions = stored <> GameState.blockProhibitions gs1}
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration attackerRef defenderRef) ->
     -- CR 508.1d / 613.11: store one requirement per (attacker, defender) pair the
     -- two refs name, rule 508.1d counting requirements PER CREATURE. RequireBlock

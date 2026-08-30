@@ -2717,11 +2717,12 @@ activationAdjustmentSpec s registry = Spec.describe s "CR 601.2f a mana ability'
   -- the reduction's Filter is asked of. Scryfall o:"aren't mana abilities cost",
   -- 2026-08-29, one hit -- Zirda; a second such printing would join it here.
   --
-  -- Two of Zirda's three clauses are not in its card file, and both omissions
-  -- leave pawl's Zirda STRICTER than printed rather than weaker: the Companion
-  -- clause, which nothing can choose or pay for (gap #2451), and "{1}, {T}:
-  -- Target creature can't block this turn", which no effect can say (gap #2588).
-  -- Neither bears on the sentence this case is about.
+  -- One of Zirda's three clauses is not in its card file, and the omission leaves
+  -- pawl's Zirda STRICTER than printed rather than weaker: the Companion clause,
+  -- which nothing can choose or pay for (gap #2451). Its "{1}, {T}: Target
+  -- creature can't block this turn" is transcribed, and proved by
+  -- Pawl.CombatSpec's StoredBlockRestriction group. Neither bears on the sentence
+  -- this case is about.
   --
   -- Proved at the PAYMENT and not at the offer, for the reason the Field's case
   -- is: Cost.tapForManaWith is what folds the gathered reduction into the mana
