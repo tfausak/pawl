@@ -2889,10 +2889,12 @@ riderFilters riders =
   concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))
     <> concatMap quantityFilters (Map.elems (EntryRiders.counters riders))
 
--- Both Filter positions a CR 614.1c counter row has, riderFilters' two over the
--- payload entryRewriteFilters and turnUpRewriteFilters share: the KINDS it is
--- keyed by and the COUNTS it holds. One function so the two rewrites that carry
--- the payload cannot sweep different halves of it.
+-- Both Filter positions a CR 614.1c counter row has: the KINDS it is keyed by
+-- (CR 122.1b's keyword counter carries a whole Keyword) and the COUNTS it holds
+-- (each a Quantity, which may carry a Count whose Filter is card text).
+-- riderFilters' two, over the payload entryRewriteFilters and
+-- turnUpRewriteFilters share -- one function so the two rewrites that carry it
+-- cannot sweep different halves.
 withCountersFilters :: WithCounters.WithCounters -> [Filter.Type.Filter Keyword.Keyword]
 withCountersFilters w =
   concatMap counterKindFilters (Map.keys (WithCounters.counters w))
@@ -4087,9 +4089,9 @@ turnUpRewriteFilters :: TurnUpRewrite.TurnUpRewrite -> [Filter.Type.Filter Keywo
 turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
   -- entryRewriteFilters' WithCounters arm, on the rewrite that shares the payload.
   -- Vacuous over `data/cards/` while Bubble Smuggler's four +1/+1 counters are the
-  -- pool's only authored turn-up rewrite of this shape and their count is a
-  -- literal, and walked anyway so the two halves of one payload cannot be swept
-  -- differently.
+  -- pool's only authored turn-up rewrite of this shape -- a plain kind and a
+  -- literal count, so neither half carries a Filter -- and walked anyway so the
+  -- two halves of one payload cannot be swept differently.
   TurnUpRewrite.WithCounters w -> withCountersFilters w
   TurnUpRewrite.MayAttachTo f -> [f]
 
@@ -8232,7 +8234,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- card-authored counter-kind position holds card text, and the traversals above
   -- have to walk it or the position lints read the wrong number.
   --
-  -- What that cost, exactly: NOT silence. Every position lint above carries a
+  -- What that costs, exactly: NOT silence. Every position lint above carries a
   -- codec cross-check -- "the traversal and the codec disagree" -- and a Filter
   -- the traversal cannot see makes both counts zero against a non-zero
   -- `jsonAtoms`, so the card was rejected all the same. What was wrong is the
