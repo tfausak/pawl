@@ -1496,7 +1496,6 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
               -- still read the unbestowed spell (#2356).
               bestowedGs <- State.get
               let slots = Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) chosenModes face
-                  sets = Target.legalSets (Just pid) Map.empty sid slots bestowedGs
                   -- CR 101.1: the ceiling this card's own words put on the value
                   -- about to be announced -- "X can't be greater than the
                   -- greatest toughness among creatures you control". Read HERE
@@ -1581,10 +1580,30 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   -- Pawl.Engine.Event.changeZoneAttaching, `Object.kicked`'s
                   -- route exactly. Rule 702.150a's compleated is the one reader.
                   State.modify' (\st -> st {GameState.objects = Map.adjust (\o -> o {Object.phyrexianLifePaid = phyrexianLifePaid}) sid (GameState.objects st)})
-                  -- CR 601.2c, and the spell is on the stack for it: `sets` above
-                  -- was computed from the same post-move `gs`, so a "target spell"
-                  -- slot draws from the pool CR 601.2a built -- with this spell in
-                  -- it, and CR 115.5 taking it back out.
+                  -- CR 601.2c, and the spell is on the stack for it: `bestowedGs`
+                  -- is the same post-move board every step above read, so a "target
+                  -- spell" slot draws from the pool CR 601.2a built -- with this
+                  -- spell in it, and CR 115.5 taking it back out.
+                  --
+                  -- SEEDED WITH CR 601.2b's X, which is what makes it a binding
+                  -- rather than a separate argument: a slot's own CR 202.3 computed
+                  -- bound may read it (Stir the Grave's "mana value X or less"),
+                  -- and the value exists by now because rule 601.2b announces the
+                  -- variable before this step. That is why this binding sits HERE
+                  -- rather than beside `slots` above, where it used to. Nothing
+                  -- else is seeded: no target has been chosen yet, and the modes
+                  -- are not a target slot's to read.
+                  --
+                  -- Binding.fromChoices is the same writer CR 601.2i stamps the
+                  -- object with below, so the offer and the announcement's record
+                  -- cannot spell one X two ways -- which is what makes CR 608.2b's
+                  -- re-check (Resolve.stillLegal, off Object.bindings) re-derive
+                  -- the same set.
+                  --
+                  -- The COUNT reads the same announcement through its own
+                  -- argument two lines down (SlotCount.AnnouncedX, Rot-Curse
+                  -- Rakshasa); the bound reads it through the seed.
+                  let sets = Target.legalSets (Just pid) (Binding.fromChoices Map.empty mAmount Seq.empty) sid slots bestowedGs
                   chosen <- Target.chooseTargets decider pid sid (Maybe.fromMaybe 0 mAmount) slots sets
                   if not (Target.selectionLegal (Just pid) sid (Maybe.fromMaybe 0 mAmount) slots sets chosen bestowedGs)
                     then reject

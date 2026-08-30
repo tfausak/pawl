@@ -136,12 +136,25 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   --   * Target.slotContext writes Filter.Context's boundAmounts, for the span of
   --     one CR 202.3 computed bound on a target slot -- Venerable Warsinger's
   --     "mana value X or less ... where X is the amount of damage this creature
-  --     dealt to that player". CR 603.3d chooses that target BEFORE the ability
-  --     object carries any binding of its own, so the reading above cannot reach
-  --     the very bindings CR 603.2's event already supplied; the caller hands
-  --     them over instead. Read after both object readings, so neither is
-  --     disturbed, and it can collide with neither -- the map is empty except
-  --     while a target slot's bound is being evaluated.
+  --     dealt to that player", and Stir the Grave's "mana value X or less" off CR
+  --     601.2b's announced X. THE ANNOUNCEMENT IS OFF-OBJECT ON TWO OF THIS
+  --     CALLER'S THREE ROADS, which is why it needs a channel of its own: CR
+  --     603.3d chooses a trigger's targets before the ability object carries any
+  --     binding at all, and CR 601.2c chooses a spell's before CR 601.2i stamps
+  --     the X onto it, so on neither can the two readings above reach what the
+  --     announcement already holds, and the caller hands it over instead.
+  --
+  --     The third road is CR 707.10c's, and there the announcement IS on the
+  --     object: Resolve.chooseNewTargetsFor re-chooses a copy's targets off a
+  --     copy that CR 707.10 has already stamped with the value of X, and
+  --     slotContext evaluates the bound with the copy's own id -- so the FIRST
+  --     reading answers and this channel, which that caller also seeds, is never
+  --     consulted for the X. It is seeded anyway because the same seed carries
+  --     every other binding the copy kept.
+  --
+  --     Read after both object readings, so neither is disturbed, and it can
+  --     collide with neither -- the map is empty except while a target slot's
+  --     bound is being evaluated.
   --   * Resolve.runPreventionRider writes GameState.ambientAmounts, for the span
   --     of one CR 615.5 rider -- Inkshield's "for each 1 damage prevented this
   --     way". That writer has NO object to bind to: the shielded recipient can be

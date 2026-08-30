@@ -679,6 +679,9 @@ durationSlots duration = case duration of
 -- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless
 -- [a player] pays" names, and every slot a target slot's own pool or filter
 -- names. A payer or pool slot no effect also reads would otherwise dangle.
+--
+-- Not implemented: CR 303.4a's enchant slot is declared on the FACE beside the
+-- modes (Card.enchantSlotMap), so nothing it names is folded here at all (#2673).
 modeSlots :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Map.Map SlotName SlotArity
 modeSlots mode =
   joinSlots
@@ -3549,7 +3552,30 @@ chooseNewTargetsFor controller copyId = do
           -- CR 608.2b's own derivation, made against the CURRENT board: this is
           -- a fresh choice of targets rather than a re-check of the old one, so
           -- it reads what the board can supply now.
-          fresh = Target.legalSets (Just controller) Map.empty copyId slots gs
+          --
+          -- Seeded with the copy's own bindings, which is where CR 707.10 put the
+          -- original's decisions: a slot's CR 202.3 computed bound reading the
+          -- announced X (Stir the Grave) is answered off the SAME number the
+          -- original was, because CR 707.10c changes targets and nothing else.
+          --
+          -- A REGRESSION FENCE rather than a proven line, and the honest reason is
+          -- that the announced X reaches the bound a second way: Quantity.InSlot
+          -- asks the object the evaluation names before it asks the context, and
+          -- for a copy that object IS the announcement's holder. So the behaviour
+          -- Pawl.CopySpec's stirCopySpec proves stands with this seed empty too,
+          -- and what the seed adds is every OTHER slot atom -- Filter's
+          -- SameNameAsBound and IsBound, a GraveyardScope.InSlot pool -- reading a
+          -- binding of the copy's that is not one of the re-chosen slots. Nothing
+          -- drives that half: stirCopySpec is the only case that copies a spell
+          -- whose slot reads the announcement at all, and its slot reads the X.
+          --
+          -- The slots being re-chosen are dropped from it. They are not decisions
+          -- the copy keeps -- this call is choosing them -- so a sibling read must
+          -- not be answered off the target it is about to replace, and CR 601.2c's
+          -- own road seeds no target either (Pawl.Engine.Cast.castProposed). The
+          -- second pass below is what relates one re-chosen slot to another.
+          seed = Map.withoutKeys (Object.bindings copy) (Map.keysSet slots)
+          fresh = Target.legalSets (Just controller) seed copyId slots gs
           -- CR 406.4: what this player may not name specifically is offered as
           -- the pile it sits in, exactly as at CR 601.2c. The targets already
           -- CHOSEN are offered unchanged whatever they are, rule 707.10c letting

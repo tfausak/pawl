@@ -695,6 +695,24 @@ data Context = MkContext
     -- LAZY like sourcePower, and load-bearingly so: filling it costs a whole
     -- Quantity evaluation, and no filter that omits the atom ever forces it.
     slotAmount :: Maybe Integer,
+    -- CR 601.2b: the slot NAMES a computed bound and the announcement that fixes
+    -- it has not been made yet, so `slotAmount` above is Nothing for a reason that
+    -- is not "no bound was stated". ManaValueAtMostAmount does not narrow then --
+    -- Stir the Grave's "mana value X or less" states no ceiling until its caster
+    -- names X, and CR 601.2b puts no ceiling on the value they may name.
+    --
+    -- The bound's counterpart of the X=0 FLOOR every castability gate asks a
+    -- slot's COUNT at (Pawl.Engine.Target.fillableModesGiven): permissive is the
+    -- opposite direction for a bound, so the two floors are spelled differently
+    -- and mean the same thing -- CR 700.2a's mode is refused only for what the
+    -- announcement cannot change.
+    --
+    -- False in contextFor and contextComparingPower below, and False at CR 601.2c
+    -- and CR 608.2b alike: by then the announcement holds the number, and a bound
+    -- that still cannot be read is vacuously False as every other
+    -- context-relative atom here is. Pawl.Engine.Target.slotContext is the ONE
+    -- site that can set it True.
+    boundUnannounced :: Bool,
     -- CR 508.5: the DEFENDING PLAYER for the source, for the one atom that asks
     -- (ControlledByDefendingPlayer, CR 702.39a). Supplied by the caller for
     -- sourcePower's reason -- this module holds no game state and cannot read the
@@ -787,14 +805,16 @@ data Context = MkContext
     -- "CR 709.4a no card asks SameNameAsBound outside a mode's target slot",
     -- the sweep sourcePower's and defendingPlayer's siblings each have.
     slotNames :: Map.Map SlotName.SlotName (Set.Set CardName.CardName),
-    -- CR 603.2: the NUMBERS the surrounding announcement's bindings hold, keyed by
-    -- slot -- "that much" as the trigger's own event stamped it
-    -- (Pawl.Engine.Binding.eventAmount). No Filter atom reads this map; it is a
+    -- CR 601.2b / 603.2: the NUMBERS the surrounding announcement's bindings hold,
+    -- keyed by slot -- "that much" as the trigger's own event stamped it
+    -- (Pawl.Engine.Binding.eventAmount), and the X a caster just named
+    -- (Pawl.Engine.Binding.variableX). No Filter atom reads this map; it is a
     -- channel THROUGH the context to Pawl.Engine.Quantity's InSlot arm, which
     -- Pawl.Engine.Target.slotContext evaluates a target slot's CR 202.3 computed
-    -- bound in, and which has no other way to reach an announcement that is not on
-    -- the board yet: CR 603.3d chooses targets before the ability object carries
-    -- any binding of its own.
+    -- bound in, and which has no other way to reach an announcement not yet stamped
+    -- on an object: CR 603.3d chooses a trigger's targets before the ability object
+    -- carries any binding at all, and CR 601.2c chooses a spell's before CR 601.2i
+    -- stamps the X onto it.
     --
     -- Empty in contextFor and contextComparingPower below, so a bound evaluated
     -- anywhere but a target slot reads no announcement -- the vacuous posture every
@@ -880,7 +900,7 @@ data Context = MkContext
 -- context from this function and then overlays sourceChosenNames. See that field
 -- above for the lint that keeps a card to that position.
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, boundAmounts = Map.empty, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
+contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -911,7 +931,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, boundAmounts = Map.empty, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
+contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -977,12 +997,17 @@ matches context view predicate = case predicate of
   -- Vacuously False where there is no mana value at all, exactly as the atom
   -- above is: a player, or an object with no card behind it.
   Filter.ManaValueIsEven -> maybe False even (manaValue view)
-  -- CR 202.3 against the slot's computed bound. Vacuously False when either
-  -- number is absent, PowerLessThanSource's posture: a candidate with no mana
-  -- value is not "a card with mana value X or less", and a slot naming no amount
-  -- has stated no bound for it to be under.
+  -- CR 202.3 against the slot's computed bound. Vacuously False for a candidate
+  -- with no mana value at all, PowerLessThanSource's posture: it is not "a card
+  -- with mana value X or less". A slot naming NO amount has stated no bound for it
+  -- to be under, and is False for the same reason -- unless the bound is one CR
+  -- 601.2b has not announced yet, which boundUnannounced is.
   Filter.ManaValueAtMostAmount -> case (manaValue view, slotAmount context) of
     (Just mv, Just n) -> mv <= n
+    -- CR 601.2b: a bound the announcement has not yet fixed states nothing, so it
+    -- narrows nothing -- see boundUnannounced. A candidate with no mana value is
+    -- still excluded, PowerLessThanSource's posture above.
+    (Just _, Nothing) -> boundUnannounced context
     _ -> False
   -- PlayerRelation.holds is what each arm MEANS, and its haddock carries the
   -- argument: every other player is an Opponent by construction (CR 806.1 in a
