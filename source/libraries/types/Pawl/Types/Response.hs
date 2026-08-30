@@ -194,6 +194,12 @@ data Response
     -- is not even an object, so no counter-placing response could stand in for
     -- it.
     ChoseMovedCounter (CounterKind.CounterKind Keyword.Keyword)
+  | -- | CR 122.5: how many counters of each kind a player chose to move off the
+    -- first object. Its own constructor and not ChoseMovedCounter above: one
+    -- names a kind and the other a tally per kind, so a transcript of either
+    -- replaying as the other would be a silently wrong answer rather than a
+    -- desync.
+    ChoseMovedCounters (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural)
   | -- | CR 608.2d: the graveyard card a player chose for an
     -- Pawl.Types.ObjectRef.ChosenCardInGraveyard. One of these per chooser, so a
     -- transcript of Exhume resolving holds one for each stocked graveyard.

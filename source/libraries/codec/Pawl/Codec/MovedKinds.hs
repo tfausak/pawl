@@ -22,5 +22,6 @@ codec =
   Arm.tagged
     [ Arm.nullary "Every" MovedKinds.Every,
       Arm.payload "Named" EntryRiders.counter (uncurry MovedKinds.Named) (\x -> case x of MovedKinds.Named kind quantity -> Just (kind, quantity); _ -> Nothing),
-      Arm.payload "Chosen" Quantity.codec MovedKinds.Chosen (\x -> case x of MovedKinds.Chosen quantity -> Just quantity; _ -> Nothing)
+      Arm.payload "Chosen" Quantity.codec MovedKinds.Chosen (\x -> case x of MovedKinds.Chosen quantity -> Just quantity; _ -> Nothing),
+      Arm.nullary "AnyNumber" MovedKinds.AnyNumber
     ]

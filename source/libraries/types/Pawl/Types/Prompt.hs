@@ -245,6 +245,27 @@ data Prompt r where
   -- counter and a deathtouch counter are plainly distinguishable, so no elision
   -- is available above one candidate.
   ChooseMovedCounter :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> NonEmpty.NonEmpty (CounterKind.CounterKind Keyword.Keyword) -> Prompt (CounterKind.CounterKind Keyword.Keyword)
+  -- | CR 122.5: WHICH counters a move takes off the first object, and how many
+  -- of each (Resourceful Defense's "move any number of counters from target
+  -- permanent you control onto a second target permanent you control"). Raised
+  -- where the card leaves both the kind and the count open, which is what
+  -- separates it from ChooseMovedCounter above: that prompt asks which of two or
+  -- more kinds a printed count comes out of, where this one lets one answer
+  -- spread across kinds.
+  --
+  -- The first ObjectId is the object the counters leave, the second the object
+  -- they land on; the Map is what the first object HAS, engine-pre-filtered to
+  -- the kinds this move could really carry, and the answer is how many of each to
+  -- move. AssignCombatDamage's shape -- an offered map in, a chosen map out --
+  -- and ChooseBolster's posture otherwise: choose, not target, and filtered
+  -- rather than trusted, since an answer naming a kind the object does not have
+  -- or a count above what it holds is clamped rather than honoured.
+  --
+  -- Raised for ONE candidate as well as for two, unlike ChooseMovedCounter:
+  -- "any number" includes none, so a lone kind bearing a lone counter is still a
+  -- real choice between moving it and not. Not raised where the first object has
+  -- no movable kind at all, which moves nothing and leaves nothing to ask.
+  ChooseMovedCounters :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural -> Prompt (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural)
   -- | CR 107.14: how much {E} this player pays to an Effect.PayAnyEnergy, asked
   -- as the spell or ability RESOLVES (Harnessed Lightning). The ObjectId is the
   -- resolving object.
