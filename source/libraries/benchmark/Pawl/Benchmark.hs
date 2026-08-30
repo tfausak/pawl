@@ -142,8 +142,7 @@ loadNoAuraDeck registry = do
 -- modification writes one (AddCardType Creature onto every Swamp), so a Swamp
 -- the Bell animates joins Ashaya's set. Back the other way, Kormus Bell's set
 -- reads a subtype and Ashaya writes one (AddLandSubtype Forest), so the aspect
--- screen clears there too and `changesAt` runs on that pair as well, even though
--- adding Forest never removes Swamp and the answer is False. Both cards ADD a
+-- screen clears there too and `changesAt` runs on that pair as well. Both cards ADD a
 -- subtype rather than setting one, so CR 305.7 never strips Ashaya's
 -- characteristic-defining ability -- which is what rules Blood Moon out as the
 -- partner even though it makes the same cross-object edge: with a set land
@@ -153,9 +152,10 @@ loadNoAuraDeck registry = do
 --
 -- Deck order is the same forced sequence loadControlDeck describes: "Ashaya,
 -- Soul of the Wild" < "Darksteel Myr" < "Forest" < "Kormus Bell" < "Swamp", so
--- the opening hand is the Ashaya, both Myr and four of the five Forests, the
--- Bell is the second card drawn, and both statics are on the battlefield from
--- the middle of the game rather than for its last turn.
+-- the opening hand is the Ashaya, both Myr and four of the five Forests and the
+-- Bell is the second card drawn, so each is castable as soon as its own land
+-- count is down rather than arriving among the last draws. Both are on the
+-- battlefield when the game ends.
 --
 -- Thirteen cards, not sixty, and that is the whole reason: `resolve` re-projects
 -- every other battlefield object at every movable layer, so the cost climbs far
