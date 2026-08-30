@@ -5014,6 +5014,13 @@ meld controller victims resultCard = do
       -- of CR 712.5's pairs prints an ability that functions from another zone
       -- (CR 113.6), so no component's projection reads another. One that did
       -- would want a single pre-removal board for all of them.
+      --
+      -- Not implemented: a stored Alchemy perpetual effect naming a component is
+      -- dropped here rather than re-anchored to the permanent the pair melds
+      -- into. This is the one road that mints an incarnation outside
+      -- changeZoneAttaching, so perpetuate is never asked; which way it SHOULD go
+      -- is a design call the CR does not make, since CR 712.21c licenses the
+      -- departure direction and no rule speaks to this one (#2657).
       State.modify' (\g -> Foldable.foldl' forgetObject g (fmap fst melding))
       let mkObj ts =
             Object.MkObject
