@@ -194,7 +194,7 @@ enteredThisTurnSpec s registry = Spec.describe s "EnteredThisTurn" $ do
 -- Condition.Any of Quantity.EnteredFrom and Quantity.WasCastFrom, each naming
 -- Zone.Graveyard scoped to the ability's controller.
 --
--- Both cases turn on the DEMON, which is the gameplay-level reading: the clause
+-- Every case turns on the DEMON, which is the gameplay-level reading: the clause
 -- is what decides whether the trigger fires at all, and the token is the only
 -- thing the resolution puts on the board.
 enteredFromSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -243,7 +243,12 @@ enteredFromSpec s registry =
               after = play S.alice riseId staged
           oneDemon after
           Spec.assertEqWith s "CR 603.4 alice's Vessel exiled itself" (length (vesselsOwnedBy S.alice vessel after)) 0
-          Spec.assertEqWith s "and bob's is still on the battlefield" (length (vesselsOwnedBy S.bob vessel after)) 1
+          -- The board, recorded after the behaviour: bob's Vessel is alice's
+          -- permanent, so the two abilities had ONE controller and only the
+          -- graveyard each came out of told them apart.
+          case vesselsOwnedBy S.bob vessel after of
+            [bobs] -> Spec.assertEqWith s "and bob's is on the battlefield under alice's control" (Projection.controllerOf bobs after) (Just S.alice)
+            other -> Spec.assertFailure s ("expected exactly one Vessel bob owns on the battlefield, got " <> show (length other))
 
         -- TWO GAMES, ONE DIFFERENCE: the zone the Vessel starts in. Yawgmoth's
         -- Will is resolved first in BOTH, so the same permission, the same mana

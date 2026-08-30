@@ -536,9 +536,9 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- haddock carries over -- the live read off GameState.events, the log's own
   -- extent standing in for "this turn", and the keying on ZoneChange.object.
   --
-  -- WHOSE copy is the entrant's OWNER, which CR 400.3 makes the only per-player
-  -- zone a card can have been in, and it is read through the INJECTED VIEW rather
-  -- than off the board: CR 603.4 re-checks an intervening "if" on resolution, by
+  -- WHOSE copy is the entrant's OWNER: CR 400.3 sends a card to its owner's copy
+  -- of a per-player zone, so the graveyard it left was its owner's. That is read
+  -- through the INJECTED VIEW rather than off the board: CR 603.4 re-checks an intervening "if" on resolution, by
   -- which time the entrant may be gone, and Event.interveningHolds and Stack's
   -- re-check both inject Projection.viewWithLastKnownAnywhere so CR 608.2h still
   -- answers. A view that cannot describe the object at all is Nothing, which
@@ -615,16 +615,6 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
     -- candidate's view carries no identity, and an evaluation outside a fold
     -- carries no candidate at all -- which is Pawl.Types.PlayerRef.Candidate's
     -- own stated answer there.
-    -- Every entry onto the battlefield this log records for one id. A list and not
-    -- a Maybe: CR 400.7 makes each arrival a new object, so at most one entry can
-    -- name a given id, and folding over the log is what says so rather than
-    -- assuming it.
-    entriesOf oid =
-      [ zc
-      | ev <- Foldable.toList (GameState.events gs),
-        Just zc <- [Game.enteredBattlefieldChange (LoggedEvent.event ev)],
-        ZoneChange.object zc == oid
-      ]
     playersOf ref = case ref of
       PlayerRef.Candidate -> fmap pure (mView >>= Filter.playerIdentity)
       -- The SECOND arm answered here rather than by Count.playersFor, and for a
@@ -654,6 +644,17 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
       -- it would need a fold this position does not supply. Its reader is
       -- Pawl.Engine.Resolve.playerRefPlayers, which folds (#1441).
       PlayerRef.Attacking _ -> Count.playersFor context gs ref
+
+    -- Every entry onto the battlefield this log records for one id. A list and not
+    -- a Maybe: CR 400.7 makes each arrival a new object, so at most one entry can
+    -- name a given id, and folding over the log is what says so rather than
+    -- assuming it.
+    entriesOf oid =
+      [ zc
+      | ev <- Foldable.toList (GameState.events gs),
+        Just zc <- [Game.enteredBattlefieldChange (LoggedEvent.event ev)],
+        ZoneChange.object zc == oid
+      ]
 
 -- Is this declared attack an attack on one of that player's OPPONENTS? CR 506.3
 -- gives three things a creature can attack and rule 702.121a counts only the
