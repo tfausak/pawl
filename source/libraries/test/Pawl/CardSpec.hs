@@ -218,6 +218,7 @@ import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.PutCounters as PutCounters
+import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
@@ -932,6 +933,7 @@ effectCounts effect = case effect of
   Effect.BecomesBlocked _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
+  Effect.PutCountersFrom {} -> []
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> foldMap quantityCounts (MovedKinds.quantityOf kinds)
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> quantityCounts quantity
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
@@ -1210,6 +1212,7 @@ effectNestedEffects effect = case effect of
   Effect.BecomesBlocked {} -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
+  Effect.PutCountersFrom {} -> []
   Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
@@ -1710,6 +1713,7 @@ effectReplacements effect = case effect of
   Effect.BecomesBlocked _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
+  Effect.PutCountersFrom {} -> []
   Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
@@ -2516,6 +2520,7 @@ effectMintedFaces effect = case effect of
   Effect.BecomesBlocked _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
+  Effect.PutCountersFrom {} -> []
   Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
@@ -4296,6 +4301,9 @@ effectFilters effect = case effect of
   -- you control with a +1/+1 counter on it", and a Filter there would otherwise
   -- escape the lint.
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity ref) -> unframed (quantityFilters quantity) <> sourceHosted (objectRefFilters ref)
+  -- The destination only, PutCounters' framing: `from` is a bare SlotName and
+  -- carries no Filter.
+  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ ref) -> sourceHosted (objectRefFilters ref)
   -- The count only: both slots are bare SlotNames, which carry no Filter.
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> unframed (foldMap quantityFilters (MovedKinds.quantityOf kinds))
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> unframed (quantityFilters quantity)
@@ -4534,6 +4542,7 @@ effectObjectRefs effect = case effect of
   Effect.BecomesBlocked {} -> []
   Effect.Counter (Counter.MkCounter ref _) -> read_ [ref]
   Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> read_ [ref]
+  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ ref) -> read_ [ref]
   Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
