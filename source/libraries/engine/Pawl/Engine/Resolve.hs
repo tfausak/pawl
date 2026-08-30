@@ -589,6 +589,12 @@ slotsOf effect = case effect of
   -- Quantity.AgainstSlot aimed at the slot its `from` names -- so it joins in
   -- here rather than being left to look dangling. The bound slot is a
   -- DEFINITION, not a read: see boundSlots below.
+  --
+  -- The `from` side reports SlotArity.Many, every ObjectRef.InSlot being a
+  -- whole-set read. A slot the COUNT also names still comes out One: joinTwo is
+  -- Map.unionWith min and a Quantity reads singly, so Black Panther's `land` --
+  -- named by both halves -- keeps the arity that says "up to two target
+  -- creatures" cannot fill it.
   Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds _ to) -> joinTwo (objectRefSlots from) (insertOne to (foldMap quantitySlots (MovedKinds.quantityOf kinds)))
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
@@ -7010,6 +7016,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- removals run in the order the sweep hands back -- battlefieldMatching's,
     -- which is CR 608.2f's APNAP order for the EachMatching arm and one object for
     -- every other arm the corpus writes.
+    --
+    -- objectRefObjects takes EVERY recipient a slot holds, through slotGroup and
+    -- then legalMany, where a bare SlotName read goes through legalOne and takes a
+    -- slot naming several objects as naming none. So a `from` slot bound to more
+    -- than one object is one pair per binding here rather than an instruction that
+    -- silently moves nothing -- which is the reading the printed sentences want,
+    -- "from all creatures" being a group before it is a slot. No card in
+    -- data/cards/ binds that slot plurally; Pawl.CardSpec's singular-reader lint
+    -- names the DESTINATION alone, this side being no longer a singular read.
     --
     -- Every read inside movePair takes the same pre-sweep snapshot, which is
     -- Effect.PutCounters' posture: one evaluation for the whole instruction. What
