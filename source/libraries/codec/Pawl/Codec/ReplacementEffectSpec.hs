@@ -65,6 +65,8 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
                   ZoneChangePattern.whoseObject = ControllerRelation.Anyones
                 }
               Zone.Exile
+              False
+              False
           )
       )
       " {\"type\":\"ZoneChangeR\",\"value\":{\"matching\":{\"whenDestination\":{\"type\":\"Graveyard\"}},\"destination\":{\"type\":\"Exile\"}}} "
@@ -82,6 +84,8 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
                   ZoneChangePattern.whoseObject = ControllerRelation.Opponents
                 }
               Zone.Exile
+              False
+              False
           )
       )
       " {\"type\":\"ZoneChangeR\",\"value\":{\"matching\":{\"whenDestination\":{\"type\":\"Graveyard\"},\"whoseObject\":{\"type\":\"Opponents\"}},\"destination\":{\"type\":\"Exile\"}}} "

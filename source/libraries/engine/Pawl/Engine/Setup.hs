@@ -304,7 +304,7 @@ newGame perform matchup = do
   -- so CR 103.5's declaration round sees settled libraries.
   Monad.forM_ (NonEmpty.toList matchup) $ \(pid, deck) -> do
     createDeck pid deck
-    Mulligan.shuffleLibrary pid
+    Event.shuffleLibrary pid
   Mulligan.openingHands perform (fmap fst (NonEmpty.toList matchup))
 
 -- CR 727.2 / 729.2: build every player's library from the EXISTING object pool
@@ -388,7 +388,7 @@ startGameFromCards perform exemptions = do
         GameState.command = commanderIds,
         GameState.stack = []
       }
-  Monad.forM_ owners Mulligan.shuffleLibrary
+  Monad.forM_ owners Event.shuffleLibrary
   Mulligan.openingHands perform owners
 
 -- CR 103 / 727.1a: put `starter` at the head of the turn order, preserving the

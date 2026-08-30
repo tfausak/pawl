@@ -1236,6 +1236,8 @@ castFromGraveyardExile =
             ZoneChangePattern.whatObject = Filter.IsSource
           }
         Zone.Exile
+        False
+        False
     )
 
 -- The static continuous abilities rule 702 states as a keyword's whole meaning,
