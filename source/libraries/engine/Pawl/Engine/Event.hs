@@ -4001,7 +4001,12 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- Pawl.Types.CarryOver is not consulted either -- a perpetual
               -- effect follows an object the caller did not mean to carry
               -- anything else over for.
-              perpetuate oid newId
+              --
+              -- `arrivals` and not `newId`, which is the other half of the same
+              -- contrast: CR 712.21c gives an effect that finds what a melded
+              -- permanent became BOTH cards, so a perpetual effect follows the
+              -- arrangement's trailing card too.
+              perpetuate oid arrivals
               -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
               -- nowhere else. CR 616.1g's nesting of one event inside another is
               -- expressed as call nesting rather than a field. `batch` is the
@@ -4216,7 +4221,7 @@ carryOver carrying oldId newId = case carrying of
   CarryOver.Carried ->
     State.modify' $ \gs ->
       gs
-        { GameState.continuousEffects = fmap (reanchor oldId newId) (GameState.continuousEffects gs),
+        { GameState.continuousEffects = fmap (reanchor oldId (Set.singleton newId)) (GameState.continuousEffects gs),
           GameState.replacements = fmap (rewatch oldId newId) (GameState.replacements gs)
         }
 
@@ -4273,28 +4278,38 @@ rewatch oldId newId row = case ActiveReplacement.effect row of
 -- Pawl.Engine.Expiry.follows is asked rather than a case on the arm, since that
 -- module is the only one that may case on Pawl.Types.Expiry.
 --
--- Not implemented: the trailing ids a CR 712.21a meld arrangement places
--- alongside `newId` are not re-anchored, so a perpetual effect on a melded
--- permanent follows only the first card the arrangement named (#2654).
-perpetuate :: ObjectId -> ObjectId -> Game ()
-perpetuate oldId newId =
+-- EVERY arrival and not just the leading one, which is CR 712.21c: "if an effect
+-- can find the new object that a melded permanent becomes as it leaves the
+-- battlefield, it finds both cards ... if that effect causes actions to be taken
+-- upon those cards, the same actions are taken upon each of them". Following an
+-- object across the zone change is finding what it became, so a CR 712.21a
+-- arrangement's trailing card is named as well as its leading one. That is the
+-- one place this parts company with carryOver beside it, which names the head
+-- alone because CR 400.7a's exception is about the permanent a SPELL becomes and
+-- a spell melds into nothing. Pawl.MeldSpec's Pearl Collector case is the proof.
+perpetuate :: ObjectId -> Seq.Seq ObjectId -> Game ()
+perpetuate oldId newIds =
   State.modify' $ \gs ->
     gs
       { GameState.continuousEffects = fmap follow (GameState.continuousEffects gs)
       }
   where
+    arrivals = Set.fromList (Foldable.toList newIds)
     follow eff =
       if Expiry.follows (ContinuousEffect.expiry eff)
-        then reanchor oldId newId eff
+        then reanchor oldId arrivals eff
         else eff
 
--- carryOver's per-effect half: swap oldId for newId in a locked affected set
--- that names it, and leave every other effect alone.
-reanchor :: ObjectId -> ObjectId -> ContinuousEffect.ContinuousEffect Card -> ContinuousEffect.ContinuousEffect Card
-reanchor oldId newId eff = case ContinuousEffect.affected eff of
+-- carryOver's per-effect half: swap oldId for the arriving ids in a locked
+-- affected set that names it, and leave every other effect alone. A SET of new
+-- ids rather than one, because CR 712.21's split makes a single departure into
+-- two arrivals; carryOver passes a singleton, since the road it gates is the one
+-- a melded permanent cannot take.
+reanchor :: ObjectId -> Set ObjectId -> ContinuousEffect.ContinuousEffect Card -> ContinuousEffect.ContinuousEffect Card
+reanchor oldId newIds eff = case ContinuousEffect.affected eff of
   Affected.TheseObjects oids
     | Set.member oldId oids ->
-        eff {ContinuousEffect.affected = Affected.TheseObjects (Set.insert newId (Set.delete oldId oids))}
+        eff {ContinuousEffect.affected = Affected.TheseObjects (Set.union newIds (Set.delete oldId oids))}
   _ -> eff
 
 -- CR 604.2 ends a static ability's continuous effect the moment its permanent

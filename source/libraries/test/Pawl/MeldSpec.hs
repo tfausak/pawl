@@ -26,6 +26,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -36,11 +37,15 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -51,6 +56,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.MeldSource as MeldSource
+import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -609,6 +615,68 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith s "one trigger reached the stack" (length (GameState.stack settled)) 1
         Spec.assertEqWith s "setup: both cards were in the graveyard when it resolved" (List.sort (graveyardNames settled)) bothNames
         Spec.assertEqWith s "setup: exile was empty once the meld had consumed the pair" (exileNames settled) []
+  -- CR 712.21c again, over Alchemy's "perpetually" -- the one stored effect that
+  -- follows its objects through a zone change at all
+  -- (Pawl.Engine.Event.perpetuate). The rule settles what the digital-only word
+  -- does not: an effect that can find what a melded permanent became finds BOTH
+  -- cards, so the effect follows the arrangement's trailing card as well as its
+  -- leading one. No rule of the CR names "perpetually"; the printed sentence is
+  -- the authority for the following, and CR 712.21c only for how many cards the
+  -- following reaches.
+  --
+  -- Pearl Collector's "{2}{W}: Another target creature perpetually gains
+  -- lifelink" is the producer, and Hanweir, the Writhing Township is a creature,
+  -- so it is a legal target for it.
+  --
+  -- ARRANGEMENT [1, 0] is the discriminating one: the components are the Garrison
+  -- then the Battlements, so that permutation puts the Battlements down FIRST and
+  -- leaves the Garrison trailing. The Garrison is also the only half that can
+  -- observe lifelink, since CR 702.15b pays off damage its source deals and the
+  -- Battlements is a land. [0, 1] is the leading-card control beside it, and the
+  -- two boards differ in nothing else.
+  --
+  -- The damage is built through Pawl.Engine.Damage.damageEvent rather than driven
+  -- through a combat step, which is the narrowest path that shows it: that
+  -- function is where CR 702.15b's rider is classified off the source's projected
+  -- keywords, and the Garrison's own attack trigger would put two tokens into the
+  -- same life arithmetic.
+  Spec.it s "CR 712.21c a perpetual grant on a melded permanent follows both cards it becomes" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    collector <- S.printingOf s registry "Pearl Collector"
+    let (collectorId, base) = S.addCreature collector S.alice (Setup.emptyGame S.bothPlayers)
+        (mMelded, meldedBoard) = meldedThrough base battlements garrison mountain
+        board = (S.landsFor plains S.alice 3 meldedBoard) {GameState.priority = Just S.alice}
+    case (mMelded, Face.activatedAbilities (S.combinedFace collector)) of
+      (Just meldedId, ability : _) -> do
+        let byCard = S.runPure (aimedAt meldedId) board (do Activate.activateAbility S.alice collectorId ability; Stack.resolveTop)
+            byHand expiry = lifelinkUnder expiry meldedId board
+            gained gs order = fmap (\g -> (S.lifeOf S.alice g, S.lifeOf S.bob g)) (garrisonPings garrison meldedId order gs)
+        Spec.assertEqWith s "CR 712.21c the trailing card came back with the perpetual lifelink" (gained byCard [1, 0]) (Just (Just 22, Just 18))
+        Spec.assertEqWith s "and the leading card does too, which is the same grant on the other arrangement" (gained byCard [0, 1]) (Just (Just 22, Just 18))
+        -- The pair that differs in EXACTLY one thing: the same stand-in grant, the
+        -- same affected set, the same board, and only the expiry changes. CR
+        -- 400.7's default is what the second leg reads back -- the arriving cards
+        -- are new objects an indefinite effect no longer names.
+        Spec.assertEqWith s "a perpetual stand-in grant does the same" (gained (byHand Expiry.Type.Perpetual) [1, 0]) (Just (Just 22, Just 18))
+        Spec.assertEqWith s "CR 400.7 while an indefinite one is left naming an id nothing answers to" (gained (byHand Expiry.Type.Never) [1, 0]) (Just (Just 20, Just 18))
+        Spec.assertEqWith s "and the leading card is no different under it" (gained (byHand Expiry.Type.Never) [0, 1]) (Just (Just 20, Just 18))
+        -- The proxies behind those, kept AFTER them: the card really did store a
+        -- perpetual grant naming the melded permanent, and the permanent really
+        -- did carry lifelink before anything moved -- so the life totals above are
+        -- the following's work and not a grant that never landed.
+        Spec.assertEqWith
+          s
+          "Pearl Collector stored one effect, under the perpetual arm, naming the melded permanent"
+          (fmap ContinuousEffect.expiry (filter (\e -> ContinuousEffect.source e == collectorId && S.continuousEffectAffects meldedId e) (GameState.continuousEffects byCard)))
+          [Expiry.Type.Perpetual]
+        Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink meldedId byCard) "the melded permanent had lifelink while it was still on the battlefield"
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Lifelink meldedId board)) "setup: and did not before the ability resolved"
+        Spec.assertEqWith s "setup: both cards reached alice's graveyard" (List.sort (graveyardNames (splitOff meldedId [1, 0] byCard))) (List.sort [S.printingName battlements, S.printingName garrison])
+      (Nothing, _) -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
+      (_, []) -> Spec.assertFailure s "Pearl Collector should declare one activated ability"
   -- CR 903.9a over CR 712.21's split, and NOT CR 903.9c -- that rule governs only
   -- the CR 903.9b replacement (the hand and library redirect), which pawl does not
   -- make for a melded permanent (#2265). What runs here is rule 903.9a's
@@ -687,6 +755,54 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith s "setup: alice's hand was empty once the Griptide had been cast" (handNames (bounced [0, 1])) []
         Spec.assertEqWith s "setup: the melded permanent left the battlefield" (Game.lookupObject meldedId (bounced [0, 1])) Nothing
         Spec.assertEqWith s "setup: alice's library was empty before it went there" (libraryNames board) []
+
+-- The melded permanent destroyed under a given CR 712.21a arrangement: the board
+-- on which its two cards have arrived in alice's graveyard.
+splitOff :: ObjectId.ObjectId -> [Natural.Natural] -> GameState.GameState -> GameState.GameState
+splitOff meldedId order gs = S.runPure (ordering order) gs (Event.destroy Regenerability.Regenerable [meldedId])
+
+-- splitOff, then the Hanweir Garrison card put back onto the battlefield and made
+-- to deal its 2 damage to bob. Nothing here decides lifelink: whether alice gains
+-- anything is Pawl.Engine.Damage.damageEvent reading the returned permanent's
+-- projected keywords. Nothing when the split or the return did not produce
+-- exactly one Garrison, so a board that never split reads as a failure rather
+-- than as no life gained.
+garrisonPings :: Printing.Printing -> ObjectId.ObjectId -> [Natural.Natural] -> GameState.GameState -> Maybe GameState.GameState
+garrisonPings garrison meldedId order gs =
+  let buried = splitOff meldedId order gs
+      inGraveyard = filter (\oid -> fmap S.nameOf (Game.cardOf oid buried) == Just (S.printingName garrison)) (Game.zoneMembers Zone.Graveyard S.alice buried)
+   in case inGraveyard of
+        [card] -> case S.runPureWith S.identityAnswer buried (Event.changeZoneReturning card Zone.Battlefield) of
+          (arrived, returned) -> case Foldable.toList arrived of
+            [back] -> Just (S.runPure S.identityAnswer returned (Damage.applyDamage [Damage.damageEvent returned DamageKind.Combat back (Recipient.ToPlayer S.bob) 2]))
+            _ -> Nothing
+        _ -> Nothing
+
+-- CR 712.21a's arrangement pinned by INDEX, with nothing else answered specially:
+-- the arrangement is the only prompt the boards above raise once the grant is in
+-- place.
+ordering :: [Natural.Natural] -> Prompt.Prompt r -> r
+ordering order p = case p of
+  Prompt.OrderComponentCards {} -> order
+  _ -> S.identityAnswer p
+
+-- A stand-in layer-6 lifelink grant on one object under a named expiry -- the
+-- control Pearl Collector's own grant is compared against, and its twin in
+-- everything but the expiry and the source. The source cannot be what
+-- discriminates: Pawl.Engine.Event.perpetuate reads the expiry and the affected
+-- set, and nothing else.
+lifelinkUnder :: Expiry.Type.Expiry -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+lifelinkUnder expiry oid gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+      eff =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = S.noSource,
+            ContinuousEffect.timestamp = ts,
+            ContinuousEffect.expiry = expiry,
+            ContinuousEffect.modification = Modification.GainKeyword Keyword.Lifelink,
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+          }
+   in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
 -- CR 701.27a as ONE instruction over the named permanents (CR 608.2f), through
 -- the opcode a card's "transform target permanent" reaches: the slot the effect
