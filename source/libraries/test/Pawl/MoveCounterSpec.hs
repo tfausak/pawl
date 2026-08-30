@@ -15,6 +15,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -28,6 +29,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -65,13 +67,15 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   namedAnyNumberSpec s registry
   absentKindSpec s registry
   groupSourceSpec s registry
+  upToOneSpec s registry
 
 -- Which counter the answerer takes, and whether it takes the printed "may" at
 -- all. Pinned by POSITION in the offered list rather than by naming a kind, so
 -- an answerer that searched for a legal option cannot silently repair a
 -- mutation: `Lowest` is CR 122.1a's +1/+1 counter (the least CounterKind) and
 -- `Highest` is CR 122.1c's shield counter (the greatest of the four the card
--- names).
+-- names). takesiesAnswer at the foot of this module reads the same three, where
+-- `Decline` is the printed "up to one" declined rather than a "may".
 data Pick = Lowest | Highest | Decline
   deriving (Eq, Show)
 
@@ -1297,3 +1301,154 @@ groupSourceSpec s registry = Spec.describe s "CR 122.5 moving counters off a gro
     -- batches grown by one apiece.
     Spec.assertEqWith s "the nine counters arrived as one batch, so Hardened Scales grew them once" (pairOn cannibalId after) (11, 0)
     Spec.assertEqWith s "and the givers are down exactly what they had, the replacement having grown the arrival and not the departure" (fmap (\oid -> pairOn oid after) [aliceWall, bobWall, bobPiker]) [(0, 0), (0, 0), (0, 5)]
+
+-- Takesies {2}{U} Instant, the front half of Takesies // Backsies (Unknown
+-- Event, set type funny; name, cost, type line and oracle text checked against
+-- Scryfall 2026-08-30), data/cards/takesies-backsies.json:
+--
+--   Move up to one counter from each permanent onto target permanent.
+--   Fuse (You may cast one or both halves of this card from your hand.)
+--
+-- The first line is this group's subject, and the card is the only printing that
+-- writes it -- Pawl.Types.MovedKinds' haddock records that sweep, its query and
+-- its date, and the card that would refute it. "Up to one" is what
+-- no other arm can say: rule 122.5 moves a counter wherever it can, so a player
+-- who may leave a given first object alone is being asked a question 'Chosen'
+-- has no room for. The PER-SOURCE part is not new, `from` having been an
+-- ObjectRef since #2717.
+--
+-- "Each permanent" narrows by nothing, so the card writes ObjectRef.EachMatching
+-- over an EMPTY Filter.And -- a conjunction of no conditions, true of every
+-- candidate. That arm sweeps the battlefield, and CR 110.1 makes every object on
+-- the battlefield a permanent, so the empty conjunction is the sentence rather
+-- than a filter left unwritten.
+--
+-- Not implemented: fuse, so the card cannot be cast as both halves at once, and
+-- the Backsies half's "Until end of turn, treat all counters as -1/-1 counters",
+-- so that half resolves doing nothing (#2725). Both omissions leave pawl's card
+-- strictly less able than the printing, never more.
+takesiesName :: CardName.CardName
+takesiesName = CardName.MkCardName (Text.pack "Takesies")
+
+-- Which counter the answerer takes off a given first object, and whether it
+-- takes one at all. The kind is pinned by POSITION in the offered list for
+-- toolkitAnswer's reason, and the object is named because the whole point of the
+-- sentence is that each first object is asked about separately: a pure
+-- @Prompt r -> r@ could not answer one permanent differently from the next, and
+-- every prompt this arm raises is COUNTED so a case can say which permanents
+-- were never asked about at all.
+takesiesAnswer :: ObjectId.ObjectId -> Map.Map ObjectId.ObjectId Pick -> Prompt.Prompt r -> State.State Int r
+takesiesAnswer destination picks p = case p of
+  -- FILTERED, not built: the answer is one of the recipients the engine offered,
+  -- so CR 608.2b's re-read at resolution still finds the target.
+  Prompt.ChooseTargets _ _ _ sets -> pure (S.preferring ((== Just destination) . Recipient.objectOf) sets)
+  Prompt.ChooseMovedCounterOrNone _ _ from _ offered -> do
+    State.modify' (+ 1)
+    pure
+      ( case Map.findWithDefault Decline from picks of
+          Lowest -> Just (NonEmpty.head offered)
+          Highest -> Just (NonEmpty.last offered)
+          Decline -> Nothing
+      )
+  _ -> pure (S.identityAnswer p)
+
+upToOneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+upToOneSpec s registry = Spec.describe s "CR 122.5 moving up to one counter off each permanent" $ do
+  let -- FOUR permanents bearing counters in counts nothing else on the board
+      -- repeats, spread over all three seats, since "each permanent" says
+      -- nothing about control -- and every one of them bears MORE THAN ONE
+      -- counter, which is what makes "one from each" a different board from
+      -- "all from each". Two of them bear two KINDS, which is what makes the
+      -- kind the player's to pick rather than the only one there is.
+      --
+      -- The destination is a fifth permanent bearing counters of its own, alice's
+      -- Wall of Stone, and alice's three Islands are the counterless leg: a
+      -- permanent the sweep reaches and has nothing to ask about.
+      board extras = do
+        island <- S.printingOf s registry "Island"
+        wall <- S.printingOf s registry "Wall of Stone"
+        piker <- S.printingOf s registry "Goblin Piker"
+        takesies <- S.printingOf s registry "Takesies"
+        seats <- mapM (S.printingOf s registry) extras
+        let (destination, g1) = S.addCreature wall S.alice (S.landsFor island S.alice 3 S.threePlayerGame)
+            (alicePiker, g2) = S.addCreature piker S.alice g1
+            (bobWall, g3) = S.addCreature wall S.bob g2
+            (carolPiker, g4) = S.addCreature piker S.carol g3
+            (carolWall, g5) = S.addCreature wall S.carol g4
+            seated = foldl (\gs pr -> snd (S.addCreature pr S.alice gs)) g5 seats
+            (held, g6) = S.addHandCard takesies S.alice seated
+            stocked =
+              S.addCounter CounterKind.Shield 9 destination
+                . S.addCounter CounterKind.Shield 3 alicePiker
+                . S.addCounter CounterKind.PlusOnePlusOne 4 alicePiker
+                . S.addCounter CounterKind.Shield 2 bobWall
+                . S.addCounter CounterKind.PlusOnePlusOne 5 bobWall
+                . S.addCounter CounterKind.PlusOnePlusOne 6 carolPiker
+                $ S.addCounter CounterKind.PlusOnePlusOne 7 carolWall g6
+        pure (held, destination, alicePiker, bobWall, carolPiker, carolWall, S.settleSba stocked)
+      -- alice's Piker gives its LEAST kind, bob's Wall its GREATEST, carol's Wall
+      -- its only one, and carol's Piker gives nothing at all. Three different
+      -- answers to one sentence, which is what the arm asks per first object.
+      picksFor alicePiker bobWall carolPiker carolWall =
+        Map.fromList [(alicePiker, Lowest), (bobWall, Highest), (carolPiker, Decline), (carolWall, Lowest)]
+      -- Pawl.Support.cast cannot name a half, so the cast goes through
+      -- Pawl.Engine.Cast directly (Pawl.Support.soleFaceName errors on a card
+      -- offering two castable halves). The narrowest path that shows the
+      -- behaviour: one cast, one resolution.
+      play picks destination held ready =
+        let run =
+              Engine.runGame
+                (takesiesAnswer destination picks)
+                ready
+                (Cast.castSpell S.alice held takesiesName Facing.FaceUp >> Stack.resolveTop)
+            ((_, after), asked) = State.runState run 0
+         in (asked, after)
+  -- THE CASE THIS UNIT EXISTS FOR. Every permanent on the battlefield is a first
+  -- object of the one sentence, each gives AT MOST ONE counter, and which one --
+  -- or whether any -- is the player's answer for that permanent alone.
+  Spec.it s "each permanent gives up to one counter, of the kind the player picked for it" $ do
+    (held, destination, alicePiker, bobWall, carolPiker, carolWall, before) <- board []
+    Spec.assertEqWith s "alice's Piker bears four +1/+1 counters and three shield counters" (pairOn alicePiker before) (4, 3)
+    Spec.assertEqWith s "bob's Wall bears five and two" (pairOn bobWall before) (5, 2)
+    Spec.assertEqWith s "carol's Piker bears six of one kind" (pairOn carolPiker before) (6, 0)
+    Spec.assertEqWith s "carol's Wall bears seven" (pairOn carolWall before) (7, 0)
+    Spec.assertEqWith s "and the destination bears nine shield counters of its own" (pairOn destination before) (0, 9)
+    let (asked, after) = play (picksFor alicePiker bobWall carolPiker carolWall) destination held before
+    -- THE GAMEPLAY-LEVEL ASSERTIONS, ahead of every proxy: one counter off each
+    -- permanent that gave, of the kind that permanent's answer named, and the
+    -- destination holding exactly the sum of them.
+    Spec.assertEqWith s "alice's Piker is down one +1/+1 counter and keeps every shield counter" (pairOn alicePiker after) (3, 3)
+    Spec.assertEqWith s "bob's Wall is down one SHIELD counter and keeps all five +1/+1 counters" (pairOn bobWall after) (5, 1)
+    Spec.assertEqWith s "carol's Wall is down one of its seven" (pairOn carolWall after) (6, 0)
+    Spec.assertEqWith s "carol's Piker, whose answer declined, keeps all six" (pairOn carolPiker after) (6, 0)
+    Spec.assertEqWith s "and the destination gained the two +1/+1 counters and the one shield counter that crossed, beside its own nine" (pairOn destination after) (2, 10)
+    -- The prompt count, last: four permanents bearing a counter were asked about,
+    -- while the destination -- rule 122.5's first impossibility, the two objects
+    -- being one -- and alice's three counterless Islands were not.
+    Spec.assertEqWith s "each permanent bearing a counter was asked about, and the destination and the Islands were not" asked 4
+  -- The same board differing in exactly ONE thing, the answers: every permanent
+  -- declines. Without this pair the case above would pass on an arm that moved a
+  -- counter whatever the player said.
+  Spec.it s "a player who declines every permanent moves nothing at all" $ do
+    (held, destination, alicePiker, bobWall, carolPiker, carolWall, before) <- board []
+    let declining = Map.fromList (fmap (\oid -> (oid, Decline)) [alicePiker, bobWall, carolPiker, carolWall])
+        (asked, after) = play declining destination held before
+    Spec.assertEqWith s "alice's Piker keeps everything it had" (pairOn alicePiker after) (4, 3)
+    Spec.assertEqWith s "so does bob's Wall" (pairOn bobWall after) (5, 2)
+    Spec.assertEqWith s "so does carol's Piker" (pairOn carolPiker after) (6, 0)
+    Spec.assertEqWith s "so does carol's Wall" (pairOn carolWall after) (7, 0)
+    Spec.assertEqWith s "and the destination is left with the nine shield counters it started with" (pairOn destination after) (0, 9)
+    Spec.assertEqWith s "and the same four permanents were asked about, the count being the one thing this board shares with the case above" asked 4
+  -- CR 608.2f's FIRST branch, made observable, and the reason a test of the
+  -- givers alone would not settle it: Hardened Scales grows each placement of one
+  -- or more +1/+1 counters onto a creature alice controls by one (CR 614.16), so
+  -- TWO +1/+1 counters gathered off two permanents land as three when they arrive
+  -- as one batch and as four when they arrive as two. The removals are untouched
+  -- either way.
+  Spec.it s "CR 608.2f the counters gathered off many permanents arrive as one placement per kind" $ do
+    (held, destination, alicePiker, bobWall, carolPiker, carolWall, before) <- board ["Hardened Scales"]
+    let (_, after) = play (picksFor alicePiker bobWall carolPiker carolWall) destination held before
+    -- THE GAMEPLAY-LEVEL ASSERTION: one batch of two grown by one, not two
+    -- batches of one grown by one apiece.
+    Spec.assertEqWith s "the two +1/+1 counters arrived as one batch, so Hardened Scales grew them once" (pairOn destination after) (3, 10)
+    Spec.assertEqWith s "and the givers are down exactly one apiece, the replacement having grown the arrival and not the departure" (fmap (`pairOn` after) [alicePiker, bobWall, carolWall]) [(3, 3), (5, 1), (6, 0)]

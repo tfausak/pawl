@@ -6775,8 +6775,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 122.5: move counters off one permanent and onto a second. WHICH kinds
     -- cross is the card's call when it names one (Explorer's Cache's "move a
     -- +1/+1 counter" and Spike Cannibal's "move all +1/+1 counters"), the
-    -- player's when it names none (Agent's Toolkit's "move a counter" and
-    -- Resourceful Defense's "move any number of counters"), shared when the card
+    -- player's when it names none (Agent's Toolkit's "move a counter",
+    -- Resourceful Defense's "move any number of counters" and Takesies' "up to
+    -- one counter", which alone lets the player decline), shared when the card
     -- names the kind and the player supplies the count (Scrounging Bandar's
     -- "move any number of +1/+1 counters"), and neither's when the card takes
     -- them all (Fate Transfer's "move all counters") or reads the
@@ -6849,7 +6850,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- binds a targeted land and a targeted creature; Fate Transfer binds two
               -- targeted creatures; Goldberry, River-Daughter binds a targeted
               -- permanent and itself; Spike Cannibal sweeps every creature on the
-              -- battlefield onto itself). A slot bound as the ability triggered may
+              -- battlefield onto itself; Takesies sweeps every permanent onto a
+              -- targeted one). A slot bound as the ability triggered may
               -- name an object CR 400.7 has since moved, and a targeted one may have
               -- become illegal, which is CR 608.2b's re-read in the legalMany inside
               -- objectRefObjects.
@@ -7033,6 +7035,31 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         let onTo = Map.filter (> 0) (maybe Map.empty Object.counters (Game.lookupObject to gs))
                             absent = Map.keys (Map.withoutKeys onFrom (Map.keysSet onTo))
                          in fmap (Map.unionsWith (+)) (mapM (`move` 1) absent)
+                      -- Takesies' "move up to one counter from each permanent":
+                      -- Chosen's question -- which kind, out of the kinds this
+                      -- first object actually has -- with declining added, and
+                      -- one counter of whichever kind is picked. Ascending
+                      -- (Map.keys), so a transcript is deterministic.
+                      --
+                      -- The prompt is raised for a SINGLE candidate as well,
+                      -- AnyNumber's reason rather than Chosen's: "up to one"
+                      -- includes none, so moving the one kind and leaving it are
+                      -- two different boards and the question is real.
+                      MovedKinds.UpToOneChosen ->
+                        case Map.keys onFrom of
+                          [] -> pure Map.empty
+                          first : rest -> do
+                            let offered = first NonEmpty.:| rest
+                            answer <- Game.choose (Prompt.ChooseMovedCounterOrNone (Decide.deciderFor controller gs) controller from to offered)
+                            -- FILTERED, NOT TRUSTED: an answer naming a kind
+                            -- that is not on the object is read as declining,
+                            -- which is Chosen's filter under a wording where
+                            -- declining is itself legal -- there the answer had
+                            -- to fall back to a kind, since rule 122.5 moves a
+                            -- counter wherever it can.
+                            case answer of
+                              Just kind | Foldable.elem kind offered -> move kind 1
+                              _ -> pure Map.empty
           -- Either side unresolvable: an illegal slot at resolution (CR 608.2b), a
           -- player recipient, or rule 122.5's impossibilities above. THIS pair moves
           -- nothing and the others in the sweep are untouched: the rule's
