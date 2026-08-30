@@ -30,8 +30,14 @@ import qualified Pawl.Types.Quantity as Quantity
 -- 'Chosen' and 'AnyNumber' are two arms and not one because they ask different
 -- questions: 'Chosen' settles the count on the card and asks WHICH KIND, where
 -- 'AnyNumber' settles nothing and asks WHICH COUNTERS, so a single answer type
--- would leave one of the two over-specified. A card either states a number --
--- and in every printing that states one, it is one counter -- or states none.
+-- would leave one of the two over-specified. 'Chosen' therefore takes its whole
+-- count out of the one kind picked, which is exact for a card that PRINTS a
+-- count, since every printing that prints one prints "a counter" -- Scryfall
+-- @oracle:\/(^|[^a-z])move [^.]*counter\/@, 2026-08-30, over every printing ever
+-- released: the kindless moves carrying more than one counter all say "all
+-- counters" ('Every') or "any number of counters" \/ "one or more counters"
+-- ('AnyNumber'). A printing saying "move two counters", where the player could
+-- take one +1\/+1 counter and one shield counter, would refute that.
 data MovedKinds
   = -- | Fate Transfer's "move all counters": every kind on the first object, the
     -- whole tally of each (CR 122.5).
@@ -41,15 +47,6 @@ data MovedKinds
     Named (CounterKind.CounterKind Keyword.Keyword) Quantity.Quantity
   | -- | Agent's Toolkit's "move a counter": one kind the player picks, that many
     -- of it (CR 122.5).
-    --
-    -- The count comes out of the ONE kind picked, which is exact for a card that
-    -- prints a count, since every printing that prints one prints "a counter" --
-    -- Scryfall @oracle:\/(^|[^a-z])move [^.]*counter\/@, 2026-08-30, over every
-    -- printing ever released: the kindless moves that carry more than one counter
-    -- all say "all counters" ('Every') or "any number of counters" \/ "one or more
-    -- counters" ('AnyNumber'). A printing saying "move two counters", where the
-    -- player could take one +1\/+1 counter and one shield counter, would refute
-    -- that.
     Chosen Quantity.Quantity
   | -- | Resourceful Defense's "move any number of counters": however many of
     -- however many kinds the player picks (CR 122.5).

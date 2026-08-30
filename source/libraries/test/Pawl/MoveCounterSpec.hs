@@ -717,19 +717,19 @@ everyKindSpec s registry = Spec.describe s "CR 122.5 moving every kind of counte
 -- The second line is this group's subject, and the card is why "any number"
 -- exists: it names neither the kind nor the count, so ONE answer settles both
 -- and may take one counter of each of two kinds -- where Agent's Toolkit's
--- printed count of one comes out of the one kind the player picks. It is the
--- only shape in which a printing moves more than one counter without naming a
--- kind: Scryfall oracle:/(^|[^a-z])move [^.]*counter/, 2026-08-30, over every
--- printing ever released, returns "all counters" (Fate Transfer, The Ozolith,
--- Nexus Mentality), "any number of counters" (this card, Slippery Bogbonder) and
--- "one or more counters" (Goldberry, River-Daughter), and no fixed count above
--- one at all.
+-- printed count of one comes out of the one kind the player picks. NO printing
+-- states a fixed count above one without naming a kind: Scryfall
+-- oracle:/(^|[^a-z])move [^.]*counter/, 2026-08-30, over every printing ever
+-- released, turns up "all counters" (Fate Transfer, The Ozolith, Nexus
+-- Mentality), "any number of counters" (this card, Slippery Bogbonder) and "one
+-- or more counters" (Goldberry, River-Daughter), and nothing else above one.
+-- Goldberry's spelling is this one with zero excluded and is not in the corpus.
 --
 -- pawl's Resourceful Defense omits the triggered ability entirely: "put those
 -- counters" copies a departing permanent's whole per-kind tally as last-known
 -- information, where Pawl.Types.PutCounters carries one kind and one Quantity
--- (#2694). The omission is stricter than printed -- alice's departing counters
--- simply cease -- and never weaker in her favour.
+-- (#2694). The omission is stricter than printed -- a departing permanent's
+-- counters simply cease -- and never weaker in its controller's favour.
 --
 -- Both target pools are Pool.Permanents and both slots accept every permanent
 -- alice controls, so one predicate over both could not tell them apart and the
@@ -741,6 +741,10 @@ everyKindSpec s registry = Spec.describe s "CR 122.5 moving every kind of counte
 -- answerer cannot silently repair a mutation by re-deriving a legal answer, and
 -- the count of prompts raised is threaded so a case whose point is that nothing
 -- was asked can say so.
+defenseFrom, defenseTo :: SlotName.SlotName
+defenseFrom = SlotName.MkSlotName (Text.pack "from")
+defenseTo = SlotName.MkSlotName (Text.pack "to")
+
 defenseAnswer ::
   ObjectId.ObjectId ->
   ObjectId.ObjectId ->
@@ -752,8 +756,11 @@ defenseAnswer giver taker wanted p = case p of
     pure
       ( Map.mapWithKey
           ( \slot (_, offered) ->
-              let target = if slot == transferFrom then giver else taker
-               in Set.filter ((==) (Just target) . Recipient.objectOf) offered
+              let target
+                    | slot == defenseFrom = Just giver
+                    | slot == defenseTo = Just taker
+                    | otherwise = Nothing
+               in Set.filter ((==) target . Recipient.objectOf) offered
           )
           asked
       )

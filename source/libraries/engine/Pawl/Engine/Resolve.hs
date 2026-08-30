@@ -6781,9 +6781,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- as much as possible". The clamp is load-bearing --
                 -- Event.removeCounters saturates where Event.putCounters does not,
                 -- so an unclamped pair would place more counters than it took off
-                -- -- and PROVEN, by the AnyNumber arm below: a card's own count is
-                -- always the tally of that kind on the very object the removal
-                -- reads, but a PLAYER's answer is not, so Pawl.MoveCounterSpec's
+                -- -- and PROVEN by the AnyNumber arm below: no card in the corpus
+                -- writes a count the object it reads cannot cover, but a PLAYER's
+                -- answer is under no such constraint, so Pawl.MoveCounterSpec's
                 -- "an answer asking for more counters than the permanent has"
                 -- case is where the two differ. It also subsumes rule 122.5's
                 -- second impossibility, a kind the first object does not have at
@@ -6818,20 +6818,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- destination refuses -- leaves nothing to move and nothing to
                   -- ask. Ascending (Map.keys), so a transcript is deterministic.
                   --
-                  --
-                  -- The whole count comes out of the ONE kind picked, which is
-                  -- exact for a card that PRINTS a count: every printing that
-                  -- prints one prints "a counter" (Pawl.Types.MovedKinds' Chosen
-                  -- records the sweep), and the kindless moves that carry more
-                  -- than one counter say "all counters" or "any number of
-                  -- counters", which are the two arms below and above.
+                  -- The whole count comes out of the ONE kind picked; the sweep
+                  -- behind that is Pawl.Types.MovedKinds' haddock.
                   MovedKinds.Chosen quantity ->
                     -- A count of zero moves nothing and ASKS nothing: the prompt
                     -- below picks which kind crosses, and no kind crossing makes
                     -- that a question whose answer cannot matter. A REGRESSION
-                    -- FENCE, not a proven behaviour -- the one producer that names
-                    -- no kind and asks has a literal count of one, so a mutation
-                    -- dropping this guard leaves the suite green.
+                    -- FENCE, not a proven behaviour -- the one producer reaching
+                    -- THIS arm has a literal count of one, so a mutation dropping
+                    -- this guard leaves the suite green.
                     let asked = askedFor quantity
                      in if asked == 0
                           then pure 0
