@@ -676,22 +676,21 @@ durationSlots duration = case duration of
   Duration.UntilPaid _ -> Map.empty
   Duration.UntilEndOfCombat -> Map.empty
 
--- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless
--- [a player] pays" names, and every slot a target slot's own pool or filter
--- names. A payer or pool slot no effect also reads would otherwise dangle.
+-- Every slot ONE target slot reads: its pool's, its filter's, and its CR 202.3
+-- computed bound's. Its own name is not among them -- this is what the slot
+-- READS, and CR 601.2c binds it only once it has been answered.
 --
--- Not implemented: CR 303.4a's enchant slot is declared on the FACE beside the
--- modes (Card.enchantSlotMap), so nothing it names is folded here at all (#2673).
-modeSlots :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Map.Map SlotName SlotArity
-modeSlots mode =
+-- Its own function because a target slot is declared in TWO places and both have
+-- to be swept: on a mode (Mode.targetSlots, folded by modeSlots below) and on the
+-- FACE beside the modes, which is CR 303.4a's enchant slot (Card.enchantSlotMap).
+-- Pawl.CardSpec's "an enchant slot reads no slot" sweep is the second reader.
+targetSlotSlots :: TargetSlot.TargetSlot -> Map.Map SlotName SlotArity
+targetSlotSlots slot =
   joinSlots
-    [ joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))),
-      joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))),
-      joinSlots (fmap askerSlot (Foldable.toList (Mode.clauses mode))),
-      joinSlots (fmap (poolSlot . TargetSlot.pool) (Map.elems (Mode.targetSlots mode))),
-      -- And every slot a target slot's own FILTER names -- CR 603.2's "target
-      -- artifact or enchantment that player controls".
-      joinSlots (fmap filterSlots (Map.elems (Mode.targetSlots mode))),
+    [ poolSlot (TargetSlot.pool slot),
+      -- Every slot the slot's own FILTER names -- CR 603.2's "target artifact or
+      -- enchantment that player controls".
+      maybe Map.empty (Map.fromSet (const SlotArity.One) . Filter.boundSlots) (TargetSlot.filter slot),
       -- And every slot its CR 202.3 computed bound names -- Venerable Warsinger's
       -- "mana value X or less ... where X is the amount of damage this creature
       -- dealt to that player", whose X is the trigger's own event amount
@@ -703,13 +702,21 @@ modeSlots mode =
       -- itself. What it fences is the pairing -- a card whose bound names an
       -- amount its CONDITION does not supply (Pawl.Engine.Event.eventBindingSlots)
       -- is caught only because the read is reported here.
-      joinSlots (fmap amountSlots (Map.elems (Mode.targetSlots mode)))
+      maybe Map.empty quantitySlots (TargetSlot.amount slot)
+    ]
+
+-- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless
+-- [a player] pays" names, and every slot a target slot's own pool, filter or
+-- bound names. A payer or pool slot no effect also reads would otherwise dangle.
+modeSlots :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Map.Map SlotName SlotArity
+modeSlots mode =
+  joinSlots
+    [ joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))),
+      joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))),
+      joinSlots (fmap askerSlot (Foldable.toList (Mode.clauses mode))),
+      joinSlots (fmap targetSlotSlots (Map.elems (Mode.targetSlots mode)))
     ]
   where
-    filterSlots =
-      maybe Map.empty (Map.fromSet (const SlotArity.One) . Filter.boundSlots)
-        . TargetSlot.filter
-    amountSlots = maybe Map.empty quantitySlots . TargetSlot.amount
     -- Every clause's payer: CR 118.12 scopes a resolution cost to its clause.
     payerSlot = maybe Map.empty (playerRefSlots . PayGate.payer) . Clause.payGate
     -- And every clause's ASKER, for its reason: CR 603.5's "may" is scoped to a
