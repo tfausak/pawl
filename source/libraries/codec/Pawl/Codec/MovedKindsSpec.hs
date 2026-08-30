@@ -42,4 +42,10 @@ spec s = Spec.describe s "Pawl.Codec.MovedKinds" $ do
   -- count, both being the player's to pick, so the tag is the whole of it.
   Spec.it s "AnyNumber" $
     Common.assertCodec s MovedKinds.codec MovedKinds.AnyNumber " {\"type\":\"AnyNumber\"} "
+  -- Goldberry, River-Daughter's "move a counter of each kind not on Goldberry":
+  -- the destination settles the kinds and the wording settles the count, so the
+  -- tag is the whole of it. Arm.tagged compiles with no arm for a constructor
+  -- and answers Nothing on encode (#2262), so this case is what forces one.
+  Spec.it s "EachAbsentKind" $
+    Common.assertCodec s MovedKinds.codec MovedKinds.EachAbsentKind " {\"type\":\"EachAbsentKind\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s MovedKinds.codec

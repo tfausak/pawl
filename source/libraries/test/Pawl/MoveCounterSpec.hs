@@ -57,6 +57,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   batchSpec s registry
   everyKindSpec s registry
   anyNumberSpec s registry
+  absentKindSpec s registry
 
 -- Which counter the answerer takes, and whether it takes the printed "may" at
 -- all. Pinned by POSITION in the offered list rather than by naming a kind, so
@@ -721,9 +722,10 @@ everyKindSpec s registry = Spec.describe s "CR 122.5 moving every kind of counte
 -- states a fixed count above one without naming a kind: Scryfall
 -- oracle:/(^|[^a-z])move [^.]*counter/, 2026-08-30, over every printing ever
 -- released, turns up "all counters" (Fate Transfer, The Ozolith, Nexus
--- Mentality), "any number of counters" (this card, Slippery Bogbonder) and "one
--- or more counters" (Goldberry, River-Daughter), and nothing else above one.
--- Goldberry's spelling is this one with zero excluded and is not in the corpus.
+-- Mentality), "any number of counters" (this card, Slippery Bogbonder), "one or
+-- more counters" (Goldberry, River-Daughter's second ability) and "a counter of
+-- each kind not on Goldberry" (its first, the group below), and nothing else
+-- above one.
 --
 -- pawl's Resourceful Defense omits the triggered ability entirely. CR 122.8's
 -- placement itself is writable -- Effect.PutCountersFrom, which Iron Apprentice
@@ -873,3 +875,135 @@ anyNumberSpec s registry = Spec.describe s "CR 122.5 moving any number of counte
         Spec.assertEqWith s "and the first still bears nothing" (tripleOn giverId after) (0, 0, 0)
         Spec.assertEqWith s "and with no kind to offer the player was not asked" asked 0
       Nothing -> Spec.assertFailure s "expected Resourceful Defense to offer exactly its one printed activated ability"
+
+-- Goldberry, River-Daughter {1}{U} Legendary Creature - Nymph (Tales of Middle-
+-- earth Commander; name, cost, type line, power, toughness and oracle text
+-- checked against Scryfall 2026-08-30), data/cards/goldberry-river-daughter.json:
+--
+--   {T}: Move a counter of each kind not on Goldberry from another target
+--   permanent you control onto Goldberry.
+--   {U}, {T}: Move one or more counters from Goldberry onto another target
+--   permanent you control. If you do, draw a card.
+--
+-- The first line is this group's subject, and the card is why "each absent kind"
+-- exists: it names no kind, prints no count and asks nothing, yet it is neither
+-- Fate Transfer's "all counters" (which takes the whole tally of every kind) nor
+-- Agent's Toolkit's "a counter" (which takes one kind out of however many) --
+-- the DESTINATION's own tally is what narrows the kinds, a read no other
+-- spelling makes.
+--
+-- pawl's Goldberry omits the second ability. Its "one or more counters" is
+-- MovedKinds.AnyNumber with zero excluded, and AnyNumber admits an empty answer
+-- (the group above proves it does, deliberately), so writing it as AnyNumber
+-- would be WEAKER than printed in the controller's favour rather than stricter
+-- (#2702). Omitting it is stricter: alice simply has one fewer ability.
+--
+-- The counter kinds are three that do not interact -- CR 122.1a's +1/+1, CR
+-- 122.1c's shield and CR 122.1h's finality. Not CR 122.1a's -1/-1 beside its
+-- +1/+1, which CR 122.3 would annihilate as a state-based action before any
+-- assertion ran.
+goldberryOn :: ObjectId.ObjectId -> GameState.GameState -> (Natural, Natural, Natural)
+goldberryOn oid gs =
+  ( S.counterOf CounterKind.PlusOnePlusOne oid gs,
+    S.counterOf CounterKind.Shield oid gs,
+    S.counterOf CounterKind.Finality oid gs
+  )
+
+-- CR 601.2c through an activated ability: the Piker in the ability's one target
+-- slot. FILTERS the offered set rather than building a recipient, so CR 608.2b's
+-- re-read at resolution still finds what was named -- aimingTransfer's posture.
+-- Every counter prompt is COUNTED, because what this group asserts about the
+-- arm is that it raises none: a pure @Prompt r -> r@ could not say so.
+goldberryAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+goldberryAnswer giver p = case p of
+  Prompt.ChooseTargets _ _ _ asked ->
+    pure (Map.map (Set.filter ((==) (Just giver) . Recipient.objectOf) . snd) asked)
+  Prompt.ChooseMovedCounter {} -> do
+    State.modify' (+ 1)
+    pure (S.identityAnswer p)
+  Prompt.ChooseMovedCounters {} -> do
+    State.modify' (+ 1)
+    pure (S.identityAnswer p)
+  _ -> pure (S.identityAnswer p)
+
+absentKindSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each kind the second permanent lacks" $ do
+  let -- alice: Goldberry, two Islands and a Goblin Piker. The Piker bears THREE
+      -- kinds in three different counts, so "one of each kind" and "the whole
+      -- tally of each kind" are different boards; the Islands make the one target
+      -- slot offer more candidates than it needs. `onGoldberry` is what a case
+      -- puts on the DESTINATION, and is the ONLY difference between the boards
+      -- below.
+      board onGoldberry = do
+        island <- S.printingOf s registry "Island"
+        goldberry <- S.printingOf s registry "Goldberry, River-Daughter"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (goldberryId, g1) = S.addCreature goldberry S.alice (S.landsInPlay island 2)
+            (giverId, g2) = S.addCreature piker S.alice g1
+            stocked =
+              S.addCounter CounterKind.Finality 2 giverId
+                . S.addCounter CounterKind.Shield 4 giverId
+                . S.addCounter CounterKind.PlusOnePlusOne 3 giverId
+            ready = (onGoldberry goldberryId (stocked g2)) {GameState.priority = Just S.alice}
+        pure (goldberryId, giverId, ready)
+      -- The ability, activated once and resolved. Exactly one printed activated
+      -- ability, not the first of however many -- pawl's Goldberry omits the
+      -- second (#2702).
+      tap (goldberryId, giverId, ready) = case Activate.abilitiesFor goldberryId ready of
+        [only] ->
+          let run =
+                Engine.runGame
+                  (goldberryAnswer giverId)
+                  ready
+                  (Activate.activateAbility S.alice goldberryId only >> Stack.resolveTop)
+              ((_, after), asked) = State.runState run 0
+           in Just (asked, after)
+        _ -> Nothing
+  -- THE CASE THIS UNIT EXISTS FOR, and BOTH halves of the spelling are
+  -- load-bearing on it. Goldberry already bears shield counters and the Piker
+  -- bears three kinds: the shield counters do not cross at all (the destination
+  -- HAS that kind), and of the two kinds that do cross exactly ONE counter each
+  -- goes, though the Piker holds three of one and two of the other.
+  Spec.it s "one counter of each kind Goldberry lacks crosses, and the kind she has does not" $ do
+    built <- board (S.addCounter CounterKind.Shield 2)
+    let (goldberryId, giverId, before) = built
+    Spec.assertEqWith s "the Piker bears three +1/+1, four shield and two finality counters" (goldberryOn giverId before) (3, 4, 2)
+    Spec.assertEqWith s "and Goldberry bears two shield counters and nothing else" (goldberryOn goldberryId before) (0, 2, 0)
+    case tap built of
+      Just (asked, after) -> do
+        -- THE GAMEPLAY-LEVEL ASSERTIONS, ahead of the prompt count.
+        Spec.assertEqWith s "Goldberry gained one +1/+1 and one finality counter and no shield counter" (goldberryOn goldberryId after) (1, 2, 1)
+        Spec.assertEqWith s "and the Piker is down one of each of those two kinds, its shield counters untouched" (goldberryOn giverId after) (2, 4, 1)
+        Spec.assertEqWith s "and nothing was asked, the card settling both the kinds and the count" asked 0
+      Nothing -> Spec.assertFailure s "expected Goldberry to offer exactly its one transcribed activated ability"
+  -- The same board differing in exactly ONE thing, what Goldberry already bears:
+  -- with no shield counter on her the shield kind is absent too and one shield
+  -- counter crosses with the rest. Without this pair the case above would pass on
+  -- a move that dropped shield counters for reasons of its own.
+  Spec.it s "and with that kind gone from Goldberry the same shield counter crosses" $ do
+    built <- board (const id)
+    let (goldberryId, giverId, before) = built
+    Spec.assertEqWith s "Goldberry bears no counter of any kind" (goldberryOn goldberryId before) (0, 0, 0)
+    case tap built of
+      Just (_, after) -> do
+        Spec.assertEqWith s "Goldberry gained one counter of all three kinds" (goldberryOn goldberryId after) (1, 1, 1)
+        Spec.assertEqWith s "and the Piker is down one of each" (goldberryOn giverId after) (2, 3, 1)
+      Nothing -> Spec.assertFailure s "expected Goldberry to offer exactly its one transcribed activated ability"
+  -- The other end of the same pair: a destination bearing every kind the first
+  -- object has leaves no appropriate kind at all, so the move is empty -- and
+  -- still asks nothing, since there was never a question.
+  Spec.it s "a Goldberry bearing every kind the permanent has moves nothing and asks nothing" $ do
+    built <-
+      board
+        ( \oid ->
+            S.addCounter CounterKind.Finality 1 oid
+              . S.addCounter CounterKind.Shield 2 oid
+              . S.addCounter CounterKind.PlusOnePlusOne 1 oid
+        )
+    let (goldberryId, giverId, _) = built
+    case tap built of
+      Just (asked, after) -> do
+        Spec.assertEqWith s "Goldberry is left with exactly what she started with" (goldberryOn goldberryId after) (1, 2, 1)
+        Spec.assertEqWith s "and the Piker kept every counter it had" (goldberryOn giverId after) (3, 4, 2)
+        Spec.assertEqWith s "and with no absent kind the player was not asked" asked 0
+      Nothing -> Spec.assertFailure s "expected Goldberry to offer exactly its one transcribed activated ability"
