@@ -321,10 +321,10 @@ movesLibraryCard effect = case effect of
   -- CR 729.2: as a subgame starts, "each player takes all the cards in their
   -- main-game library, moves them to their subgame library, and shuffles them".
   Effect.PlaySubgame _ -> True
-  -- The one arm that has to read its payload, because the opcode is the general
-  -- zone change and only its ZONES answer the question. Three ways to touch a
-  -- library: arriving in one, being named as leaving one (CR 113.6m's origin),
-  -- or being referred to by position in one.
+  -- Reads its payload, as the Meld and Conjure arms below do: the opcode is the
+  -- general zone change and only its ZONES answer the question. Three ways to
+  -- touch a library: arriving in one, being named as leaving one (CR 113.6m's
+  -- origin), or being referred to by position in one.
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone _ _ origin _ _) ->
     zone == Zone.Library || origin == Just Zone.Library || refReachesLibrary ref
   -- CR 701.42a's destination is the battlefield, so the "to" half is never a
