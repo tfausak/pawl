@@ -219,6 +219,7 @@ manaProduced effect = case effect of
   Effect.RedirectDamage {} -> Nothing
   Effect.Counter {} -> Nothing
   Effect.PutCounters {} -> Nothing
+  Effect.PutCountersFrom {} -> Nothing
   Effect.RemoveCounters {} -> Nothing
   Effect.MoveCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
@@ -407,6 +408,7 @@ movesLibraryCard effect = case effect of
   -- CR 701.6: a countered spell goes to its owner's GRAVEYARD.
   Effect.Counter {} -> False
   Effect.PutCounters {} -> False
+  Effect.PutCountersFrom {} -> False
   Effect.RemoveCounters {} -> False
   Effect.MoveCounters {} -> False
   Effect.GainPlayerCounters {} -> False

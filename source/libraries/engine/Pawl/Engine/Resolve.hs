@@ -222,6 +222,7 @@ import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.PutCounters as PutCounters
+import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
@@ -578,6 +579,9 @@ slotsOf effect = case effect of
   -- The bound slot is a DEFINITION, not a read: see boundSlots below.
   Effect.Counter (Counter.MkCounter ref _) -> objectRefSlots ref
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity ref) -> joinTwo (objectRefSlots ref) (quantitySlots quantity)
+  -- CR 122.8 reads its tally off ONE object, so `from` is read singly, where
+  -- the destination is an ObjectRef and may sweep.
+  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from ref) -> insertOne from (objectRefSlots ref)
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity slot) -> insertOne slot (quantitySlots quantity)
   -- CR 122.5's pair, both read singly: the object the counters leave and the
   -- object they land on. The count reads slots of its own -- Black Panther,
@@ -926,6 +930,8 @@ slotsAreExhaustive effect = case effect of
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _ _) -> durationSlotsAreExhaustive duration
   Effect.Counter {} -> True
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
+  -- No Quantity at all: CR 122.8 names neither a kind nor a count.
+  Effect.PutCountersFrom {} -> True
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> all Quantity.slotsAreExhaustive (MovedKinds.quantityOf kinds)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
@@ -1100,6 +1106,7 @@ readsX = any effectReadsX
       Effect.RedirectDamage {} -> False
       Effect.Counter {} -> False
       Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
+      Effect.PutCountersFrom {} -> False
       Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.readsX quantity
       Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> any Quantity.readsX (MovedKinds.quantityOf kinds)
       Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
@@ -1338,6 +1345,7 @@ boundSlots effect = case effect of
   -- countered this way".
   Effect.Counter (Counter.MkCounter _ mSlot) -> foldMap Set.singleton mSlot
   Effect.PutCounters {} -> Set.empty
+  Effect.PutCountersFrom {} -> Set.empty
   Effect.RemoveCounters {} -> Set.empty
   -- How many counters CR 122.5 ACTUALLY moved, for a "that much life".
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ mSlot _) -> foldMap Set.singleton mSlot
@@ -6654,6 +6662,43 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       Just n ->
         Monad.when (n > 0) . Event.simultaneously . Monad.forM_ targets $ \target ->
           Event.putCounters (CounterCause.ByEffect controller) target kind (Integer.toNaturalSaturating n)
+  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom fromSlot ref) -> do
+    gs <- State.get
+    -- CR 122.8: put the counters the `from` object HAD onto every permanent the
+    -- ref names -- "the player puts the same number of each kind of counter the
+    -- first object had onto the second object".
+    --
+    -- A PUT and nothing else: rule 122.8's first sentence says the player
+    -- "doesn't move counters from one object to the other", so unlike the CR
+    -- 122.5 arm below there is no removal, no atomicity to enforce and none of
+    -- that rule's four impossibilities to check. CR 122.2 is why -- the first
+    -- object's counters ceased to exist as it changed zones, and what rule 122.8
+    -- reads is the tally, not the counters.
+    --
+    -- The tally comes off the VIEW rather than off Object.counters, which is what
+    -- makes CR 608.2h answer it: `effectViewOf` hands the resolving SOURCE its
+    -- last known information, and Iron Apprentice's "when this creature dies" is
+    -- read off the source itself.
+    --
+    -- Not implemented: a `from` slot naming some OTHER object that has left reads
+    -- an empty tally, since CR 608.2b wants a gone target blank and no reserved
+    -- slot names a departing bystander yet -- Resourceful Defense's "whenever a
+    -- permanent you control leaves the battlefield" is the shape that needs one
+    -- (#2694).
+    let viewOf = effectViewOf source legal gs
+        -- CR 608.2c: the set is swept as this instruction is reached, and an
+        -- illegal slot (CR 608.2b) or a player recipient answers with nobody.
+        targets = objectRefObjects legal resolving controller source gs ref
+        -- Ascending (Map.toList), so a transcript is deterministic. A kind
+        -- recorded at zero is dropped: it is not a kind the object HAD.
+        tally = case legalOne fromSlot legal >>= Recipient.objectOf of
+          Nothing -> Map.empty
+          Just oid -> Map.filter (> 0) (maybe Map.empty Filter.counters (viewOf oid))
+    -- ONE event for the placements, the PutCounters arm's Event.simultaneously
+    -- bracket and its reasons (CR 608.2f), spent only when something crosses.
+    -- ONE call per kind per permanent inside it, which is CR 614.16's own unit.
+    Monad.unless (Map.null tally) . Event.simultaneously . Monad.forM_ targets $ \target ->
+      Monad.forM_ (Map.toList tally) (uncurry (Event.putCounters (CounterCause.ByEffect controller) target))
   -- CR 201.4 via CR 608.2c: the resolving controller names a card, and the name
   -- is stamped on the SOURCE so a later clause of the same resolution can read it
   -- (Ancient Vendetta). Object.chosenNames is the same store CR 614.1c's

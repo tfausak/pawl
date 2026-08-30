@@ -653,6 +653,8 @@ library codec
     Pawl.Codec.ProjectedCharacteristics
     Pawl.Codec.ProjectedCharacteristicsSpec
     Pawl.Codec.PutCounters
+    Pawl.Codec.PutCountersFrom
+    Pawl.Codec.PutCountersFromSpec
     Pawl.Codec.PutCountersSpec
     Pawl.Codec.Quantity
     Pawl.Codec.QuantitySpec
@@ -1238,6 +1240,7 @@ library test
     Pawl.PlayerEffectSpec
     Pawl.PowerToughnessSpec
     Pawl.ProjectionSpec
+    Pawl.PutCounterSpec
     Pawl.RadSpec
     Pawl.RegistrySpec
     Pawl.ReplacementSpec
@@ -1605,6 +1608,7 @@ library types
     Pawl.Types.Prompt
     Pawl.Types.ProposedEvent
     Pawl.Types.PutCounters
+    Pawl.Types.PutCountersFrom
     Pawl.Types.Quantity
     Pawl.Types.Recipient
     Pawl.Types.RedirectDamage
