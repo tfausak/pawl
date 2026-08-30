@@ -725,11 +725,13 @@ everyKindSpec s registry = Spec.describe s "CR 122.5 moving every kind of counte
 -- or more counters" (Goldberry, River-Daughter), and nothing else above one.
 -- Goldberry's spelling is this one with zero excluded and is not in the corpus.
 --
--- pawl's Resourceful Defense omits the triggered ability entirely: "put those
--- counters" copies a departing permanent's whole per-kind tally as last-known
--- information, where Pawl.Types.PutCounters carries one kind and one Quantity
--- (#2694). The omission is stricter than printed -- a departing permanent's
--- counters simply cease -- and never weaker in its controller's favour.
+-- pawl's Resourceful Defense omits the triggered ability entirely. CR 122.8's
+-- placement itself is writable -- Effect.PutCountersFrom, which Iron Apprentice
+-- proves in Pawl.PutCounterSpec -- but that opcode reads its tally off a SLOT,
+-- and no reserved slot names the departing BYSTANDER this card's condition
+-- watches (#2694). The omission is stricter than printed -- a departing
+-- permanent's counters simply cease -- and never weaker in its controller's
+-- favour.
 --
 -- Both target pools are Pool.Permanents and both slots accept every permanent
 -- alice controls, so one predicate over both could not tell them apart and the
