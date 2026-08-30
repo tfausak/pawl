@@ -11,8 +11,11 @@ import qualified Pawl.Types.SlotName as SlotName
 -- stated about a pair. An ObjectRef describing a set would have no pair for that
 -- clause to be about.
 --
+-- Not implemented: the printed text that DOES name a set on the first side,
+-- Slippery Bogbonder's "from among creatures you control" (#2704).
+--
 -- `kinds` is WHICH counters cross and how many of each, which the printed text
--- spells four ways; Pawl.Types.MovedKinds is where the four are set out.
+-- spells five ways; Pawl.Types.MovedKinds is where the five are set out.
 --
 -- ONE batch per kind is what crosses. Rule 122.5 never speaks of more than one
 -- counter, so it does not settle the batch on its own; what does is that each of
