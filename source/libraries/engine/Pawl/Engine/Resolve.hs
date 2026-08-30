@@ -684,10 +684,24 @@ durationSlots duration = case duration of
 -- computed bound's. Its own name is not among them -- this is what the slot
 -- READS, and CR 601.2c binds it only once it has been answered.
 --
--- Its own function because a target slot is declared in TWO places and both have
--- to be swept: on a mode (Mode.targetSlots, folded by modeSlots below) and on the
--- FACE beside the modes, which is CR 303.4a's enchant slot (Card.enchantSlotMap).
--- Pawl.CardSpec's "an Aura's enchant slot reads no slot" sweep is the second reader.
+-- Its own function because a card declares a target slot in THREE places, and
+-- each needs its own reader. Enumerated off the three types that hold one:
+--
+--   * Mode.targetSlots -- CR 601.2c's ordinary target, declared inside a mode.
+--     modeSlots below folds this one, and the corpus lint that pairs a mode's
+--     reads with its declarations is what consumes it.
+--   * Face.enchant -- CR 303.4a's enchant slot, declared on the face BESIDE the
+--     modes (Card.enchantSlotMap), so it is in no mode's declared set.
+--   * Modification.GainEnchant -- the same slot GRANTED by a CR 613.1f layer 6
+--     effect (Cloudform, the Licids, CR 702.103b's bestow). What answers it is
+--     never the granting mode: the grant is a CR 611.2 continuous effect that
+--     outlives the resolution that made it, so by the time CR 601.2c chooses for
+--     a bestowed spell (Card.modesTargetSlotsGiven) or CR 303.4c's state-based
+--     action re-reads CR 702.5a against a permanent, the announcement the grant
+--     was written in is gone. Declaring the name would not rescue it.
+--
+-- The last two are one claim, and Pawl.CardSpec's "an enchant slot reads no slot,
+-- printed or granted" sweep is what states it: neither may read anything.
 targetSlotSlots :: TargetSlot.TargetSlot -> Map.Map SlotName SlotArity
 targetSlotSlots slot =
   joinSlots
