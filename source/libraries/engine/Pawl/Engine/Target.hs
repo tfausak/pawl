@@ -152,13 +152,15 @@ legalRecipients perspective source slot gs =
 -- (see slotContext). A whole Binding rather than the recipients alone because the
 -- second half is not a recipient at all.
 --
--- `unannounced` says the announcement has not been made AT ALL, which is a
--- different claim from an empty one: it is CR 700.2a's fillability gate asking
--- before CR 601.2b, and the only thing it changes is that a computed bound
--- reading a number that does not exist yet states no bound rather than an
--- unmeetable one (Filter.boundUnannounced). True at exactly one call site,
--- fillableModesGiven's; every other caller is judging an announcement that has
--- been made, however empty.
+-- `unannounced` is CR 700.2a's fillability gate saying it is asking ahead of the
+-- announcement, and the only thing it changes is that a computed bound reading a
+-- number the seed cannot supply states no bound rather than an unmeetable one
+-- (Filter.boundUnannounced). True at exactly one call site,
+-- fillableModesGiven's, which is where the argument for it lives; False
+-- everywhere else, which leaves such a bound vacuously False. That is right at CR
+-- 601.2c and CR 608.2b, where the announcement is made and answers it, and it is
+-- what makes Pawl.Engine.Activate's pre-X call a KNOWN gap rather than a silent
+-- widening (#2672).
 legalRecipientsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> TargetSlot -> GameState -> Set Recipient
 legalRecipientsGiven pcs grants pools perspective unannounced bindings source slot gs =
   -- The SAME thunk both halves read, so the whole-board projection is taken at
@@ -1337,16 +1339,34 @@ fillableModesGiven pcs grants pools perspective seed source extra modal gs =
   let ms = Foldable.toList (Modal.modes modal)
       fillable i m =
         let slots = Map.union extra (Mode.targetSlots m)
-            -- CR 601.2b's other FLOOR, the one `short` below cannot spell: this
-            -- gate runs before the announcement, so a slot's CR 202.3 computed
-            -- bound that reads a number the announcement has not supplied states
-            -- no bound at all rather than an unmeetable one (see
+            -- CR 601.2b's other FLOOR, the one `short` below cannot spell: a
+            -- slot's CR 202.3 computed bound that reads a number the seed cannot
+            -- supply states no bound at all rather than an unmeetable one (see
             -- Filter.boundUnannounced). Permissive is the floor's direction for a
-            -- bound as X=0 is for a count -- CR 601.2b puts no ceiling on the
-            -- value a caster may name, so Stir the Grave's mode is refused for an
-            -- empty graveyard and for nothing else. A bound the seed DOES answer
-            -- narrows here as it always did (Venerable Warsinger's, off CR 603.2's
-            -- event amount).
+            -- bound as X=0 is for a count, and both are the same question -- is
+            -- there SOME value of the announcement under which this mode is
+            -- fillable -- so Stir the Grave's mode is refused for an empty
+            -- graveyard and for nothing else. A bound the seed DOES answer narrows
+            -- here as it always did.
+            --
+            -- FIVE of the six callers ask before that announcement exists: CR
+            -- 601.2b names the modes before the X, so Cast's three (castable's
+            -- targetable, entwineOffer, castProposed's mode gate) and Activate's
+            -- two (activatableGiven, activateAbility's mode gate) all run first.
+            -- The sixth, Pawl.Engine.Engine.placeBorne, hands in CR 603.2's
+            -- bindings, which ARE the announcement -- so for it this is not a
+            -- floor but a widening: a trigger's bound its own event bindings
+            -- cannot answer is judged fillable here and then admits nothing at CR
+            -- 603.3d.
+            --
+            -- No card can write one, and the pairing rather than the constructor
+            -- is why: Pawl.CardSpec's "every slot a triggered ability reads is
+            -- bound for its condition" subtracts Event.eventBindingSlots from the
+            -- read side, and Resolve.modeSlots reports a slot's `amount` reads into
+            -- it -- so a bound naming a slot the condition does not supply fails
+            -- "no dangling triggered-ability slot" before it can reach a board.
+            -- Venerable Warsinger is the pool's one such bound, and its condition's
+            -- arm supplies Binding.eventAmount unconditionally.
             sets = legalSetsGiven pcs grants pools perspective True seed source slots gs
          in -- CR 115.6 / 601.2c: a slot is unfillable when the board cannot supply
             -- the MINIMUM its count demands. An "up to one" slot with no legal
