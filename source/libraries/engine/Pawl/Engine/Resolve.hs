@@ -694,6 +694,12 @@ modeSlots mode =
       -- dealt to that player", whose X is the trigger's own event amount
       -- (Pawl.Engine.Binding.eventAmount). Target.slotContext is what answers it,
       -- off the announcement the caller hands over.
+      --
+      -- A REGRESSION FENCE on its own: the reserved names a carrier binds are
+      -- subtracted from the READ side, so removing this fold reddens nothing by
+      -- itself. What it fences is the pairing -- a card whose bound names an
+      -- amount its CONDITION does not supply (Pawl.Engine.Event.eventBindingSlots)
+      -- is caught only because the read is reported here.
       joinSlots (fmap amountSlots (Map.elems (Mode.targetSlots mode)))
     ]
   where

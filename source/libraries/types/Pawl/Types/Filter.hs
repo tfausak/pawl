@@ -196,8 +196,9 @@ data Filter keyword
     -- evaluates a target slot's Filter, at both of CR 115's moments -- so the
     -- bound is READ AGAIN at CR 608.2b rather than frozen at announcement. Which
     -- direction that can move is a fact about the quantities cards name rather
-    -- than about this atom: a turn's life gain only grows, so today the re-read
-    -- can only widen.
+    -- than about this atom: a turn's life gain only grows, so that re-read can
+    -- only widen, and Venerable Warsinger's CR 603.2 event amount is a number the
+    -- announcement fixed, so its re-read cannot move at all.
     --
     -- AT MOST only, ManaValueAtMost's reason one atom over: that is the direction
     -- the printed cards ask in.

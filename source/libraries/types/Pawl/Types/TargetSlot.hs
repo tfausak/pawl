@@ -75,8 +75,8 @@ data TargetSlot = MkTargetSlot
     -- slotContext hands the environment to Pawl.Engine.Quantity through
     -- Filter.Context's boundAmounts. Venerable Warsinger's "where X is the amount
     -- of damage this creature dealt to that player" is the printed shape, and
-    -- Pawl.TargetSpec's "CR 603.2 a bound reading the trigger's own event amount
-    -- returns the creature it admits" is what proves it on a board.
+    -- Pawl.TargetSpec's "CR 603.2 whole card: the bound is the damage the event
+    -- carried" is what proves it on a board.
     amount :: Maybe Quantity.Quantity
   }
   deriving (Eq, Ord, Show)

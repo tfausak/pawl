@@ -145,8 +145,11 @@ legalRecipients perspective source slot gs =
 -- once per ability even after #716 threaded the projections in (#1073). See
 -- Pools.
 --
--- `bindings` is what the OTHER slots of the same announcement hold -- the map a
--- GraveyardScope.InSlot pool is resolved against. See graveyardRecipients.
+-- `bindings` is the ANNOUNCEMENT's whole binding environment -- what its other
+-- slots hold, which a GraveyardScope.InSlot pool is resolved against (see
+-- graveyardRecipients), plus the NUMBERS CR 603.2's event stamped, which a CR
+-- 202.3 computed bound reads (see slotContext). A whole Binding rather than the
+-- recipients alone because the second half is not a recipient at all.
 legalRecipientsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> TargetSlot -> GameState -> Set Recipient
 legalRecipientsGiven pcs grants pools perspective bindings source slot gs =
   -- The SAME thunk both halves read, so the whole-board projection is taken at
@@ -984,9 +987,9 @@ stillAdmitted perspective source recipient slot gs = Set.member recipient (admit
 --
 -- `seed` is what the announcement ALREADY has bound before any target is chosen
 -- -- empty for a cast and for an activation, and CR 603.2's trigger bindings for
--- a triggered ability being placed (Harness the Storm's cast spell). It joins the
--- per-slot bindings the two passes below build, so an atom that reads a slot
--- cannot tell the two apart.
+-- a triggered ability being placed (Harness the Storm's cast spell, Venerable
+-- Warsinger's event amount). It joins the per-slot bindings the two passes below
+-- build, so an atom that reads a slot cannot tell the two apart.
 legalSets :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
 legalSets perspective seed source slots gs =
   let pcs = Projection.projectAll gs
@@ -1331,9 +1334,11 @@ fillableModesGiven pcs grants pools perspective seed source extra modal gs =
 -- Pawl.Engine.Resolve.resolveModes' CR 608.2b re-check -- so the rule re-judges
 -- what the choice was offered against.
 --
--- A REWRITE rather than a Context field, and no signature here widens: the
--- bindings are known where these two callers stand and nowhere else, so the slot
--- reaching this module is already answerable. The order is not CR 601.2c's
+-- A REWRITE rather than a Context field, unlike the AMOUNT half of the same
+-- environment (slotContext's boundAmounts): a player substituted into an atom
+-- leaves the slot answerable by itself, where a bound reading CR 603.2's number
+-- has to reach Pawl.Engine.Quantity, which takes a Context and no bindings. The
+-- order is not CR 601.2c's
 -- simultaneity problem that a slot depending on ANOTHER SLOT is
 -- (Pawl.Types.GraveyardScope's InSlot, two passes in legalSetsGiven): a trigger's
 -- event bindings are fixed before the ability is put on the stack, so nothing
@@ -1345,9 +1350,9 @@ bakeSlots players = fmap (bakeSlot players)
 -- CR 202.3's computed bound is a Quantity, and a Quantity names CR 603.2's
 -- bindings through PlayerRef.InSlot exactly as a Filter names them through
 -- ControlledByBound. An unbaked one would be unanswerable where the filter beside
--- it is answerable. A REGRESSION FENCE rather than a proved behaviour: the one
--- card that names an amount names Quantity.LifeGainedThisTurn, which holds no
--- slot, so no board today tells the two readings apart.
+-- it is answerable. A REGRESSION FENCE rather than a proved behaviour: no
+-- committed bound holds a PlayerRef at all -- two name Quantity.LifeGainedThisTurn
+-- and one a Quantity.InSlot -- so no board today tells the two readings apart.
 bakeSlot :: Map SlotName PlayerId -> TargetSlot -> TargetSlot
 bakeSlot players slot =
   slot
