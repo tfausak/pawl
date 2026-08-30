@@ -67,6 +67,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.InZone as InZone
@@ -1437,6 +1438,12 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       codec
       (Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (PlayerRef.Relative PlayerRelation.You)))
       " {\"type\":\"RequireAttack\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"attacker\":{\"type\":\"InSlot\",\"value\":\"target\"},\"defender\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}}} "
+  Spec.it s "ForbidBlock" $
+    Common.assertCodec
+      s
+      codec
+      (Effect.ForbidBlock (ForbidBlock.MkForbidBlock Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
+      " {\"type\":\"ForbidBlock\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
   Spec.it s "CreateEmblem" $
     Common.assertJsonCodec
       s

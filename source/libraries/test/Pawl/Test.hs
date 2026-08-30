@@ -19,6 +19,7 @@ import qualified Pawl.Codec.ActivatedAbilitySourceSpec
 import qualified Pawl.Codec.ActivatedAbilitySpec
 import qualified Pawl.Codec.ActivationRestrictionSpec
 import qualified Pawl.Codec.ActiveAttackRequirementSpec
+import qualified Pawl.Codec.ActiveBlockProhibitionSpec
 import qualified Pawl.Codec.ActiveBlockRequirementSpec
 import qualified Pawl.Codec.ActivePlayerEffectSpec
 import qualified Pawl.Codec.ActiveReplacementSpec
@@ -176,6 +177,7 @@ import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.FlipCoinSpec
 import qualified Pawl.Codec.FloatingCandidateSpec
 import qualified Pawl.Codec.ForEachSpec
+import qualified Pawl.Codec.ForbidBlockSpec
 import qualified Pawl.Codec.FromOutsideTheGameSpec
 import qualified Pawl.Codec.GameEventSpec
 import qualified Pawl.Codec.GrantPlayFromExileSpec
@@ -564,6 +566,7 @@ spec s registry = do
   Pawl.Codec.ActivatedAbilitySpec.spec s
   Pawl.Codec.ActivationRestrictionSpec.spec s
   Pawl.Codec.ActiveAttackRequirementSpec.spec s
+  Pawl.Codec.ActiveBlockProhibitionSpec.spec s
   Pawl.Codec.ActiveBlockRequirementSpec.spec s
   Pawl.Codec.ActivePlayerEffectSpec.spec s
   Pawl.Codec.ActiveReplacementSpec.spec s
@@ -720,6 +723,7 @@ spec s registry = do
   Pawl.Codec.FlipCoinSpec.spec s
   Pawl.Codec.FloatingCandidateSpec.spec s
   Pawl.Codec.ForEachSpec.spec s
+  Pawl.Codec.ForbidBlockSpec.spec s
   Pawl.Codec.FromOutsideTheGameSpec.spec s
   Pawl.Codec.GameEventSpec.spec s
   Pawl.Codec.GrantPlayFromExileSpec.spec s

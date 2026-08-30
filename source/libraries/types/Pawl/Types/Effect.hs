@@ -27,6 +27,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.Keyword as Keyword
@@ -997,6 +998,21 @@ data Effect card ability
     -- attack (CR 508.1b) -- so this pairs an ObjectRef with a PlayerRef, one
     -- requirement instance per (attacker, defender) pair.
     RequireAttack RequireAttack.RequireAttack
+  | -- | CR 509.1b / 613.11: install a stored BLOCKING RESTRICTION for a duration.
+    -- Zirda, the Dawnwaker's is `ForbidBlock UntilEndOfTurn (InSlot target)`.
+    --
+    -- RequireBlock's opposite polarity and CantBeRegenerated's shape: rule
+    -- 509.1b's subject is one OBJECT, so a single ObjectRef and no second axis --
+    -- "can't block" names nothing to be blocked, where CR 509.1c's requirement
+    -- names what must be blocked.
+    --
+    -- Not a Pawl.Types.Modification, and CR 613.11 is the reason: a restriction on
+    -- a declaration modifies the RULES rather than any object's characteristics,
+    -- so it is applied after the layers and Pawl.Engine.Projection never sees it.
+    -- Pawl.Types.CombatRestriction is the printed carrier of the same sentence and
+    -- could not have been reused either -- it is gathered live off a source on the
+    -- battlefield, where this outlives its source (CR 611.2a).
+    ForbidBlock ForbidBlock.ForbidBlock
   | -- | CR 114.2: the resolving controller gets an emblem with the given
     -- abilities, put into the command zone. Targetless; the abilities ride a Card
     -- so the emblem reuses the whole ability pipeline.
