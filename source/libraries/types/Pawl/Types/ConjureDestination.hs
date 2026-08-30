@@ -13,13 +13,19 @@ module Pawl.Types.ConjureDestination where
 -- reaches.
 --
 -- Not implemented: a graveyard (Shellfish Scholar\'s "conjure a card named Think
--- Twice into your graveyard"), exile (Dazzling Flameweaver\'s "conjure a random
--- card from Dazzling Flameweaver\'s spellbook into exile", Gyox, Brutal
--- Carnivora\'s "conjure X duplicates of it into exile") and the battlefield
--- (Gilt-Leaf Alchemist\'s "conjure a card named Forest onto the battlefield"),
--- which is the expensive one -- that arrival is an ENTRY and wants CR 614's
--- replacements and CR 603's triggers, where a hand, library or exile arrival is
--- no zone change at all (#2638).
+-- Twice into your graveyard") and the battlefield (Gilt-Leaf Alchemist\'s
+-- "conjure a card named Forest onto the battlefield"), which is the expensive one
+-- -- that arrival is an ENTRY and wants CR 614's replacements and CR 603's
+-- triggers, where a hand, library or exile arrival is no zone change at all
+-- (#2638).
+--
+-- Not implemented: exile (Dazzling Flameweaver\'s "conjure a random card from
+-- Dazzling Flameweaver\'s spellbook into exile", Gyox, Brutal Carnivora\'s
+-- "conjure X duplicates of it into exile"), which is an axis of its own rather
+-- than a third zone on the line above -- Scryfall @o:conjure o:exile@,
+-- 2026-08-29, five printings name this destination and not one of them names the
+-- card it conjures, so each is held out by #2643 as well and the arm above
+-- landing would leave this one still unreachable (#2653).
 data ConjureDestination
   = -- | Emporium Thopterist\'s "conjure a card named Ornithopter into your
     -- hand".
