@@ -9,8 +9,8 @@ import qualified Pawl.Types.GraveyardScope as GraveyardScope
 -- (#40): it grows when the rules admit a new kind of targetable object, or a new
 -- ZONE for one -- never with a card's own restriction, which is the Filter's job.
 -- A union of two admitted kinds is the one further shape a card can force, since
--- CR 601.2c fixes one count per slot and a slot has one pool; SpellsAndPermanents
--- and CreaturesAndCardsInGraveyard are those.
+-- CR 601.2c fixes one count per slot and a slot has one pool; SpellsAndPermanents,
+-- PlayersAndPlaneswalkers and CreaturesAndCardsInGraveyard are those.
 data Pool
   = Creatures -- CR 115.1a: creatures on the battlefield (ToCreature).
   | Players -- CR 115: players still in the game (ToPlayer).
@@ -36,6 +36,16 @@ data Pool
     -- Pawl.Engine.Activate.activatable already excludes it (CR 605.1a).
     Abilities
   | SpellsAndPermanents -- CR 115: spells on the stack + battlefield permanents (ToObject).
+  | -- | CR 115.2's own two halves in one slot -- the rule's default (a permanent
+    -- is a legal target, here CR 306's planeswalkers, ToPlaneswalker) plus clause
+    -- (a)'s "or a player" (ToPlayer). Goblin War Strike's "target player or
+    -- planeswalker".
+    --
+    -- Not CR 115.4's AnyTarget narrowed by a Filter. That rule's four-way is a
+    -- different printed template, and a card's Filter is its own restriction
+    -- rather than the pool's; Pawl.PlaneswalkerSpec's "CR 115.2 a 'player or
+    -- planeswalker' spell offers neither Goblin" is what holds the two apart.
+    PlayersAndPlaneswalkers
   | -- | CR 404.1: the cards in a graveyard (ToObject) -- Raise Dead's "target
     -- creature card in your graveyard". CR 115.2's OTHER escape hatch, the one
     -- Spells and Abilities above are not: those are its clause (b), and Players

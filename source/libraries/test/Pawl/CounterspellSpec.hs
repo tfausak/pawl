@@ -2285,9 +2285,8 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
   -- against Scryfall) -- puts the changeable word inside its damage clause's own
   -- Count, where every other case in this group puts it in a filter or a subtype.
   --
-  -- pawl's Goblin War Strike is aimed with Pool.Players, so it cannot be pointed
-  -- at a planeswalker -- stricter than printed, since no pool names that pair
-  -- (gap #2594).
+  -- The chain aims the Strike at a player; Pool.PlayersAndPlaneswalkers is the
+  -- slot's own pool, and Pawl.PlaneswalkerSpec proves the planeswalker half.
   --
   -- The control first, so the pair cannot pass on a chain that never resolved the
   -- Strike.

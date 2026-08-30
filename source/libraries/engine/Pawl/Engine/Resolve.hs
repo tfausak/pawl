@@ -715,6 +715,7 @@ poolSlot pool = case pool of
   Pool.Spells -> Map.empty
   Pool.Abilities -> Map.empty
   Pool.SpellsAndPermanents -> Map.empty
+  Pool.PlayersAndPlaneswalkers -> Map.empty
   Pool.CardsInGraveyard scope -> case scope of
     GraveyardScope.Scoped _ -> Map.empty
     GraveyardScope.InSlot slot -> oneSlot slot
