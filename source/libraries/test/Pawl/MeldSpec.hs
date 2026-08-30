@@ -680,6 +680,72 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith s "setup: both cards reached alice's graveyard" (List.sort (graveyardNames (splitOff meldedId [1, 0] byCard))) (List.sort [S.printingName battlements, S.printingName garrison])
       (Nothing, _) -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
       (_, []) -> Spec.assertFailure s "Pearl Collector should declare one activated ability"
+  -- The ARRIVAL direction of the case above: a perpetual grant naming one of the
+  -- two cards a meld consumes, rather than one naming the permanent they became.
+  -- CR 701.42a puts both cards ONTO the battlefield, so each is an object that
+  -- moved and the permanent is the CR 400.7 new object it became -- what
+  -- Pawl.Types.Duration's Perpetual arm says such an effect follows across.
+  --
+  -- BOTH HALVES in turn, and that is the case rather than belt and braces: the
+  -- two boards differ in nothing but which component the grant names, so an
+  -- engine re-anchoring only the first card the meld recorded answers them
+  -- differently.
+  --
+  -- Each leg is paired with the same stand-in grant under Expiry.Never, which is
+  -- CR 400.7's default and the only thing that differs between the two boards.
+  -- Pearl Collector's own grant is the third leg, aimed at the Garrison while it
+  -- is still a creature on the battlefield -- "another target creature", so the
+  -- Collector cannot name itself.
+  --
+  -- The damage is built through Pawl.Engine.Damage.damageEvent from the melded
+  -- permanent itself, the narrowest path that shows CR 702.15b's rider: driving
+  -- an attack instead would put the Township's own two 3/2 tokens into the same
+  -- life arithmetic.
+  Spec.it s "a perpetual grant naming a meld component follows onto the permanent the pair melds into" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    collector <- S.printingOf s registry "Pearl Collector"
+    let (collectorId, base) = S.addCreature collector S.alice (Setup.emptyGame S.bothPlayers)
+        (battlementsId, g1) = S.addCreature battlements S.alice base
+        (garrisonId, g2) = S.addCreature garrison S.alice g1
+        board = S.landsFor plains S.alice 3 (readyFor mountain g2)
+        -- Priority handed back and everything untapped before the melding
+        -- ability is activated. The Pearl Collector leg has already paid {2}{W}
+        -- on this board and the stand-in legs have not, and Hanweir Battlements
+        -- is itself a land that {2}{W}'s generic half can be paid from -- its own
+        -- melding cost has a {T} in it. Applied to EVERY leg, so the boards still
+        -- differ in the grant alone.
+        ready gs = gs {GameState.priority = Just S.alice, GameState.objects = fmap (\o -> o {Object.tapped = TapState.Untapped}) (GameState.objects gs)}
+        melds gs = case Projection.abilitiesOf battlementsId gs of
+          [_, _, melding] ->
+            let after = S.runPure S.identityAnswer (ready gs) (do Activate.activateAbility S.alice battlementsId melding; Stack.resolveTop)
+             in fmap (\oid -> (oid, after)) (Maybe.listToMaybe (namedTownship after (Game.zoneMembers Zone.Battlefield S.alice after)))
+          _ -> Nothing
+        pings (oid, gs) = S.runPure S.identityAnswer gs (Damage.applyDamage [Damage.damageEvent gs DamageKind.Combat oid (Recipient.ToPlayer S.bob) 2])
+        gained grant = fmap (\onBoard -> let hit = pings onBoard in (S.lifeOf S.alice hit, S.lifeOf S.bob hit)) (melds (grant board))
+    case Face.activatedAbilities (S.combinedFace collector) of
+      ability : _ -> do
+        let byCard = S.runPure (aimedAt garrisonId) board (do Activate.activateAbility S.alice collectorId ability; Stack.resolveTop)
+        Spec.assertEqWith s "the melded permanent carries a perpetual grant its Garrison half was given" (gained (lifelinkUnder Expiry.Type.Perpetual garrisonId)) (Just (Just 22, Just 18))
+        Spec.assertEqWith s "CR 400.7 while an indefinite grant on the same half is left naming an id nothing answers to" (gained (lifelinkUnder Expiry.Type.Never garrisonId)) (Just (Just 20, Just 18))
+        Spec.assertEqWith s "and the Battlements half is no different, so it is not the first component alone" (gained (lifelinkUnder Expiry.Type.Perpetual battlementsId)) (Just (Just 22, Just 18))
+        Spec.assertEqWith s "CR 400.7 again, against an indefinite grant on that half" (gained (lifelinkUnder Expiry.Type.Never battlementsId)) (Just (Just 20, Just 18))
+        Spec.assertEqWith s "Pearl Collector's own grant on the Garrison reaches the permanent too" (gained (const byCard)) (Just (Just 22, Just 18))
+        -- The proxies behind those, kept AFTER them: the card really did store a
+        -- perpetual grant naming the Garrison while it was still a creature, and
+        -- the pair really did mint one permanent -- so the life totals above are
+        -- the arrival's work and not a grant that never landed.
+        Spec.assertEqWith
+          s
+          "Pearl Collector stored one effect, under the perpetual arm, naming Hanweir Garrison"
+          (fmap ContinuousEffect.expiry (filter (\e -> ContinuousEffect.source e == collectorId && S.continuousEffectAffects garrisonId e) (GameState.continuousEffects byCard)))
+          [Expiry.Type.Perpetual]
+        Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink garrisonId byCard) "the Garrison had lifelink before anything melded"
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Lifelink garrisonId board)) "setup: and did not before the ability resolved"
+        Spec.assertEqWith s "setup: the pair melded into one permanent named Hanweir, the Writhing Township" (fmap (\(oid, after) -> fmap S.nameOf (Game.cardOf oid after)) (melds board)) (Just (Just townshipName))
+      [] -> Spec.assertFailure s "Pearl Collector should declare one activated ability"
   -- CR 903.9a over CR 712.21's split, and NOT CR 903.9c -- that rule governs only
   -- the CR 903.9b replacement (the hand and library redirect), which pawl does not
   -- make for a melded permanent (#2265). What runs here is rule 903.9a's

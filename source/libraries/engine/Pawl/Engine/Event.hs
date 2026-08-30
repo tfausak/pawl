@@ -4282,7 +4282,7 @@ rewatch oldId newId row = case ActiveReplacement.effect row of
   _ -> row
 
 -- Alchemy's "perpetually": the stored effects that FOLLOW their objects across a
--- zone change, re-anchored to the incarnation that just arrived. No rule of the
+-- zone change, re-anchored to every incarnation that just arrived. No rule of the
 -- CR names the word -- it is digital-only, and the printed sentence is the
 -- authority -- so the citation here is for what the rules DO settle: CR 400.7
 -- makes the arriving object a new one with no memory of the old, which is why
@@ -4308,7 +4308,10 @@ rewatch oldId newId row = case ActiveReplacement.effect row of
 -- arrangement's trailing card is named as well as its leading one. That is a
 -- THIRD difference from carryOver beside it, which names the head alone because
 -- CR 400.7a's exception is about the permanent a SPELL becomes and a spell melds
--- into nothing. Pawl.MeldSpec's Pearl Collector case is the proof.
+-- into nothing. Pawl.MeldSpec's departure case is the proof.
+--
+-- meld calls this too, one component at a time -- the same shape read backwards,
+-- two departures with one arrival each. Its own comment has the reason.
 perpetuate :: ObjectId -> Seq.Seq ObjectId -> Game ()
 perpetuate oldId newIds =
   State.modify' $ \gs ->
@@ -5038,13 +5041,6 @@ meld controller victims resultCard = do
       -- of CR 712.5's pairs prints an ability that functions from another zone
       -- (CR 113.6), so no component's projection reads another. One that did
       -- would want a single pre-removal board for all of them.
-      --
-      -- Not implemented: a stored Alchemy perpetual effect naming a component is
-      -- dropped here rather than re-anchored to the permanent the pair melds
-      -- into. This is the one road that mints an incarnation outside
-      -- changeZoneAttaching, so perpetuate is never asked; which way it SHOULD go
-      -- is a design call the CR does not make, since CR 712.21c licenses the
-      -- departure direction and no rule speaks to this one (#2657).
       State.modify' (\g -> Foldable.foldl' forgetObject g (fmap fst melding))
       let mkObj ts =
             Object.MkObject
@@ -5104,6 +5100,28 @@ meld controller victims resultCard = do
                 Object.exertedBy = Set.empty
               }
       newId <- placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue
+      -- Alchemy's "perpetually", the ARRIVAL direction of what perpetuate does at
+      -- every other zone change. This is the one road that mints an incarnation
+      -- outside changeZoneAttaching, so the call is made by hand here.
+      --
+      -- No rule of the CR names the word, and none needs to. CR 701.42a puts the
+      -- two cards ONTO the battlefield, so each is an object that moved and the
+      -- permanent is the CR 400.7 new object it became -- which is what
+      -- Pawl.Types.Duration's Perpetual arm already says such an effect follows
+      -- across. Reading CR 400.7's default as ending the effect HERE would be
+      -- selective, the arm overriding that default at every other zone change. CR
+      -- 712.21c is the same identity read the other way: one card becoming two,
+      -- where this is two becoming one.
+      --
+      -- EVERY component rather than the first, for perpetuate's own reason one
+      -- direction over: CR 701.42a's permanent is represented by both cards, and
+      -- CR 712.21e counts a melded permanent as two cards that moved.
+      -- Pawl.MeldSpec's arrival case grants on each half in turn to prove it.
+      --
+      -- Before runEntry, which is changeZoneAttaching's ordering: CR 614.12 reads
+      -- an entry replacement against the continuous effects that already apply to
+      -- the permanent.
+      Foldable.traverse_ (\component -> perpetuate (fst component) (Seq.singleton newId)) melding
       -- CR 712.14c / CR 616.1: ONE permanent enters, so ONE entry loop, with no
       -- simultaneously-entering sibling to exclude. createTokens' order exactly:
       -- the object is materialized first, because CR 614.12 asks for the
