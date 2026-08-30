@@ -176,7 +176,9 @@ import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaRestriction as ManaRestriction
+import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaRider as ManaRider
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -205,7 +207,9 @@ import qualified Pawl.Types.PerCreature as PerCreature
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -565,6 +569,55 @@ objectRefPositions =
 -- another position's ref is visible rather than merely absent.
 plantedRef :: String -> ObjectRef.ObjectRef
 plantedRef = ObjectRef.InSlot . SlotName.MkSlotName . Text.pack
+
+-- One planted effect per position a PlayerRef sits in, each reference naming its
+-- own position, paired with what Resolve.effectPlayerRefs owes back.
+-- objectRefPositions' twin one type over, and written out for its reason: the
+-- compiler forces an arm per OPCODE, not a reference per FIELD, so a second
+-- PlayerRef field on a payload that already has one would answer with the first
+-- alone and compile.
+playerRefPositions :: [(String, Effect.Effect () (), [PlayerRef.PlayerRef])]
+playerRefPositions =
+  [ ("add-mana", Effect.AddMana (ManaAddition.MkManaAddition (plantedPlayer "am") ManaProduction.AnyColor ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "am"]),
+    ("search", Effect.Search (Search.MkSearch (plantedPlayer "se-searcher") (plantedPlayer "se-owner") Set.empty Nothing (Filter.Type.And []) False SearchDestination.Battlefield), [plantedPlayer "se-searcher", plantedPlayer "se-owner"]),
+    ("draw", Effect.Draw (Draw.MkDraw (plantedPlayer "dr") one Nothing), [plantedPlayer "dr"]),
+    ("mill", Effect.Mill (Mill.MkMill (plantedPlayer "mi") one Nothing Nothing), [plantedPlayer "mi"]),
+    ("scry", Effect.Scry (playerQuantity "sc"), [plantedPlayer "sc"]),
+    ("surveil", Effect.Surveil (playerQuantity "su"), [plantedPlayer "su"]),
+    ("fateseal", Effect.Fateseal (playerQuantity "fs"), [plantedPlayer "fs"]),
+    ("lose-life", Effect.LoseLife (playerQuantity "ll"), [plantedPlayer "ll"]),
+    ("gain-life", Effect.GainLife (playerQuantity "gl"), [plantedPlayer "gl"]),
+    ("set-life-total", Effect.SetLifeTotal (playerQuantity "sl"), [plantedPlayer "sl"]),
+    ("increase-speed", Effect.IncreaseSpeed (playerQuantity "is"), [plantedPlayer "is"]),
+    ("decrease-speed", Effect.DecreaseSpeed (SpeedDecrease.MkSpeedDecrease (plantedPlayer "ds") one 0), [plantedPlayer "ds"]),
+    ("create", Effect.Create (Create.MkCreate one () EntryRiders.defaultValue Nothing (plantedPlayer "cr")), [plantedPlayer "cr"]),
+    ("skip-next-phase", Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase (plantedPlayer "sn") PhaseSelector.CombatPhase), [plantedPlayer "sn"]),
+    ("gain-player-counters", Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "gp") PlayerCounterKind.Rad one), [plantedPlayer "gp"]),
+    ("remove-player-counters", Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "rp") PlayerCounterKind.Rad one), [plantedPlayer "rp"]),
+    ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (plantedRef "ra") (plantedPlayer "ra-defender")), [plantedPlayer "ra-defender"]),
+    ("blight", Effect.Blight (playerQuantity "bl"), [plantedPlayer "bl"]),
+    ("take-extra-turn", Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn (plantedPlayer "te") Set.empty), [plantedPlayer "te"]),
+    ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (plantedRef "si")), [plantedPlayer "si"]),
+    ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
+    ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (SlotName.MkSlotName (Text.pack "oc")) (plantedPlayer "oc-caster") CastObligation.Optional CastOffer.defaultValue), [plantedPlayer "oc-caster"])
+  ]
+  where
+    one = Quantity.Type.Literal 1
+    playerQuantity stem = PlayerQuantity.MkPlayerQuantity (plantedPlayer stem) one
+
+-- The same list one type in, for the four ObjectRef arms that count PER SEAT
+-- (CR 400.1's per-player zones). Resolve.objectRefPlayerRefs is what owes these.
+objectRefPlayerRefPositions :: [(String, ObjectRef.ObjectRef, [PlayerRef.PlayerRef])]
+objectRefPlayerRefPositions =
+  [ ("top-of-library", ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (plantedPlayer "tl") (Quantity.Type.Literal 1)), [plantedPlayer "tl"]),
+    ("top-of-library-until", ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (plantedPlayer "tu") (Filter.Type.And []) (Quantity.Type.Literal 1)), [plantedPlayer "tu"]),
+    ("chosen-card-in-hand", ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (plantedPlayer "ch") (Filter.Type.And [])), [plantedPlayer "ch"]),
+    ("random-card-in-hand", ObjectRef.RandomCardInHand (plantedPlayer "rh"), [plantedPlayer "rh"])
+  ]
+
+-- plantedRef's player half, named for its position for that function's reason.
+plantedPlayer :: String -> PlayerRef.PlayerRef
+plantedPlayer = PlayerRef.InSlot . SlotName.MkSlotName . Text.pack
 
 -- Every Count reachable from a Quantity: a leaf Count directly, or one nested
 -- through Plus's two children (CR 208.2 composition -- a printed 1+*) or
@@ -5919,6 +5972,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "each planted position answers with its own ref"
       (fmap (\(label, effect, _) -> (label, Resolve.effectObjectRefs effect)) objectRefPositions)
       (fmap (\(label, _, refs) -> (label, refs)) objectRefPositions)
+  -- The same pinning for the PLAYER half, whose readers are Resolve.slotsOf and
+  -- Pawl.CardSpec's plural-slot lint. Planted for objectRefPositions' reason: a
+  -- second PlayerRef field on a payload that already has one compiles.
+  Spec.it s "every PlayerRef-taking opcode reports the references it holds" $ do
+    Spec.assertBool s (not (null playerRefPositions)) "the planted positions are not empty"
+    Spec.assertEqWith
+      s
+      "each planted position answers with its own reference"
+      (fmap (\(label, effect, _) -> (label, Resolve.effectPlayerRefs effect)) playerRefPositions)
+      (fmap (\(label, _, refs) -> (label, refs)) playerRefPositions)
+    Spec.assertEqWith
+      s
+      "and each per-seat object reference answers with its own"
+      (fmap (\(label, ref, _) -> (label, Resolve.objectRefPlayerRefs ref)) objectRefPlayerRefPositions)
+      (fmap (\(label, _, refs) -> (label, refs)) objectRefPlayerRefPositions)
   -- And the three readers of a nested Quantity take their refs from there,
   -- shown at an opcode that routed none of its own: Destroy's ref reached
   -- slotsOf and nothing else, so all three answered a constant for it.
@@ -7274,15 +7342,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- MonarchTarget's InSlot and ExchangeSides' WithController match
         -- Recipient.ToPlayer, and no binder in boundPlurally mints a player slot.
         --
-        -- Not implemented: the object slot PlayerRef.ControllerOfBound reads
-        -- singly, which no arm below can see because a PlayerRef sits inside a
-        -- payload rather than being one (#2707).
+        -- A PlayerRef an effect carries is NOT one of these arms: it sits inside
+        -- a payload rather than being one, so readSinglyInPlayerRefs below is its
+        -- leg.
         --
         -- Not implemented: the two singular reads that reach a slot through
         -- Filter.slotOneObject from inside a NUMBER -- Quantity.AgainstSlot and
-        -- Pawl.Engine.Quantity's own PlayerRef.ControllerOfBound arm, which is
-        -- outside Resolve where the paragraph above describes its sibling as
-        -- inside. Both decline a group exactly as Binding.onlyOne does, and
+        -- Pawl.Engine.Quantity's own PlayerRef.ControllerOfBound arm, which
+        -- reads a reference nested in a NUMBER where readSinglyInPlayerRefs
+        -- below reaches only the ones an opcode holds in a field of its own.
+        -- Both decline a group exactly as Binding.onlyOne does, and
         -- reaching them wants an Effect-to-Quantity traversal this file does not
         -- have (#2711). The third reader through that funnel,
         -- Filter.IsControllerOfBound, IS fenced -- by filterSlotsReadSingly,
@@ -7347,14 +7416,32 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         readSinglyInFilters effects =
           concatMap (filterSlotsReadSingly . snd) (concatMap effectFilters effects)
             List.\\ concatMap (filterSlotsReadSingly . snd) (concatMap (cardFilters . snd) (concatMap effectMintedFaces effects))
+        -- The reading side's fourth carrier: a PlayerRef, whose slot reads are
+        -- Resolve.playerRefSlots' own classification rather than a second one
+        -- kept here -- SlotArity.One is exactly the arm that hands its slot to
+        -- legalOne, and CR 608.2h's ControllerOfBound is the one such arm naming
+        -- an OBJECT slot, which is the only kind boundPlurally mints. The
+        -- traversals are Resolve's too, so an opcode gaining a PlayerRef field
+        -- is fenced without an arm here.
+        --
+        -- No subtraction of a minted object's text, which readSinglyInFilters
+        -- needs: neither traversal descends into the card a Create or a Conjure
+        -- carries, so nothing a token prints is attributed to its creator.
+        readSinglyInPlayerRefs effects =
+          [ slot
+          | effect <- effects,
+            ref <- Resolve.effectPlayerRefs effect <> concatMap Resolve.objectRefPlayerRefs (Resolve.effectObjectRefs effect),
+            (slot, SlotArity.One) <- Map.toList (Resolve.playerRefSlots ref)
+          ]
         -- The two READING sides at once: this resolution's own effects, and the
         -- conditions of the delayed abilities it arms. CR 603.7c is what puts
         -- the second there -- the entry captures the arming resolution's whole
         -- environment, so a slot an earlier clause bound is exactly what the
         -- condition names -- and DELAYED abilities alone, since a printed
         -- trigger has no captured environment for a card-authored slot to be in.
-        -- Each side is folded over BOTH walks -- the slots named outright and
-        -- the slots a Filter in that position reads singly.
+        -- The effects side is folded over all three walks -- the slots named
+        -- outright, the slots a Filter reads singly and the slots a PlayerRef
+        -- does -- and the conditions side over the two it has.
         clashesIn effects conditions =
           not
             . Set.null
@@ -7363,6 +7450,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               ( Set.unions
                   [ Set.fromList (concatMap readSingly effects),
                     Set.fromList (readSinglyInFilters effects),
+                    Set.fromList (readSinglyInPlayerRefs effects),
                     Set.fromList (concatMap triggerConditionSlots conditions),
                     Set.fromList (concatMap (concatMap filterSlotsReadSingly . triggerConditionFilters) conditions)
                   ]
@@ -7388,6 +7476,19 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- (its Tap arm is sourceHosted (objectRefFilters ref)). Nothing about the
         -- opcode matters here: what is on trial is the atom inside the predicate.
         tapping f = Effect.Tap (ObjectRef.EachMatching f)
+        -- An opcode holding a PlayerRef in a field of its own, Marchesa's Decree
+        -- shape. Nothing about the opcode matters here either: what is on trial
+        -- is the ARM of the reference.
+        gaining ref = Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref (Quantity.Type.Literal 1))
+        -- The same reference NESTED IN AN OBJECTREF, CR 400.1's per-seat walk.
+        revealing ref = Effect.Reveal (Reveal.MkReveal (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary ref (Quantity.Type.Literal 1))) Nothing)
+        -- CR 608.2h's arm anywhere a PlayerRef sits in an effect, which is the
+        -- corpus half of this leg. A wildcard because it is a presence probe:
+        -- every other arm is not this one, however many there come to be.
+        readsController effect =
+          any
+            (\ref -> case ref of PlayerRef.ControllerOfBound _ -> True; _ -> False)
+            (Resolve.effectPlayerRefs effect <> concatMap Resolve.objectRefPlayerRefs (Resolve.effectObjectRefs effect))
         -- CR 111.1's token, whose OWN printed text carries that same predicate:
         -- Face.enchant is a Filter position cardFilters walks, so effectFilters
         -- splices it in beside the creating card's. Binds no slot itself --
@@ -7473,6 +7574,24 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- bound, so the pair differs in the slot name alone.
     Spec.assertBool s (clashesIn [destruction] [TriggerCondition.PermanentDies (Filter.Type.IsControllerOfBound destroyedSlot)]) "a singular read inside a delayed condition's filter is caught"
     Spec.assertBool s (not (clashesIn [destruction] [TriggerCondition.PermanentDies (Filter.Type.IsControllerOfBound elsewhereSlot)])) "a singular read inside a delayed condition's filter of another slot is left alone"
+    -- The reading side's fourth carrier: a PlayerRef an opcode holds, where CR
+    -- 608.2h's ControllerOfBound names an OBJECT slot and reads it through
+    -- Resolve.playerRefPlayers' legalOne. Three boards differing in one thing
+    -- each -- the ARM against the group-tolerant PlayerRef.EachInSlot, which is
+    -- what proves the walk reads Resolve.playerRefSlots' arity rather than
+    -- reporting every slot a reference names, and the SLOT against a name the
+    -- destruction never bound.
+    Spec.assertBool s (clashes [destruction, gaining (PlayerRef.ControllerOfBound destroyedSlot)]) "a singular read inside a player reference is caught"
+    Spec.assertBool s (not (clashes [destruction, gaining (PlayerRef.EachInSlot destroyedSlot)])) "a group-tolerant read inside a player reference is left alone"
+    Spec.assertBool s (not (clashes [destruction, gaining (PlayerRef.ControllerOfBound elsewhereSlot)])) "a singular read inside a player reference of another slot is left alone"
+    -- The same arm NESTED IN AN OBJECTREF, which is the half a top-level field
+    -- cannot prove: an objectRefPlayerRefs answering [] for the library walk
+    -- would pass all three assertions above.
+    Spec.assertBool s (clashes [destruction, revealing (PlayerRef.ControllerOfBound destroyedSlot)]) "a singular read inside an object reference's own player reference is caught"
+    -- And the guard that keeps the leg from fencing a shape no card writes:
+    -- Rampage of the Clans' creator, Belltower Sphinx's miller, Marchesa's
+    -- Decree's loser and Spikeshell Harrier's slowed player all print one.
+    Spec.assertBool s (any (anyFace (any readsController . cardResolutionEffects) . Printing.card) ps) "the pool has a card naming a player by the controller of a bound object"
     -- The boundary the leg above must not cross: a MINTED object's text is read
     -- in a resolution of its own, so the token's slot names are not this card's
     -- (#2735). The pair differs in nothing but whose text the atom sits in --
