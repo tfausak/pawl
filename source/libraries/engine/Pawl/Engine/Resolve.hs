@@ -7066,9 +7066,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- all-or-nothing is stated about one pair.
           _ -> pure Map.empty
     -- The FIRST side is swept as this instruction is reached (CR 608.2c), and the
-    -- removals run in the order the sweep hands back -- battlefieldMatching's,
-    -- which is CR 608.2f's APNAP order for the EachMatching arm and one object for
-    -- every other arm the corpus writes.
+    -- removals run in the order the sweep hands back -- battlefieldMatching's
+    -- APNAP sort for the EachMatching arm, one object for every other arm the
+    -- corpus writes. That sort is not this arm's reason for ordering them:
+    -- rule 608.2f orders an action that CANNOT be processed simultaneously, and
+    -- the placement paragraph below is why this one can. What it buys here is a
+    -- deterministic transcript.
     --
     -- objectRefObjects takes EVERY recipient a slot holds, through slotGroup and
     -- then legalMany, where a bare SlotName read goes through legalOne and takes a
@@ -7077,18 +7080,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- silently moves nothing -- which is the reading the printed sentences want,
     -- "from all creatures" being a group before it is a slot. No card in
     -- data/cards/ binds that slot plurally; Pawl.CardSpec's singular-reader lint
-    -- names the DESTINATION alone, this side being no longer a singular read.
+    -- names the DESTINATION alone, this side not being a singular read.
     --
     -- Every read inside movePair takes the same pre-sweep snapshot, which is
-    -- Effect.PutCounters' posture: one evaluation for the whole instruction. What
-    -- makes that sound here rather than a stale read is that each read is a
-    -- per-pair value a sibling pair cannot move -- the counters on the FIRST
-    -- object, and a prohibition on the destination. The one read that is not is
-    -- the destination's own tally, which only MovedKinds.EachAbsentKind takes and
-    -- which rule 122.5 settles once for the sentence either way (CR 608.2h: the
-    -- answer "is determined only once, when the effect is applied"); no card in
-    -- the corpus writes that arm over a group, so this is a REGRESSION FENCE
-    -- rather than a proven ordering.
+    -- Effect.PutCounters' posture: one evaluation for the whole instruction. That
+    -- is not a stale read, because no sibling pair can move what any of these
+    -- reads asks about. The counters on the FIRST object and a prohibition on the
+    -- destination are per-pair values to begin with, and so is the destination's
+    -- own tally, which only MovedKinds.EachAbsentKind reads: a pair takes counters
+    -- off nothing but its own first object, `from /= to` keeps the destination out
+    -- of that set, and nothing is placed until the sweep has ended. Each read
+    -- therefore answers what a live read would, which is the answer CR 608.2h
+    -- wants either way -- it "is determined only once, when the effect is
+    -- applied".
     taken <- fmap (Map.unionsWith (+)) (mapM movePair (objectRefObjects legal resolving controller source gs fromRef))
     -- CR 608.2f's FIRST branch, and the whole reason the placement is not inside
     -- movePair: "in most cases, each such action is processed simultaneously", so
