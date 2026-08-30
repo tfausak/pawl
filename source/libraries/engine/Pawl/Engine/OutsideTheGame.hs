@@ -23,21 +23,17 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
-import qualified Data.Set as Set
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
-import qualified Pawl.Types.Mana as Mana
-import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.OutsideCard as OutsideCard
 import qualified Pawl.Types.OutsideObject as OutsideObject
@@ -46,9 +42,6 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RevealCause as RevealCause
-import qualified Pawl.Types.Sickness as Sickness
-import qualified Pawl.Types.Source as Source
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 400.11c: which of a player's cards outside the game an effect's Filter
@@ -104,11 +97,11 @@ eligible predicate source pid gs =
 -- reveal says the card prints one -- Burning Wish's sentence, and Death Wish's
 -- without the reveal.
 --
--- The card is MINTED here, Pawl.Engine.Dungeon.enter's road: outside the game is
--- not a zone (CR 400.11), so no object stood for the card and the move into the
--- hand is not a zone change. It is inserted into the hand directly rather than
--- through Pawl.Engine.Event.changeZone for that reason -- a zone change would
--- announce a departure from a zone the card was never in.
+-- The card is MINTED, Pawl.Engine.Dungeon.enter's road: outside the game is not
+-- a zone (CR 400.11), so no object stood for the card and the move into the hand
+-- is not a zone change. Pawl.Engine.Event.mintCard is where that happens, and
+-- its haddock says why the insertion does not go through
+-- Pawl.Engine.Event.changeZone.
 --
 -- The pool is SPENT, unlike Pawl.Engine.Dungeon.enter's supply: CR 400.11b keeps
 -- a card brought in "in the game until the game ends", so a second Burning Wish
@@ -160,72 +153,16 @@ bringInto payload source pid = do
               State.put gs2
               showIt oid
 
--- The object construction and hand-insertion `bringIn` and `bringInFrom` share
--- -- everything about arriving except what is spent to get there. Split out so
--- neither road duplicates Object.MkObject's field list.
-mint :: PlayerId -> PrintingId.PrintingId -> GameState.GameState -> (ObjectId, GameState.GameState)
-mint pid printingId gs =
-  let (oid, gs1) = Game.freshObjectId gs
-      (ts, gs2) = Game.freshTimestamp gs1
-      obj =
-        Object.MkObject
-          { Object.owner = pid,
-            Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard printingId,
-            Object.zone = Zone.Hand,
-            Object.tapped = TapState.Untapped,
-            Object.facing = Facing.FaceUp,
-            Object.exiledFaceDown = False,
-            Object.damage = 0,
-            Object.sickness = Sickness.Sick,
-            Object.bindings = Map.empty,
-            Object.counters = Map.empty,
-            Object.counterTimestamps = Map.empty,
-            Object.attachedTo = Nothing,
-            Object.chosenColor = Nothing,
-            Object.chosenSubtype = Nothing,
-            Object.chosenNames = Set.empty,
-            Object.chosenPlayer = Nothing,
-            Object.timestamp = ts,
-            Object.face = Nothing,
-            Object.turnedOverAt = Nothing,
-            Object.worldSince = Nothing,
-            Object.playableFromExile = Nothing,
-            Object.plotted = Nothing,
-            Object.foretold = Nothing,
-            Object.ringBearerFor = Nothing,
-            Object.protector = Nothing,
-            Object.ventureRoom = Nothing,
-            Object.classLevel = Nothing,
-            Object.unlockedHalves = Set.empty,
-            Object.designations = Set.empty,
-            Object.kicked = False,
-            Object.bestowed = False,
-            Object.phyrexianLifePaid = 0,
-            Object.manaSpent = Mana.MkMana [],
-            Object.announcedX = Nothing,
-            Object.detainedUntil = Set.empty,
-            Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
-          }
-   in ( oid,
-        Game.insertIntoZone
-          Zone.Hand
-          LibraryPosition.defaultValue
-          pid
-          oid
-          gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2)}
-      )
-
 -- CR 400.11b: take one copy of this printing out of the player's pool and mint
 -- the card into their hand. Split out from `bringInto` above because it is the half
 -- every other road into the game will want -- CR 727.2's restart (#135) and CR
 -- 707.13's copy created outside the game (#888) -- and none of those reveals
--- anything.
+-- anything. The SPEND is the whole of what it adds over
+-- Pawl.Engine.Event.mintCard, which Alchemy's conjure reaches with nothing to
+-- spend.
 bringIn :: PlayerId -> PrintingId.PrintingId -> GameState.GameState -> (ObjectId, GameState.GameState)
 bringIn pid printingId gs =
-  let (oid, gs1) = mint pid printingId gs
+  let (oid, gs1) = Event.mintCard pid printingId Zone.Hand LibraryPosition.defaultValue gs
       -- One copy, not the entry: CR 100.2a's four-card limit is applied to the
       -- combined deck and sideboard (CR 100.4a), so copies of a card are COUNTED
       -- and a player who set aside two can be brought the second one later.
@@ -244,7 +181,7 @@ bringInFrom :: PlayerId -> ObjectId -> GameState.GameState -> (Maybe ObjectId, G
 bringInFrom pid outerId gs = case Map.lookup outerId (GameState.outsideObjects gs) of
   Nothing -> (Nothing, gs)
   Just entry ->
-    let (oid, gs1) = mint pid (OutsideObject.printing entry) gs
+    let (oid, gs1) = Event.mintCard pid (OutsideObject.printing entry) Zone.Hand LibraryPosition.defaultValue gs
      in ( Just oid,
           gs1
             { GameState.outsideObjects = Map.delete outerId (GameState.outsideObjects gs1),

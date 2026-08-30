@@ -129,6 +129,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.IncreaseSpeed {} -> Nothing
   Effect.DecreaseSpeed {} -> Nothing
   Effect.Create {} -> Nothing
+  Effect.Conjure {} -> Nothing
   Effect.CreateCopy {} -> Nothing
   -- CR 707.4 changes a permanent's copiable values while it stays on the
   -- battlefield, so nothing leaves a zone and this functions from none.

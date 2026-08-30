@@ -85,6 +85,8 @@ import qualified Pawl.Codec.CombatStepSpec
 import qualified Pawl.Codec.ComparesSpec
 import qualified Pawl.Codec.ComparisonSpec
 import qualified Pawl.Codec.ConditionSpec
+import qualified Pawl.Codec.ConjureDestinationSpec
+import qualified Pawl.Codec.ConjureSpec
 import qualified Pawl.Codec.ContinuousEffectSpec
 import qualified Pawl.Codec.ControlChangedSpec
 import qualified Pawl.Codec.ControllerBecomesTargetSpec
@@ -383,6 +385,7 @@ import qualified Pawl.CombatEffectSpec
 import qualified Pawl.CombatSpec
 import qualified Pawl.CommanderSpec
 import qualified Pawl.ConditionSpec
+import qualified Pawl.ConjureSpec
 import qualified Pawl.CopySpec
 import qualified Pawl.CoreSpec
 import qualified Pawl.CostSpec
@@ -647,6 +650,8 @@ spec s registry = do
   Pawl.Codec.CounteringSpec.spec s
   Pawl.Codec.CopySpellSpec.spec s
   Pawl.Codec.CreateCopySpec.spec s
+  Pawl.Codec.ConjureDestinationSpec.spec s
+  Pawl.Codec.ConjureSpec.spec s
   Pawl.Codec.CreateSpec.spec s
   Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec.spec s
   Pawl.Codec.CyclingSpec.spec s
@@ -922,6 +927,7 @@ spec s registry = do
   Pawl.CombatSpec.spec s registry
   Pawl.CommanderSpec.spec s registry
   Pawl.ConditionSpec.spec s registry
+  Pawl.ConjureSpec.spec s registry
   Pawl.CopySpec.spec s registry
   Pawl.CopySpec.copySpellSpec s registry
   Pawl.CopySpec.copyTargetSpec s registry

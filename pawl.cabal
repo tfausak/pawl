@@ -231,6 +231,10 @@ library codec
     Pawl.Codec.ComparisonSpec
     Pawl.Codec.Condition
     Pawl.Codec.ConditionSpec
+    Pawl.Codec.Conjure
+    Pawl.Codec.ConjureDestination
+    Pawl.Codec.ConjureDestinationSpec
+    Pawl.Codec.ConjureSpec
     Pawl.Codec.ContinuousEffect
     Pawl.Codec.ContinuousEffectSpec
     Pawl.Codec.ControlChanged
@@ -1181,6 +1185,7 @@ library test
     Pawl.CombatSpec
     Pawl.CommanderSpec
     Pawl.ConditionSpec
+    Pawl.ConjureSpec
     Pawl.CopySpec
     Pawl.CoreSpec
     Pawl.CostSpec
@@ -1345,6 +1350,8 @@ library types
     Pawl.Types.Comparison
     Pawl.Types.Concession
     Pawl.Types.Condition
+    Pawl.Types.Conjure
+    Pawl.Types.ConjureDestination
     Pawl.Types.ContinuousEffect
     Pawl.Types.ControlChanged
     Pawl.Types.ControllerBecomesTarget
