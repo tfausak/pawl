@@ -128,6 +128,68 @@ loadNoAuraDeck registry = do
   myr <- fetchOrThrow registry "Darksteel Myr"
   pure (Deck.fromCards (Map.fromList [(island, 56), (myr, 4)]))
 
+-- The only deck here that reaches CR 613.8's dependency ordering at all. Every
+-- other scenario above runs Projection.projectDeciding's tight fold instead:
+-- that loop is entered only at a layer in `movableLayers`, which needs a
+-- candidate whose affected set is `staticallyMovable` (a Matching* or
+-- AttachedPlayerControls filter) or one whose magnitude counts its own layer,
+-- and no printing in the decks above carries a static ability except Control
+-- Magic, whose one ability is Affected.Attached.
+--
+-- Ashaya, Soul of the Wild ({3}{G}{G}) and Kormus Bell ({4}) are a CR 613.8a
+-- clause (b) pair at layer 4, in both directions. Ashaya's affected set --
+-- nontoken creatures you control -- reads card types, and Kormus Bell's layer-4
+-- modification writes one (AddCardType Creature onto every Swamp), so a Swamp
+-- the Bell animates joins Ashaya's set. Back the other way, Kormus Bell's set
+-- reads a subtype and Ashaya writes one (AddLandSubtype Forest), so the aspect
+-- screen clears there too and `changesAt` runs on that pair as well, even though
+-- adding Forest never removes Swamp and the answer is False. Neither card kills
+-- the other: both modifications ADD, so CR 305.7 never strips Ashaya's
+-- characteristic-defining ability -- which is what rules Blood Moon out as the
+-- partner, since a set land subtype takes Ashaya's own P/T away and the
+-- state-based actions bury it the turn it lands.
+--
+-- Deck order is the same forced sequence loadControlDeck describes: "Ashaya,
+-- Soul of the Wild" < "Darksteel Myr" < "Forest" < "Kormus Bell" < "Swamp", so
+-- the opening hand is the Ashaya, both Myr and four of the five Forests, the
+-- Bell arrives on the sixth draw, and both statics are on the battlefield for
+-- most of the game rather than for its last turn.
+--
+-- Thirteen cards, not sixty, and that is the whole reason: measured by running
+-- the same match at several deck sizes, the game costs 3.4s at 12 cards, 6.3s
+-- here, 13.7s at 14, 23.6s at 15, 74s at 18 and did not finish in twelve minutes
+-- at 30. `resolve` re-projects every other battlefield object at every movable
+-- layer, so the scenario has to be kept small to stay a benchmark.
+--
+-- Observed by running the match and reading the final GameState: both decks deck
+-- out on turn 14, and the battlefields differ only by the four permanents the
+-- statics themselves are -- 21 here against 17 there, with 10 Forests, 3 Swamps
+-- and 4 Darksteel Myr on both.
+loadDependentDeck :: Registry.Registry IO -> IO Deck.Deck
+loadDependentDeck registry = do
+  ashaya <- fetchOrThrow registry "Ashaya, Soul of the Wild"
+  myr <- fetchOrThrow registry "Darksteel Myr"
+  forest <- fetchOrThrow registry "Forest"
+  bell <- fetchOrThrow registry "Kormus Bell"
+  swamp <- fetchOrThrow registry "Swamp"
+  pure (Deck.fromCards (Map.fromList [(ashaya, 1), (myr, 2), (forest, 5), (bell, 1), (swamp, 4)]))
+
+-- loadDependentDeck's PAIRED CONTROL: the same 13 cards and the same 2 Darksteel
+-- Myr, with Ashaya and the Bell replaced by two more Swamps, so the only
+-- difference between the two scenarios is the movable layer.
+--
+-- Without it "casting 2p dependent" is a baseline rather than a diagnostic, for
+-- the reason loadNoAuraDeck gives: its number folds what the dependency scan
+-- costs together with what the board costs. Deck size holds the game length
+-- fixed (both deck out on turn 14) and the land count holds the workload fixed
+-- (10 Forests and 3 Swamps a side either way).
+loadIndependentDeck :: Registry.Registry IO -> IO Deck.Deck
+loadIndependentDeck registry = do
+  myr <- fetchOrThrow registry "Darksteel Myr"
+  forest <- fetchOrThrow registry "Forest"
+  swamp <- fetchOrThrow registry "Swamp"
+  pure (Deck.fromCards (Map.fromList [(myr, 2), (forest, 5), (swamp, 6)]))
+
 main :: IO ()
 main = do
   root <- Registry.defaultRoot
@@ -135,11 +197,17 @@ main = do
   deck <- loadRedDeck registry
   controlDeck <- loadControlDeck registry
   noAuraDeck <- loadNoAuraDeck registry
+  dependentDeck <- loadDependentDeck registry
+  independentDeck <- loadIndependentDeck registry
   Bench.defaultMain
     [ Bench.bench "goldfish 2p" $ Bench.whnf (goldfish deck) 0,
       Bench.bench "casting 2p" $ Bench.whnf (casting deck) 0,
       Bench.bench "fighting 2p" $ Bench.whnf (fighting deck) 0,
       Bench.bench "fighting 2p aura" $ Bench.whnf (fighting controlDeck) 0,
       -- The line above's paired control: same board, no Aura (loadNoAuraDeck).
-      Bench.bench "fighting 2p no aura" $ Bench.whnf (fighting noAuraDeck) 0
+      Bench.bench "fighting 2p no aura" $ Bench.whnf (fighting noAuraDeck) 0,
+      Bench.bench "casting 2p dependent" $ Bench.whnf (casting dependentDeck) 0,
+      -- The line above's paired control: same 13 cards, no movable layer
+      -- (loadIndependentDeck).
+      Bench.bench "casting 2p independent" $ Bench.whnf (casting independentDeck) 0
     ]
