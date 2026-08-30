@@ -6770,12 +6770,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- +1/+1 counter"), the player's when it names none (Agent's Toolkit's "move a
     -- counter" and Resourceful Defense's "move any number of counters"), and
     -- neither's when the card takes them all (Fate Transfer's "move all
-    -- counters"), which is what `kinds` holds. ATOMIC -- "if either of
-    -- these actions isn't possible, it's not possible to move a counter, and no
-    -- counter is removed from or put onto anything" -- so every impossibility the
-    -- rule names is checked BEFORE either half runs, and this arm is not a
-    -- RemoveCounters followed by a PutCounters however much its tail looks like
-    -- one.
+    -- counters") or reads the DESTINATION for them (Goldberry, River-Daughter's
+    -- "a counter of each kind not on Goldberry"), which is what `kinds` holds.
+    -- ATOMIC -- "if either of these actions isn't possible, it's not possible to
+    -- move a counter, and no counter is removed from or put onto anything" -- so
+    -- every impossibility the rule names is checked BEFORE either half runs, and
+    -- this arm is not a RemoveCounters followed by a PutCounters however much its
+    -- tail looks like one.
     --
     -- All four of the rule's impossibilities are checked here, in its own order.
     -- Its third, "the second object can't have counters put onto it", is a
@@ -6791,8 +6792,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- move could choose, and rule 122.5's atomicity is why it is dropped from the
     -- candidates rather than chosen and then half-performed -- "no counter is
     -- removed from or put onto anything". Under "all counters" that is per kind
-    -- too: the refused kind stays where it is and every other kind still crosses,
-    -- since each kind is its own pair of actions and the rule's all-or-nothing is
+    -- too, and under "a counter of each kind not on Goldberry" likewise: the
+    -- refused kind stays where it is and every other kind still crosses, since
+    -- each kind is its own pair of actions and the rule's all-or-nothing is
     -- stated about one counter, not about the sentence that moved it.
     --
     -- The two halves go through Event.removeCounters and Event.putCounters, so the
@@ -6821,14 +6823,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- puts a counter on "an object or player", and CR 122.1a/122.1b
           -- contemplate counters on a card in a zone other than the battlefield,
           -- so the battlefield is not the correct zone by the rule alone -- it is
-          -- the correct zone for THIS opcode because every producer names a
-          -- permanent on each side (Agent's Toolkit binds the artifact itself and
-          -- the creature that entered; Explorer's Cache binds the artifact and a
-          -- targeted creature; Black Panther, Wakandan King binds a targeted land
-          -- and a targeted creature; Fate Transfer binds two targeted creatures).
-          -- A slot bound as the ability triggered may name an object CR 400.7 has
-          -- since moved, and a targeted one may have become illegal, which is CR
-          -- 608.2b's re-read in legalOne above.
+          -- the correct zone for THIS opcode because every producer in
+          -- data/cards/ names a permanent on each side (Agent's Toolkit binds the
+          -- artifact itself and the creature that entered; Explorer's Cache binds
+          -- the artifact and a targeted creature; Black Panther, Wakandan King
+          -- binds a targeted land and a targeted creature; Fate Transfer binds two
+          -- targeted creatures; Goldberry, River-Daughter binds a targeted
+          -- permanent and itself). A slot bound as the ability triggered may name
+          -- an object CR 400.7 has since moved, and a targeted one may have become
+          -- illegal, which is CR 608.2b's re-read in legalOne above.
+          --
+          -- Not implemented: a move whose first side is a GROUP of permanents
+          -- rather than one, which Slippery Bogbonder's "from among creatures you
+          -- control" prints (#2704).
           --
           -- The `from` half answers CR 702.26b as much as CR 400.7, and both are
           -- proven boards. Pawl.Engine.Phasing spells "treated as though it does
@@ -6842,16 +6849,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Set.member to (GameState.battlefield gs) ->
             -- "... if the first object doesn't have the appropriate kind of
             -- counter on it". Which kinds are appropriate is the one place the
-            -- four spellings part, and rule 122.5's clause reads differently
+            -- five spellings part, and rule 122.5's clause reads differently
             -- under each.
             --
             -- `onFrom` drops the kinds rule 122.5's THIRD impossibility rules out
-            -- as well as the ones the first object does not have, so all four
+            -- as well as the ones the first object does not have, so all five
             -- spellings answer it in one place: a kind the destination refuses is
             -- not appropriate for this move, whether the card named it, the
-            -- player would have, or the card took every kind. Rule 122.5's
-            -- atomicity is why it is dropped here rather than half-performed --
-            -- "no counter is removed from or put onto anything".
+            -- player would have, the card took every kind, or the destination's
+            -- own tally settled it. Rule 122.5's atomicity is why it is dropped
+            -- here rather than half-performed -- "no counter is removed from or
+            -- put onto anything".
             let onFrom =
                   Map.filterWithKey
                     (\kind n -> n > 0 && not (CounterRestriction.prohibited to kind gs))
@@ -6945,6 +6953,29 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         -- count above what the object holds is clamped to it. A
                         -- filter written here as well would have no observer.
                         fmap sum (mapM (uncurry move) (Map.toList answer))
+                  -- Goldberry, River-Daughter's "a counter of each kind not on
+                  -- Goldberry": one counter of every kind the FIRST object has
+                  -- that the SECOND does not, which names no kind, prints no
+                  -- count and asks nothing -- the destination's own tally is the
+                  -- whole of the decision, so a prompt here would be the engine
+                  -- putting a choice where the card leaves none. Ascending
+                  -- (Map.keys), so a transcript is deterministic.
+                  --
+                  -- `onTo` is read from the SAME pre-move snapshot as `onFrom`,
+                  -- which is not a stale read but the rule's own reading: "each
+                  -- kind not on Goldberry" is settled once for the whole sentence,
+                  -- and the kinds it selects are by construction absent from the
+                  -- destination, so no kind this arm moves can make a later kind
+                  -- ineligible however the batch is ordered.
+                  --
+                  -- Kinds the destination holds at zero count as absent: CR 122.1
+                  -- makes a counter a marker that is on the object or is not, and
+                  -- Object.counters keeps a key whose counters have all been
+                  -- removed.
+                  MovedKinds.EachAbsentKind ->
+                    let onTo = Map.filter (> 0) (maybe Map.empty Object.counters (Game.lookupObject to gs))
+                        absent = Map.keys (Map.withoutKeys onFrom (Map.keysSet onTo))
+                     in fmap sum (mapM (`move` 1) absent)
       -- Either side unresolvable: an illegal slot at resolution (CR 608.2b), a
       -- player recipient, or rule 122.5's impossibilities above. Nothing moves.
       _ -> pure 0
