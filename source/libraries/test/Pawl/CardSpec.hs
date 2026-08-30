@@ -3760,9 +3760,15 @@ triggerConditionSlots triggerCondition = case triggerCondition of
 -- IsBound and SameNameAsBound beside the atom wanted -- both of which read the
 -- whole bound set through Filter.Context and so tolerate a group.
 --
--- ControlledByBound is not one either, though it names a slot: CR 603.2's
--- bakeBound answers it off a map of PLAYER slots, a namespace disjoint from the
--- object slots a binder mints.
+-- ControlledByBound is not one either, though it names a slot:
+-- Pawl.Engine.Filter.bakeBound answers it off a map of PLAYER slots, a namespace
+-- disjoint from the object slots a binder mints.
+--
+-- Reported wherever the atom sits, not only where it is ANSWERED -- which is a
+-- Scope.OverPlayers count's filter and nothing else, Pawl.Types.Filter's own
+-- haddock says, every other position leaving it vacuously False. That is the
+-- conservative direction: a slot named in one of those other positions is not
+-- read at all, so this can only reject a card that was already unwritable.
 --
 -- Not implemented: the Filter a Keyword carries (CR 702.29e) and the one a
 -- CounterKind hides under a keyword (CR 122.1b). Neither is evaluated with a
@@ -3800,8 +3806,8 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.SameNameAsBound _ -> []
   Filter.Type.HasChosenName -> []
   Filter.Type.IsPlayer _ -> []
-  -- The one arm with an answer: CR 608.2h's "the controller of the exiled card",
-  -- read through slotOneObject.
+  -- The one arm with an answer: the candidate is the controller of the object
+  -- the slot names (CR 608.2h), read through slotOneObject.
   Filter.Type.IsControllerOfBound slot -> [slot]
   -- DESCENT: the nest is card text like any other, and an atom written into it
   -- is read exactly as one written at the top level.
@@ -7205,18 +7211,20 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- WRITES a count into rather than reading an object out of.
           Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ _ to) -> [to]
           _ -> []
-        -- The two READING sides at once: this resolution's own effects, and the
-        -- conditions of the delayed abilities it arms. CR 603.7c is what puts
-        -- the second there -- the entry captures the arming resolution's whole
-        -- environment, so a slot an earlier clause bound is exactly what the
-        -- condition names -- and DELAYED abilities alone, since a printed
-        -- trigger has no captured environment for a card-authored slot to be in.
         -- The slots a Filter these effects carry reads singly. effectFilters is
         -- the traversal rather than a new one, and it recurses into a nested
         -- effect list of its own, so a rider's Filter is reached whether or not
         -- cardResolutionEffects flattened it -- harmless either way, this being
         -- a Set.
         readSinglyInFilters effects = concatMap (filterSlotsReadSingly . snd) (concatMap effectFilters effects)
+        -- The two READING sides at once: this resolution's own effects, and the
+        -- conditions of the delayed abilities it arms. CR 603.7c is what puts
+        -- the second there -- the entry captures the arming resolution's whole
+        -- environment, so a slot an earlier clause bound is exactly what the
+        -- condition names -- and DELAYED abilities alone, since a printed
+        -- trigger has no captured environment for a card-authored slot to be in.
+        -- Each side is folded over BOTH walks -- the slots named outright and
+        -- the slots a Filter in that position reads singly.
         clashesIn effects conditions =
           not
             . Set.null
