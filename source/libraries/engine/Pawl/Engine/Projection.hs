@@ -3872,12 +3872,11 @@ designationGathered gs = concatMap fromObject (Set.toList (GameState.battlefield
 -- WHOSE would still have to match a plain write of the same aspect -- an identical
 -- order for a larger type; see #357.
 --
--- That confirmation is board-wide wherever it can matter, which is what makes a
--- cross-object row load-bearing rather than a fence: `changesAt` applies the
--- other effect everywhere it applies and re-asks the set through the resulting
--- board, at every object once filterReadsPeers says the filter can read a second
--- projection and at the objects the other effect applies to otherwise.
--- Pawl.ProjectionSpec's "CR 613.8a an Aura's host is animated under it" proves it.
+-- That confirmation goes board-wide once filterReadsPeers says the filter can
+-- read a second projection, which is what makes a cross-object row load-bearing
+-- rather than a fence: `changesAt` applies the other effect everywhere it applies
+-- and re-asks the set through the resulting board. Pawl.ProjectionSpec's "CR
+-- 613.8a an Aura's host is animated under it" proves it.
 data Aspect
   = Types
   | Subtypes
@@ -4074,11 +4073,11 @@ filterReads f = case f of
 -- comes from the candidate's own partial or from the GameState, which no layer
 -- writes.
 --
--- What it buys is CR 613.8a's gate: at an object `b` does not apply to, a filter
--- answering False here reads exactly what it read before `b` was applied, so
--- `movesSet` can skip the board-wide re-ask there. Exhaustive, and
--- over-approximating is the safe direction -- a True costs that re-ask, a wrong
--- False loses a dependency.
+-- What it buys is which arm of `movesSet` runs: a filter answering False here
+-- reads exactly what it read before the other effect was applied, at every object
+-- that effect did not land on, so `changesHere` asks only where it did land.
+-- Exhaustive, and over-approximating is the safe direction -- a True costs the
+-- board-wide re-ask, a wrong False loses a dependency.
 filterReadsPeers :: Filter.Type.Filter Keyword.Type.Keyword -> Bool
 filterReadsPeers f = case f of
   -- The four atoms that read a peer view directly.
@@ -4642,21 +4641,27 @@ projectDeciding admits cands = forObject
                         -- board is built once per PAIR rather than once per
                         -- object; an id outside `after` cannot arise, since
                         -- appliedEverywhere maps over the same `running` that
-                        -- `boards` is built from.
-                        --
-                        -- `elsewhere` is the gate that keeps the board-wide ask
-                        -- off the objects it cannot say anything new about. At an
-                        -- object `b` does not apply to, `after` holds the partial
-                        -- `running` already held, so the only way `a`'s answer can
-                        -- move is through a SECOND object's projection -- which
-                        -- affectsGiven reads through `peers` alone, and which
-                        -- affectedReadsPeers over-approximates. `answerFor ans j`
-                        -- is the same expression appliedEverywhere applies `b` on.
-                        changesAt after afterView elsewhere j (i, as) (o, p, d, ans) =
+                        -- `boards` is built from. Reached only when `a`'s filter
+                        -- can read a second projection -- changesHere below is the
+                        -- other case.
+                        changesAt after afterView (i, as) (o, p, d, ans) =
                           let a = NonEmpty.head as
                            in not (decidedAt d a)
-                                && (elsewhere || answerFor ans j)
                                 && appliesTo afterView o d (maybe p fst (Map.lookup o after)) a /= answerFor ans i
+                        -- The same question where `a`'s affected set reads no
+                        -- SECOND projection (affectedReadsPeers): applying `b`
+                        -- then moves `a`'s answer only where `b` landed, since
+                        -- everywhere else the partial `a` is judged against is the
+                        -- one it was already judged against; and `view` answers
+                        -- there for the running board, since a filter that reads
+                        -- no peer cannot tell the two views apart. So this is
+                        -- changesAt with the board-wide application dropped --
+                        -- which is what keeps the scan off `reachable`.
+                        changesHere bs j (i, as) (o, p, d, ans) =
+                          let a = NonEmpty.head as
+                           in not (decidedAt d a)
+                                && answerFor ans j
+                                && appliesTo view o d (applyUnit view o p bs) a /= answerFor ans i
                         -- `a` depends on `b` when that holds ANYWHERE: CR 613.8a
                         -- asks about the whole affected SET, which is also how CR
                         -- 613.8b's loop becomes visible. Clause (c)'s CDA
@@ -4667,9 +4672,9 @@ projectDeciding admits cands = forObject
                             Nothing -> False
                             Just aspects ->
                               not (Set.disjoint aspects (unitWrites bs))
-                                && let after = appliedEverywhere bs
-                                       elsewhere = affectedReadsPeers (gAffected (NonEmpty.head as))
-                                    in any (changesAt after (viewOfBoard after) elsewhere j x) boards
+                                && if affectedReadsPeers (gAffected (NonEmpty.head as))
+                                  then let after = appliedEverywhere bs in any (changesAt after (viewOfBoard after) x) boards
+                                  else any (changesHere bs j x) boards
                         -- CR 613.8a clause (b)'s LAST limb: applying `b` changes
                         -- what `a` does to the things it applies to. Only a
                         -- magnitude can move, so what is compared is the P/T `a`
@@ -4688,11 +4693,6 @@ projectDeciding admits cands = forObject
                                 boards
                         -- `b` applied to every object whose set holds it, judged
                         -- against the board as it stands (CR 613.6).
-                        --
-                        -- LAZY in each partial, which is what `changesAt`'s gate
-                        -- rests on: Data.Map.Strict forces a value to WHNF, and
-                        -- WHNF here is the pair, so an object the gate skips never
-                        -- pays the appliesTo or the applyUnit.
                         appliedEverywhere bs =
                           Map.mapWithKey
                             (\o (p, d) -> (if appliesTo view o d p (NonEmpty.head bs) then applyUnit view o p bs else p, d))
