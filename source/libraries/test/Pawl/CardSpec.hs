@@ -4655,9 +4655,9 @@ grantedModifications card =
 
 -- The enchant slots this face GRANTS rather than prints: CR 613.1f layer 6's
 -- Modification.GainEnchant, which Cloudform and Gliding Licid write and CR
--- 702.103b's bestow grants from the engine. Indexed off grantedModifications, so both
--- roads to a modification are covered -- a printed static ability's and the ones
--- Effect.ModifyTarget stores, which is the road both cards take.
+-- 702.103b's bestow grants from the engine. Indexed off grantedModifications, so
+-- both roads to a modification are covered -- a printed static ability's, and the
+-- ones Effect.ModifyTarget stores, which is the road both cards take.
 grantedEnchantSlots :: Face.Face Card.Type.Card -> [TargetSlot.TargetSlot]
 grantedEnchantSlots card =
   [ slot
