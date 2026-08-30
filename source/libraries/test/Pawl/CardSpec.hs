@@ -6733,6 +6733,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           _ -> False
         readSingly effect = case effect of
           Effect.OfferCast (OfferCast.MkOfferCast slot _ _ _) -> [slot]
+          -- Every slot Pawl.Engine.Resolve reads through legalOne, which declines
+          -- a slot naming several objects rather than picking one of them: CR
+          -- 122.5's pair and CR 122.8's read. A group bound under any of the
+          -- three would leave the instruction doing nothing at all.
+          Effect.MoveCounters (MoveCounters.MkMoveCounters from _ _ to) -> [from, to]
+          Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _) -> [from]
           _ -> []
         clashes effects =
           not
