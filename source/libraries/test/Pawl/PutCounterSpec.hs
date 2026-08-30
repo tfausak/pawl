@@ -90,6 +90,10 @@ putCountersFromSpec s registry = Spec.describe s "CR 122.8 putting the counters 
       -- third, which "target creature you control" excludes -- so the offered set
       -- is wider than the legal one and wider still than the answer.
       --
+      -- The trigger aims at the LATER of alice's two Pikers, so S.identityAnswer's
+      -- least Recipient is the other one: a test that never reached `aiming` would
+      -- grow the decoy instead, and the assertions below would say so.
+      --
       -- `counters` is what a case puts on the Apprentice and is the ONLY
       -- difference between the boards below.
       board counters = do
@@ -97,8 +101,8 @@ putCountersFromSpec s registry = Spec.describe s "CR 122.8 putting the counters 
         apprentice <- S.printingOf s registry "Iron Apprentice"
         piker <- S.printingOf s registry "Goblin Piker"
         let (apprenticeId, g1) = S.addCreature apprentice S.alice (S.landsInPlay swamp 1)
-            (takerId, g2) = S.addCreature piker S.alice g1
-            (_, g3) = S.addCreature piker S.alice g2
+            (_, g2) = S.addCreature piker S.alice g1
+            (takerId, g3) = S.addCreature piker S.alice g2
             (_, g4) = S.addCreature piker S.bob g3
             -- CR 104.3c: nothing here draws or advances a turn, and a stocked
             -- library keeps it that way if a later fixture change does.
