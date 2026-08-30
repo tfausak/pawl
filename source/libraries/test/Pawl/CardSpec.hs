@@ -3648,10 +3648,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
 -- Binding.groupsOf at all -- so a slot bound as a group is not merely declined
 -- but invisible, and the delayed ability never fires, in silence.
 --
--- Not implemented: a slot a condition names through a FILTER rather than
--- outright. Filter.IsBound reads the whole bound set and is no risk; the
--- singular one beside it is Filter.IsControllerOfBound, whose fence is a Filter
--- traversal rather than this one (#2711).
+-- A slot a condition names through a FILTER rather than outright is fenced too,
+-- by filterSlotsReadSingly below rather than by this walk: clashesIn folds both
+-- over a delayed ability's condition.
 triggerConditionSlots :: TriggerCondition.TriggerCondition -> [SlotName.SlotName]
 triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfEnters -> []
@@ -3748,6 +3747,104 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   -- CR 603.7c's captured environment is what a reflexive trigger knows, but the
   -- condition itself admits no event and names nothing.
   TriggerCondition.Reflexive -> []
+
+-- Every SlotName a Filter reads SINGLY -- today exactly the IsControllerOfBound
+-- atoms in it. Pawl.Engine.Count answers that one through
+-- Pawl.Engine.Filter.slotOneObject, which declines a slot naming several objects
+-- rather than picking one of them (Pawl.Engine.Binding.onlyOne's doctrine), so
+-- the atom is False for every candidate and the count is zero, in silence.
+--
+-- Exhaustive with no fallthrough, triggerConditionSlots' shape and for its
+-- reason. Pawl.Engine.Filter.boundSlots is deliberately NOT reused: it ends in a
+-- catch-all, so a new atom naming a slot would be absorbed there, and it reports
+-- IsBound and SameNameAsBound beside the atom wanted -- both of which read the
+-- whole bound set through Filter.Context and so tolerate a group.
+--
+-- ControlledByBound is not one either, though it names a slot: CR 603.2's
+-- bakeBound answers it off a map of PLAYER slots, a namespace disjoint from the
+-- object slots a binder mints.
+--
+-- Not implemented: the Filter a Keyword carries (CR 702.29e) and the one a
+-- CounterKind hides under a keyword (CR 122.1b). Neither is evaluated with a
+-- resolution's bindings behind it at all, so an atom written there is
+-- unanswerable for a reason of its own (#2730).
+filterSlotsReadSingly :: Filter.Type.Filter Keyword.Keyword -> [SlotName.SlotName]
+filterSlotsReadSingly predicate = case predicate of
+  Filter.Type.HasCardType _ -> []
+  Filter.Type.HasSupertype _ -> []
+  Filter.Type.HasColor _ -> []
+  Filter.Type.HasSubtype _ -> []
+  Filter.Type.HasName _ -> []
+  -- The keyword's own Filter, left alone for the reason above (#2730).
+  Filter.Type.HasKeyword _ -> []
+  Filter.Type.HasKeywordFamily _ -> []
+  Filter.Type.PowerAtLeast _ -> []
+  Filter.Type.PowerAtMost _ -> []
+  Filter.Type.PowerLessThanSource -> []
+  Filter.Type.PowerGreaterThanSource -> []
+  Filter.Type.ManaValueAtMost _ -> []
+  Filter.Type.ManaValueIsEven -> []
+  Filter.Type.ManaValueAtMostAmount -> []
+  Filter.Type.ControlledBy _ -> []
+  Filter.Type.ControlledByDefendingPlayer -> []
+  -- A PLAYER slot, not an object one -- the disjoint namespace above.
+  Filter.Type.ControlledByBound _ -> []
+  Filter.Type.ControlledByPlayer _ -> []
+  Filter.Type.ControlledByRecipient -> []
+  Filter.Type.OwnedBy _ -> []
+  Filter.Type.IsSource -> []
+  -- Reads the whole bound set off Filter.Context, so a group is every one of its
+  -- members rather than nothing -- the atom this lint must NOT report.
+  Filter.Type.IsBound _ -> []
+  -- Reads the whole set too, one field over.
+  Filter.Type.SameNameAsBound _ -> []
+  Filter.Type.HasChosenName -> []
+  Filter.Type.IsPlayer _ -> []
+  -- The one arm with an answer: CR 608.2h's "the controller of the exiled card",
+  -- read through slotOneObject.
+  Filter.Type.IsControllerOfBound slot -> [slot]
+  -- DESCENT: the nest is card text like any other, and an atom written into it
+  -- is read exactly as one written at the top level.
+  Filter.Type.ControlsMoreThanYou f -> filterSlotsReadSingly f
+  Filter.Type.CardsInGraveyardAtLeast _ -> []
+  Filter.Type.IsAttacking -> []
+  Filter.Type.IsAttackingPlayer _ -> []
+  Filter.Type.IsAttackingPlaneswalker _ -> []
+  Filter.Type.IsAttackingBattle _ -> []
+  Filter.Type.DeclaredAttackedThisCombat -> []
+  Filter.Type.IsBlocking -> []
+  Filter.Type.IsBlocked -> []
+  Filter.Type.DeclaredAttackerThisCombat -> []
+  Filter.Type.DeclaredBlockerThisCombat -> []
+  Filter.Type.AttackedThisTurn -> []
+  Filter.Type.MilledThisTurn -> []
+  Filter.Type.DealtDamageThisTurn -> []
+  -- DESCENT, for ControlsMoreThanYou's reason.
+  Filter.Type.AttachedTo f -> filterSlotsReadSingly f
+  -- DESCENT, for the atom above's reason.
+  Filter.Type.HasAttached f -> filterSlotsReadSingly f
+  Filter.Type.IsAttachedToSource -> []
+  Filter.Type.IsHostOfSource -> []
+  Filter.Type.CanHostSubject -> []
+  Filter.Type.CanAttachToSubject -> []
+  Filter.Type.IsToken -> []
+  Filter.Type.IsTapped -> []
+  Filter.Type.IsFaceDown -> []
+  -- DESCENT, for the atom above's reason.
+  Filter.Type.RepresentedByCard f -> filterSlotsReadSingly f
+  Filter.Type.IsExiledFaceDown -> []
+  Filter.Type.Transformed -> []
+  Filter.Type.IsRingBearer -> []
+  Filter.Type.HasDesignation _ -> []
+  -- The kind may be a whole Keyword hiding a Filter, left alone for the reason
+  -- the keyword atom above is (#2730).
+  Filter.Type.HasCounters _ -> []
+  Filter.Type.HasCountersOfAnyKind -> []
+  Filter.Type.HasNonManaActivatedAbility -> []
+  Filter.Type.IsInZone _ -> []
+  Filter.Type.And fs -> concatMap filterSlotsReadSingly fs
+  Filter.Type.Or fs -> concatMap filterSlotsReadSingly fs
+  Filter.Type.Not f -> filterSlotsReadSingly f
 
 -- The Filters a DamagePattern carries -- its source half and its printed
 -- recipient half, the two axes of that type that ARE predicates over an object.
@@ -7060,20 +7157,22 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- singly, which no arm below can see because a PlayerRef sits inside a
         -- payload rather than being one (#2707).
         --
-        -- Not implemented: a singular read that reaches a slot through
-        -- Filter.slotOneObject rather than through Resolve. WHICH those are is
-        -- that function's callers and not this paragraph -- Quantity.AgainstSlot
-        -- and Filter.IsControllerOfBound among them, plus
+        -- Not implemented: the two singular reads that reach a slot through
+        -- Filter.slotOneObject from inside a NUMBER -- Quantity.AgainstSlot and
         -- Pawl.Engine.Quantity's own PlayerRef.ControllerOfBound arm, which is
         -- outside Resolve where the paragraph above describes its sibling as
-        -- inside. All of them decline a group exactly as Binding.onlyOne does.
+        -- inside. Both decline a group exactly as Binding.onlyOne does, and
+        -- reaching them wants an Effect-to-Quantity traversal this file does not
+        -- have (#2711). The third reader through that funnel,
+        -- Filter.IsControllerOfBound, IS fenced -- by filterSlotsReadSingly,
+        -- which clashesIn folds over every Filter these effects carry.
         -- Filter.IsBound reads the whole set, so it is no risk and no fence for
-        -- the others either (#2711).
+        -- the others either.
         --
         -- The condition of a DELAYED ability is a singular reader too, and it is
-        -- fenced: triggerConditionSlots joins this list inside clashesIn below,
-        -- which is why the sweep is over the FACE rather than over an effect
-        -- list.
+        -- fenced on both axes: triggerConditionSlots and filterSlotsReadSingly
+        -- both join this list inside clashesIn below, which is why the sweep is
+        -- over the FACE rather than over an effect list.
         readSingly effect = case effect of
           -- CR 701.14b's pair, which is why both slots count.
           Effect.Fight (Fight.MkFight one two) -> [one, two]
@@ -7112,12 +7211,24 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- environment, so a slot an earlier clause bound is exactly what the
         -- condition names -- and DELAYED abilities alone, since a printed
         -- trigger has no captured environment for a card-authored slot to be in.
+        -- The slots a Filter these effects carry reads singly. effectFilters is
+        -- the traversal rather than a new one, and it recurses into a nested
+        -- effect list of its own, so a rider's Filter is reached whether or not
+        -- cardResolutionEffects flattened it -- harmless either way, this being
+        -- a Set.
+        readSinglyInFilters effects = concatMap (filterSlotsReadSingly . snd) (concatMap effectFilters effects)
         clashesIn effects conditions =
           not
             . Set.null
             $ Set.intersection
               (Set.fromList (concatMap boundPlurally effects))
-              (Set.union (Set.fromList (concatMap readSingly effects)) (Set.fromList (concatMap triggerConditionSlots conditions)))
+              ( Set.unions
+                  [ Set.fromList (concatMap readSingly effects),
+                    Set.fromList (readSinglyInFilters effects),
+                    Set.fromList (concatMap triggerConditionSlots conditions),
+                    Set.fromList (concatMap (concatMap filterSlotsReadSingly . triggerConditionFilters) conditions)
+                  ]
+              )
         clashes effects = clashesIn effects []
         faceClashes card = clashesIn (cardResolutionEffects card) (fmap TriggeredAbility.condition (Map.elems (Face.delayedAbilities card)))
         offenders = filter (anyFace faceClashes . Printing.card) ps
@@ -7135,6 +7246,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         elsewhereSlot = SlotName.MkSlotName (Text.pack "elsewhere")
         removal slot = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) slot)
         destruction = Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing Nothing (Just destroyedSlot))
+        -- An opcode whose ObjectRef carries a Filter, so effectFilters reports it
+        -- (its Tap arm is sourceHosted (objectRefFilters ref)). Nothing about the
+        -- opcode matters here: what is on trial is the atom inside the predicate.
+        tapping f = Effect.Tap (ObjectRef.EachMatching f)
         victimSlot = SlotName.MkSlotName (Text.pack "victim")
         discarding = Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard victimSlot (Quantity.Type.Literal 1) (Just destroyedSlot)))
         minting n = Effect.Create (Create.MkCreate (Quantity.Type.Literal n) (oneFaced (vanillaFace "Soldier" (spellLine CardType.Creature Set.empty Set.empty))) EntryRiders.defaultValue (Just destroyedSlot) (PlayerRef.Relative PlayerRelation.You))
@@ -7188,6 +7303,25 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- the destruction never bound.
     Spec.assertBool s (clashesIn [destruction] [TriggerCondition.LoseControlOfBound destroyedSlot]) "a delayed condition naming a plurally bound slot is caught"
     Spec.assertBool s (not (clashesIn [destruction] [TriggerCondition.LoseControlOfBound elsewhereSlot])) "a delayed condition naming another slot is left alone"
+    -- The reading side's third carrier: a Filter an effect carries, where CR
+    -- 608.2h's Filter.IsControllerOfBound reads the slot through
+    -- Pawl.Engine.Filter.slotOneObject rather than through Resolve. Three boards
+    -- differing in one thing each -- the ATOM against the group-tolerant
+    -- Filter.IsBound, which is what proves the walk discriminates rather than
+    -- reporting every slot a Filter names, and the SLOT against a name the
+    -- destruction never bound.
+    Spec.assertBool s (clashes [destruction, tapping (Filter.Type.IsControllerOfBound destroyedSlot)]) "a singular read inside a filter is caught"
+    Spec.assertBool s (not (clashes [destruction, tapping (Filter.Type.IsBound destroyedSlot)])) "a group-tolerant read inside a filter is left alone"
+    Spec.assertBool s (not (clashes [destruction, tapping (Filter.Type.IsControllerOfBound elsewhereSlot)])) "a singular read inside a filter of another slot is left alone"
+    -- The same atom under a NEST, which is the half of that walk a top-level
+    -- board cannot prove: an arm answering [] for Not would pass every assertion
+    -- above.
+    Spec.assertBool s (clashes [destruction, tapping (Filter.Type.Not (Filter.Type.IsControllerOfBound destroyedSlot))]) "a singular read nested inside a filter is caught"
+    -- And the same atom in a DELAYED ability's condition, the other carrier
+    -- clashesIn folds the walk over. Paired with the slot the destruction never
+    -- bound, so the pair differs in the slot name alone.
+    Spec.assertBool s (clashesIn [destruction] [TriggerCondition.PermanentDies (Filter.Type.IsControllerOfBound destroyedSlot)]) "a singular read inside a delayed condition's filter is caught"
+    Spec.assertBool s (not (clashesIn [destruction] [TriggerCondition.PermanentDies (Filter.Type.IsControllerOfBound elsewhereSlot)])) "a singular read inside a delayed condition's filter of another slot is left alone"
     Spec.assertEqWith s "a group binding is invisible to a singular reader" (fmap (S.nameOf . Printing.card) offenders) []
   -- OwnerChooses asks a player which END of a library a card arrives at (CR
   -- 401.2), and only a library HAS ends -- so on any other destination it would
