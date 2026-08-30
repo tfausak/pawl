@@ -40,6 +40,9 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.Scope as Scope
 import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- Nothing when the value cannot be determined.
 --
@@ -526,6 +529,49 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
     fmap
       (\oid -> if any ((== Just oid) . Game.enteredBattlefield . LoggedEvent.event) (GameState.events gs) then 1 else 0)
       mOid
+  -- CR 400.7 / 400.3 read as a 0/1: did the object this evaluation is aimed at
+  -- enter the battlefield out of the named player's copy of the named zone?
+  --
+  -- EnteredThisTurn's arm with the origin zone tested as well, so its whole
+  -- haddock carries over -- the live read off GameState.events, the log's own
+  -- extent standing in for "this turn", and the keying on ZoneChange.object.
+  --
+  -- WHOSE copy is the entrant's OWNER, which CR 400.3 makes the only per-player
+  -- zone a card can have been in, and it is read through the INJECTED VIEW rather
+  -- than off the board: CR 603.4 re-checks an intervening "if" on resolution, by
+  -- which time the entrant may be gone, and Event.interveningHolds and Stack's
+  -- re-check both inject Projection.viewWithLastKnownAnywhere so CR 608.2h still
+  -- answers. A view that cannot describe the object at all is Nothing, which
+  -- Condition.holds collapses to False.
+  Quantity.EnteredFrom inZone -> do
+    oid <- mOid
+    pids <- playersOf (InZone.player inZone)
+    owner <- Filter.owner =<< viewOf oid
+    let entered = any (\zc -> ZoneChange.from zc == InZone.zone inZone) (entriesOf oid)
+    pure (if elem owner pids && entered then 1 else 0)
+  -- CR 601.2a / 400.3 read as a 0/1: was the object this evaluation is aimed at
+  -- cast by the named player out of that player's copy of the named zone?
+  --
+  -- Two hops rather than one, because CR 400.7 puts a whole object between the
+  -- cast and the entry: the spell the card became is ZoneChange.departed of the
+  -- stack-to-battlefield entry, and GameEvent.SpellCast files the zone under that
+  -- id (Pawl.Types.SpellWasCast.zone). Nothing else records it -- the permanent
+  -- has no memory of the spell's origin.
+  --
+  -- The reference is asked of the CASTER and of the owner both, which is the whole
+  -- of "you cast it from YOUR graveyard"; the owner half is EnteredFrom's, for CR
+  -- 400.3's reason, and is read the same way for CR 603.4's.
+  Quantity.WasCastFrom inZone -> do
+    oid <- mOid
+    pids <- playersOf (InZone.player inZone)
+    owner <- Filter.owner =<< viewOf oid
+    let spells = [ZoneChange.departed zc | zc <- entriesOf oid, ZoneChange.from zc == Zone.Stack]
+        castFromZone cast =
+          elem (SpellWasCast.spell cast) spells
+            && SpellWasCast.zone cast == Just (InZone.zone inZone)
+            && elem (SpellWasCast.player cast) pids
+        wasCast = any (maybe False castFromZone . Game.castOf . LoggedEvent.event) (GameState.events gs)
+    pure (if elem owner pids && wasCast then 1 else 0)
   -- CR 509.1h's declaration, counted beyond the first: how many creatures are
   -- blocking the object this evaluation is aimed at, less one, floored at 0 for
   -- rule 702.23a's "beyond the first".
@@ -560,6 +606,16 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
     -- candidate's view carries no identity, and an evaluation outside a fold
     -- carries no candidate at all -- which is Pawl.Types.PlayerRef.Candidate's
     -- own stated answer there.
+    -- Every entry onto the battlefield this log records for one id. A list and not
+    -- a Maybe: CR 400.7 makes each arrival a new object, so at most one entry can
+    -- name a given id, and folding over the log is what says so rather than
+    -- assuming it.
+    entriesOf oid =
+      [ zc
+      | ev <- Foldable.toList (GameState.events gs),
+        Just zc <- [Game.enteredBattlefieldChange (LoggedEvent.event ev)],
+        ZoneChange.object zc == oid
+      ]
     playersOf ref = case ref of
       PlayerRef.Candidate -> fmap pure (mView >>= Filter.playerIdentity)
       -- The SECOND arm answered here rather than by Count.playersFor, and for a
@@ -690,6 +746,8 @@ substituteStar star quantity = case quantity of
   Quantity.SpellsCastLastTurn _ -> quantity
   Quantity.DungeonsCompleted _ -> quantity
   Quantity.EnteredThisTurn -> quantity
+  Quantity.EnteredFrom _ -> quantity
+  Quantity.WasCastFrom _ -> quantity
   Quantity.BlockersBeyondFirst -> quantity
   -- No descent, for the Count arm's reason: CR 604.3 makes a CDA a static
   -- ability with no resolution and so no slots, and Pawl.CardSpec's
@@ -826,6 +884,10 @@ slots quantity = case quantity of
   -- And a nullary arm, which names nothing at all: CR 400.7's entry is read
   -- against the object the evaluation is aimed at, as ObjectCounters is.
   Quantity.EnteredThisTurn -> Set.empty
+  -- And two more with nothing beside their InZone's PlayerRef, CR 400.7's origin
+  -- zone and CR 601.2a's cast zone alike.
+  Quantity.EnteredFrom _ -> Set.empty
+  Quantity.WasCastFrom _ -> Set.empty
   -- And a nullary arm, which names nothing at all: CR 509.1h's declaration is
   -- read against the object the evaluation is aimed at, as ObjectCounters is.
   Quantity.BlockersBeyondFirst -> Set.empty
@@ -883,6 +945,8 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.SpellsCastLastTurn ref -> playerRefIsSlotless ref
   Quantity.DungeonsCompleted ref -> playerRefIsSlotless ref
   Quantity.EnteredThisTurn -> True
+  Quantity.EnteredFrom inZone -> playerRefIsSlotless (InZone.player inZone)
+  Quantity.WasCastFrom inZone -> playerRefIsSlotless (InZone.player inZone)
   Quantity.BlockersBeyondFirst -> True
   -- True because `slots` above DOES report this arm's slot, unlike the nested
   -- PlayerRefs -- so the reported set is the whole of what evaluating it reads.
@@ -1006,6 +1070,8 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn ref -> Quantity.PlayersDealtDamageThisTurn (f ref)
   Quantity.SpellsCastLastTurn ref -> Quantity.SpellsCastLastTurn (f ref)
   Quantity.DungeonsCompleted ref -> Quantity.DungeonsCompleted (f ref)
+  Quantity.EnteredFrom z -> Quantity.EnteredFrom z {InZone.player = f (InZone.player z)}
+  Quantity.WasCastFrom z -> Quantity.WasCastFrom z {InZone.player = f (InZone.player z)}
   Quantity.ManaCount c -> Quantity.ManaCount c {ManaCount.Type.player = f (ManaCount.Type.player c)}
   Quantity.Count c -> Quantity.Count (intoCount c)
   Quantity.Plus (Plus.MkPlus a b) -> Quantity.Plus (Plus.MkPlus (recur a) (recur b))
@@ -1158,6 +1224,8 @@ readsX quantity = case quantity of
   Quantity.SpellsCastLastTurn _ -> False
   Quantity.DungeonsCompleted _ -> False
   Quantity.EnteredThisTurn -> False
+  Quantity.EnteredFrom _ -> False
+  Quantity.WasCastFrom _ -> False
   Quantity.BlockersBeyondFirst -> False
   -- Not a leaf: its payload is a whole Quantity and may read X, the same recursion
   -- Plus above needs. Its own SlotName names a target rather than an amount, and X

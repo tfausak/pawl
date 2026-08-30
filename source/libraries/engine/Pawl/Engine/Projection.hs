@@ -2921,6 +2921,8 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.SpellsCastLastTurn _ -> quantity
   Quantity.Type.DungeonsCompleted _ -> quantity
   Quantity.Type.EnteredThisTurn -> quantity
+  Quantity.Type.EnteredFrom _ -> quantity
+  Quantity.Type.WasCastFrom _ -> quantity
   Quantity.Type.BlockersBeyondFirst -> quantity
   -- Not a leaf: the payload is a whole Quantity and may hide a Count.
   Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot (rewriteQuantity pairs inner))
@@ -4337,6 +4339,8 @@ quantityReads q = case q of
   Quantity.Type.SpellsCastLastTurn _ -> Set.empty
   Quantity.Type.DungeonsCompleted _ -> Set.empty
   Quantity.Type.EnteredThisTurn -> Set.empty
+  Quantity.Type.EnteredFrom _ -> Set.empty
+  Quantity.Type.WasCastFrom _ -> Set.empty
   Quantity.Type.BlockersBeyondFirst -> Set.empty
 
 -- What an Aggregation reads off each member the Filter kept. DistinctCardTypes

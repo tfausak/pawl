@@ -1,6 +1,6 @@
 -- Covers Pawl.Engine.Condition, Pawl.Types.Condition and Pawl.Types.Comparison,
--- including what Condition.holds makes of Pawl.Engine.Quantity's IsMonarch and
--- EnteredThisTurn.
+-- including what Condition.holds makes of Pawl.Engine.Quantity's IsMonarch,
+-- EnteredThisTurn, EnteredFrom and WasCastFrom.
 module Pawl.ConditionSpec where
 
 import qualified Data.Map as Map
@@ -31,6 +31,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Moved as Moved
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -187,6 +188,82 @@ enteredThisTurnSpec s registry = Spec.describe s "EnteredThisTurn" $ do
         Spec.assertBool s (reaches later pikerId) "in both games"
       other -> Spec.assertFailure s ("expected exactly one Thrasta on the battlefield, got " <> show (length other))
 
+-- Archfiend's Vessel: "When this creature enters, if it entered from your
+-- graveyard or you cast it from your graveyard, exile it. If you do, create a 5/5
+-- black Demon creature token with flying." CR 603.4's intervening "if" as a
+-- Condition.Any of Quantity.EnteredFrom and Quantity.WasCastFrom, each naming
+-- Zone.Graveyard scoped to the ability's controller.
+--
+-- Both cases turn on the DEMON, which is the gameplay-level reading: the clause
+-- is what decides whether the trigger fires at all, and the token is the only
+-- thing the resolution puts on the board.
+enteredFromSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+enteredFromSpec s registry =
+  let cast pid oid gs = S.runPure S.identityAnswer gs (S.cast pid oid)
+      resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
+      settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      -- Cast it, resolve it, let CR 603.3 place whatever it triggered, resolve
+      -- that too. The second resolveTop is what runs the Vessel's ability.
+      play pid oid gs = resolveTop (settle (resolveTop (cast pid oid gs)))
+      ownerOf oid gs = fmap Object.owner (Map.lookup oid (GameState.objects gs))
+      vesselsOwnedBy pid vessel gs =
+        [ oid
+        | oid <- Set.toList (GameState.battlefield gs),
+          S.soleFaceName oid gs == S.printingName vessel,
+          ownerOf oid gs == Just pid
+        ]
+      oneDemon after = case S.tokensOf after of
+        [tok] -> do
+          Spec.assertEqWith s "5/5" (Projection.powerOf tok after, Projection.toughnessOf tok after) (Just 5, Just 5)
+          Spec.assertEqWith s "black" (Projection.colorsOf tok after) (Set.singleton Color.Black)
+          Spec.assertBool s (Set.member Subtype.Demon (Projection.subtypesOf tok after)) "a Demon"
+          Spec.assertEqWith s "flying" (Map.keysSet (Projection.keywordsOf tok after)) (Set.singleton Keyword.Flying)
+        other -> Spec.assertFailure s ("expected exactly one Demon token, got " <> show (length other))
+   in Spec.describe s "EnteredFrom" $ do
+        -- ONE BOARD, ONE EVENT. Rise of the Dark Realms puts every creature card
+        -- in EVERY graveyard onto the battlefield under ALICE's control, so the
+        -- two Vessels enter simultaneously, under one controller, off one
+        -- resolution. The only thing that differs is whose graveyard each came
+        -- out of, which CR 400.3 makes its owner's -- so this is the "your" in
+        -- "your graveyard" and nothing else.
+        Spec.it s "CR 400.3 only the Vessel raised from YOUR graveyard triggers" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          vessel <- S.printingOf s registry "Archfiend's Vessel"
+          rise <- S.printingOf s registry "Rise of the Dark Realms"
+          let (start, riseId) = S.handOne rise (S.landsInPlay swamp 9)
+              staged = snd (S.addGraveyardCard vessel S.bob (snd (S.addGraveyardCard vessel S.alice start)))
+              after = play S.alice riseId staged
+          oneDemon after
+          Spec.assertEqWith s "CR 603.4 alice's Vessel exiled itself" (length (vesselsOwnedBy S.alice vessel after)) 0
+          Spec.assertEqWith s "and bob's is still on the battlefield" (length (vesselsOwnedBy S.bob vessel after)) 1
+
+        -- TWO GAMES, ONE DIFFERENCE: the zone the Vessel starts in. Yawgmoth's
+        -- Will is resolved first in BOTH, so the same permission, the same mana
+        -- and the same cast happen either way -- only the origin differs. The
+        -- Vessel enters from the STACK in both, which is what makes this the
+        -- WasCastFrom half rather than the EnteredFrom one.
+        Spec.it s "CR 601.2a a Vessel cast from your graveyard triggers" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          vessel <- S.printingOf s registry "Archfiend's Vessel"
+          will <- S.printingOf s registry "Yawgmoth's Will"
+          let (start, willId) = S.handOne will (S.landsInPlay swamp 4)
+              (vesselId, staged) = S.addGraveyardCard vessel S.alice start
+              permitted = resolveTop (cast S.alice willId staged)
+              after = play S.alice vesselId permitted
+          Spec.assertBool s (S.castable S.alice vesselId permitted) "Yawgmoth's Will made the Vessel castable from the graveyard"
+          oneDemon after
+
+        Spec.it s "and the same cast from HAND does not" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          vessel <- S.printingOf s registry "Archfiend's Vessel"
+          will <- S.printingOf s registry "Yawgmoth's Will"
+          let (start, willId) = S.handOne will (S.landsInPlay swamp 4)
+              (vesselId, staged) = S.addHandCard vessel S.alice start
+              permitted = resolveTop (cast S.alice willId staged)
+              after = play S.alice vesselId permitted
+          Spec.assertEqWith s "CR 603.4 the clause is false, so no Demon" (length (S.tokensOf after)) 0
+          Spec.assertEqWith s "and the Vessel stayed on the battlefield" (length (vesselsOwnedBy S.alice vessel after)) 1
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   Spec.describe s "Exactly" $ do
@@ -263,3 +340,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
 
   monarchSpec s registry
   enteredThisTurnSpec s registry
+  enteredFromSpec s registry

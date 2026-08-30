@@ -370,6 +370,20 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.EnteredThisTurn
       " {\"type\":\"EnteredThisTurn\"} "
+  -- CR 400.7's origin zone and CR 601.2a's cast zone, each carrying an InZone --
+  -- the payload a Count's scope carries, so the decoder that rejects a shared zone
+  -- scoped to one player covers these arms without a second predicate.
+  Spec.it s "EnteredFrom and WasCastFrom carry an InZone" $ do
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.EnteredFrom (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.You)))
+      " {\"type\":\"EnteredFrom\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"zone\":{\"type\":\"Graveyard\"}}} "
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.WasCastFrom (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.You)))
+      " {\"type\":\"WasCastFrom\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"zone\":{\"type\":\"Graveyard\"}}} "
   -- CR 509.1h with NOTHING on the wire: the object is the one the quantity is
   -- evaluated against, so this is a bare tag like Power and ManaValue.
   Spec.it s "BlockersBeyondFirst is nullary" $

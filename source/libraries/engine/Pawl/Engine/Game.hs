@@ -1100,9 +1100,17 @@ discardOf event = case event of
 -- castOf's and discardOf's sibling, and here for their import-graph reason: the
 -- caller is Pawl.Engine.Quantity's EnteredThisTurn arm.
 enteredBattlefield :: GameEvent -> Maybe ObjectId
-enteredBattlefield event = case event of
+enteredBattlefield = fmap ZoneChange.object . enteredBattlefieldChange
+
+-- The same entry, kept WHOLE: CR 400.7's `from` is what a reader asking where the
+-- entrant came from needs, and ZoneChange.departed is the id the spell had if it
+-- came off the stack. Pawl.Engine.Quantity's EnteredFrom and WasCastFrom arms are
+-- the callers; enteredBattlefield above is this with the extra fields dropped, so
+-- the two cannot disagree about what entered.
+enteredBattlefieldChange :: GameEvent -> Maybe ZoneChange.ZoneChange
+enteredBattlefieldChange event = case event of
   GameEvent.Moved (Moved.MkMoved change _ _) ->
-    if ZoneChange.to change == Zone.Battlefield then Just (ZoneChange.object change) else Nothing
+    if ZoneChange.to change == Zone.Battlefield then Just change else Nothing
   GameEvent.Discarded {} -> Nothing
   GameEvent.Drew {} -> Nothing
   GameEvent.SpellCast {} -> Nothing

@@ -559,6 +559,14 @@ quantityCounts quantity = case quantity of
   -- CR 400.7's logged entry, read against the object the quantity is aimed at: no
   -- reference at all, so no Count and no Filter here either.
   Quantity.Type.EnteredThisTurn -> []
+  -- CR 400.7's logged origin zone and CR 601.2a's logged cast zone: an InZone and
+  -- nothing else, so no Count and no Filter here either. The shared-zone pairing
+  -- their InZone could state is rejected at the decoder by
+  -- Pawl.Codec.InZone.undividedShared; cardOffendsSharedZoneScope below restates
+  -- it only over a Count's scope, so these two are covered once rather than twice
+  -- (see #161).
+  Quantity.Type.EnteredFrom _ -> []
+  Quantity.Type.WasCastFrom _ -> []
   -- CR 509.1h's declaration, read against the object the quantity is evaluated
   -- against: a nullary leaf, so no Count and no Filter here either.
   Quantity.Type.BlockersBeyondFirst -> []
@@ -1427,6 +1435,8 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.SpellsCastLastTurn {} -> False
   Quantity.Type.DungeonsCompleted {} -> False
   Quantity.Type.EnteredThisTurn -> False
+  Quantity.Type.EnteredFrom {} -> False
+  Quantity.Type.WasCastFrom {} -> False
   Quantity.Type.BlockersBeyondFirst -> False
   Quantity.Type.AgainstSlot {} -> False
 

@@ -5,6 +5,7 @@ import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Halved as Halved
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCount as ManaCount
 import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
@@ -648,6 +649,12 @@ data Quantity
     --
     -- A LEAF: it holds no Quantity.
     EnteredThisTurn
+  | -- | CR 400.7 / 400.3: did the object this quantity is evaluated against enter
+    -- the battlefield out of that player's copy of that zone? 1 if so and 0 if not.
+    EnteredFrom InZone.InZone
+  | -- | CR 601.2a / 400.3: was the object this quantity is evaluated against cast
+    -- by that player out of that player's copy of that zone? 1 if so and 0 if not.
+    WasCastFrom InZone.InZone
   | -- | CR 509.1h / 702.23a: how many creatures are blocking the object this
     -- quantity is evaluated against, BEYOND THE FIRST -- rampage's "for each
     -- creature blocking it beyond the first".
