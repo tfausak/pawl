@@ -16,10 +16,11 @@ data DealDamage = MkDealDamage
     -- prove each is one batch, which is what a CR 615.7 shield covering a player
     -- and their permanents can tell apart.
     --
-    -- Nothing here deduplicates or sums: two clauses naming one recipient deal
-    -- it two events, which Char aimed at its own caster does. Whether the rules
-    -- make that one event of the total is unsettled (#2586); CR 615.7 cannot
-    -- tell the readings apart, counting amounts rather than events.
+    -- Two clauses naming ONE recipient are one event of the total, not two: CR
+    -- 120.4's event is one source, one recipient, one moment, and
+    -- Pawl.Engine.Damage.oneEventPerRecipient is where the sum happens. Char
+    -- aimed at its own caster is the sentence, and Pawl.ReplacementSpec's Ajani
+    -- Steadfast emblem case is the proof.
     parts :: Seq.Seq DamagePart.DamagePart,
     -- | WHICH OBJECT DEALS IT -- CR 120.1's "an object that deals damage is the
     -- source of that damage", which CR 120.2b lets a spell or ability name for
