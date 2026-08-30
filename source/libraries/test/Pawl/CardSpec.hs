@@ -4190,7 +4190,8 @@ entryRewriteFilters entryRewrite = case entryRewrite of
 -- attach is what it describes: the enchant-ability narrowing is added by
 -- Pawl.Engine.Attach.turnUpHosts because rule 303.4k mandates it, so a card
 -- writing Filter.CanHostSubject here would be stating a rule rather than its own
--- text. That is why this list feeds `unframed` with every other position.
+-- text. That is why this position is tagged like any other rather than as an
+-- attach destination.
 turnUpRewriteFilters :: TurnUpRewrite.TurnUpRewrite -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
   -- entryRewriteFilters' WithCounters arm, on the rewrite that shares the payload.
@@ -4363,6 +4364,9 @@ blockPermissionFilters permission =
 --     this one, for a reason that is about the lints and not about the rule:
 --     `hostFramed` treats the two alike, and only the ObjectRef twin lint tells
 --     them apart.
+--   * KeywordFramed -- a KEYWORD's own Filter, wherever the keyword is written.
+--     The one tag applied by the leaf that PRODUCES the Filter rather than by
+--     the position that quotes it, which `frame` below is what keeps.
 --   * Unframed -- everything else.
 --
 -- CR 303.4a's enchant slot (Face.enchant) is Unframed rather than InTargetSlot,
@@ -4452,11 +4456,6 @@ unframed = fmap ((,) Unframed)
 sourceHosted :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 sourceHosted = fmap ((,) SourceHostFramed)
 
--- Tag a Filter position as a CR 614.1 replacement ROW's -- SourceHostFramed's
--- twin, kept apart from it for the reason that constructor gives.
-replacementRowFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
-replacementRowFramed = fmap ((,) ReplacementRowFramed)
-
 -- Tag a Filter position as a SEARCH's, the one position whose evaluator supplies
 -- Filter.View.canAttachToSubject (CR 701.3a from the candidate's side).
 searchFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
@@ -4473,10 +4472,10 @@ keywordFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.
 keywordFramed = fmap ((,) KeywordFramed)
 
 -- Apply a quoting position's Framing to filters that are ALREADY tagged, filling
--- in only the ones still Unframed. The five combinators above lift a bare list,
--- which is the shape of a traversal that cannot reach a keyword; the traversals
--- that can reach one hand back tagged pairs, and a deeper tag wins because the
--- deeper position is the one whose evaluator actually reads the Filter.
+-- in only the ones still Unframed. The lifts above take a bare list, which is
+-- the shape of a traversal that cannot reach a keyword; the traversals that can
+-- reach one hand back tagged pairs, and a deeper tag wins because the deeper
+-- position is the one whose evaluator actually reads the Filter.
 --
 -- KeywordFramed is the only tag any of those traversals produces, so "a deeper
 -- tag wins" has exactly one case today; it is written as the general rule
