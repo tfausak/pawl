@@ -1207,10 +1207,22 @@ loop asOf batch applied prevented exiledBy shuffling event = do
 -- shuffled even once the object has been moved elsewhere.
 --
 -- A CLASSIFICATION of the row, not a test of which card it came from.
+-- One arm per constructor, no wildcard, `readsApplier`'s discipline: a wildcard
+-- answering False would let an author who teaches a new arm to carry a shuffle
+-- get a silent no-op instead of a build failure.
 shufflesAfter :: ReplacementCandidate -> Bool
 shufflesAfter candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.ZoneChangeR zoneChangeR -> ZoneChangeR.shuffling zoneChangeR
-  _ -> False
+  ReplacementEffect.EntryR {} -> False
+  ReplacementEffect.DamageR {} -> False
+  ReplacementEffect.DestructionR _ -> False
+  ReplacementEffect.CounterR {} -> False
+  ReplacementEffect.TokenR {} -> False
+  ReplacementEffect.TurnUpR {} -> False
+  ReplacementEffect.UntapR _ -> False
+  ReplacementEffect.LifeLossR {} -> False
+  ReplacementEffect.DrawR {} -> False
+  ReplacementEffect.PhaseR _ -> False
 
 exiledByAfter :: ReplacementCandidate -> ProposedEvent -> ProposedEvent -> Maybe ObjectId -> Maybe ObjectId
 exiledByAfter candidate before after exiledBy =

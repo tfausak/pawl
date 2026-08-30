@@ -1965,6 +1965,7 @@ shufflingOutsideLibraryOffends replacement = case replacement of
   ReplacementEffect.TurnUpR {} -> False
   ReplacementEffect.UntapR _ -> False
   ReplacementEffect.LifeLossR {} -> False
+  ReplacementEffect.DrawR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- The non-vacuity half of shufflingOutsideLibraryOffends' lint, isPhaseR's shape.
