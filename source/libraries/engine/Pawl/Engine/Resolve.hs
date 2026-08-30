@@ -6775,8 +6775,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 122.5: move counters off one permanent and onto a second. WHICH kinds
     -- cross is the card's call when it names one (Explorer's Cache's "move a
     -- +1/+1 counter" and Spike Cannibal's "move all +1/+1 counters"), the
-    -- player's when it names none (Agent's Toolkit's "move a counter" and
-    -- Resourceful Defense's "move any number of counters"), and neither's when
+    -- player's when it names none (Agent's Toolkit's "move a counter",
+    -- Resourceful Defense's "move any number of counters" and Takesies' "up to
+    -- one counter", which alone lets the player decline), and neither's when
     -- the card takes them all (Fate Transfer's "move all counters") or reads the
     -- DESTINATION for them (Goldberry, River-Daughter's "a counter of each kind
     -- not on Goldberry"), which is what `kinds` holds. HOW MANY first objects
@@ -6847,7 +6848,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- binds a targeted land and a targeted creature; Fate Transfer binds two
               -- targeted creatures; Goldberry, River-Daughter binds a targeted
               -- permanent and itself; Spike Cannibal sweeps every creature on the
-              -- battlefield onto itself). A slot bound as the ability triggered may
+              -- battlefield onto itself; Takesies sweeps every permanent onto a
+              -- targeted one). A slot bound as the ability triggered may
               -- name an object CR 400.7 has since moved, and a targeted one may have
               -- become illegal, which is CR 608.2b's re-read in the legalMany inside
               -- objectRefObjects.

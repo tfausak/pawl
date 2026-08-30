@@ -68,7 +68,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
 -- an answerer that searched for a legal option cannot silently repair a
 -- mutation: `Lowest` is CR 122.1a's +1/+1 counter (the least CounterKind) and
 -- `Highest` is CR 122.1c's shield counter (the greatest of the four the card
--- names).
+-- names). takesiesAnswer at the foot of this module reads the same three, where
+-- `Decline` is the printed "up to one" declined rather than a "may".
 data Pick = Lowest | Highest | Decline
   deriving (Eq, Show)
 
