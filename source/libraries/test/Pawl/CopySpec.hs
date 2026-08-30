@@ -31,9 +31,11 @@
 -- Enchantment / Clever Impersonator put it there (copiedAbilitySpec).
 --
 -- And Pawl.Engine.Resolve's CopySpell arm (CR 707.10's copy of a spell on the
--- stack, Twincast) with the CR 707.10c re-target prompt it raises, the CR 704.5e
--- state-based action in Pawl.Engine.Sba that removes the resolved copy, and
--- Pawl.Engine.Stack's OfSpellCopy resolution arm.
+-- stack, Twincast) with the CR 707.10c re-target prompt it raises -- including
+-- the announcement that prompt's offer is judged inside, CR 707.10's copied X
+-- read by a copied Stir the Grave's own target slot (stirCopySpec) -- the CR
+-- 704.5e state-based action in Pawl.Engine.Sba that removes the resolved copy,
+-- and Pawl.Engine.Stack's OfSpellCopy resolution arm.
 module Pawl.CopySpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -1346,6 +1348,97 @@ copyTargetSpec s registry =
               Spec.assertEqWith s "alice's Piker, whom nothing named, is untouched" (S.powerToughnessOf pikerId after) (Just (2, 1))
               Spec.assertEqWith s "TWO ward triggers stand over the copy and the Growth" (length (GameState.stack copied)) 4
               Spec.assertEqWith s "and everything resolved" (length (GameState.stack after)) 0
+
+-- alice holds Stir the Grave and Twincast with three Swamps and two Islands
+-- untapped -- exactly {2}{B} and {U}{U}, so neither cast can fail for mana --
+-- and her graveyard holds `cards` in the order given. Returns the two hand
+-- cards, the graveyard ids and the board, in a main phase so the sorcery is
+-- castable.
+stirCopyBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId, ObjectId, [ObjectId], GameState.GameState)
+stirCopyBoard swamp island stir twincast cards =
+  let lands = S.landsFor island S.alice 2 (S.landsFor swamp S.alice 3 (Setup.emptyGame S.bothPlayers))
+      (withStir, stirId) = S.handOne stir lands
+      (twincastId, withBoth) = handAppend twincast S.alice withStir
+      add (acc, g) c = let (oid, g') = S.addGraveyardCard c S.alice g in (acc <> [oid], g')
+      (ids, board) = List.foldl' add ([], withBoth) cards
+   in (stirId, twincastId, ids, board {GameState.phase = Phase.PrecombatMain})
+
+-- Announce this X, and answer every target prompt by FILTERING the offered set
+-- down to one recipient -- pinTarget's posture, with CR 601.2b's announcement in
+-- front of it.
+announcing :: Natural.Natural -> Recipient.Recipient -> Prompt.Prompt r -> r
+announcing x recipient p = case p of
+  Prompt.ChooseX {} -> x
+  _ -> pinTarget recipient p
+
+-- CR 707.10's copied announcement, read by the copy's own target slot.
+--
+-- Stir the Grave ({X}{B} Sorcery) is "return target creature card with mana value
+-- X or less from your graveyard to the battlefield", so its slot carries a CR
+-- 202.3 computed bound reading the X the caster announced (#2670 built the cast's
+-- half). CR 707.10 copies "the value of X", and CR 707.10c then offers new
+-- targets -- so the offer the copy's controller is given must be judged inside
+-- that same announcement, which is what Resolve.chooseNewTargetsFor seeds from
+-- Object.bindings.
+--
+-- One graveyard, four cards, THREE readings of it. alice announces X = 2 and
+-- names the Piker; the copy is then offered the Evangel (the other mana value 2
+-- creature card) and nothing else -- a seed that never reached the bound offers
+-- NOTHING, which elides CR 707.10c's prompt altogether and leaves the copy on the
+-- Piker, and a bound that had stopped narrowing offers the mana value 3 and 4
+-- cards too. The pair below differs in exactly one thing: which recipient the
+-- copy's prompt is pinned to.
+stirCopySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+stirCopySpec s registry =
+  let boardOf = do
+        swamp <- S.printingOf s registry "Swamp"
+        island <- S.printingOf s registry "Island"
+        stir <- S.printingOf s registry "Stir the Grave"
+        twincast <- S.printingOf s registry "Twincast"
+        cards <- traverse (S.printingOf s registry) ["Goblin Piker", "Cabal Evangel", "Kalakscion, Hunger Tyrant", "Russet Wolves"]
+        pure (stirCopyBoard swamp island stir twincast cards)
+      -- alice casts Stir the Grave for X = 2 at `pikerId`, then -- CR 117.3c,
+      -- still holding priority -- Twincast at it, and resolves Twincast so that
+      -- CR 707.10c's prompt reaches `retarget`. Then drains the stack: the copy
+      -- first, the original under it.
+      play retarget pikerId stirId twincastId board =
+        let castStir = S.runPure (announcing 2 (Recipient.ToObject pikerId)) board (S.cast S.alice stirId)
+         in do
+              stirSpell <- topOfStack castStir
+              let castTwincast = S.runPure (pinTarget (Recipient.ToObject stirSpell)) castStir (S.cast S.alice twincastId)
+              pure (drainStack S.identityAnswer (resolveOne (pinTarget retarget) castTwincast))
+   in Spec.describe s "Pawl.Engine.Copy" $ do
+        -- THE proving case: the copy is offered, and takes, a card the ANNOUNCED
+        -- X admits and the original did not name.
+        Spec.it s "CR 707.10c the copy's new target is judged against the copied X" $ do
+          (stirId, twincastId, ids, board) <- boardOf
+          case ids of
+            [pikerId, evangelId, _, _] ->
+              case play (Recipient.ToObject evangelId) pikerId stirId twincastId board of
+                Nothing -> Spec.assertFailure s "Stir the Grave never reached the stack"
+                Just after -> do
+                  Spec.assertEqWith s "CR 202.3: the copy returned the OTHER mana value 2 creature card" (S.countOnBattlefieldByName (cardNamed "Cabal Evangel") S.alice after) 1
+                  Spec.assertEqWith s "and the original returned the one it named" (S.countOnBattlefieldByName (cardNamed "Goblin Piker") S.alice after) 1
+                  Spec.assertEqWith s "the mana value 3 card stayed in the graveyard" (S.countOnBattlefieldByName (cardNamed "Kalakscion, Hunger Tyrant") S.alice after) 0
+                  Spec.assertEqWith s "and everything resolved" (length (GameState.stack after)) 0
+            _ -> Spec.assertFailure s "fixture should stock alice's graveyard with four cards"
+        -- The same board, the same announcement, one recipient different: mana
+        -- value 4 is outside an announced 2, so it is never offered, the answer
+        -- names a recipient it was not shown, and reject-not-repair leaves the
+        -- copy on the Piker. A seed that had widened the bound instead of
+        -- reaching it reads this as the Wolves arriving.
+        Spec.it s "CR 707.10c a card the copied X does not reach is not offered" $ do
+          (stirId, twincastId, ids, board) <- boardOf
+          case ids of
+            [pikerId, _, _, wolvesId] ->
+              case play (Recipient.ToObject wolvesId) pikerId stirId twincastId board of
+                Nothing -> Spec.assertFailure s "Stir the Grave never reached the stack"
+                Just after -> do
+                  Spec.assertEqWith s "the mana value 4 creature card is still in the graveyard" (S.countOnBattlefieldByName (cardNamed "Russet Wolves") S.alice after) 0
+                  Spec.assertEqWith s "the copy kept the Piker, which the original had also named, so it came back once" (S.countOnBattlefieldByName (cardNamed "Goblin Piker") S.alice after) 1
+                  Spec.assertEqWith s "no other graveyard card came back" (S.countOnBattlefieldByName (cardNamed "Cabal Evangel") S.alice after) 0
+                  Spec.assertEqWith s "and everything resolved" (length (GameState.stack after)) 0
+            _ -> Spec.assertFailure s "fixture should stock alice's graveyard with four cards"
 
 -- alice's Unstable Shapeshifter becomes a copy of `original`, and the original
 -- then LEAVES the battlefield.
