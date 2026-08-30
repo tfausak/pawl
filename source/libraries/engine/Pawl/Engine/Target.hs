@@ -1012,9 +1012,11 @@ stillAdmitted perspective source recipient slot gs = Set.member recipient (admit
 -- `seed` is what the announcement ALREADY has bound before any target is chosen
 -- -- CR 601.2b's announced X for a cast (Stir the Grave's bound), CR 603.2's
 -- trigger bindings for a triggered ability being placed (Harness the Storm's cast
--- spell, Venerable Warsinger's event amount), and empty for an activation, whose
--- X does not reach a slot yet (#2672). It joins the per-slot bindings the two
--- passes below build, so an atom that reads a slot cannot tell the two apart.
+-- spell, Venerable Warsinger's event amount), CR 707.10's copied decisions minus
+-- the targets CR 707.10c is re-choosing (Resolve.chooseNewTargetsFor), and empty
+-- for an activation, whose X does not reach a slot yet (#2672). It joins the
+-- per-slot bindings the two passes below build, so an atom that reads a slot
+-- cannot tell the two apart.
 legalSets :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
 legalSets perspective seed source slots gs =
   let pcs = Projection.projectAll gs
