@@ -2908,6 +2908,7 @@ rewriteMovedKinds pairs kinds = case kinds of
   MovedKinds.EveryOfKind _ -> kinds
   MovedKinds.Chosen quantity -> MovedKinds.Chosen (rewriteQuantity pairs quantity)
   MovedKinds.AnyNumber -> kinds
+  MovedKinds.AnyNumberOfKind _ -> kinds
   MovedKinds.EachAbsentKind -> kinds
 
 -- CR 612.1 through a Quantity: a Count's Filter is where the subtype word hides,

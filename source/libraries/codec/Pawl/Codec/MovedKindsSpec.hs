@@ -52,6 +52,17 @@ spec s = Spec.describe s "Pawl.Codec.MovedKinds" $ do
   -- count, both being the player's to pick, so the tag is the whole of it.
   Spec.it s "AnyNumber" $
     Common.assertCodec s MovedKinds.codec MovedKinds.AnyNumber " {\"type\":\"AnyNumber\"} "
+  -- Scrounging Bandar's "move any number of +1/+1 counters": the kind is all the
+  -- card settles, the count being the player's to pick, so the payload is
+  -- EveryOfKind's and the tag is what tells the two apart. Arm.tagged compiles
+  -- with no arm for a constructor and answers Nothing on encode (#2262), so this
+  -- case is what forces one.
+  Spec.it s "AnyNumberOfKind carries only its kind" $
+    Common.assertCodec
+      s
+      MovedKinds.codec
+      (MovedKinds.AnyNumberOfKind CounterKind.PlusOnePlusOne)
+      " {\"type\":\"AnyNumberOfKind\",\"value\":{\"type\":\"PlusOnePlusOne\"}} "
   -- Goldberry, River-Daughter's "move a counter of each kind not on Goldberry":
   -- the destination settles the kinds and the wording settles the count, so the
   -- tag is the whole of it. Arm.tagged compiles with no arm for a constructor

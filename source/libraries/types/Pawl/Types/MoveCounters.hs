@@ -17,8 +17,8 @@ import qualified Pawl.Types.SlotName as SlotName
 -- creatures", which asks for a distribution across the batch where a set on the
 -- first side asks for a gathering out of it (#2713).
 --
--- `kinds` is WHICH counters cross and how many of each, which the printed text
--- spells six ways; Pawl.Types.MovedKinds is where the six are set out.
+-- `kinds` is WHICH counters cross and how many of each; Pawl.Types.MovedKinds is
+-- where every spelling the printed text uses for that is set out.
 --
 -- ONE batch per kind per pair is what crosses. Rule 122.5 never speaks of more
 -- than one counter, so it does not settle the batch on its own; what does is that

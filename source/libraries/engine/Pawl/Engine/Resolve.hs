@@ -6770,7 +6770,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- cross is the card's call when it names one (Explorer's Cache's "move a
     -- +1/+1 counter" and Spike Cannibal's "move all +1/+1 counters"), the
     -- player's when it names none (Agent's Toolkit's "move a counter" and
-    -- Resourceful Defense's "move any number of counters"), and neither's when
+    -- Resourceful Defense's "move any number of counters"), shared when the card
+    -- names the kind and the player supplies the count (Scrounging Bandar's "move
+    -- any number of +1/+1 counters"), and neither's when
     -- the card takes them all (Fate Transfer's "move all counters") or reads the
     -- DESTINATION for them (Goldberry, River-Daughter's "a counter of each kind
     -- not on Goldberry"), which is what `kinds` holds. HOW MANY first objects
@@ -6859,12 +6861,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               Set.member to (GameState.battlefield gs) ->
                 -- "... if the first object doesn't have the appropriate kind of
                 -- counter on it". Which kinds are appropriate is the one place the
-                -- six spellings part, and rule 122.5's clause reads differently
+                -- printed spellings part, and rule 122.5's clause reads differently
                 -- under each.
                 --
                 -- `onFrom` drops the kinds rule 122.5's THIRD impossibility rules out
-                -- as well as the ones the first object does not have, so all six
-                -- spellings answer it in one place: a kind the destination refuses is
+                -- as well as the ones the first object does not have, so every
+                -- spelling answers it in one place: a kind the destination refuses is
                 -- not appropriate for this move, whether the card named it, the
                 -- player would have, the card took every kind, or the destination's
                 -- own tally settled it. Rule 122.5's atomicity is why it is dropped
@@ -6970,6 +6972,29 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                             -- count above what the object holds is clamped to it. A
                             -- filter written here as well would have no observer.
                             fmap sum (mapM (uncurry move) (Map.toList answer))
+                      -- Scrounging Bandar's "move any number of +1/+1 counters": the card
+                      -- names the kind and leaves the count to the player, so the
+                      -- prompt above is raised over the ONE kind the card named
+                      -- rather than over every kind the object bears. That is what
+                      -- keeps this arm from being AnyNumber: offering the rest would
+                      -- let the answerer move a counter the card never mentioned.
+                      --
+                      -- The same prompt and not a bespoke one: its Map is what the
+                      -- move could really carry, and a card naming its kind narrows
+                      -- that to a single key exactly as `onFrom` narrows it to the
+                      -- kinds present. The answer is FILTERED the same way too, by
+                      -- reading only the named kind out of it.
+                      --
+                      -- A first object bearing none of that kind moves nothing and
+                      -- asks nothing -- rule 122.5's second impossibility with no
+                      -- question left behind it. Everywhere else the prompt IS
+                      -- raised, a lone counter included, AnyNumber's reason above.
+                      MovedKinds.AnyNumberOfKind wanted ->
+                        case Map.lookup wanted onFrom of
+                          Nothing -> pure 0
+                          Just available -> do
+                            answer <- Game.choose (Prompt.ChooseMovedCounters (Decide.deciderFor controller gs) controller from to (Map.singleton wanted available))
+                            move wanted (Map.findWithDefault 0 wanted answer)
                       -- Goldberry, River-Daughter's "a counter of each kind not on
                       -- Goldberry": one counter of every kind the FIRST object has
                       -- that the SECOND does not, which names no kind, prints no
