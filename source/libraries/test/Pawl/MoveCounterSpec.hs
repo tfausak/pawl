@@ -1213,16 +1213,18 @@ groupSourceSpec s registry = Spec.describe s "CR 122.5 moving counters off a gro
       --
       -- `stock` is what the case puts on those four, and is the ONLY difference
       -- between the two boards below.
-      board stock = do
+      board extras stock = do
         island <- S.printingOf s registry "Island"
         wall <- S.printingOf s registry "Wall of Stone"
         piker <- S.printingOf s registry "Goblin Piker"
         cannibal <- S.printingOf s registry "Spike Cannibal"
+        seats <- mapM (S.printingOf s registry) extras
         let (aliceWall, g1) = S.addCreature wall S.alice S.threePlayerGame
             (bobWall, g2) = S.addCreature wall S.bob g1
             (bobPiker, g3) = S.addCreature piker S.bob g2
             (aliceIsland, g4) = S.addCreature island S.alice g3
-            (cannibalId, g5) = S.entersWithTrigger cannibal S.alice (stock aliceWall bobWall bobPiker aliceIsland g4)
+            seated = foldl (\gs p -> snd (S.addCreature p S.alice gs)) g4 seats
+            (cannibalId, g5) = S.entersWithTrigger cannibal S.alice (stock aliceWall bobWall bobPiker aliceIsland seated)
             -- The card's own entry rider, supplied by hand: S.addCreature places
             -- a permanent without running CR 614.1c's replacement, and a 0/0
             -- Spike Cannibal would be buried by CR 704.5f before its own trigger
@@ -1248,7 +1250,7 @@ groupSourceSpec s registry = Spec.describe s "CR 122.5 moving counters off a gro
   -- separate tallies plus the one it entered with -- a number no reading that
   -- moved from a single permanent can produce.
   Spec.it s "every creature's +1/+1 counters cross at once, whichever seat controls it" $ do
-    (cannibalId, aliceWall, bobWall, bobPiker, aliceIsland, before) <- board stocked
+    (cannibalId, aliceWall, bobWall, bobPiker, aliceIsland, before) <- board [] stocked
     let staged = onStack before
     Spec.assertEqWith s "alice's Wall bears four +1/+1 counters" (pairOn aliceWall before) (4, 0)
     Spec.assertEqWith s "bob's Wall bears three" (pairOn bobWall before) (3, 0)
@@ -1274,7 +1276,7 @@ groupSourceSpec s registry = Spec.describe s "CR 122.5 moving counters off a gro
   -- pair the case above would pass on a sweep that credited the destination a
   -- number of its own rather than what it took.
   Spec.it s "a board whose creatures bear no +1/+1 counter moves nothing and still asks nothing" $ do
-    (cannibalId, aliceWall, bobWall, bobPiker, aliceIsland, before) <- board (\_ _ bobPiker' aliceIsland' -> S.addCounter CounterKind.PlusOnePlusOne 6 aliceIsland' . S.addCounter CounterKind.Shield 5 bobPiker')
+    (cannibalId, aliceWall, bobWall, bobPiker, aliceIsland, before) <- board [] (\_ _ bobPiker' aliceIsland' -> S.addCounter CounterKind.PlusOnePlusOne 6 aliceIsland' . S.addCounter CounterKind.Shield 5 bobPiker')
     let (asked, after) = gathered (onStack before)
     Spec.assertEqWith s "the Cannibal still bears the one counter it entered with" (pairOn cannibalId after) (1, 0)
     Spec.assertEqWith s "alice's Wall bears none either way" (pairOn aliceWall after) (0, 0)
@@ -1282,3 +1284,20 @@ groupSourceSpec s registry = Spec.describe s "CR 122.5 moving counters off a gro
     Spec.assertEqWith s "bob's Piker keeps the five shield counters the sentence never named" (pairOn bobPiker after) (0, 5)
     Spec.assertEqWith s "and the Island keeps its six, as in the case above" (pairOn aliceIsland after) (6, 0)
     Spec.assertEqWith s "and with nothing to move the player was not asked" asked 0
+  -- CR 608.2f's FIRST branch, made observable. Hardened Scales grows each
+  -- placement of one or more +1/+1 counters onto a creature alice controls by one
+  -- (CR 614.16), so the number of PLACEMENTS the sentence makes is readable off
+  -- the board: nine counters arriving as one batch land as ten, where the same
+  -- nine arriving as three batches of four, three and two would land as twelve.
+  -- The removals are untouched either way, which is what separates "the arrival
+  -- was grown once" from "more was taken".
+  --
+  -- The Cannibal's own counter is added by hand and so escapes the replacement,
+  -- which is what keeps the arithmetic below about the move alone.
+  Spec.it s "CR 608.2f the whole sweep arrives as one placement per kind, not one per giver" $ do
+    (cannibalId, aliceWall, bobWall, bobPiker, _, before) <- board ["Hardened Scales"] stocked
+    let (_, after) = gathered (onStack before)
+    -- THE GAMEPLAY-LEVEL ASSERTION: one batch of nine grown by one, not three
+    -- batches grown by one apiece.
+    Spec.assertEqWith s "the nine counters arrived as one batch, so Hardened Scales grew them once" (pairOn cannibalId after) (11, 0)
+    Spec.assertEqWith s "and the givers are down exactly what they had, the replacement having grown the arrival and not the departure" (fmap (\oid -> pairOn oid after) [aliceWall, bobWall, bobPiker]) [(0, 0), (0, 0), (0, 5)]

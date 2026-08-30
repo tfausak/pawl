@@ -589,6 +589,12 @@ slotsOf effect = case effect of
   -- Quantity.AgainstSlot aimed at the slot its `from` names -- so it joins in
   -- here rather than being left to look dangling. The bound slot is a
   -- DEFINITION, not a read: see boundSlots below.
+  --
+  -- The `from` side reports SlotArity.Many, every ObjectRef.InSlot being a
+  -- whole-set read. A slot the COUNT also names still comes out One: joinTwo is
+  -- Map.unionWith min and a Quantity reads singly, so Black Panther's `land` --
+  -- named by both halves -- keeps the arity that says "up to two target
+  -- creatures" cannot fill it.
   Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds _ to) -> joinTwo (objectRefSlots from) (insertOne to (foldMap quantitySlots (MovedKinds.quantityOf kinds)))
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
@@ -6806,10 +6812,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- The two halves go through Event.removeCounters and Event.putCounters, so the
     -- move records both crossings -- a CR 122.7 "when the Nth counter is put on"
     -- trigger sees the arrival, and rule 122.5's own reading is that a move IS
-    -- those two actions. ONE call to each per kind and not one pair per counter,
-    -- which is CR 614.16's own unit ("one or more counters") and the call
-    -- Pawl.Types.PutCounters already made; Pawl.Types.MovedKinds carries the
-    -- argument.
+    -- those two actions. Never one pair per counter, CR 614.16's own unit being
+    -- "one or more counters" and the call Pawl.Types.PutCounters already made.
+    -- The two halves batch DIFFERENTLY, which the sweep below is what forces: one
+    -- removal per kind PER FIRST OBJECT, since a removal is off one object and
+    -- rule 122.5 pairs it with one; one placement per kind for the WHOLE
+    -- instruction, since CR 608.2f processes an action taken on several objects
+    -- simultaneously and every pair's counters land on the one destination.
     gs <- State.get
     let objectAt slot = legalOne slot legal >>= Recipient.objectOf
         viewOf = effectViewOf source legal gs
@@ -6888,25 +6897,30 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     -- second impossibility, a kind the first object does not have at
                     -- all: `onFrom` answers zero and nothing crosses.
                     --
-                    -- ANSWERS how many counters made the whole journey, which is
-                    -- neither half on its own: Event.putCounters reports what landed
-                    -- after CR 614.16, and a row that GREW the placement added
-                    -- counters that never came off the first object, so they were not
-                    -- moved. The minimum is the pair's overlap.
+                    -- The REMOVAL half alone, reporting per kind what it took off
+                    -- THIS first object. The placement half is deliberately not here:
+                    -- it happens once for the whole instruction, below the sweep, which
+                    -- is CR 608.2f's FIRST branch -- "in most cases, each such action is
+                    -- processed simultaneously". Nothing about removals off distinct
+                    -- objects beside one batch of placements onto a single object
+                    -- cannot be processed simultaneously, so the rule's individual
+                    -- fallback and its APNAP ordering never engage. A group source is
+                    -- exactly where the two branches part: one placement of nine is
+                    -- one CR 614.16 opportunity and one CR 122.7 arrival, where three
+                    -- placements of four, three and two are three of each.
                     move kind asked =
                       let taken = min asked (Map.findWithDefault 0 kind onFrom)
                        in if taken == 0
-                            then pure 0
+                            then pure Map.empty
                             else do
                               Event.removeCounters from kind taken
-                              landed <- Event.putCounters (CounterCause.ByEffect controller) to kind taken
-                              pure (min taken landed)
+                              pure (Map.singleton kind taken)
                  in case kinds of
                       -- "Move all counters": every kind the first object has, the whole
                       -- tally of each, with nothing asked and nothing to name. Ascending
                       -- (Map.toList), so a transcript is deterministic, and SUMMED,
                       -- since "moved this way" counts counters and not kinds.
-                      MovedKinds.Every -> fmap sum (mapM (uncurry move) (Map.toList onFrom))
+                      MovedKinds.Every -> fmap (Map.unionsWith (+)) (mapM (uncurry move) (Map.toList onFrom))
                       -- The card named the kind, so the appropriate kind is that one
                       -- and NOTHING is asked: a prompt offering the single option the
                       -- card already settled would be the engine putting a decision
@@ -6935,9 +6949,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         -- this guard leaves the suite green.
                         let asked = askedFor quantity
                          in if asked == 0
-                              then pure 0
+                              then pure Map.empty
                               else case Map.keys onFrom of
-                                [] -> pure 0
+                                [] -> pure Map.empty
                                 first : rest -> do
                                   kind <- case rest of
                                     -- One kind on the object leaves nothing to decide.
@@ -6962,7 +6976,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- the question would be the engine making the player's choice.
                       MovedKinds.AnyNumber ->
                         if Map.null onFrom
-                          then pure 0
+                          then pure Map.empty
                           else do
                             answer <- Game.choose (Prompt.ChooseMovedCounters (Decide.deciderFor controller gs) controller from to onFrom)
                             -- FILTERED, NOT TRUSTED, in `move` rather than here: it
@@ -6971,7 +6985,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                             -- `onFrom` dropped -- answers zero and moves nothing, and a
                             -- count above what the object holds is clamped to it. A
                             -- filter written here as well would have no observer.
-                            fmap sum (mapM (uncurry move) (Map.toList answer))
+                            fmap (Map.unionsWith (+)) (mapM (uncurry move) (Map.toList answer))
                       -- Scrounging Bandar's "move any number of +1/+1 counters": the card
                       -- names the kind and leaves the count to the player, so the
                       -- prompt above is raised over the ONE kind the card named
@@ -6991,7 +7005,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- raised, a lone counter included, AnyNumber's reason above.
                       MovedKinds.AnyNumberOfKind wanted ->
                         case Map.lookup wanted onFrom of
-                          Nothing -> pure 0
+                          Nothing -> pure Map.empty
                           Just available -> do
                             answer <- Game.choose (Prompt.ChooseMovedCounters (Decide.deciderFor controller gs) controller from to (Map.singleton wanted available))
                             move wanted (Map.findWithDefault 0 wanted answer)
@@ -7017,16 +7031,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       MovedKinds.EachAbsentKind ->
                         let onTo = Map.filter (> 0) (maybe Map.empty Object.counters (Game.lookupObject to gs))
                             absent = Map.keys (Map.withoutKeys onFrom (Map.keysSet onTo))
-                         in fmap sum (mapM (`move` 1) absent)
+                         in fmap (Map.unionsWith (+)) (mapM (`move` 1) absent)
           -- Either side unresolvable: an illegal slot at resolution (CR 608.2b), a
           -- player recipient, or rule 122.5's impossibilities above. THIS pair moves
           -- nothing and the others in the sweep are untouched: the rule's
           -- all-or-nothing is stated about one pair.
-          _ -> pure 0
+          _ -> pure Map.empty
     -- The FIRST side is swept as this instruction is reached (CR 608.2c), and the
-    -- pairs run in the order the sweep hands back -- battlefieldMatching's, which
-    -- is CR 608.2f's APNAP order for the EachMatching arm and one object for
+    -- removals run in the order the sweep hands back -- battlefieldMatching's,
+    -- which is CR 608.2f's APNAP order for the EachMatching arm and one object for
     -- every other arm the corpus writes.
+    --
+    -- objectRefObjects takes EVERY recipient a slot holds, through slotGroup and
+    -- then legalMany, where a bare SlotName read goes through legalOne and takes a
+    -- slot naming several objects as naming none. So a `from` slot bound to more
+    -- than one object is one pair per binding here rather than an instruction that
+    -- silently moves nothing -- which is the reading the printed sentences want,
+    -- "from all creatures" being a group before it is a slot. No card in
+    -- data/cards/ binds that slot plurally; Pawl.CardSpec's singular-reader lint
+    -- names the DESTINATION alone, this side being no longer a singular read.
     --
     -- Every read inside movePair takes the same pre-sweep snapshot, which is
     -- Effect.PutCounters' posture: one evaluation for the whole instruction. What
@@ -7034,10 +7057,34 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- per-pair value a sibling pair cannot move -- the counters on the FIRST
     -- object, and a prohibition on the destination. The one read that is not is
     -- the destination's own tally, which only MovedKinds.EachAbsentKind takes and
-    -- which rule 122.5 settles once for the sentence either way; no card in the
-    -- corpus writes that arm over a group, so this is a REGRESSION FENCE rather
-    -- than a proven ordering.
-    moved <- fmap sum (mapM movePair (objectRefObjects legal resolving controller source gs fromRef))
+    -- which rule 122.5 settles once for the sentence either way (CR 608.2h: the
+    -- answer "is determined only once, when the effect is applied"); no card in
+    -- the corpus writes that arm over a group, so this is a REGRESSION FENCE
+    -- rather than a proven ordering.
+    taken <- fmap (Map.unionsWith (+)) (mapM movePair (objectRefObjects legal resolving controller source gs fromRef))
+    -- CR 608.2f's FIRST branch, and the whole reason the placement is not inside
+    -- movePair: "in most cases, each such action is processed simultaneously", so
+    -- one written instruction puts ONE batch of each kind onto the destination
+    -- however many first objects it took them off. The rule's individual fallback
+    -- is for an action that CANNOT be simultaneous -- Soulfire Eruption's example,
+    -- where a library can only be exiled off one card at a time -- and nothing
+    -- makes a single object's arrivals serial that way.
+    --
+    -- It is observable, which is why it is not a matter of taste: CR 614.16
+    -- replaces "one or more counters" per placement, so Hardened Scales grows one
+    -- batch of nine by one and three batches of four, three and two by three; and
+    -- CR 122.7's "when the Nth counter is put on" sees one arrival rather than
+    -- three. Pawl.MoveCounterSpec's Hardened Scales case is that board.
+    --
+    -- Ascending by kind (Map.toList), so a transcript is deterministic, and SUMMED,
+    -- since "moved this way" counts counters and not kinds.
+    moved <- case objectAt toSlot of
+      Nothing -> pure 0
+      -- ANSWERS how many counters made the whole journey, which is neither half on
+      -- its own: Event.putCounters reports what landed after CR 614.16, and a row
+      -- that GREW the placement added counters that never came off a first object,
+      -- so they were not moved. The minimum is the journey's overlap.
+      Just to -> fmap sum (mapM (\(kind, n) -> fmap (min n) (Event.putCounters (CounterCause.ByEffect controller) to kind n)) (Map.toList taken))
     -- "Counters moved this way", for a later effect of the same resolution to read
     -- as Quantity.InSlot -- Destroy's `slot` above in every respect, bound onto
     -- this effect's SOURCE and bound even when nothing moved, since zero is an
