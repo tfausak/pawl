@@ -5019,7 +5019,6 @@ meld controller victims resultCard = do
       -- of CR 712.5's pairs prints an ability that functions from another zone
       -- (CR 113.6), so no component's projection reads another. One that did
       -- would want a single pre-removal board for all of them.
-      --
       State.modify' (\g -> Foldable.foldl' forgetObject g (fmap fst melding))
       let mkObj ts =
             Object.MkObject
