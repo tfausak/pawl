@@ -7041,10 +7041,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- The FIRST side is swept as this instruction is reached (CR 608.2c), and the
     -- removals run in the order the sweep hands back -- battlefieldMatching's
     -- APNAP sort for the EachMatching arm, one object for every other arm the
-    -- corpus writes. That order is the sweep's own and not rule 608.2f's: its
-    -- ordering branch governs an action that CANNOT be processed simultaneously,
-    -- and the placement paragraph below is why this one can. What the order buys
-    -- here is a deterministic transcript.
+    -- corpus writes. That sort is not this arm's reason for ordering them:
+    -- rule 608.2f orders an action that CANNOT be processed simultaneously, and
+    -- the placement paragraph below is why this one can. What it buys here is a
+    -- deterministic transcript.
     --
     -- objectRefObjects takes EVERY recipient a slot holds, through slotGroup and
     -- then legalMany, where a bare SlotName read goes through legalOne and takes a
@@ -7053,7 +7053,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- silently moves nothing -- which is the reading the printed sentences want,
     -- "from all creatures" being a group before it is a slot. No card in
     -- data/cards/ binds that slot plurally; Pawl.CardSpec's singular-reader lint
-    -- names the DESTINATION alone, this side being no longer a singular read.
+    -- names the DESTINATION alone, this side not being a singular read.
     --
     -- Every read inside movePair takes the same pre-sweep snapshot, which is
     -- Effect.PutCounters' posture: one evaluation for the whole instruction. That
