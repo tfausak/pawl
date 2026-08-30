@@ -58,4 +58,10 @@ spec s = Spec.describe s "Pawl.Codec.MovedKinds" $ do
   -- and answers Nothing on encode (#2262), so this case is what forces one.
   Spec.it s "EachAbsentKind" $
     Common.assertCodec s MovedKinds.codec MovedKinds.EachAbsentKind " {\"type\":\"EachAbsentKind\"} "
+  -- Takesies' "move up to one counter from each permanent": the player picks the
+  -- kind and may pick none, so the tag is the whole of it. Arm.tagged compiles
+  -- with no arm for a constructor and answers Nothing on encode (#2262), so this
+  -- case is what forces one.
+  Spec.it s "UpToOneChosen" $
+    Common.assertCodec s MovedKinds.codec MovedKinds.UpToOneChosen " {\"type\":\"UpToOneChosen\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s MovedKinds.codec

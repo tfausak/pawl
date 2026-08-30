@@ -30,5 +30,6 @@ codec =
       Arm.payload "EveryOfKind" (CounterKind.codec Keyword.codec) MovedKinds.EveryOfKind (\x -> case x of MovedKinds.EveryOfKind kind -> Just kind; _ -> Nothing),
       Arm.payload "Chosen" Quantity.codec MovedKinds.Chosen (\x -> case x of MovedKinds.Chosen quantity -> Just quantity; _ -> Nothing),
       Arm.nullary "AnyNumber" MovedKinds.AnyNumber,
-      Arm.nullary "EachAbsentKind" MovedKinds.EachAbsentKind
+      Arm.nullary "EachAbsentKind" MovedKinds.EachAbsentKind,
+      Arm.nullary "UpToOneChosen" MovedKinds.UpToOneChosen
     ]

@@ -6,7 +6,7 @@ import qualified Pawl.Types.Quantity as Quantity
 
 -- | WHICH counters a CR 122.5 move carries, and how many of each.
 --
--- The printed text goes six ways and rule 122.5 answers them differently.
+-- Every arm below is a printed spelling, and rule 122.5 answers them differently.
 -- Explorer's Cache says "move a +1/+1 counter", which settles the kind on the
 -- card, so nothing is asked -- that is 'Named'. Agent's Toolkit says "move a
 -- counter", naming none, which leaves WHICH counter moves to the player
@@ -29,13 +29,24 @@ import qualified Pawl.Types.Quantity as Quantity
 -- 'Every', 'EveryOfKind' and 'EachAbsentKind' is what empties the batch rather
 -- than what forbids it.
 --
--- The count rides on the two arms that HAVE one rather than on a field beside
--- them, because the other four have none to carry: "all counters" and "all +1/+1
--- counters" are a tally read off the first object and a Quantity is one number,
--- "any number" is the player's answer rather than the card's, and "a counter of
--- each kind" fixes the count at one per kind on the wording itself, so a field
--- would have to be ignored under all four and a card could write a count that
--- means nothing.
+-- Takesies says "move up to one counter from each permanent", which names no
+-- kind and asks the player which one -- 'Chosen''s question -- but lets the
+-- answer be NONE, and that is 'UpToOneChosen'. The PER-SOURCE half of that
+-- sentence is not what makes it its own arm, though the issue that filed it
+-- read it that way (see #2709): Pawl.Types.MoveCounters' `from` is an ObjectRef, so
+-- every arm here is already performed once per first object, and 'Chosen' with a
+-- count of one would take one counter off each permanent too. What no arm could
+-- say is "UP TO": rule 122.5's move happens wherever it is possible, so a card
+-- that lets the player leave a given first object alone is asking a question none
+-- of the others ask -- #2702's zero-versus-one, read the other way round.
+--
+-- The count rides on the arms that HAVE one rather than on a field beside them,
+-- because the rest have none to carry: "all counters" and "all +1/+1 counters"
+-- are a tally read off the first object and a Quantity is one number, "any
+-- number" is the player's answer rather than the card's, and "a counter of each
+-- kind" and "up to one counter" fix the count at one on the wording itself, so a
+-- field would have to be ignored under every one of them and a card could write a
+-- count that means nothing.
 --
 -- 'Chosen' and 'AnyNumber' are two arms and not one because they ask different
 -- questions: 'Chosen' settles the count on the card and asks WHICH KIND, where
@@ -51,11 +62,10 @@ import qualified Pawl.Types.Quantity as Quantity
 -- more counters" (Goldberry, River-Daughter's second ability, which is that arm
 -- with zero excluded and is not written today, #2702), "a counter of each kind
 -- not on Goldberry" (her first -- 'EachAbsentKind') or "up to one counter from
--- each permanent" (Takesies, a per-source cap across a batch that no arm states,
--- gap #2709), and NONE of them prints a count above one -- Takesies' "up to one"
--- is a cap per source, not a tally. A printing saying "move two counters", where
--- the player could take one +1\/+1 counter and one shield counter, would refute
--- that.
+-- each permanent" (Takesies -- 'UpToOneChosen'), and NONE of them prints a count
+-- above one -- Takesies' "up to one" is a cap, not a tally. A printing saying
+-- "move two counters", where the player could take one +1\/+1 counter and one
+-- shield counter, would refute that.
 --
 -- @include_extras@ is what makes that run every printing rather than most of
 -- one, and it is the parameter every sweep in this neighbourhood needs: without
@@ -92,13 +102,16 @@ data MovedKinds
     -- Goldberry": one counter of each kind the DESTINATION does not already bear
     -- (CR 122.5).
     EachAbsentKind
+  | -- | Takesies' "move up to one counter from each permanent": one counter of
+    -- one kind the player picks, or none at all (CR 122.5).
+    UpToOneChosen
   deriving (Eq, Ord, Show)
 
 -- | The count the card asks for, for a caller that reads every Quantity an
 -- effect holds. 'Nothing' under 'Every' and 'EveryOfKind', which ask for a tally
 -- read off the first object rather than a number, under 'AnyNumber', whose count
--- is the player's answer, and under 'EachAbsentKind', whose one per kind the card
--- never writes down.
+-- is the player's answer, and under 'EachAbsentKind' and 'UpToOneChosen', whose
+-- one the card never writes down.
 quantityOf :: MovedKinds -> Maybe Quantity.Quantity
 quantityOf x = case x of
   Every -> Nothing
@@ -107,3 +120,4 @@ quantityOf x = case x of
   Chosen quantity -> Just quantity
   AnyNumber -> Nothing
   EachAbsentKind -> Nothing
+  UpToOneChosen -> Nothing

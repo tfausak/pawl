@@ -266,6 +266,26 @@ data Prompt r where
   -- real choice between moving it and not. Not raised where the first object has
   -- no movable kind at all, which moves nothing and leaves nothing to ask.
   ChooseMovedCounters :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural -> Prompt (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural)
+  -- | CR 122.5: WHICH counter a move takes off the first object, OR NONE
+  -- (Takesies' "move up to one counter from each permanent onto target
+  -- permanent"). ChooseMovedCounter's question with declining added, which is
+  -- the whole of what separates the two: a card that says "move a counter"
+  -- moves one wherever it can, where "up to one" leaves the first object alone
+  -- if the player says so.
+  --
+  -- The first ObjectId is the object the counter would leave, the second the
+  -- object it would land on, and the candidates are what the first object HAS,
+  -- engine-pre-filtered to the kinds this move could really carry.
+  -- ChooseMovedCounter's posture otherwise: choose, not target, and filtered
+  -- rather than trusted -- an answer naming a kind that was not offered is read
+  -- as declining, the one answer that is legal whatever the first object bears.
+  --
+  -- Raised for ONE candidate as well as for two, unlike ChooseMovedCounter and
+  -- for ChooseMovedCounters' reason: "up to one" includes none, so a lone kind
+  -- is still a real choice between moving it and not. Not raised where the
+  -- first object has no movable kind at all, which moves nothing and leaves
+  -- nothing to ask.
+  ChooseMovedCounterOrNone :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> NonEmpty.NonEmpty (CounterKind.CounterKind Keyword.Keyword) -> Prompt (Maybe (CounterKind.CounterKind Keyword.Keyword))
   -- | CR 107.14: how much {E} this player pays to an Effect.PayAnyEnergy, asked
   -- as the spell or ability RESOLVES (Harnessed Lightning). The ObjectId is the
   -- resolving object.

@@ -18,7 +18,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- first side asks for a gathering out of it (#2713).
 --
 -- `kinds` is WHICH counters cross and how many of each, which the printed text
--- spells six ways; Pawl.Types.MovedKinds is where the six are set out.
+-- spells several ways; Pawl.Types.MovedKinds is where they are set out.
 --
 -- ONE batch per kind is what crosses -- one REMOVAL of it per first object, and
 -- one PLACEMENT of it for the whole instruction, CR 608.2f processing an action

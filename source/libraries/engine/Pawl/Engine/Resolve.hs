@@ -6868,12 +6868,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               Set.member to (GameState.battlefield gs) ->
                 -- "... if the first object doesn't have the appropriate kind of
                 -- counter on it". Which kinds are appropriate is the one place the
-                -- six spellings part, and rule 122.5's clause reads differently
+                -- spellings part, and rule 122.5's clause reads differently
                 -- under each.
                 --
                 -- `onFrom` drops the kinds rule 122.5's THIRD impossibility rules out
-                -- as well as the ones the first object does not have, so all six
-                -- spellings answer it in one place: a kind the destination refuses is
+                -- as well as the ones the first object does not have, so every
+                -- spelling answers it in one place: a kind the destination refuses is
                 -- not appropriate for this move, whether the card named it, the
                 -- player would have, the card took every kind, or the destination's
                 -- own tally settled it. Rule 122.5's atomicity is why it is dropped
@@ -7007,6 +7007,31 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         let onTo = Map.filter (> 0) (maybe Map.empty Object.counters (Game.lookupObject to gs))
                             absent = Map.keys (Map.withoutKeys onFrom (Map.keysSet onTo))
                          in fmap (Map.unionsWith (+)) (mapM (`move` 1) absent)
+                      -- Takesies' "move up to one counter from each permanent":
+                      -- Chosen's question -- which kind, out of the kinds this
+                      -- first object actually has -- with declining added, and
+                      -- one counter of whichever kind is picked. Ascending
+                      -- (Map.keys), so a transcript is deterministic.
+                      --
+                      -- The prompt is raised for a SINGLE candidate as well,
+                      -- AnyNumber's reason rather than Chosen's: "up to one"
+                      -- includes none, so moving the one kind and leaving it are
+                      -- two different boards and the question is real.
+                      MovedKinds.UpToOneChosen ->
+                        case Map.keys onFrom of
+                          [] -> pure Map.empty
+                          first : rest -> do
+                            let offered = first NonEmpty.:| rest
+                            answer <- Game.choose (Prompt.ChooseMovedCounterOrNone (Decide.deciderFor controller gs) controller from to offered)
+                            -- FILTERED, NOT TRUSTED: an answer naming a kind
+                            -- that is not on the object is read as declining,
+                            -- which is Chosen's filter under a wording where
+                            -- declining is itself legal -- there the answer had
+                            -- to fall back to a kind, since rule 122.5 moves a
+                            -- counter wherever it can.
+                            case answer of
+                              Just kind | Foldable.elem kind offered -> move kind 1
+                              _ -> pure Map.empty
           -- Either side unresolvable: an illegal slot at resolution (CR 608.2b), a
           -- player recipient, or rule 122.5's impossibilities above. THIS pair moves
           -- nothing and the others in the sweep are untouched: the rule's
