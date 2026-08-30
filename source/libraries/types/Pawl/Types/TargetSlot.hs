@@ -69,6 +69,13 @@ data TargetSlot = MkTargetSlot
     -- a handful: the atom is vacuously False against a Nothing here, and
     -- Pawl.CardSpec's position lint is what keeps a card from writing one into a
     -- slot that names no amount.
+    --
+    -- Not implemented: a bound that reads a SLOT. Pawl.Engine.Target.slotContext
+    -- evaluates this against CR 113.7's source, which carries no announcement
+    -- binding, so such a quantity answers Nothing and the atom reading it is
+    -- vacuously False; Pawl.CardSpec's "no card's computed bound reads a slot"
+    -- rejects one and Pawl.TargetSpec's "a bound that names a slot admits nothing
+    -- at all" is the board it rests on (gap #2666).
     amount :: Maybe Quantity.Quantity
   }
   deriving (Eq, Ord, Show)

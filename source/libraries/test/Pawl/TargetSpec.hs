@@ -63,6 +63,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural.Type
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -95,6 +96,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -1971,3 +1973,33 @@ celestineSpec s registry = Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ 
           "while the same graveyard at 4 gained offers both"
           (Target.legalRecipients (Just S.alice) S.noSource theSlot atFour)
           (Set.fromList [Recipient.ToObject pikerId, Recipient.ToObject wolvesId])
+  -- The bound a card may NOT write, and the reason Pawl.CardSpec's "no card's
+  -- computed bound reads a slot" keeps it out: a Quantity naming a SLOT. CR 601.2c
+  -- matches the slot as the ability is announced, and slotContext evaluates the
+  -- bound against CR 113.7's source -- a permanent, which carries no announcement
+  -- binding -- so Quantity.InSlot answers Nothing and the atom is vacuously False.
+  --
+  -- The pair differs in exactly one thing, the Quantity in the SAME slot on the
+  -- SAME board, and the source is a real permanent rather than S.noSource so that
+  -- the empty answer is the bound talking and not a missing object. "thatMuch" is
+  -- Pawl.Engine.Binding.eventAmount, the name a triggered ability's own CR 603.2
+  -- event stamps -- the reading a card author would reach for first.
+  Spec.it s "CR 202.3 a bound that names a slot admits nothing at all" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    celestine <- S.printingOf s registry "Celestine, the Living Saint"
+    case triggerTargetSlot celestine of
+      Nothing -> Spec.assertFailure s "Celestine should declare one triggered ability with one target slot"
+      Just theSlot -> do
+        let (pikerId, wolvesId, _, atFour) = celestineGraveyard piker wolves bolt 4
+            (sourceId, board) = S.addCreature piker S.alice atFour
+            slotted = theSlot {TargetSlot.amount = Just (Quantity.Type.InSlot Binding.eventAmount)}
+            legal slot = Target.legalRecipients (Just S.alice) sourceId slot board
+        Spec.assertEqWith s "a bound naming a slot admits nothing" (legal slotted) Set.empty
+        Spec.assertEqWith
+          s
+          "while the printed bound on the same slot and board offers both graveyard creatures"
+          (legal theSlot)
+          (Set.fromList [Recipient.ToObject pikerId, Recipient.ToObject wolvesId])
+        Spec.assertBool s (not (Set.member (Recipient.ToObject sourceId) (legal theSlot))) "the source itself is on the battlefield, so the graveyard pool leaves it out"
