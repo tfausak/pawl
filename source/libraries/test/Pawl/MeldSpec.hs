@@ -710,16 +710,13 @@ spec s registry = Spec.describe s "Meld" $ do
     let (collectorId, base) = S.addCreature collector S.alice (Setup.emptyGame S.bothPlayers)
         (battlementsId, g1) = S.addCreature battlements S.alice base
         (garrisonId, g2) = S.addCreature garrison S.alice g1
-        -- Three more Mountains than readyFor's five, and three Plains: Pearl
-        -- Collector's {2}{W} is paid FIRST here, and its generic half may take
-        -- Mountains, so the melding ability's {3}{R}{R} needs slack behind it.
-        board = (S.landsFor plains S.alice 3 (S.landsFor mountain S.alice 3 (readyFor mountain g2))) {GameState.priority = Just S.alice}
+        board = S.landsFor plains S.alice 3 (readyFor mountain g2)
         -- Priority handed back and everything untapped before the melding
         -- ability is activated. The Pearl Collector leg has already paid {2}{W}
         -- on this board and the stand-in legs have not, and Hanweir Battlements
-        -- is itself a land that could have been tapped for that generic half --
-        -- its own cost has a {T} in it. Applied to EVERY leg, so the boards
-        -- still differ in the grant alone.
+        -- is itself a land that {2}{W}'s generic half can be paid from -- its own
+        -- melding cost has a {T} in it. Applied to EVERY leg, so the boards still
+        -- differ in the grant alone.
         ready gs = gs {GameState.priority = Just S.alice, GameState.objects = fmap (\o -> o {Object.tapped = TapState.Untapped}) (GameState.objects gs)}
         melds gs = case Projection.abilitiesOf battlementsId gs of
           [_, _, melding] ->

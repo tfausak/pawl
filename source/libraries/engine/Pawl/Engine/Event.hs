@@ -4283,11 +4283,13 @@ rewatch oldId newId row = case ActiveReplacement.effect row of
 -- battlefield, it finds both cards ... if that effect causes actions to be taken
 -- upon those cards, the same actions are taken upon each of them". Following an
 -- object across the zone change is finding what it became, so a CR 712.21a
--- arrangement's trailing card is named as well as its leading one. The meld
--- caller is the same shape read backwards -- two departures, one arrival each. That is a
+-- arrangement's trailing card is named as well as its leading one. That is a
 -- THIRD difference from carryOver beside it, which names the head alone because
 -- CR 400.7a's exception is about the permanent a SPELL becomes and a spell melds
--- into nothing. Pawl.MeldSpec's Pearl Collector case is the proof.
+-- into nothing. Pawl.MeldSpec's departure case is the proof.
+--
+-- meld calls this too, one component at a time -- the same shape read backwards,
+-- two departures with one arrival each. Its own comment has the reason.
 perpetuate :: ObjectId -> Seq.Seq ObjectId -> Game ()
 perpetuate oldId newIds =
   State.modify' $ \gs ->
