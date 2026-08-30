@@ -6689,8 +6689,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 122.5: move counters off one permanent and onto a second. WHICH kinds
     -- cross is the card's call when it names one (Explorer's Cache's "move a
     -- +1/+1 counter"), the player's when it names none (Agent's Toolkit's "move a
-    -- counter"), and neither's when the card takes them all (Fate Transfer's
-    -- "move all counters"), which is what `kinds` holds. ATOMIC -- "if either of
+    -- counter" and Resourceful Defense's "move any number of counters"), and
+    -- neither's when the card takes them all (Fate Transfer's "move all
+    -- counters"), which is what `kinds` holds. ATOMIC -- "if either of
     -- these actions isn't possible, it's not possible to move a counter, and no
     -- counter is removed from or put onto anything" -- so every impossibility the
     -- rule names is checked BEFORE either half runs, and this arm is not a
@@ -6762,11 +6763,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Set.member to (GameState.battlefield gs) ->
             -- "... if the first object doesn't have the appropriate kind of
             -- counter on it". Which kinds are appropriate is the one place the
-            -- three spellings part, and rule 122.5's clause reads differently
+            -- four spellings part, and rule 122.5's clause reads differently
             -- under each.
             --
             -- `onFrom` drops the kinds rule 122.5's THIRD impossibility rules out
-            -- as well as the ones the first object does not have, so all three
+            -- as well as the ones the first object does not have, so all four
             -- spellings answer it in one place: a kind the destination refuses is
             -- not appropriate for this move, whether the card named it, the
             -- player would have, or the card took every kind. Rule 122.5's
@@ -6777,14 +6778,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     (\kind n -> n > 0 && not (CounterRestriction.prohibited to kind gs))
                     (maybe Map.empty Object.counters (Game.lookupObject from gs))
                 -- CR 609.3 for a count larger than the object has: "it does only
-                -- as much as possible". The clamp is load-bearing rather than
-                -- defensive -- Event.removeCounters saturates where
-                -- Event.putCounters does not, so an unclamped pair would place
-                -- more counters than it took off -- but it is a REGRESSION FENCE
-                -- and not a proven behaviour: every producer's count is the tally
-                -- of that kind on the very object the removal reads, so nothing in
-                -- the corpus can make the two differ, and a mutation removing the
-                -- clamp leaves the suite green. It also subsumes rule 122.5's
+                -- as much as possible". The clamp is load-bearing --
+                -- Event.removeCounters saturates where Event.putCounters does not,
+                -- so an unclamped pair would place more counters than it took off
+                -- -- and PROVEN, by the AnyNumber arm below: a card's own count is
+                -- always the tally of that kind on the very object the removal
+                -- reads, but a PLAYER's answer is not, so Pawl.MoveCounterSpec's
+                -- "an answer asking for more counters than the permanent has"
+                -- case is where the two differ. It also subsumes rule 122.5's
                 -- second impossibility, a kind the first object does not have at
                 -- all: `onFrom` answers zero and nothing crosses.
                 --
@@ -6817,9 +6818,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- destination refuses -- leaves nothing to move and nothing to
                   -- ask. Ascending (Map.keys), so a transcript is deterministic.
                   --
-                  -- Not implemented: the whole count comes out of the ONE kind
-                  -- picked, so a move of two counters of different kinds is
-                  -- unwritable (gap #2607).
+                  --
+                  -- The whole count comes out of the ONE kind picked, which is
+                  -- exact for a card that PRINTS a count: every printing that
+                  -- prints one prints "a counter" (Pawl.Types.MovedKinds' Chosen
+                  -- records the sweep), and the kindless moves that carry more
+                  -- than one counter say "all counters" or "any number of
+                  -- counters", which are the two arms below and above.
                   MovedKinds.Chosen quantity ->
                     -- A count of zero moves nothing and ASKS nothing: the prompt
                     -- below picks which kind crosses, and no kind crossing makes
@@ -6843,6 +6848,29 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                                   -- not on the object is dropped for the first one offered.
                                   pure (if Foldable.elem answer offered then answer else first)
                               move kind asked
+                  -- Resourceful Defense's "move any number of counters": the card
+                  -- settles neither the kind nor the count, so ONE prompt asks for
+                  -- both and the answer may spread across kinds -- which is the
+                  -- whole of what separates this arm from Chosen above. Ascending
+                  -- (Map.toList), so a transcript is deterministic.
+                  --
+                  -- An object with no movable kind moves nothing and asks nothing.
+                  -- Everywhere else the prompt IS raised, a single kind bearing a
+                  -- single counter included, because "any number" includes none:
+                  -- moving it and leaving it are two different boards, so eliding
+                  -- the question would be the engine making the player's choice.
+                  MovedKinds.AnyNumber ->
+                    if Map.null onFrom
+                      then pure 0
+                      else do
+                        answer <- Game.choose (Prompt.ChooseMovedCounters (Decide.deciderFor controller gs) controller from to onFrom)
+                        -- FILTERED, NOT TRUSTED, in `move` rather than here: it
+                        -- already reads `onFrom` for the count, so a kind the object
+                        -- does not have -- or one the destination refuses, which
+                        -- `onFrom` dropped -- answers zero and moves nothing, and a
+                        -- count above what the object holds is clamped to it. A
+                        -- filter written here as well would have no observer.
+                        fmap sum (mapM (uncurry move) (Map.toList answer))
       -- Either side unresolvable: an illegal slot at resolution (CR 608.2b), a
       -- player recipient, or rule 122.5's impossibilities above. Nothing moves.
       _ -> pure 0

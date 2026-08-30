@@ -38,4 +38,8 @@ spec s = Spec.describe s "Pawl.Codec.MovedKinds" $ do
       MovedKinds.codec
       (MovedKinds.Chosen (Quantity.Literal 1))
       " {\"type\":\"Chosen\",\"value\":{\"type\":\"Literal\",\"value\":1}} "
+  -- Resourceful Defense's "move any number of counters": neither a kind nor a
+  -- count, both being the player's to pick, so the tag is the whole of it.
+  Spec.it s "AnyNumber" $
+    Common.assertCodec s MovedKinds.codec MovedKinds.AnyNumber " {\"type\":\"AnyNumber\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s MovedKinds.codec

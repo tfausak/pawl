@@ -56,6 +56,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   namedKindSpec s registry
   batchSpec s registry
   everyKindSpec s registry
+  anyNumberSpec s registry
 
 -- Which counter the answerer takes, and whether it takes the printed "may" at
 -- all. Pinned by POSITION in the offered list rather than by naming a kind, so
@@ -703,3 +704,163 @@ everyKindSpec s registry = Spec.describe s "CR 122.5 moving every kind of counte
     let after = transfer built
     Spec.assertEqWith s "every kind crossed, the -1/-1 counter included" (tripleOn takerId after) (0, 2, 1)
     Spec.assertEqWith s "and bob's wall is left with nothing" (tripleOn giverId after) (0, 0, 0)
+
+-- Resourceful Defense {2}{W} Enchantment (Edge of Eternities Commander; name,
+-- cost, type line and oracle text checked against Scryfall 2026-08-30),
+-- data/cards/resourceful-defense.json:
+--
+--   Whenever a permanent you control leaves the battlefield, if it had counters
+--   on it, put those counters on target permanent you control.
+--   {4}{W}: Move any number of counters from target permanent you control onto
+--   a second target permanent you control.
+--
+-- The second line is this group's subject, and the card is why "any number"
+-- exists: it names neither the kind nor the count, so ONE answer settles both
+-- and may take one counter of each of two kinds -- where Agent's Toolkit's
+-- printed count of one comes out of the one kind the player picks. It is the
+-- only shape in which a printing moves more than one counter without naming a
+-- kind: Scryfall oracle:/(^|[^a-z])move [^.]*counter/, 2026-08-30, over every
+-- printing ever released, returns "all counters" (Fate Transfer, The Ozolith,
+-- Nexus Mentality), "any number of counters" (this card, Slippery Bogbonder) and
+-- "one or more counters" (Goldberry, River-Daughter), and no fixed count above
+-- one at all.
+--
+-- pawl's Resourceful Defense omits the triggered ability entirely: "put those
+-- counters" copies a departing permanent's whole per-kind tally as last-known
+-- information, where Pawl.Types.PutCounters carries one kind and one Quantity
+-- (#2694). The omission is stricter than printed -- alice's departing counters
+-- simply cease -- and never weaker in her favour.
+--
+-- Both target pools are Pool.Permanents and both slots accept every permanent
+-- alice controls, so one predicate over both could not tell them apart and the
+-- slot NAME is what settles which -- Fate Transfer's aimingTransfer posture, and
+-- FILTERING the offered set rather than building a recipient so CR 608.2b's
+-- re-read at resolution still finds what was named.
+--
+-- `wanted` is answered VERBATIM rather than derived from what is offered, so an
+-- answerer cannot silently repair a mutation by re-deriving a legal answer, and
+-- the count of prompts raised is threaded so a case whose point is that nothing
+-- was asked can say so.
+defenseAnswer ::
+  ObjectId.ObjectId ->
+  ObjectId.ObjectId ->
+  Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural ->
+  Prompt.Prompt r ->
+  State.State Int r
+defenseAnswer giver taker wanted p = case p of
+  Prompt.ChooseTargets _ _ _ asked ->
+    pure
+      ( Map.mapWithKey
+          ( \slot (_, offered) ->
+              let target = if slot == transferFrom then giver else taker
+               in Set.filter ((==) (Just target) . Recipient.objectOf) offered
+          )
+          asked
+      )
+  Prompt.ChooseMovedCounters {} -> do
+    State.modify' (+ 1)
+    pure wanted
+  _ -> pure (S.identityAnswer p)
+
+anyNumberSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+anyNumberSpec s registry = Spec.describe s "CR 122.5 moving any number of counters" $ do
+  let -- alice: five untapped Plains (the {4}{W} has to come from somewhere),
+      -- Resourceful Defense, and two Goblin Pikers -- one to move counters off
+      -- and one to move them onto. Every one of those is a permanent she
+      -- controls, so both target slots are offered far more candidates than they
+      -- need. `counters` is what a case puts on the first Piker, and is the ONLY
+      -- difference between the boards below.
+      board counters = do
+        plains <- S.printingOf s registry "Plains"
+        defense <- S.printingOf s registry "Resourceful Defense"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (defenseId, g1) = S.addCreature defense S.alice (S.landsInPlay plains 5)
+            (giverId, g2) = S.addCreature piker S.alice g1
+            (takerId, g3) = S.addCreature piker S.alice g2
+            ready = (counters giverId g3) {GameState.priority = Just S.alice}
+        pure (defenseId, giverId, takerId, ready)
+      -- The ability, activated once and resolved, answering the counter question
+      -- with `wanted`. Exactly one printed activated ability, not the first of
+      -- however many.
+      spend wanted (defenseId, giverId, takerId, ready) = case Activate.abilitiesFor defenseId ready of
+        [only] ->
+          let run =
+                Engine.runGame
+                  (defenseAnswer giverId takerId wanted)
+                  ready
+                  (Activate.activateAbility S.alice defenseId only >> Stack.resolveTop)
+              ((_, after), asked) = State.runState run 0
+           in Just (asked, after)
+        _ -> Nothing
+      stocked oid = S.addCounter CounterKind.Shield 2 oid . S.addCounter CounterKind.PlusOnePlusOne 3 oid
+  -- THE CASE THIS UNIT EXISTS FOR. The first Piker bears TWO kinds, and the
+  -- answer takes one counter of each -- fewer than either pile holds, so "one
+  -- counter out of each of two kinds" is a different board from any count taken
+  -- out of one kind, which is what a move settling on a single kind would have
+  -- produced.
+  Spec.it s "one counter of each of two kinds crosses on one answer" $ do
+    built <- board stocked
+    let (_, giverId, takerId, before) = built
+    Spec.assertEqWith s "the first creature bears three +1/+1 counters and two shield counters" (tripleOn giverId before) (3, 2, 0)
+    Spec.assertEqWith s "and the second bears none of any kind" (tripleOn takerId before) (0, 0, 0)
+    case spend (Map.fromList [(CounterKind.PlusOnePlusOne, 1), (CounterKind.Shield, 1)]) built of
+      Just (asked, after) -> do
+        -- THE GAMEPLAY-LEVEL ASSERTIONS, ahead of the prompt count: one of each
+        -- kind arrived, and the rest of both piles stayed where it was.
+        Spec.assertEqWith s "the second creature has one counter of each kind" (tripleOn takerId after) (1, 1, 0)
+        Spec.assertEqWith s "and the first kept two +1/+1 counters and one shield counter" (tripleOn giverId after) (2, 1, 0)
+        Spec.assertEqWith s "the player was asked which counters, both kinds being distinguishable" asked 1
+      Nothing -> Spec.assertFailure s "expected Resourceful Defense to offer exactly its one printed activated ability"
+  -- The same board differing in exactly ONE thing, the answer: two counters of a
+  -- single kind. Without this pair the case above would pass on a move that
+  -- always took one of everything offered, and it is also the shape Agent's
+  -- Toolkit's Chosen arm can already write -- so "any number" widens that arm
+  -- rather than replacing it.
+  Spec.it s "and an answer naming one kind twice takes both out of that kind" $ do
+    built <- board stocked
+    let (_, giverId, takerId, _) = built
+    case spend (Map.singleton CounterKind.PlusOnePlusOne 2) built of
+      Just (_, after) -> do
+        Spec.assertEqWith s "the second creature has two +1/+1 counters and no shield counter" (tripleOn takerId after) (2, 0, 0)
+        Spec.assertEqWith s "and the first kept one +1/+1 counter and both shield counters" (tripleOn giverId after) (1, 2, 0)
+      Nothing -> Spec.assertFailure s "expected Resourceful Defense to offer exactly its one printed activated ability"
+  -- CR 609.3 -- "it does only as much as possible" -- and rule 122.5's second
+  -- impossibility, both against an answer no card could have written: nine +1/+1
+  -- counters off a creature bearing three, and four -1/-1 counters off one
+  -- bearing none. This is the only board on which the count asked for and the
+  -- tally present can differ at all, since a card's own count is read off the
+  -- very object the removal reads.
+  Spec.it s "an answer asking for more counters than the permanent has moves only what is there" $ do
+    built <- board stocked
+    let (_, giverId, takerId, _) = built
+    case spend (Map.fromList [(CounterKind.PlusOnePlusOne, 9), (CounterKind.MinusOneMinusOne, 4)]) built of
+      Just (_, after) -> do
+        Spec.assertEqWith s "three +1/+1 counters crossed and no more, and no -1/-1 counter appeared" (tripleOn takerId after) (3, 0, 0)
+        Spec.assertEqWith s "and the first creature is down all three, its shield counters untouched" (tripleOn giverId after) (0, 2, 0)
+      Nothing -> Spec.assertFailure s "expected Resourceful Defense to offer exactly its one printed activated ability"
+  -- "Any number" includes NONE, so a lone kind bearing a lone counter is still a
+  -- real choice and the prompt IS raised -- unlike Agent's Toolkit's Chosen arm
+  -- above, which elides it at one candidate because the card's own count then
+  -- settles everything. The two runs differ in exactly one thing, the answer, so
+  -- an engine that moved the counter without asking would fail the second.
+  Spec.it s "a single counter of a single kind is still asked about, and may be left where it is" $ do
+    built <- board (S.addCounter CounterKind.PlusOnePlusOne 1)
+    let (_, giverId, takerId, _) = built
+    case (spend (Map.singleton CounterKind.PlusOnePlusOne 1) built, spend Map.empty built) of
+      (Just (askedMoving, moving), Just (askedLeaving, leaving)) -> do
+        Spec.assertEqWith s "the answer that names the counter moves it" (tripleOn takerId moving, tripleOn giverId moving) ((1, 0, 0), (0, 0, 0))
+        Spec.assertEqWith s "and the answer that names nothing leaves it where it was" (tripleOn takerId leaving, tripleOn giverId leaving) ((0, 0, 0), (1, 0, 0))
+        Spec.assertEqWith s "both runs asked, a lone counter being a choice between moving it and not" (askedMoving, askedLeaving) (1, 1)
+      _ -> Spec.assertFailure s "expected Resourceful Defense to offer exactly its one printed activated ability"
+  -- Rule 122.5's second impossibility with nothing to ask about: a first object
+  -- bearing no counter at all has no candidate kind, so the move is settled
+  -- before the player is asked anything.
+  Spec.it s "a permanent bearing no counter moves nothing and asks nothing" $ do
+    built <- board (const id)
+    let (_, giverId, takerId, _) = built
+    case spend (Map.singleton CounterKind.PlusOnePlusOne 1) built of
+      Just (asked, after) -> do
+        Spec.assertEqWith s "the second creature received nothing" (tripleOn takerId after) (0, 0, 0)
+        Spec.assertEqWith s "and the first still bears nothing" (tripleOn giverId after) (0, 0, 0)
+        Spec.assertEqWith s "and with no kind to offer the player was not asked" asked 0
+      Nothing -> Spec.assertFailure s "expected Resourceful Defense to offer exactly its one printed activated ability"

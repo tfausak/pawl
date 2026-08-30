@@ -2889,13 +2889,14 @@ rewriteDuration pairs duration = case duration of
   Duration.UntilPaid _ -> duration
 
 -- CR 612.1 through the counters a CR 122.5 move carries: the count is the only
--- place a subtype word can hide, since the kind is a CounterKind and Every names
--- nothing at all.
+-- place a subtype word can hide, since the kind is a CounterKind and neither
+-- Every nor AnyNumber names anything at all.
 rewriteMovedKinds :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> MovedKinds.MovedKinds -> MovedKinds.MovedKinds
 rewriteMovedKinds pairs kinds = case kinds of
   MovedKinds.Every -> kinds
   MovedKinds.Named kind quantity -> MovedKinds.Named kind (rewriteQuantity pairs quantity)
   MovedKinds.Chosen quantity -> MovedKinds.Chosen (rewriteQuantity pairs quantity)
+  MovedKinds.AnyNumber -> kinds
 
 -- CR 612.1 through a Quantity: a Count's Filter is where the subtype word hides,
 -- and its Aggregation may name a further Quantity. Every remaining arm is a leaf.
