@@ -20,7 +20,10 @@
                       {
                         "type": "MoveCounters",
                         "value": {
-                          "from": "permanent",
+                          "from": {
+                            "type": "InSlot",
+                            "value": "permanent"
+                          },
                           "kinds": {
                             "type": "EachAbsentKind"
                           },

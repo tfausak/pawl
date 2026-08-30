@@ -20,7 +20,10 @@
                       {
                         "type": "MoveCounters",
                         "value": {
-                          "from": "land",
+                          "from": {
+                            "type": "InSlot",
+                            "value": "land"
+                          },
                           "kinds": {
                             "type": "Named",
                             "value": {
