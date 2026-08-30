@@ -36,9 +36,10 @@ data Pool
     -- Pawl.Engine.Activate.activatable already excludes it (CR 605.1a).
     Abilities
   | SpellsAndPermanents -- CR 115: spells on the stack + battlefield permanents (ToObject).
-  | -- | CR 115.2 clause (a) exercised in BOTH halves at once: players still in the
-    -- game (ToPlayer) plus battlefield planeswalkers (ToPlaneswalker) -- Goblin War
-    -- Strike's "target player or planeswalker".
+  | -- | CR 115.2's own two halves in one slot -- the rule's default (a permanent
+    -- is a legal target, here CR 306's planeswalkers, ToPlaneswalker) plus clause
+    -- (a)'s "or a player" (ToPlayer). Goblin War Strike's "target player or
+    -- planeswalker".
     --
     -- Not CR 115.4's AnyTarget narrowed by a Filter. That rule's four-way is a
     -- different printed template, and a card's Filter is its own restriction

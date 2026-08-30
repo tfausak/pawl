@@ -480,10 +480,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     -- it to permanents.
     Spec.assertEqWith s "and nothing else on the battlefield is" (fmap (Set.size . Set.filter (Maybe.isJust . Recipient.objectOf)) offered) (Just 1)
 
-  -- The OTHER pool that offers a planeswalker, and the pair is the point: CR 115.2
-  -- lets a spell "specify that it can target an object in another zone or a
-  -- player", and a card may exercise both halves of that clause in one slot
-  -- without reaching rule 115.4's four-way at all. Goblin War Strike {R} Sorcery
+  -- The OTHER pool that offers a planeswalker, and the pair is the point: CR
+  -- 115.2's default already admits a permanent, and its clause (a) adds "or a
+  -- player", so a card can name both in one slot without reaching rule 115.4's
+  -- four-way at all. Goblin War Strike {R} Sorcery
   -- -- "Goblin War Strike deals damage to target player or planeswalker equal to
   -- the number of Goblins you control" (checked against Scryfall) -- is that
   -- card, and Pool.PlayersAndPlaneswalkers is its slot.

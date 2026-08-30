@@ -407,7 +407,10 @@ poolHeldLastKnown pool view =
         Pool.AnyTarget -> hasType CardType.Creature || hasType CardType.Planeswalker || hasType CardType.Battle
         Pool.SpellsAndPermanents -> any Card.isPermanentType (Set.toList types)
         -- Only the planeswalker half can be asked: the player half is looked up by
-        -- PlayerId, as Pool.Players below is.
+        -- PlayerId, as Pool.Players below is. A REGRESSION FENCE like the arms
+        -- around it -- the one caller asks about an ENCHANT slot, and CR 702.5a's
+        -- "Enchant [object or player]" cannot name this pair, so answering False
+        -- here reddens nothing.
         Pool.PlayersAndPlaneswalkers -> hasType CardType.Planeswalker
         Pool.Players -> False
         Pool.Spells -> False

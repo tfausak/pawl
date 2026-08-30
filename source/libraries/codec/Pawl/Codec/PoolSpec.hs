@@ -53,7 +53,7 @@ spec s = Spec.describe s "Pawl.Codec.Pool" $ do
       Pool.codec
       Pool.SpellsAndPermanents
       " {\"type\":\"SpellsAndPermanents\"} "
-  -- CR 115.2 clause (a) in both halves: players plus battlefield planeswalkers.
+  -- CR 115.2: battlefield planeswalkers plus clause (a)'s "or a player".
   Spec.it s "PlayersAndPlaneswalkers" $
     Common.assertCodec
       s

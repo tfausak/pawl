@@ -2408,7 +2408,9 @@ m2cPropertySpec s registry =
 --
 -- The PLANESWALKER answer is pinned here and nowhere else, because no card in
 -- the pool can produce it. A DealDamage takes its recipient from an AnyTarget,
--- Creatures or Players pool -- none of which tags a candidate ToObject -- or
+-- Creatures, Players or PlayersAndPlaneswalkers pool -- none of which tags a
+-- candidate ToObject, the two that reach a planeswalker tagging it
+-- ToPlaneswalker outright -- or
 -- from a bound slot, or from a swept set, and neither of the two that can name
 -- a permanent generically admits a planeswalker: Aether Flash's `became` has a
 -- trigger condition Filter that admits only creatures, and Corrosive Gale's
