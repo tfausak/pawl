@@ -3712,7 +3712,7 @@ zirdaResolved s registry pick = do
       abilities = Activate.abilitiesFor zirdaId board
       named = pick attacker victim twin
       resolved = case abilities of
-        [ability] -> S.runPure (naming named) board (Activate.activateAbility S.alice zirdaId ability >> Stack.resolveTop)
+        [ability] -> S.runPure (namingTarget named) board (Activate.activateAbility S.alice zirdaId ability >> Stack.resolveTop)
         _ -> board
   Spec.assertEqWith s "Zirda states exactly one activated ability" (length abilities) 1
   pure (attacker, victim, twin, resolved)
@@ -3722,8 +3722,8 @@ zirdaResolved s registry pick = do
 -- Recipient.ToCreature, and a hand-built Recipient.ToObject of the same permanent
 -- is a different recipient that CR 608.2b's re-read drops silently. Filtering also
 -- stops the answerer repairing a mutation by finding whatever is still legal.
-naming :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-naming oid p = case p of
+namingTarget :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+namingTarget oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter ((== Just oid) . Recipient.objectOf) offered) sets
   _ -> S.identityAnswer p
 
