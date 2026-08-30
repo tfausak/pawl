@@ -11,8 +11,13 @@ import qualified Pawl.Types.SlotName as SlotName
 -- stated about a pair. An ObjectRef describing a set would have no pair for that
 -- clause to be about.
 --
--- Not implemented: the printed text that DOES name a set on the first side,
--- Slippery Bogbonder's "from among creatures you control" (#2704).
+-- Not implemented: the printed text that DOES name a set on the first side --
+-- Spike Cannibal's "from all creatures", Aetherborn Marauder's "from other
+-- permanents you control", Slippery Bogbonder's "from among creatures you
+-- control", Oozeavite's "from other creatures you control" (#2704). Nor a set on
+-- the SECOND side, Forgotten Ancient's "onto other creatures", which asks for a
+-- distribution across the batch where a set on the first side asks for a
+-- gathering out of it (#2713).
 --
 -- `kinds` is WHICH counters cross and how many of each, which the printed text
 -- spells five ways; Pawl.Types.MovedKinds is where the five are set out.
