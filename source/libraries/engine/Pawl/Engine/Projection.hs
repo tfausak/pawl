@@ -2910,6 +2910,7 @@ rewriteMovedKinds pairs kinds = case kinds of
   MovedKinds.AnyNumber -> kinds
   MovedKinds.AnyNumberOfKind _ -> kinds
   MovedKinds.EachAbsentKind -> kinds
+  MovedKinds.UpToOneChosen -> kinds
 
 -- CR 612.1 through a Quantity: a Count's Filter is where the subtype word hides,
 -- and its Aggregation may name a further Quantity. Every remaining arm is a leaf.

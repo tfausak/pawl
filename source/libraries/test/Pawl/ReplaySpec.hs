@@ -1208,6 +1208,25 @@ combatReplaySpec s =
             "the empty tally"
             (Replay.defaultAnswer (Prompt.ChooseMovedCounters decider S.alice oid (ObjectId.MkObjectId 9) (Map.singleton CounterKind.PlusOnePlusOne (3 :: Natural.Natural))))
             Map.empty
+        -- CR 122.5 once more, for "up to one": the answer is a kind OR none, so a
+        -- transcript has to carry the declining half that ChooseMovedCounter's
+        -- cannot say.
+        Spec.it s "ChooseMovedCounterOrNone round-trips through the transcript" $ do
+          let a = CounterKind.PlusOnePlusOne
+              b = CounterKind.Shield
+              p = Prompt.ChooseMovedCounterOrNone decider S.alice oid (ObjectId.MkObjectId 9) (a NonEmpty.:| [b])
+          Spec.assertEqWith s "declining round trips" (Replay.decode p (Replay.encode p Nothing)) (Just Nothing)
+          -- Discriminating: a decode that ignored the response would answer the
+          -- case above whatever was encoded.
+          Spec.assertEqWith s "and so does choosing the second" (Replay.decode p (Replay.encode p (Just b))) (Just (Just b))
+        Spec.it s "a short up-to-one transcript moves nothing" $
+          -- CR 122.5: "up to one" includes none, so the quiet answer is always
+          -- legal and leaves the board where a short transcript found it.
+          Spec.assertEqWith
+            s
+            "declining"
+            (Replay.defaultAnswer (Prompt.ChooseMovedCounterOrNone decider S.alice oid (ObjectId.MkObjectId 9) (CounterKind.PlusOnePlusOne NonEmpty.:| [CounterKind.Shield])))
+            Nothing
         -- CR 701.68a: which creature a blighting player put the counters on is a
         -- decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseBlight round-trips through the transcript" $ do

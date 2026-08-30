@@ -200,6 +200,12 @@ data Response
     -- replaying as the other would be a silently wrong answer rather than a
     -- desync.
     ChoseMovedCounters (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural)
+  | -- | CR 122.5: the KIND of counter a player chose to move off the first
+    -- object, or none at all. Its own constructor and not ChoseMovedCounter
+    -- above for that same reason: declining is an answer only one of the two
+    -- prompts allows, so a transcript of either replaying as the other would be
+    -- a silently wrong answer rather than a desync.
+    ChoseMovedCounterOrNone (Maybe (CounterKind.CounterKind Keyword.Keyword))
   | -- | CR 608.2d: the graveyard card a player chose for an
     -- Pawl.Types.ObjectRef.ChosenCardInGraveyard. One of these per chooser, so a
     -- transcript of Exhume resolving holds one for each stocked graveyard.
