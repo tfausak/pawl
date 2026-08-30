@@ -4841,10 +4841,11 @@ manaValueAtMostAmountCounts card =
 manaValueAtMostAmountOffends :: Face.Face Card.Type.Card -> Bool
 manaValueAtMostAmountOffends card = snd (manaValueAtMostAmountCounts card) /= 0
 
--- Every TARGET SLOT one face declares, as values rather than as names: CR 303.4a's
--- enchant slot and every mode of each of the four carriers CR 601.2c, CR 602.2b
--- and CR 603.3d reach, plus the abilities a static ability GRANTS -- the quoted
--- text is this card's, so its slots are this card's too.
+-- Every TARGET SLOT one face declares, as values rather than as names:
+-- ownDeclaredTargetSlots' carriers -- CR 303.4a's enchant slot, and every mode of
+-- everything that announces targets under CR 601.2c, CR 602.2b or CR 603.3d --
+-- plus the abilities a static ability GRANTS, whose quoted text is this card's, so
+-- whose slots are this card's too.
 --
 -- Per MODE and per ability rather than through Card.allTargetSlots, which is a
 -- Map.unions and so collapses two modes declaring the same name (#475): the count
@@ -4877,6 +4878,10 @@ cardTargetSlots card = concatMap ownTargetSlots (card : mintedFaces card)
 --
 -- Quantity.slots is the same reader Resolve.slotsOf gives every other quantity, so
 -- a new quantity arm carrying a slot is classified here by being classified there.
+--
+-- A Filter nested inside the bound is a DIFFERENT question and is not counted
+-- here: Filter.IsBound in one is answered off Filter.Context.slotObjects, which
+-- slotContext does fill from whatever bindings its caller supplies.
 amountSlotCounts :: Face.Face Card.Type.Card -> (Int, Int)
 amountSlotCounts card =
   let amounts = Maybe.mapMaybe TargetSlot.amount (cardTargetSlots card)
