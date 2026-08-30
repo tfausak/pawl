@@ -114,10 +114,11 @@ representatives pcs gs candidates =
 --   * The turn, phase, priority, result, daytime, signal, supply and printing
 --     fields describe the GAME rather than any object.
 --
--- GameState.unregeneratables and GameState.blockProhibitions ARE listed below,
--- for the reason every other listed field is: a row names one object and not
--- another (CR 701.19c, CR 509.1b), so two creatures alike in every
--- characteristic are told apart by which of them a prohibition covers.
+-- GameState.unregeneratables, GameState.blockProhibitions and
+-- GameState.attackProhibitions ARE listed below, for the reason every other
+-- listed field is: a row names one object and not another (CR 701.19c, CR
+-- 509.1b, CR 508.1c), so two creatures alike in every characteristic are told
+-- apart by which of them a prohibition covers.
 --
 -- GameState.enteringCounters, GameState.detachedBindings and
 -- GameState.broughtIn are listed below because each holds ObjectIds, and NOT
@@ -135,6 +136,7 @@ quiet gs =
     && null (GameState.attackRequirements gs)
     && null (GameState.unregeneratables gs)
     && null (GameState.blockProhibitions gs)
+    && null (GameState.attackProhibitions gs)
     && null (GameState.ignoredAbilities gs)
     && Seq.null (GameState.delayedTriggers gs)
     && Seq.null (GameState.pendingPreventionRiders gs)

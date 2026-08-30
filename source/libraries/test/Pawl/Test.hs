@@ -18,6 +18,7 @@ import qualified Pawl.Codec.AbilityTriggeredSpec
 import qualified Pawl.Codec.ActivatedAbilitySourceSpec
 import qualified Pawl.Codec.ActivatedAbilitySpec
 import qualified Pawl.Codec.ActivationRestrictionSpec
+import qualified Pawl.Codec.ActiveAttackProhibitionSpec
 import qualified Pawl.Codec.ActiveAttackRequirementSpec
 import qualified Pawl.Codec.ActiveBlockProhibitionSpec
 import qualified Pawl.Codec.ActiveBlockRequirementSpec
@@ -177,6 +178,7 @@ import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.FlipCoinSpec
 import qualified Pawl.Codec.FloatingCandidateSpec
 import qualified Pawl.Codec.ForEachSpec
+import qualified Pawl.Codec.ForbidAttackSpec
 import qualified Pawl.Codec.ForbidBlockSpec
 import qualified Pawl.Codec.FromOutsideTheGameSpec
 import qualified Pawl.Codec.GameEventSpec
@@ -565,6 +567,7 @@ spec s registry = do
   Pawl.Codec.ActivatedAbilitySourceSpec.spec s
   Pawl.Codec.ActivatedAbilitySpec.spec s
   Pawl.Codec.ActivationRestrictionSpec.spec s
+  Pawl.Codec.ActiveAttackProhibitionSpec.spec s
   Pawl.Codec.ActiveAttackRequirementSpec.spec s
   Pawl.Codec.ActiveBlockProhibitionSpec.spec s
   Pawl.Codec.ActiveBlockRequirementSpec.spec s
@@ -723,6 +726,7 @@ spec s registry = do
   Pawl.Codec.FlipCoinSpec.spec s
   Pawl.Codec.FloatingCandidateSpec.spec s
   Pawl.Codec.ForEachSpec.spec s
+  Pawl.Codec.ForbidAttackSpec.spec s
   Pawl.Codec.ForbidBlockSpec.spec s
   Pawl.Codec.FromOutsideTheGameSpec.spec s
   Pawl.Codec.GameEventSpec.spec s

@@ -241,7 +241,9 @@ canAttackGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs 
       -- CR 508.1c through CR 702.3b: a creature with defender can't attack. It may
       -- still block -- 702.3b says nothing about blocking.
       && not (Projection.hasKeywordGiven pcs Keyword.Defender oid gs)
-      -- CR 508.1c: every PRINTED attacking restriction in force (Pacifism).
+      -- CR 508.1c: every per-creature attacking restriction in force -- printed
+      -- (Pacifism), CR 701.35a's detain, or stored by the resolution that said it
+      -- (Netter en-Dal).
       && not (Set.member oid restricted)
 
 legalAttackers :: PlayerId -> GameState -> [ObjectId]
@@ -542,8 +544,9 @@ canBlockGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs o
       && Set.member oid (GameState.battlefield gs)
       && Object.tapped obj == TapState.Untapped
       && isCreatureObjectGiven pcs oid gs
-      -- CR 509.1b: every per-creature blocking restriction in force, printed
-      -- (Pacifism) or minted by rule 702 from a keyword (unleash, CR 702.98a).
+      -- CR 509.1b: every per-creature blocking restriction in force -- printed
+      -- (Pacifism), minted by rule 702 from a keyword (unleash, CR 702.98a), or
+      -- stored by the resolution that said it (Zirda, the Dawnwaker).
       && not (Set.member oid restricted)
 
 legalBlockers :: PlayerId -> GameState -> [ObjectId]

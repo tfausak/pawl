@@ -27,6 +27,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
@@ -1013,6 +1014,21 @@ data Effect card ability
     -- could not have been reused either -- it is gathered live off a source on the
     -- battlefield, where this outlives its source (CR 611.2a).
     ForbidBlock ForbidBlock.ForbidBlock
+  | -- | CR 508.1c / 613.11: install a stored ATTACKING RESTRICTION for a duration.
+    -- Netter en-Dal's is `ForbidAttack UntilEndOfTurn (InSlot target)`.
+    --
+    -- ForbidBlock's twin one rule over, and RequireAttack's opposite polarity:
+    -- rule 508.1c's subject is one OBJECT, so a single ObjectRef and no second
+    -- axis -- "can't attack" names nothing to be attacked, where CR 508.1d's
+    -- requirement names whom the creature must attack.
+    --
+    -- Not a Pawl.Types.Modification, and CR 613.11 is the reason: a restriction on
+    -- a declaration modifies the RULES rather than any object's characteristics,
+    -- so it is applied after the layers and Pawl.Engine.Projection never sees it.
+    -- Pawl.Types.CombatRestriction is the printed carrier of the same sentence and
+    -- could not have been reused either -- it is gathered live off a source on the
+    -- battlefield, where this outlives its source (CR 611.2a).
+    ForbidAttack ForbidAttack.ForbidAttack
   | -- | CR 114.2: the resolving controller gets an emblem with the given
     -- abilities, put into the command zone. Targetless; the abilities ride a Card
     -- so the emblem reuses the whole ability pipeline.
