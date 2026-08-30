@@ -160,9 +160,13 @@ loadNoAuraDeck registry = do
 -- Thirteen cards, not sixty, and that is the whole reason: `resolve` re-projects
 -- every other battlefield object at every movable layer, so the cost climbs far
 -- faster than the deck does. Wall clock for one process running this match and
--- its control back to back, measured at several deck sizes: about 3s at 12
--- cards, 6s at 13, 14s at 14, 24s at 15, 74s at 18, and no result inside twelve
--- minutes at 30.
+-- its control back to back, measured at several deck sizes on the engine as it
+-- stood while #2636's dependency scan ran board-wide at every pair: about 3s at
+-- 12 cards, 6s at 13, 14s at 14, 24s at 15, 74s at 18, and no result inside
+-- twelve minutes at 30. #2641's arm split took the 13-card point back from 5.696s
+-- to 2.355s of tasty-bench mean, against 2.312s for the same tree with the scan
+-- as it stood before #2636; the rest of the ladder is unmeasured since, and the
+-- deck stays at 13.
 --
 -- Observed by running the match and reading the final GameState: both decks deck
 -- out on turn 14, and the battlefields differ only by the four permanents the
