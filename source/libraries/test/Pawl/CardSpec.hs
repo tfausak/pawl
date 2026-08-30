@@ -6601,12 +6601,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   --
   -- So the shape a card must not author is a singular read of a slot a move that
   -- may take SEVERAL cards bound: it would silently name nothing rather than
-  -- fail. Effect.OfferCast is the ONE singular reader -- Resolve.offerCast asks
-  -- slotOne and nothing else. A MoveToZone whose own ref is an InSlot is not
-  -- one, despite reading the slot by hand rather than through
-  -- Resolve.objectRefObjects: its branch asks slotGroup FIRST and moves every
-  -- member, which is Feral Lightning's "exile them" and Ignorant Bliss' "return
-  -- those cards to your hand".
+  -- fail. WHICH reads are singular is `readSingly` below and not this paragraph
+  -- -- an opcode is one when Resolve hands its slot to legalOne or slotOne with
+  -- no slotGroup fallback beside it, which many of them do. A MoveToZone whose
+  -- own ref is an InSlot is NOT one, despite reading the slot by hand rather
+  -- than through Resolve.objectRefObjects: its branch asks slotGroup FIRST and
+  -- moves every member, which is Feral Lightning's "exile them" and Ignorant
+  -- Bliss' "return those cards to your hand".
   Spec.it s "no card reads a slot a plural move bound with a singular reader" $ do
     ps <- S.allPrintings s
     let -- The refs that move at most ONE object, and so bind the singular shape
@@ -6752,6 +6753,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- Not implemented: the object slot PlayerRef.ControllerOfBound reads
         -- singly, which no arm below can see because a PlayerRef sits inside a
         -- payload rather than being one (#2707).
+        --
+        -- Not implemented: the reading side stops at Resolve, so the two singular
+        -- readers outside it are unfenced -- Quantity.AgainstSlot and
+        -- Filter.IsControllerOfBound both go through Filter.slotOneObject, which
+        -- declines a group exactly as Binding.onlyOne does. Filter.IsBound reads
+        -- the whole set, but it is a DIFFERENT atom and does nothing for a card
+        -- that wrote either of those two (#2711).
         readSingly effect = case effect of
           -- CR 701.14b's pair, which is why both slots count.
           Effect.Fight (Fight.MkFight one two) -> [one, two]
