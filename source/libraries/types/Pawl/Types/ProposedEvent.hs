@@ -57,7 +57,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- nothing and pays nothing. Nothing is what a reader gating on a paid cost -- CR
 -- 702.37b's megamorph counter, the only such reader -- correctly declines.
 --
--- Eleven arms, not every replaceable event class the rules define: each of the rest
+-- Twelve arms, not every replaceable event class the rules define: each of the rest
 -- is one more arm plus the funnel that raises it.
 data ProposedEvent
   = WouldChangeZone ZoneChange.ZoneChange
@@ -137,4 +137,23 @@ data ProposedEvent
     -- field's currency, so CR 616.2's next iteration sees a smaller loss rather
     -- than a differently-shaped event.
     WouldLoseLife LifeLossCause.LifeLossCause PlayerId.PlayerId Natural.Natural
+  | -- | CR 121.1 / 614.11: a player would draw a card. Raised by
+    -- Pawl.Engine.Event.drawCardReturning, the one funnel CR 121.1's turn-based
+    -- draw, an opening hand and an Effect.Draw all go through -- and raised
+    -- BEFORE the library is looked at, which is rule 614.11's "applied even if no
+    -- cards could be drawn because there are no cards in the affected player's
+    -- library".
+    --
+    -- ONE draw and no count: CR 121.2 makes an instruction to draw several cards
+    -- that many individual card draws, and this funnel runs once per draw.
+    --
+    -- Not implemented: CR 121.2a's modification of the NUMBER a single
+    -- instruction names, which rule 616.1g applies once before any of the
+    -- individual draws. That is a different event class -- the instruction, not
+    -- the draw -- and nothing raises it (#2660).
+    --
+    -- The PlayerId and nothing else: rule 121.1's action has no source, no amount
+    -- and no destination a replacement could rewrite, and the card it would move
+    -- is not chosen until the draw happens.
+    WouldDraw PlayerId.PlayerId
   deriving (Eq, Ord, Show)

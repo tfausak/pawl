@@ -1268,7 +1268,7 @@ wasDealtDamageThisTurn gs pid = any ((== Just pid) . damagedPlayer . LoggedEvent
 -- EVENTS, which is the right unit for a trigger and the wrong one for a total.
 --
 -- CR 119.9's zero is not fenced here, because nothing files one: the write every
--- gain goes through (Pawl.Engine.Resolve.changeLife) skips a zero delta, and
+-- gain goes through (Pawl.Engine.Event.changeLife) skips a zero delta, and
 -- Pawl.Engine.Damage's lifelink record guards its own amount.
 lifeGainOf :: GameEvent -> Maybe (PlayerId, Natural)
 lifeGainOf event = case event of

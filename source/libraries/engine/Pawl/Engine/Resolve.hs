@@ -158,7 +158,6 @@ import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
-import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaAddition as ManaAddition
@@ -764,6 +763,9 @@ replacementPatternSlots re = case re of
   -- of LifeLossRewrite carries a Filter: no Filter, so no slot. TokenR's answer,
   -- and for its reason.
   ReplacementEffect.LifeLossR {} -> Map.empty
+  -- A DrawR is one ControllerRelation and one amount of life: no Filter, so no
+  -- slot. LifeLossR's answer, and for its reason.
+  ReplacementEffect.DrawR {} -> Map.empty
   ReplacementEffect.PhaseR _ -> Map.empty
 
 -- The Filters a damage REWRITE holds, which is CR 614.9's printed destination and
@@ -5315,7 +5317,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- same player at the same life survives 3 damage and dies to
               -- Stronghold Discipline's 3.
               settled <- Event.resolveLifeLoss LifeLossCause.ByEffect pid (Integer.toNaturalSaturating n)
-              changeLife pid (negate (toInteger settled))
+              Event.changeLife pid (negate (toInteger settled))
         _ -> pure ()
   -- CR 119.3's other half, LoseLife's mirror but for the sign. The `n > 0` guard
   -- is CR 119.9: a gain of 0 is no life gain event to trigger on.
@@ -5334,7 +5336,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Event.simultaneously . Monad.forM_ gainers $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
         Just n
-          | n > 0 -> changeLife pid n
+          | n > 0 -> Event.changeLife pid n
         _ -> pure ()
   -- CR 701.12c: both sides reach each other's PREVIOUS total, so both deltas are
   -- read off the same game state before either is written. Written as a gain and
@@ -5365,14 +5367,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- so the gain and the loss it decomposes into share one
         -- Pawl.Types.EventGroup rather than reading as two events in sequence.
         Event.simultaneously $ do
-          changeLife this (thatLife - thisLife)
-          changeLife that (thisLife - thatLife)
+          Event.changeLife this (thatLife - thisLife)
+          Event.changeLife that (thisLife - thatLife)
       -- CR 701.12a: if the entire exchange can't be completed, no part of it
       -- occurs.
       Nothing -> pure ()
   -- CR 119.5: a DELTA per player against that player's own current total, so one
-  -- seat may gain while another loses. Through changeLife rather than a raw write
-  -- to Player.life, for the sake of the log the rule describes.
+  -- seat may gain while another loses. Through Event.changeLife rather than a raw
+  -- write to Player.life, for the sake of the log the rule describes.
   --
   -- Evaluated ONCE PER RECIPIENT, a card being able to name a number that is each
   -- recipient's own (Biorhythm). Every evaluation and delta is read off `gs`, the
@@ -5401,8 +5403,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
            in if delta < 0
                 then do
                   settled <- Event.resolveLifeLoss LifeLossCause.ByEffect pid (Integer.toNaturalSaturating (negate delta))
-                  changeLife pid (negate (toInteger settled))
-                else changeLife pid delta
+                  Event.changeLife pid (negate (toInteger settled))
+                else Event.changeLife pid delta
   -- CR 119.7 / 119.8: redistribute life totals, each new total being CR 119.5's
   -- gain or loss of the necessary amount. The roster is CR 102.1's players IN the
   -- game, not the keys of GameState.players, which keep a departed seat's row.
@@ -5434,7 +5436,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- one action taken on every seat it names, so the whole permutation's gains
       -- and losses share one Pawl.Types.EventGroup.
       Monad.when isPermutation . Event.simultaneously . Monad.forM_ (Map.toList assignment) $ \(taker, giver) ->
-        changeLife taker (lifeOf giver - lifeOf taker)
+        Event.changeLife taker (lifeOf giver - lifeOf taker)
   -- CR 702.179c: each named player's speed increases by this much. Its two
   -- readings -- a player who HAS speed goes up, a player with NONE has their
   -- speed BECOME the value -- are spelled separately, since DecreaseSpeed below
@@ -7247,22 +7249,6 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Pawl.Types.ExtraTurn).
     let entry pid = ExtraTurn.MkExtraTurn {ExtraTurn.taker = pid, ExtraTurn.source = source, ExtraTurn.skipped = skips}
     State.modify' (\g -> g {GameState.extraTurns = List.foldl' (\ts pid -> entry pid : ts) (GameState.extraTurns g) takers})
-
--- CR 119.3: move one player's life total by this much, and record the CR 608.2i
--- event of the matching sign. The write LoseLife, GainLife and
--- ExchangeLifeTotals share, so a life total moves in exactly one place.
---
--- A zero delta writes nothing at all: CR 119.9 says so for the gain side, and the
--- loss side takes the same posture.
-changeLife :: PlayerId -> Integer -> Game ()
-changeLife pid delta =
-  Monad.when (delta /= 0) . State.modify' $
-    Event.recordEvent
-      ( if delta > 0
-          then GameEvent.LifeGained (LifeChange.MkLifeChange pid (Integer.toNaturalSaturating delta))
-          else GameEvent.LifeLost (LifeChange.MkLifeChange pid (Integer.toNaturalSaturating (negate delta)))
-      )
-      . (\g -> g {GameState.players = Map.adjust (\p -> p {Player.life = Player.life p + delta}) pid (GameState.players g)})
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).

@@ -2537,6 +2537,9 @@ rewriteReplacementEffect pairs effect = case effect of
   -- and no arm of the rewrite names a Filter or a card. No printed word, so
   -- nothing to swap.
   ReplacementEffect.LifeLossR {} -> effect
+  -- A DrawR is one CR 109.5 relation and one amount of life; no Filter and no
+  -- card, so no printed word to swap. LifeLossR's answer, and for its reason.
+  ReplacementEffect.DrawR {} -> effect
   ReplacementEffect.CounterR r ->
     ReplacementEffect.CounterR
       r
