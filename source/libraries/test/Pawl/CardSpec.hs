@@ -3632,8 +3632,8 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SagaFinalChapterTriggers _ -> []
   TriggerCondition.PlayerBecomesMonarch _ -> []
   -- CR 603.7's slot-named condition, the one arm with an answer: Ray of
-  -- Command's "when that creature leaves the battlefield or you lose control of
-  -- it" watches the permanent its own spell targeted.
+  -- Command's "when you lose control of the creature" watches the permanent its
+  -- own spell targeted.
   TriggerCondition.LoseControlOfBound slot -> [slot]
   TriggerCondition.RoomEntered _ -> []
   TriggerCondition.PlayerScries _ -> []
@@ -6148,15 +6148,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         cardOffends card = any (\ability -> abilityOffends card ability || conditionOffends (cardBound card) ability) (Map.elems (Face.delayedAbilities card))
         offenders = filter (anyFace cardOffends . Printing.card) ps
         watching slot = modalTrigger (TriggerCondition.LoseControlOfBound slot) [lintMode [] []]
-        armed = SlotName.MkSlotName (Text.pack "target")
-        unarmed = SlotName.MkSlotName (Text.pack "elsewhere")
-    -- The condition half is vacuous as a corpus sweep -- Ray of Command is the
-    -- pool's one slot-named condition and it names the slot its own spell
-    -- declares -- so the REJECTING direction is put to a hand-built pair
-    -- differing in the slot name alone, the posture the batch-bound lint below
-    -- takes.
-    Spec.assertBool s (conditionOffends (Set.singleton armed) (watching unarmed)) "a condition naming a slot the card never binds is caught"
-    Spec.assertBool s (not (conditionOffends (Set.singleton armed) (watching armed))) "a condition naming the arming spell's target slot is left alone"
+        armingSlot = SlotName.MkSlotName (Text.pack "target")
+        strangerSlot = SlotName.MkSlotName (Text.pack "elsewhere")
+    -- The condition half is vacuous as a corpus sweep: every slot-named
+    -- condition in the pool names a slot its own spell declares (Ray of
+    -- Command's target), so the sweep would pass under a predicate that always
+    -- answered False. The REJECTING direction is therefore put to a hand-built
+    -- pair differing in the slot name alone, the posture the batch-bound lint
+    -- below takes.
+    Spec.assertBool s (conditionOffends (Set.singleton armingSlot) (watching strangerSlot)) "a condition naming a slot the card never binds is caught"
+    Spec.assertBool s (not (conditionOffends (Set.singleton armingSlot) (watching armingSlot))) "a condition naming the arming spell's target slot is left alone"
     Spec.assertEqWith s "no dangling delayed-ability slot" (fmap (S.nameOf . Printing.card) offenders) []
   -- A delayed ability may not DECLARE a target slot under a name its own card
   -- already DEFINES, because the two would land in one slot and the reader would
@@ -6879,14 +6880,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- CR 701.9's look-back slot, the destruction's shape and for its
           -- reason: the counted discard's arm binds the group however few cards
           -- moved, so no ref test and no count test. Psychic Miasma's "if a land
-          -- card is discarded this way" is what writes it. Discard.These binds
-          -- nothing at all and so is not here.
+          -- card is discarded this way" is one that writes it. Discard.These
+          -- binds nothing at all and so is not here.
           Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard _ _ mDiscarded)) -> Maybe.maybeToList mDiscarded
-          -- CR 111.1's minted tokens, whose plurality is the mill's and the
-          -- draw's -- Resolve.namesEveryToken, which is any count that is not a
-          -- literal one, so a computed count is plural here for the reason a
-          -- computed depth is. At a literal one the arm takes the single
-          -- binding, or asks when CR 614.16 multiplied the count.
+          -- CR 111.1's minted tokens, whose plurality is Resolve.namesEveryToken
+          -- -- any count that is not a literal one, so a computed count is
+          -- plural here for the reason a computed depth is. No seat test, unlike
+          -- the mill's and the draw's: at a literal one the arm never binds the
+          -- group however many creators the reference named, taking the single
+          -- binding for one token and ASKING where CR 614.16 multiplied the
+          -- count.
           Effect.Create (Create.MkCreate quantity _ _ mSlot _)
             | Resolve.namesEveryToken quantity ->
                 Maybe.maybeToList mSlot
@@ -6922,9 +6925,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- the others either (#2711).
         --
         -- The condition of a DELAYED ability is a singular reader too, and it is
-        -- fenced: triggerConditionSlots feeds the readsSingly union below, and
-        -- the sweep is over the face rather than over an effect list for that
-        -- reason alone.
+        -- fenced: triggerConditionSlots joins this list inside clashesIn below,
+        -- which is why the sweep is over the FACE rather than over an effect
+        -- list.
         readSingly effect = case effect of
           -- CR 701.14b's pair, which is why both slots count.
           Effect.Fight (Fight.MkFight one two) -> [one, two]
@@ -6998,9 +7001,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- the shape.
     Spec.assertBool s (any (anyFace (any binds . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding what a plural move minted"
     -- The same guard for the two arms added to the binding side: an arm no card
-    -- reaches is a fence the corpus sweep can never exercise. Psychic Miasma
-    -- writes the first, and Feral Lightning, Salt Road Skirmish and Thatcher
-    -- Revolt the second.
+    -- reaches is a fence the corpus sweep can never exercise. Psychic Miasma is
+    -- one that writes the first and Thatcher Revolt one that writes the second.
     Spec.assertBool s (any (anyFace (any bindsDiscarded . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding what a counted discard moved"
     Spec.assertBool s (any (anyFace (any bindsTokens . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding a batch of minted tokens"
     Spec.assertBool
