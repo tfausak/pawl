@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -35,6 +36,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
@@ -3645,6 +3647,86 @@ keywordCounterRestrictionSpec s registry = Spec.describe s "KeywordCounterRestri
         Spec.assertEqWith s "the Rakshasa never left the graveyard" (Game.zoneMembers Zone.Graveyard S.alice resolved) [gyId]
       (abilities, _) -> Spec.assertEqWith s "exactly one ability to activate, on three Pikers" (length abilities) 1
 
+-- CR 509.1b / 611.1 / 613.11: a restriction a RESOLUTION hands a creature for a
+-- duration, which neither the group above's counter nor the printed rows further
+-- up can state -- the counter's restriction is indefinite, and a printed row is
+-- gathered live off a source standing on the battlefield. Zirda, the Dawnwaker's
+-- "{1}, {T}: Target creature can't block this turn" (checked against Scryfall) is
+-- the pool's printing; the row lands in GameState.blockProhibitions and
+-- Pawl.Engine.CombatRestriction.prohibited is what reads it.
+--
+-- THE PAIR that makes these cases discriminating: the SAME activation is made on
+-- both boards, for the same {1} and the same tap, and the two differ only in
+-- which creature the one target slot named -- one of bob's twins, or alice's own
+-- attacker, whose block the restriction has nothing to reach. So a green control
+-- leg cannot come from an unpaid cost, an untapped Zirda, or a board on which
+-- nobody could have blocked.
+storedBlockRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+storedBlockRestrictionSpec s registry = Spec.describe s "StoredBlockRestriction" $ do
+  Spec.it s "CR 509.1b the creature Zirda named cannot block, and its twin still does" $ do
+    (attacker, victim, twin, resolved) <- zirdaResolved s registry (\_ v _ -> v)
+    let declaring = declaringAttackers resolved
+        after = S.runPure S.aggressiveAnswer declaring Combat.declareBlockers
+    Spec.assertEqWith s "only the twin ended up blocking" (Combat.blockersOf attacker after) (Set.singleton twin)
+    Spec.assertBool s (not (Combat.canBlock S.bob victim declaring)) "and the named creature is off CR 509.1a's candidate list"
+    Spec.assertEqWith s "one restriction was stored, over the creature named" (fmap ActiveBlockProhibition.object (GameState.blockProhibitions resolved)) [victim]
+  -- The pair's other half: the same activation, aimed at alice's attacker.
+  Spec.it s "CR 509.1b aimed elsewhere, both of bob's twins block" $ do
+    (attacker, victim, twin, resolved) <- zirdaResolved s registry (\a _ _ -> a)
+    let after = S.runPure S.aggressiveAnswer (declaringAttackers resolved) Combat.declareBlockers
+    Spec.assertEqWith s "both twins blocked" (Combat.blockersOf attacker after) (Set.fromList [victim, twin])
+    Spec.assertEqWith s "and the restriction was stored all the same, over the attacker" (fmap ActiveBlockProhibition.object (GameState.blockProhibitions resolved)) [attacker]
+  -- CR 514.2 / 611.2a: "this turn" arms Expiry.AtCleanup, so the cleanup sweep
+  -- drops the row and the creature blocks again. Through the sweep directly,
+  -- which is the narrowest path that shows it.
+  Spec.it s "CR 514.2 the restriction ends at cleanup" $ do
+    (_, victim, _, resolved) <- zirdaResolved s registry (\_ v _ -> v)
+    let swept = Expiry.dropAtCleanup resolved
+    Spec.assertBool s (not (Combat.canBlock S.bob victim resolved)) "restricted on the turn it resolved"
+    Spec.assertBool s (Combat.canBlock S.bob victim swept) "and blocking again once the turn's cleanup has run"
+    Spec.assertEqWith s "with nothing left stored" (GameState.blockProhibitions swept) []
+
+-- Alice's Zirda, activated once and resolved, over a board of her own attacker
+-- and two of bob's identical blockers. `pick` chooses which of the three the one
+-- target slot names, and is the only thing the boards above differ in.
+zirdaResolved ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  (ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId) ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+zirdaResolved s registry pick = do
+  zirda <- S.printingOf s registry "Zirda, the Dawnwaker"
+  mountain <- S.printingOf s registry "Mountain"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (zirdaId, withZirda) = S.addCreature zirda S.alice (S.landsInPlay mountain 2)
+      (attacker, withAttacker) = S.addCreature piker S.alice withZirda
+      (victim, withVictim) = S.addCreature piker S.bob withAttacker
+      (twin, placed) = S.addCreature piker S.bob withVictim
+      board =
+        placed
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      abilities = Activate.abilitiesFor zirdaId board
+      named = pick attacker victim twin
+      resolved = case abilities of
+        [ability] -> S.runPure (naming named) board (Activate.activateAbility S.alice zirdaId ability >> Stack.resolveTop)
+        _ -> board
+  Spec.assertEqWith s "Zirda states exactly one activated ability" (length abilities) 1
+  pure (attacker, victim, twin, resolved)
+
+-- Aim Zirda's one target slot at this permanent, PINNED by filtering the offered
+-- set rather than built from the id: CR 115.1's pool of creatures offers
+-- Recipient.ToCreature, and a hand-built Recipient.ToObject of the same permanent
+-- is a different recipient that CR 608.2b's re-read drops silently. Filtering also
+-- stops the answerer repairing a mutation by finding whatever is still legal.
+naming :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+naming oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter ((== Just oid) . Recipient.objectOf) offered) sets
+  _ -> S.identityAnswer p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   declareSpec s registry
@@ -3660,6 +3742,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   attackRequirementSpec s registry
   combatRestrictionSpec s registry
   keywordCounterRestrictionSpec s registry
+  storedBlockRestrictionSpec s registry
   suspectedAbilityRemovalSpec s registry
   conditionalCombatRestrictionSpec s registry
   defendingPlayerRestrictionSpec s registry

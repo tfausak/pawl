@@ -5,6 +5,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
+import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
@@ -413,6 +414,13 @@ data GameState = MkGameState
     -- an effect that destroys and forbids regeneration in one breath (Terror)
     -- carries the Regenerability on the destruction instead.
     unregeneratables :: [ActiveUnregeneratable.ActiveUnregeneratable],
+    -- | CR 509.1b / 611.1: stored BLOCKING RESTRICTIONS from resolutions (Zirda,
+    -- the Dawnwaker), each with an expiry the Pawl.Engine.Expiry sweeps consult.
+    -- Read at Pawl.Engine.CombatRestriction.prohibited, which unions them into
+    -- that module's `cantBlock`. A permanent's printed restrictions are NOT here
+    -- -- Pawl.Engine.CombatRestriction.inForce re-derives those live off the
+    -- battlefield.
+    blockProhibitions :: [ActiveBlockProhibition.ActiveBlockProhibition],
     -- | CR 116.2d: the ignores players have paid for, each with an expiry the
     -- Pawl.Engine.Expiry sweeps consult. Read by Pawl.Engine.PlayerEffect.applying,
     -- which drops an ignored permanent's abilities for the ignoring player alone

@@ -6,7 +6,9 @@
 --
 -- Not all of them are card data: CR 701.35a's detain forbids both declarations
 -- and is read off the victim (Pawl.Engine.Detain) rather than off any card's
--- printed text. See `detained`.
+-- printed text, and CR 509.1b's "can't block this turn" is stored by the
+-- resolution that said it (GameState.blockProhibitions). See `detained` and
+-- `prohibited`.
 --
 -- The only module that may CASE on Pawl.Types.CombatRestriction.
 -- Pawl.Engine.Keyword constructs one -- rule 702.98a's unleash -- and reads none.
@@ -29,6 +31,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
@@ -59,7 +62,37 @@ cantAttack candidates gs = Set.union (restricted attacking candidates gs) (detai
 -- BLOCK. Pacifism's second half, Blind-Spot Giant's when its gate is shut, and CR
 -- 701.35a's second clause.
 cantBlock :: [ObjectId] -> GameState -> Set ObjectId
-cantBlock candidates gs = Set.union (restricted blocking candidates gs) (detained candidates gs)
+cantBlock candidates gs =
+  Set.unions
+    [ restricted blocking candidates gs,
+      detained candidates gs,
+      prohibited candidates gs
+    ]
+
+-- CR 509.1b / 611.1: the candidates a stored, resolution-generated restriction
+-- forbids blocking. Zirda, the Dawnwaker's "target creature can't block this
+-- turn".
+--
+-- UNIONED in here rather than added to `inForce`, for `detained`'s reason and
+-- with one more of its own. A row here has outlived its source (CR 611.2a), so
+-- it opts out of the liveness checks, the CR 612.1 word swap and the CR 305.7 /
+-- CR 613.1f ability gates that every printed row passes -- and it names no
+-- Pawl.Types.Affected either, because the ref was read once at resolution and
+-- Pawl.Engine.Resolve stored the ids it named. The extra reason is the "unless":
+-- CR 509.1b's second clause is a property of PRINTED text, and a resolution
+-- states its restriction flat, so there is no gate to ask.
+--
+-- Outside the layer system, which is CR 613.11 -- a restriction on a declaration
+-- modifies the rules rather than an object's characteristics, so no
+-- Pawl.Types.Modification could have carried it and Pawl.Engine.Projection sees
+-- nothing of it.
+--
+-- No attacking counterpart. Not implemented: a stored restriction on the CR
+-- 508.1c side, "target creature can't attack this turn" (#2683).
+prohibited :: [ObjectId] -> GameState -> Set ObjectId
+prohibited candidates gs =
+  let stopped = Set.fromList (fmap ActiveBlockProhibition.object (GameState.blockProhibitions gs))
+   in Set.intersection (Set.fromList candidates) stopped
 
 -- CR 701.35a: the detained permanents among `candidates`, which that rule forbids
 -- both declarations at once -- so one reading serves both gates above.
