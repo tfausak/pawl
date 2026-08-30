@@ -12,7 +12,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- clause to be about.
 --
 -- `kinds` is WHICH counters cross and how many of each, which the printed text
--- spells four ways; Pawl.Types.MovedKinds is where the four are set out.
+-- spells five ways; Pawl.Types.MovedKinds is where the five are set out.
 --
 -- ONE batch per kind is what crosses. Rule 122.5 never speaks of more than one
 -- counter, so it does not settle the batch on its own; what does is that each of

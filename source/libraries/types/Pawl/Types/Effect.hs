@@ -690,7 +690,7 @@ data Effect card ability
     RemoveCounters RemoveCounters.RemoveCounters
   | -- | CR 122.5: move counters from the first slot's permanent onto the second
     -- slot's. WHICH kinds cross and HOW MANY of each is Pawl.Types.MovedKinds,
-    -- four spellings over one batch per kind; see Pawl.Types.MoveCounters'
+    -- five spellings over one batch per kind; see Pawl.Types.MoveCounters'
     -- `kinds`.
     --
     -- NOT a RemoveCounters beside a PutCounters, which is the whole reason this

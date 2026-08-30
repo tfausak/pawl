@@ -926,25 +926,38 @@ goldberryAnswer giver p = case p of
     pure (S.identityAnswer p)
   _ -> pure (S.identityAnswer p)
 
+-- Records the candidates the ability's one target slot OFFERED, so the printed
+-- "another target permanent you control" is read off the engine's list rather
+-- than off the answer. Names the Piker as well, so the activation still goes
+-- through.
+goldberryOffered :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State (Set.Set ObjectId.ObjectId) r
+goldberryOffered giver p = case p of
+  Prompt.ChooseTargets _ _ _ asked -> do
+    State.modify' (Set.union (Set.fromList (concatMap (Maybe.mapMaybe Recipient.objectOf . Set.toList . snd) (Map.elems asked))))
+    pure (Map.map (Set.filter ((==) (Just giver) . Recipient.objectOf) . snd) asked)
+  _ -> pure (S.identityAnswer p)
+
 absentKindSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each kind the second permanent lacks" $ do
   let -- alice: Goldberry, two Islands and a Goblin Piker. The Piker bears THREE
       -- kinds in three different counts, so "one of each kind" and "the whole
       -- tally of each kind" are different boards; the Islands make the one target
-      -- slot offer more candidates than it needs. `onGoldberry` is what a case
-      -- puts on the DESTINATION, and is the ONLY difference between the boards
-      -- below.
+      -- slot offer more candidates than it needs, and bob's own Piker is a
+      -- permanent the printed "you control" has to keep off the list.
+      -- `onGoldberry` is what a case puts on the DESTINATION, and is the ONLY
+      -- difference between the boards below.
       board onGoldberry = do
         island <- S.printingOf s registry "Island"
         goldberry <- S.printingOf s registry "Goldberry, River-Daughter"
         piker <- S.printingOf s registry "Goblin Piker"
         let (goldberryId, g1) = S.addCreature goldberry S.alice (S.landsInPlay island 2)
             (giverId, g2) = S.addCreature piker S.alice g1
+            (_, g3) = S.addCreature piker S.bob g2
             stocked =
               S.addCounter CounterKind.Finality 2 giverId
                 . S.addCounter CounterKind.Shield 4 giverId
                 . S.addCounter CounterKind.PlusOnePlusOne 3 giverId
-            ready = (onGoldberry goldberryId (stocked g2)) {GameState.priority = Just S.alice}
+            ready = (onGoldberry goldberryId (stocked g3)) {GameState.priority = Just S.alice}
         pure (goldberryId, giverId, ready)
       -- The ability, activated once and resolved. Exactly one printed activated
       -- ability, not the first of however many -- pawl's Goldberry omits the
@@ -989,6 +1002,22 @@ absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each k
         Spec.assertEqWith s "Goldberry gained one counter of all three kinds" (goldberryOn goldberryId after) (1, 1, 1)
         Spec.assertEqWith s "and the Piker is down one of each" (goldberryOn giverId after) (2, 3, 1)
       Nothing -> Spec.assertFailure s "expected Goldberry to offer exactly its one transcribed activated ability"
+  -- The card's own targeting, which the answerer above cannot prove because it
+  -- names the Piker rather than reading what was offered: "ANOTHER target
+  -- permanent YOU control" is Filter.Not Filter.IsSource beside
+  -- Filter.ControlledBy Filter.You, so Goldberry herself and bob's Piker are both
+  -- off the list while alice's two Islands -- permanents she controls that bear
+  -- no counter -- stay on it.
+  Spec.it s "CR 601.2c the ability offers every other permanent alice controls and neither Goldberry nor bob's" $ do
+    (goldberryId, giverId, ready) <- board (const id)
+    case Activate.abilitiesFor goldberryId ready of
+      [only] -> do
+        let run = Engine.runGame (goldberryOffered giverId) ready (Activate.activateAbility S.alice goldberryId only)
+            (_, offered) = State.runState run Set.empty
+        Spec.assertEqWith s "Goldberry is not among her own ability's candidates" (Set.member goldberryId offered) False
+        Spec.assertEqWith s "alice's Piker is" (Set.member giverId offered) True
+        Spec.assertEqWith s "and the candidates are exactly the three other permanents alice controls, bob's Piker excluded" (Set.size offered) 3
+      _ -> Spec.assertFailure s "expected Goldberry to offer exactly its one transcribed activated ability"
   -- The other end of the same pair: a destination bearing every kind the first
   -- object has leaves no appropriate kind at all, so the move is empty -- and
   -- still asks nothing, since there was never a question.

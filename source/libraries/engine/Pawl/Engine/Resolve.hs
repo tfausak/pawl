@@ -6849,14 +6849,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Set.member to (GameState.battlefield gs) ->
             -- "... if the first object doesn't have the appropriate kind of
             -- counter on it". Which kinds are appropriate is the one place the
-            -- four spellings part, and rule 122.5's clause reads differently
+            -- five spellings part, and rule 122.5's clause reads differently
             -- under each.
             --
             -- `onFrom` drops the kinds rule 122.5's THIRD impossibility rules out
-            -- as well as the ones the first object does not have, so all four
+            -- as well as the ones the first object does not have, so all five
             -- spellings answer it in one place: a kind the destination refuses is
             -- not appropriate for this move, whether the card named it, the
-            -- player would have, or the card took every kind. Rule 122.5's
+            -- player would have, the card took every kind, or the destination's
+            -- own tally settled it. Rule 122.5's
             -- atomicity is why it is dropped here rather than half-performed --
             -- "no counter is removed from or put onto anything".
             let onFrom =
