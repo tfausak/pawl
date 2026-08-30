@@ -2004,8 +2004,8 @@ celestineSpec s registry = Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ 
       Just theSlot -> do
         -- No life gained, so the printed Quantity this slot replaces would admit
         -- nothing: every offer below is the seeded amount talking.
-        let (pikerId, wolvesId, _, empty_) = celestineGraveyard piker wolves bolt 0
-            (sourceId, board) = S.addCreature piker S.alice empty_
+        let (pikerId, wolvesId, _, noGain) = celestineGraveyard piker wolves bolt 0
+            (sourceId, board) = S.addCreature piker S.alice noGain
             name = SlotName.MkSlotName (Text.pack "target")
             slotted = theSlot {TargetSlot.amount = Just (Quantity.Type.InSlot Binding.eventAmount)}
             offer seed = Map.findWithDefault Set.empty name (Target.legalSets (Just S.alice) seed sourceId (Map.singleton name slotted) board)
@@ -2036,13 +2036,14 @@ celestineSpec s registry = Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ 
 --
 --   * the event's amount (2) admits the Piker alone -- the printed rule;
 --   * the source's printed power (3) would admit the Tyrant too;
---   * a bound that went unanswered admits nothing, which is CR 603.3c's removal.
+--   * a bound that went unanswered admits nothing, which is CR 603.3d's removal.
 --
--- The answerer PREFERS the two cards the rule excludes, so a widened bound is
--- observable as a different permanent arriving rather than as nothing happening.
--- A Lightning Bolt under every bound sits in the same graveyard: it is kept out by
--- the And's other conjunct alone, so a filter that had stopped narrowing by card
--- type would show up here.
+-- The answerer PREFERS every card the rule excludes, so a widened bound is
+-- observable as a different permanent arriving rather than as nothing happening --
+-- a Lightning Bolt UNDER every bound among them, since it is kept out by the And's
+-- other conjunct alone and a filter that had stopped narrowing by card type would
+-- otherwise be invisible (the fallback takes the smallest legal recipient, which
+-- is the Piker either way).
 --
 -- THREE SEATS, so "your graveyard" (CR 109.5's you, alice) is a different zone
 -- from the damaged player's.
@@ -2058,16 +2059,16 @@ warsingerSpec s registry =
             (pikerId, g1) = S.addGraveyardCard piker S.alice gs0
             (tyrantId, g2) = S.addGraveyardCard tyrant S.alice g1
             (wolvesId, g3) = S.addGraveyardCard wolves S.alice g2
-            (_, g4) = S.addGraveyardCard bolt S.alice g3
+            (boltId, g4) = S.addGraveyardCard bolt S.alice g3
             shrunk = List.foldl' (flip (S.addCounter CounterKind.MinusOneMinusOne 1)) g4 mine
             -- The same seam questingBeastSpec uses: the declarations run as
             -- steps, the damage is dealt by hand, and settleForPriority places
             -- the trigger -- so `placed` is the state with the ability on the
             -- stack and its target already chosen.
-            atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) (warsingerPlan tyrantId wolvesId) shrunk
-            fought = S.runPure (warsingerPlan tyrantId wolvesId) atDamage Damage.dealCombatDamage
-            placed = S.runPure (warsingerPlan tyrantId wolvesId) fought Engine.settleForPriority
-        pure (mine, pikerId, shrunk, placed, S.runPure (warsingerPlan tyrantId wolvesId) placed Engine.priorityLoop)
+            atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) (warsingerPlan [tyrantId, wolvesId, boltId]) shrunk
+            fought = S.runPure (warsingerPlan [tyrantId, wolvesId, boltId]) atDamage Damage.dealCombatDamage
+            placed = S.runPure (warsingerPlan [tyrantId, wolvesId, boltId]) fought Engine.settleForPriority
+        pure (mine, pikerId, shrunk, placed, S.runPure (warsingerPlan [tyrantId, wolvesId, boltId]) placed Engine.priorityLoop)
    in Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ do
         -- THE proving case, at gameplay level: which card came back.
         Spec.it s "CR 603.2 whole card: the bound is the damage the event carried" $ do
@@ -2094,13 +2095,13 @@ warsingerSpec s registry =
               Spec.assertEqWith s "and the event stamped 2 under CR 603.2's own slot" (Binding.amountOf Binding.eventAmount bindings) (Just 2)
             _ -> Spec.assertFailure s "fixture should place exactly one trigger"
 
--- Attacks bob, takes the printed "may", and aims every target slot at the two
+-- Attacks bob, takes the printed "may", and aims every target slot at the
 -- graveyard cards the rule EXCLUDES -- falling back to the smallest legal
 -- recipient, which is what makes a widened bound observable as a different
 -- permanent arriving.
-warsingerPlan :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-warsingerPlan tyrant wolves p = case p of
+warsingerPlan :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+warsingerPlan bait p = case p of
   Prompt.ChooseDefender {} -> S.bob
-  Prompt.ChooseTargets _ _ _ asked -> S.preferring (\r -> Recipient.objectOf r == Just tyrant || Recipient.objectOf r == Just wolves) asked
+  Prompt.ChooseTargets _ _ _ asked -> S.preferring (maybe False (`elem` bait) . Recipient.objectOf) asked
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   _ -> S.aggressiveAnswer p
