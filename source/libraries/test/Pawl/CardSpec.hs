@@ -75,6 +75,7 @@ import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
+import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
@@ -90,6 +91,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastObligation as CastObligation
+import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
@@ -146,9 +148,11 @@ import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
+import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
@@ -243,6 +247,7 @@ import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
+import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotArity as SlotArity
@@ -6731,14 +6736,47 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         takesAtMostOne player quantity = case quantity of
           Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
           _ -> False
+        -- Every slot Pawl.Engine.Resolve hands to a SINGULAR read with no group
+        -- fallback beside it: `legalOne` over the legal-target map, or `slotOne`
+        -- over the resolving object's own target bindings. Both are
+        -- Binding.onlyOne, so a slot naming several objects answers Nothing and
+        -- the instruction is skipped in silence. In Resolve's own arm order, so
+        -- the enumeration is checkable by reading down that file.
+        --
+        -- Two shapes of singular reader are deliberately absent. Effect.Sacrifice
+        -- reads slotGroup first and sacrifices every member, so a group is what
+        -- it wants rather than what defeats it. Effect.ControlPlayerNextTurn,
+        -- MonarchTarget's InSlot and ExchangeSides' WithController match
+        -- Recipient.ToPlayer, and no binder in boundPlurally mints a player slot.
         readSingly effect = case effect of
+          -- CR 701.14b's pair, which is why both slots count.
+          Effect.Fight (Fight.MkFight one two) -> [one, two]
+          Effect.ChangeText (ChangeText.MkChangeText _ _ slot) -> [slot]
+          Effect.TurnFaceUp slot -> [slot]
+          Effect.BecomesBlocked slot -> [slot]
           Effect.OfferCast (OfferCast.MkOfferCast slot _ _ _) -> [slot]
-          -- Every slot Pawl.Engine.Resolve reads through legalOne, which declines
-          -- a slot naming several objects rather than picking one of them: CR
-          -- 122.5's pair and CR 122.8's read. A group bound under any of the
-          -- three would leave the instruction doing nothing at all.
-          Effect.MoveCounters (MoveCounters.MkMoveCounters from _ _ to) -> [from, to]
+          Effect.Designate (Designate.MkDesignate _ slot) -> [slot]
+          Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ slot) -> [slot]
+          Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ slot) -> [slot]
+          Effect.Evolve slot -> [slot]
+          Effect.Mentor slot -> [slot]
+          Effect.Train slot -> [slot]
+          Effect.Attach slot -> [slot]
+          Effect.AttachTarget (AttachTarget.MkAttachTarget slot _) -> [slot]
+          Effect.AttachTargetToEach (AttachTarget.MkAttachTarget slot _) -> [slot]
+          -- The DESTINATION alone: AttachBound's `subject` goes through
+          -- objectRefObjects, which reads slotGroup and attaches every member.
+          Effect.AttachBound (AttachBound.MkAttachBound _ destination) -> [destination]
+          Effect.ExileUntilMonarch slot -> [slot]
+          -- Both slots: the host through legalOne, the haunting card through
+          -- slotOne.
+          Effect.ExileHaunting (ExileHaunting.MkExileHaunting card host) -> [card, host]
+          -- CR 122.8's read.
           Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _) -> [from]
+          Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ _ slot) -> [slot]
+          -- CR 122.5's pair. Not MoveCounters' third slot, which this opcode
+          -- WRITES a count into rather than reading an object out of.
+          Effect.MoveCounters (MoveCounters.MkMoveCounters from _ _ to) -> [from, to]
           _ -> []
         clashes effects =
           not
@@ -6751,6 +6789,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _ _) -> Maybe.isJust mSlot && not (movesAtMostOne ref)
           _ -> False
         exiledSlot = SlotName.MkSlotName (Text.pack "exiled")
+        destroyedSlot = SlotName.MkSlotName (Text.pack "destroyed")
+        elsewhereSlot = SlotName.MkSlotName (Text.pack "elsewhere")
+        removal slot = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) slot)
+        destruction = Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing Nothing (Just destroyedSlot))
     -- Half the rejected shape is in the pool: Act on Impulse binds a group. The
     -- OTHER half is Wild Evocation, whose OfferCast reads a slot a RANDOM reveal
     -- of one card bound -- singular either way, so the two never meet. The
@@ -6767,6 +6809,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ]
       )
       "a singular read of a plurally bound slot is caught"
+    -- The reader OfferCast is not, against the binder MoveToZone is not: the
+    -- enumeration above is the lint, so a slot only OfferCast could name would
+    -- leave every other one-object instruction unfenced. Paired with the board
+    -- below, which differs in the slot name alone, so the catch is the
+    -- intersection rather than `clashes` answering True for anything.
+    Spec.assertBool s (clashes [destruction, removal destroyedSlot]) "a singular read outside OfferCast is caught"
+    Spec.assertBool s (not (clashes [destruction, removal elsewhereSlot])) "a singular read of another slot is left alone"
     Spec.assertEqWith s "a group binding is invisible to a singular reader" (fmap (S.nameOf . Printing.card) offenders) []
   -- OwnerChooses asks a player which END of a library a card arrives at (CR
   -- 401.2), and only a library HAS ends -- so on any other destination it would
