@@ -124,7 +124,7 @@ import qualified Pawl.Types.Zone as Zone
 legalRecipients :: Maybe PlayerId -> ObjectId -> TargetSlot -> GameState -> Set Recipient
 legalRecipients perspective source slot gs =
   let pcs = Projection.projectAll gs
-   in legalRecipientsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective Map.empty source slot gs
+   in legalRecipientsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective False Map.empty source slot gs
 
 -- The same set given a board the CALLER has already walked. `pcs` and `grants`
 -- are one whole-board projection and one control-grant walk, and threading them
@@ -150,8 +150,8 @@ legalRecipients perspective source slot gs =
 -- graveyardRecipients), plus the NUMBERS CR 603.2's event stamped, which a CR
 -- 202.3 computed bound reads (see slotContext). A whole Binding rather than the
 -- recipients alone because the second half is not a recipient at all.
-legalRecipientsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> TargetSlot -> GameState -> Set Recipient
-legalRecipientsGiven pcs grants pools perspective bindings source slot gs =
+legalRecipientsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> TargetSlot -> GameState -> Set Recipient
+legalRecipientsGiven pcs grants pools perspective unannounced bindings source slot gs =
   -- The SAME thunk both halves read, so the whole-board projection is taken at
   -- most once per slot even when this is reached through the wrapper above, and
   -- once per enumeration when it is not (admittedGiven's own note).
@@ -176,7 +176,7 @@ legalRecipientsGiven pcs grants pools perspective bindings source slot gs =
       keep recipient =
         not (sourceOnStack && Recipient.objectOf recipient == Just source)
           && targetable pcs perspective source sourceView gs recipient
-   in Set.filter keep (admittedGiven pcs grants pools perspective bindings source slot gs)
+   in Set.filter keep (admittedGiven pcs grants pools perspective unannounced bindings source slot gs)
 
 -- CR 115.1 / CR 303.4c / CR 701.3a: the recipients the SLOT itself admits -- its
 -- Pool's base candidate set (CR 115.4's "any target" is creatures, planeswalkers
@@ -201,13 +201,13 @@ legalRecipientsGiven pcs grants pools perspective bindings source slot gs =
 admittedRecipients :: Maybe PlayerId -> ObjectId -> TargetSlot -> GameState -> Set Recipient
 admittedRecipients perspective source slot gs =
   let pcs = Projection.projectAll gs
-   in admittedGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective Map.empty source slot gs
+   in admittedGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective False Map.empty source slot gs
 
-admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> TargetSlot -> GameState -> Set Recipient
-admittedGiven pcs grants pools perspective bindings source slot gs =
+admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> TargetSlot -> GameState -> Set Recipient
+admittedGiven pcs grants pools perspective unannounced bindings source slot gs =
   let pool = TargetSlot.pool slot
       narrowing = TargetSlot.filter slot
-      context = slotContext pcs perspective bindings source (TargetSlot.amount slot) gs
+      context = slotContext pcs perspective unannounced bindings source (TargetSlot.amount slot) gs
       -- ONE whole-board projection and ONE control-grant walk for the whole
       -- slot: both the base pool's creature test and the Filter's per-candidate
       -- view are asked of every object on the battlefield, and each was a fresh
@@ -261,8 +261,8 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
 -- target slot can reach it. All are thunks, like the caller's `pcs`: a slot
 -- whose filter never names an atom pays for neither the source's projection,
 -- the combat lookup, nor the bound's evaluation.
-slotContext :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Maybe Quantity -> GameState -> Filter.Context
-slotContext pcs perspective bindings source amount gs =
+slotContext :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> Maybe Quantity -> GameState -> Filter.Context
+slotContext pcs perspective unannounced bindings source amount gs =
   let -- CR 601.2c's chosen recipients out of the announcement's whole binding
       -- environment, which is what the two slot-reading atoms below want; the
       -- amounts beside them go to boundAmounts instead.
@@ -278,6 +278,9 @@ slotContext pcs perspective bindings source amount gs =
             -- over it. Nothing inside it is what makes that non-circular: no Quantity
             -- arm reads this field.
             Filter.slotAmount = Nothing,
+            -- False HERE and laid over below, slotAmount's reason one field up: the
+            -- answer turns on whether that evaluation came back with a number.
+            Filter.boundUnannounced = False,
             -- CR 508.5, asked of the SOURCE: rule 702.39a's clause is on an
             -- attacking creature, and `source` is the object CR 113.7 says the
             -- ability came from.
@@ -343,6 +346,7 @@ slotContext pcs perspective bindings source amount gs =
             -- what keeps a card out of the slot.
             Filter.sourceChosenNames = Set.empty
           }
+      evaluated = amount >>= Quantity.evaluate (Projection.fullView gs) base gs source
    in -- CR 202.3 / 601.2c: the slot's own computed mana-value bound, evaluated
       -- against the context above and handed to Filter.ManaValueAtMostAmount.
       -- THIS is the one site that fills it, sourcePower's and slotNames' sibling
@@ -364,7 +368,16 @@ slotContext pcs perspective bindings source amount gs =
       --
       -- A THUNK for sourcePower's reason: a slot naming an amount whose filter
       -- never asks pays for no evaluation.
-      base {Filter.slotAmount = amount >>= Quantity.evaluate (Projection.fullView gs) base gs source}
+      base
+        { Filter.slotAmount = evaluated,
+          -- CR 601.2b: the slot NAMES a bound and the announcement that would fix it
+          -- has not been made -- Stir the Grave's "mana value X or less" at the
+          -- castability gate, which runs before its caster names X. Only then, so a
+          -- bound the announcement DID make and that still cannot be read stays
+          -- vacuously False, and a slot naming no bound at all is untouched.
+          -- Filter.boundUnannounced carries the rest of the argument.
+          Filter.boundUnannounced = unannounced && Maybe.isJust amount && Maybe.isNothing evaluated
+        }
 
 -- CR 608.2h asked of a target SLOT: would it admit `host` as that object MOST
 -- RECENTLY existed, once `host` no longer exists at all? The counterpart of
@@ -382,7 +395,7 @@ slotContext pcs perspective bindings source amount gs =
 -- reader gives an id it has no record of.
 lastKnownAdmits :: Maybe PlayerId -> ObjectId -> TargetSlot -> ObjectId -> GameState -> Bool
 lastKnownAdmits perspective source slot host gs =
-  let context = slotContext (Projection.projectAll gs) perspective Map.empty source (TargetSlot.amount slot) gs
+  let context = slotContext (Projection.projectAll gs) perspective False Map.empty source (TargetSlot.amount slot) gs
       admits view =
         poolHeldLastKnown (TargetSlot.pool slot) view
           && Maybe.maybe True (Filter.matches context view) (TargetSlot.filter slot)
@@ -968,7 +981,7 @@ exileRecipients gs = Set.fromList (fmap Recipient.ToObject (Set.toList (GameStat
 stillLegal :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Recipient -> TargetSlot -> GameState -> Bool
 stillLegal perspective bindings source recipient slot gs =
   let pcs = Projection.projectAll gs
-   in Set.member recipient (legalRecipientsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective bindings source slot gs)
+   in Set.member recipient (legalRecipientsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective False bindings source slot gs)
 
 -- CR 303.4c: is `recipient` still one the slot ADMITS -- the same membership
 -- question stillLegal asks, minus rule 702's targeting restrictions. See
@@ -986,14 +999,15 @@ stillAdmitted perspective source recipient slot gs = Set.member recipient (admit
 -- source that is itself on the stack -- see legalRecipients.
 --
 -- `seed` is what the announcement ALREADY has bound before any target is chosen
--- -- empty for a cast and for an activation, and CR 603.2's trigger bindings for
--- a triggered ability being placed (Harness the Storm's cast spell, Venerable
--- Warsinger's event amount). It joins the per-slot bindings the two passes below
--- build, so an atom that reads a slot cannot tell the two apart.
+-- -- CR 601.2b's announced X for a cast (Stir the Grave's bound), CR 603.2's
+-- trigger bindings for a triggered ability being placed (Harness the Storm's cast
+-- spell, Venerable Warsinger's event amount), and empty for an activation, whose
+-- X does not reach a slot yet (#2672). It joins the per-slot bindings the two
+-- passes below build, so an atom that reads a slot cannot tell the two apart.
 legalSets :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
 legalSets perspective seed source slots gs =
   let pcs = Projection.projectAll gs
-   in legalSetsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective seed source slots gs
+   in legalSetsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective False seed source slots gs
 
 -- The same map on a board the caller already walked -- see legalRecipientsGiven.
 --
@@ -1013,9 +1027,9 @@ legalSets perspective seed source slots gs =
 -- Ordinary cards pay nothing: `dependent` is empty for every slot map with no
 -- slot-scoped pool in it, so the second pass is a Map.filter over a map with at
 -- most a handful of keys.
-legalSetsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
-legalSetsGiven pcs grants pools perspective seed source slots gs =
-  let answer bindings slot = legalRecipientsGiven pcs grants pools perspective bindings source slot gs
+legalSetsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
+legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
+  let answer bindings slot = legalRecipientsGiven pcs grants pools perspective unannounced bindings source slot gs
       -- The FIRST pass sees the seed alone, which is the only thing bound before
       -- CR 601.2c chooses anything; the second sees it under the first pass's
       -- answers. Map.union is left-biased, so a target slot's own answer wins over
@@ -1281,7 +1295,7 @@ selectionLegal perspective source x slots sets chosen gs =
     coherent slot targetSlot =
       Set.isSubsetOf
         (Map.findWithDefault Set.empty slot chosen)
-        (legalRecipientsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective (fmap Binding.toRecipients chosen) source targetSlot gs)
+        (legalRecipientsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective False (fmap Binding.toRecipients chosen) source targetSlot gs)
 
 -- CR 700.2a: the mode indices every one of whose target slots can be filled --
 -- that is, has at least as many legal recipients as its count demands (a mode
@@ -1314,7 +1328,17 @@ fillableModesGiven pcs grants pools perspective seed source extra modal gs =
   let ms = Foldable.toList (Modal.modes modal)
       fillable i m =
         let slots = Map.union extra (Mode.targetSlots m)
-            sets = legalSetsGiven pcs grants pools perspective seed source slots gs
+            -- CR 601.2b's other FLOOR, the one `short` below cannot spell: this
+            -- gate runs before the announcement, so a slot's CR 202.3 computed
+            -- bound that reads a number the announcement has not supplied states
+            -- no bound at all rather than an unmeetable one (see
+            -- Filter.boundUnannounced). Permissive is the floor's direction for a
+            -- bound as X=0 is for a count -- CR 601.2b puts no ceiling on the
+            -- value a caster may name, so Stir the Grave's mode is refused for an
+            -- empty graveyard and for nothing else. A bound the seed DOES answer
+            -- narrows here as it always did (Venerable Warsinger's, off CR 603.2's
+            -- event amount).
+            sets = legalSetsGiven pcs grants pools perspective True seed source slots gs
          in -- CR 115.6 / 601.2c: a slot is unfillable when the board cannot supply
             -- the MINIMUM its count demands. An "up to one" slot with no legal
             -- recipient demands none, and is answered with zero targets.
@@ -1351,10 +1375,10 @@ bakeSlots players = fmap (bakeSlot players)
 -- bindings through PlayerRef.InSlot exactly as a Filter names them through
 -- ControlledByBound. An unbaked one would be unanswerable where the filter beside
 -- it is answerable. A REGRESSION FENCE rather than a proved behaviour: no
--- committed bound holds a PlayerRef.InSlot -- two name Quantity.LifeGainedThisTurn
--- against a PlayerRef.Relative, which baking leaves alone, and one a
--- Quantity.InSlot, which carries no PlayerRef at all -- so no board today tells
--- the two readings apart.
+-- committed bound holds a PlayerRef.InSlot -- the pool's bounds name either
+-- Quantity.LifeGainedThisTurn against a PlayerRef.Relative, which baking leaves
+-- alone, or Quantity.InSlot, which carries no PlayerRef at all -- so no board
+-- today tells the two readings apart.
 bakeSlot :: Map SlotName PlayerId -> TargetSlot -> TargetSlot
 bakeSlot players slot =
   slot

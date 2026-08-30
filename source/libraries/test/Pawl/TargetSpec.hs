@@ -1798,6 +1798,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- The same bound read off the ANNOUNCEMENT instead: the amount CR 603.2's own
   -- event stamped, which no board can answer.
   warsingerSpec s registry
+  stirTheGraveSpec s registry
 
 razorfinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 razorfinSpec s registry = Spec.describe s "HasCountersOfAnyKind (CR 122.1)" $ do
@@ -2105,3 +2106,89 @@ warsingerPlan bait p = case p of
   Prompt.ChooseTargets _ _ _ asked -> S.preferring (maybe False (`elem` bait) . Recipient.objectOf) asked
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   _ -> S.aggressiveAnswer p
+
+-- Stir the Grave ({X}{B} Sorcery, BOK, paper, Oracle text fetched from Scryfall
+-- this session and transcribed whole): "Return target creature card with mana
+-- value X or less from your graveyard to the battlefield."
+--
+-- The SPELL half of the announcement-read bound, where warsingerSpec above is the
+-- trigger half. The number is CR 601.2b's announced X rather than CR 603.2's event
+-- amount, and the two roads differ in more than which slot the bound names:
+--
+--   * CR 601.2b names X one step BEFORE CR 601.2c chooses the target, so the
+--     value exists when the offer is computed and Pawl.Engine.Cast.castProposed
+--     hands it over as the seed. That is the second case here.
+--   * CR 700.2a's fillability gate runs EARLIER STILL -- before the mode choice
+--     rule 601.2b lists first, and so before any X exists at all. A bound read
+--     there states nothing, because rule 601.2b puts no ceiling on the value the
+--     caster may name; the gate refuses the spell for what the announcement
+--     cannot change and for nothing else. That is the first case, built as a PAIR
+--     of graveyards differing in one card.
+--
+-- The gameplay case is Warsinger's board one rule over: alice's graveyard holds a
+-- creature card at each of mana value 2, 3 and 4 plus a Lightning Bolt UNDER every
+-- bound among them, and the answerer PREFERS every card the announced X excludes,
+-- so a widened bound is observable as a different permanent arriving rather than as
+-- nothing happening. The Bolt is what makes a filter that had stopped narrowing by
+-- card type visible, since the fallback takes the smallest legal recipient either
+-- way.
+stirTheGraveSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+stirTheGraveSpec s registry =
+  let boardOf graveyard swamps = do
+        stir <- S.printingOf s registry "Stir the Grave"
+        swamp <- S.printingOf s registry "Swamp"
+        cards <- traverse (S.printingOf s registry) graveyard
+        let (gs0, stirId) = S.boltInHand swamp stir swamps Phase.PrecombatMain
+            (ids, gs1) = List.foldl' (\(acc, g) c -> let (oid, g') = S.addGraveyardCard c S.alice g in (acc <> [oid], g')) ([], gs0) cards
+        pure (stirId, ids, gs1)
+   in Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ do
+        -- CR 700.2a asked before CR 601.2b exists, as a pair of boards differing in
+        -- exactly one card: the same three Swamps and the same one graveyard card,
+        -- which is a creature on one board and an instant on the other. A gate that
+        -- read the unannounced bound as a bound would refuse BOTH -- mana value 4 is
+        -- not "4 or less" of an X that has not been named -- and a gate that had
+        -- stopped narrowing at all would offer both.
+        Spec.it s "CR 601.2b the castability gate states no bound the announcement has not made" $ do
+          (creatureBoard, _, withCreature) <- boardOf ["Russet Wolves"] 3
+          (instantBoard, _, withInstant) <- boardOf ["Lightning Bolt"] 3
+          Spec.assertBool s (S.castable S.alice creatureBoard withCreature) "the mana value 4 creature card is reachable by some X, so the cast is offered"
+          Spec.assertBool s (not (S.castable S.alice instantBoard withInstant)) "and no X reaches an instant, so it is not"
+        -- THE proving case, at gameplay level: which card came back. THREE
+        -- DISTINCT READINGS of one graveyard, so the offered set names one and
+        -- rejects two -- the announced 2 admits the Piker alone, a bound that had
+        -- widened admits the Tyrant and the Wolves as well, and a bound that went
+        -- unanswered admits nothing and CR 601.2e reverses the whole cast.
+        Spec.it s "CR 601.2c whole card: the bound is the X the caster announced" $ do
+          (stirId, ids, gs) <- boardOf ["Goblin Piker", "Kalakscion, Hunger Tyrant", "Russet Wolves", "Lightning Bolt"] 3
+          case ids of
+            [_, tyrantId, wolvesId, boltId] -> do
+              let after = S.runPure (stirPlan 2 [tyrantId, wolvesId, boltId]) gs (S.cast S.alice stirId >> Stack.resolveTop)
+              Spec.assertEqWith s "CR 202.3: the mana value 2 creature card is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
+              Spec.assertEqWith s "and the mana value 3 one the answerer preferred is not" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Kalakscion, Hunger Tyrant")) S.alice after) 0
+              Spec.assertEqWith s "nor the mana value 4 one" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Russet Wolves")) S.alice after) 0
+              Spec.assertEqWith s "nor the instant under every bound" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Lightning Bolt")) S.alice after) 0
+              -- The fixture's own precondition, asserted rather than assumed: the
+              -- cast was not reversed, so {2}{B} was announced and paid.
+              Spec.assertEqWith s "CR 601.2h all three Swamps paid {2}{B}" (S.tappedCount S.alice after) 3
+            _ -> Spec.assertFailure s "fixture should stock alice's graveyard with four cards"
+        -- The other end of the same announcement, on the same board: X is the
+        -- caster's to name, so naming 0 leaves a slot no card in that graveyard
+        -- satisfies -- and CR 601.2c's unfillable announcement makes the casting
+        -- illegal rather than being repaired to some value the board can meet.
+        Spec.it s "CR 601.2e an X no graveyard card is under reverses the whole cast" $ do
+          (stirId, ids, gs) <- boardOf ["Goblin Piker", "Kalakscion, Hunger Tyrant", "Russet Wolves", "Lightning Bolt"] 3
+          case ids of
+            [_, tyrantId, wolvesId, boltId] -> do
+              let after = S.runPure (stirPlan 0 [tyrantId, wolvesId, boltId]) gs (S.cast S.alice stirId >> Stack.resolveTop)
+              Spec.assertEqWith s "no creature card came back" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 0
+              Spec.assertEqWith s "CR 601.2: the game returned to before the casting was proposed, so no Swamp is tapped" (S.tappedCount S.alice after) 0
+            _ -> Spec.assertFailure s "fixture should stock alice\'s graveyard with four cards"
+
+-- Announces this X and aims every target slot at the graveyard cards the bound
+-- EXCLUDES, falling back to the smallest legal recipient -- warsingerPlan\'s shape,
+-- with CR 601.2b\'s announcement in place of the combat that supplied the trigger.
+stirPlan :: Natural.Type.Natural -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+stirPlan x bait p = case p of
+  Prompt.ChooseX {} -> x
+  Prompt.ChooseTargets _ _ _ asked -> S.preferring (maybe False (`elem` bait) . Recipient.objectOf) asked
+  _ -> S.identityAnswer p

@@ -433,7 +433,12 @@ recipientObjects = Set.fromList . concatMap (Maybe.mapMaybe Recipient.objectOf .
 candidateTargetsGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Target.Pools -> PlayerId -> ObjectId -> Modal.Type.Modal Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Set.Set ModeIndex.ModeIndex -> GameState -> Set.Set ObjectId
 candidateTargetsGiven pcs grants pools pid srcId modal fillable gs =
   let slotsOf mi = Modal.modesTargetSlots (Seq.singleton mi) modal
-      setsOf slots = Target.legalSetsGiven pcs grants pools (Just pid) Map.empty srcId slots gs
+      -- CR 601.2b's announcement is judged MADE here, and empty.
+      -- Not implemented: an activated ability's announced X never reaches a target
+      -- slot's CR 202.3 computed bound, so such a slot admits nothing and this gate
+      -- has nothing to be permissive about (#2672). Pawl.Engine.Cast is the half
+      -- that is built.
+      setsOf slots = Target.legalSetsGiven pcs grants pools (Just pid) False Map.empty srcId slots gs
    in Set.unions (fmap (recipientObjects . setsOf . slotsOf) (Set.toList fillable))
 
 -- CR 601.2b via 602.2b: the greatest X this player could actually pay for, which
@@ -686,6 +691,10 @@ activateAbility pid srcId ability = do
           -- be (aimingSomewhere). Read off `gs`, the same pre-stack board
           -- Target.chooseTargets is offered from, so one binding serves both.
           slots = Modal.modesTargetSlots chosenModes (ActivatedAbility.modal ability)
+          -- Not implemented: the seed is empty, so a slot's CR 202.3 computed bound
+          -- cannot read the X announced two lines down (#2672). Splitting the map
+          -- in two is what it would take -- this one is measured BEFORE the
+          -- announcement on purpose, the cost bound below needing it.
           sets = Target.legalSets (Just pid) Map.empty srcId slots gs
           candidates = recipientObjects sets
       mAmount <-

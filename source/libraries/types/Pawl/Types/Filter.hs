@@ -197,8 +197,9 @@ data Filter keyword
     -- bound is READ AGAIN at CR 608.2b rather than frozen at announcement. Which
     -- direction that can move is a fact about the quantities cards name rather
     -- than about this atom: a turn's life gain only grows, so that re-read can
-    -- only widen, and Venerable Warsinger's CR 603.2 event amount is a number the
-    -- announcement fixed, so its re-read cannot move at all.
+    -- only widen, while a bound naming an announcement's own number -- Venerable
+    -- Warsinger's CR 603.2 event amount, Stir the Grave's CR 601.2b announced X --
+    -- cannot move at all, the announcement having fixed it.
     --
     -- AT MOST only, ManaValueAtMost's reason one atom over: that is the direction
     -- the printed cards ask in.
@@ -206,7 +207,10 @@ data Filter keyword
     -- Vacuously False where either number is absent -- a candidate with no mana
     -- value, or a slot naming no amount -- the posture PowerLessThanSource takes.
     -- Pawl.CardSpec's position lint is what keeps a card from writing the atom
-    -- into a slot with no amount, where it would be a silent False.
+    -- into a slot with no amount, where it would be a silent False. The one
+    -- exception is a bound the announcement has not made yet, which states nothing
+    -- rather than an unmeetable ceiling: Pawl.Engine.Filter.Context's
+    -- boundUnannounced.
     ManaValueAtMostAmount
   | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
   | -- | CR 508.5: the candidate's controller is the DEFENDING PLAYER for the

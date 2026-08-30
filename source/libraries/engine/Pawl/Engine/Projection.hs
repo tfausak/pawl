@@ -2722,9 +2722,9 @@ rewritePayGate pairs gate =
 -- computed bound is a Quantity, and a Quantity reaches a Count's Filter, so a
 -- word swap finds text there exactly as it finds it at the top level. A
 -- REGRESSION FENCE rather than a proved behaviour, bakeSlot's posture one module
--- over: no committed bound reaches a Filter -- two name
--- Quantity.LifeGainedThisTurn and one a Quantity.InSlot, and neither arm carries
--- one -- so no board today tells the two readings apart.
+-- over: no committed bound reaches a Filter -- the pool's bounds name either
+-- Quantity.LifeGainedThisTurn or Quantity.InSlot, and neither arm carries one --
+-- so no board today tells the two readings apart.
 rewriteTargetSlot :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> TargetSlot.TargetSlot -> TargetSlot.TargetSlot
 rewriteTargetSlot pairs slot =
   slot

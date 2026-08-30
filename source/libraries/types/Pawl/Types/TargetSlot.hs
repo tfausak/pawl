@@ -73,10 +73,12 @@ data TargetSlot = MkTargetSlot
     -- A bound that reads a SLOT is answered off the ANNOUNCEMENT rather than off
     -- CR 113.7's source, which carries no such binding: Pawl.Engine.Target's
     -- slotContext hands the environment to Pawl.Engine.Quantity through
-    -- Filter.Context's boundAmounts. Venerable Warsinger's "where X is the amount
-    -- of damage this creature dealt to that player" is the printed shape, and
-    -- Pawl.TargetSpec's "CR 603.2 whole card: the bound is the damage the event
-    -- carried" is what proves it on a board.
+    -- Filter.Context's boundAmounts. Both announcements reach it -- CR 603.2's
+    -- trigger event (Venerable Warsinger's "where X is the amount of damage this
+    -- creature dealt to that player", proved by Pawl.TargetSpec's "CR 603.2 whole
+    -- card: the bound is the damage the event carried") and CR 601.2b's announced
+    -- X on a spell (Stir the Grave's "mana value X or less", proved by that
+    -- module's "CR 601.2c whole card: the bound is the X the caster announced").
     amount :: Maybe Quantity.Quantity
   }
   deriving (Eq, Ord, Show)

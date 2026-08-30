@@ -679,6 +679,9 @@ durationSlots duration = case duration of
 -- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless
 -- [a player] pays" names, and every slot a target slot's own pool or filter
 -- names. A payer or pool slot no effect also reads would otherwise dangle.
+--
+-- Not implemented: CR 303.4a's enchant slot is declared on the FACE beside the
+-- modes (Card.enchantSlotMap), so nothing it names is folded here at all (#2673).
 modeSlots :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Map.Map SlotName SlotArity
 modeSlots mode =
   joinSlots
@@ -3549,6 +3552,11 @@ chooseNewTargetsFor controller copyId = do
           -- CR 608.2b's own derivation, made against the CURRENT board: this is
           -- a fresh choice of targets rather than a re-check of the old one, so
           -- it reads what the board can supply now.
+          --
+          -- Not implemented: the seed is empty, so a slot judged against the
+          -- announcement -- a CR 202.3 computed bound reading CR 707.10's copied X,
+          -- a GraveyardScope.InSlot pool reading a sibling slot -- is answered off
+          -- nothing here, where Object.bindings copy holds both (#2674).
           fresh = Target.legalSets (Just controller) Map.empty copyId slots gs
           -- CR 406.4: what this player may not name specifically is offered as
           -- the pile it sits in, exactly as at CR 601.2c. The targets already

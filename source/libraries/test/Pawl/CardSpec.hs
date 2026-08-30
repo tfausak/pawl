@@ -1553,11 +1553,15 @@ modalCountsOffend modal =
    in any modeOffends (Modal.modes modal)
 
 -- CR 601.2c with CR 601.2b: does this modal read the announced X through a
--- TARGET SLOT's count -- "each of X target creatures" (Rot-Curse Rakshasa)? A
--- reader Resolve.readsX cannot see, that one walking effects and this X sitting
--- on the slot, so the two reads-equal-declares lints below ask both.
+-- TARGET SLOT's count -- "each of X target creatures" (Rot-Curse Rakshasa) -- or
+-- through a slot's CR 202.3 computed BOUND, "mana value X or less" (Stir the
+-- Grave)? Two readers Resolve.readsX cannot see, that one walking effects and
+-- both of these sitting on the slot, so the two reads-equal-declares lints below
+-- ask all three.
 modalReadsAnnouncedX :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
-modalReadsAnnouncedX = any ((==) SlotCount.AnnouncedX . TargetSlot.count) . Modal.allTargetSlots
+modalReadsAnnouncedX modal =
+  any ((==) SlotCount.AnnouncedX . TargetSlot.count) (Modal.allTargetSlots modal)
+    || any (any (Set.member Binding.variableX . Quantity.slots) . TargetSlot.amount) (Modal.allTargetSlots modal)
 
 -- Every ReplacementEffect a card AUTHORS: the ones it PRINTS
 -- (Face.replacementEffects, Eon Hub's) and the ones an effect of its own
@@ -5390,9 +5394,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- X it announces is the "pays {X}" its clause offers at resolution
   -- (`payGateCostsOf`, substituted in by Pawl.Engine.Resolve.announcedXOn).
   --
-  -- A TARGET SLOT counting the announced X is the fourth such reader
-  -- (modalReadsAnnouncedX): CR 601.2c's variable number of targets is named at
-  -- the announcement rather than by anything the modes do.
+  -- A TARGET SLOT counting the announced X is the fourth such reader, and a
+  -- slot whose CR 202.3 computed bound names it the fifth (both
+  -- modalReadsAnnouncedX): CR 601.2c's number of targets and the bound its filter
+  -- compares a candidate against are alike named at the announcement rather than
+  -- by anything the modes do.
   Spec.it s "every printing that reads X declares X, and vice versa" $ do
     ps <- S.allPrintings s
     let -- CR 107.3m's other reader, one CR 614.1c row over from the printed
@@ -7550,11 +7556,20 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "the Warsinger's slot names its bound as well"
       (manaValueAtMostAmountCounts (S.combinedFace warsinger))
       (1, 0)
+    -- The pool's fourth author, and the first on a SPELL: Stir the Grave's bound
+    -- is CR 601.2b's announced X, which the caster names one step before CR
+    -- 601.2c chooses the target (Pawl.Engine.Cast.castProposed's seed).
+    stir <- S.printingOf s registry "Stir the Grave"
+    Spec.assertEqWith
+      s
+      "Stir the Grave's slot names its bound as well"
+      (manaValueAtMostAmountCounts (S.combinedFace stir))
+      (1, 0)
     Spec.assertEqWith
       s
       "and they are the pool's only ones"
       (sum (fmap (uncurry (+) . manaValueAtMostAmountCounts . S.combinedFace) ps))
-      3
+      4
     -- The rejected side, which the sweep above cannot show while the pool has no
     -- offender: the SAME atom, buried under all three combinators, in a target
     -- slot that names no amount -- the position a card author would most plausibly
