@@ -6816,6 +6816,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- intersection rather than `clashes` answering True for anything.
     Spec.assertBool s (clashes [destruction, removal destroyedSlot]) "a singular read outside OfferCast is caught"
     Spec.assertBool s (not (clashes [destruction, removal elsewhereSlot])) "a singular read of another slot is left alone"
+    -- The other funnel, slotOne, on the same board: ExileHaunting's haunting card
+    -- is read through it rather than through legalOne. Paired with AttachBound,
+    -- whose FIRST slot is the group-tolerant one -- objectRefObjects attaches
+    -- every member (CR 712.21c) -- so the two opcodes take the same pair of slot
+    -- names and only the second is an offender.
+    Spec.assertBool s (clashes [destruction, Effect.ExileHaunting (ExileHaunting.MkExileHaunting destroyedSlot elsewhereSlot)]) "a slotOne read of a plurally bound slot is caught"
+    Spec.assertBool s (not (clashes [destruction, Effect.AttachBound (AttachBound.MkAttachBound destroyedSlot elsewhereSlot)])) "a group-tolerant read of a plurally bound slot is left alone"
     Spec.assertEqWith s "a group binding is invisible to a singular reader" (fmap (S.nameOf . Printing.card) offenders) []
   -- OwnerChooses asks a player which END of a library a card arrives at (CR
   -- 401.2), and only a library HAS ends -- so on any other destination it would
