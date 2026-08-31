@@ -1602,10 +1602,10 @@ evolvingHumanAt oid p = case p of
   Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Human, Subtype.Goblin)
   _ -> S.identityAnswer p
 
--- CR 115.10a's bound object inside a floating shield's own recipient
--- description, whose producer is Synthetic Communal Bulwark ({1}{W} Instant:
--- "Prevent the next 3 damage that would be dealt this turn to you and to target
--- creature.").
+-- CR 601.2c's announced target read back inside a floating shield's own
+-- recipient description, whose producer is Synthetic Communal Bulwark ({1}{W}
+-- Instant: "Prevent the next 3 damage that would be dealt this turn to you and to
+-- target creature.").
 --
 -- ONE SHIELD OVER TWO RECIPIENTS is what forces the spelling, and it is a rules
 -- reason rather than a convenience: CR 615.7 counts DAMAGE rather than events or
@@ -1630,16 +1630,17 @@ evolvingHumanAt oid p = case p of
 -- three-seat trap does not apply. bob supplies the source, which is a role the
 -- shield says nothing about.
 communalBulwarkSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-communalBulwarkSpec s registry = Spec.describe s "Synthetic Communal Bulwark (CR 115.10a)" $ do
-  Spec.it s "CR 115.10a the shield's description names the object the spell targeted" $ do
+communalBulwarkSpec s registry = Spec.describe s "Synthetic Communal Bulwark (CR 601.2c / 615.7)" $ do
+  Spec.it s "CR 601.2c the shield's description names the object the spell targeted" $ do
     plains <- S.printingOf s registry "Plains"
     bulwark <- S.printingOf s registry "Synthetic Communal Bulwark"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     piker <- S.printingOf s registry "Goblin Piker"
+    tracker <- S.printingOf s registry "Ainok Tracker"
     let base = S.landsInPlay plains 2
         (warded, g1) = S.addCreature sorcerer S.alice base
         (unwarded, g2) = S.addCreature piker S.alice g1
-        (attacker, g3) = S.addCreature piker S.bob g2
+        (attacker, g3) = S.addCreature tracker S.bob g2
         (bulwarkId, g4) = S.addHandCard bulwark S.alice g3
         ready =
           g4
@@ -1659,17 +1660,18 @@ communalBulwarkSpec s registry = Spec.describe s "Synthetic Communal Bulwark (CR
     -- Its twin on the same board, differing in the RECIPIENT alone: alice's other
     -- creature is not the bound object, so the case above cannot pass on a shield
     -- that covers every creature she controls.
-    Spec.assertEqWith s "alice's untargeted creature takes the whole 2" (S.damageOf unwarded (strike (Recipient.ToCreature unwarded) 2)) (Just 2)
+    Spec.assertEqWith s "alice's untargeted creature takes the whole 4" (S.damageOf unwarded (strike (Recipient.ToCreature unwarded) 4)) (Just 4)
     -- The player half of the same description, which no slot answers: it holds
     -- either way, so the two assertions above cannot both pass because no row was
     -- installed at all.
     Spec.assertEqWith s "and the 3 to alice herself is prevented whole" (S.lifeOf S.alice (strike (Recipient.ToPlayer S.alice) 3)) (Just 20)
-    -- CR 615.7's pool is shared, so the creature's 2 leaves 1: a fourth reading
-    -- that the two halves are separate shields would leave 3.
+    -- CR 615.7's pool is shared, so the creature's 2 leaves 1: the other reading,
+    -- that the two halves are separate shields, would leave 3 and cost alice
+    -- nothing.
     Spec.assertEqWith s "CR 615.7 the creature and the player draw down one pool" (S.lifeOf S.alice (S.runPure S.identityAnswer (strike (Recipient.ToCreature warded) 2) (Damage.applyDamage [hit (Recipient.ToPlayer S.alice) 3]))) (Just 18)
     -- The proxies, after the behaviour.
     Spec.assertEqWith s "setup: the Bulwark installed exactly one row" (length (GameState.replacements shielded)) 1
-    Spec.assertEqWith s "setup: bob's source is undamaged and unshielded" (S.damageOf attacker (strike (Recipient.ToCreature attacker) 2)) (Just 2)
+    Spec.assertEqWith s "setup: the shield covers nothing of bob's either" (S.damageOf attacker (strike (Recipient.ToCreature attacker) 5)) (Just 5)
 
 -- Aims a spell at `oid` by narrowing the offered set to it, evolvingHumanAt
 -- without the word swap: the target is FILTERED out of the offered set rather
