@@ -8305,6 +8305,74 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.VentureMarkerEntered {} -> False
           GameEvent.BecameTarget {} -> False
           GameEvent.BecameAttached {} -> False
+  -- CR 603.6c's family with the DESTINATION pinned: the arm above's match,
+  -- narrowed to the one zone this condition names. CR 110.1 is what makes the
+  -- origin implicit -- a permanent is on the battlefield, so "returned to hand"
+  -- is battlefield-to-hand and admits no other pair.
+  --
+  -- The same viewWithLastKnown read on ZoneChange.departed, and CR 603.10a
+  -- cites it twice over here: this is a leaves-the-battlefield ability AND an
+  -- ability that triggers when an object all players can see is put into a
+  -- hand. Without the look-back "you control" would be asked of a card in a
+  -- hand, which CR 108.4 gives no controller.
+  --
+  -- CR 603.6c's leaving-the-game form is declined, unlike the arm above: a
+  -- permanent that leaves the game reaches no zone at all, so it is not
+  -- returned to anyone's hand.
+  TriggerCondition.PermanentReturnedToHand f ->
+    let admits departed = case Projection.viewWithLastKnown departed gs departed of
+          Nothing -> False
+          Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+     in case event of
+          GameEvent.Moved (Moved.MkMoved zc _ _)
+            | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Hand ->
+                admits (ZoneChange.departed zc)
+          GameEvent.Moved {} -> False
+          GameEvent.LeftTheGame _ -> False
+          GameEvent.Milled {} -> False
+          GameEvent.Scried _ -> False
+          GameEvent.Surveiled _ -> False
+          GameEvent.DiceRolled _ -> False
+          GameEvent.ClassLevelSet _ -> False
+          GameEvent.Plotted _ -> False
+          GameEvent.Explored _ -> False
+          GameEvent.Exerted _ -> False
+          GameEvent.BecameAttacked _ -> False
+          GameEvent.AttackersDeclared _ -> False
+          GameEvent.BecameTapped _ -> False
+          GameEvent.CoinFlipped {} -> False
+          GameEvent.DamageDealt _ -> False
+          GameEvent.StepBegan {} -> False
+          GameEvent.SpellCast {} -> False
+          GameEvent.DamagePrevented {} -> False
+          GameEvent.BecameMonarch _ -> False
+          GameEvent.Discarded {} -> False
+          GameEvent.Drew {} -> False
+          GameEvent.Revealed {} -> False
+          GameEvent.AttackerDeclared {} -> False
+          GameEvent.BecameBlocking {} -> False
+          GameEvent.BlocksDeclared {} -> False
+          GameEvent.AttackerBlocked {} -> False
+          GameEvent.AttackerUnblocked _ -> False
+          GameEvent.SpellCountered _ -> False
+          GameEvent.HalfUnlocked {} -> False
+          GameEvent.TurnedFaceUp _ -> False
+          GameEvent.Transformed {} -> False
+          GameEvent.BecameDesignated {} -> False
+          GameEvent.Evolved _ -> False
+          GameEvent.Mentored {} -> False
+          GameEvent.Trained _ -> False
+          GameEvent.PermanentSacrificed {} -> False
+          GameEvent.AbilityTriggered {} -> False
+          GameEvent.LoyaltyAbilityActivated _ -> False
+          GameEvent.LifeLost {} -> False
+          GameEvent.LifeGained {} -> False
+          GameEvent.CountersPut {} -> False
+          GameEvent.CountersRemoved {} -> False
+          GameEvent.ControlChanged {} -> False
+          GameEvent.VentureMarkerEntered {} -> False
+          GameEvent.BecameTarget {} -> False
+          GameEvent.BecameAttached {} -> False
   -- CR 702.55b/702.55c: SelfDies' zone pair, asked of the object the BEARER
   -- HAUNTS rather than of the bearer itself -- so the id compared against
   -- ZoneChange.departed is the one GameState.haunting files the bearer under, and
@@ -10607,6 +10675,9 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PermanentsDie _ -> False
   TriggerCondition.SelfLeavesTheBattlefield -> False
   TriggerCondition.PermanentLeavesTheBattlefield _ -> False
+  -- The destination-pinned reading of that same form: a zone change is not
+  -- another ability triggering either.
+  TriggerCondition.PermanentReturnedToHand _ -> False
   -- CR 702.55b watches a death, not another ability triggering.
   TriggerCondition.HauntedCreatureDies -> False
   -- CR 701.6a's countering is a spell or ability DOING something, not one
@@ -11531,6 +11602,12 @@ eventBindingSlots cond = case cond of
   -- change carries ZoneChange.departed and a departure from the game carries the
   -- id itself -- which is what lets Resourceful Defense read "it".
   TriggerCondition.PermanentLeavesTheBattlefield _ -> Set.singleton Binding.departedPermanent
+  -- Nothing, unlike the arm above, and by decision rather than by oversight:
+  -- no printed payload under this condition points at the returned permanent
+  -- or at the player whose hand it reached, so eventBindings has no arm for it
+  -- at all. Warped Devotion's "that player discards a card" is what would earn
+  -- a slot.
+  TriggerCondition.PermanentReturnedToHand _ -> Set.empty
   -- Nothing, where PermanentDies binds CR 400.7e's graveyard card: rule 702.55b's
   -- ability speaks about the creature it HAUNTS and never about the card that
   -- creature became, so no printing of haunt names the arrival. eventBindings has
@@ -11841,6 +11918,10 @@ looksBack condition = case condition of
   TriggerCondition.PermanentsDie _ -> True
   TriggerCondition.SelfLeavesTheBattlefield -> True
   TriggerCondition.PermanentLeavesTheBattlefield _ -> True
+  -- CR 603.10a twice over: this is a leaves-the-battlefield ability, and it is
+  -- also an ability that triggers when an object all players can see is put
+  -- into a hand.
+  TriggerCondition.PermanentReturnedToHand _ -> True
   -- CR 603.10a's first family read off the HOST rather than the bearer: this
   -- triggers when a permanent leaves the battlefield, so the rule reaches the
   -- ability however the bearer is found.
@@ -12019,6 +12100,9 @@ batchScoped condition = case condition of
   TriggerCondition.PermanentsDie _ -> True
   TriggerCondition.SelfLeavesTheBattlefield -> False
   TriggerCondition.PermanentLeavesTheBattlefield _ -> False
+  -- Per-permanent too: CR 603.2c's batch reading of this event is the printed
+  -- "one or more ... are returned", which no condition spells yet (#2682).
+  TriggerCondition.PermanentReturnedToHand _ -> False
   TriggerCondition.AttachedCreatureDies -> False
   -- CR 603.2e names the MOMENT a permanent becomes tapped, and a moment holds one
   -- occurrence; no printing of that event says "one or more".
@@ -13313,6 +13397,9 @@ zonesTriggeredFrom cond = case cond of
   -- The same answer once more, and here it is the ONLY one CR 113.6k could give:
   -- the bearer is a bystander that never left the battlefield at all.
   TriggerCondition.PermanentLeavesTheBattlefield _ -> battlefield
+  -- The same answer for the same reason: the bearer is a bystander that never
+  -- left the battlefield.
+  TriggerCondition.PermanentReturnedToHand _ -> battlefield
   -- CR 113.6k's third zone, and rule 702.55c states it outright: "triggered
   -- abilities of cards with haunt that refer to the haunted creature can trigger
   -- in the exile zone". A permanent on the battlefield haunts nothing -- only a
@@ -13543,6 +13630,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PermanentsDie _ -> False
   TriggerCondition.SelfLeavesTheBattlefield -> False
   TriggerCondition.PermanentLeavesTheBattlefield _ -> False
+  TriggerCondition.PermanentReturnedToHand _ -> False
   -- Rule 702.55b names no turn.
   TriggerCondition.HauntedCreatureDies -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
@@ -13740,6 +13828,7 @@ stateTriggers gs
               TriggerCondition.PermanentsDie _ -> False
               TriggerCondition.SelfLeavesTheBattlefield -> False
               TriggerCondition.PermanentLeavesTheBattlefield _ -> False
+              TriggerCondition.PermanentReturnedToHand _ -> False
               TriggerCondition.HauntedCreatureDies -> False
               TriggerCondition.SpellOrAbilityCounters _ -> False
               TriggerCondition.DamageToPlayerPrevented _ -> False

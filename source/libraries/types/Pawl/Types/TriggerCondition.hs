@@ -603,6 +603,35 @@ data TriggerCondition
     -- have it as CR 113.7a's source already, so a slot would be a second name
     -- for one object.
     PermanentLeavesTheBattlefield (Filter.Filter Keyword.Keyword)
+  | -- | CR 603.6c's leaves-the-battlefield family narrowed to ONE destination:
+    -- "whenever another nonland permanent you control is returned to its owner's
+    -- hand" (Justice, Vance Astrovik). PermanentDies is the same shape with a
+    -- graveyard where this has a hand, and CR 110.1 is what makes the origin
+    -- implicit -- a permanent is on the battlefield, so "returned to hand" is
+    -- battlefield-to-hand and nothing else.
+    --
+    -- NOT PermanentLeavesTheBattlefield with a Filter, which names no
+    -- destination and so would fire on a permanent destroyed or exiled too. A
+    -- Filter is a predicate over the OBJECT; where the card's clause is about
+    -- where the object went, the condition has to carry it.
+    --
+    -- A look-back for PermanentDies' reasons, doubly cited here: CR 603.10a
+    -- names leaves-the-battlefield abilities and, separately, abilities that
+    -- trigger when an object all players can see is put into a hand. The
+    -- candidate is ZoneChange.departed, read through CR 608.2h last known
+    -- information, which is the only way "you control" can be answered about a
+    -- card that is in a hand by the time the scan runs.
+    --
+    -- Binds nothing, PermanentsDie's floor and for eventBindingSlots' stated
+    -- reason: no printed payload under this condition points at the returned
+    -- permanent or at the player whose hand it reached. Warped Devotion's "that
+    -- player discards a card" is what would earn a slot.
+    --
+    -- Not implemented: CR 603.2c's batch reading of the same event -- "whenever
+    -- one or more noncreature permanents are returned to hand" (Tameshi, Reality
+    -- Architect), which fires once however many moved, the way PermanentsDie
+    -- stands beside PermanentDies (#2682).
+    PermanentReturnedToHand (Filter.Filter Keyword.Keyword)
   | -- | CR 700.4's "dies" read off the permanent the BEARER IS ATTACHED TO
     -- (Screams from Within's "when enchanted creature dies"). PermanentDies'
     -- battlefield-to-graveyard pair and a look-back for its reasons; WHICH
