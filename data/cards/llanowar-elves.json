@@ -60,6 +60,14 @@
         "value": 1
       },
       "typeLine": {
+        "subtypes": [
+          {
+            "type": "Druid"
+          },
+          {
+            "type": "Elf"
+          }
+        ],
         "types": [
           {
             "type": "Creature"

@@ -77,6 +77,12 @@
         "subtypes": [
           {
             "type": "Human"
+          },
+          {
+            "type": "Sorcerer"
+          },
+          {
+            "type": "Wizard"
           }
         ],
         "types": [

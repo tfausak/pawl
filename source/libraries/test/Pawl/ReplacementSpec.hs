@@ -1382,6 +1382,112 @@ scarecrowSpec s registry = Spec.describe s "Scarecrow (CR 609.7b)" $ do
     -- installed at all.
     Spec.assertEqWith s "and the same flier's 4 to alice is prevented whole" (S.lifeOf S.alice (strike (Recipient.ToPlayer S.alice) 4 shielded)) (Just 20)
 
+-- CR 611.2c's LIVE recipient set on the UNBOUNDED shield, whose producer is Pack
+-- Leader ({1}{W} Creature -- Dog, 2/2: "Other Dogs you control get +1/+1.
+-- Whenever this creature attacks, prevent all combat damage that would be dealt
+-- this turn to Dogs you control.").
+--
+-- The shield DESCRIBES its recipients rather than naming them, and that is the
+-- whole point of the card here: a prevention effect modifies no characteristic
+-- and no controller, so CR 611.2c leaves its set live and the description is
+-- re-asked at each damage event. Spelling the same clause as a ref over "each Dog
+-- you control" would sweep the set as the trigger resolved -- weaker than printed
+-- in one direction and stricter in the other -- which is what the third case
+-- below tells apart.
+--
+-- Two seats is enough: the card says "you control" and names no opponent, so the
+-- three-seat trap does not apply. bob's own Dog is what makes "you control" do
+-- work, and it is a recipient rather than a role.
+packLeaderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+packLeaderSpec s registry = Spec.describe s "Pack Leader (CR 611.2c)" $ do
+  Spec.it s "CR 611.2c the shield covers whatever matches its description when the damage would happen" $ do
+    leader <- S.printingOf s registry "Pack Leader"
+    tracker <- S.printingOf s registry "Ainok Tracker"
+    piker <- S.printingOf s registry "Goblin Piker"
+    kinGuard <- S.printingOf s registry "Fortress Kin-Guard"
+    let (gs, mine, theirs) = S.combatBoardOf [leader, tracker, piker] [tracker, piker]
+        -- The declare blockers step, Hanweir Garrison's vantage point: the
+        -- trigger fired at the declaration (CR 508.2b) and resolved in the
+        -- declare attackers step's priority round, so the shield is up and no
+        -- combat damage has been dealt yet.
+        atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+        -- A Dog that comes under alice's control AFTER the shield resolved, which
+        -- is exactly the object CR 611.2c's second sentence admits and a swept
+        -- set could not.
+        (latecomer, board) = S.addCreature kinGuard S.alice atBlockers
+        hit src recipient n =
+          DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Combat
+        -- ONE source for every case, so each pair below differs in the recipient
+        -- alone: the shield says nothing about its source, and a case that
+        -- swapped sources would not be a twin of the one beside it.
+        strike src oid n = S.damageOf oid (S.runPure S.identityAnswer board (Damage.applyDamage [hit src (Recipient.ToCreature oid) n]))
+    case (mine, theirs) of
+      ([leaderId, ourDog, ourPiker], [theirDog, theirPiker]) -> do
+        let strikeFrom = strike theirPiker
+        -- THE gameplay assertion: a recipient the shield only DESCRIBES is
+        -- covered, which is the field this card exists to exercise.
+        Spec.assertEqWith s "the 3 combat damage to a Dog alice controls is prevented whole" (strikeFrom ourDog 3) (Just 0)
+        -- Its twin, differing in the RECIPIENT alone and on the same board: a
+        -- creature of alice's that is not a Dog takes its damage, so the case
+        -- above cannot pass on a shield that covers everything.
+        Spec.assertEqWith s "the 4 to alice's non-Dog Piker is marked in full" (strikeFrom ourPiker 4) (Just 4)
+        -- CR 611.2c's own case: this Dog was not on the battlefield when the
+        -- shield was created, and the shield covers it anyway.
+        Spec.assertEqWith s "CR 611.2c the Dog that entered after the shield resolved is covered too" (strikeFrom latecomer 5) (Just 0)
+        -- The other half of the description -- "you control" -- with the same
+        -- creature type on the other side of the table.
+        Spec.assertEqWith s "bob's own Dog is not covered, the clause saying you control" (strikeFrom theirDog 6) (Just 6)
+        -- The proxies, after the behaviour.
+        Spec.assertEqWith s "setup: the shield is one floating replacement" (length (GameState.replacements atBlockers)) 1
+        Spec.assertEqWith s "setup: Pack Leader was declared as an attacker" (elem leaderId (S.attackerDeclarationsOf atBlockers)) True
+        Spec.assertEqWith s "setup: the latecomer is on the battlefield and undamaged" (S.damageOf latecomer board) (Just 0)
+      _ -> Spec.assertFailure s "fixture should have three creatures for alice and two for bob"
+  -- CR 612.1 through the UNBOUNDED shield's described recipient, which the
+  -- Synthetic Warding Chant group below cannot reach: that card's unbounded
+  -- shield describes its SOURCE. Artificial Evolution ({U} Instant: "Change the
+  -- text of target spell or permanent by replacing all instances of one creature
+  -- type with another") is aimed at the Pack Leader PERMANENT before it attacks,
+  -- so the trigger resolves off swapped text and the shield goes up over Cats.
+  Spec.it s "CR 612.1 the swap reaches the word the shield's RECIPIENT predicate names" $ do
+    island <- S.printingOf s registry "Island"
+    leader <- S.printingOf s registry "Pack Leader"
+    tracker <- S.printingOf s registry "Ainok Tracker"
+    cheetah <- S.printingOf s registry "Pouncing Cheetah"
+    piker <- S.printingOf s registry "Goblin Piker"
+    evolution <- S.printingOf s registry "Artificial Evolution"
+    let (gs, mine, theirs) = S.combatBoardOf [leader, tracker, cheetah] [piker]
+        (evolutionId, ready) = S.addHandCard evolution S.alice (S.landsFor island S.alice 1 gs)
+        hit src recipient n =
+          DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Combat
+        strike src oid n g = S.damageOf oid (S.runPure S.identityAnswer g (Damage.applyDamage [hit src (Recipient.ToCreature oid) n]))
+    case (mine, theirs) of
+      ([leaderId, ourDog, ourCat], [theirPiker]) -> do
+        let evolved =
+              S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer $
+                S.runPure (evolvingDogAt leaderId) (ready {GameState.priority = Just S.alice}) (S.cast S.alice evolutionId Monad.>> Stack.resolveTop)
+            -- The control leg, the same board without the Evolution cast.
+            printed = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer ready
+        -- THE gameplay assertion: after the swap the shield covers Cats, a word
+        -- Pack Leader never printed.
+        Spec.assertEqWith s "after the swap alice's Cat takes none of the 3" (strike theirPiker ourCat 3 evolved) (Just 0)
+        -- Its twin, differing in the RECIPIENT alone: the Dog the card printed is
+        -- no longer covered.
+        Spec.assertEqWith s "and alice's Dog takes the whole 4" (strike theirPiker ourDog 4 evolved) (Just 4)
+        Spec.assertEqWith s "unevolved, alice's Dog takes none of the 5" (strike theirPiker ourDog 5 printed) (Just 0)
+        Spec.assertEqWith s "unevolved, alice's Cat takes the whole 6" (strike theirPiker ourCat 6 printed) (Just 6)
+        -- The proxies, after the behaviour.
+        Spec.assertEqWith s "setup: each leg installed exactly one shield" (fmap (length . GameState.replacements) [evolved, printed]) [1, 1]
+      _ -> Spec.assertFailure s "fixture should have three creatures for alice and one for bob"
+
+-- Aims the Evolution at `oid` and answers CR 612.1's word swap with Dog for Cat,
+-- evolvingHumanAt's shape below and for its reason: the target is FILTERED out of
+-- the offered set rather than rebuilt.
+evolvingDogAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+evolvingDogAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
+  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Dog, Subtype.Cat)
+  _ -> S.identityAnswer p
+
 -- CR 612.1 through a prevention shield's own PREDICATES, whose producer is
 -- Synthetic Warding Chant ({1}{W} Instant: "Prevent all damage that would be
 -- dealt to you this turn by Humans. Prevent the next 3 damage that would be
@@ -1399,9 +1505,9 @@ scarecrowSpec s registry = Spec.describe s "Scarecrow (CR 609.7b)" $ do
 -- Effect.Replace's DamageR instead, which is the shape data/cards/moonmist.json
 -- already writes; their own text change is #2746. The static abilities (Drogskol
 -- Reinforcements, Rescue Retriever, Marble Priest) install no shield at
--- resolution. Pack Leader's "to Dogs you control" is the near miss: CR 611.2c
--- makes that description live, and PreventAllDamage has no field to hold it
--- (#2748).
+-- resolution. Pack Leader's "to Dogs you control" reaches the unbounded shield's
+-- own whatRecipient, which the group above proves, but no printing aims a text
+-- changer at it.
 --
 -- BOTH filters on ONE card, because they sit on the two different opcodes: CR
 -- 615.1's unbounded shield describes its source in whatSource, and CR 615.7's
@@ -6257,6 +6363,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   healingGraceSpec s registry
   auriokReplicaSpec s registry
   scarecrowSpec s registry
+  packLeaderSpec s registry
   wardingChantSpec s registry
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry

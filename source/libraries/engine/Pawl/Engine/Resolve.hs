@@ -541,7 +541,7 @@ effectObjectRefs effect = case effect of
   Effect.SkipNextPhase {} -> []
   -- Absent where the shield's recipients are described rather than named.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> Maybe.maybeToList ref
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _) -> [ref]
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _ _) -> Maybe.maybeToList ref
   -- CR 614.9's two sides, the damage's old recipient and its new one.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ from to _) -> [from, to]
   Effect.Counter (Counter.MkCounter ref _) -> [ref]
@@ -872,7 +872,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
         Map.delete Binding.eventAmount (joinSlots (fmap slotsOf (Foldable.toList rider)))
       ]
   -- The same reads, minus the shield size this opcode does not carry.
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ rider) ->
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ _ rider) ->
     joinTwo
       (durationSlots duration)
       (Map.delete Binding.eventAmount (joinSlots (fmap slotsOf (Foldable.toList rider))))
@@ -1240,7 +1240,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> True
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity rider) ->
     durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity && all slotsAreExhaustive rider
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ rider) ->
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ _ rider) ->
     durationSlotsAreExhaustive duration && all slotsAreExhaustive rider
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _ _) -> durationSlotsAreExhaustive duration
   Effect.Counter {} -> True
@@ -1424,7 +1424,7 @@ readsX = any effectReadsX
       Effect.SkipNextPhase {} -> False
       -- CR 601.2b's X reaches the rider too.
       Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ quantity rider) -> Quantity.readsX quantity || readsX (Foldable.toList rider)
-      Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ rider) -> readsX (Foldable.toList rider)
+      Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> readsX (Foldable.toList rider)
       Effect.RedirectDamage {} -> False
       Effect.Counter {} -> False
       Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
@@ -1661,7 +1661,7 @@ boundSlots effect = case effect of
   -- The shield itself binds nothing; CR 615.5's rider is an effect list, so a
   -- name IT authors is a name this card authors. Both shields.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ _ rider) -> foldMap boundSlots rider
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ rider) -> foldMap boundSlots rider
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> foldMap boundSlots rider
   Effect.RedirectDamage {} -> Set.empty
   -- How many spells this countering ACTUALLY countered, for a "for each spell
   -- countered this way".
@@ -6340,20 +6340,29 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               State.modify' $ \g0 ->
                 let amount = Integer.toNaturalSaturating n
                  in List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind (DamageRewrite.PreventNext amount) rider (Filter.Type.And []) describedRecipient) g0 (fmap (\recipient -> (recipient, sourceChoice)) rows)
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref direction sourceFilter printedSource riderEffects) -> do
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref whatRecipient direction sourceFilter printedSource riderEffects) -> do
     -- CR 615.1 / 615.3: one floating shield per object the ref names, with no
     -- amount to count down. PreventNextDamage's row but for its rewrite, hence
     -- the shared `installDamageRow`; CR 615.7's "reduced to 0" terminator does
     -- not exist here, so only the duration ends it. The recipient side goes
     -- through Damage.damageRecipient for PreventNextDamage's reason (CR
     -- 120.1a); the source side is an ObjectId and needs no such translation.
+    --
+    -- ONE ROW ALTOGETHER for a card that DESCRIBES its recipients instead (Pack
+    -- Leader's "to Dogs you control"), PreventNextDamage's split exactly: CR
+    -- 611.2c leaves that set live, so the row carries the predicate and
+    -- Replacement re-asks it at each damage event rather than sweeping it here.
+    -- A card writing both spellings is read as the description alone.
     gs <- State.get
-    let named = objectRefRecipients legal resolving controller source gs ref
+    let named = foldMap (objectRefRecipients legal resolving controller source gs) ref
         -- Through effectContext rather than Filter.contextFor, so CR 609.7a's
         -- candidates are narrowed against this resolution's own slot bindings
         -- and CR 109.5's "you" rather than against an empty slot map.
         context = effectContext controller source legal (slotGroups resolving gs)
         recipients = Maybe.mapMaybe (Damage.damageRecipient gs) named
+        -- The recipient each row this resolution installs bakes: one row naming
+        -- nobody for a described shield, and one per named recipient otherwise.
+        rows = if Maybe.isJust whatRecipient then [Nothing] else fmap Just recipients
         -- CR 615.5's additional effect. With no amount to count down, "this way"
         -- is what THIS application prevented, which Prevention.amount carries.
         rider =
@@ -6387,13 +6396,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- CR 609.7b's PRINTED properties are a predicate rather than a second
       -- name, so they are threaded on this side too; every by-direction card in
       -- data/cards/ leaves them trivial.
+      --
+      -- The DESCRIBED recipient side is not read here either: a shield pinned to
+      -- the source side names no recipient at all, and what its source looks like
+      -- is `printedSource` one field over.
       DamageDirection.DealtBy ->
         State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind DamageRewrite.PreventAll rider printedSource (Nothing, Nothing)) g0 (fmap (\oid -> (Nothing, Just (Filter.Type.And [], oid))) (Maybe.mapMaybe Recipient.objectOf named))
       DamageDirection.DealtTo ->
         -- No recipient is CR 608.2b's gone target, so there is nothing to shield
         -- and CR 609.7a's choice -- a choice existing only to be baked into a
-        -- row -- is not raised either. PreventNextDamage's posture.
-        Monad.unless (null recipients) $ do
+        -- row -- is not raised either. PreventNextDamage's posture. A DESCRIBED
+        -- shield always has its one row, its recipients being read at the damage
+        -- event rather than settled here.
+        Monad.unless (null rows) $ do
           -- CR 609.7a: "the source is chosen when the effect is created", so the
           -- choice is made ONCE here and every shield this resolution installs
           -- watches the object it landed on.
@@ -6404,7 +6419,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- stricter than printed rather than weaker, which a row watching
             -- every source would be.
             (Just _, Nothing) -> pure ()
-            _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind DamageRewrite.PreventAll rider printedSource (Nothing, Nothing)) g0 (fmap (\recipient -> (Just recipient, sourceChoice)) recipients)
+            _ -> State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind DamageRewrite.PreventAll rider printedSource (whatRecipient, Nothing)) g0 (fmap (\recipient -> (recipient, sourceChoice)) rows)
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind srcRef destRef sourceFilter) -> do
     -- CR 614.9: install a floating redirection effect. BOTH sides are baked here,
     -- both being known only at resolution: the source side into
