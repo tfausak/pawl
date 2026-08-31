@@ -47,13 +47,13 @@ data ConjureDestination
   | -- | Shellfish Scholar\'s "conjure a card named Think Twice into your
     -- graveyard" (CR 404.1).
     Graveyard
-  | -- | Grave Studies\' "conjure a card named Teacher\'s Pest onto the
-    -- battlefield" (CR 403.1).
+  | -- | Lam, Storm Crane Elder\'s "conjure a card named Monastery Mentor onto
+    -- the battlefield" (CR 403.1).
     --
     -- The only arm that is an ENTRY: the other three put the card into a zone
     -- and stop, where this one wants CR 616.1's entry loop and the CR 603.6a
     -- trigger scan, so Pawl.Engine.Event.conjureOntoBattlefield is a road of its
-    -- own rather than a third argument to Pawl.Engine.Event.conjure.
+    -- own rather than another argument to Pawl.Engine.Event.conjure.
     --
     -- Not implemented: a STATED status. The arrival is untapped and out of
     -- combat, which is CR 110.5b's default and what this arm\'s producer prints,

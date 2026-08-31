@@ -10,10 +10,13 @@
 -- Thopterist on the battlefield and begin its controller's upkeep so the printed
 -- trigger fires and resolves; the third declares a printed Toralf's Disciple as
 -- an attacker; the fourth enters a printed Shellfish Scholar; the fifth casts a
--- noncreature spell under a printed Lam, Storm Crane Elder. Every case CASTS or
--- otherwise uses what the conjure created, which is the point -- conjure creates
--- a CARD and not CR 111.1's token, and a token outside the battlefield would be
--- swept up by CR 111.7 first.
+-- noncreature spell under a printed Lam, Storm Crane Elder.
+--
+-- The first four CAST what the conjure created, which is the point -- conjure
+-- creates a CARD and not CR 111.1's token, and a token in a hand, a library or a
+-- graveyard would be swept up by CR 111.7 before any cast. The BATTLEFIELD case
+-- proves the entry rather than the cardness: rule 111.7 sweeps up nothing there,
+-- so no board of that shape tells a conjured card from a token.
 module Pawl.ConjureSpec where
 
 import qualified Control.Monad as Monad
@@ -30,11 +33,13 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- Pawl.CounterspellSpec's bitterblossomChain, which is the shape both cases
@@ -212,8 +217,8 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
         (_, stocked) = S.addLibraryCard islandPrinting S.alice entered
         conjured = settleTriggers stocked
         inYard = namedIn thinkTwice Zone.Graveyard conjured
-        -- CR 307.1: an instant is castable in a main phase as readily as
-        -- anywhere, and this is where the existing cases cast from.
+        -- CR 304.1: an instant needs only priority, so the main phase is where
+        -- the cases above cast from rather than something this one requires.
         main_ = conjured {GameState.phase = Phase.PrecombatMain}
         flashedBack = case inYard of
           oid : _ -> S.runPure S.identityAnswer main_ (S.cast S.alice oid >> Stack.resolveTop)
@@ -236,23 +241,33 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   -- Monastery Mentor onto the battlefield."), the one destination that is an
   -- ENTRY rather than a bare arrival.
   --
-  -- Soul Warden ("Whenever another creature enters, you gain 1 life") is the
-  -- witness for the entry half: it reads the Moved event
-  -- Pawl.Engine.Event.recordMintedEntry files, so a conjure that placed the card
-  -- without running an entry would leave alice on 20. The projected power and
-  -- toughness are the other half -- the arrival is a permanent CR 613 answers
-  -- for, not merely an object with the right name.
-  Spec.it s "conjure onto the battlefield enters as a permanent an enters trigger sees" $ do
+  -- Three assertions for the three halves of an entry the other destinations do
+  -- not have. Soul Warden ("Whenever another creature enters, you gain 1 life")
+  -- reads the Moved event Pawl.Engine.Event.recordMintedEntry files, so a
+  -- conjure that placed the card without announcing an entry leaves alice on 20
+  -- (CR 603.6a). Bob's Kismet ("Artifacts, creatures, and lands your opponents
+  -- control enter tapped") is a replacement effect the arrival only meets inside
+  -- CR 616.1's loop, which is what runEntry runs. The projected power and
+  -- toughness are the third -- the arrival is a permanent CR 613 answers for,
+  -- not merely an object with the right name.
+  --
+  -- Kismet is BOB's, so it reaches the conjured Mentor and nothing alice's
+  -- fixture placed; addCreature arranges a board rather than entering anything.
+  Spec.it s "conjure onto the battlefield enters as a permanent, seen by an enters trigger and an entry replacement" $ do
     islandPrinting <- S.printingOf s registry "Island"
     lam <- S.printingOf s registry "Lam, Storm Crane Elder"
     warden <- S.printingOf s registry "Soul Warden"
+    kismet <- S.printingOf s registry "Kismet"
     twice <- S.printingOf s registry "Think Twice"
     let board0 = S.landsInPlay islandPrinting 2
         (_, board1) = S.addCreature lam S.alice board0
         (_, board2) = S.addCreature warden S.alice board1
-        (spell, board3) = S.addHandCard twice S.alice board2
-        (_, board4) = S.addLibraryCard islandPrinting S.alice board3
-        cast_ = S.runPure S.identityAnswer (board4 {GameState.phase = Phase.PrecombatMain}) (S.cast S.alice spell)
+        (_, board3) = S.addCreature kismet S.bob board2
+        (spell, board4) = S.addHandCard twice S.alice board3
+        -- Think Twice draws, and CR 104.3c would lose alice the game out from
+        -- under the assertions on an empty library.
+        (_, board5) = S.addLibraryCard islandPrinting S.alice board4
+        cast_ = S.runPure S.identityAnswer (board5 {GameState.phase = Phase.PrecombatMain}) (S.cast S.alice spell)
         final = settleTriggers cast_
         mentors = namedIn monasteryMentor Zone.Battlefield final
     Spec.assertEqWith
@@ -265,6 +280,11 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "Soul Warden saw it ENTER, so alice gained 1 life"
       (S.lifeOf S.alice final)
       (Just 21)
+    Spec.assertEqWith
+      s
+      "CR 616.1 ran over the arrival, so bob's Kismet had it enter tapped"
+      (fmap (\oid -> fmap Object.tapped (Game.lookupObject oid final)) mentors)
+      [Just TapState.Tapped]
     Spec.assertEqWith
       s
       "and it reached no other zone of alice's"

@@ -722,6 +722,10 @@ placeObject pid mkObj dest position = do
 -- Not routed through Event.changeZone for that shared reason: a zone change
 -- would announce a departure from a zone the card was never in.
 --
+-- The MATERIALIZATION only. A battlefield destination is an entry as well, and
+-- CR 616.1's loop and the CR 603.6a scan run after this rather than inside it --
+-- see conjureOntoBattlefield, which is the one caller passing that zone.
+--
 -- `position` is CR 401.2's end for a LIBRARY destination and inert elsewhere,
 -- placeObject's own note; Game.insertIntoZone is the only reader.
 --
@@ -823,6 +827,14 @@ conjure pid card dest position = do
 -- CR 110.5b's defaults throughout: nothing here taps the arrival or puts it into
 -- combat, which is what this road's producer prints;
 -- Pawl.Types.ConjureDestination names the printings that state otherwise.
+--
+-- CR 110.2a's `Just controller` is correct by construction and unobservable: a
+-- conjured card's OWNER is the player who conjured it (mintCard's `pid`, the
+-- same seat), and Projection.defaultControllerOf answers the owner when
+-- `enteredUnder` is Nothing, so no board can tell the two writings apart.
+-- Mutating it to Nothing leaves Pawl.ConjureSpec green, and would stop doing so
+-- the day a printing names a conjurer other than the resolving controller
+-- (#2638).
 conjureOntoBattlefield :: PlayerId -> Card -> Natural -> Game (Seq.Seq ObjectId)
 conjureOntoBattlefield controller card count = do
   printingId <- State.state (Game.intern (Printing.MkPrinting card))
@@ -8212,8 +8224,9 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   --
   -- The `to /= Battlefield` guard is that rule's own word "another", and is
   -- load-bearing: recordMintedEntry files a battlefield-to-battlefield pseudo-move
-  -- whose `departed` is the token's own id, so a token bearing this condition
-  -- would fire on its own creation without it.
+  -- whose `departed` is the arrival's own id, so a permanent minted straight onto
+  -- the battlefield -- a token, a melded permanent, a conjured card -- would fire
+  -- this condition on its own creation without it.
   --
   -- Matched on `departed` for SelfDies' reason (CR 603.10a).
   --
@@ -12421,7 +12434,8 @@ eventTriggers events gs =
       -- battlefield" arrive as a matcher arm alone.
       --
       -- The `to /= Battlefield` guard is CR 603.6c's own word "another": the
-      -- pseudo-move recordMintedEntry emits for a new token is not a departure.
+      -- pseudo-move recordMintedEntry emits for a permanent minted straight onto
+      -- the battlefield is not a departure.
       --
       -- The departing id is what the placed trigger carries as its SOURCE (CR
       -- 113.7a). CR 603.6c's arriving incarnation is a SECOND slot rather than a
