@@ -540,7 +540,7 @@ objectRefPositions =
     ("counter", Effect.Counter (Counter.MkCounter (plantedRef "co") Nothing), [plantedRef "co"]),
     ("put-counters", Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) (plantedRef "pc")), [plantedRef "pc"]),
     ("move-counters", Effect.MoveCounters (MoveCounters.MkMoveCounters (plantedRef "mc-from") MovedKinds.Every Nothing (plantedRef "mc-to")), [plantedRef "mc-from", plantedRef "mc-to"]),
-    ("put-counters-from", Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom (SlotName.MkSlotName (Text.pack "giver")) (plantedRef "pf")), [plantedRef "pf"]),
+    ("put-counters-from", Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom (SlotName.MkSlotName (Text.pack "giver")) Nothing (plantedRef "pf")), [plantedRef "pf"]),
     ("tap", Effect.Tap (plantedRef "ta"), [plantedRef "ta"]),
     ("untap", Effect.Untap (plantedRef "un"), [plantedRef "un"]),
     ("detain", Effect.Detain (plantedRef "dt"), [plantedRef "dt"]),
@@ -5126,9 +5126,11 @@ effectFilters effect = case effect of
   -- otherwise escape the lint; the count is a Quantity like any other; and CR
   -- 122.1b's kind may be a whole Keyword with a Filter under it; see #2728.
   Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) -> frame Unframed (counterKindFilters kind <> quantityFilters quantity) <> frame SourceHostFramed (objectRefFilters ref)
-  -- The destination only, PutCounters' framing: `from` is a bare SlotName and
-  -- carries no Filter.
-  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ ref) -> frame SourceHostFramed (objectRefFilters ref)
+  -- The destination and CR 122.1b's kind, PutCounters' framing: `from` is a bare
+  -- SlotName and carries no Filter, and the kind is the one rule 122.8's second
+  -- sentence lets a card name, which may be a whole Keyword with a Filter under
+  -- it; see #2728.
+  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ kind ref) -> frame Unframed (foldMap counterKindFilters kind) <> frame SourceHostFramed (objectRefFilters ref)
   -- FOUR positions, PutCounters' framing: BOTH sides are ObjectRefs and carry a
   -- Filter apiece -- Spike Cannibal's "all creatures" on the first, Forgotten
   -- Ancient's "other creatures" on the second. The moved kinds hold the other
@@ -5376,7 +5378,7 @@ effectObjectRefs effect = case effect of
   Effect.BecomesBlocked {} -> []
   Effect.Counter (Counter.MkCounter ref _) -> read_ [ref]
   Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> read_ [ref]
-  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ ref) -> read_ [ref]
+  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ _ ref) -> read_ [ref]
   -- BOTH sides, each a READ -- CR 122.5 takes no choice of WHICH objects the
   -- counters leave or land on, so this arm goes through the pure objectRefObjects
   -- and a chooser-shaped ref written on either side would name nothing. WHICH
@@ -7828,7 +7830,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- slotOne.
           Effect.ExileHaunting (ExileHaunting.MkExileHaunting card host) -> [card, host]
           -- CR 122.8's read.
-          Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _) -> [from]
+          Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _ _) -> [from]
           Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ _ slot) -> [slot]
           -- CR 122.5 names NO slot read singly: both its sides are ObjectRefs and
           -- go through objectRefObjects, which reads slotGroup and moves counters
@@ -9450,6 +9452,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             ("Effect.PutCounters' kind", holds (effectFilters (Effect.PutCounters (PutCounters.MkPutCounters kind one anywhere)))),
             ("Effect.RemoveCounters' kind", holds (effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind one slot)))),
             ("Effect.MoveCounters' kinds", holds (effectFilters (Effect.MoveCounters (MoveCounters.MkMoveCounters anywhere (MovedKinds.Named kind one) Nothing anywhere)))),
+            ("Effect.PutCountersFrom' kind", holds (effectFilters (Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom slot (Just kind) anywhere)))),
             ("Quantity.ObjectCounters' kind", holds (quantityFilters (Quantity.Type.ObjectCounters kind))),
             ("CR 714.2b's threshold", holds (triggerConditionFilters (TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached kind 2)))),
             ("CR 310.12b's last removal", holds (triggerConditionFilters (TriggerCondition.SelfLastCounterRemoved kind))),

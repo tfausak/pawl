@@ -571,7 +571,7 @@ effectObjectRefs effect = case effect of
   -- CR 122.5's two sides, either of which may name a group.
   Effect.MoveCounters (MoveCounters.MkMoveCounters from _ _ to) -> [from, to]
   -- CR 122.8's taker; the giver is a slot.
-  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ ref) -> [ref]
+  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ _ ref) -> [ref]
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.PayAnyEnergy {} -> []
@@ -920,7 +920,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantitySlots quantity
   -- CR 122.8 reads its tally off ONE object, so `from` is read singly, where the
   -- destination is an ObjectRef and may sweep.
-  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _) -> oneSlot from
+  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _ _) -> oneSlot from
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity slot) -> insertOne slot (quantitySlots quantity)
   -- CR 122.5's pair: BOTH sides are ObjectRefs, joined at slotsOf's head with
   -- every other ref, so neither is read here. The count reads
@@ -7244,7 +7244,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       Just n ->
         Monad.when (n > 0) . Event.simultaneously . Monad.forM_ targets $ \target ->
           Event.putCounters (CounterCause.ByEffect controller) target kind (Integer.toNaturalSaturating n)
-  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom fromSlot ref) -> do
+  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom fromSlot kind ref) -> do
     gs <- State.get
     -- CR 122.8: put the counters the `from` object HAD onto every permanent the
     -- ref names -- "the player puts the same number of each kind of counter the
@@ -7270,9 +7270,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         targets = objectRefObjects legal resolving controller source gs ref
         -- Ascending (Map.toList), so a transcript is deterministic. A kind
         -- recorded at zero is dropped: it is not a kind the object HAD.
+        -- CR 122.8's second sentence: an ability that "specifies what kind(s) of
+        -- counters to place" places "the same number of each of those kinds of
+        -- counter the first object had", so a named kind narrows the tally to
+        -- itself -- Selfless Police Captain's "put its +1/+1 counters", where
+        -- Iron Apprentice's "put those counters" names none and takes all.
+        narrow m = maybe m (Map.restrictKeys m . Set.singleton) kind
         tally = case legalOne fromSlot legal >>= Recipient.objectOf of
           Nothing -> Map.empty
-          Just oid -> Map.filter (> 0) (maybe Map.empty Filter.counters (viewOf oid))
+          Just oid -> narrow (Map.filter (> 0) (maybe Map.empty Filter.counters (viewOf oid)))
     -- ONE event for the placements, the PutCounters arm's Event.simultaneously
     -- bracket and its reasons (CR 608.2f), spent only when something crosses.
     -- ONE call per kind per permanent inside it, which is CR 614.16's own unit.

@@ -1003,7 +1003,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom (SlotName.MkSlotName (Text.pack "self")) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "creature")))))
+      (Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom (SlotName.MkSlotName (Text.pack "self")) Nothing (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "creature")))))
       " {\"type\":\"PutCountersFrom\",\"value\":{\"from\":\"self\",\"ref\":{\"type\":\"InSlot\",\"value\":\"creature\"}}} "
   -- CR 122: PutCounters' mirror, and a distinct tag -- a signed amount under one
   -- tag would make the two indistinguishable in a card file.
