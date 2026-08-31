@@ -1382,6 +1382,117 @@ scarecrowSpec s registry = Spec.describe s "Scarecrow (CR 609.7b)" $ do
     -- installed at all.
     Spec.assertEqWith s "and the same flier's 4 to alice is prevented whole" (S.lifeOf S.alice (strike (Recipient.ToPlayer S.alice) 4 shielded)) (Just 20)
 
+-- CR 612.1 through a prevention shield's own PREDICATES, whose producer is
+-- Synthetic Warding Chant ({1}{W} Instant: "Prevent all damage that would be
+-- dealt to you this turn by Humans. Prevent the next 3 damage that would be
+-- dealt to Humans you control this turn.") aimed at by Artificial Evolution ({U}
+-- Instant: "Change the text of target spell or permanent by replacing all
+-- instances of one creature type with another. The new creature type can't be
+-- Wall.").
+--
+-- SYNTHETIC because no printing reaches THESE TWO FIELDS, not because none pairs
+-- a text changer with a typed shield. Scryfall o:prevent over every printing,
+-- 2026-08-30, read for a creature type or a basic land type in the prevention
+-- clause, sorts the hits three ways. The ones that restrict no recipient at all
+-- (Arachnogenesis, Galadhrim Ambush, Repel the Abominable, That's No Moonmist,
+-- Frontline Strategist) cannot spell this opcode's required ref and take
+-- Effect.Replace's DamageR instead, which is the shape data/cards/moonmist.json
+-- already writes; their own text change is #2746. The static abilities (Drogskol
+-- Reinforcements, Rescue Retriever, Marble Priest) install no shield at
+-- resolution. Pack Leader's "to Dogs you control" is the near miss: CR 611.2c
+-- makes that description live, and PreventAllDamage has no field to hold it
+-- (#2748).
+--
+-- BOTH filters on ONE card, because they sit on the two different opcodes: CR
+-- 615.1's unbounded shield describes its source in whatSource, and CR 615.7's
+-- countdown describes its recipients in whatRecipient.
+--
+-- Two seats is enough: the card says "you" and "you control" and names no
+-- opponent, so the three-seat trap does not apply.
+wardingChantSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wardingChantSpec s registry = Spec.describe s "Synthetic Warding Chant (CR 612.1)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      strike src recipient n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src recipient n])
+  Spec.it s "CR 612.1 the swap reaches the word the shield's SOURCE predicate names" $ do
+    (bobHuman, bobGoblin, _, _, evolved) <- wardingChantBoard s registry True
+    (printedHuman, printedGoblin, _, _, printed) <- wardingChantBoard s registry False
+    -- THE gameplay assertion: after the swap the shield watches Goblins, so the
+    -- Goblin's 4 is the damage that never lands. An engine that dropped the
+    -- filter would still be watching Humans here and read 16.
+    Spec.assertEqWith s "after the swap the Goblin's 4 to alice is prevented whole" (S.lifeOf S.alice (strike bobGoblin (Recipient.ToPlayer S.alice) 4 evolved)) (Just 20)
+    -- Its twin on the same board, differing in the SOURCE alone: the Human the
+    -- card printed is no longer named, so its 3 lands.
+    Spec.assertEqWith s "and the Human's 3 to alice lands in full" (S.lifeOf S.alice (strike bobHuman (Recipient.ToPlayer S.alice) 3 evolved)) (Just 17)
+    -- The control leg, the same board without the Evolution: the pair differs in
+    -- exactly whether the text was changed, so neither reading is "no shield was
+    -- installed at all".
+    Spec.assertEqWith s "unevolved, the Human's 3 to alice is prevented whole" (S.lifeOf S.alice (strike printedHuman (Recipient.ToPlayer S.alice) 3 printed)) (Just 20)
+    Spec.assertEqWith s "unevolved, the Goblin's 4 to alice lands in full" (S.lifeOf S.alice (strike printedGoblin (Recipient.ToPlayer S.alice) 4 printed)) (Just 16)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "setup: the Chant installed both of its shields" (length (GameState.replacements evolved)) 2
+  Spec.it s "CR 612.1 the swap reaches the word the shield's RECIPIENT predicate names" $ do
+    (_, bobGoblin, aliceHuman, aliceGoblin, evolved) <- wardingChantBoard s registry True
+    (_, printedSource, printedHuman, printedGoblin, printed) <- wardingChantBoard s registry False
+    -- THE gameplay assertion: after the swap the countdown shield covers alice's
+    -- Goblins, so the 2 dealt to hers is prevented and marks nothing.
+    Spec.assertEqWith s "after the swap alice's Goblin takes none of the 2" (S.damageOf aliceGoblin (strike bobGoblin (Recipient.ToCreature aliceGoblin) 2 evolved)) (Just 0)
+    -- Its twin, differing in the RECIPIENT alone: the Human the card printed is
+    -- no longer covered.
+    Spec.assertEqWith s "and alice's Human takes the whole 2" (S.damageOf aliceHuman (strike bobGoblin (Recipient.ToCreature aliceHuman) 2 evolved)) (Just 2)
+    -- The control leg, the same board without the Evolution.
+    Spec.assertEqWith s "unevolved, alice's Human takes none of the 2" (S.damageOf printedHuman (strike printedSource (Recipient.ToCreature printedHuman) 2 printed)) (Just 0)
+    Spec.assertEqWith s "unevolved, alice's Goblin takes the whole 2" (S.damageOf printedGoblin (strike printedSource (Recipient.ToCreature printedGoblin) 2 printed)) (Just 2)
+
+-- alice holds the Chant and an Artificial Evolution, and each player controls a
+-- Human (Prodigal Sorcerer) and a Goblin (Goblin Piker) -- one seat's pair to
+-- deal the damage, the other's to receive it. She casts the Chant, and when
+-- `evolve` casts the Evolution at the SPELL while it is still on the stack,
+-- swapping Human for Goblin, before letting the Chant resolve. The two boards
+-- differ in exactly that cast. Returns bob's Human, bob's Goblin, alice's Human,
+-- alice's Goblin and the shielded board.
+--
+-- THREE Plains and TWO Islands for a {1}{W} and a {U}, redirectedSpellChain's
+-- reason: the Chant is cast first and spends at most two lands, so an Island
+-- survives however the payment picks.
+wardingChantBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+wardingChantBoard s registry evolve = do
+  plains <- S.printingOf s registry "Plains"
+  island <- S.printingOf s registry "Island"
+  chant <- S.printingOf s registry "Synthetic Warding Chant"
+  evolution <- S.printingOf s registry "Artificial Evolution"
+  sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let base = S.landsFor island S.alice 2 (S.landsInPlay plains 3)
+      (bobHuman, g1) = S.addCreature sorcerer S.bob base
+      (bobGoblin, g2) = S.addCreature piker S.bob g1
+      (aliceHuman, g3) = S.addCreature sorcerer S.alice g2
+      (aliceGoblin, g4) = S.addCreature piker S.alice g3
+      (chantId, g5) = S.addHandCard chant S.alice g4
+      (evolutionId, g6) = S.addHandCard evolution S.alice g5
+      ready =
+        g6
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      onStack = S.runPure S.identityAnswer ready (S.cast S.alice chantId)
+      evolved = case GameState.stack onStack of
+        spellId : _ -> S.runPure (evolvingHumanAt spellId) onStack (S.cast S.alice evolutionId Monad.>> Stack.resolveTop)
+        [] -> onStack
+      shielded = S.runPure S.identityAnswer (if evolve then evolved else onStack) Stack.resolveTop
+  pure (bobHuman, bobGoblin, aliceHuman, aliceGoblin, shielded)
+
+-- Aims the Evolution at the spell `oid` by narrowing the offered set to it, and
+-- answers CR 612.1's word swap with Human for Goblin. The target is FILTERED out
+-- of the offered set rather than rebuilt, evolvingAt's reason below: a hand-built
+-- recipient would be dropped at CR 608.2b's re-read with no error.
+evolvingHumanAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+evolvingHumanAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
+  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Human, Subtype.Goblin)
+  _ -> S.identityAnswer p
+
 -- CR 615.5's ADDITIONAL EFFECT, whose producer is Test of Faith ({1}{W} Instant:
 -- "Prevent the next 3 damage that would be dealt to target creature this turn.
 -- For each 1 damage prevented this way, put a +1/+1 counter on that creature").
@@ -6146,6 +6257,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   healingGraceSpec s registry
   auriokReplicaSpec s registry
   scarecrowSpec s registry
+  wardingChantSpec s registry
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
   worshipSpec s registry
