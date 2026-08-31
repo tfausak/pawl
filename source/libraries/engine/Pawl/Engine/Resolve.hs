@@ -7268,14 +7268,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- CR 608.2c: the set is swept as this instruction is reached, and an
         -- illegal slot (CR 608.2b) or a player recipient answers with nobody.
         targets = objectRefObjects legal resolving controller source gs ref
-        -- Ascending (Map.toList), so a transcript is deterministic. A kind
-        -- recorded at zero is dropped: it is not a kind the object HAD.
         -- CR 122.8's second sentence: an ability that "specifies what kind(s) of
         -- counters to place" places "the same number of each of those kinds of
         -- counter the first object had", so a named kind narrows the tally to
         -- itself -- Selfless Police Captain's "put its +1/+1 counters", where
         -- Iron Apprentice's "put those counters" names none and takes all.
         narrow m = maybe m (Map.restrictKeys m . Set.singleton) kind
+        -- Ascending (Map.toList), so a transcript is deterministic. A kind
+        -- recorded at zero is dropped: it is not a kind the object HAD.
         tally = case legalOne fromSlot legal >>= Recipient.objectOf of
           Nothing -> Map.empty
           Just oid -> narrow (Map.filter (> 0) (maybe Map.empty Filter.counters (viewOf oid)))
