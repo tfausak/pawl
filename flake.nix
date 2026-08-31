@@ -116,29 +116,26 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-        in
-        {
-          # What CI's incremental Cabal build runs in. GHC has to come from the
-          # flake rather than a setup action, since PerformanceSpec's allocation
-          # ceilings shift across compiler versions; keeping it to the compiler
-          # and Cabal spares the runner the rest of the default shell.
           ci = pkgs.mkShell {
             nativeBuildInputs = [
               pkgs.cabal-install
               pkgs.ghc
             ];
           };
+        in
+        {
+          inherit ci;
 
           default = pkgs.mkShell {
+            inputsFrom = [ ci ];
+
             nativeBuildInputs = [
               cabal-gild.packages.${system}.default
               hooky.packages.${system}.default
               pkgs.bash
-              pkgs.cabal-install
               pkgs.coreutils
               pkgs.fzf
               pkgs.gh
-              pkgs.ghc
               pkgs.ghcid
               pkgs.git
               pkgs.hlint

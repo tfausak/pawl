@@ -10,18 +10,10 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: nixbuild/nix-quick-install-action@v35
-      # A pull request can only restore what its base branch saved, so the push
-      # trigger is what keeps that base warm; without it every branch would
-      # start cold. Branches save too, so a second push reuses the first one's
-      # objects, and since every restore refreshes main's entry, LRU keeps the
-      # base alive. The key carries the commit so each run saves, and the lock
-      # file leads the prefix because a compiler change invalidates every
-      # object.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cache/cabal
@@ -30,9 +22,6 @@ jobs:
           key: cabal-${{ hashFiles('flake.lock') }}-${{ github.sha }}
           restore-keys: cabal-${{ hashFiles('flake.lock') }}-
       - run: nix develop .#ci --command cabal update
-      # These reproduce cabal.project.local, which is gitignored. `--semaphore`
-      # is deliberately absent: it earns nothing on a runner that runs one
-      # cabal at a time, and a killed run corrupts it.
       - run: |
           nix develop .#ci --command cabal configure \
             --disable-executable-dynamic \
@@ -41,11 +30,10 @@ jobs:
             --enable-tests \
             --flags=pedantic \
             --ghc-options='+RTS -A64m -RTS' \
-            --jobs=4
+            --jobs \
+            --semaphore
       - run: nix develop .#ci --command cabal build all
-      - run: |
-          nix develop .#ci --command cabal test \
-            --test-options='--hide-successes --timeout 15s'
+      - run: nix develop .#ci --command cabal test --test-options='--timeout 15s'
   cabal:
     name: Cabal
     runs-on: ubuntu-latest
