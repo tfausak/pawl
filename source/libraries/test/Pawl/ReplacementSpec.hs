@@ -1494,6 +1494,106 @@ evolvingHumanAt oid p = case p of
   Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Human, Subtype.Goblin)
   _ -> S.identityAnswer p
 
+-- CR 612.1 through a REDIRECTION's own chosen-source predicate (CR 609.7a),
+-- whose producer is Synthetic Turn the Blade ({1}{W} Instant: "The next time a
+-- Human of your choice would deal damage to you this turn, that damage is dealt
+-- to target creature you control instead.") aimed at by Artificial Evolution
+-- ({U} Instant: "Change the text of target spell or permanent by replacing all
+-- instances of one creature type with another. The new creature type can't be
+-- Wall.").
+--
+-- SYNTHETIC because no printing describes a REDIRECT's chooseable source with a
+-- word rule 612 can swap. Scryfall o:"of your choice would deal damage",
+-- include_extras=true, 2026-08-30: forty-six printings, and the only descriptors
+-- any of them put in front of "source" are a colour (the Circles and Runes of
+-- Protection, Penance, Pilgrim of Justice, Burrenton Forge-Tender), "artifact"
+-- or "land" (Circle of Protection: Artifacts, Rune of Protection: Lands) -- card
+-- types and colours, never a subtype. Every one of those is a PREVENTION besides;
+-- the redirects among the forty-six (Beacon of Destiny, Eye for an Eye, General's
+-- Regalia, Jade Monolith, Nova Pentacle, Opal-Eye, Reflect Damage, Shaman en-Kor)
+-- all say plain "a source of your choice", the trivial `And []`, on which
+-- Filter.rewrite is the identity. Martyrs of Korlis is the near miss and is not
+-- one: it names a card type, and it is a static ability, so it is a
+-- Pawl.Types.PrintedReplacement rather than this opcode.
+--
+-- The board discriminates the two readings by WHICH ATTACKER's damage turns
+-- aside: bob's Human and bob's Goblin each swing a different amount at alice, and
+-- exactly one of them is the source the shield chose. Three distinct numbers --
+-- the Goblin's 4, the Human's 3, alice's starting 20 -- so no two readings land
+-- on the same life total.
+--
+-- Two seats is enough: the card says "you" and "target creature you control" and
+-- names no opponent, so the three-seat trap does not apply. Alice's redirect
+-- destination is a Cat Warrior (Jedit Ojanen), which is neither of the two words
+-- in play, so it can never be its own chosen source and the candidate set stays a
+-- singleton under both readings -- CR 609.7a's choice is then made without a
+-- prompt, and nothing here rests on an answerer.
+turnTheBladeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+turnTheBladeSpec s registry = Spec.describe s "Synthetic Turn the Blade (CR 612.1)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      strike src recipient n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src recipient n])
+  Spec.it s "CR 612.1 the swap reaches the word the redirection's CHOSEN SOURCE names" $ do
+    (bobHuman, bobGoblin, cat, evolved) <- turnTheBladeBoard s registry True
+    (printedHuman, printedGoblin, printedCat, printed) <- turnTheBladeBoard s registry False
+    -- THE gameplay assertion: after the swap the redirection watches the Goblin,
+    -- so the Goblin's 4 is what turns aside onto alice's Cat. An engine that
+    -- dropped the filter would have chosen the Human under CR 609.7a and left the
+    -- Cat untouched here.
+    Spec.assertEqWith s "after the swap the Goblin's 4 is redirected onto alice's Cat" (S.damageOf cat (strike bobGoblin (Recipient.ToPlayer S.alice) 4 evolved)) (Just 4)
+    Spec.assertEqWith s "so alice loses none of that 4" (S.lifeOf S.alice (strike bobGoblin (Recipient.ToPlayer S.alice) 4 evolved)) (Just 20)
+    -- Its twin on the same board, differing in the SOURCE alone: the Human the
+    -- card printed is no longer the chosen source, so its 3 reaches alice.
+    Spec.assertEqWith s "and the Human's 3 lands on alice instead" (S.lifeOf S.alice (strike bobHuman (Recipient.ToPlayer S.alice) 3 evolved)) (Just 17)
+    Spec.assertEqWith s "with her Cat taking none of it" (S.damageOf cat (strike bobHuman (Recipient.ToPlayer S.alice) 3 evolved)) (Just 0)
+    -- The control leg, the same board without the Evolution: the pair differs in
+    -- exactly whether the text was changed, so neither reading is "no redirection
+    -- was installed at all".
+    Spec.assertEqWith s "unevolved, the Human's 3 is redirected onto alice's Cat" (S.damageOf printedCat (strike printedHuman (Recipient.ToPlayer S.alice) 3 printed)) (Just 3)
+    Spec.assertEqWith s "unevolved, alice loses none of that 3" (S.lifeOf S.alice (strike printedHuman (Recipient.ToPlayer S.alice) 3 printed)) (Just 20)
+    Spec.assertEqWith s "unevolved, the Goblin's 4 lands on alice" (S.lifeOf S.alice (strike printedGoblin (Recipient.ToPlayer S.alice) 4 printed)) (Just 16)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "setup: the Blade installed exactly one redirection" (length (GameState.replacements evolved)) 1
+
+-- alice holds the Blade and an Artificial Evolution and controls the Cat the
+-- redirect names; bob controls the Human (Prodigal Sorcerer) and the Goblin
+-- (Goblin Piker) whose damage the two readings tell apart. She casts the Blade at
+-- her Cat, and when `evolve` casts the Evolution at that SPELL while it is still
+-- on the stack, swapping Human for Goblin, before letting the Blade resolve. The
+-- two boards differ in exactly that cast. Returns bob's Human, bob's Goblin,
+-- alice's Cat and the board with the redirection installed.
+--
+-- THREE Plains and TWO Islands for a {1}{W} and a {U}, wardingChantBoard's
+-- reason: the Blade is cast first and spends at most two lands, so an Island
+-- survives however the payment picks.
+turnTheBladeBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+turnTheBladeBoard s registry evolve = do
+  plains <- S.printingOf s registry "Plains"
+  island <- S.printingOf s registry "Island"
+  blade <- S.printingOf s registry "Synthetic Turn the Blade"
+  evolution <- S.printingOf s registry "Artificial Evolution"
+  sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+  piker <- S.printingOf s registry "Goblin Piker"
+  jedit <- S.printingOf s registry "Jedit Ojanen"
+  let base = S.landsFor island S.alice 2 (S.landsInPlay plains 3)
+      (bobHuman, g1) = S.addCreature sorcerer S.bob base
+      (bobGoblin, g2) = S.addCreature piker S.bob g1
+      (cat, g3) = S.addCreature jedit S.alice g2
+      (bladeId, g4) = S.addHandCard blade S.alice g3
+      (evolutionId, g5) = S.addHandCard evolution S.alice g4
+      ready =
+        g5
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      onStack = S.runPure S.identityAnswer ready (S.cast S.alice bladeId)
+      evolved = case GameState.stack onStack of
+        spellId : _ -> S.runPure (evolvingHumanAt spellId) onStack (S.cast S.alice evolutionId Monad.>> Stack.resolveTop)
+        [] -> onStack
+      installed = S.runPure S.identityAnswer (if evolve then evolved else onStack) Stack.resolveTop
+  pure (bobHuman, bobGoblin, cat, installed)
+
 -- CR 615.5's ADDITIONAL EFFECT, whose producer is Test of Faith ({1}{W} Instant:
 -- "Prevent the next 3 damage that would be dealt to target creature this turn.
 -- For each 1 damage prevented this way, put a +1/+1 counter on that creature").
@@ -6259,6 +6359,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   auriokReplicaSpec s registry
   scarecrowSpec s registry
   wardingChantSpec s registry
+  turnTheBladeSpec s registry
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
   worshipSpec s registry

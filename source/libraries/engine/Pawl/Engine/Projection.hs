@@ -31,6 +31,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackTarget as AttackTarget
@@ -152,6 +153,7 @@ import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
@@ -2282,7 +2284,30 @@ rewriteEffect pairs effect = case effect of
     Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage (rewriteDuration pairs duration) kind (fmap (rewriteObjectRef pairs) ref) (fmap (Filter.rewrite pairs) whatRecipient) whoRecipient (fmap (Filter.rewrite pairs) chosenSource) (rewriteQuantity pairs quantity) (fmap (rewriteEffect pairs) rider))
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref direction chosenSource whatSource rider) ->
     Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage (rewriteDuration pairs duration) kind (rewriteObjectRef pairs ref) direction (fmap (Filter.rewrite pairs) chosenSource) (Filter.rewrite pairs whatSource) (fmap (rewriteEffect pairs) rider))
-  Effect.RedirectDamage {} -> effect
+  -- CR 612.1 through every half of the redirection that holds printed words: the
+  -- two ends of the rewrite, the predicate describing CR 609.7a's chosen source,
+  -- and the duration. `kind` is not a word a subtype swap can find -- it is a
+  -- damage kind (CR 120.1a).
+  --
+  -- Written as a RECORD UPDATE, Effect.Replace's shape above: a sixth
+  -- word-bearing field is then dropped visibly rather than absorbed by a
+  -- positional pattern, which is how this arm came to skip chosenSource in the
+  -- first place.
+  --
+  -- Only chosenSource is PROVEN, by Pawl.ReplacementSpec's "Synthetic Turn the
+  -- Blade (CR 612.1)" group. The two refs and the duration are REGRESSION
+  -- FENCES, the neighbouring shields' shape: both redirects in data/cards/
+  -- (Oracle's Attendants, Turn the Tables) write an InSlot at each end, on which
+  -- rewriteObjectRef is the identity, and UntilEndOfTurn, on which
+  -- rewriteDuration is, so mutating either line reddens nothing.
+  Effect.RedirectDamage r ->
+    Effect.RedirectDamage
+      r
+        { RedirectDamage.duration = rewriteDuration pairs (RedirectDamage.duration r),
+          RedirectDamage.from = rewriteObjectRef pairs (RedirectDamage.from r),
+          RedirectDamage.to = rewriteObjectRef pairs (RedirectDamage.to r),
+          RedirectDamage.chosenSource = fmap (Filter.rewrite pairs) (RedirectDamage.chosenSource r)
+        }
   Effect.Counter (Counter.MkCounter ref mSlot) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot)
   -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
   -- printed keyword through the swap, where Filter's HasCounters arm rewrites
@@ -2331,7 +2356,16 @@ rewriteEffect pairs effect = case effect of
   Effect.EndTurn -> effect
   Effect.EndCombatPhase -> effect
   Effect.GainControl (DurationRef.MkDurationRef duration ref) -> Effect.GainControl (DurationRef.MkDurationRef (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
-  Effect.ArmDelayedTrigger {} -> effect
+  -- CR 612.1 through the only half that holds printed words: CR 603.7b's stated
+  -- duration, whose "for as long as" clause is text like any other. The
+  -- AbilityName is the arming effect's own pointer at a delayed ability and CR
+  -- 603.7a's Onset is a moment, so neither is a word rule 612 can swap.
+  --
+  -- A REGRESSION FENCE rather than a proven behaviour: every ArmDelayedTrigger in
+  -- data/cards/ writes either no duration or UntilEndOfTurn, on both of which
+  -- rewriteDuration is the identity, so mutating this line reddens nothing.
+  Effect.ArmDelayedTrigger a ->
+    Effect.ArmDelayedTrigger a {ArmDelayedTrigger.duration = fmap (rewriteDuration pairs) (ArmDelayedTrigger.duration a)}
   -- CR 612.1 through BOTH halves that hold printed text, the same descent every
   -- neighbouring arm here makes. The duration's "for as long as" clause is
   -- printed text, so a Magical Hack on the spell while it is on the stack changes
