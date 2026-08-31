@@ -134,6 +134,7 @@ encode p answer = case p of
   Prompt.ChoosePermanent {} -> Response.ChosePermanent answer
   Prompt.ChooseTapsForTotalPower {} -> Response.ChoseTaps answer
   Prompt.ChooseTaps {} -> Response.ChoseTaps answer
+  Prompt.ChooseReturns {} -> Response.ChoseReturns answer
   Prompt.ChooseAttachment {} -> Response.ChoseAttachment answer
   Prompt.ChooseTurnUpAttachment {} -> Response.ChoseTurnUpAttachment answer
   Prompt.ChooseCost {} -> Response.ChoseCost answer
@@ -414,6 +415,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseTaps {} -> case response of
     Response.ChoseTaps ids -> Just ids
+    _ -> Nothing
+  Prompt.ChooseReturns {} -> case response of
+    Response.ChoseReturns ids -> Just ids
     _ -> Nothing
   Prompt.ChooseAttachment {} -> case response of
     Response.ChoseAttachment oid -> Just oid
@@ -817,6 +821,9 @@ defaultAnswer p = case p of
   -- here, so the maximal subset the arm above takes would be rejected outright
   -- wherever there are more candidates than the cost wants.
   Prompt.ChooseTaps _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
+  -- The first `count` candidates, the arm above\'s fallback over a return to
+  -- hand: the count is exact here too.
+  Prompt.ChooseReturns _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   -- CR 701.3a: every candidate is a destination the card's own text offered.
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
   -- CR 303.4k: declining, the ChooseRiot posture -- the "may" is a real fork, so

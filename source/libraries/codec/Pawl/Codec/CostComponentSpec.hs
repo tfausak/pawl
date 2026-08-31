@@ -12,6 +12,7 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
@@ -85,6 +86,14 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 (Filter.HasCardType CardType.Creature)))
       " {\"type\":\"TapPermanents\",\"value\":{\"count\":1,\"whichPermanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  -- TapPermanents' payload shape spelled over a return to hand -- Meloku the
+  -- Clouded Mirror's one land.
+  Spec.it s "ReturnPermanents" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents 1 (Filter.HasCardType CardType.Land)))
+      " {\"type\":\"ReturnPermanents\",\"value\":{\"count\":1,\"whichPermanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}} "
   Spec.it s "DiscardCards" $
     Common.assertCodec
       s

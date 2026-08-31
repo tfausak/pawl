@@ -312,6 +312,7 @@ import qualified Pawl.Codec.RequireAttackSpec
 import qualified Pawl.Codec.RequireBlockSpec
 import qualified Pawl.Codec.RestartSignalSpec
 import qualified Pawl.Codec.ResultSpec
+import qualified Pawl.Codec.ReturnPermanentsSpec
 import qualified Pawl.Codec.ReturnWatchSpec
 import qualified Pawl.Codec.RevealCauseSpec
 import qualified Pawl.Codec.RevealSpec
@@ -872,6 +873,7 @@ spec s registry = do
   Pawl.Codec.RoundingSpec.spec s
   Pawl.Codec.SacrificeAnyNumberSpec.spec s
   Pawl.Codec.SacrificeRestrictionSpec.spec s
+  Pawl.Codec.ReturnPermanentsSpec.spec s
   Pawl.Codec.SacrificeSpec.spec s
   Pawl.Codec.ScalingSpec.spec s
   Pawl.Codec.ScopeSpec.spec s
