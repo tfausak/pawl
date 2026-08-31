@@ -216,8 +216,9 @@ data Modification ability
     -- An ADD, so the object keeps its other families (a Vehicle stays a Vehicle)
     -- and its own creature types. That is CR 702.73a's changeling stated as an
     -- ordinary timestamped effect -- which is exactly what the keyword becomes
-    -- when another object GRANTS it (CR 604.3a denies the granted instance CDA
-    -- status), so Pawl.Engine.Projection.grantedDefiningParts mints this arm.
+    -- when anything GRANTS it, a static ability or a resolution alike (CR 604.3a
+    -- denies the granted instance CDA status), so
+    -- Pawl.Engine.Projection.grantedDefiningParts mints this arm.
     AddEveryCreatureSubtype
   | -- | layer 4, CR 613.1d / CR 205.1b add, over the subtype families the two
     -- family-tagged adds above cannot reach: CR 205.3g's artifact types (Ygra,
