@@ -353,8 +353,12 @@ graveyardScopeSlots scope = case scope of
 -- 115.10a needs the word "target" against them, and a graveyard scope says it
 -- against the PLAYER -- so what CR 608.2b judges is still the card's own target
 -- slot, holding that player, and not this read.
+--
+-- The PlayerRefs the four per-player arms hold are taken from
+-- objectRefPlayerRefs below rather than arm by arm, so no arm of the case names
+-- one.
 objectRefSlots :: ObjectRef -> Map.Map SlotName SlotArity
-objectRefSlots ref = case ref of
+objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRefs ref))) $ case ref of
   ObjectRef.InSlot slot -> Map.singleton slot SlotArity.Many
   ObjectRef.EachMatching _ -> Map.empty
   -- The sweeping arms that DO name a slot are this one and EachCardInHand below:
@@ -379,16 +383,16 @@ objectRefSlots ref = case ref of
   ObjectRef.EachOpponent -> Map.empty
   -- The seat comes from the source's own entry choice (CR 614.12a), not a slot.
   ObjectRef.ChosenPlayer -> Map.empty
-  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player count) -> joinTwo (playerRefSlots player) (quantitySlots count)
-  -- The arm above's two reads, and no more: the seat and the count. What a
-  -- MATCH is is a Filter, and no arm here reports the slots a Filter reads --
-  -- EachMatching's and the two chosen arms' each answer for their PLAYER side
-  -- alone, for the reason the header states.
-  ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil player _ count) -> joinTwo (playerRefSlots player) (quantitySlots count)
+  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary _ count) -> quantitySlots count
+  -- The arm above's count, and no more: the SEAT is objectRefPlayerRefs' half.
+  -- What a MATCH is is a Filter, and no arm here reports the slots a Filter
+  -- reads, for the reason the header states.
+  ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil _ _ count) -> quantitySlots count
   -- CR 109.5: whose graveyards names no slot; who CHOOSES may.
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser _ _) -> chooserSlots chooser
-  -- CR 402.3: the choosers own the hands, so the PlayerRef is the whole read.
-  ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> playerRefSlots player
+  -- CR 402.3: the choosers own the hands, so the PlayerRef is the whole read --
+  -- reported by objectRefPlayerRefs rather than here.
+  ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand _ _) -> Map.empty
   -- The first of the two arms whose CANDIDATES come from a slot -- the plural is
   -- below -- where the two chosen arms above name a slot only through their
   -- chooser. Reported for EachCardInGraveyard's
@@ -400,8 +404,9 @@ objectRefSlots ref = case ref of
   -- The arm above's read, for its reasons: the candidates come from a slot, and
   -- the ref reads every member of the group to match them.
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong slot _) -> Map.singleton slot SlotArity.Many
-  -- The seats whose hands randomness reads: the arm above's read.
-  ObjectRef.RandomCardInHand player -> playerRefSlots player
+  -- The seats whose hands randomness reads are ChosenCardInHand's, and reported
+  -- where that arm's are.
+  ObjectRef.RandomCardInHand _ -> Map.empty
   -- EachMatching's answer: the candidates come off the battlefield, so no slot
   -- names them and the chooser is CR 608.2c's resolving controller.
   ObjectRef.AnyNumberMatching _ -> Map.empty
@@ -439,6 +444,35 @@ objectRefQuantities ref = case ref of
   ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _) -> []
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
   ObjectRef.RandomCardInHand _ -> []
+  ObjectRef.AnyNumberMatching _ -> []
+  ObjectRef.ChosenPermanent _ -> []
+
+-- Every PlayerRef nested in one ObjectRef -- effectPlayerRefs' other half, and
+-- the seat a per-player walk counts against. objectRefSlots takes its player
+-- reads from here, so a reference dropped here stops being reported there.
+--
+-- No wildcard, objectRefQuantities' discipline above.
+objectRefPlayerRefs :: ObjectRef -> [PlayerRef]
+objectRefPlayerRefs ref = case ref of
+  ObjectRef.InSlot _ -> []
+  ObjectRef.EachMatching _ -> []
+  ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard _ _) -> []
+  ObjectRef.EachCardInYourHand -> []
+  ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand _ _) -> []
+  ObjectRef.EachCardInYourLibrary -> []
+  ObjectRef.EachCardExiledWithSource _ -> []
+  ObjectRef.EachSpell _ -> []
+  ObjectRef.EachOnStack _ -> []
+  ObjectRef.EachPlayer -> []
+  ObjectRef.EachOpponent -> []
+  ObjectRef.ChosenPlayer -> []
+  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player _) -> [player]
+  ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil player _ _) -> [player]
+  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ _) -> []
+  ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> [player]
+  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _) -> []
+  ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
+  ObjectRef.RandomCardInHand player -> [player]
   ObjectRef.AnyNumberMatching _ -> []
   ObjectRef.ChosenPermanent _ -> []
 
@@ -583,6 +617,135 @@ effectObjectRefs effect = case effect of
   -- CR 608.2f's set, swept once; the body's own refs are the caller's recursion.
   Effect.ForEach (ForEach.MkForEach ref _ _) -> [ref]
 
+-- Every PlayerRef this ONE effect holds in a field of its own: not the ones
+-- nested in an ObjectRef it carries (objectRefPlayerRefs), not the ones nested
+-- in a Quantity (Pawl.Engine.Quantity's readers), and not a nested effect's,
+-- which are its own answer here.
+--
+-- The single enumeration of where a PlayerRef sits in an opcode, and
+-- effectObjectRefs' twin one type over. Its readers -- slotsOf here, and
+-- Pawl.CardSpec's plural-slot lint -- call this rather than naming the opcodes
+-- themselves, so they cannot come to disagree about which opcodes hold one. The
+-- test a reader can apply: no arm of either names a PlayerRef field.
+--
+-- No wildcard, and the arms that hold a reference destructure positionally: a
+-- new opcode the compiler forces, and so does a new FIELD on a payload that
+-- already holds one. What neither the compiler nor this shape catches is an
+-- existing field WIDENED to a PlayerRef; slotsOf's corpus lints pay for that,
+-- since a reference dropped here stops being reported there, and so does
+-- Pawl.CardSpec's planted playerRefPositions.
+effectPlayerRefs :: Effect card ability -> [PlayerRef]
+effectPlayerRefs effect = case effect of
+  Effect.DealDamage {} -> []
+  Effect.Fight {} -> []
+  Effect.ModifyTarget {} -> []
+  Effect.ChangeText {} -> []
+  Effect.AddMana (ManaAddition.MkManaAddition ref _ _ _ _) -> [ref]
+  Effect.Search (Search.MkSearch searcher owner _ _ _ _ _) -> [searcher, owner]
+  Effect.ExileAllGraveyards -> []
+  Effect.RestartGame {} -> []
+  Effect.ControlPlayerNextTurn {} -> []
+  Effect.Destroy {} -> []
+  Effect.Sacrifice {} -> []
+  Effect.Attach {} -> []
+  Effect.AttachTarget {} -> []
+  Effect.AttachTargetToEach {} -> []
+  Effect.AttachBound {} -> []
+  Effect.MoveToZone {} -> []
+  Effect.Draw (Draw.MkDraw ref _ _) -> [ref]
+  Effect.Mill (Mill.MkMill ref _ _ _) -> [ref]
+  Effect.Reveal {} -> []
+  Effect.FromOutsideTheGame {} -> []
+  Effect.ExileThisSpell -> []
+  Effect.LookAt {} -> []
+  Effect.Scry (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
+  Effect.Surveil (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
+  Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
+  Effect.Explore {} -> []
+  Effect.Discard {} -> []
+  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
+  Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
+  Effect.ExchangeLifeTotals {} -> []
+  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
+  Effect.RedistributeLifeTotals -> []
+  Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
+  Effect.DecreaseSpeed (SpeedDecrease.MkSpeedDecrease ref _ _) -> [ref]
+  Effect.Create (Create.MkCreate _ _ _ _ creator) -> [creator]
+  Effect.Conjure {} -> []
+  Effect.CreateCopy {} -> []
+  Effect.BecomeCopy {} -> []
+  Effect.CopySpell {} -> []
+  Effect.Replace {} -> []
+  Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase ref _) -> [ref]
+  Effect.PreventNextDamage {} -> []
+  Effect.PreventAllDamage {} -> []
+  Effect.RedirectDamage {} -> []
+  Effect.Counter {} -> []
+  Effect.PutCounters {} -> []
+  Effect.RemoveCounters {} -> []
+  Effect.MoveCounters {} -> []
+  Effect.PutCountersFrom {} -> []
+  Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref _ _) -> [ref]
+  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref _ _) -> [ref]
+  Effect.PayAnyEnergy {} -> []
+  Effect.Tap {} -> []
+  Effect.Untap {} -> []
+  Effect.Detain {} -> []
+  Effect.Goad {} -> []
+  Effect.DoesNotUntapNext {} -> []
+  Effect.Transform {} -> []
+  Effect.Convert {} -> []
+  Effect.Meld {} -> []
+  Effect.PhaseOut {} -> []
+  Effect.TurnFaceDown {} -> []
+  Effect.TurnFaceUp {} -> []
+  Effect.RemoveFromCombat {} -> []
+  Effect.BecomesBlocked {} -> []
+  Effect.AddPhases {} -> []
+  Effect.EndTurn -> []
+  Effect.EndCombatPhase -> []
+  Effect.GainControl {} -> []
+  Effect.ArmDelayedTrigger {} -> []
+  Effect.AffectPlayers {} -> []
+  Effect.RequireBlock {} -> []
+  Effect.CantBeRegenerated {} -> []
+  Effect.RequireAttack (RequireAttack.MkRequireAttack _ _ defender) -> [defender]
+  Effect.ForbidBlock {} -> []
+  Effect.ForbidAttack {} -> []
+  Effect.CreateEmblem {} -> []
+  Effect.BecomeMonarch {} -> []
+  Effect.Designate {} -> []
+  Effect.SetClassLevel {} -> []
+  Effect.Unsuspect {} -> []
+  Effect.SetHalfLocked {} -> []
+  Effect.Evolve {} -> []
+  Effect.Mentor {} -> []
+  Effect.Train {} -> []
+  Effect.ItBecomes {} -> []
+  Effect.ExileUntilMonarch {} -> []
+  Effect.ExileHaunting {} -> []
+  Effect.PlaySubgame {} -> []
+  Effect.ChooseOpponent {} -> []
+  Effect.ChooseOpponentAtRandom {} -> []
+  Effect.RollDie {} -> []
+  Effect.FlipCoin {} -> []
+  Effect.ExileHandThenDraw -> []
+  Effect.Proliferate -> []
+  Effect.ChooseCardName {} -> []
+  Effect.Bolster {} -> []
+  Effect.Amass {} -> []
+  Effect.Blight (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
+  Effect.TemptWithTheRing -> []
+  Effect.Venture {} -> []
+  Effect.PlayerSacrifices {} -> []
+  Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref _) -> [ref]
+  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> Maybe.maybeToList named
+  Effect.Shuffle ref -> [ref]
+  Effect.OfferCast (OfferCast.MkOfferCast _ caster _ _) -> [caster]
+  Effect.GrantPlayFromExile {} -> []
+  Effect.MakePlotted {} -> []
+  Effect.ForEach {} -> []
+
 -- The slots a MonarchTarget reads: only the targeted arm names one.
 monarchTargetSlots :: MonarchTarget.MonarchTarget -> Map.Map SlotName SlotArity
 monarchTargetSlots target = case target of
@@ -600,8 +763,12 @@ exchangeSidesSlots sides = case sides of
 -- The one legitimate home of `case effect of`: this module is the VM's opcode
 -- semantics (design.md section 1). slotsOf is the read half of the dataflow lint;
 -- X is not one of its reads, readsX below being X's own half.
+--
+-- The ObjectRefs and the PlayerRefs this effect holds are taken from
+-- effectObjectRefs and effectPlayerRefs at the head rather than arm by arm, so
+-- no arm of the case names either.
 slotsOf :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Map.Map SlotName SlotArity
-slotsOf effect = joinTwo (joinSlots (fmap objectRefSlots (effectObjectRefs effect))) $ case effect of
+slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectRefs effect))) (joinSlots (fmap playerRefSlots (effectPlayerRefs effect)))) $ case effect of
   -- The dealer is a read like any other (CR 120.2b), and one object (CR 120.1).
   Effect.DealDamage (DealDamage.MkDealDamage parts dealer _) ->
     joinTwo
@@ -615,10 +782,10 @@ slotsOf effect = joinTwo (joinSlots (fmap objectRefSlots (effectObjectRefs effec
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) ->
     joinTwo (joinSlots (fmap quantitySlots (Projection.quantitiesOf modification))) (durationSlots duration)
   Effect.ChangeText (ChangeText.MkChangeText _ _ slot) -> oneSlot slot
-  Effect.AddMana (ManaAddition.MkManaAddition ref _ _ _ _) -> playerRefSlots ref
-  -- BOTH refs: a slot read only by the owner ref would otherwise look dangling.
-  Effect.Search (Search.MkSearch searcher owner _ quantity _ _ _) ->
-    joinSlots (playerRefSlots searcher : playerRefSlots owner : fmap quantitySlots (Maybe.maybeToList quantity))
+  Effect.AddMana {} -> Map.empty
+  -- The COUNT alone: both references are effectPlayerRefs' half.
+  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) ->
+    joinSlots (fmap quantitySlots (Maybe.maybeToList quantity))
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
   -- CR 201.4's name is not an object, so the choice binds no slot and the
@@ -631,7 +798,7 @@ slotsOf effect = joinTwo (joinSlots (fmap objectRefSlots (effectObjectRefs effec
   Effect.ExileThisSpell -> Map.empty
   Effect.Bolster quantity -> quantitySlots quantity
   Effect.Amass (Amass.Type.MkAmass quantity _) -> quantitySlots quantity
-  Effect.Blight (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.TemptWithTheRing -> Map.empty
   Effect.Venture {} -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
@@ -650,17 +817,17 @@ slotsOf effect = joinTwo (joinSlots (fmap objectRefSlots (effectObjectRefs effec
   Effect.BecomesBlocked slot -> oneSlot slot
   Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> joinTwo (joinSlots (fmap quantitySlots (riderQuantities riders))) (riderSlots riders)
   -- CR 121.1's bound slot is a DEFINITION, not a read: see boundSlots below.
-  Effect.Draw (Draw.MkDraw ref quantity _) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.Draw (Draw.MkDraw _ quantity _) -> quantitySlots quantity
   -- The tally's slot and CR 701.17c's are DEFINITIONS, not reads: see boundSlots
   -- below.
-  Effect.Mill (Mill.MkMill ref quantity _ _) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.Mill (Mill.MkMill _ quantity _ _) -> quantitySlots quantity
   -- The bound slot is a DEFINITION, not a read.
   Effect.Reveal {} -> Map.empty
   -- The bound slot is a DEFINITION, not a read.
   Effect.LookAt {} -> Map.empty
-  Effect.Scry (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
-  Effect.Surveil (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
-  Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
+  Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
+  Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.Explore _ -> Map.empty
   Effect.Discard subject -> case subject of
     -- The bound slot is a DEFINITION, not a read, so it is not joined in here.
@@ -669,18 +836,19 @@ slotsOf effect = joinTwo (joinSlots (fmap objectRefSlots (effectObjectRefs effec
     -- every player the slot names.
     Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity _) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots quantity)
     Discard.These {} -> Map.empty
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
-  Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
+  Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.ExchangeLifeTotals sides -> exchangeSidesSlots sides
-  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.RedistributeLifeTotals -> Map.empty
-  Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
-  Effect.DecreaseSpeed d -> joinTwo (playerRefSlots (SpeedDecrease.player d)) (quantitySlots (SpeedDecrease.quantity d))
+  Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
+  Effect.DecreaseSpeed d -> quantitySlots (SpeedDecrease.quantity d)
   -- Create's slot is a DEFINITION, not a read, so the lint must not see it here.
-  -- CR 111.2's creator is a READ: Rampage of the Clans names the controller of
-  -- the permanent the loop around it bound. So is CR 509.4's blocking rider,
-  -- which names the attacker the token enters blocking (Flash Foliage's target).
-  Effect.Create (Create.MkCreate quantity _ riders _ creator) -> joinSlots [quantitySlots quantity, playerRefSlots creator, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
+  -- CR 111.2's creator is a READ -- Rampage of the Clans names the controller of
+  -- the permanent the loop around it bound -- reported at the head with every
+  -- other PlayerRef. So is CR 509.4's blocking rider, which names the attacker
+  -- the token enters blocking (Flash Foliage's target), and that one is here.
+  Effect.Create (Create.MkCreate quantity _ riders _ _) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
   -- The COUNT only: the conjured card is literal card data, its destination is
   -- a constructor, and the conjurer is the resolving controller.
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> quantitySlots quantity
@@ -693,7 +861,7 @@ slotsOf effect = joinTwo (joinSlots (fmap objectRefSlots (effectObjectRefs effec
   -- spell"), which is what the row's captured environment answers at CR 616.1.
   Effect.Replace (Replace.MkReplace duration _ _ condition re) ->
     joinSlots [durationSlots duration, joinSlots (fmap conditionSlots (Maybe.maybeToList condition)), replacementPatternSlots re]
-  Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase ref _) -> playerRefSlots ref
+  Effect.SkipNextPhase {} -> Map.empty
   -- CR 615.5's rider reads slots of its own, so its reads join this effect's,
   -- LESS the reserved amount slot: the prevention binds that one itself
   -- (Event.eventBindingSlots), and Resolve.runPreventionRider is the writer.
@@ -730,8 +898,8 @@ slotsOf effect = joinTwo (joinSlots (fmap objectRefSlots (effectObjectRefs effec
   -- named by both halves -- keeps the arity that says "up to two target
   -- creatures" cannot fill it.
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ to) -> insertOne to (foldMap quantitySlots (MovedKinds.quantityOf kinds))
-  Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
-  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantitySlots quantity
+  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantitySlots quantity
   -- The SlotName is a DEFINITION, not a read; it belongs to boundSlots below.
   Effect.PayAnyEnergy _ -> Map.empty
   Effect.Tap _ -> Map.empty
@@ -755,8 +923,9 @@ slotsOf effect = joinTwo (joinSlots (fmap objectRefSlots (effectObjectRefs effec
   Effect.CantBeRegenerated {} -> Map.empty
   Effect.ForbidBlock {} -> Map.empty
   Effect.ForbidAttack {} -> Map.empty
-  -- The defender is a PlayerRef, CR 508.1b's other side; the attacker is a ref.
-  Effect.RequireAttack (RequireAttack.MkRequireAttack _ _ defender) -> playerRefSlots defender
+  -- CR 508.1b's two sides are a PlayerRef and an ObjectRef, both reported at the
+  -- head, so this arm has nothing of its own.
+  Effect.RequireAttack {} -> Map.empty
   Effect.CreateEmblem {} -> Map.empty
   -- CR 725.1's crown names a target slot only in the InSlot arm.
   Effect.BecomeMonarch target -> monarchTargetSlots target
@@ -797,13 +966,14 @@ slotsOf effect = joinTwo (joinSlots (fmap objectRefSlots (effectObjectRefs effec
   Effect.RollDie rollDie -> maybe Map.empty quantitySlots (RollDie.modifier rollDie)
   -- And a DEFINITION too: CR 705.1's coin has no payload but the slot it writes.
   Effect.FlipCoin {} -> Map.empty
-  Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref _) -> playerRefSlots ref
-  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> maybe Map.empty playerRefSlots named
-  -- The arm above's library read; nothing is shuffled into it, so there is no
-  -- ref beside it.
-  Effect.Shuffle ref -> playerRefSlots ref
-  -- BOTH are reads: the slot is bound by an earlier effect of the list (CR 400.7).
-  Effect.OfferCast (OfferCast.MkOfferCast slot caster _ _) -> joinTwo (oneSlot slot) (playerRefSlots caster)
+  Effect.TakeExtraTurn {} -> Map.empty
+  Effect.ShuffleIntoLibrary {} -> Map.empty
+  -- The arm above's library read, reported at the head; nothing is shuffled into
+  -- it, so there is no ref beside it either.
+  Effect.Shuffle {} -> Map.empty
+  -- The SLOT alone: the caster is a PlayerRef and is reported at the head. This
+  -- one is a read, bound by an earlier effect of the list (CR 400.7).
+  Effect.OfferCast (OfferCast.MkOfferCast slot _ _ _) -> oneSlot slot
   Effect.GrantPlayFromExile grant -> durationSlots (GrantPlayFromExile.duration grant)
   -- Everything the BODY reads. The loop's own slot is NOT subtracted as the
   -- rider's reserved slot is: boundSlots below defines it.
