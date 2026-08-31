@@ -94,11 +94,15 @@ data View = MkView
     -- ever rewrites: CR 613.1b's layer 2 changes CONTROL, and rule 108.3 has no
     -- counterpart, so no projection is consulted.
     --
-    -- Just in strictly MORE places than `controller` above, and deliberately: an
-    -- owner is a fact about a card IN THE GAME, so it is answerable in every
-    -- zone, where CR 108.4 gives a card outside the battlefield and the stack no
-    -- controller at all. That is manaValue's posture rather than power's, for
-    -- manaValue's reason.
+    -- Just wherever `controller` above is, and in more besides, on an OBJECT
+    -- view, and deliberately: an owner is a fact about a card IN THE GAME, so it
+    -- is answerable in every zone, where CR 108.4 gives a card outside the
+    -- battlefield and the stack no controller at all. That is manaValue's
+    -- posture rather than power's, for manaValue's reason.
+    --
+    -- Not strictly more across every view: the event-snapshot view below is the
+    -- one where the order reverses, Count.viewOfSnapshot filling `controller`
+    -- off CR 608.2h's record and leaving this Nothing, see #1069.
     --
     -- Nothing only where there is no OBJECT to read it off: a player view, an
     -- event snapshot, or a printed card being matched by a search, which CR
