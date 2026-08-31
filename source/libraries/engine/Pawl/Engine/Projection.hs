@@ -2296,10 +2296,12 @@ rewriteEffect pairs effect = case effect of
   --
   -- Only chosenSource is PROVEN, by Pawl.ReplacementSpec's "Synthetic Turn the
   -- Blade (CR 612.1)" group. The two refs and the duration are REGRESSION
-  -- FENCES, the neighbouring shields' shape: both redirects in data/cards/
-  -- (Oracle's Attendants, Turn the Tables) write an InSlot at each end, on which
-  -- rewriteObjectRef is the identity, and UntilEndOfTurn, on which
-  -- rewriteDuration is, so mutating either line reddens nothing.
+  -- FENCES, the neighbouring shields' shape: Turn the Tables writes an InSlot at
+  -- each end and Oracle's Attendants an InSlot and an `EachMatching IsSource`, on
+  -- all three of which rewriteObjectRef is the identity -- a slot name is not a
+  -- word, and IsSource holds none -- and both write UntilEndOfTurn, on which
+  -- rewriteDuration is the identity too. So mutating any of those three lines
+  -- reddens nothing.
   Effect.RedirectDamage r ->
     Effect.RedirectDamage
       r
