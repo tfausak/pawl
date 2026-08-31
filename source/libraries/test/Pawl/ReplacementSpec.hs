@@ -1390,16 +1390,18 @@ scarecrowSpec s registry = Spec.describe s "Scarecrow (CR 609.7b)" $ do
 -- instances of one creature type with another. The new creature type can't be
 -- Wall.").
 --
--- SYNTHETIC, and the gap is pawl's rather than the CR's: the printed shields
--- whose prevention clause names a creature type either restrict no recipient at
--- all -- Repel the Abominable's "by non-Human sources", Arachnogenesis' "by
--- non-Spider creatures", which this opcode's required ref cannot spell and which
--- pawl would write as Luminesce's CR 614 replacement instead -- or are static
--- abilities rather than a shield a resolution installs (Drogskol Reinforcements,
--- Rescue Retriever, Marble Priest). Scryfall o:prevent over every printing,
+-- SYNTHETIC because no printing reaches THESE TWO FIELDS, not because none pairs
+-- a text changer with a typed shield. Scryfall o:prevent over every printing,
 -- 2026-08-30, read for a creature type or a basic land type in the prevention
--- clause; the one near miss is Pack Leader's "to Dogs you control", whose live
--- CR 611.2c description wants a field PreventAllDamage does not carry.
+-- clause, sorts the hits three ways. The ones that restrict no recipient at all
+-- (Arachnogenesis, Galadhrim Ambush, Repel the Abominable, That's No Moonmist,
+-- Frontline Strategist) cannot spell this opcode's required ref and take
+-- Effect.Replace's DamageR instead, which is the shape data/cards/moonmist.json
+-- already writes; their own text change is #2746. The static abilities (Drogskol
+-- Reinforcements, Rescue Retriever, Marble Priest) install no shield at
+-- resolution. Pack Leader's "to Dogs you control" is the near miss: CR 611.2c
+-- makes that description live, and PreventAllDamage has no field to hold it
+-- (#2748).
 --
 -- BOTH filters on ONE card, because they sit on the two different opcodes: CR
 -- 615.1's unbounded shield describes its source in whatSource, and CR 615.7's
