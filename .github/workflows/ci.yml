@@ -26,13 +26,12 @@ jobs:
           nix develop .#ci --command cabal configure \
             --disable-executable-dynamic \
             --disable-shared \
-            --enable-tests \
             --flags=pedantic \
             --ghc-options='+RTS -A64m -RTS' \
             --jobs \
             --semaphore
       - run: nix develop .#ci --command cabal build all
-      - run: nix develop .#ci --command cabal test --test-options='--timeout 15s'
+      - run: nix develop .#ci --command cabal run pawl -- test --timeout=15s
   cabal:
     name: Cabal
     runs-on: ubuntu-latest
