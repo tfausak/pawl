@@ -49,11 +49,15 @@ caught it.
 While iterating, run only the subtree you are in --- add `-p Detain`, a tasty
 pattern over the `Spec.describe` group names --- and the whole suite before
 each commit and before the push; an engine change reaches specs you did not
-open. Redirect output to a file and read the file: piping `cabal test` stalls
-it for minutes and, backgrounded, leaves the output empty. One build at a time;
-no `cabal clean`; keep the optimizer on (`-O0` was measured: the cold build
-saves under a minute and the suite then blows its budget on cases that take
-0.02s at `-O1`).
+open. Redirect output to a file and read the file, and keep
+`--hide-successes`: piping `cabal test` stalls it for minutes and,
+backgrounded, leaves the output empty, and a passing run otherwise prints a
+line per test --- 9326 lines, ~186k tokens, more than a whole unit's budget
+--- where `--hide-successes` leaves 18. Build with `cabal build -v0`, which
+drops cabal's progress noise and still prints GHC's errors in full, `pedantic`
+having made the warnings errors. One build at a time; no `cabal clean`; keep
+the optimizer on (`-O0` was measured: the cold build saves under a minute and
+the suite then blows its budget on cases that take 0.02s at `-O1`).
 
 The timeout catches infinite loops; it is not an assertion about speed. A few
 cases run 1-2s unloaded and the machine is shared, so a lone TIMEOUT is
