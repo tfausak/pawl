@@ -2241,7 +2241,8 @@ rewriteEffect pairs effect = case effect of
   Effect.SkipNextPhase {} -> effect
   -- CR 612.1 through every half of the shield that holds printed words: the
   -- objects it covers, the predicates describing its recipients and its source,
-  -- the amount, the duration and the CR 615.5 rider. `kind`, `whoRecipient` and
+  -- the countdown's amount, the duration and the CR 615.5 rider. `kind`,
+  -- `whoRecipient` and
   -- `direction` are not words a subtype swap can find -- a damage kind, CR
   -- 109.5's player relation and which side of the event the ref sits on.
   --
