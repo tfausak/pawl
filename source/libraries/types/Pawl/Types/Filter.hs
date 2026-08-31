@@ -396,9 +396,9 @@ data Filter keyword
     -- would empty the slot and make the spell uncastable rather than unrestricted;
     -- the pass WIDENS and Pawl.Engine.Target.selectionLegal's joint check is what
     -- narrows, re-deriving the slot against the targets actually chosen under the
-    -- announcement's own seed, exactly as CR 608.2b will at resolution. Filter.boundUnannounced is the same call one
-    -- field over -- a bound nothing can supply yet states no bound rather than an
-    -- unmeetable one.
+    -- announcement's own seed, exactly as CR 608.2b will at resolution.
+    -- Filter.boundUnannounced is the same call one field over -- a bound nothing
+    -- can supply yet states no bound rather than an unmeetable one.
     --
     -- What keeps the atom out of the positions with no joint check behind them is
     -- Pawl.CardSpec's "CR 110.2 no card asks SameControllerAsBound outside a mode's

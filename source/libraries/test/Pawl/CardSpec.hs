@@ -9178,8 +9178,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "Stir the Grave's slot names its bound as well"
       (manaValueAtMostAmountCounts (S.combinedFace stir))
       (1, 0)
-    -- The pool's fifth author, and the only one whose slot is also JOINTLY JUDGED
-    -- (Pawl.Engine.Target.jointlyJudged): Synthetic Borrowed Exhumation reads the
+    -- The pool's fifth author, and the only one in `data/cards/` whose slot is
+    -- also JOINTLY JUDGED (Pawl.Engine.Target.jointlyJudged) -- a printing that
+    -- paired the two would refute it: Synthetic Borrowed Exhumation reads the
     -- same announced X off a pool scoped to what its sibling slot targets, so CR
     -- 601.2c's joint check re-derives the bound rather than merely offering it.
     exhumation <- S.printingOf s registry "Synthetic Borrowed Exhumation"
