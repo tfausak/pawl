@@ -1,6 +1,11 @@
 {
   "faces": [
     {
+      "keywords": [
+        {
+          "type": "Fuse"
+        }
+      ],
       "manaCost": [
         {
           "type": "Generic",
@@ -64,6 +69,11 @@
       }
     },
     {
+      "keywords": [
+        {
+          "type": "Fuse"
+        }
+      ],
       "manaCost": [
         {
           "type": "Generic",

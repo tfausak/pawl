@@ -766,6 +766,21 @@ data Keyword
     -- reader takes the per-keyword count rather than membership, CR 702.100d
     -- giving it the multiplicity CR 702.108b gives prowess.
     Evolve
+  | -- | 702.102a: fuse. A static ability of a split card in a player's HAND: a
+    -- player casting that card from there may choose to cast both halves as one
+    -- fused split spell rather than choose one half.
+    --
+    -- Nullary, because rule 702.102a takes no parameter, so no KeywordFamily is
+    -- owed. Read as MEMBERSHIP rather than by count, shadow's redundancy rather
+    -- than prowess's multiplicity: the permission is to cast both halves, and a
+    -- second instance offers nothing a first did not.
+    --
+    -- The value is only the permission. What the fused spell IS lives in
+    -- Pawl.Engine.Card.fusedFace -- rule 702.102b's combined characteristics
+    -- (CR 709.4d), rule 702.102c's combined cost and rule 702.102d's left-then-right
+    -- order -- and Pawl.Engine.Cast.castableSpells is what offers it, in the hand
+    -- alone, which is rule 702.102a's own zone.
+    Fuse
   | -- | 702.105a: whenever this creature attacks the player with the most life or
     -- tied for most life, put a +1/+1 counter on it. Rule 702 states it as a
     -- triggered ability, minted by Pawl.Engine.Keyword.dethrone like the triggered
