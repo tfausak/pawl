@@ -1,0 +1,21 @@
+name: Nightly
+on:
+  schedule:
+    - cron: 0 9 * * *
+  workflow_dispatch:
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: nixbuild/nix-quick-install-action@v35
+        with:
+          nix_conf: max-jobs = auto
+      - run: nix build --print-build-logs
+      - run: nix build --print-build-logs --out-link benchmark .#benchmark
+      - run: cp benchmark/bench.csv .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pawl-${{ github.sha }}-bench
+          path: bench.csv
