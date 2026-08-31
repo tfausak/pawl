@@ -9180,11 +9180,22 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "Stir the Grave's slot names its bound as well"
       (manaValueAtMostAmountCounts (S.combinedFace stir))
       (1, 0)
+    -- The pool's fifth author, and the only one in `data/cards/` whose slot is
+    -- also JOINTLY JUDGED (Pawl.Engine.Target.jointlyJudged) -- a printing that
+    -- paired the two would refute it: Synthetic Borrowed Exhumation reads the
+    -- same announced X off a pool scoped to what its sibling slot targets, so CR
+    -- 601.2c's joint check re-derives the bound rather than merely offering it.
+    exhumation <- S.printingOf s registry "Synthetic Borrowed Exhumation"
+    Spec.assertEqWith
+      s
+      "the Exhumation's slot names its bound as well"
+      (manaValueAtMostAmountCounts (S.combinedFace exhumation))
+      (1, 0)
     Spec.assertEqWith
       s
       "and they are the pool's only ones"
       (sum (fmap (uncurry (+) . manaValueAtMostAmountCounts . S.combinedFace) ps))
-      4
+      5
     -- The rejected side, which the sweep above cannot show while the pool has no
     -- offender: the SAME atom, buried under all three combinators, in a target
     -- slot that names no amount -- the position a card author would most plausibly

@@ -1879,6 +1879,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- And the SPELL's announcement: CR 601.2b's X, named one step before CR 601.2c
   -- chooses against it.
   stirTheGraveSpec s registry
+  -- And the same announcement read TWICE, by the offer and by CR 601.2c's joint
+  -- check: a slot whose bound reads that X and whose pool reads a sibling slot.
+  borrowedExhumationSpec s registry
 
 razorfinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 razorfinSpec s registry = Spec.describe s "HasCountersOfAnyKind (CR 122.1)" $ do
@@ -2273,4 +2276,92 @@ stirPlan :: Natural.Type.Natural -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 stirPlan x bait p = case p of
   Prompt.ChooseX {} -> x
   Prompt.ChooseTargets _ _ _ asked -> S.preferring (maybe False (`elem` bait) . Recipient.objectOf) asked
+  _ -> S.identityAnswer p
+
+-- Synthetic Borrowed Exhumation ({X}{B} Sorcery,
+-- data/cards/synthetic-borrowed-exhumation.json): "Return target creature card
+-- with mana value X or less from target player's graveyard to the battlefield."
+--
+-- SYNTHETIC, and the search that settled it: Scryfall, 2026-08-31, with a
+-- User-Agent -- o:"mana value X or less" (95 printings), o:"power X or less"
+-- (8), and o:/X or less/ minus those two (7), every one read. Every X-bounded
+-- target slot Magic has printed draws from a pool no other slot names and
+-- carries a filter naming none either, so no printing pairs the two halves. Stir
+-- the Grave above is the bound alone; Dwell on the Past is the sibling-slot pool
+-- alone. Nothing in CR 202.3 or 601.2c forbids one card printing both, which is
+-- what makes the synthetic legitimate rather than a shape the rules exclude.
+--
+-- Those two halves on ONE slot are the whole point: the card slot is jointly
+-- judged (Target.jointlyJudged, because its pool is CR 400.1's graveyard scoped
+-- to whatever the player slot names) AND its CR 202.3 computed bound reads CR
+-- 601.2b's announced X. The offer is computed against the seed carrying that X;
+-- the joint check re-derives the same slot, and it is handed the same seed. Given
+-- the chosen targets alone the bound reads no number, Filter.ManaValueAtMostAmount
+-- is vacuously False, the card the caster was OFFERED is not in the re-derived
+-- set, and CR 601.2e reverses a casting rule 601.2c allows; see #2676.
+--
+-- THREE SEATS for Dwell on the Past's reason: with alice and bob alone, "bob's
+-- graveyard" and "not the caster's graveyard" pick out the same cards.
+--
+-- The two runs differ in EXACTLY ONE thing: which graveyard the mana value 2
+-- creature card sits in. Both announce X = 2, both name bob in the player slot,
+-- both pay the same {2}{B} off the same three Swamps, off one board.
+borrowedExhumationSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+borrowedExhumationSpec s registry = Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ do
+  Spec.it s "CR 601.2c the joint check re-derives a jointly judged slot against the announced X" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    exhumation <- S.printingOf s registry "Synthetic Borrowed Exhumation"
+    let (hisId, g1) = S.addGraveyardCard piker S.bob (S.landsFor swamp S.alice 3 S.threePlayerGame)
+        (hisBigId, g2) = S.addGraveyardCard wolves S.bob g1
+        (hersId, g3) = S.addGraveyardCard evangel S.carol g2
+        (board, spellId) = S.handOne exhumation g3
+        slots = Modal.allTargetSlots (Face.spell (S.combinedFace exhumation))
+        -- The OFFER, taken through the same door Pawl.Engine.Cast.castProposed
+        -- takes it through and against the same seed: CR 601.2b's X and nothing
+        -- else. It is what the two runs below are judged against, and it is
+        -- insensitive to the joint check -- which is what lets the pair say the
+        -- offer and the re-check agree rather than merely that something was
+        -- rejected.
+        offered = Target.legalSets (Just S.alice) (Binding.fromChoices Map.empty (Just 2) mempty) S.noSource slots board
+        slotNamed name = Map.findWithDefault Set.empty (SlotName.MkSlotName (Text.pack name)) offered
+        run oid =
+          let cast = S.runPure (aimingExhumation 2 oid) board (S.cast S.alice spellId)
+           in (cast, S.runPure (aimingExhumation 2 oid) cast Stack.resolveTop)
+        (castAtBob, atBob) = run hisId
+        (castAtCarol, _) = run hersId
+    Spec.assertEqWith s "CR 601.2c the card slot is offered the UNION over the player slot, narrowed by the announced X" (slotNamed "card") (Set.fromList (fmap Recipient.ToObject [hisId, hersId]))
+    Spec.assertEqWith s "and the player slot every player" (slotNamed "player") (Set.fromList (fmap Recipient.ToPlayer [S.alice, S.bob, S.carol]))
+    -- THE GAMEPLAY ASSERTION, ahead of every proxy: the card the offer named came
+    -- back, so the joint check read the same X the offer did.
+    Spec.assertEqWith s "CR 202.3 naming bob and the mana value 2 card in HIS graveyard, that card is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.bob atBob) 1
+    Spec.assertEqWith s "CR 601.2h so the casting was not reversed: all three Swamps paid {2}{B}" (S.tappedCount S.alice atBob) 3
+    Spec.assertEqWith s "with the mana value 4 card in the same graveyard left behind, unoffered" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Russet Wolves")) S.bob atBob) 0
+    Spec.assertEqWith s "and his card gone from his graveyard (CR 400.7: a new object arrived)" (Game.zoneMembers Zone.Graveyard S.bob atBob) [hisBigId]
+    Spec.assertEqWith s "CR 601.2e naming bob and a card in CAROL's graveyard, the joint check rejects and the whole cast is reversed" (length (GameState.stack castAtCarol)) 0
+    Spec.assertEqWith s "so carol's card stayed in her graveyard" (Game.zoneMembers Zone.Graveyard S.carol castAtCarol) [hersId]
+    Spec.assertBool s (elem spellId (Game.zoneMembers Zone.Hand S.alice castAtCarol)) "and the spell is back in alice's hand"
+    Spec.assertEqWith s "where naming his own card put it on the stack" (length (GameState.stack castAtBob)) 1
+
+-- CR 601.2c's whole announcement for Synthetic Borrowed Exhumation: bob in the
+-- player slot and `oid` in the card slot, with CR 601.2b's X announced first.
+--
+-- PINNED rather than searched, aimingDwell's reason: the run naming carol's card
+-- beside bob has to be rejected by the JOINT check, so an answerer that filtered
+-- against the offer would hand back an empty slot and the announcement would
+-- fail on its count instead -- passing for a reason the case is not about.
+aimingExhumation :: Natural.Type.Natural -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimingExhumation x oid p = case p of
+  Prompt.ChooseX {} -> x
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const 1) offers
+  Prompt.ChooseTargets _ _ _ asked ->
+    Map.mapWithKey
+      ( \slot _ ->
+          if slot == SlotName.MkSlotName (Text.pack "player")
+            then Set.singleton (Recipient.ToPlayer S.bob)
+            else Set.singleton (Recipient.ToObject oid)
+      )
+      asked
   _ -> S.identityAnswer p

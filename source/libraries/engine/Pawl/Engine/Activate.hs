@@ -764,7 +764,11 @@ activateAbility pid srcId ability = do
           -- an activation cost.
           (announcedCost, _) <- Cost.announce (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
           chosen <- Target.chooseTargets decider pid abilId (Maybe.fromMaybe 0 mAmount) slots sets
-          if not (Target.selectionLegal (Just pid) srcId (Maybe.fromMaybe 0 mAmount) slots sets chosen gs)
+          -- Not implemented: the seed is empty here for the same reason it is
+          -- empty above -- the announcement's X does not reach a slot on this
+          -- road at all, so there is nothing yet for the joint check to re-derive
+          -- a CR 202.3 computed bound against (#2672).
+          if not (Target.selectionLegal (Just pid) Map.empty srcId (Maybe.fromMaybe 0 mAmount) slots sets chosen gs)
             then State.put before -- reject: the whole activation is a no-op
             else do
               -- CR 113.7: bind the source permanent under the reserved self slot, so
