@@ -2055,6 +2055,14 @@ statesAQuality predicate = case predicate of
 -- an effect: a card reading "that player" under a condition that never binds one
 -- is then a failing test rather than a slot that silently admits nothing.
 --
+-- The SECOND consumer is behavioural rather than a lint, and the catch-all below
+-- is behavioural with it: Pawl.Engine.Resolve.replacementRowReads walks a waiting
+-- replacement's Filters through here to decide which of the installing
+-- resolution's bindings that row CAPTURES, so an atom this function does not
+-- report is a slot the row does not carry and the atom then answers vacuously
+-- False at the event. No -Werror reaches it, and the lint cannot either, both
+-- sides being this one function.
+--
 -- The same descent `bakeBound` makes, and deliberately so: a position that
 -- function does not bake is a position this one must not report as read, or the
 -- lint would bless an atom the engine can never answer.

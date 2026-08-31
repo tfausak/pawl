@@ -69,6 +69,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
+import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackTarget as AttackTarget
@@ -135,6 +136,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryR as EntryR
+import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
@@ -239,6 +241,7 @@ import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.RollDie as RollDie
+import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
@@ -264,7 +267,9 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnUpR as TurnUpR
+import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Uses as Uses
+import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
@@ -859,17 +864,18 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.BecomeCopy {} -> Map.empty
   Effect.CopySpell {} -> Map.empty
   -- The Duration and Condition each carry Quantities; a Quantity.InSlot is a read.
-  -- The pattern's Filter is a READ too: Filter.IsBound in one names an object an
-  -- earlier effect of this same resolution defined (Dire Fleet Daredevil's "that
-  -- spell"), which is what the row's captured environment answers at CR 616.1.
+  -- The ROW's own Filters and Quantities are READS too (replacementRowReads):
+  -- Filter.IsBound in one names an object an earlier effect of this same
+  -- resolution defined (Dire Fleet Daredevil's "that spell"), which is what the
+  -- row's captured environment answers at CR 616.1.
   Effect.Replace (Replace.MkReplace duration _ _ condition re) ->
-    joinSlots [durationSlots duration, joinSlots (fmap conditionSlots (Maybe.maybeToList condition)), replacementPatternSlots re]
+    joinSlots [durationSlots duration, joinSlots (fmap conditionSlots (Maybe.maybeToList condition)), replacementRowSlots re]
   Effect.SkipNextPhase {} -> Map.empty
   -- CR 615.5's rider reads slots of its own, so its reads join this effect's,
   -- LESS the reserved amount slot: the prevention binds that one itself
   -- (Event.eventBindingSlots), and Resolve.runPreventionRider is the writer.
   --
-  -- The card-authored FILTERS are reads too, replacementPatternSlots' answer for
+  -- The card-authored FILTERS are reads too, replacementRowSlots' answer for
   -- the same DamageR row one carrier over: the recipient description rides the
   -- installed row and is re-asked at each damage event, and CR 609.7a's
   -- chosen-source predicate is asked once as this effect resolves. CR 609.7b's
@@ -1107,44 +1113,127 @@ conditionSlots condition = case condition of
   Condition.Type.Any conditions -> joinSlots (fmap conditionSlots conditions)
   Condition.Type.All conditions -> joinSlots (fmap conditionSlots conditions)
 
--- The slots a replacement's PATTERN names: every arm's pattern says which objects
--- the row applies to as a Filter, and Filter.IsBound in one is a read of the
--- installing resolution's binding environment (Pawl.Types.ActiveReplacement).
--- Arity One, since IsBound is a membership test rather than a target slot.
+-- Everything one waiting ROW can name a slot with: the Filters its pattern and its
+-- rewrite describe things with, and the Quantities its rewrite counts with. A
+-- Filter.IsBound in any of them, and a Quantity.InSlot in any of them, is a read
+-- of the installing resolution's binding environment
+-- (Pawl.Types.ActiveReplacement).
+--
+-- ONE declaration for THREE consumers, which is why the rewrite is not left to a
+-- second function: replacementRowSlots below reports it as what the effect reads
+-- (CR 603.3b, through slotsOf's Replace arm); installDamageRow and the
+-- Effect.Replace resolution arm restrict what the installed row CAPTURES to it;
+-- and referredToSources reads that captured map back out as CR 609.7a's "any
+-- object referred to by ... a replacement or prevention effect that's waiting to
+-- apply". A read missing here is one the row cannot answer at the event, with no
+-- -Werror to catch it and no help from the card dataflow lint, whose read side is
+-- this same function.
+--
+-- The two halves are returned TOGETHER rather than by two traversals, so that
+-- ownSlotsAreExhaustive's Replace arm and the slot walk cannot come apart about
+-- what an arm holds.
+--
+-- SYNTACTIC rather than per-reader: a slot NAME anywhere in the row's own data is
+-- an object the row refers to, whether or not the arm reading it happens to build
+-- a slot-aware Filter.Context today (#2141 names callers that do not). That is
+-- what CR 609.7a asks for, and it is the safe direction for the capture.
 --
 -- CR 614.9's printed DESTINATION is walked with the damage pattern beside it and
--- is the one Filter here that is not a pattern: it is read in the same
+-- is not a pattern: it is read in the same
 -- Pawl.Engine.Replacement.candidateContext the pattern is, so IsBound means the
 -- same thing in both and a slot declared for one is declared for the other.
 --
 -- No wildcard: an arm added to Pawl.Types.ReplacementEffect must answer here, and
--- the three that carry no Filter say so rather than falling through. The nested
--- EFFECTS an EntryR rewrite or a DamageR rider carries are not walked -- see
--- slotsAreExhaustive's Replace arm.
-replacementPatternSlots :: ReplacementEffect.ReplacementEffect (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Map.Map SlotName SlotArity
-replacementPatternSlots re = case re of
-  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _ _ _) -> filterSlotsOf (ZoneChangePattern.whatObject pat)
-  ReplacementEffect.EntryR (EntryR.MkEntryR pat _) -> filterSlotsOf pat
+-- the ones carrying neither Filter nor Quantity say so rather than falling
+-- through. Not implemented: the nested EFFECTS an EntryR rewrite or a DamageR
+-- rider carries read slots of their own and are not walked (gap #1962).
+replacementRowReads :: ReplacementEffect.ReplacementEffect (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
+replacementRowReads re = case re of
+  -- The rewrite is a Zone and two Bools (Pawl.Types.ZoneChangeR): nothing that can
+  -- name a slot, so the pattern is the whole of it.
+  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _ _ _) -> ([ZoneChangePattern.whatObject pat], [])
+  ReplacementEffect.EntryR (EntryR.MkEntryR pat rewrite) -> addFilter pat (entryRewriteReads rewrite)
   ReplacementEffect.DamageR (DamageR.MkDamageR pat rewrite _) ->
-    joinTwo
-      (filterSlotsOf (DamagePattern.whatSource pat))
-      (joinSlots (fmap filterSlotsOf (Maybe.maybeToList (DamagePattern.whatRecipient pat) <> damageRewriteFilters rewrite)))
-  ReplacementEffect.DestructionR _ -> Map.empty
-  ReplacementEffect.CounterR (CounterR.MkCounterR pat _) -> filterSlotsOf (CounterPattern.onWhat pat)
-  ReplacementEffect.TokenR _ -> Map.empty
-  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat _ _) -> filterSlotsOf pat
-  ReplacementEffect.UntapR _ -> Map.empty
+    ( DamagePattern.whatSource pat : (Maybe.maybeToList (DamagePattern.whatRecipient pat) <> damageRewriteFilters rewrite),
+      []
+    )
+  ReplacementEffect.DestructionR _ -> ([], [])
+  -- The rewrite is one Scaling, which is a constructor and a Natural.
+  ReplacementEffect.CounterR (CounterR.MkCounterR pat _) -> ([CounterPattern.onWhat pat], [])
+  ReplacementEffect.TokenR _ -> ([], [])
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat _ rewrite) -> addFilter pat (turnUpRewriteReads rewrite)
+  ReplacementEffect.UntapR _ -> ([], [])
   -- A LifeLossPattern is one ControllerRelation and one LifeLossCause, and no arm
-  -- of LifeLossRewrite carries a Filter: no Filter, so no slot. TokenR's answer,
+  -- of LifeLossRewrite carries a Filter or a Quantity: no read at all. TokenR's
+  -- answer, and for its reason.
+  ReplacementEffect.LifeLossR {} -> ([], [])
+  -- A DrawR is one ControllerRelation and one amount of life. LifeLossR's answer,
   -- and for its reason.
-  ReplacementEffect.LifeLossR {} -> Map.empty
-  -- A DrawR is one ControllerRelation and one amount of life: no Filter, so no
-  -- slot. LifeLossR's answer, and for its reason.
-  ReplacementEffect.DrawR {} -> Map.empty
-  ReplacementEffect.PhaseR _ -> Map.empty
+  ReplacementEffect.DrawR {} -> ([], [])
+  ReplacementEffect.PhaseR _ -> ([], [])
+
+-- A row's pattern Filter joined onto what its rewrite reads.
+addFilter :: Filter.Type.Filter Keyword.Type.Keyword -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity]) -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
+addFilter filter_ (filters, quantities) = (filter_ : filters, quantities)
+
+-- What an ENTRY rewrite reads, beside its row's pattern. Total over
+-- Pawl.Types.EntryRewrite and no wildcard, replacementRowReads' discipline: an arm
+-- gaining a Filter or a Quantity must answer here rather than have its reads go
+-- undeclared. The arms answering nothing carry Naturals, constructors and literal
+-- card data, none of which can name a slot.
+--
+-- Every arm here is a REGRESSION FENCE rather than a proven behaviour: no
+-- Effect.Replace in data/cards/ carries an EntryR whose rewrite is anything but
+-- Tapped, so neutralizing any arm leaves the whole suite green. They are written
+-- because the narrowing one caller over is only sound if this list is complete --
+-- a rewrite read left out is a slot the installed row does not carry, and the
+-- Filter or Quantity that wanted it then answers vacuously at the event.
+entryRewriteReads :: EntryRewrite.EntryRewrite (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
+entryRewriteReads rewrite = case rewrite of
+  EntryRewrite.AsCopy asCopy -> ([AsCopy.eligible asCopy], [])
+  EntryRewrite.ChoiceOf _ -> ([], [])
+  EntryRewrite.ChoiceByCoinFlip _ -> ([], [])
+  EntryRewrite.ChooseColor -> ([], [])
+  EntryRewrite.ChooseBasicLandType -> ([], [])
+  EntryRewrite.ChoosePlayer -> ([], [])
+  EntryRewrite.ChooseCardNames restriction -> ([restriction], [])
+  -- CR 614.1c's count per kind, evaluated as the row applies and against the ROW's
+  -- Context (Pawl.Engine.Event's WithCounters arm), so a Quantity.InSlot in one
+  -- reads the captured map. The KINDS beside them cannot name a slot.
+  EntryRewrite.WithCounters counters -> ([], Map.elems (WithCounters.counters counters))
+  EntryRewrite.UnderSourceControl -> ([], [])
+  EntryRewrite.SacrificeAnyNumber sacrifice -> ([SacrificeAnyNumber.filter sacrifice], [])
+  EntryRewrite.Riot -> ([], [])
+  EntryRewrite.ReadAhead -> ([], [])
+  EntryRewrite.Unleash -> ([], [])
+  EntryRewrite.Bloodthirst _ -> ([], [])
+  EntryRewrite.Compleated _ -> ([], [])
+  EntryRewrite.Tapped -> ([], [])
+  EntryRewrite.PayLifeOrTapped _ -> ([], [])
+  EntryRewrite.RevealOrTapped filter_ -> ([filter_], [])
+  EntryRewrite.EntersTransformed -> ([], [])
+  -- Not implemented: the nested effects read slots of their own and neither this
+  -- answer nor slotsOf reports them (gap #1962).
+  EntryRewrite.RunEffects _ -> ([], [])
+
+-- What a TURN-UP rewrite reads. entryRewriteReads' two shapes and its discipline:
+-- CR 702.37b's count is evaluated against the row's Context, and CR 303.4k's host
+-- description is a Filter.
+turnUpRewriteReads :: TurnUpRewrite.TurnUpRewrite -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
+turnUpRewriteReads rewrite = case rewrite of
+  TurnUpRewrite.WithCounters counters -> ([], Map.elems (WithCounters.counters counters))
+  TurnUpRewrite.MayAttachTo filter_ -> ([filter_], [])
+
+-- replacementRowReads as a slot map. Arity One throughout, since a Filter.IsBound
+-- is a membership test rather than a target slot and Quantity.slots answers the
+-- same way.
+replacementRowSlots :: ReplacementEffect.ReplacementEffect (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Map.Map SlotName SlotArity
+replacementRowSlots re =
+  let (filters, quantities) = replacementRowReads re
+   in joinSlots (fmap filterSlotsOf filters <> fmap quantitySlots quantities)
 
 -- The Filters a damage REWRITE holds, which is CR 614.9's printed destination and
--- nothing else. No wildcard, replacementPatternSlots' discipline: a later rewrite
+-- nothing else. No wildcard, replacementRowSlots' discipline: a later rewrite
 -- describing something must answer here rather than have its slot reads go
 -- undeclared.
 damageRewriteFilters :: DamageRewrite.DamageRewrite -> [Filter.Type.Filter Keyword.Type.Keyword]
@@ -1248,14 +1337,16 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
   Effect.BecomeCopy {} -> True
   Effect.CopySpell {} -> True
-  -- The ReplacementEffect holds no Quantity, and the one reference it can hold --
-  -- a Filter.IsBound in its pattern -- slotsOf reports through
-  -- replacementPatternSlots. Not implemented: the effects a rewrite or a CR 615.5
-  -- rider nests under this opcode read slots of their own and neither this answer
-  -- nor slotsOf reports them; every Effect.Replace in data/cards/ nests none
-  -- (gap #1962).
-  Effect.Replace (Replace.MkReplace duration _ _ condition _) ->
-    durationSlotsAreExhaustive duration && all conditionSlotsAreExhaustive condition
+  -- The ReplacementEffect's own reads are replacementRowReads', and slotsOf
+  -- reports them through replacementRowSlots: its Filters name no target slot, and
+  -- the Quantities a counter rewrite counts with are asked here. Not implemented:
+  -- the effects a rewrite or a CR 615.5 rider nests under this opcode read slots
+  -- of their own and neither this answer nor slotsOf reports them; every
+  -- Effect.Replace in data/cards/ nests none (gap #1962).
+  Effect.Replace (Replace.MkReplace duration _ _ condition re) ->
+    durationSlotsAreExhaustive duration
+      && all conditionSlotsAreExhaustive condition
+      && all Quantity.slotsAreExhaustive (snd (replacementRowReads re))
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> True
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity rider) ->
     durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity && all slotsAreExhaustive rider
@@ -3423,20 +3514,21 @@ installDamageRow players slots controller source duration kind rewrite rider pri
               -- referredToSources offers "any object referred to by ... a
               -- replacement or prevention effect that's waiting to apply", and a
               -- slot an unrelated earlier effect of the same resolution bound is
-              -- not something this row refers to. The redirection is the extreme
-              -- case -- it is installed with the trivial printed predicate, no
-              -- described recipient, no rider and no clause, so nothing it holds
-              -- can read a slot at all.
+              -- not something this row refers to. The redirection carries the
+              -- narrowest row of the three -- no described recipient, no rider and
+              -- no clause -- but not an empty one: its CR 609.7a chosen-source
+              -- predicate is the card's own Filter and folds into
+              -- DamagePattern.whatSource, which Synthetic Turn the Blade writes.
               ActiveReplacement.slots = Map.restrictKeys slots namedSlots
             }
-        -- Every slot name the row above can name: the PATTERN's own Filters,
-        -- which is the whole of what Replacement.candidateContext re-asks them
-        -- against, plus CR 615.5's rider, whose objects the effect still refers
-        -- to even though Resolve.runPreventionRider reads them off
-        -- Pawl.Types.PreventionRider rather than off the row. `condition` is
-        -- Nothing on every one of these carriers, so it contributes no third
-        -- half.
-        namedSlots = Map.keysSet (replacementPatternSlots re) <> foldMap (Map.keysSet . PreventionRider.targets) rider
+        -- Every slot name the row above can name: replacementRowReads' answer for
+        -- the ReplacementEffect just built, which is the whole of what
+        -- Replacement.candidateContext re-asks it against, plus CR 615.5's rider,
+        -- whose objects the effect still refers to even though
+        -- Resolve.runPreventionRider reads them off Pawl.Types.PreventionRider
+        -- rather than off the row. `condition` is Nothing on every one of these
+        -- carriers, so it contributes no third half.
+        namedSlots = Map.keysSet (replacementRowSlots re) <> foldMap (Map.keysSet . PreventionRider.targets) rider
      in g1 {GameState.replacements = active : GameState.replacements g1}
 
 -- CR 609.7a: choose the SOURCE a prevention or redirection effect names, and
@@ -3530,24 +3622,74 @@ damageSourceCandidates context gs filter_ =
 -- reads it through CR 608.2h's last known information rather than through the
 -- blank view a live-only projection gives.
 --
--- What a waiting ROW refers to is narrower than the map it carries: a floating
--- damage row holds only the slots its own fields name, since installDamageRow
--- restricts what it captures. So the fold below is over referents rather than
--- over a whole resolution's bindings, and that narrowing is what
--- Pawl.ReplacementSpec's Synthetic Parting Ward case reads.
+-- A waiting ROW refers to three things, and the fold below is over all three
+-- rather than over a whole resolution's bindings: its source, the SLOTS its own
+-- pattern and rewrite name -- which is all its captured map now holds, since
+-- installDamageRow and the Effect.Replace resolution arm restrict what they
+-- capture to replacementRowSlots, and Pawl.ReplacementSpec's Synthetic Parting
+-- Ward and Galvanic Blast cases read that narrowing -- and the ids a resolution
+-- BAKED into it, which no Filter and no slot map holds (referentsOfReplacement).
 --
--- Only the STACK half is proven in the OFFERING direction -- Pawl.ReplacementSpec's
--- "a source only a waiting ability still refers to is offered", Ghitu Fire-Eater
--- under Auriok Replica. That the replacement-row and delayed-trigger halves
--- OFFER anything is a REGRESSION FENCE: neutralizing either leaves the whole
--- suite green, no board in data/cards/ needing such an object in front of a
--- chooser to make its play. They are written because rule 609.7a's one sentence
--- names all three carriers (#2479).
+-- Two halves are proven in the OFFERING direction: the STACK's, by
+-- Pawl.ReplacementSpec's "a source only a waiting ability still refers to is
+-- offered" (Ghitu Fire-Eater under Auriok Replica), and the ROW's baked ids, by
+-- the Healing Grace case beside it. That the row's captured SLOTS and the
+-- delayed-trigger half OFFER anything is a REGRESSION FENCE: neutralizing either
+-- leaves the whole suite green, no board in data/cards/ needing such an object in
+-- front of a chooser to make its play. They are written because rule 609.7a's one
+-- sentence names all three carriers (#2479).
 referredToSources :: GameState -> [ObjectId]
 referredToSources gs =
   foldMap (\oid -> foldMap referentsOfObject (Game.lookupObject oid gs)) (GameState.stack gs)
-    <> foldMap (\row -> ActiveReplacement.source row : foldMap Set.toList (ActiveReplacement.slots row)) (GameState.replacements gs)
+    <> foldMap (\row -> ActiveReplacement.source row : (referentsOfReplacement (ActiveReplacement.effect row) <> foldMap Set.toList (ActiveReplacement.slots row))) (GameState.replacements gs)
     <> foldMap (\entry -> DelayedTrigger.source entry : referentsOfBindings (DelayedTrigger.bindings entry)) (GameState.delayedTriggers gs)
+
+-- The objects a waiting row names BY ID: what card data cannot write, so what no
+-- Filter and no captured slot holds, and what CR 609.7a's "any object referred to
+-- by ... a replacement or prevention effect that's waiting to apply" reaches only
+-- through here. Only the damage arm has any -- CR 609.7a's chosen source or CR
+-- 601.2c's targeted one, CR 611.2c's named recipient, and CR 614.9's baked
+-- destination -- and each is written as a resolution installs the row
+-- (installDamageRow), a card's own redirection naming its destination by
+-- description instead (DamageRewrite.RedirectMatching, Pariah). Each is exactly
+-- the rule's parenthetical case, an object that may no longer be in the zone it
+-- used to be in.
+--
+-- PLAYER recipients drop out, referentsOfBindings' reason: the rule's four classes
+-- are all objects.
+--
+-- No wildcard: an arm of Pawl.Types.ReplacementEffect that later bakes an id must
+-- answer here, or its object silently leaves the pool. Every arm answering []
+-- names things by Filter and by slot alone, which replacementRowSlots reports.
+referentsOfReplacement :: ReplacementEffect.ReplacementEffect effect -> [ObjectId]
+referentsOfReplacement re = case re of
+  ReplacementEffect.ZoneChangeR _ -> []
+  ReplacementEffect.EntryR _ -> []
+  ReplacementEffect.DamageR (DamageR.MkDamageR pat rewrite _) ->
+    Maybe.maybeToList (DamagePattern.whichSource pat)
+      <> Maybe.mapMaybe Recipient.objectOf (Maybe.maybeToList (DamagePattern.whichRecipient pat) <> damageRewriteRecipients rewrite)
+  ReplacementEffect.DestructionR _ -> []
+  ReplacementEffect.CounterR _ -> []
+  ReplacementEffect.TokenR _ -> []
+  ReplacementEffect.TurnUpR _ -> []
+  ReplacementEffect.UntapR _ -> []
+  ReplacementEffect.LifeLossR _ -> []
+  ReplacementEffect.DrawR _ -> []
+  ReplacementEffect.PhaseR _ -> []
+
+-- The recipients a damage REWRITE bakes, which is CR 614.9's redirect destination
+-- and nothing else. damageRewriteFilters' discipline: no wildcard, so a later
+-- rewrite naming a recipient must answer here.
+damageRewriteRecipients :: DamageRewrite.DamageRewrite -> [Recipient]
+damageRewriteRecipients rewrite = case rewrite of
+  DamageRewrite.RedirectMatching _ -> []
+  DamageRewrite.Redirect recipient -> [recipient]
+  DamageRewrite.PreventAll -> []
+  DamageRewrite.PreventRemovingShieldCounter -> []
+  DamageRewrite.PreventNext _ -> []
+  DamageRewrite.PreventAllBut _ -> []
+  DamageRewrite.SetAmount _ -> []
+  DamageRewrite.Scale _ -> []
 
 -- What one object on the stack refers to: its CR 113.7 source object, and every
 -- object its bindings name.
@@ -6322,15 +6464,27 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         -- (see Pawl.Types.ActiveReplacement).
                         ActiveReplacement.condition = condition,
                         ActiveReplacement.rider = Nothing,
-                        -- The resolution's own slot bindings, captured as the
-                        -- row is installed for the reason Pawl.Types.DelayedTrigger
+                        -- The resolution's slot bindings, captured as the row is
+                        -- installed for the reason Pawl.Types.DelayedTrigger
                         -- captures them (CR 603.7c): this resolution is about to
                         -- end and its object with it, so a pattern naming a slot
                         -- would have nothing live to read. The row's `condition`
                         -- is asked against these too (Replacement.collect), so
                         -- the clause and the pattern cannot disagree about what a
                         -- slot names.
-                        ActiveReplacement.slots = Filter.slotObjects context
+                        --
+                        -- NARROWED to the slots THIS ROW names, installDamageRow's
+                        -- restriction and for its reason: referredToSources reads
+                        -- this map as CR 609.7a's "any object referred to by ... a
+                        -- replacement or prevention effect that's waiting to
+                        -- apply", and a slot an unrelated earlier effect of the
+                        -- same resolution bound is not something this row refers
+                        -- to. The CLAUSE's own reads join the row's, since it is
+                        -- asked in a Context built from this very map.
+                        ActiveReplacement.slots =
+                          Map.restrictKeys
+                            (Filter.slotObjects context)
+                            (Map.keysSet (replacementRowSlots re) <> foldMap (Map.keysSet . conditionSlots) condition)
                       }
                in gs1 {GameState.replacements = active : GameState.replacements gs1}
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref whatRecipient whoRecipient sourceFilter quantity riderEffects) -> do
