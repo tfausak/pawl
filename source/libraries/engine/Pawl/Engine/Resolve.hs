@@ -867,11 +867,12 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- (Event.eventBindingSlots), and Resolve.runPreventionRider is the writer.
   --
   -- The card-authored FILTERS are reads too, replacementPatternSlots' answer for
-  -- the same DamageR row one carrier over: the recipient description and CR
-  -- 609.7b's printed source properties ride the installed row and are re-asked at
-  -- each damage event, and CR 609.7a's chosen-source predicate is asked once as
-  -- this effect resolves. A Filter.IsBound in any of them names a slot of this
-  -- resolution.
+  -- the same DamageR row one carrier over: the recipient description rides the
+  -- installed row and is re-asked at each damage event, and CR 609.7a's
+  -- chosen-source predicate is asked once as this effect resolves. CR 609.7b's
+  -- printed source properties are not among them -- this opcode has no such
+  -- field, and its installDamageRow call passes the trivial predicate. A
+  -- Filter.IsBound in either names a slot of this resolution.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ whatRecipient _ chosenSource quantity rider) ->
     joinSlots
       [ durationSlots duration,
@@ -880,7 +881,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
         Map.delete Binding.eventAmount (joinSlots (fmap slotsOf (Foldable.toList rider)))
       ]
   -- The same reads, minus the shield size this opcode does not carry and plus CR
-  -- 609.7b's printed source, which only this one spells out.
+  -- 609.7b's printed source properties, the one field only this opcode spells
+  -- out; they ride the row and are rechecked at the damage event (CR 615.9).
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ whatRecipient _ chosenSource whatSource rider) ->
     joinSlots
       [ durationSlots duration,
@@ -6310,14 +6312,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Through Damage.damageRecipient, so the baked recipient is in the same
     -- vocabulary a DamageEvent's target arrives in (CR 120.1a).
     --
-    -- ONE ROW PER NAMED RECIPIENT, but only ONE ROW ALTOGETHER for a card that
-    -- DESCRIBES its recipients instead (Divine Deflection's "you and/or
-    -- permanents you control"): CR 615.7's shield counts damage rather than
-    -- events or recipients, so a described set shares one pool, where the
-    -- recipients a resolution named each got their own shield. A card writing
-    -- both spellings is read as the description alone, since the described row
-    -- already covers whatever it admits and a second row would be a second
-    -- shield the card never printed.
+    -- ONE ROW PER NAMED RECIPIENT, which is CR 615.11: a shield over "each of a
+    -- number of untargeted creatures" is a separate shield per creature, created
+    -- as the spell resolves. Only ONE ROW ALTOGETHER for a card that DESCRIBES
+    -- its recipients instead (Divine Deflection's "you and/or permanents you
+    -- control"), which CR 615.11 does not reach -- it names neither "each" nor an
+    -- untargeted creature -- leaving CR 615.7's plain shield: one countdown,
+    -- reduced by 1 for each 1 damage it prevents, whatever it is around. A card
+    -- writing both spellings is read as the description alone, since the
+    -- described row already covers whatever it admits and a second row would be a
+    -- second shield the card never printed.
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)

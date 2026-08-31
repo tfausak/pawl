@@ -1607,14 +1607,23 @@ evolvingHumanAt oid p = case p of
 -- Instant: "Prevent the next 3 damage that would be dealt this turn to you and to
 -- target creature.").
 --
--- ONE SHIELD OVER TWO RECIPIENTS is what forces the spelling, and it is a rules
--- reason rather than a convenience: CR 615.7 counts DAMAGE rather than events or
--- recipients, so "you and target creature" is a single pool both recipients draw
--- down. Pawl.Engine.Resolve installs one row per NAMED recipient and one row
--- altogether for a DESCRIBED one, so writing the creature half as the opcode's
--- `ref` would give the card two independent pools of 3 -- weaker than printed.
--- The creature half therefore has to be a predicate on the one row, and the only
--- predicate that can say "that creature" is Filter.IsBound over the target slot.
+-- ONE SHIELD OVER TWO RECIPIENTS, and it is a rules reason rather than a
+-- convenience. CR 615.11's per-creature shield does not reach this card: that
+-- rule is scoped to "each of a number of UNTARGETED creatures", where here the
+-- creature IS targeted, there is no "each", and one of the two covered things is
+-- a player rather than a creature. What stands is CR 615.7's plain shield -- one
+-- countdown of 3, reduced by 1 for each 1 damage it prevents, whatever it is
+-- around -- which is how pawl already models Divine Deflection's "you and/or
+-- permanents you control".
+--
+-- What forces the SPELLING is one step further on, and it is not that a `ref`
+-- would give a second pool: it would give the creature NO shield at all.
+-- Pawl.Engine.Resolve reads a card that both names and describes its recipients
+-- as the description alone, and `whoRecipient` on its own already makes this a
+-- described shield, so a creature half written as the opcode's `ref` is dropped
+-- and the single row installed covers alice and nobody else. The creature half
+-- therefore has to be a predicate on that row, and the only predicate that can
+-- say "that creature" is Filter.IsBound over the target slot.
 --
 -- SYNTHETIC because no printing writes a bound slot into either of the two
 -- Filters an installed shield carries. Scryfall o:prevent o:"that creature would
@@ -1665,10 +1674,10 @@ communalBulwarkSpec s registry = Spec.describe s "Synthetic Communal Bulwark (CR
     -- either way, so the two assertions above cannot both pass because no row was
     -- installed at all.
     Spec.assertEqWith s "and the 3 to alice herself is prevented whole" (S.lifeOf S.alice (strike (Recipient.ToPlayer S.alice) 3)) (Just 20)
-    -- CR 615.7's pool is shared, so the creature's 2 leaves 1: the other reading,
-    -- that the two halves are separate shields, would leave 3 and cost alice
-    -- nothing.
-    Spec.assertEqWith s "CR 615.7 the creature and the player draw down one pool" (S.lifeOf S.alice (S.runPure S.identityAnswer (strike (Recipient.ToCreature warded) 2) (Damage.applyDamage [hit (Recipient.ToPlayer S.alice) 3]))) (Just 18)
+    -- CR 615.7's one countdown is shared, so the creature's 2 leaves 1: the other
+    -- reading, CR 615.11's separate shield per covered thing, would leave 3 and
+    -- cost alice nothing.
+    Spec.assertEqWith s "CR 615.7 the creature and the player draw down one shield" (S.lifeOf S.alice (S.runPure S.identityAnswer (strike (Recipient.ToCreature warded) 2) (Damage.applyDamage [hit (Recipient.ToPlayer S.alice) 3]))) (Just 18)
     -- The proxies, after the behaviour.
     Spec.assertEqWith s "setup: the Bulwark installed exactly one row" (length (GameState.replacements shielded)) 1
     Spec.assertEqWith s "setup: the shield covers nothing of bob's either" (S.damageOf attacker (strike (Recipient.ToCreature attacker) 5)) (Just 5)
