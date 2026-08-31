@@ -1347,9 +1347,11 @@ copiableSnapshotOf oid gs = Game.lookupObject oid gs >>= (Binding.copyOf . Objec
 -- Printed abilities keep their indices; a minted one takes the position after.
 --
 -- Off the COPIABLE keywords, like the rest of this function. So a living metal
--- another object's static ability grants is not expanded (#2523), the way a
--- granted devoid (#793) and a granted changeling (#1288) are not: what a keyword
--- MEANS would otherwise have to be known before layer 6 has decided who holds it.
+-- another object's ability grants is not expanded (#2523): what a keyword MEANS
+-- would otherwise have to be known before layer 6 has decided who holds it.
+-- Devoid and changeling take the other road out of that -- grantedDefiningParts
+-- emits their defining half as a second PART of whatever grants the keyword, so
+-- neither needs an ability minted here.
 staticAbilitiesOf :: ObjectId -> GameState -> [StaticAbility.StaticAbility Card.Type.Card]
 staticAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
   Just snapshot -> PC.staticAbilities snapshot <> Keyword.mintedStaticAbilitiesOf (Map.keysSet (PC.keywords snapshot))
@@ -3263,20 +3265,42 @@ gatherGiven stripped functioning seed gs =
       setStripped = case seed of
         Nothing -> const False
         Just cands -> setSubtypeStripped cands setEffs gs
-      -- A stored effect carries exactly one modification, so CR 613.6 has
-      -- nothing to hold together, and its set is CR 611.2c's TheseObjects,
-      -- locked when the effect began.
+      -- A stored effect carries exactly one modification, and its set is CR
+      -- 611.2c's TheseObjects, locked when the effect began -- every writer of
+      -- GameState.continuousEffects stores that arm, the CR 611.2c freeze in
+      -- frozenStaticParts included.
+      --
+      -- grantedDefiningParts still splits a devoid or a changeling in two here,
+      -- exactly as gatherStatic does for a grant from a static ability: rule
+      -- 604.3a denies CDA status to a keyword a resolution hands out, so the
+      -- colour or the creature types have to arrive as an ordinary continuous
+      -- effect or not at all. CR 613.6 has nothing to hold together across the
+      -- two parts even so, which is why both carry no effect key and their own
+      -- layer as gLowest: a fixed id set answers the same question at every
+      -- layer, so there is no affected-set decision to share.
+      --
+      -- CR 613.7b timestamps the effect at creation, and both parts take it.
+      --
+      -- The one stored effect that arrives ALREADY expanded is a lingering static
+      -- one, whose parts frozenStaticParts split before handing them over. Its
+      -- keyword half is split a second time here, which costs a duplicate part
+      -- rather than a wrong answer -- same layer, same timestamp, same set, and
+      -- both SetColor Set.empty and AddEveryCreatureSubtype are idempotent. No
+      -- board reaches it: Titania's Song is the pool's only StaticAbility.lingers
+      -- and it grants neither keyword.
       fromStored eff =
-        MkGathered
-          { gEffect = Nothing,
-            gSource = ContinuousEffect.source eff,
-            gAffected = ContinuousEffect.affected eff,
-            gLayer = layer (ContinuousEffect.modification eff),
-            gLowest = layer (ContinuousEffect.modification eff),
-            gTimestamp = ContinuousEffect.timestamp eff,
-            gModification = ContinuousEffect.modification eff
-          }
-      stored = fmap fromStored (GameState.continuousEffects gs)
+        let one m =
+              MkGathered
+                { gEffect = Nothing,
+                  gSource = ContinuousEffect.source eff,
+                  gAffected = ContinuousEffect.affected eff,
+                  gLayer = layer m,
+                  gLowest = layer m,
+                  gTimestamp = ContinuousEffect.timestamp eff,
+                  gModification = m
+                }
+         in fmap one (NonEmpty.toList (grantedDefiningParts (ContinuousEffect.modification eff)))
+      stored = concatMap fromStored (GameState.continuousEffects gs)
       static = concatMap (fmap snd . permanentParts stripped functioning setEffs setStripped gs) (abilitySources gs)
       fromEmblem emblemId = case Game.lookupObject emblemId gs of
         Nothing -> []
@@ -3727,8 +3751,14 @@ abilitiesRemovedBy keep cands gs oid =
 -- is the last word -- a newer colour- or type-changing effect lands on top of it
 -- (CR 613.7).
 --
--- Only a static ability's grant is expanded. A devoid granted by a resolution is
--- not (#793), nor a changeling so granted (#1288).
+-- Both GRANTS run through this: a static ability's by way of staticParts, and a
+-- resolution's stored effect by way of gatherGiven's fromStored, where CR 613.7b's
+-- creation timestamp replaces CR 613.7a's.
+--
+-- gatherGiven's other layer-6 producers do not, and none of them can carry either
+-- keyword: CR 122.1b's list names neither, so no keyword counter is one, and
+-- `designations` and `bestows` emit only menace (CR 701.60c) and rule 702.103b's
+-- type line and enchant.
 grantedDefiningParts :: Modification -> NonEmpty.NonEmpty Modification
 grantedDefiningParts m = case m of
   Modification.GainKeyword Keyword.Type.Devoid -> m NonEmpty.:| [Modification.SetColor Set.empty]

@@ -1310,10 +1310,13 @@ data Keyword
 -- is a characteristic-defining ability and is folded at the start of layer 5
 -- (Projection.applyColorDefining), per CR 613.3. A GRANTED one is not, CR 604.3a
 -- denying CDA status to an ability that is not printed on the card it affects, so
--- Projection.grantedDefiningParts routes it into layer 5 as an ordinary colour
--- effect timestamped with the granting permanent (CR 613.7a). Slivdrazi
--- Monstrosity is the card that separates them, and Pawl.ColorSpec's "CR 613.7a a
--- granted devoid clears an OLDER 'in addition' colour" is the proof.
+-- Projection.grantedDefiningParts routes it into layer 5 as an ordinary
+-- timestamped colour effect -- stamped with the granting permanent when a static
+-- ability grants it (CR 613.7a), and at creation when a resolution does (CR
+-- 613.7b). Slivdrazi Monstrosity and Synthetic Colorless Blessing are the two
+-- grants, and Pawl.ColorSpec's "CR 613.7a a granted devoid clears an OLDER 'in
+-- addition' colour" and "CR 702.114a devoid granted by a RESOLUTION makes the
+-- creature colourless" are the proofs.
 --
--- CR 702.73a's changeling takes the same two routes one layer down, through the
+-- CR 702.73a's changeling takes the same routes one layer down, through the
 -- same pair of functions.

@@ -2474,6 +2474,40 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "Creature -- Frog alone" (Projection.subtypesOf pikerId gs) (Set.singleton Subtype.Type.Frog)
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Changeling pikerId gs)) "and no changeling"
 
+  -- THE THIRD ROUTE INTO CHANGELING, the twin of ColorSpec's "devoid granted by a
+  -- RESOLUTION". A keyword a resolution hands out is stored as a continuous
+  -- effect over a set CR 611.2c locked at resolution, and the creature-type half
+  -- has to come with it: CR 604.3a(2) denies the granted instance CDA status, so
+  -- it is an ordinary layer-4 effect (CR 613.1d) stamped at creation (CR 613.7b)
+  -- rather than one applied at the start of the layer (CR 613.3).
+  --
+  -- Synthetic Protean Blessing ("target creature gains changeling until end of
+  -- turn") is the producer. No printing reaches this arm: Scryfall
+  -- `o:changeling -keyword:changeling include:extras`, 2026-08-31, is exhaustive
+  -- and every hit either creates a TOKEN with changeling -- CR 604.3a(2) makes
+  -- that a CDA, since the creating effect granted it -- or writes the subtype
+  -- sentence instead (Maskwood Nexus, Stalactite Dagger). Oddric, Lunar Marquis
+  -- does grant it by a triggered ability's resolution, alongside eleven keywords
+  -- Pawl.Types.Keyword mostly cannot name.
+  --
+  -- Lord of Atlantis is the READER, as it is for the printed changeling above:
+  -- its affected set is "other Merfolk", asked at layer 7c against a projection
+  -- that has already applied layer 4. 2 and 3 are distinct on purpose; a grant
+  -- that adds no creature type leaves the Piker at 2.
+  Spec.it s "CR 702.73a changeling granted by a RESOLUTION makes the creature every creature type" $ do
+    island <- S.printingOf s registry "Island"
+    lord <- S.printingOf s registry "Lord of Atlantis"
+    piker <- S.printingOf s registry "Goblin Piker"
+    blessing <- S.printingOf s registry "Synthetic Protean Blessing"
+    let (_, withLord) = S.addCreature lord S.alice (S.landsInPlay island 2)
+        (pikerId, before) = S.addCreature piker S.alice withLord
+        after = castAtCreature pikerId blessing before
+    Spec.assertEqWith s "the lord leaves the Goblin alone before the spell resolves" (Projection.powerOf pikerId before) (Just 2)
+    Spec.assertEqWith s "and pumps it once the granted changeling has made it a Merfolk" (Projection.powerOf pikerId after) (Just 3)
+    Spec.assertBool s (Set.member Subtype.Type.Merfolk (Projection.subtypesOf pikerId after)) "a Merfolk"
+    Spec.assertBool s (Set.member Subtype.Type.Goblin (Projection.subtypesOf pikerId after)) "and still the printed Goblin (CR 205.1b: the add keeps the rest)"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Changeling pikerId after) "and the keyword itself is there (CR 613.1f layer 6)"
+
   -- CR 613.8b's loop clause reached by two PRINTED cards, and the proving pair
   -- for deciding CR 613.8a over the whole board rather than per projected object.
   -- Each permanent shows one edge only (see limbBloodMoon), so a per-object
