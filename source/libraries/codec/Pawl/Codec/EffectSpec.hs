@@ -835,7 +835,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) DamageDirection.DealtTo Nothing (Filter.And []) Seq.empty))
+      (Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you")))) Nothing DamageDirection.DealtTo Nothing (Filter.And []) Seq.empty))
       " {\"type\":\"PreventAllDamage\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"you\"}}} "
   -- The same shield with both defaulted keys written: CR 510.2's kind
   -- (Inkshield's "all COMBAT damage") and CR 615.5's rider (Brace for Impact's
@@ -849,7 +849,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           PreventAllDamage.MkPreventAllDamage
             { PreventAllDamage.duration = Duration.UntilEndOfTurn,
               PreventAllDamage.kind = Just DamageKind.Combat,
-              PreventAllDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+              PreventAllDamage.ref = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
+              PreventAllDamage.whatRecipient = Nothing,
               PreventAllDamage.direction = DamageDirection.DealtTo,
               PreventAllDamage.chosenSource = Nothing,
               PreventAllDamage.whatSource = Filter.And [],

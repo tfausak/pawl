@@ -26,7 +26,24 @@ data PreventAllDamage effect = MkPreventAllDamage
     -- Selfless Squire says only "damage". Nothing is a shield naming no kind,
     -- taking combat and noncombat alike, and is elided rather than written null.
     kind :: Maybe DamageKind.DamageKind,
-    ref :: ObjectRef.ObjectRef,
+    -- | The objects or players this RESOLUTION names -- Selfless Squire's
+    -- "permanents you control", swept as the effect is created. Nothing for a
+    -- shield that DESCRIBES its recipients in @whatRecipient@ below instead; the
+    -- two spellings are alternatives, and a card writing both is read as the
+    -- description alone (Pawl.Engine.Resolve's arm), exactly as
+    -- Pawl.Types.PreventNextDamage reads its pair.
+    ref :: Maybe ObjectRef.ObjectRef,
+    -- | CR 611.2c's LIVE description of the objects one shared shield covers --
+    -- Pack Leader's "to Dogs you control", which is not a set swept when the
+    -- effect is created: a prevention effect modifies neither characteristics
+    -- nor controller, so a permanent that BECOMES a Dog you control afterwards is
+    -- covered too and one that stops being one is not. That is the whole reason
+    -- this is not spelled as an @EachMatching@ ref above.
+    --
+    -- Read on the DealtTo side only: a shield pinned to the other side of the
+    -- event names no recipient at all, and describes its source in @whatSource@
+    -- below instead.
+    whatRecipient :: Maybe (Filter.Filter Keyword.Keyword),
     -- | Which SIDE of the damage event the objects @ref@ names sit on -- the
     -- recipients (Inkshield, Selfless Squire) or the SOURCE (Dovin, Hand of
     -- Control's "and dealt by target permanent"). DealtTo for every shield that

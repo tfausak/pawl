@@ -35,7 +35,8 @@ codec ::
 codec effectCodec = Fields.object $ do
   duration <- Fields.required "duration" Duration.codec PreventAllDamage.duration
   kind <- Fields.defaulted "kind" Nothing (Common.maybe DamageKind.codec) PreventAllDamage.kind
-  ref <- Fields.required "ref" ObjectRef.codec PreventAllDamage.ref
+  ref <- Fields.defaulted "ref" Nothing (Common.maybe ObjectRef.codec) PreventAllDamage.ref
+  whatRecipient <- Fields.defaulted "whatRecipient" Nothing (Common.maybe (Filter.codec Keyword.codec)) PreventAllDamage.whatRecipient
   direction <- Fields.defaulted "direction" DamageDirection.DealtTo DamageDirection.codec PreventAllDamage.direction
   chosenSource <- Fields.defaulted "chosenSource" Nothing (Common.maybe (Filter.codec Keyword.codec)) PreventAllDamage.chosenSource
   whatSource <- Fields.defaulted "whatSource" (Filter.And []) (Filter.codec Keyword.codec) PreventAllDamage.whatSource
@@ -45,6 +46,7 @@ codec effectCodec = Fields.object $ do
       { PreventAllDamage.duration = duration,
         PreventAllDamage.kind = kind,
         PreventAllDamage.ref = ref,
+        PreventAllDamage.whatRecipient = whatRecipient,
         PreventAllDamage.direction = direction,
         PreventAllDamage.chosenSource = chosenSource,
         PreventAllDamage.whatSource = whatSource,

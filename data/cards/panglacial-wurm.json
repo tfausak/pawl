@@ -45,6 +45,11 @@
         "value": 5
       },
       "typeLine": {
+        "subtypes": [
+          {
+            "type": "Wurm"
+          }
+        ],
         "types": [
           {
             "type": "Creature"
