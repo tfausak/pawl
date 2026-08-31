@@ -60,8 +60,18 @@ Cite identifiers to grep for, never line numbers.
 
 ## Distrust the issue body, and the comments
 
-`CLAUDE.md` says to re-derive an issue's status against the tree. Sharper
-forms, all of which have paid repeatedly:
+`CLAUDE.md` says to re-derive an issue's status against the tree. Start from
+staleness rather than testing for it: over 2026-08-31's run essentially every
+issue dispatched was wrong in some way, and several of the shapes are not what
+"out of date" suggests --- the body named the wrong gap entirely, the opcode it
+called missing having existed all along; a "no printing spells this" claim fell
+to a better-phrased Scryfall query, the original being unable to match its own
+counterexample; an issue called its omission STRICTER than printed when it ran
+weaker, so a rules-correctness bug sat inside a documentation-shaped issue; one
+was half overtaken by a PR that landed the same day; and a "nothing in the pool
+does this" claim was falsified by a card added after the issue was filed.
+
+Sharper forms, all of which have paid repeatedly:
 
 **"No printed card does this" is the least reliable claim in the tracker** ---
 false eight times in one run, twice from an earlier comment on the same issue.
@@ -129,6 +139,17 @@ machinery usually turns out to mean.** Every one of the eleven topic trackers
 unrelated units under triage. Before proposing a cluster, name the function or
 constructor all its issues edit. If you cannot, you have found a topic, and the
 issues dispatch separately.
+
+**The clustering pass** is the sweep form of this, and one dispatch of its own:
+index the `Module.function` identifiers every dispatchable issue body names,
+group by shared identifier, and open the cited function with `git show
+origin/main:<path>` for every pair you propose --- a pair whose shared function
+you have not read is a topic. Rank each cluster high or medium confidence and
+name the claim it rests on, since the dispatcher weights a shared-edit-site or
+containment claim far above an "issue X unblocks issue Y" one; `drain-loop.md`
+has why. Report the by-catch as findings in their own right, and it is much of
+the pass's value: issues already satisfied by landed work, issues citing a
+closed blocker as open, duplicates.
 
 ## What a finding is
 
