@@ -202,7 +202,9 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
+import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.PerCreature as PerCreature
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.Phase as Phase
@@ -768,6 +770,12 @@ durationConditions duration = case duration of
 durationCounts :: Duration.Duration -> [Count.Type.Count Quantity.Type.Quantity]
 durationCounts = concatMap conditionCounts . durationConditions
 
+-- Every Quantity a Duration holds, off the same enumeration. The Count walk's
+-- twin, for the readers that need the Quantity itself rather than the Counts
+-- under it.
+durationQuantities :: Duration.Duration -> [Quantity.Type.Quantity]
+durationQuantities = concatMap conditionQuantities . durationConditions
+
 -- Every Count reachable from a Modification: only its P/T quantities
 -- (layers 7b/7c) carry one.
 modificationCounts :: Projection.Modification -> [Count.Type.Count Quantity.Type.Quantity]
@@ -1149,6 +1157,146 @@ ownCounts effect = case effect of
   -- CR 608.2f's body is an effect list a card authors, so its Counts are this
   -- card's -- the rider's recursion one opcode over.
   Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectCounts body
+
+-- Every Quantity one effect carries: the ones nested in its ObjectRefs, and the
+-- ones its own fields hold. ownCounts above is the Count twin, and neither
+-- derives from the other -- quantityCounts collapses a Quantity to the Counts
+-- beneath it, which loses exactly what a slot reader needs, Quantity.AgainstSlot
+-- naming a slot and holding no Count of its own.
+--
+-- No recursion into a nested effect list (CR 615.5's rider, CR 608.2f's body, an
+-- installed replacement's own effects): effectWithNested has already flattened
+-- those into the list this is folded over, so an arm that descended would report
+-- the same quantities twice. And no descent into a MINTED object's text either,
+-- the boundary effectNestedEffects draws in so many words: a token's number is
+-- evaluated in a resolution of its own.
+--
+-- Hand-maintained, ownCounts' caveat: a new OPCODE the compiler forces, since
+-- this case is exhaustive; a new Quantity FIELD on an existing one it does not.
+effectQuantities :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Quantity.Type.Quantity]
+effectQuantities effect = concatMap Resolve.objectRefQuantities (Resolve.effectObjectRefs effect) <> ownQuantities effect
+
+-- effectQuantities' half that is not an ObjectRef's. In ownCounts' arm order, so
+-- the two are checkable side by side; the arms that differ from it are the entry
+-- riders, whose per-kind count is a Quantity Resolve.slotsOf reads and ownCounts
+-- leaves to the Filter sweep.
+ownQuantities :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Quantity.Type.Quantity]
+ownQuantities effect = case effect of
+  Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> fmap DamagePart.quantity (Foldable.toList parts)
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationQuantities duration <> Projection.quantitiesOf modification
+  Effect.ChangeText {} -> []
+  Effect.AddMana _ -> []
+  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> Maybe.maybeToList quantity
+  Effect.ExileAllGraveyards -> []
+  Effect.Proliferate -> []
+  Effect.ChooseCardName _ -> []
+  Effect.FromOutsideTheGame _ -> []
+  Effect.ExileThisSpell -> []
+  Effect.Bolster quantity -> [quantity]
+  Effect.Amass (Amass.MkAmass quantity _) -> [quantity]
+  Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
+  Effect.TemptWithTheRing -> []
+  Effect.Venture {} -> []
+  Effect.ExileHandThenDraw -> []
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> [quantity]
+  Effect.RestartGame _ -> []
+  Effect.ControlPlayerNextTurn _ -> []
+  Effect.Destroy {} -> []
+  Effect.Sacrifice _ -> []
+  -- The entry riders' counts, which Resolve.slotsOf reads and ownCounts does
+  -- not: CR 122.6's per-kind number is a Quantity like any other.
+  Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> Resolve.riderQuantities riders
+  Effect.Draw (Draw.MkDraw _ quantity _) -> [quantity]
+  Effect.Mill (Mill.MkMill _ quantity _ _) -> [quantity]
+  Effect.Reveal {} -> []
+  Effect.LookAt {} -> []
+  Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
+  Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
+  Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
+  Effect.Explore {} -> []
+  Effect.Discard subject -> case subject of
+    Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> [quantity]
+    Discard.These {} -> []
+  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
+  Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
+  Effect.ExchangeLifeTotals _ -> []
+  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
+  Effect.RedistributeLifeTotals -> []
+  Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
+  Effect.DecreaseSpeed d -> [SpeedDecrease.quantity d]
+  Effect.Create (Create.MkCreate quantity _ riders _ _) -> quantity : Resolve.riderQuantities riders
+  Effect.Conjure (Conjure.MkConjure quantity _ _) -> [quantity]
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> quantity : Resolve.riderQuantities riders
+  Effect.BecomeCopy {} -> []
+  Effect.CopySpell {} -> []
+  Effect.Replace (Replace.MkReplace duration _ _ condition _) -> durationQuantities duration <> foldMap conditionQuantities condition
+  Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity _) -> quantity : durationQuantities duration
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ _ _) -> durationQuantities duration
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _ _) -> durationQuantities duration
+  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown _ listed) ->
+    fmap (\(Power.MkPower quantity) -> quantity) (Maybe.maybeToList (FaceDownCharacteristics.power listed))
+      <> fmap (\(Toughness.MkToughness quantity) -> quantity) (Maybe.maybeToList (FaceDownCharacteristics.toughness listed))
+  Effect.TurnFaceUp _ -> []
+  Effect.Fight _ -> []
+  Effect.RemoveFromCombat _ -> []
+  Effect.BecomesBlocked _ -> []
+  Effect.Counter {} -> []
+  Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> [quantity]
+  Effect.PutCountersFrom {} -> []
+  Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> Maybe.maybeToList (MovedKinds.quantityOf kinds)
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> [quantity]
+  Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> [quantity]
+  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> [quantity]
+  Effect.PayAnyEnergy _ -> []
+  Effect.Tap _ -> []
+  Effect.Untap _ -> []
+  Effect.Detain _ -> []
+  Effect.Goad _ -> []
+  Effect.MakePlotted _ -> []
+  Effect.DoesNotUntapNext _ -> []
+  Effect.Transform _ -> []
+  Effect.Convert _ -> []
+  Effect.Meld (Meld.MkMeld _ _) -> []
+  Effect.PhaseOut _ -> []
+  Effect.AddPhases _ -> []
+  Effect.EndTurn -> []
+  Effect.EndCombatPhase -> []
+  Effect.GainControl (DurationRef.MkDurationRef duration _) -> durationQuantities duration
+  Effect.ArmDelayedTrigger {} -> []
+  Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) -> durationQuantities duration
+  Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationQuantities duration
+  Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) -> durationQuantities duration
+  Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) -> durationQuantities duration
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _) -> durationQuantities duration
+  Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationQuantities duration
+  Effect.CreateEmblem _ -> []
+  Effect.BecomeMonarch _ -> []
+  Effect.Designate (Designate.MkDesignate _ _) -> []
+  Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
+  Effect.Unsuspect _ -> []
+  Effect.SetHalfLocked {} -> []
+  Effect.Evolve _ -> []
+  Effect.Mentor _ -> []
+  Effect.Train _ -> []
+  Effect.ItBecomes _ -> []
+  Effect.ExileUntilMonarch _ -> []
+  Effect.ExileHaunting {} -> []
+  Effect.Attach _ -> []
+  Effect.AttachTarget {} -> []
+  Effect.AttachTargetToEach {} -> []
+  Effect.AttachBound {} -> []
+  Effect.PlaySubgame _ -> []
+  Effect.ChooseOpponent _ -> []
+  Effect.ChooseOpponentAtRandom _ -> []
+  Effect.RollDie rollDie -> Maybe.maybeToList (RollDie.modifier rollDie)
+  Effect.FlipCoin {} -> []
+  Effect.TakeExtraTurn {} -> []
+  Effect.ShuffleIntoLibrary {} -> []
+  Effect.Shuffle {} -> []
+  Effect.OfferCast {} -> []
+  Effect.GrantPlayFromExile grant -> durationQuantities (GrantPlayFromExile.duration grant)
+  Effect.ForEach {} -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
@@ -2229,6 +2377,33 @@ faceModals card =
       <> fmap TriggeredAbility.modal (Face.triggeredAbilities card)
       <> fmap TriggeredAbility.modal (Map.elems (Face.delayedAbilities card))
       <> fmap DungeonRoom.ability (Foldable.toList (Face.rooms card))
+
+-- Every PlayerRef a CLAUSE of this face holds: CR 118.12a's payer and CR 603.5's
+-- asker. Both sit on Pawl.Types.Clause rather than inside any effect, so neither
+-- effect traversal reaches them; Pawl.Engine.Resolve.modeSlots reads exactly this
+-- pair, through the same playerRefSlots classification.
+--
+-- Over the GRANTED carriers as well as the printed ones, cardResolutionEffects'
+-- scope: CR 613.1f's quoted ability is text this face printed, so a clause of one
+-- is this face's clause.
+faceClausePlayerRefs :: Face.Face Card.Type.Card -> [PlayerRef.PlayerRef]
+faceClausePlayerRefs card =
+  concatMap clausePlayerRefs
+    . concatMap (Foldable.toList . Mode.clauses)
+    . concatMap (Foldable.toList . Modal.modes)
+    $ faceModals card
+      <> fmap ActivatedAbility.modal (grantedActivatedAbilities card)
+      <> fmap TriggeredAbility.modal (grantedTriggeredAbilities card)
+
+-- One clause's two: the player CR 118.12's cost is offered to, and the player CR
+-- 603.5's "may" is asked of. A clause with no gate offers nobody, and a mandatory
+-- one asks nobody.
+clausePlayerRefs :: Clause.Clause card ability -> [PlayerRef.PlayerRef]
+clausePlayerRefs clause =
+  fmap PayGate.payer (Maybe.maybeToList (Clause.payGate clause))
+    <> case Clause.optionality clause of
+      Optionality.Mandatory -> []
+      Optionality.Optional ref -> [ref]
 
 -- CR 608.2d: does any clause's either-or name a sibling that does not name it
 -- back? Clause.orElse is SYMMETRIC by design -- the announcement is made at
@@ -7513,18 +7688,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- a payload rather than being one, so readSinglyInPlayerRefs below is its
         -- leg.
         --
-        -- Not implemented: the two singular reads that reach a slot through
-        -- Filter.slotOneObject from inside a NUMBER -- Quantity.AgainstSlot and
-        -- Pawl.Engine.Quantity's own PlayerRef.ControllerOfBound arm, which
-        -- reads a reference nested in a NUMBER where readSinglyInPlayerRefs
-        -- below reaches only the ones an opcode holds in a field of its own.
-        -- Both decline a group exactly as Binding.onlyOne does, and
-        -- reaching them wants an Effect-to-Quantity traversal this file does not
-        -- have (#2711). The third reader through that funnel,
-        -- Filter.IsControllerOfBound, IS fenced -- by filterSlotsReadSingly,
-        -- which clashesIn folds over every Filter these effects carry.
-        -- Filter.IsBound reads the whole set, so it is no risk and no fence for
-        -- the others either.
+        -- A slot read from inside a NUMBER is not one of these arms either:
+        -- Quantity.AgainstSlot reaches Filter.slotOneObject, which declines a
+        -- group exactly as Binding.onlyOne does, and readSinglyInQuantities
+        -- below is its leg. Filter.IsControllerOfBound, the third reader through
+        -- that funnel, is filterSlotsReadSingly's; Filter.IsBound reads the whole
+        -- set, so it is no risk and no fence for the others either.
+        --
+        -- Not implemented: a PlayerRef NESTED IN a quantity -- Quantity's own
+        -- ControllerOfBound arm -- which Quantity.slots answers empty for, so the
+        -- quantity leg cannot report it and nothing else looks there (#1079).
         --
         -- The condition of a DELAYED ability is a singular reader too, and it is
         -- fenced on both axes: triggerConditionSlots and filterSlotsReadSingly
@@ -7595,25 +7768,48 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- needs: neither traversal descends into the card a Create or a Conjure
         -- carries, so nothing a token prints is attributed to its creator.
         --
-        -- Not implemented: the same arm written as CR 118.12a's payer or CR
-        -- 603.5's asker, which sit on a CLAUSE and so are in neither traversal
-        -- (#2743).
+        -- CR 118.12a's payer and CR 603.5's asker are the same arm one carrier
+        -- over -- a CLAUSE rather than an effect -- so faceClausePlayerRefs is
+        -- what collects them and they arrive here through the same
+        -- slotsReadSinglyIn.
         readSinglyInPlayerRefs effects =
+          slotsReadSinglyIn
+            (concatMap (\effect -> Resolve.effectPlayerRefs effect <> concatMap Resolve.objectRefPlayerRefs (Resolve.effectObjectRefs effect)) effects)
+        -- The arity classification itself, shared by the effect leg above and the
+        -- clause leg clashesIn folds in below.
+        slotsReadSinglyIn refs =
           [ slot
-          | effect <- effects,
-            ref <- Resolve.effectPlayerRefs effect <> concatMap Resolve.objectRefPlayerRefs (Resolve.effectObjectRefs effect),
+          | ref <- refs,
             (slot, SlotArity.One) <- Map.toList (Resolve.playerRefSlots ref)
           ]
-        -- The two READING sides at once: this resolution's own effects, and the
-        -- conditions of the delayed abilities it arms. CR 603.7c is what puts
-        -- the second there -- the entry captures the arming resolution's whole
-        -- environment, so a slot an earlier clause bound is exactly what the
-        -- condition names -- and DELAYED abilities alone, since a printed
-        -- trigger has no captured environment for a card-authored slot to be in.
-        -- The effects side is folded over all three walks -- the slots named
-        -- outright, the slots a Filter reads singly and the slots a PlayerRef
-        -- does -- and the conditions side over the two it has.
-        clashesIn effects conditions =
+        -- The reading side's fifth carrier: a NUMBER. Pawl.Engine.Quantity.slots
+        -- reports the slot a Quantity.AgainstSlot aims at, and
+        -- Resolve.quantitySlots classifies every slot a quantity reads at
+        -- SlotArity.One -- a quantity evaluates against one object, so a slot
+        -- naming several leaves Filter.slotOneObject with nothing to pick and the
+        -- whole number unanswered.
+        --
+        -- No subtraction of a minted object's text, which readSinglyInFilters
+        -- needs: effectQuantities does not descend into the card a Create or a
+        -- Conjure carries.
+        readSinglyInQuantities effects =
+          [ slot
+          | effect <- effects,
+            quantity <- effectQuantities effect,
+            (slot, SlotArity.One) <- Map.toList (Resolve.quantitySlots quantity)
+          ]
+        -- The three READING sides at once: this resolution's own effects, the
+        -- conditions of the delayed abilities it arms, and the PlayerRefs its
+        -- CLAUSES hold. CR 603.7c is what puts the second there -- the entry
+        -- captures the arming resolution's whole environment, so a slot an
+        -- earlier clause bound is exactly what the condition names -- and
+        -- DELAYED abilities alone, since a printed trigger has no captured
+        -- environment for a card-authored slot to be in. The effects side is
+        -- folded over four walks -- the slots named outright, the slots a Filter
+        -- reads singly, the slots a PlayerRef does and the slots a Quantity does
+        -- -- the conditions side over the two it has, and the clause side over
+        -- the one arity classification the PlayerRef walks share.
+        clashesIn effects conditions refs =
           not
             . Set.null
             $ Set.intersection
@@ -7622,12 +7818,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                   [ Set.fromList (concatMap readSingly effects),
                     Set.fromList (readSinglyInFilters effects),
                     Set.fromList (readSinglyInPlayerRefs effects),
+                    Set.fromList (readSinglyInQuantities effects),
                     Set.fromList (concatMap triggerConditionSlots conditions),
-                    Set.fromList (concatMap (concatMap framedSlotsReadSingly . triggerConditionFilters) conditions)
+                    Set.fromList (concatMap (concatMap framedSlotsReadSingly . triggerConditionFilters) conditions),
+                    Set.fromList (slotsReadSinglyIn refs)
                   ]
               )
-        clashes effects = clashesIn effects []
-        faceClashes card = clashesIn (cardResolutionEffects card) (fmap TriggeredAbility.condition (Map.elems (Face.delayedAbilities card)))
+        clashes effects = clashesIn effects [] []
+        faceClashes card = clashesIn (cardResolutionEffects card) (fmap TriggeredAbility.condition (Map.elems (Face.delayedAbilities card))) (faceClausePlayerRefs card)
         offenders = filter (anyFace faceClashes . Printing.card) ps
         binds effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _ _) -> Maybe.isJust mSlot && not (movesAtMostOne ref)
@@ -7657,10 +7855,45 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- CR 608.2h's arm anywhere a PlayerRef sits in an effect, which is the
         -- corpus half of this leg. A wildcard because it is a presence probe:
         -- every other arm is not this one, however many there come to be.
+        namesControllerOfBound ref = case ref of PlayerRef.ControllerOfBound _ -> True; _ -> False
         readsController effect =
           any
-            (\ref -> case ref of PlayerRef.ControllerOfBound _ -> True; _ -> False)
+            namesControllerOfBound
             (Resolve.effectPlayerRefs effect <> concatMap Resolve.objectRefPlayerRefs (Resolve.effectObjectRefs effect))
+        -- An opcode holding a QUANTITY in a field of its own, and the arm of that
+        -- quantity which aims an inner number at the one object a slot names.
+        -- Nothing about the opcode matters: what is on trial is the atom inside
+        -- the number.
+        counting quantity = Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) quantity Nothing)
+        against slot = Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot Quantity.Type.Power)
+        -- The corpus half of the number leg: does any card read ANY slot inside a
+        -- number? A presence probe over the traversal rather than over the arm,
+        -- since an effectQuantities answering [] everywhere would leave the leg
+        -- silently inert.
+        readsSlotInNumber effect = not (all (Set.null . Quantity.slots) (effectQuantities effect))
+        -- A face whose first clause binds the group and whose second carries the
+        -- clause-level PlayerRef on trial. Built as a FACE rather than as an
+        -- effect list because the walk from a face to its clauses is the half
+        -- being proven; the second clause carries no effects at all, so nothing
+        -- but the payer or the asker can name the slot.
+        clauseFace gate optionality =
+          (vanillaFace "Planted" instantLine)
+            { Face.spell =
+                Modal.MkModal
+                  ( Seq.singleton
+                      ( Mode.MkMode
+                          ( Seq.fromList
+                              [ Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton destruction),
+                                Clause.MkClause Nothing Nothing Nothing optionality gate Seq.empty
+                              ]
+                          )
+                          Map.empty
+                      )
+                  )
+                  (ModeSelection.ChooseExactly 1)
+            }
+        payerFace ref = clauseFace (Just (PayGate.MkPayGate ref (Cost.Type.MkCost Nothing []) PayBranch.IfNotPaid PayObligation.Optional Nothing)) Optionality.Mandatory
+        askerFace ref = clauseFace Nothing (Optionality.Optional ref)
         -- CR 111.1's token, whose OWN printed text carries that same predicate:
         -- Face.enchant is a Filter position cardFilters walks, so effectFilters
         -- splices it in beside the creating card's. Binds no slot itself --
@@ -7725,8 +7958,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- environment to a delayed ability, whose condition names a slot and reads
     -- it through Binding.objectSlots. Paired with the same condition over a slot
     -- the destruction never bound.
-    Spec.assertBool s (clashesIn [destruction] [TriggerCondition.LoseControlOfBound destroyedSlot]) "a delayed condition naming a plurally bound slot is caught"
-    Spec.assertBool s (not (clashesIn [destruction] [TriggerCondition.LoseControlOfBound elsewhereSlot])) "a delayed condition naming another slot is left alone"
+    Spec.assertBool s (clashesIn [destruction] [TriggerCondition.LoseControlOfBound destroyedSlot] []) "a delayed condition naming a plurally bound slot is caught"
+    Spec.assertBool s (not (clashesIn [destruction] [TriggerCondition.LoseControlOfBound elsewhereSlot] [])) "a delayed condition naming another slot is left alone"
     -- The reading side's third carrier: a Filter an effect carries, where CR
     -- 608.2h's Filter.IsControllerOfBound reads the slot through
     -- Pawl.Engine.Filter.slotOneObject rather than through Resolve. Three boards
@@ -7744,8 +7977,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- And the same atom in a DELAYED ability's condition, the other carrier
     -- clashesIn folds the walk over. Paired with the slot the destruction never
     -- bound, so the pair differs in the slot name alone.
-    Spec.assertBool s (clashesIn [destruction] [TriggerCondition.PermanentDies (Filter.Type.IsControllerOfBound destroyedSlot)]) "a singular read inside a delayed condition's filter is caught"
-    Spec.assertBool s (not (clashesIn [destruction] [TriggerCondition.PermanentDies (Filter.Type.IsControllerOfBound elsewhereSlot)])) "a singular read inside a delayed condition's filter of another slot is left alone"
+    Spec.assertBool s (clashesIn [destruction] [TriggerCondition.PermanentDies (Filter.Type.IsControllerOfBound destroyedSlot)] []) "a singular read inside a delayed condition's filter is caught"
+    Spec.assertBool s (not (clashesIn [destruction] [TriggerCondition.PermanentDies (Filter.Type.IsControllerOfBound elsewhereSlot)] [])) "a singular read inside a delayed condition's filter of another slot is left alone"
     -- The PlayerRef carrier, where CR 608.2h's ControllerOfBound names an OBJECT
     -- slot and reads it through Resolve.playerRefPlayers' legalOne. Three boards
     -- differing in one thing
@@ -7775,6 +8008,38 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- leg a set difference would pass the assertion above and silently mask a
     -- real offender.
     Spec.assertBool s (clashes [destruction, tapping (Filter.Type.IsControllerOfBound destroyedSlot), tokenReading (Filter.Type.IsControllerOfBound destroyedSlot)]) "the creating card's own read survives a token reading the same slot"
+    -- The reading side's fifth carrier: a NUMBER. CR 115.10a's group is what an
+    -- earlier effect of the same resolution bound, and Quantity.AgainstSlot aims
+    -- an inner number at the ONE object a slot names, through
+    -- Pawl.Engine.Filter.slotOneObject. Paired with the same number over a slot
+    -- the destruction never bound.
+    Spec.assertBool s (clashes [destruction, counting (against destroyedSlot)]) "a singular read inside a number is caught"
+    Spec.assertBool s (not (clashes [destruction, counting (against elsewhereSlot)])) "a singular read inside a number of another slot is left alone"
+    -- The same atom under a NEST, which is the half a top-level number cannot
+    -- prove: a Quantity.slots answering the empty set for Negate would pass both
+    -- assertions above.
+    Spec.assertBool s (clashes [destruction, counting (Quantity.Type.Negate (against destroyedSlot))]) "a singular read nested inside a number is caught"
+    -- And the guard that keeps the leg from being silently inert: the pool reads
+    -- a slot inside a number -- Soul's Majesty aims a count at its target, and
+    -- every card with an {X} in a number reads the announced amount.
+    Spec.assertBool s (any (anyFace (any readsSlotInNumber . cardResolutionEffects) . Printing.card) ps) "the pool has a card reading a slot inside a number"
+    -- The PlayerRef carrier one step out: CR 118.12a's payer and CR 603.5's asker
+    -- sit on a CLAUSE, so this pair goes through faceClashes rather than through
+    -- `clashes` -- the walk from a face to its clauses is what is on trial. Three
+    -- boards differing in one thing each, the PlayerRef leg's own posture: the
+    -- ARM against the group-tolerant PlayerRef.EachInSlot, and the SLOT against a
+    -- name the destruction never bound.
+    Spec.assertBool s (faceClashes (payerFace (PlayerRef.ControllerOfBound destroyedSlot))) "a resolution cost's payer naming a plurally bound slot is caught"
+    Spec.assertBool s (not (faceClashes (payerFace (PlayerRef.EachInSlot destroyedSlot)))) "a group-tolerant payer is left alone"
+    Spec.assertBool s (not (faceClashes (payerFace (PlayerRef.ControllerOfBound elsewhereSlot)))) "a payer naming another slot is left alone"
+    -- The same arm at the OTHER clause position, which the payer's boards cannot
+    -- prove: an askerSlot answering nothing would pass all three above.
+    Spec.assertBool s (faceClashes (askerFace (PlayerRef.ControllerOfBound destroyedSlot))) "a may's asker naming a plurally bound slot is caught"
+    Spec.assertBool s (not (faceClashes (askerFace (PlayerRef.ControllerOfBound elsewhereSlot)))) "an asker naming another slot is left alone"
+    -- And the guard that keeps this leg from fencing a shape no card writes: Mana
+    -- Leak, Clash of Wills, Mystic Confluence and Don't Make a Sound all offer
+    -- their cost to the countered spell's controller.
+    Spec.assertBool s (any (anyFace (any namesControllerOfBound . faceClausePlayerRefs) . Printing.card) ps) "the pool has a card naming a clause's player by the controller of a bound object"
     Spec.assertEqWith s "a group binding is invisible to a singular reader" (fmap (S.nameOf . Printing.card) offenders) []
   -- OwnerChooses asks a player which END of a library a card arrives at (CR
   -- 401.2), and only a library HAS ends -- so on any other destination it would
