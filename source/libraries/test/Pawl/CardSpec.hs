@@ -8791,7 +8791,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             -- Condition's, a Duration's or an ObjectRef's Counts alone answers []
             -- here, since quantityCounts has no Count to hand back for an
             -- ObjectCounters.
-            ("CR 604.2's gate", holds (conditionFilters counting)),
+            ("a Condition's own number", holds (conditionFilters counting)),
             ("CR 611.2b's for-as-long-as clause", holds (durationFilters (Duration.ForAsLongAs counting))),
             ("a library depth", holds (objectRefFilters topDepth)),
             ("its reveal-until mirror", holds (objectRefFilters (ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (PlayerRef.Relative PlayerRelation.You) (Filter.Type.HasCardType CardType.Land) (Quantity.Type.ObjectCounters kind))))),
