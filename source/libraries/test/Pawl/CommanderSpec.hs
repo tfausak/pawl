@@ -33,11 +33,14 @@
 -- The Bounce group adds two of bob's spells and the Islands to cast them with:
 -- Unsummon ({U} Instant, "return target creature to its owner's hand") for rule
 -- 903.9b's hand half and Griptide ({3}{U} Instant, "put target creature on top of
--- its owner's library") for its library half.
+-- its owner's library") for its library half. Evacuation ({3}{U}{U} Instant,
+-- "return all creatures to their owners' hands") is the one event that reaches
+-- two commanders, which is rule 903.9b's exception to CR 614.5.
 module Pawl.CommanderSpec where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
@@ -54,6 +57,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -362,6 +366,47 @@ bounceSpec s registry = Spec.describe s "Bounce" $ do
         after = bouncing (answering S.alice) bounceId undesignated
     Spec.assertEqWith s "nothing reaches the command zone" (length (inCommandZone after)) 0
     Spec.assertEqWith s "and it is in her hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
+  -- CR 903.9b's last sentence: "this replacement effect may apply more than once
+  -- to the same event. This is an exception to rule 614.5." Evacuation -- "return
+  -- all creatures to their owners' hands" -- is that event: CR 608.2f makes the
+  -- whole sweep one event, and two of the creatures it returns are commanders, so
+  -- the offer has to be made twice.
+  --
+  -- THREE SEATS and TWO ANSWERS, which is what an engine getting only one
+  -- application cannot produce: carol casts the spell so neither owner is the
+  -- caster, alice answers Returns and bob answers Leaves, and the two commanders
+  -- end in different zones. One application -- whichever commander it was spent
+  -- on -- leaves the other card in its owner's hand with no question asked, so
+  -- both assertions below would have to read the same answer.
+  --
+  -- Asserted on the PRINTED NAMES: CR 400.7 mints a fresh id on every zone
+  -- change, so nothing on this board can be followed by the id it started with.
+  Spec.it s "CR 903.9b the offer applies once per commander in the same event" $ do
+    island <- S.printingOf s registry "Island"
+    kalakscion <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    evacuation <- S.printingOf s registry "Evacuation"
+    let seated = designating [(S.alice, kalakscion), (S.bob, jedit)] S.threePlayerGame
+        inPlay = intoPlay S.bob (intoPlay S.alice seated)
+        (castId, board) = S.addHandCard evacuation S.carol (S.landsFor island S.carol 5 inPlay)
+        answer = answering S.alice
+        after = S.runPure answer (S.runPure answer board (S.cast S.carol castId)) Stack.resolveTop
+    Spec.assertEqWith s "alice accepted, so her Kalakscion is the one card in the command zone" (commandZoneNames after) [S.nameOf (Printing.card kalakscion)]
+    Spec.assertEqWith s "bob declined, so his Jedit went to his hand instead" (handNames S.bob after) [S.nameOf (Printing.card jedit)]
+    -- The proxies, kept after the two above: both commanders really were on the
+    -- battlefield to be returned, and neither started in a hand.
+    Spec.assertEqWith s "setup: the command zone was empty and both commanders were in play" (commandZoneNames board, S.creaturesInPlay S.alice board, S.creaturesInPlay S.bob board) ([], 1, 1)
+    Spec.assertEqWith s "setup: and neither owner held a card" (handNames S.alice board <> handNames S.bob board) []
+
+-- The printed names of the cards in the command zone, in id order. NAMES and not
+-- ids because CR 400.7 makes the object that arrives a different one from the
+-- object that left.
+commandZoneNames :: GameState.GameState -> [CardName.CardName]
+commandZoneNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (inCommandZone gs)
+
+-- The same read of a player's hand.
+handNames :: PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
+handNames pid gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Hand pid gs)
 
 -- CR 903.10a's pool, which Shimatsu cannot serve: a 0/0 dies to CR 704.5f before
 -- it can attack.
