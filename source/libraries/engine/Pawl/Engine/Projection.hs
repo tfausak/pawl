@@ -2244,6 +2244,14 @@ rewriteEffect pairs effect = case effect of
   -- permanent's static row; a floating one is the same text one carrier over.
   -- CR 614.3's Uses is a count and CR 614.15's ReplacementOrigin is provenance,
   -- so neither holds a printed word.
+  --
+  -- The EFFECT half is proved by Pawl.CounterspellSpec's evolved Moonmist, whose
+  -- shield spares Goblins where the printed word says Werewolves. The DURATION
+  -- and the CONDITION are REGRESSION FENCES rather than proved behaviours:
+  -- every Effect.Replace in data/cards/ lasts UntilEndOfTurn, which holds no
+  -- word, and the four that print a CR 614.1 gate are metalcraft-shaped counts
+  -- over HasCardType Artifact, which is a card type rather than a subtype -- so
+  -- mutating either line away leaves the whole suite green.
   Effect.Replace r ->
     Effect.Replace
       r
