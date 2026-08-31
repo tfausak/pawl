@@ -492,7 +492,9 @@ data Prompt r where
   -- unlocks. The ObjectId is the permanent; the NonEmpty is the halves the
   -- instruction admits -- rule 709.5g's "an unlocked half" for a lock and rule
   -- 709.5f's "a locked half" for an unlock -- in printed order. Choose, not
-  -- target. Raised only for two or more, one half leaving nothing to ask.
+  -- target. Raised only for two or more, one half leaving nothing to ask -- and
+  -- not at all for an instruction naming every admitted half
+  -- (Pawl.Types.SetHalfLocked's `every`), which chooses nothing.
   --
   -- HALVES and not doors, and no Room in sight: CR 709.5j makes "door" what a
   -- card calls a half, and rules 709.5f\/g word both instructions over any

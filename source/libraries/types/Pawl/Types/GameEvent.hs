@@ -582,9 +582,9 @@ data GameEvent
     -- 'removed'; they simply cease to exist", so there is no removal to record.
     CountersRemoved CounterChange.CounterChange
   | -- | CR 709.5c: a permanent was given an UNLOCKED DESIGNATION -- the permanent,
-    -- and the half the designation names. Emitted by Pawl.Engine.Event.unlockHalf,
-    -- the one place a designation is given, and only when the permanent did not
-    -- already have it.
+    -- who unlocked it, and the half the designation names. Emitted by
+    -- Pawl.Engine.Event.unlockHalves, the one place a designation is given after
+    -- the entry write, and only when the permanent did not already have it.
     --
     -- The event CR 709.5h asks about: "Some abilities trigger when a player
     -- unlocks a particular half of a permanent. These abilities trigger when that
@@ -599,11 +599,10 @@ data GameEvent
     -- Room with two "when you unlock this door" abilities needs each to know
     -- which door the event was about.
     --
-    -- No player, though CR 709.5e's special action has one: the rule words the
-    -- trigger as "when that permanent IS GIVEN the appropriate unlocked
-    -- designation", and CR 709.5f's unlock reaches it with no payer at all. The
-    -- ability's own controller is CR 603.3a's, read off the source as every other
-    -- trigger's is.
+    -- The PLAYER is rules 709.5h and 709.5i's "a player unlocks", which a card
+    -- names as "you" (CR 109.5). Every route supplies one -- rule 709.5e's payer,
+    -- the controller of the object carrying out rule 709.5f's instruction, and
+    -- CR 110.2a's entry controller for rule 709.5d's designation.
     --
     -- NOT emitted for a LOCK (CR 709.5g), and that is the rule rather than an
     -- omission: rules 709.5h and 709.5i are the only rules that ask a trigger
@@ -618,7 +617,9 @@ data GameEvent
     -- rather than about the moment the designation was given. Computed at the two
     -- write sites from one helper (Pawl.Engine.Event.fullyUnlockedAfter), so the
     -- entry designation (CR 709.5d) and the later one (CR 709.5f) cannot disagree
-    -- about what "fully" means.
+    -- about what "fully" means. It marks the WRITE and not the half: a write that
+    -- gives both designations at once records one event per door and sets this on
+    -- exactly one, so rule 709.5i's second branch fires once.
     HalfUnlocked HalfUnlocked.HalfUnlocked
   | -- | CR 708.7: a face-down permanent was turned face up. CR 708.8 makes that a
     -- change to one permanent's copiable values rather than a zone change, so no
@@ -629,9 +630,9 @@ data GameEvent
     -- needs: the SELF-scoped condition compares it against the bearer, and the
     -- watcher-scoped form CR 708.7 also admits would filter on it (#959).
     --
-    -- No PLAYER, for the reason HalfUnlocked carries none: CR 702.37e's action
-    -- has a taker, but the trigger is worded about the permanent BEING turned
-    -- face up, and CR 603.3a reads the ability's controller off its source.
+    -- No PLAYER, unlike HalfUnlocked above: CR 702.37e's action has a taker, but
+    -- the trigger is worded about the permanent BEING turned face up, and CR
+    -- 603.3a reads the ability's controller off its source.
     --
     -- One DIRECTION only. Turning a permanent face down (CR 708.2a's first
     -- sentence) is the opposite change and would be its own event -- and no

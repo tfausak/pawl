@@ -253,14 +253,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked (ObjectId.MkObjectId 4) (CardName.MkCardName (Text.pack "Roaring Furnace")) False))
-      " {\"type\":\"HalfUnlocked\",\"value\":{\"object\":4,\"name\":\"Roaring Furnace\",\"fully\":false}} "
+      (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked (ObjectId.MkObjectId 4) (PlayerId.MkPlayerId 1) (CardName.MkCardName (Text.pack "Roaring Furnace")) False))
+      " {\"type\":\"HalfUnlocked\",\"value\":{\"object\":4,\"actor\":1,\"name\":\"Roaring Furnace\",\"fully\":false}} "
   Spec.it s "HalfUnlocked carrying CR 709.5i's fully-unlocked flag" $
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked (ObjectId.MkObjectId 4) (CardName.MkCardName (Text.pack "Steaming Sauna")) True))
-      " {\"type\":\"HalfUnlocked\",\"value\":{\"object\":4,\"name\":\"Steaming Sauna\",\"fully\":true}} "
+      (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked (ObjectId.MkObjectId 4) (PlayerId.MkPlayerId 1) (CardName.MkCardName (Text.pack "Steaming Sauna")) True))
+      " {\"type\":\"HalfUnlocked\",\"value\":{\"object\":4,\"actor\":1,\"name\":\"Steaming Sauna\",\"fully\":true}} "
   -- CR 708.7. One id and no more: CR 708.8 makes turning face up a change to one
   -- permanent, and the payload says only which.
   Spec.it s "TurnedFaceUp" $

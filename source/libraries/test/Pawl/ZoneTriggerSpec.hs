@@ -2126,11 +2126,12 @@ representativeEvents cond =
         -- CR 709.5h's own event, on the BEARER and naming the same door the
         -- condition does, so the pair really matches -- the door below is the one
         -- everyTriggerCondition names.
-        TriggerCondition.SelfHalfUnlocked half -> one (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked departed half False))
-        -- CR 709.5i's own event, with the flag SET -- an unset one matches
+        TriggerCondition.SelfHalfUnlocked half -> one (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked departed S.alice half False))
+        -- CR 709.5i's own event, with the flag SET and alice as the player who
+        -- unlocked -- an unset flag, or an actor the relation refuses, matches
         -- nothing, and would pin the floor against an event this condition does
         -- not admit.
-        TriggerCondition.RoomFullyUnlocked _ -> one (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked departed (CardName.MkCardName (Text.pack "Steaming Sauna")) True))
+        TriggerCondition.RoomFullyUnlocked _ -> one (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked departed S.alice (CardName.MkCardName (Text.pack "Steaming Sauna")) True))
         -- EVERY event any branch admits, concatenated, which is what makes the
         -- intersection below the honest floor for an AnyOf: a slot one branch
         -- binds and another does not must not be claimed.

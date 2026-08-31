@@ -1109,11 +1109,12 @@ data Effect card ability
     -- Not a designation-parameterised inverse of Designate: CR 701.60a's ending
     -- belongs to `Suspected` alone, no rule taking renowned or monstrous away.
     Unsuspect ObjectRef.ObjectRef
-  | -- | CR 709.5f and CR 709.5g: "lock" or "unlock" half of the slot's
+  | -- | CR 709.5f and CR 709.5g: "lock" or "unlock" halves of the slot's
     -- permanent. Keys to the House's "lock or unlock a door of target Room you
-    -- control" is the producer in data/cards, and it prints both settings as one
-    -- either-or clause pair (Pawl.Types.Clause.orElse). Marina Vendrell prints
-    -- the same clause on a five-colour legend and is not transcribed.
+    -- control" is the printed producer in data/cards, and it prints both settings
+    -- as one either-or clause pair (Pawl.Types.Clause.orElse). Marina Vendrell
+    -- prints the same clause on a five-colour legend and is not transcribed.
+    -- Synthetic Skeleton Key is the producer of the plural setting.
     --
     -- ONE opcode over a payload and not one arm apiece, Designate's argument
     -- above: rules 709.5f and 709.5g are the same sentence with two words
@@ -1132,7 +1133,9 @@ data Effect card ability
     --
     -- WHICH half is not a payload: both rules make it a choice taken while the
     -- effect is applied (CR 608.2d), so it is asked at resolution and filtered to
-    -- the halves the setting admits.
+    -- the halves the setting admits. HOW MANY is a payload, since that is the
+    -- instruction's own wording rather than a choice -- "each locked door" leaves
+    -- nothing to ask and is the only route to CR 709.5i's second branch.
     --
     -- Writes Object.unlockedHalves, which holds DESIGNATIONS (CR 709.5c) rather
     -- than characteristics, so nothing in CR 613 could carry it -- Designate's

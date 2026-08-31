@@ -2417,7 +2417,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> effect
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> effect
   Effect.Unsuspect ref -> Effect.Unsuspect (rewriteObjectRef pairs ref)
-  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> effect
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> effect
   Effect.Evolve _ -> effect
   Effect.Mentor _ -> effect
   Effect.Train _ -> effect
