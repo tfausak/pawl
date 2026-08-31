@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.OutsideTheGame as OutsideTheGame
+import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Turn as Turn
@@ -38,6 +39,7 @@ import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OutsideObject as OutsideObject
+import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -292,6 +294,17 @@ dirtied pid object =
 -- leaves this green.
 forgotten :: Object.Object -> Bool
 forgotten object = Object.newIncarnation object == object
+
+-- Settle the CR 117.5 scan and then run the priority loop, so a trigger a
+-- crossing put on the stack actually resolves. Pawl.DepartureSpec's namesake for
+-- the other road out of the game.
+resolveTriggers :: GameState.GameState -> GameState.GameState
+resolveTriggers gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs Engine.settleForPriority) Engine.priorityLoop
+
+-- The token Thragtusk's leaves-the-battlefield ability makes, which is how the
+-- two crossing legs below say whether that ability fired.
+beastToken :: CardName.CardName
+beastToken = CardName.MkCardName (Text.pack "Beast Token")
 
 restartSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
@@ -644,6 +657,62 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     Spec.assertEqWith s "bob's creature, which nothing took, is untouched" (Set.member bystanderId (GameState.battlefield after)) True
     Spec.assertEqWith s "CR 729.4a: a GameEvent.LeftTheGame names it in the main game's log" leftEvents [elfId]
     Spec.assertEqWith s "CR 608.2h: its last known information is filed under the id it had" (Map.member elfId (GameState.lastKnown after)) True
+
+  -- CR 603.6c's second trigger event on the OTHER road out of the game -- CR
+  -- 729.4a's crossing, where the departure road above it is CR 800.4a. Three
+  -- seats, each doing a job, exactly as Pawl.DepartureSpec's pair does for that
+  -- road: alice OWNS the Thragtusk, carol CONTROLS it and so takes CR 603.3a's
+  -- trigger, and bob is the bystander the token count is checked against.
+  --
+  -- The trigger can only be read from CR 608.2h last known information: the
+  -- crossed permanent is not merely off the battlefield by the CR 117.5 scan, it
+  -- is out of the main game, so neither the live board nor the per-group sample
+  -- has anything to find.
+  Spec.it s "CR 603.6c/729.4a a phased-in permanent a subgame takes triggers its leaves-the-battlefield ability" $ do
+    thragtusk <- S.printingOf s registry "Thragtusk"
+    let (tusk, g1) = S.addCreature thragtusk S.alice S.threePlayerGame
+        parent = S.giveControl tusk S.carol g1
+        sub0 = Setup.subgameStateFrom S.alice parent
+        (_, crossedSub) = OutsideTheGame.bringInFrom S.alice tusk sub0
+        after = resolveTriggers (Setup.applyCrossings crossedSub parent)
+    Spec.assertEqWith s "carol controls the creature alice owns" (Projection.controllerOf tusk parent) (Just S.carol)
+    Spec.assertEqWith s "it is phased in, so the pair's one difference is genuinely absent here" (Map.member tusk (GameState.phasedOut parent)) False
+    Spec.assertEqWith s "the subgame's wish took it out of the main game" (Game.lookupObject tusk after) Nothing
+    Spec.assertEqWith s "CR 603.6c: carol got the Beast the leaves-the-battlefield ability makes" (S.countOnBattlefieldByName beastToken S.carol after) 1
+    Spec.assertEqWith s "and nobody else did" (fmap (\pid -> S.countOnBattlefieldByName beastToken pid after) [S.alice, S.bob]) [0, 0]
+
+  -- CR 702.26b: "except for rules and effects that specifically mention
+  -- phased-out permanents, a phased-out permanent is treated as though it does
+  -- not exist. It can't affect or be affected by anything else in the game." CR
+  -- 729.4a mentions none, so a main-game ability watching for permanents leaving
+  -- the battlefield cannot see this one go -- the same answer CR 702.26k gives
+  -- in so many words for the departure road. What CR 702.26d does settle is that
+  -- the permanent never changed zones, which is why the crossing has to be gated
+  -- on battlefield MEMBERSHIP for the two legs to differ at all.
+  --
+  -- The paired negative for the case above: the same board, the same seats, the
+  -- same crossing, and the one difference is that the Thragtusk is phased out
+  -- when the subgame's wish reaches it. Carol's control is asserted on the
+  -- phased-out board too, so rule 702.26b's "does not exist" cannot quietly hand
+  -- the creature back to alice and answer for a different reason.
+  --
+  -- Built with Pawl.Engine.Phasing.phaseOut for Pawl.DepartureSpec's reason: no
+  -- printing in the pool has both phasing and a leaves-the-battlefield ability.
+  Spec.it s "CR 702.26b a phased-out permanent a subgame takes leaves the main game and triggers nothing" $ do
+    thragtusk <- S.printingOf s registry "Thragtusk"
+    let (tusk, g1) = S.addCreature thragtusk S.alice S.threePlayerGame
+        parent = Phasing.phaseOut (PhasedOut.Directly S.carol) tusk (S.giveControl tusk S.carol g1)
+        sub0 = Setup.subgameStateFrom S.alice parent
+        (broughtInId, crossedSub) = OutsideTheGame.bringInFrom S.alice tusk sub0
+        after = resolveTriggers (Setup.applyCrossings crossedSub parent)
+    Spec.assertEqWith s "it is phased out" (Phasing.isPhasedOut tusk parent) True
+    Spec.assertEqWith s "and carol still controls it, so CR 702.26b is not answering by handing it back" (Projection.controllerOf tusk parent) (Just S.carol)
+    Spec.assertEqWith s "CR 729.4: a phased-out main-game permanent is still offered to the subgame" (Maybe.isJust broughtInId) True
+    -- The rule under test, ahead of every proxy below it.
+    Spec.assertEqWith s "CR 702.26b: no zone-change ability triggered" (fmap (\pid -> S.countOnBattlefieldByName beastToken pid after) [S.alice, S.bob, S.carol]) [0, 0, 0]
+    Spec.assertEqWith s "CR 729.4a: it left the main game just the same" (Game.lookupObject tusk after) Nothing
+    Spec.assertEqWith s "and is no longer recorded as phased out either" (Map.member tusk (GameState.phasedOut after)) False
+    Spec.assertEqWith s "CR 608.2h: its last known information is still filed" (Map.member tusk (GameState.lastKnown after)) True
 
   -- Why applyCrossings does NOT wrap its batch in Event.simultaneouslyPure, the
   -- one place it parts company with Departure.objectsLeaveWith: CR 800.4a's
