@@ -1881,9 +1881,10 @@ goblinWarStrikeChain s registry swap = do
             Stack.resolveTop
   pure (S.runPure S.identityAnswer evolved Stack.resolveTop)
 
--- CR 612.1 into the SHIELD a resolving spell installs, which is the one carrier
--- of a replacement effect that is neither a permanent's static row nor a printed
--- face: Moonmist {1}{G} Instant -- "Transform all Humans. Prevent all combat
+-- CR 612.1 into the SHIELD a resolving spell installs, which is the CR 614.3
+-- floating carrier rather than the permanent's static row
+-- Projection.rewritePrintedReplacement already descends: Moonmist {1}{G}
+-- Instant -- "Transform all Humans. Prevent all combat
 -- damage that would be dealt this turn by creatures other than Werewolves and
 -- Wolves." (checked against Scryfall). alice casts it, optionally has an
 -- Artificial Evolution resolved at the MOONMIST ON THE STACK first, and then the
@@ -2403,8 +2404,8 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     Spec.assertEqWith s "and the Clavileño itself is a Vampire Zombie" (Projection.subtypesOf clavilenoId alive) (Set.fromList [Subtype.Vampire, Subtype.Zombie])
 
   -- CR 612.1 reaching a FLOATING replacement effect (CR 614.3), which no case
-  -- above touches: every other chain here rewrites something the resolution does
-  -- once, while a Moonmist leaves a shield behind that is asked again at every
+  -- above installs: the other chains here rewrite what the resolution itself
+  -- does, while a Moonmist leaves a shield behind that is asked again at every
   -- later damage event (CR 609.7b). The words that decide what it spares are
   -- printed on the spell, so the swap has to land before the shield is built.
   --

@@ -2248,10 +2248,12 @@ rewriteEffect pairs effect = case effect of
   -- The EFFECT half is proved by Pawl.CounterspellSpec's evolved Moonmist, whose
   -- shield spares Goblins where the printed word says Werewolves. The DURATION
   -- and the CONDITION are REGRESSION FENCES rather than proved behaviours:
-  -- every Effect.Replace in data/cards/ lasts UntilEndOfTurn, which holds no
-  -- word, and the four that print a CR 614.1 gate are metalcraft-shaped counts
-  -- over HasCardType Artifact, which is a card type rather than a subtype -- so
-  -- mutating either line away leaves the whole suite green.
+  -- scanning data/cards/ for Effect.Replace on 2026-08-30 found every duration
+  -- UntilEndOfTurn, which holds no word, and every printed CR 614.1 gate a
+  -- metalcraft-shaped count over HasCardType Artifact, which is a card type
+  -- rather than a subtype -- so mutating either line away left the whole suite
+  -- green. A card gating a shield on "if you control three or more Goblins" is
+  -- what would prove them.
   Effect.Replace r ->
     Effect.Replace
       r
