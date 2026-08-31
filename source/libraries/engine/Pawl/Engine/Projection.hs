@@ -2245,7 +2245,12 @@ rewriteEffect pairs effect = case effect of
   -- usually sits. rewritePrintedReplacement makes the same descent over a
   -- permanent's static row; a floating one is the same text one carrier over.
   -- CR 614.3's Uses is a count and CR 614.15's ReplacementOrigin is provenance,
-  -- so neither holds a printed word.
+  -- so neither holds a printed word, and both are passed through.
+  --
+  -- Destructured POSITIONALLY, the prevention arms' shape below: a new
+  -- word-bearing field on the record is then a compile error here, where a record
+  -- update over the whole value would have carried it through unrewritten and
+  -- said nothing.
   --
   -- The EFFECT half is proved by Pawl.CounterspellSpec's evolved Moonmist, whose
   -- shield spares Goblins where the printed word says Werewolves. The DURATION
@@ -2257,13 +2262,8 @@ rewriteEffect pairs effect = case effect of
   -- does not swap -- so mutating either line away left the whole suite green. A
   -- card gating a shield on "if you control three or more Goblins" is what would
   -- prove them.
-  Effect.Replace r ->
-    Effect.Replace
-      r
-        { Replace.duration = rewriteDuration pairs (Replace.duration r),
-          Replace.condition = fmap (rewriteCondition pairs) (Replace.condition r),
-          Replace.effect = rewriteReplacementEffect pairs (Replace.effect r)
-        }
+  Effect.Replace (Replace.MkReplace duration uses origin condition replacement) ->
+    Effect.Replace (Replace.MkReplace (rewriteDuration pairs duration) uses origin (fmap (rewriteCondition pairs) condition) (rewriteReplacementEffect pairs replacement))
   Effect.SkipNextPhase {} -> effect
   -- CR 612.1 through every half of the shield that holds printed words: the
   -- objects it covers, the predicates describing its recipients and its source,
@@ -2292,10 +2292,12 @@ rewriteEffect pairs effect = case effect of
   -- combat (CR 510) or noncombat, which is a rules category rather than printed
   -- vocabulary.
   --
-  -- Written as a RECORD UPDATE, Effect.Replace's shape above: a sixth
-  -- word-bearing field is then dropped visibly rather than absorbed by a
-  -- positional pattern, which is how this arm came to skip chosenSource in the
-  -- first place.
+  -- Destructured POSITIONALLY, the prevention arms' shape directly above and
+  -- Effect.Replace's above them: a new word-bearing field on the record is then a
+  -- compile error here. Before the widening that filled these fields in, the arm
+  -- matched `RedirectDamage {}` and rewrote nothing at all, which is how
+  -- chosenSource came to be skipped in the first place; a record update over the
+  -- whole value would have kept that failure mode for the next field.
   --
   -- Only chosenSource is PROVEN, by Pawl.ReplacementSpec's "Synthetic Turn the
   -- Blade (CR 612.1)" group. The two refs and the duration are REGRESSION
@@ -2305,14 +2307,8 @@ rewriteEffect pairs effect = case effect of
   -- word, and IsSource holds none -- and every redirect in data/cards/ writes
   -- UntilEndOfTurn, on which rewriteDuration is the identity too. So mutating any
   -- of those three lines reddens nothing.
-  Effect.RedirectDamage r ->
-    Effect.RedirectDamage
-      r
-        { RedirectDamage.duration = rewriteDuration pairs (RedirectDamage.duration r),
-          RedirectDamage.from = rewriteObjectRef pairs (RedirectDamage.from r),
-          RedirectDamage.to = rewriteObjectRef pairs (RedirectDamage.to r),
-          RedirectDamage.chosenSource = fmap (Filter.rewrite pairs) (RedirectDamage.chosenSource r)
-        }
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind from to chosenSource) ->
+    Effect.RedirectDamage (RedirectDamage.MkRedirectDamage (rewriteDuration pairs duration) kind (rewriteObjectRef pairs from) (rewriteObjectRef pairs to) (fmap (Filter.rewrite pairs) chosenSource))
   Effect.Counter (Counter.MkCounter ref mSlot) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot)
   -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
   -- printed keyword through the swap, where Filter's HasCounters arm rewrites

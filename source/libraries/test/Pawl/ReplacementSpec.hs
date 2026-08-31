@@ -1501,16 +1501,20 @@ evolvingDogAt oid p = case p of
 -- 2026-08-30, read for a creature type or a basic land type in the prevention
 -- clause, sorts the hits three ways. The ones that restrict no recipient at all
 -- (Arachnogenesis, Galadhrim Ambush, Repel the Abominable, That's No Moonmist,
--- Frontline Strategist) name neither a ref nor a description, so this opcode
--- installs no row for them at all, and they take Effect.Replace's DamageR
--- instead -- the shape data/cards/moonmist.json already writes, and a text
--- change reaching THAT shape is proved by Pawl.CounterspellSpec's evolved
--- Moonmist. The static abilities (Drogskol Reinforcements, Rescue Retriever,
--- Marble Priest) install no shield at resolution. Pack Leader's "to Dogs you
--- control" is a printing that reaches a THIRD field, the unbounded shield's own
--- whatRecipient, and the "Pack Leader (CR 611.2c)" group above proves the swap
--- through it with Artificial Evolution -- so this card is synthetic for the two
--- fields named below and for nothing else.
+-- Frontline Strategist) name their source by PROPERTY rather than by object, and
+-- the by-source branch installs one row per NAMED source object, so an absent ref
+-- leaves them no row at all. The recipient side is no way in either: it wants a
+-- ref or a description of the recipients, and a card restricting neither has
+-- neither to give. So this opcode installs nothing for them and they take
+-- Effect.Replace's DamageR instead -- the shape data/cards/moonmist.json already
+-- writes, and a text change reaching THAT shape is proved by
+-- Pawl.CounterspellSpec's evolved Moonmist. The static abilities (Drogskol
+-- Reinforcements, Rescue Retriever, Marble Priest) install no shield at
+-- resolution. Pack Leader's "to Dogs you control" is a printing that reaches a
+-- THIRD field, the unbounded shield's own whatRecipient, and the "Pack Leader
+-- (CR 611.2c)" group above proves the swap through it with Artificial Evolution
+-- -- so this card is synthetic for the two fields named below and for nothing
+-- else.
 --
 -- BOTH filters on ONE card, because they sit on the two different opcodes: CR
 -- 615.1's unbounded shield describes its source in whatSource, and CR 615.7's

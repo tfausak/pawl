@@ -308,7 +308,10 @@ riderQuantities = Map.elems . EntryRiders.counters
 riderSlots :: EntryRiders.EntryRiders count -> Map.Map SlotName SlotArity
 riderSlots = maybe Map.empty oneSlot . EntryRiders.blocking
 
--- The slots a PlayerRef reads. Only InSlot names one.
+-- The slots a PlayerRef reads. Five arms name one: EachPlayerExcept, InSlot,
+-- ControllerOfBound and Attacking at arity One, EachInSlot at arity Many. The
+-- other four name none, and the arms below carry the reason for each arity that
+-- is not self-evident.
 playerRefSlots :: PlayerRef -> Map.Map SlotName SlotArity
 playerRefSlots ref = case ref of
   PlayerRef.EachPlayer -> Map.empty
