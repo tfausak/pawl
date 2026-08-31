@@ -200,6 +200,20 @@ data Response
     -- replaying as the other would be a silently wrong answer rather than a
     -- desync.
     ChoseMovedCounters (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural)
+  | -- | CR 122.5: how many counters of each kind a player chose to move off the
+    -- first object under a card that states a floor ("move one or more
+    -- counters"). Its own constructor and not ChoseMovedCounters above, whose
+    -- payload it shares: an empty answer is legal to that prompt and illegal to
+    -- this one, so a transcript of either replaying as the other would be a
+    -- silently wrong answer rather than a desync.
+    ChoseMovedCountersAtLeastOne (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural)
+  | -- | CR 122.5: how many counters of each kind a player chose to move onto EACH
+    -- destination, where the move names a group of them (Forgotten Ancient's
+    -- "onto other creatures"). Its own constructor and not ChoseMovedCounters
+    -- above: that answer is one tally per kind for one destination, where this
+    -- one is a tally per kind PER OBJECT, so neither could stand in for the
+    -- other.
+    ChoseDistributedMovedCounters (Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural))
   | -- | CR 122.5: the KIND of counter a player chose to move off the first
     -- object, or none at all. Its own constructor and not ChoseMovedCounter
     -- above for that same reason: declining is an answer only one of the two

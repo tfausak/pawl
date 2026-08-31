@@ -41,7 +41,10 @@
                       "kinds": {
                         "type": "Every"
                       },
-                      "to": "to"
+                      "to": {
+                        "type": "InSlot",
+                        "value": "to"
+                      }
                     }
                   }
                 ]

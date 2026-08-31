@@ -1208,6 +1208,51 @@ combatReplaySpec s =
             "the empty tally"
             (Replay.defaultAnswer (Prompt.ChooseMovedCounters decider S.alice oid (ObjectId.MkObjectId 9) (Map.singleton CounterKind.PlusOnePlusOne (3 :: Natural.Natural))))
             Map.empty
+        -- CR 122.5 again, for the move that states a FLOOR: the payload and the
+        -- answer are ChooseMovedCounters' exactly, so the transcript's two
+        -- responses have to be told apart by the prompt they answer and not by
+        -- their shape.
+        Spec.it s "ChooseMovedCountersAtLeastOne round-trips through the transcript, and not as its unfloored sibling" $ do
+          let tally :: [(CounterKind.CounterKind Keyword.Keyword, Natural.Natural)] -> Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural
+              tally = Map.fromList
+              offered = tally [(CounterKind.PlusOnePlusOne, 3), (CounterKind.Shield, 2)]
+              spread = tally [(CounterKind.PlusOnePlusOne, 1), (CounterKind.Shield, 1)]
+              floored = Prompt.ChooseMovedCountersAtLeastOne decider S.alice oid (ObjectId.MkObjectId 9) offered
+              any_ = Prompt.ChooseMovedCounters decider S.alice oid (ObjectId.MkObjectId 9) offered
+          Spec.assertEqWith s "the floored answer round trips" (Replay.decode floored (Replay.encode floored spread)) (Just spread)
+          -- Discriminating, and the reason the prompt is its own constructor: an
+          -- answer to "any number" is not an answer to "one or more".
+          Spec.assertEqWith s "and the unfloored prompt's response does not decode as it" (Replay.decode floored (Replay.encode any_ spread)) Nothing
+        Spec.it s "a short one-or-more transcript moves a single counter" $
+          -- CR 122.5: "one or more" excludes none, so the quietest LEGAL answer is
+          -- one counter of the first kind offered rather than the empty tally.
+          Spec.assertEqWith
+            s
+            "one of the first kind"
+            (Replay.defaultAnswer (Prompt.ChooseMovedCountersAtLeastOne decider S.alice oid (ObjectId.MkObjectId 9) (Map.fromList [(CounterKind.PlusOnePlusOne, 3 :: Natural.Natural), (CounterKind.Shield, 2)])))
+            (Map.singleton CounterKind.PlusOnePlusOne 1)
+        -- CR 122.5 again, for a move whose SECOND side is a group: the answer is a
+        -- tally per kind PER OBJECT, so a transcript carries a map of maps.
+        Spec.it s "ChooseDistributedMovedCounters round-trips through the transcript" $ do
+          let one = ObjectId.MkObjectId 9
+              two = ObjectId.MkObjectId 11
+              offered = Map.singleton CounterKind.PlusOnePlusOne (5 :: Natural.Natural)
+              spread = Map.fromList [(one, Map.singleton CounterKind.PlusOnePlusOne (3 :: Natural.Natural)), (two, Map.singleton CounterKind.PlusOnePlusOne 1)]
+              onlyOne = Map.singleton two (Map.singleton CounterKind.PlusOnePlusOne (2 :: Natural.Natural))
+              p = Prompt.ChooseDistributedMovedCounters decider S.alice oid offered (one NonEmpty.:| [two])
+          Spec.assertEqWith s "a distribution across both recipients round trips" (Replay.decode p (Replay.encode p spread)) (Just spread)
+          -- Discriminating: a decode that ignored the response would answer the
+          -- case above whatever was encoded.
+          Spec.assertEqWith s "and one naming a single recipient round trips as itself" (Replay.decode p (Replay.encode p onlyOne)) (Just onlyOne)
+        Spec.it s "a short distributed transcript moves nothing" $
+          -- CR 122.5: "any number" includes none here too, so the quiet answer
+          -- allocates to nobody and leaves the board where a short transcript
+          -- found it.
+          Spec.assertEqWith
+            s
+            "the empty distribution"
+            (Replay.defaultAnswer (Prompt.ChooseDistributedMovedCounters decider S.alice oid (Map.singleton CounterKind.PlusOnePlusOne (3 :: Natural.Natural)) (ObjectId.MkObjectId 9 NonEmpty.:| [])))
+            Map.empty
         -- CR 122.5 once more, for "up to one": the answer is a kind OR none, so a
         -- transcript has to carry the declining half that ChooseMovedCounter's
         -- cannot say.

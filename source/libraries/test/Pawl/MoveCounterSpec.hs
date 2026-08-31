@@ -66,7 +66,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   anyNumberSpec s registry
   namedAnyNumberSpec s registry
   absentKindSpec s registry
+  atLeastOneSpec s registry
   groupSourceSpec s registry
+  groupDestinationSpec s registry
   upToOneSpec s registry
 
 -- Which counter the answerer takes, and whether it takes the printed "may" at
@@ -1022,11 +1024,11 @@ namedAnyNumberSpec s registry = Spec.describe s "CR 122.5 moving any number of c
 -- the DESTINATION's own tally is what narrows the kinds, a read no other
 -- spelling makes.
 --
--- pawl's Goldberry omits the second ability. Its "one or more counters" is
--- MovedKinds.AnyNumber with zero excluded, and AnyNumber admits an empty answer
--- (the group above proves it does, deliberately), so writing it as AnyNumber
--- would be WEAKER than printed in the controller's favour rather than stricter
--- (#2702). Omitting it is stricter: alice simply has one fewer ability.
+-- The second line is MovedKinds.AtLeastOne -- "any number of counters" with the
+-- empty answer struck out -- and atLeastOneSpec below is where it is proved.
+-- Every case here activates the FIRST of the card's two printed abilities by
+-- position, so a Goldberry that lost one of them would fail this group rather
+-- than quietly test the other.
 --
 -- The counter kinds are three that do not interact -- CR 122.1a's +1/+1, CR
 -- 122.1c's shield and CR 122.1h's finality. Not CR 122.1a's -1/-1 beside its
@@ -1089,11 +1091,11 @@ absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each k
                 . S.addCounter CounterKind.PlusOnePlusOne 3 giverId
             ready = (onGoldberry goldberryId (stocked g3)) {GameState.priority = Just S.alice}
         pure (goldberryId, giverId, ready)
-      -- The ability, activated once and resolved. Exactly one printed activated
-      -- ability, not the first of however many -- pawl's Goldberry omits the
-      -- second (#2702).
+      -- The FIRST of the card's two printed activated abilities, activated once
+      -- and resolved. Both are named rather than one taken off the front, so this
+      -- group cannot drift onto the other.
       tap (goldberryId, giverId, ready) = case Activate.abilitiesFor goldberryId ready of
-        [only] ->
+        [only, _] ->
           let run =
                 Engine.runGame
                   (goldberryAnswer giverId)
@@ -1118,7 +1120,7 @@ absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each k
         Spec.assertEqWith s "Goldberry gained one +1/+1 and one finality counter and no shield counter" (finalityTripleOn goldberryId after) (1, 2, 1)
         Spec.assertEqWith s "and the Piker is down one of each of those two kinds, its shield counters untouched" (finalityTripleOn giverId after) (2, 4, 1)
         Spec.assertEqWith s "and nothing was asked, the card settling both the kinds and the count" asked 0
-      Nothing -> Spec.assertFailure s "expected Goldberry to offer exactly its one transcribed activated ability"
+      Nothing -> Spec.assertFailure s "expected Goldberry to offer both of her printed activated abilities"
   -- The same board differing in exactly ONE thing, what Goldberry already bears:
   -- with no shield counter on her the shield kind is absent too and one shield
   -- counter crosses with the rest. Without this pair the case above would pass on
@@ -1131,7 +1133,7 @@ absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each k
       Just (_, after) -> do
         Spec.assertEqWith s "Goldberry gained one counter of all three kinds" (finalityTripleOn goldberryId after) (1, 1, 1)
         Spec.assertEqWith s "and the Piker is down one of each" (finalityTripleOn giverId after) (2, 3, 1)
-      Nothing -> Spec.assertFailure s "expected Goldberry to offer exactly its one transcribed activated ability"
+      Nothing -> Spec.assertFailure s "expected Goldberry to offer both of her printed activated abilities"
   -- The card's own targeting, which the answerer above cannot prove because it
   -- names the Piker rather than reading what was offered: "ANOTHER target
   -- permanent YOU control" is Filter.Not Filter.IsSource beside
@@ -1141,13 +1143,13 @@ absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each k
   Spec.it s "CR 602.2b / 601.2c the ability offers every other permanent alice controls and neither Goldberry nor bob's" $ do
     (goldberryId, giverId, ready) <- board (const id)
     case Activate.abilitiesFor goldberryId ready of
-      [only] -> do
+      [only, _] -> do
         let run = Engine.runGame (goldberryOffered giverId) ready (Activate.activateAbility S.alice goldberryId only)
             (_, offered) = State.runState run Set.empty
         Spec.assertEqWith s "Goldberry is not among her own ability's candidates" (Set.member goldberryId offered) False
         Spec.assertEqWith s "alice's Piker is" (Set.member giverId offered) True
         Spec.assertEqWith s "and the candidates are exactly the three other permanents alice controls, bob's Piker excluded" (Set.size offered) 3
-      _ -> Spec.assertFailure s "expected Goldberry to offer exactly its one transcribed activated ability"
+      _ -> Spec.assertFailure s "expected Goldberry to offer both of her printed activated abilities"
   -- The other end of the same pair: a destination bearing every kind the first
   -- object has leaves no appropriate kind at all, so the move is empty -- and
   -- still asks nothing, since there was never a question.
@@ -1165,7 +1167,7 @@ absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each k
         Spec.assertEqWith s "Goldberry is left with exactly what she started with" (finalityTripleOn goldberryId after) (1, 2, 1)
         Spec.assertEqWith s "and the Piker kept every counter it had" (finalityTripleOn giverId after) (3, 4, 2)
         Spec.assertEqWith s "and with no absent kind the player was not asked" asked 0
-      Nothing -> Spec.assertFailure s "expected Goldberry to offer exactly its one transcribed activated ability"
+      Nothing -> Spec.assertFailure s "expected Goldberry to offer both of her printed activated abilities"
 
 -- Spike Cannibal {1}{B}{B} Creature - Spike (Exodus; name, cost, type line,
 -- power, toughness and oracle text checked against Scryfall 2026-08-30),
@@ -1451,3 +1453,261 @@ upToOneSpec s registry = Spec.describe s "CR 122.5 moving up to one counter off 
     -- batches of one grown by one apiece.
     Spec.assertEqWith s "the two +1/+1 counters arrived as one batch, so Hardened Scales grew them once" (pairOn destination after) (3, 10)
     Spec.assertEqWith s "and the givers are down exactly one apiece, the replacement having grown the arrival and not the departure" (fmap (`pairOn` after) [alicePiker, bobWall, carolWall]) [(3, 3), (5, 1), (6, 0)]
+
+-- Goldberry, River-Daughter's SECOND ability, the one this group exists for:
+--
+--   {U}, {T}: Move one or more counters from Goldberry onto another target
+--   permanent you control. If you do, draw a card.
+--
+-- The card is why "one or more" exists as its own arm: it is "any number of
+-- counters" with the empty answer struck out, and the difference is observable
+-- through the printed rider -- an answer of none would leave "if you do" unfired,
+-- which is weaker than printed in the controller's favour rather than stricter.
+-- The rider itself is the existing `slot` read, Black Panther, Wakandan King's
+-- shape.
+--
+-- The counter kinds are CR 122.1a's +1/+1 beside CR 122.1c's shield, two kinds
+-- that do not interact, so an answer naming one of each is a different board from
+-- any count out of either alone -- and the +1/+1 counter is the LESSER of the two
+-- as a CounterKind, which is what the floor's repair falls back on.
+goldberryFloorAnswer ::
+  ObjectId.ObjectId ->
+  Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural ->
+  Prompt.Prompt r ->
+  State.State (Int, Int) r
+goldberryFloorAnswer taker wanted p = case p of
+  -- CR 602.2b through CR 601.2c, FILTERED out of what the engine offered rather
+  -- than built by hand, so CR 608.2b's re-read at resolution finds what was named.
+  Prompt.ChooseTargets _ _ _ asked ->
+    pure (Map.map (Set.filter ((==) (Just taker) . Recipient.objectOf) . snd) asked)
+  -- Answered VERBATIM, so an answerer cannot repair a mutation by re-deriving a
+  -- legal answer, and counted in the FIRST slot of the pair.
+  Prompt.ChooseMovedCountersAtLeastOne {} -> do
+    State.modify' (\(floored, any_) -> (floored + 1, any_))
+    pure wanted
+  -- Counted in the SECOND slot, because which of the two prompts was raised is
+  -- half of what this group asserts: the two carry the same payload and the same
+  -- answer, and only the floor tells them apart.
+  Prompt.ChooseMovedCounters {} -> do
+    State.modify' (\(floored, any_) -> (floored, any_ + 1))
+    pure wanted
+  _ -> pure (S.identityAnswer p)
+
+atLeastOneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+atLeastOneSpec s registry = Spec.describe s "CR 122.5 moving one or more counters" $ do
+  let -- alice: Goldberry, two Islands (the {U} has to come from somewhere), a
+      -- Goblin Piker to move counters onto and a library to draw from. bob's own
+      -- Piker is a permanent the printed "you control" has to keep off the target
+      -- list, and the Islands make the slot offer more candidates than it needs.
+      -- `counters` is what a case puts on GOLDBERRY, the first object here, and is
+      -- the ONLY difference between the boards below.
+      board counters = do
+        island <- S.printingOf s registry "Island"
+        goldberry <- S.printingOf s registry "Goldberry, River-Daughter"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (goldberryId, g1) = S.addCreature goldberry S.alice (S.landsInPlay island 2)
+            (takerId, g2) = S.addCreature piker S.alice g1
+            (_, g3) = S.addCreature piker S.bob g2
+            -- Stocked so the printed draw has a card to take and CR 104.3c cannot
+            -- end the game before an assertion runs.
+            stockedLibrary = List.foldl' (\gs _ -> snd (S.addLibraryCard piker S.alice gs)) g3 [1 :: Int .. 3]
+            ready = (counters goldberryId stockedLibrary) {GameState.priority = Just S.alice}
+        pure (goldberryId, takerId, ready)
+      -- The SECOND printed activated ability, activated once and resolved. Both
+      -- are named, which is itself an assertion: pawl's Goldberry used to carry
+      -- the first alone.
+      tap wanted (goldberryId, takerId, ready) = case Activate.abilitiesFor goldberryId ready of
+        [_, second] ->
+          let run =
+                Engine.runGame
+                  (goldberryFloorAnswer takerId wanted)
+                  ready
+                  (Activate.activateAbility S.alice goldberryId second >> Stack.resolveTop)
+              ((_, after), asked) = State.runState run (0, 0)
+           in Just (asked, after)
+        _ -> Nothing
+      stocked oid = S.addCounter CounterKind.Shield 2 oid . S.addCounter CounterKind.PlusOnePlusOne 3 oid
+  -- The card's own answer honoured: two kinds named at once, fewer of each than
+  -- the pile holds, and the printed rider fires because something crossed.
+  Spec.it s "the player's answer settles which counters cross, and the rider fires" $ do
+    built <- board stocked
+    let (goldberryId, takerId, before) = built
+    Spec.assertEqWith s "Goldberry bears three +1/+1 counters and two shield counters" (tripleOn goldberryId before) (3, 2, 0)
+    Spec.assertEqWith s "and the Piker bears none of any kind" (tripleOn takerId before) (0, 0, 0)
+    case tap (Map.fromList [(CounterKind.PlusOnePlusOne, 2), (CounterKind.Shield, 1)]) built of
+      Just (asked, after) -> do
+        -- THE GAMEPLAY-LEVEL ASSERTIONS, ahead of the draw and the prompt counts.
+        Spec.assertEqWith s "two +1/+1 counters and one shield counter crossed" (tripleOn takerId after) (2, 1, 0)
+        Spec.assertEqWith s "and Goldberry kept the rest" (tripleOn goldberryId after) (1, 1, 0)
+        Spec.assertEqWith s "and alice drew a card, counters having moved" (S.handSize S.alice after) 1
+        Spec.assertEqWith s "the floored prompt was raised and the unfloored one was not" asked (1, 0)
+      Nothing -> Spec.assertFailure s "expected Goldberry to offer both of her printed activated abilities"
+  -- THE CASE THIS UNIT EXISTS FOR, and the same board differing in exactly ONE
+  -- thing, the answer: none. "One or more" excludes none where "any number"
+  -- includes it, so the empty answer is not honoured -- one counter of the first
+  -- kind offered crosses anyway -- and the printed rider fires with it. On the
+  -- AnyNumber arm this board is the anyNumberSpec case above: nothing moves and
+  -- nothing is drawn.
+  Spec.it s "an answer moving nothing is refused, the card's floor standing" $ do
+    built <- board stocked
+    let (goldberryId, takerId, _) = built
+    case tap Map.empty built of
+      Just (asked, after) -> do
+        -- THE GAMEPLAY-LEVEL ASSERTIONS, ahead of the draw and the prompt counts.
+        Spec.assertEqWith s "one +1/+1 counter crossed anyway, the floor being the card's" (tripleOn takerId after) (1, 0, 0)
+        Spec.assertEqWith s "and Goldberry is down that one counter and no other" (tripleOn goldberryId after) (2, 2, 0)
+        Spec.assertEqWith s "and alice drew, since a counter did move" (S.handSize S.alice after) 1
+        Spec.assertEqWith s "and the floored prompt was still the one raised" asked (1, 0)
+      Nothing -> Spec.assertFailure s "expected Goldberry to offer both of her printed activated abilities"
+  -- The other end of the pair: the floor is what the CARD may ask for, not what
+  -- rule 122.5 can perform. A Goldberry bearing no counter has no appropriate kind
+  -- (rule 122.5's second impossibility), so nothing crosses, nothing is asked, and
+  -- the rider's gate reads the zero this opcode still writes into its slot.
+  Spec.it s "a Goldberry bearing no counter moves nothing, asks nothing and draws nothing" $ do
+    built <- board (const id)
+    let (goldberryId, takerId, _) = built
+    case tap (Map.singleton CounterKind.PlusOnePlusOne 1) built of
+      Just (asked, after) -> do
+        Spec.assertEqWith s "the Piker received nothing" (tripleOn takerId after) (0, 0, 0)
+        Spec.assertEqWith s "and Goldberry still bears nothing" (tripleOn goldberryId after) (0, 0, 0)
+        Spec.assertEqWith s "and alice drew nothing, the rider's gate reading zero" (S.handSize S.alice after) 0
+        Spec.assertEqWith s "and with no kind to offer neither prompt was raised" asked (0, 0)
+      Nothing -> Spec.assertFailure s "expected Goldberry to offer both of her printed activated abilities"
+
+-- Forgotten Ancient {3}{G} Creature - Elemental 0/3 (Ravnica: City of Guilds;
+-- name, cost, type line, power, toughness and oracle text checked against
+-- Scryfall 2026-08-31), data/cards/forgotten-ancient.json:
+--
+--   Whenever a player casts a spell, you may put a +1/+1 counter on this
+--   creature.
+--   At the beginning of your upkeep, you may move any number of +1/+1 counters
+--   from this creature onto other creatures.
+--
+-- The second line is this group's subject, and the card is why a GROUP-valued
+-- DESTINATION exists: "onto other creatures" names every creature on the
+-- battlefield but this one, so one sentence performs one CR 122.5 pair per
+-- recipient and the player says how many counters each of them gets. Spike
+-- Cannibal's group is on the FIRST side and gathers counters in; this one spreads
+-- them out, and the difference is that the count per object is a question rather
+-- than a tally.
+--
+-- "Other creatures" says nothing about control, so bob's creature is a recipient
+-- and the boards below prove it -- a filter reading "you control" would pass every
+-- assertion but that one.
+--
+-- The counters go on by hand rather than through the printed cast trigger, which
+-- gives one counter per spell: these boards need five at once, so that an answer
+-- spreading four of them unequally over two of three candidates is a different
+-- board from every even split and from every single recipient.
+forgottenAnswer ::
+  Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural) ->
+  Prompt.Prompt r ->
+  State.State (Int, Set.Set ObjectId.ObjectId) r
+forgottenAnswer wanted p = case p of
+  -- The printed "you may", taken every time: a declined trigger would move
+  -- nothing for a reason no case here is about.
+  Prompt.ChooseOptional {} -> pure OptionalDecision.Exercises
+  -- Answered VERBATIM, so an answerer cannot repair a mutation by re-deriving a
+  -- legal answer; COUNTED, because one case asserts that nothing was asked; and
+  -- the offered recipients are RECORDED, so which objects the engine put on the
+  -- list is read off the engine rather than off the answer.
+  Prompt.ChooseDistributedMovedCounters _ _ _ _ offered -> do
+    State.modify' (\(asked, seen) -> (asked + 1, Set.union seen (Set.fromList (NonEmpty.toList offered))))
+    pure wanted
+  _ -> pure (S.identityAnswer p)
+
+groupDestinationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+groupDestinationSpec s registry = Spec.describe s "CR 122.5 moving counters onto a group of permanents" $ do
+  let -- alice: her Forgotten Ancient and two other creatures; bob a third, since
+      -- "other creatures" names his as well. Wall of Stone at two of the three
+      -- destinations, a 0/8 body being unmoved by whatever these boards carry onto
+      -- it, and a Goblin Piker at the third so the recipients are told apart by
+      -- more than their ids. `counters` is what a case puts on the Ancient and is
+      -- the ONLY difference between the boards below.
+      board counters = do
+        forest <- S.printingOf s registry "Forest"
+        wall <- S.printingOf s registry "Wall of Stone"
+        piker <- S.printingOf s registry "Goblin Piker"
+        ancient <- S.printingOf s registry "Forgotten Ancient"
+        let (ancientId, g1) = S.addCreature ancient S.alice (S.landsInPlay forest 1)
+            (aliceWall, g2) = S.addCreature wall S.alice g1
+            (alicePiker, g3) = S.addCreature piker S.alice g2
+            (bobWall, g4) = S.addCreature wall S.bob g3
+        pure (ancientId, aliceWall, alicePiker, bobWall, counters ancientId g4)
+      -- alice's upkeep begins, the printed trigger goes on the stack and resolves
+      -- -- namedAnyNumberSpec's `begin`, with the prompt count and the offered
+      -- recipients threaded out of the answerer.
+      upkeep = Phase.Beginning BeginningStep.Upkeep
+      begin wanted (ancientId, aliceWall, alicePiker, bobWall, ready) =
+        let begun =
+              Event.recordEvent
+                (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice))
+                (ready {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+            run = Engine.runGame (forgottenAnswer wanted) begun (Engine.settleForPriority >> Engine.priorityLoop)
+            ((_, after), asked) = State.runState run (0, Set.empty)
+         in (ancientId, aliceWall, alicePiker, bobWall, asked, after)
+      plussed = S.counterOf CounterKind.PlusOnePlusOne
+  -- THE CASE THIS UNIT EXISTS FOR. Four of the five counters cross, THREE onto one
+  -- creature and ONE onto another, and the third candidate gets none -- so this is
+  -- neither an even split, nor a single recipient, nor the whole pile, and no
+  -- move naming one destination could have produced it.
+  Spec.it s "the player spreads counters unevenly over some of the other creatures" $ do
+    built <- board (S.addCounter CounterKind.PlusOnePlusOne 5)
+    let (ancientId, aliceWall, alicePiker, bobWall, before) = built
+    Spec.assertEqWith s "the Ancient bears five +1/+1 counters and the others none" (fmap (`plussed` before) [ancientId, aliceWall, alicePiker, bobWall]) [5, 0, 0, 0]
+    let wanted =
+          Map.fromList
+            [ (aliceWall, Map.singleton CounterKind.PlusOnePlusOne 3),
+              (bobWall, Map.singleton CounterKind.PlusOnePlusOne 1)
+            ]
+        (_, _, _, _, (asked, offered), after) = begin wanted built
+    -- THE GAMEPLAY-LEVEL ASSERTIONS, ahead of the prompt count.
+    Spec.assertEqWith s "three counters landed on alice's Wall, one on bob's, none on the Piker, and the Ancient kept one" (fmap (`plussed` after) [ancientId, aliceWall, alicePiker, bobWall]) [1, 3, 0, 1]
+    Spec.assertEqWith s "and the recipients offered were the three other creatures, bob's included and the Ancient itself not" (offered, Set.member ancientId offered) (Set.fromList [aliceWall, alicePiker, bobWall], False)
+    Spec.assertEqWith s "and one distribution was asked for" asked 1
+  -- The same board differing in exactly ONE thing, the answer: an allocation onto
+  -- the Ancient itself, which rule 122.5's first impossibility keeps off the
+  -- offered list. FILTERED, not trusted -- the counter named for it stays where it
+  -- is, and the one counter the answer aims at a real recipient still crosses.
+  Spec.it s "an answer naming an object that was not offered moves nothing to it" $ do
+    built <- board (S.addCounter CounterKind.PlusOnePlusOne 5)
+    let (ancientId, aliceWall, alicePiker, bobWall, _) = built
+        wanted =
+          Map.fromList
+            [ (ancientId, Map.singleton CounterKind.PlusOnePlusOne 2),
+              (aliceWall, Map.singleton CounterKind.PlusOnePlusOne 1)
+            ]
+        (_, _, _, _, _, after) = begin wanted built
+    Spec.assertEqWith s "only the one counter aimed at a real recipient crossed" (fmap (`plussed` after) [ancientId, aliceWall, alicePiker, bobWall]) [4, 1, 0, 0]
+  -- CR 609.3's "only as much as possible" over a group: an answer asking for more
+  -- counters than the Ancient holds is clamped in the order the recipients were
+  -- offered, so five counters cross and no sixth is invented.
+  Spec.it s "an answer asking for more counters than the creature has moves only what is there" $ do
+    built <- board (S.addCounter CounterKind.PlusOnePlusOne 5)
+    let (ancientId, aliceWall, alicePiker, bobWall, _) = built
+        wanted =
+          Map.fromList
+            [ (aliceWall, Map.singleton CounterKind.PlusOnePlusOne 4),
+              (alicePiker, Map.singleton CounterKind.PlusOnePlusOne 4),
+              (bobWall, Map.singleton CounterKind.PlusOnePlusOne 4)
+            ]
+        (_, _, _, _, _, after) = begin wanted built
+    Spec.assertEqWith s "the Ancient is emptied and exactly its five counters landed" (plussed ancientId after, sum (fmap (`plussed` after) [aliceWall, alicePiker, bobWall])) (0, 5)
+  -- "Any number" includes none whatever the destination looks like, so an answer
+  -- allocating nothing leaves every counter where it was -- and the question was
+  -- still a question.
+  Spec.it s "an answer allocating nothing leaves every counter where it was" $ do
+    built <- board (S.addCounter CounterKind.PlusOnePlusOne 5)
+    let (ancientId, aliceWall, alicePiker, bobWall, _) = built
+        (_, _, _, _, (asked, _), after) = begin Map.empty built
+    Spec.assertEqWith s "the Ancient kept all five and the other creatures got none" (fmap (`plussed` after) [ancientId, aliceWall, alicePiker, bobWall]) [5, 0, 0, 0]
+    Spec.assertEqWith s "and it was asked anyway, none being one of the distributions" asked 1
+  -- Rule 122.5's second impossibility over a group: an Ancient bearing no counter
+  -- of the named kind has nothing to spread, so no distribution is asked for
+  -- however many creatures are standing beside it.
+  Spec.it s "an Ancient bearing no counter asks for no distribution" $ do
+    built <- board (const id)
+    let (ancientId, aliceWall, alicePiker, bobWall, _) = built
+        (_, _, _, _, (asked, _), after) = begin Map.empty built
+    Spec.assertEqWith s "nothing moved" (fmap (`plussed` after) [ancientId, aliceWall, alicePiker, bobWall]) [0, 0, 0, 0]
+    Spec.assertEqWith s "and with nothing to spread the player was not asked" asked 0

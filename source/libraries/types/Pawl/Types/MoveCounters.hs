@@ -6,16 +6,21 @@ import qualified Pawl.Types.SlotName as SlotName
 
 -- | The payload of Pawl.Types.Effect's MoveCounters arm (CR 122.5).
 --
--- An ObjectRef on the FIRST side and a SlotName on the second. Rule 122.5
--- defines a move between an object and "a second object" and states its
--- impossibilities about that pair, so a pair is what the arm performs -- but the
--- printed sentence may name a whole GROUP of first objects, Spike Cannibal's
--- "move all +1\/+1 counters from all creatures onto it", and every member is then
--- its own pair against the one destination.
+-- An ObjectRef on EACH side. Rule 122.5 defines a move between an object and "a
+-- second object" and states its impossibilities about that pair, so a pair is
+-- what the arm performs -- but the printed sentence may name a whole GROUP on
+-- either side, and every pair it makes is then its own. A group on the FIRST
+-- side gathers counters in, Spike Cannibal's "move all +1\/+1 counters from all
+-- creatures onto it", every member being its own pair against the one
+-- destination. A group on the SECOND spreads them out, Forgotten Ancient's "move
+-- any number of +1\/+1 counters from this creature onto other creatures", where
+-- HOW MANY land on each is the player's answer
+-- (Pawl.Types.Prompt's ChooseDistributedMovedCounters) rather than the card's.
 --
--- Not implemented: a set on the SECOND side, Forgotten Ancient's "onto other
--- creatures", which asks for a distribution across the batch where a set on the
--- first side asks for a gathering out of it (#2713).
+-- Not implemented: a group destination under a `kinds` arm whose count the CARD
+-- settles, which would have to ask where a fixed batch goes rather than what
+-- crosses; no printing writes one, the sweep on Pawl.Types.MovedKinds naming
+-- Forgotten Ancient as the only group destination there is (#2784).
 --
 -- `kinds` is WHICH counters cross and how many of each; Pawl.Types.MovedKinds is
 -- where every spelling the printed text uses for that is set out.
@@ -46,6 +51,6 @@ data MoveCounters = MkMoveCounters
     -- answer, where an unbound slot would leave the rider's gate unevaluable
     -- instead. Nothing for every move nothing looks back at.
     slot :: Maybe SlotName.SlotName,
-    to :: SlotName.SlotName
+    to :: ObjectRef.ObjectRef
   }
   deriving (Eq, Ord, Show)
