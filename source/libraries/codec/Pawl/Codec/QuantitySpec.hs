@@ -236,6 +236,20 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.SnowWasSpent
       " {\"type\":\"SnowWasSpent\"} "
+  -- CR 111.6 and CR 509.1g, with nothing on the wire for WasKicked's reason: the
+  -- object is whichever one the quantity is evaluated against.
+  Spec.it s "WasToken" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.WasToken
+      " {\"type\":\"WasToken\"} "
+  Spec.it s "WasBlocking" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.WasBlocking
+      " {\"type\":\"WasBlocking\"} "
   -- CR 122.1, with BOTH halves on the wire: a PlayerRef saying whose and a
   -- PlayerCounterKind saying which. Rule 728.1's reading is the Relative one.
   Spec.it s "PlayerCounters, relative and from a slot" $ do

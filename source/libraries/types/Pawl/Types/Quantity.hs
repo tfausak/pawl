@@ -431,6 +431,25 @@ data Quantity
     --
     -- A LEAF: it holds no Quantity.
     SnowWasSpent
+  | -- | CR 111.6 / 608.2h: was the object this quantity is evaluated against a
+    -- token? 1 if so and 0 if not -- Sunpearl Kirin's "if it was a token", asked
+    -- of a permanent the same resolution has just moved to a hidden zone, which
+    -- is rule 608.2h's second clause. WasKicked's shape -- one object, one Bool,
+    -- off the view -- so Pawl.Engine.Projection.viewWithLastKnownAnywhere is what
+    -- answers it once CR 400.7 has deleted the id.
+    --
+    -- Not Filter.IsToken, which is the LIVE question a pool's filter asks of a
+    -- candidate that is still there.
+    --
+    -- A LEAF: it holds no Quantity.
+    WasToken
+  | -- | CR 509.1g / 608.2h: was the object this quantity is evaluated against
+    -- blocking? 1 if so and 0 if not -- Guildsworn Prowler's "if it wasn't
+    -- blocking", an intervening "if" on a creature CR 400.7 has already deleted.
+    -- WasToken's shape above, off the same view.
+    --
+    -- A LEAF: it holds no Quantity.
+    WasBlocking
   | -- | CR 508.3b: how many of that player's opponents were DECLARED attacked
     -- this combat phase -- rule 702.121a's "for each opponent you attacked with a
     -- creature this combat".
