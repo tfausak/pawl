@@ -658,9 +658,11 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "CR 709.4a matches a candidate showing the chosen name among others" $ do
       Spec.assertBool s (Filter.matches (named ["Wax"]) (called ["Wax", "Wane"]) Filter.Type.HasChosenName) "one of two names"
 
-    -- The posture every context-relative atom takes, and the reason the position
-    -- lint exists: outside the one context that fills the field this is False
-    -- rather than an error.
+    -- This atom's vacuous direction, and the reason the position lint exists:
+    -- outside the one context that fills the field this is False rather than an
+    -- error. Not a rule every context-relative atom follows -- CR 110.2's
+    -- SameControllerAsBound answers True on its unfilled read, which the
+    -- SameControllerAsBound group above asserts.
     Spec.it s "a source that chose nothing is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self (called ["Chromatic Star"]) Filter.Type.HasChosenName)) "contextFor leaves it empty"
 

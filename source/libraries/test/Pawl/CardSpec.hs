@@ -2335,14 +2335,20 @@ shieldNamingNothingOffends :: Effect.Effect Card.Type.Card (GrantedAbility.Grant
 shieldNamingNothingOffends effect = case effect of
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref whatRecipient whoRecipient _ _ _) ->
     Maybe.isNothing ref && Maybe.isNothing whatRecipient && Maybe.isNothing whoRecipient
-  -- `direction` is not read here: on the by-direction shield `ref` names CR
-  -- 120.1's SOURCE rather than a recipient, but either way it is the field the
-  -- row is built from, so a shield leaving both empty has nothing to install
-  -- whichever side it is pinned to. Its `whatSource` is not a substitute -- that
-  -- one narrows a row rather than creating one, and `And []` is its ordinary
-  -- value.
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref whatRecipient _ _ _ _) ->
-    Maybe.isNothing ref && Maybe.isNothing whatRecipient
+  -- `direction` IS read here, because it decides whether `whatRecipient` can
+  -- stand in for `ref`. Beside DealtTo the two are alternative spellings of the
+  -- covered side, and Pawl.Engine.Resolve builds one row per named recipient or
+  -- one row for a description, so either alone installs something. Beside DealtBy
+  -- `ref` names CR 120.1's SOURCE and the description is the far END of the
+  -- event: that branch folds over the ids the ref named and conjoins the
+  -- description onto each row, never making a row of its own, so a by-direction
+  -- shield with no ref installs nothing however it describes its recipients.
+  -- `whatSource` is not a substitute on either side -- that one narrows a row
+  -- rather than creating one, and `And []` is its ordinary value.
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref whatRecipient direction _ _ _) ->
+    Maybe.isNothing ref && case direction of
+      DamageDirection.DealtBy -> True
+      DamageDirection.DealtTo -> Maybe.isNothing whatRecipient
   _ -> False
 
 -- The non-vacuity half of that lint, isPhaseR's shape.
@@ -4720,12 +4726,12 @@ blockPermissionFilters permission =
     <> foldMap quantityFilters (BlockPermission.additional permission)
     <> frame Unframed (foldMap conditionFilters (BlockPermission.while permission))
 
--- WHICH position of a card's text a Filter sits in, for the three lints that are
--- about position rather than about the atom. Each atom they police is answered
--- off a field only certain callers fill -- a Filter.View's for CR 701.3a, a
--- Filter.Context's for CR 709.4a and for CR 303.4b -- so the position IS the
--- soundness question. Two of the three name ONE position; CR 303.4b's names
--- several, which is why this is a tag on the position rather than a Bool.
+-- WHICH position of a card's text a Filter sits in, for the lints that are about
+-- position rather than about the atom. Each atom they police is answered off a
+-- field only certain callers fill -- a Filter.View's or a Filter.Context's,
+-- which the constructors below name one by one -- so the position IS the
+-- soundness question. Most name ONE position; CR 303.4b's names several, which
+-- is why this is a tag on the position rather than a Bool.
 --
 --   * AttachDestination -- the destination of Effect.AttachTarget or
 --     Effect.AttachTargetToEach, the positions evaluated against a view whose
@@ -4733,8 +4739,13 @@ blockPermissionFilters permission =
 --     atom belongs here and nowhere else.
 --   * InTargetSlot -- a MODE's target slot filter, the one position matched by
 --     Pawl.Engine.Target.admittedGiven, which is the one site that fills
---     Filter.Context.slotNames. CR 709.4a's Filter.SameNameAsBound belongs here
---     and nowhere else.
+--     Filter.Context.slotNames and Filter.Context.slotControllers. CR 709.4a's
+--     Filter.SameNameAsBound and CR 110.2's Filter.SameControllerAsBound belong
+--     here and nowhere else, and their vacuous directions differ: an unfilled
+--     slotNames answers False, an unfilled slotControllers answers True. So a
+--     misplaced SameNameAsBound admits nothing and a misplaced
+--     SameControllerAsBound admits everything, so this tag carries more for the
+--     second than for the first.
 --   * SourceHostFramed -- a position whose evaluator fills
 --     Filter.Context.sourceAttachedTo, which is five rather than one: a static
 --     ability's CR 604.2 clause (Pawl.Engine.Projection.conditionHolds), a
@@ -4764,11 +4775,15 @@ blockPermissionFilters permission =
 --
 -- CR 303.4a's enchant slot (Face.enchant) is Unframed rather than InTargetSlot,
 -- and that is the load-bearing call: it is a TargetSlot, but two of its readers
--- reach Target.admittedRecipients, which passes NO bindings, so slotNames is
--- empty there -- Pawl.Engine.Attach.attachmentFor's CR 303.4j move and
--- Pawl.Engine.Sba.stillLegalEnchant's CR 303.4c check. A SameNameAsBound written
--- into an enchant ability would answer one way at CR 601.2c and another way at
--- every later reading.
+-- reach Target.admittedRecipients, which passes NO bindings, so slotNames and
+-- slotControllers are both empty there -- Pawl.Engine.Attach.attachmentFor's CR
+-- 303.4j move and Pawl.Engine.Sba.stillLegalEnchant's CR 303.4c check. A
+-- SameNameAsBound written into an enchant ability would answer one way at CR
+-- 601.2c and another way at every later reading; a SameControllerAsBound would do
+-- the same in the widening direction, admitting every host at those later
+-- readings, so this tag is what refuses the atom rather than merely narrowing it.
+-- Modification.GainEnchant's granted slot lands Unframed the same way, through
+-- modificationFilters below.
 data Framing
   = Unframed
   | AttachDestination
@@ -8586,6 +8601,23 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any isByDirectionShield (shieldsOf dovin)) "setup: Dovin prints a by-direction shield"
     Spec.assertBool s (not (any shieldNamingNothingOffends (shieldsOf dovin))) "and naming only the source it watches is accepted"
     Spec.assertEqWith s "while stripping that name rejects both of Dovin's shields" (length (filter (shieldNamingNothingOffends . strip) (shieldsOf dovin))) (2 :: Int)
+    -- The cell the lint reads `direction` for: beside DealtBy the description is
+    -- the OTHER end of the damage event rather than a second spelling of the
+    -- covered side, and Pawl.Engine.Resolve's by-direction branch folds over the
+    -- ids the ref named, so describing recipients does not save a shield naming
+    -- no source. Dovin's other shield is DealtTo, where the same rewrite IS a
+    -- covered side, so `any` is what distinguishes the two.
+    let describeOnly effect = case effect of
+          Effect.PreventAllDamage shield ->
+            Effect.PreventAllDamage shield {PreventAllDamage.ref = Nothing, PreventAllDamage.whatRecipient = Just (Filter.Type.And [])}
+          other -> other
+    Spec.assertBool s (any (shieldNamingNothingOffends . describeOnly) (shieldsOf dovin)) "and a by-direction shield describing recipients but naming no source is rejected"
+    -- The legal neighbour that same arm must still accept: a by-direction shield
+    -- writing BOTH ends, which is the shape Resolve installs one narrowed row per
+    -- named source for.
+    muzzle <- S.printingOf s registry "Synthetic Selective Muzzle"
+    Spec.assertBool s (any isByDirectionShield (shieldsOf muzzle)) "setup: the Muzzle prints a by-direction shield describing its recipients"
+    Spec.assertBool s (not (any shieldNamingNothingOffends (shieldsOf muzzle))) "and naming a source beside that description is accepted"
   -- The same shape one axis over, and the thing that makes
   -- Pawl.Engine.PlayerEffect.unpreventable's board fold EXACT rather than
   -- approximate. See unpreventableScopeOffends.
