@@ -597,7 +597,11 @@ data TriggerCondition
     -- No card in `data/cards/` needs the arriving incarnation, so what the
     -- payload could act on is bound exactly as SelfLeavesTheBattlefield binds it
     -- -- only for a public destination (CR 400.7e), and never for the
-    -- leaving-the-game form, which reaches no zone.
+    -- leaving-the-game form, which reaches no zone. What a card here DOES name
+    -- is the departing permanent itself, and this is the one condition that
+    -- binds it (Pawl.Engine.Binding.departedPermanent): the self-scoped forms
+    -- have it as CR 113.7a's source already, so a slot would be a second name
+    -- for one object.
     PermanentLeavesTheBattlefield (Filter.Filter Keyword.Keyword)
   | -- | CR 700.4's "dies" read off the permanent the BEARER IS ATTACHED TO
     -- (Screams from Within's "when enchanted creature dies"). PermanentDies'
