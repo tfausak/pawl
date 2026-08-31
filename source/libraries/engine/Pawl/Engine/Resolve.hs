@@ -3342,6 +3342,12 @@ offerCast resolving caster slot optionality offer = do
       -- 702.162a's alternative cost put it there, so an offer spending the
       -- spell's one alternative on something else cannot also reach it. CR
       -- 712.11's default -- the front face -- is then the whole answer.
+      --
+      -- Card.castableFaces carries the HALVES and never Card.fusedFace, so an
+      -- offer naming a card in a hand offers each half and no fused cast. Not
+      -- implemented: CR 702.102a's fused cast under a permission an effect grants
+      -- (#2787). The direction is the safe one -- this list only ever offers less
+      -- than the rules allow, never a cast for free.
       faces card
         | CastOffer.transformed offer = fmap pure (Card.backFace card)
         | alternative = Just (filter (\face -> fmap Face.name (Card.convertedFace card) /= Just (Face.name face)) (Card.castableFaces card))

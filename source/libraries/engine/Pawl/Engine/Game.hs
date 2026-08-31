@@ -477,9 +477,20 @@ resolveFace mName card = case mName of
   -- 709.3a's chosen half and CR 712.13's carried face both ride in on;
   -- Cast.asProposed, the gate's speculative
   -- stamp; and Resolve's CR 701.27a Transform arm) store a name they read from
-  -- that same card's faces -- so this arm has no case that reaches it, short of
-  -- a bug in one of them.
-  Just n -> Maybe.fromMaybe (Card.combined card) (Card.faceNamed n card)
+  -- that same card's faces -- or, since fuse landed, the name of the card's
+  -- FUSED view, which the arm below is for. Anything else is a bug in one of
+  -- them.
+  Just n -> case Card.faceNamed n card of
+    Just face -> face
+    -- CR 702.102b: the one name that resolves to no half and is not a bug is a
+    -- FUSED split spell's -- Pawl.Engine.Cast.castableSpells proposes rule
+    -- 702.102a's fused cast under the combined view's rendered name (CR 709.4a),
+    -- which is by construction none of the card's own faces. What it resolves to
+    -- is the combined characteristics rule 702.102b gives it, plus the payload of
+    -- both halves that Pawl.Engine.Card.fusedFace builds (CR 702.102d).
+    Nothing -> case Card.fusedFace card of
+      Just fused | Face.name fused == n -> fused
+      _ -> Card.combined card
 
 -- resolveFace for a reader that has the OBJECT and not just its chosen half --
 -- the door CR 709.5's subtraction is behind.

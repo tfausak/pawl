@@ -746,6 +746,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Dethrone
       " {\"type\":\"Dethrone\"} "
+  -- CR 702.102a's fuse is nullary too: the rule states a permission and names no
+  -- value, so the arm carries no payload.
+  Spec.it s "Fuse" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Fuse
+      " {\"type\":\"Fuse\"} "
   Spec.it s "Menace" $
     Common.assertCodec
       s

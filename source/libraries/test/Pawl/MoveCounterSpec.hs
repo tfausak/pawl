@@ -1324,10 +1324,12 @@ groupSourceSpec s registry = Spec.describe s "CR 122.5 moving counters off a gro
 -- the battlefield a permanent, so the empty conjunction is the sentence rather
 -- than a filter left unwritten.
 --
--- Not implemented: fuse, so the card cannot be cast as both halves at once, and
--- the Backsies half's "Until end of turn, treat all counters as -1/-1 counters",
--- so that half resolves doing nothing (#2725). Both omissions leave pawl's card
--- strictly less able than the printing, never more.
+-- Fuse is transcribed (CR 702.102), so the card offers a fused cast of both
+-- halves from a hand -- Pawl.CastSpec's WearTear group is where that is proved,
+-- against Wear // Tear. Not implemented: the Backsies half's "Until end of turn,
+-- treat all counters as -1/-1 counters", so the right half of a fused cast, like
+-- a cast of Backsies alone, resolves doing nothing (#2725). The omission leaves
+-- pawl's card strictly less able than the printing, never more.
 takesiesName :: CardName.CardName
 takesiesName = CardName.MkCardName (Text.pack "Takesies")
 

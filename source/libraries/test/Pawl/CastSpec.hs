@@ -3171,6 +3171,121 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
         Spec.assertEqWith s "and CR 709.4b's combined colours" (Projection.colorsOf exiled after) (Set.fromList [Color.Green, Color.White])
       _ -> Spec.assertFailure s "expected the redirected card in exile"
 
+-- Wear // Tear {1}{R} // {W}, the pool's first card with fuse (CR 702.102):
+-- Wear is "Destroy target artifact", Tear is "Destroy target enchantment", and
+-- both halves print "Fuse (You may cast one or both halves of this card from
+-- your hand.)".
+--
+-- The card that tells a fused cast from either half: two halves that destroy
+-- DIFFERENT permanents, so "both halves resolved" is a board no single half
+-- reaches, and two mana costs of different colours, so rule 702.102c's combined
+-- cost is a board too.
+--
+-- Every case casts by NAME, as the WaxWane group above does. The fused spell's
+-- name is neither half's -- CR 709.4a's pair rendered, which
+-- Pawl.Engine.Card.merge2 joins and Pawl.Engine.Game.resolveFace turns back into
+-- the fused face.
+wearName, tearName, fusedName :: CardName.CardName
+wearName = CardName.MkCardName (Text.pack "Wear")
+tearName = CardName.MkCardName (Text.pack "Tear")
+fusedName = CardName.MkCardName (Text.pack "Wear//Tear")
+
+sphereName, prisonName :: CardName.CardName
+sphereName = CardName.MkCardName (Text.pack "Chromatic Sphere")
+prisonName = CardName.MkCardName (Text.pack "Ghostly Prison")
+
+wearTearSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wearTearSpec s registry = Spec.describe s "WearTear" $ do
+  -- CR 702.102d: "As a fused split spell resolves, the controller of the spell
+  -- follows the instructions of the left half and then follows the instructions
+  -- of the right half."
+  --
+  -- The Prison assertion comes first because it is the one that discriminates:
+  -- an engine resolving the combined view's payload as it stood before this
+  -- change destroys the Sphere and nothing else (Pawl.Engine.Card.merge2 keeps
+  -- Face.spell as the LEFT half's), so a Sphere-first ordering would report a
+  -- pass on the very half that is not in question.
+  --
+  -- Asserted BY NAME rather than by object id: a destroyed permanent is a new
+  -- object in its graveyard (CR 400.7), and a count of what is still on the
+  -- battlefield asks the question the rule does.
+  Spec.it s "CR 702.102d a fused cast destroys the enchantment and the artifact" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    sphere <- S.printingOf s registry "Chromatic Sphere"
+    ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
+    wearTear <- S.printingOf s registry "Wear"
+    let board = S.landsFor mountain S.alice 2 (S.landsInPlay plains 1)
+        (_, withSphere) = S.addCreature sphere S.alice board
+        (_, withPrison) = S.addCreature ghostlyPrison S.alice withSphere
+        (gs, oid) = S.handOne wearTear withPrison
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid fusedName Facing.FaceUp))
+        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+    Spec.assertEqWith s "the Prison starts on the battlefield" (S.countOnBattlefieldByName prisonName S.alice gs) 1
+    Spec.assertEqWith s "and Tear, the RIGHT half, destroys it" (S.countOnBattlefieldByName prisonName S.alice resolved) 0
+    Spec.assertEqWith s "the Sphere starts on the battlefield" (S.countOnBattlefieldByName sphereName S.alice gs) 1
+    Spec.assertEqWith s "and Wear, the left half, destroys it" (S.countOnBattlefieldByName sphereName S.alice resolved) 0
+  -- CR 702.102a offers a THIRD action and never replaces the two halves: "the
+  -- player may choose to cast both halves of that split card rather than choose
+  -- one half", a choice the player makes by picking an action.
+  --
+  -- CR 702.102c is the pair that follows: "the total cost of a fused split spell
+  -- includes the mana cost of each half". Two boards differing in exactly one
+  -- Plains -- {1}{R} pays Wear alone, {1}{R}{W} pays the fused spell too -- so
+  -- the fused offer appearing is about the mana and not about the targets, which
+  -- both boards supply.
+  Spec.it s "CR 702.102c the fused cast is offered only where both halves' mana is payable" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    sphere <- S.printingOf s registry "Chromatic Sphere"
+    ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
+    wearTear <- S.printingOf s registry "Wear"
+    let targets g = snd (S.addCreature ghostlyPrison S.alice (snd (S.addCreature sphere S.alice g)))
+        namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
+        (red, _) = S.handOne wearTear (targets (S.landsInPlay mountain 2))
+        (both, _) = S.handOne wearTear (targets (S.landsFor plains S.alice 1 (S.landsInPlay mountain 2)))
+    Spec.assertEqWith s "two Mountains: Wear alone, and no fused cast" (namesOffered red) [wearName]
+    Spec.assertEqWith s "a Plains as well: both halves and the fused cast" (namesOffered both) [wearName, tearName, fusedName]
+  -- The other half of that offer: CR 702.102a is a permission fuse GRANTS, so a
+  -- split card without it is offered its two halves and nothing else. Wax // Wane
+  -- is that card -- Scryfall reports no keywords on it, and Dragon's Maze is
+  -- where fuse was printed -- and the WaxWane group above is where its halves are
+  -- proved castable, so this case adds only the absence.
+  Spec.it s "CR 702.102a a split card without fuse offers no fused cast" $ do
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
+    waxWane <- S.printingOf s registry "Wax"
+    let targets g = snd (S.addCreature ghostlyPrison S.alice (snd (S.addCreature piker S.alice g)))
+        namesOffered board = [n | A.Cast _ n _ <- Action.legalActions S.alice board]
+        (unfused, _) = S.handOne waxWane (targets (S.landsFor plains S.alice 1 (S.landsInPlay forest 1)))
+    Spec.assertEqWith s "both halves payable, and still two offers" (namesOffered unfused) [waxName, waneName]
+    Spec.assertEqWith s "and no fused face to offer" (fmap Face.name (Card.fusedFace (Printing.card waxWane))) Nothing
+  -- CR 601.2c, asked of a spell with TWO halves' target slots: "the player
+  -- announces their choice of an appropriate . . . object for each target the
+  -- spell requires", and CR 601.2e rewinds the cast where they cannot. So a board
+  -- with an artifact and no enchantment offers Wear and refuses the fused spell,
+  -- which needs a target for Tear as well.
+  --
+  -- The pair to the mana case above, and the same shape: two boards differing in
+  -- exactly one permanent, so the refusal is about the missing target rather than
+  -- about the mana, which both boards pay in full. It is also what holds the
+  -- fused proposal to the ORDINARY gates -- a proposal exempt from `castable`
+  -- would be offered on both boards.
+  Spec.it s "CR 601.2c the fused cast is refused where one half has no legal target" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    sphere <- S.printingOf s registry "Chromatic Sphere"
+    ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
+    wearTear <- S.printingOf s registry "Wear"
+    let mana = S.landsFor plains S.alice 1 (S.landsInPlay mountain 2)
+        namesOffered board = [n | A.Cast _ n _ <- Action.legalActions S.alice board]
+        (artifactOnly, _) = S.handOne wearTear (snd (S.addCreature sphere S.alice mana))
+        (bothTargets, _) = S.handOne wearTear (snd (S.addCreature ghostlyPrison S.alice (snd (S.addCreature sphere S.alice mana))))
+    Spec.assertEqWith s "no enchantment: Wear alone, and no fused cast" (namesOffered artifactOnly) [wearName]
+    Spec.assertEqWith s "an enchantment as well: the fused cast returns" (namesOffered bothTargets) [wearName, tearName, fusedName]
+
 -- Victor Mancha, Runaway {5} Legendary Artifact Creature -- Human Hero 4/4:
 -- "When Victor Mancha enters, exile target card from your graveyard. You may
 -- play it for as long as you control Victor Mancha." The pool's only
@@ -3804,6 +3919,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   charSpec s registry
   corrosiveGaleSpec s registry
   waxWaneSpec s registry
+  wearTearSpec s registry
   aftermathSpec s registry
   modalCastSpec s registry
   entwineSpec s registry

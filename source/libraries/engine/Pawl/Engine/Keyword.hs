@@ -195,6 +195,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Evolve -> List.genericReplicate count evolve
   -- CR 702.105b: each instance triggers separately.
   Keyword.Dethrone -> List.genericReplicate count dethrone
+  Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> List.genericReplicate count prowess
@@ -354,6 +355,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Dethrone -> []
+  Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
@@ -563,6 +565,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Dethrone -> []
+  Keyword.Fuse -> []
   Keyword.LevelUp cost -> List.genericReplicate count (levelUp cost)
   Keyword.Outlast cost -> List.genericReplicate count (outlast cost)
   Keyword.Prowess -> []
@@ -909,6 +912,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Dethrone -> []
+  Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
@@ -996,6 +1000,20 @@ hasFlash = Set.member Keyword.Flash
 -- count, the rule taking no parameter.
 hasJumpStart :: Set Keyword -> Bool
 hasJumpStart = Set.member Keyword.JumpStart
+
+-- CR 702.102a: does this card's keyword set let both halves be cast as one fused
+-- split spell? Its one reader is Pawl.Engine.Card.fusedFace, which builds the
+-- spell rule 702.102b describes; Pawl.Engine.Cast.castableSpells is what applies
+-- the rule's OWN zone gate, "while the card with fuse is in a player's hand".
+--
+-- MEMBERSHIP, not a count: the permission is to cast both halves, and rule
+-- 702.102a states nothing a second instance could add.
+--
+-- Asked of the COMBINED view's keywords (CR 709.4c: a split card has "each
+-- ability in the text box of each half"), so a card printing fuse on either half
+-- has it -- which is also why this takes a keyword set rather than a card.
+hasFuse :: Set Keyword -> Bool
+hasFuse = Set.member Keyword.Fuse
 
 -- CR 702.34a: every cost this card may be cast from the graveyard for, in
 -- ascending Set order, and empty when it has no flashback. Read by
@@ -1444,6 +1462,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Dethrone -> []
+  Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
@@ -1624,6 +1643,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Dethrone -> []
+  Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
@@ -1778,6 +1798,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
   Keyword.Dethrone -> []
+  Keyword.Fuse -> []
   Keyword.LevelUp _ -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
@@ -1936,6 +1957,7 @@ familyOf keyword = case keyword of
   Keyword.BattleCry -> Nothing
   Keyword.Evolve -> Nothing
   Keyword.Dethrone -> Nothing
+  Keyword.Fuse -> Nothing
   Keyword.LevelUp _ -> Just KeywordFamily.LevelUp
   Keyword.Outlast _ -> Just KeywordFamily.Outlast
   Keyword.Prowess -> Nothing

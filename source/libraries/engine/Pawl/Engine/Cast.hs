@@ -924,6 +924,9 @@ castable pid oid name facing gs =
 -- static ability that functions in any zone from which you could play the
 -- card"), and off the face being proposed, so a multi-face card offers the
 -- morph cast only for the half that prints one. No printing has one.
+--
+-- AND ONE MORE FOR A HAND'S FUSE CARD, rule 702.102a's own permission, offered
+-- the same way for the same reason -- see `fusedProposals` below.
 castableSpells :: PlayerId -> GameState -> [(ObjectId, CardName.CardName, Facing.Facing)]
 castableSpells pid gs =
   let facings face =
@@ -951,8 +954,35 @@ castableSpells pid gs =
         | face <- foldMap Card.castableFaces (Game.cardOf oid gs),
           facing <- facings face
         ]
-      offered oid = filter (\(_, name, facing) -> castable pid oid name facing gs) (proposals oid)
-      inZone zone = concatMap offered (zoneCandidates zone pid gs)
+      -- CR 702.102a's third offer, beside the two halves and never instead of
+      -- them: "if a player casts a split card with fuse FROM THEIR HAND, the
+      -- player may choose to cast both halves of that split card rather than
+      -- choose one half". A choice the player makes by picking an action, which
+      -- is Split's own posture one line up -- the engine never decides which.
+      --
+      -- Named for the FUSED face (Pawl.Engine.Card.fusedFace), whose name is the
+      -- pair rendered (CR 709.4a) and so is neither half's;
+      -- Pawl.Engine.Game.resolveFace is what turns that name back into the spell
+      -- rule 702.102b describes, so every conjunct of `castable` below -- the
+      -- timing window, rule 702.102c's combined cost, both halves' targets --
+      -- reads it without knowing fuse exists.
+      --
+      -- FACE UP alone: rule 702.102a is a permission to cast both halves, and a
+      -- face-down cast has no halves to combine -- CR 708.2 leaves such a spell
+      -- "no characteristics other than those listed by the ability or rules that
+      -- allowed" it, which is one set of listed values rather than two halves.
+      --
+      -- HAND alone, which is rule 702.102a's own zone -- the ability "applies
+      -- while the card with fuse is in a player's hand" -- so a fuse card in a
+      -- graveyard or exile offers its halves and nothing more.
+      fusedProposals zone oid =
+        [ (oid, Face.name face, Facing.FaceUp)
+        | zone == Zone.Hand,
+          card <- Maybe.maybeToList (Game.cardOf oid gs),
+          face <- Maybe.maybeToList (Card.fusedFace card)
+        ]
+      offered zone oid = filter (\(_, name, facing) -> castable pid oid name facing gs) (proposals oid <> fusedProposals zone oid)
+      inZone zone = concatMap (offered zone) (zoneCandidates zone pid gs)
    in concatMap inZone castZones
 
 -- CR 601.3 (Panglacial): may this card be cast from the library while its
