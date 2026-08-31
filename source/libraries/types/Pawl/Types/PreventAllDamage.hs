@@ -28,9 +28,11 @@ data PreventAllDamage effect = MkPreventAllDamage
     kind :: Maybe DamageKind.DamageKind,
     -- | The objects or players this RESOLUTION names -- Selfless Squire's
     -- "permanents you control", swept as the effect is created. Nothing for a
-    -- shield that DESCRIBES its recipients in @whatRecipient@ below instead; the
-    -- two spellings are alternatives, and a card writing both is read as the
-    -- description alone (Pawl.Engine.Resolve's arm), exactly as
+    -- shield that DESCRIBES its recipients in @whatRecipient@ below instead; on
+    -- the DealtTo side the two spellings are alternatives, and a card writing
+    -- both is read as the description alone (Pawl.Engine.Resolve's arm) -- but
+    -- beside DealtBy this field names the SOURCE and the two are read together,
+    -- which is @whatRecipient@'s own note. That alternation is exactly how
     -- Pawl.Types.PreventNextDamage reads its pair. A shield writing NEITHER
     -- surrounds nothing (CR 615.1) and installs no row at all, which
     -- Pawl.CardSpec's shieldNamingNothingOffends rejects.
@@ -42,11 +44,14 @@ data PreventAllDamage effect = MkPreventAllDamage
     -- covered too and one that stops being one is not. That is the whole reason
     -- this is not spelled as an @EachMatching@ ref above.
     --
-    -- Read on the DealtTo side only: a shield pinned to the other side of the
-    -- event names no recipient at all, and describes its source in @whatSource@
-    -- below instead. A card writing one beside DealtBy would install a shield
-    -- broader than it printed, which Pawl.CardSpec's byDirectionRecipientOffends
-    -- rejects.
+    -- Read on BOTH sides of @direction@: CR 615.1's shield watches a damage
+    -- EVENT, so a card may narrow the source end and the recipient end at once --
+    -- Goblin Furrier's "prevent all damage that this creature would deal to snow
+    -- creatures", printed as a STATIC ability and so carried by
+    -- Pawl.Types.PrintedReplacement rather than by this opcode. Beside DealtBy
+    -- this description and @ref@ are the two ends rather than two spellings of
+    -- one, which Synthetic Selective Muzzle is what proves. What that costs on the DealtTo side
+    -- is that the two ARE alternatives there, @ref@ being a recipient too.
     --
     -- No PLAYER half beside it, where Pawl.Types.PreventNextDamage carries
     -- @whoRecipient@. Printings that want both halves exist -- Safe Passage's

@@ -2352,24 +2352,8 @@ isPreventionShield effect = case effect of
   Effect.PreventAllDamage {} -> True
   _ -> False
 
--- The same question one axis over: a shield pinned to the SOURCE side of the
--- damage event covers every recipient.
---
--- Not implemented: restricting whom such a shield protects.
--- Pawl.Engine.Resolve's DealtBy branch passes no printed recipient to
--- installDamageRow at all, so a described recipient beside that direction is text
--- nothing performs and the shield installed would be BROADER than the card
--- printed (#2765). Until that side carries the description, this lint is what
--- stops one being written. In data/cards/, a card mentioning both sides of the
--- damage event is written as two shields instead -- Dovin, Hand of Control's one
--- ability prints both.
-byDirectionRecipientOffends :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
-byDirectionRecipientOffends effect = case effect of
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ whatRecipient direction _ _ _) ->
-    direction == DamageDirection.DealtBy && Maybe.isJust whatRecipient
-  _ -> False
-
--- The non-vacuity half of THAT lint, one field narrower than isPreventionShield.
+-- A shield pinned to the SOURCE side of the damage event, one field narrower
+-- than isPreventionShield.
 isByDirectionShield :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 isByDirectionShield effect = case effect of
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ direction _ _ _) -> direction == DamageDirection.DealtBy
@@ -4859,15 +4843,21 @@ hostFramed framing = case framing of
 -- above)? Every framing but a keyword's own, which is not: no evaluator of a
 -- keyword's payload Filter supplies SLOT OBJECTS, so Filter.IsControllerOfBound
 -- reads nothing at any of them. That is the test to put a new evaluator to,
--- rather than a list of today's, and two of the three Pawl.Engine.Filter Context
--- builders settle it by construction -- contextFor and contextComparingPower
--- both write slotObjects empty. The third, contextWithSlots, is reached once:
--- Pawl.Engine.Replacement.candidateContext, for the CR 702.16e quality
--- Pawl.Engine.Keyword transplants into a DamageR's source half, and the slots it
--- is handed are a ReplacementCandidate's -- empty for the PERMANENT candidate a
--- keyword mint always is, since no resolution installed a printed static
--- ability. Filter.HasKeyword is not even a read: it asks Set membership of the
--- whole keyword.
+-- rather than a list of today's: the question is what the EVALUATING context
+-- holds, not how many builders there are -- Pawl.Engine.Filter.contextWithSlots
+-- has six callers and Pawl.Engine.Target.slotContext writes a slot-carrying
+-- Context out by hand. Neither reaches a keyword's payload: CR 702.11d and CR
+-- 702.16b (Pawl.Engine.Target.targetable), CR 702.14c (Pawl.Engine.Combat), CR
+-- 702.16c/d (Pawl.Engine.AttachRestriction), CR 702.16f
+-- (Pawl.Engine.CombatRestriction), a keyword cost's criterion (Pawl.Engine.Cost)
+-- and the CR 702.29e cycling mint's Search filter all evaluate in a context built
+-- with no slots, and the CR 702.16e quality Pawl.Engine.Keyword transplants into
+-- a DamageR's source half goes through candidateContext on the PERMANENT segment,
+-- whose ReplacementCandidate.slots is empty because no resolution installed a
+-- printed static ability. Target.slotContext's map is answered only by
+-- admittedGiven and lastKnownAdmits, which match a target slot's own Filter --
+-- Unframed, never KeywordFramed. Filter.HasKeyword is not even a read: it asks
+-- Set membership of the whole keyword.
 --
 -- The lint is conservative everywhere else, reporting the atom wherever it sits
 -- rather than only where it is answered, so this is the one exemption and it is
@@ -8595,29 +8585,6 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any isByDirectionShield (shieldsOf dovin)) "setup: Dovin prints a by-direction shield"
     Spec.assertBool s (not (any shieldNamingNothingOffends (shieldsOf dovin))) "and naming only the source it watches is accepted"
     Spec.assertEqWith s "while stripping that name rejects both of Dovin's shields" (length (filter (shieldNamingNothingOffends . strip) (shieldsOf dovin))) (2 :: Int)
-  -- CR 615.1 one axis over: WHICH SIDE of the damage event the shield is pinned
-  -- to. See byDirectionRecipientOffends.
-  Spec.it s "no card restricts a by-direction prevention shield to described recipients" $ do
-    ps <- S.allPrintings s
-    let offenders = filter (anyFace (any byDirectionRecipientOffends . cardResolutionEffects) . Printing.card) ps
-    -- Guards against a vacuous sweep: with no by-direction shield in the pool at
-    -- all this would pass whatever a card said. Dovin, Hand of Control and Old
-    -- Fat Spider Can't See Me print one.
-    Spec.assertBool s (any (anyFace (any isByDirectionShield . cardResolutionEffects) . Printing.card) ps) "the pool has a card printing a by-direction shield"
-    Spec.assertEqWith s "a shield pinned to the source side describes no recipient (CR 615.1)" (fmap (S.nameOf . Printing.card) offenders) []
-  -- The rejecting direction, proven against Dovin, whose one ability prints both
-  -- directions -- so the count is the lint: it rejects the by-direction shield and
-  -- accepts the same description on the DealtTo shield beside it, where a
-  -- predicate answering on `whatRecipient` alone would reject both.
-  Spec.it s "the lint itself catches a by-direction shield restricted to recipients" $ do
-    dovin <- S.printingOf s registry "Dovin, Hand of Control"
-    let describe effect = case effect of
-          Effect.PreventAllDamage shield -> Effect.PreventAllDamage shield {PreventAllDamage.whatRecipient = Just (Filter.Type.And [])}
-          other -> other
-        shields = filter isPreventionShield (cardResolutionEffects (S.combinedFace dovin))
-    Spec.assertBool s (any isByDirectionShield shields) "setup: Dovin prints a by-direction shield to describe"
-    Spec.assertBool s (not (any byDirectionRecipientOffends shields)) "the real Dovin describes no recipient beside that direction"
-    Spec.assertEqWith s "and describing one rejects the by-direction shield alone" (length (filter (byDirectionRecipientOffends . describe) shields)) (1 :: Int)
   -- The same shape one axis over, and the thing that makes
   -- Pawl.Engine.PlayerEffect.unpreventable's board fold EXACT rather than
   -- approximate. See unpreventableScopeOffends.
