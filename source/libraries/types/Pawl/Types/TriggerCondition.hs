@@ -11,6 +11,7 @@ import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBl
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -216,8 +217,7 @@ data TriggerCondition
     --
     -- CR 508.3e's "[a player] attacks [another player]" reads the same event,
     -- and PlayerAttacksPlayer below is that arm: this one names the ATTACKED
-    -- player by attachment, that one names the ATTACKING player by relation and
-    -- leaves the attacked side unqualified.
+    -- player by attachment, that one names both subjects by relation.
     --
     -- Not implemented: rule 508.3b's planeswalker and battle subjects -- the
     -- sweep above turned up no card writing one, and GameEvent.BecameAttacked
@@ -276,11 +276,19 @@ data TriggerCondition
     -- three or more creatures" needs (#2226).
     PlayerAttacksWith PlayerAttacksWith.PlayerAttacksWith
   | -- | CR 508.3e: "whenever [a player] attacks [another player]" -- Seifer,
-    -- Balamb Rival's "whenever you attack a player". The payload is which player
-    -- rule 508.3e names FIRST, the one who declared; the second subject is the
-    -- rule's bare "[another player]", left unqualified because every printing
-    -- this arm serves prints it bare -- Scryfall o:"attack a player",
-    -- 2026-08-24, twenty-four cards and not one of them narrows that side.
+    -- Balamb Rival's "whenever you attack a player", Lulu, Stern Guardian's
+    -- "whenever an opponent attacks you". The payload names BOTH of rule
+    -- 508.3e's subjects: `attacker` is the one who declared, `attacked` the one
+    -- the declaration was aimed at. A card leaving the second subject bare
+    -- writes AnyPlayer there, which is what every printing of Seifer's shape
+    -- says -- Scryfall o:"attack a player", 2026-08-24, twenty-four cards and
+    -- not one of them narrows it.
+    --
+    -- Both relations are read against CR 109.5's "you" and not against each
+    -- other, so Opponent on the ATTACKED side would say "somebody other than me
+    -- was attacked" rather than restate CR 506.2a's requirement that the
+    -- defending player be an opponent of the attacker. Only You is in print
+    -- there today.
     --
     -- CR 508.3b's per-TARGET arity and not rule 508.3d's, so this reads
     -- GameEvent.BecameAttacked where PlayerAttacks above reads
@@ -295,8 +303,10 @@ data TriggerCondition
     -- off the same event, because that is what the printed payloads read --
     -- Seifer's "goad target creature that player controls", Karazikar, the Eye
     -- Tyrant's and Gornog, the Red Reaper's the same. The ATTACKING player is
-    -- not bound: no printing points back at it that the payload's own "you"
-    -- cannot say.
+    -- not bound.
+    --
+    -- Not implemented: the ATTACKING player as a bound slot, which Archnemesis'
+    -- "attach this Aura to that player" needs (#2810).
     --
     -- ONLY AttackTarget.OfPlayer matches, which is rule 508.3e's last sentence
     -- in as many words -- "it won't trigger if a creature attacks a planeswalker
@@ -305,11 +315,7 @@ data TriggerCondition
     -- battlefield attacking, holds by construction: CR 508.4 says such a
     -- creature was never declared, and Pawl.Engine.Combat.putOntoBattlefieldAttacking
     -- records no event.
-    --
-    -- Not implemented: a NAMED attacked side, which "whenever a player attacks
-    -- you" needs -- Mirkwood Trapper and Lulu, Stern Guardian print it, and each
-    -- wants a second capability besides (#2281).
-    PlayerAttacksPlayer PlayerRelation.PlayerRelation
+    PlayerAttacksPlayer PlayerAttacksPlayer.PlayerAttacksPlayer
   | -- | CR 702.105a: dethrone -- SelfAttacks narrowed by whom the bearer
     -- attacked. The attacked player comes from Combat.attackers rather than the
     -- event, and that is the whole narrowing: the event carries CR 508.5's
