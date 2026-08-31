@@ -12,8 +12,8 @@ module Pawl.Types.DamageDirection where
 -- Cashed by Pawl.Engine.Resolve.installDamageRow into
 -- Pawl.Types.DamagePattern's two baked halves: 'DealtTo' writes the recipient
 -- into @whichRecipient@, 'DealtBy' writes the object into @whichSource@ and
--- names no recipient, so the by-direction covers a player as much as a
--- permanent.
+-- names no recipient, so a by-direction shield describing none covers a player
+-- as much as a permanent.
 --
 -- Not a Bool, for Pawl.Types.CostScale's reason: the constructor names the
 -- direction where @True@ would only say that something is different.

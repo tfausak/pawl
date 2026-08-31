@@ -1844,8 +1844,9 @@ selectiveMuzzleSpec s registry = Spec.describe s "Synthetic Selective Muzzle (CR
     -- description does NOT admit lands whole. A row built from the source alone
     -- prevents it and leaves 0.
     Spec.assertEqWith s "the 3 the muzzled creature deals to bob's own creature lands whole" (S.damageOf bystander (strike muzzled (Recipient.ToCreature bystander) 3)) (Just 3)
-    -- The same reading one recipient KIND over: CR 120.3a's other kind of
-    -- recipient satisfies no object filter, so a player is uncovered too.
+    -- The same reading one recipient KIND over: CR 120.3's recipient is a player
+    -- or a permanent, and a player satisfies no object filter, so the shield's
+    -- description leaves one uncovered.
     Spec.assertEqWith s "and the 4 it deals to alice herself lands whole" (S.lifeOf S.alice (strike muzzled (Recipient.ToPlayer S.alice) 4)) (Just 16)
     -- The covering direction, differing from the first case in the RECIPIENT
     -- alone: without it the two above could pass on a shield that was never
