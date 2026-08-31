@@ -155,6 +155,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.Replace as Replace
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
@@ -2237,7 +2238,30 @@ rewriteEffect pairs effect = case effect of
   -- copiable values, so what the copy becomes is not rewritten. CR 707.10c's
   -- offer is no land type either.
   Effect.CopySpell (CopySpell.MkCopySpell ref newTargets) -> Effect.CopySpell (CopySpell.MkCopySpell (rewriteObjectRef pairs ref) newTargets)
-  Effect.Replace {} -> effect
+  -- CR 612.1 through the SHIELD a resolution installs: the row's duration, its
+  -- CR 614.1 gate, and the replacement effect itself, which is where the word
+  -- usually sits. rewritePrintedReplacement makes the same descent over a
+  -- permanent's static row; a floating one is the same text one carrier over.
+  -- CR 614.3's Uses is a count and CR 614.15's ReplacementOrigin is provenance,
+  -- so neither holds a printed word.
+  --
+  -- The EFFECT half is proved by Pawl.CounterspellSpec's evolved Moonmist, whose
+  -- shield spares Goblins where the printed word says Werewolves. The DURATION
+  -- and the CONDITION are REGRESSION FENCES rather than proved behaviours. The
+  -- test a reader can re-run: scan data/cards/ for Effect.Replace and ask which
+  -- rows hold a subtype in those two fields. On 2026-08-30 none did -- every
+  -- duration was UntilEndOfTurn, which holds no word at all, and every printed
+  -- CR 614.1 gate was a Compares over a count of one CARD TYPE, which rule 612.2
+  -- does not swap -- so mutating either line away left the whole suite green. A
+  -- card gating a shield on "if you control three or more Goblins" is what would
+  -- prove them.
+  Effect.Replace r ->
+    Effect.Replace
+      r
+        { Replace.duration = rewriteDuration pairs (Replace.duration r),
+          Replace.condition = fmap (rewriteCondition pairs) (Replace.condition r),
+          Replace.effect = rewriteReplacementEffect pairs (Replace.effect r)
+        }
   Effect.SkipNextPhase {} -> effect
   -- CR 612.1 through every half of the shield that holds printed words: the
   -- objects it covers, the predicates describing its recipients and its source,
