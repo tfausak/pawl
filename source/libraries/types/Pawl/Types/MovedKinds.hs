@@ -76,13 +76,13 @@ import qualified Pawl.Types.Quantity as Quantity
 --
 -- The same run's KIND-NAMING moves that leave the count to the player all say
 -- "any number of +1\/+1 counters" -- Scrounging Bandar, Bioshift, Aetherborn
--- Marauder and Forgotten Ancient, every one of them 'AnyNumberOfKind'. Only
--- Scrounging Bandar is written today. Bioshift's second side is "another target
--- creature with the same controller", which no filter can demand of a sibling
--- OBJECT slot (#2722), and dropping the clause would be weaker than printed;
--- Aetherborn Marauder's "from other permanents you control" is a group on the
--- first side, which ObjectRef.EachMatching says; Forgotten Ancient's "onto other
--- creatures" is a group on the SECOND, which nothing says (#2713).
+-- Marauder and Forgotten Ancient, every one of them 'AnyNumberOfKind'. Scrounging
+-- Bandar and Bioshift are written today, the second one's "another target
+-- creature with the same controller" being Filter.SameControllerAsBound over its
+-- first slot; Aetherborn Marauder's "from other permanents you control" is a
+-- group on the first side, which ObjectRef.EachMatching says; Forgotten
+-- Ancient's "onto other creatures" is a group on the SECOND, which nothing says
+-- (#2713).
 --
 -- @include_extras@ is what makes that run every printing rather than most of
 -- one, and it is the parameter every sweep in this neighbourhood needs: without

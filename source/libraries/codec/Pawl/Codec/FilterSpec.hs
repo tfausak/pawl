@@ -204,6 +204,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.SameNameAsBound (SlotName.MkSlotName (Text.pack "castSpell")))
       " {\"type\":\"SameNameAsBound\",\"value\":\"castSpell\"} "
+  Spec.it s "SameControllerAsBound" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.SameControllerAsBound (SlotName.MkSlotName (Text.pack "from")))
+      " {\"type\":\"SameControllerAsBound\",\"value\":\"from\"} "
   Spec.it s "HasChosenName" $
     Common.assertCodec
       s

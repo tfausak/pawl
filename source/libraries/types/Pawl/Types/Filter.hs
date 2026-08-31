@@ -369,6 +369,41 @@ data Filter keyword
     -- has no name at all (CR 708.2a's face-down object) -- the posture IsBound
     -- above takes, and the answer CR 709.4a itself gives for a nameless object.
     SameNameAsBound SlotName.SlotName
+  | -- | CR 110.2 asked of TWO objects: the candidate has the same controller as the
+    -- object this slot holds -- Bioshift's "another target creature with the same
+    -- controller", where the slot is the sibling target the same announcement is
+    -- choosing (CR 601.2c).
+    --
+    -- SameNameAsBound's sibling one characteristic over, and built the same way:
+    -- that atom compares the candidate's names against the bound object's and this
+    -- one compares controllers, neither carrying the value it compares against --
+    -- Pawl.Engine.Filter.Context's `slotControllers` is where the board-holding
+    -- caller puts them, as `slotNames` is for that one.
+    --
+    -- NOT ControlledByBound, whose slot holds a PLAYER: that atom is CR 603.2's
+    -- trigger binding, answered by rewriting at Pawl.Engine.Filter.bakeBound off a
+    -- map Pawl.Engine.Binding.playerSlots builds through Recipient.playerOf, so a
+    -- slot holding an OBJECT contributes nothing to it. The two would also have to
+    -- disagree about the vacuous case below, which one atom cannot do; see #2722.
+    --
+    -- VACUOUSLY TRUE where the slot names no object, which is the one atom here
+    -- that does not answer False, and the departure is CR 601.2c's rather than a
+    -- convenience: this is a RELATION between two of one announcement's targets,
+    -- and the offer is made before either is chosen. Pawl.Engine.Target
+    -- .legalSetsGiven's first pass hands every slot the seed alone, so a False here
+    -- would empty the slot and make the spell uncastable rather than unrestricted;
+    -- the pass WIDENS and Pawl.Engine.Target.selectionLegal's joint check is what
+    -- narrows, re-deriving the slot against the targets actually chosen, exactly as
+    -- CR 608.2b will at resolution. Filter.boundUnannounced is the same call one
+    -- field over -- a bound nothing can supply yet states no bound rather than an
+    -- unmeetable one.
+    --
+    -- What keeps the atom out of the positions with no joint check behind them is
+    -- Pawl.CardSpec's "CR 110.2 no card asks SameControllerAsBound outside a mode's
+    -- target slot", which the vacuous direction makes load-bearing where
+    -- SameNameAsBound's sweep is merely tidy: an atom that widens in a position
+    -- nothing re-derives would admit candidates the card excludes.
+    SameControllerAsBound SlotName.SlotName
   | -- | CR 201.4: the candidate has a name the SOURCE has chosen -- Ancient
     -- Vendetta's "cards with that name", where the name was chosen earlier in the
     -- same resolution (CR 608.2c).

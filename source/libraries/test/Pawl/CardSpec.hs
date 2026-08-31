@@ -3189,6 +3189,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsPlayer _ -> 0
   Filter.Type.IsBound _ -> 0
   Filter.Type.SameNameAsBound _ -> 0
+  Filter.Type.SameControllerAsBound _ -> 0
   Filter.Type.HasChosenName -> 0
   Filter.Type.IsControllerOfBound _ -> 0
   -- Zero for the nullary atoms' reason, a payload over: CR 400.1's card count is
@@ -4197,6 +4198,8 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.IsBound _ -> []
   -- Reads the whole set too, one field over.
   Filter.Type.SameNameAsBound _ -> []
+  -- Reads the whole set too, one field further over.
+  Filter.Type.SameControllerAsBound _ -> []
   Filter.Type.HasChosenName -> []
   Filter.Type.IsPlayer _ -> []
   -- The one arm with an answer: the candidate is the controller of the object
@@ -5861,6 +5864,36 @@ sameNameAsBoundOffends :: Face.Face Card.Type.Card -> Bool
 sameNameAsBoundOffends card =
   let (slotted, elsewhere) = sameNameAsBoundCounts card
    in elsewhere /= 0 || slotted + elsewhere /= jsonAtoms sameNameAsBoundTag (Codec.encode (Face.Codec.codec Card.codec) card)
+
+-- The CR 110.2 tag, spelled once.
+sameControllerAsBoundTag :: Text.Text
+sameControllerAsBoundTag = Text.pack "SameControllerAsBound"
+
+-- How many CR 110.2 shared-controller atoms this card carries inside a MODE's
+-- target slot filter, and how many anywhere else. The second number is the
+-- offence; the first is what Bioshift legitimately has one of.
+sameControllerAsBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
+sameControllerAsBoundCounts card =
+  let total wanted = sum [filterAtoms sameControllerAsBoundTag f | (framing, f) <- cardFilters card, (framing == InTargetSlot) == wanted]
+   in (total True, total False)
+
+-- CR 110.2's shared-controller comparison is answerable only where
+-- Filter.Context.slotControllers is filled, and Pawl.Engine.Target.slotContext --
+-- the one site that matches a MODE's target slot Filter -- is the one site that
+-- fills it. This is sameNameAsBoundOffends' sweep one characteristic over, and
+-- the one place the two differ is what makes it load-bearing rather than tidy:
+-- that atom is a silent False outside its position and this one is a silent TRUE,
+-- so an atom in a Count filter, an affected set or a search filter would ADMIT
+-- what the card excludes rather than nothing at all.
+--
+-- Two offences under one name, sameNameAsBoundOffends' two: the traversal found
+-- the atom outside a target slot, or the traversal and the codec disagree about
+-- how many the card holds. The second disjunct is a REGRESSION FENCE for that
+-- function's reason.
+sameControllerAsBoundOffends :: Face.Face Card.Type.Card -> Bool
+sameControllerAsBoundOffends card =
+  let (slotted, elsewhere) = sameControllerAsBoundCounts card
+   in elsewhere /= 0 || slotted + elsewhere /= jsonAtoms sameControllerAsBoundTag (Codec.encode (Face.Codec.codec Card.codec) card)
 
 -- The CR 303.4b tag, spelled once.
 hostOfSourceTag :: Text.Text
@@ -9025,6 +9058,49 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let positions = concatMap (cardFilters . S.combinedFace) ps
     Spec.assertBool s (length positions > 100) "the pool gives the traversal Filter positions to walk"
     Spec.assertBool s (length (filter ((== InTargetSlot) . fst) positions) > 10) "and target slot filters for the accepted side to be about"
+  -- CR 110.2's Filter.SameControllerAsBound is CR 709.4a's atom one characteristic
+  -- over, in the same position and with the STAKES reversed: it is vacuously TRUE
+  -- where Filter.Context.slotControllers has no key for its slot, so an atom
+  -- outside a mode's target slot admits every candidate the card meant to exclude
+  -- rather than none. See sameControllerAsBoundOffends.
+  Spec.it s "CR 110.2 no card asks SameControllerAsBound outside a mode's target slot" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace sameControllerAsBoundOffends . Printing.card) ps
+    Spec.assertEqWith s "the atom sits only in a target slot's filter" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: the pool authors the atom, and the card that does is ACCEPTED
+    -- here rather than skipped.
+    bioshift <- S.printingOf s registry "Bioshift"
+    Spec.assertEqWith
+      s
+      "Bioshift's one atom is in its second target slot"
+      (sameControllerAsBoundCounts (S.combinedFace bioshift))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and it is the pool's only one"
+      (sum (fmap (uncurry (+) . sameControllerAsBoundCounts . S.combinedFace) ps))
+      1
+    -- The REJECTING direction, hand-built for the reason every sibling lint's is:
+    -- a card that offends must not be loadable, so no file can carry one. Buried
+    -- under all three combinators, so an implementation reading only the top of a
+    -- Filter would accept it.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let atom = Filter.Type.SameControllerAsBound (SlotName.MkSlotName (Text.pack "from"))
+        buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not atom]]
+        planted =
+          (S.combinedFace piker)
+            { Face.staticAbilities =
+                [ StaticAbility.MkStaticAbility
+                    (Affected.Matching buried)
+                    Nothing
+                    Set.empty
+                    Nothing
+                    (NonEmpty.singleton Modification.LoseAllAbilities)
+                ]
+            }
+    Spec.assertEqWith s "the same atom in a static ability's affected set is an offence" (sameControllerAsBoundCounts planted) (0, 1)
+    Spec.assertBool s (sameControllerAsBoundOffends planted) "and the lint says so"
+    Spec.assertBool s (not (sameControllerAsBoundOffends (S.combinedFace piker))) "where the ungrafted card is accepted"
   -- CR 202.3's computed bound is CR 709.4a's atom one axis over once more, and the
   -- axis is the SLOT rather than the Framing: Pawl.Engine.Target.slotContext fills
   -- Filter.Context.slotAmount off the target slot's own Quantity, so the atom in a

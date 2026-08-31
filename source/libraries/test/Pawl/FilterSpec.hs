@@ -596,6 +596,51 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertEqWith s "the singleton is answerable" (Filter.slotOneObject slot (bound [7])) (Just (ObjectId.MkObjectId 7))
       Spec.assertEqWith s "and the group is not" (Filter.slotOneObject slot (bound [6, 7, 8])) Nothing
 
+  -- CR 110.2 across two of one announcement's targets. blackCreature is
+  -- controlled by player 0 and owned by player 1, so a reading off the wrong field
+  -- disagrees with every arm below.
+  Spec.describe s "SameControllerAsBound" $ do
+    let slot = SlotName.MkSlotName (Text.pack "from")
+        player = PlayerId.MkPlayerId
+        controlledBy pids = self {Filter.slotControllers = Map.singleton slot (Set.fromList (fmap player pids))}
+    Spec.it s "matches a candidate the bound object's controller controls" $
+      Spec.assertBool s (Filter.matches (controlledBy [0]) blackCreature (Filter.Type.SameControllerAsBound slot)) "the same controller"
+
+    Spec.it s "does not match a candidate under another player" $
+      Spec.assertBool s (not (Filter.matches (controlledBy [1]) blackCreature (Filter.Type.SameControllerAsBound slot))) "the owner is not the controller"
+
+    -- The one atom here that widens rather than answering False, and the two cases
+    -- that keep the departure narrow: a slot with NO KEY is one CR 601.2c has not
+    -- answered yet, where a key holding no controller is a bound object that has
+    -- none (CR 108.4) and shares one with nobody. Pawl.TargetSpec's Bioshift case
+    -- is what proves the first at gameplay level.
+    Spec.it s "CR 601.2c a slot the announcement has not answered constrains nothing" $ do
+      Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.SameControllerAsBound slot)) "no key at all"
+      Spec.assertBool s (Filter.matches noPerspective blackCreature (Filter.Type.SameControllerAsBound slot)) "and no perspective is needed"
+
+    Spec.it s "CR 108.4 a bound object with no controller matches nothing" $
+      Spec.assertBool s (not (Filter.matches (controlledBy []) blackCreature (Filter.Type.SameControllerAsBound slot))) "a bound key naming no controller"
+
+    -- The slot is REPORTED as read, which is what makes
+    -- Pawl.Engine.Target.jointlyJudged fire on a slot whose only sibling read is
+    -- this atom -- the offer widens for it, so the joint check is the whole of its
+    -- enforcement. Proved here rather than at gameplay level: Bioshift's `to` slot
+    -- also carries Filter.Not (Filter.IsBound "from"), which fires that gate on its
+    -- own, so a card writing this atom alone is what the arm is a fence for.
+    Spec.it s "CR 601.2c the atom reports its slot as one the filter reads" $ do
+      let buried f = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not f]]
+      Spec.assertEqWith s "at the top" (Filter.boundSlots (Filter.Type.SameControllerAsBound slot)) (Set.singleton slot)
+      Spec.assertEqWith s "and buried under every combinator" (Filter.boundSlots (buried (Filter.Type.SameControllerAsBound slot))) (Set.singleton slot)
+
+    -- Vacuously False off a candidate with no controller, whichever way the slot
+    -- is filled: CR 109.1's list of what an object is has no player in it, so a
+    -- player candidate has no controller to compare, and neither has a card in a
+    -- library (CR 108.4).
+    Spec.it s "a candidate with no controller matches nothing" $ do
+      let noController = blackCreature {Filter.controller = Nothing}
+      Spec.assertBool s (not (Filter.matches (controlledBy [0]) noController (Filter.Type.SameControllerAsBound slot))) "no candidate controller"
+      Spec.assertBool s (not (Filter.matches (controlledBy [0]) aPlayer (Filter.Type.SameControllerAsBound slot))) "player"
+
   -- CR 201.4: what the SOURCE named, against what the candidate is called. The
   -- two sides are set intersection, so CR 201.4g's interchangeable names and CR
   -- 709.4a's two-named objects each fall out.

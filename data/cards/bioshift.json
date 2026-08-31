@@ -1,0 +1,89 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Hybrid",
+          "value": {
+            "left": {
+              "type": "Colored",
+              "value": {
+                "type": "Green"
+              }
+            },
+            "right": {
+              "type": "Colored",
+              "value": {
+                "type": "Blue"
+              }
+            }
+          }
+        }
+      ],
+      "name": "Bioshift",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "MoveCounters",
+                    "value": {
+                      "from": {
+                        "type": "InSlot",
+                        "value": "from"
+                      },
+                      "kinds": {
+                        "type": "AnyNumberOfKind",
+                        "value": {
+                          "type": "PlusOnePlusOne"
+                        }
+                      },
+                      "to": "to"
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "from": {
+                "pool": {
+                  "type": "Creatures"
+                }
+              },
+              "to": {
+                "filter": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "Not",
+                      "value": {
+                        "type": "IsBound",
+                        "value": "from"
+                      }
+                    },
+                    {
+                      "type": "SameControllerAsBound",
+                      "value": "from"
+                    }
+                  ]
+                },
+                "pool": {
+                  "type": "Creatures"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
