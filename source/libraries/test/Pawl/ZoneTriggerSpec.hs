@@ -2574,9 +2574,9 @@ permanentReturnedToHandSpec s registry =
             other -> Spec.assertFailure s ("expected one Piker, got " <> show (length other))
         -- The destination, and nothing else. ONE board, moved two ways: a hand
         -- fires this condition and a graveyard does not, which is what a Filter
-        -- over the object alone could never say -- CR 400.2 makes both zones
-        -- somewhere other than the battlefield, so
-        -- PermanentLeavesTheBattlefield admits them alike.
+        -- over the object alone could never say -- CR 603.6c admits every zone
+        -- but the battlefield, so PermanentLeavesTheBattlefield takes the two
+        -- alike and only a condition naming the destination can tell them apart.
         Spec.it s "CR 603.6c a Piker destroyed rather than returned leaves Justice a 2/2" $ do
           island <- S.printingOf s registry "Island"
           (justiceId, pikerIds, board) <- justiceBoard (S.landsInPlay island 1) [S.alice]
@@ -2585,6 +2585,19 @@ permanentReturnedToHandSpec s registry =
               Spec.assertEqWith s "the graveyard leaves Justice a 2/2" (sizeOf justiceId (moveTo pikerId Zone.Graveyard board)) (Just 2, Just 2)
               Spec.assertEqWith s "the hand, on the same board, makes it a 3/3" (sizeOf justiceId (moveTo pikerId Zone.Hand board)) (Just 3, Just 3)
             other -> Spec.assertFailure s ("expected one Piker, got " <> show (length other))
+        -- The printed "nonland", which is Not (HasCardType Land) inside the
+        -- condition's own Filter and the one clause the destination does not
+        -- already cover: an Island bounced to hand is returned to its owner's
+        -- hand every bit as much as the Piker beside it on this board.
+        Spec.it s "CR 603.6c an Island returned to hand leaves Justice a 2/2" $ do
+          island <- S.printingOf s registry "Island"
+          (justiceId, pikerIds, board) <- justiceBoard (S.landsInPlay island 1) [S.alice]
+          let lands = Set.toList (Set.filter (Set.member CardType.Land . (`Projection.cardTypesOf` board)) (GameState.battlefield board))
+          case (lands, pikerIds) of
+            ([landId], [pikerId]) -> do
+              Spec.assertEqWith s "the Island leaves Justice a 2/2" (sizeOf justiceId (moveTo landId Zone.Hand board)) (Just 2, Just 2)
+              Spec.assertEqWith s "the Piker, on the same board and the same destination, makes it a 3/3" (sizeOf justiceId (moveTo pikerId Zone.Hand board)) (Just 3, Just 3)
+            other -> Spec.assertFailure s ("expected one Island and one Piker, got " <> show other)
         -- The printed "you control", read from CR 608.2h last known information:
         -- by the time CR 117.5's scan runs the Piker is a card in a hand, which
         -- CR 108.4 gives no controller at all. Same board shape as the case
