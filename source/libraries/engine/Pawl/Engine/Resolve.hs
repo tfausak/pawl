@@ -3623,12 +3623,11 @@ chooseDamageSource controller resolving context gs filter_ = case filter_ of
 -- Pawl.Engine.Replacement.matchesDamageSource rechecks with under CR 609.7b, so
 -- the choice and the recheck cannot read one source two ways.
 --
--- That fallback is a REGRESSION FENCE rather than a proven behaviour: no card in
--- data/cards/ naming a chosen source needs it -- most write a trivial filter,
--- which admits a blank view as readily as a filled one, and Synthetic Turn the
--- Blade's creature-type filter is answered off an ordinary battlefield view -- so
--- replacing the pair with the bare viewOfObject leaves the whole suite green
--- (#2480).
+-- The fallback is what Pawl.ReplacementSpec's "a departed source is narrowed by
+-- its last known information" proves: Synthetic Turn the Blade narrows to Humans
+-- and the Ghitu Fire-Eater its controller names has already paid itself as a
+-- cost, so under the bare viewOfObject it satisfies no subtype filter, is never
+-- offered, and the redirection watches a source nobody chose.
 --
 -- DEDUPED, the classes overlapping wherever a spell's living target is also a
 -- permanent, and ASCENDING out of the same Set, so both the single-candidate
@@ -3672,14 +3671,12 @@ damageSourceCandidates context gs filter_ =
 -- Ward and Galvanic Blast cases read that narrowing -- and the ids a resolution
 -- BAKED into it, which no Filter and no slot map holds (referentsOfReplacement).
 --
--- Two halves are proven in the OFFERING direction: the STACK's, by
--- Pawl.ReplacementSpec's "a source only a waiting ability still refers to is
--- offered" (Ghitu Fire-Eater under Auriok Replica), and the ROW's baked ids, by
--- the Healing Grace case beside it. That the row's captured SLOTS and the
--- delayed-trigger half OFFER anything is a REGRESSION FENCE: neutralizing either
--- leaves the whole suite green, no board in data/cards/ needing such an object in
--- front of a chooser to make its play. They are written because rule 609.7a's one
--- sentence names all three carriers (#2479).
+-- Every carrier is proven in the OFFERING direction, each by one
+-- Pawl.ReplacementSpec case: the STACK's by "a source only a waiting ability
+-- still refers to is offered" (Ghitu Fire-Eater under Auriok Replica), the ROW's
+-- baked ids by the Healing Grace case beside it, the row's captured SLOTS by
+-- Synthetic Communal Bulwark's under Healing Grace, and the DELAYED TRIGGER's
+-- bindings by Come Back Wrong's under Auriok Replica.
 referredToSources :: GameState -> [ObjectId]
 referredToSources gs =
   foldMap (\oid -> foldMap referentsOfObject (Game.lookupObject oid gs)) (GameState.stack gs)
