@@ -1503,18 +1503,20 @@ evolvingHumanAt oid p = case p of
 -- Wall.").
 --
 -- SYNTHETIC because no printing describes a REDIRECT's chooseable source with a
--- word rule 612 can swap. Scryfall o:"of your choice would deal damage",
--- include_extras=true, 2026-08-30: forty-six printings, and the only descriptors
--- any of them put in front of "source" are a colour (the Circles and Runes of
--- Protection, Penance, Pilgrim of Justice, Burrenton Forge-Tender), "artifact"
--- or "land" (Circle of Protection: Artifacts, Rune of Protection: Lands) -- card
--- types and colours, never a subtype. Every one of those is a PREVENTION besides;
--- the redirects among the forty-six (Beacon of Destiny, Eye for an Eye, General's
--- Regalia, Jade Monolith, Nova Pentacle, Opal-Eye, Reflect Damage, Shaman en-Kor)
--- all say plain "a source of your choice", the trivial `And []`, on which
--- Filter.rewrite is the identity. Martyrs of Korlis is the near miss and is not
--- one: it names a card type, and it is a static ability, so it is a
--- Pawl.Types.PrintedReplacement rather than this opcode.
+-- word rule 612 can swap. Scryfall o:"of your choice would deal damage" and
+-- o:/[A-Z][a-z]+ source of your choice/, both with include_extras=true,
+-- 2026-08-30: every descriptor any printing puts in front of "source" is a colour
+-- (the Circles and Runes of Protection, Penance, Pilgrim of Justice, Burrenton
+-- Forge-Tender) or a card type (Circle of Protection: Artifacts, Rune of
+-- Protection: Lands) -- never a subtype -- and every one of those is a
+-- PREVENTION. The REDIRECTS the first query returns (Beacon of Destiny, Eye for
+-- an Eye, General's Regalia, Jade Monolith, Nova Pentacle, Opal-Eye, Reflect
+-- Damage, Shaman en-Kor) all say plain "a source of your choice", the trivial
+-- `And []`, on which Filter.rewrite is the identity. What would refute this is a
+-- printing reading "the next time a [creature type] of your choice would deal
+-- damage"; Martyrs of Korlis is the near miss and is not one, since it names a
+-- card type and is a static ability, so it is a Pawl.Types.PrintedReplacement
+-- rather than this opcode.
 --
 -- The board discriminates the two readings by WHICH ATTACKER's damage turns
 -- aside: bob's Human and bob's Goblin each swing a different amount at alice, and

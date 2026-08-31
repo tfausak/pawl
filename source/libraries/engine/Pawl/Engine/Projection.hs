@@ -2286,8 +2286,9 @@ rewriteEffect pairs effect = case effect of
     Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage (rewriteDuration pairs duration) kind (rewriteObjectRef pairs ref) direction (fmap (Filter.rewrite pairs) chosenSource) (Filter.rewrite pairs whatSource) (fmap (rewriteEffect pairs) rider))
   -- CR 612.1 through every half of the redirection that holds printed words: the
   -- two ends of the rewrite, the predicate describing CR 609.7a's chosen source,
-  -- and the duration. `kind` is not a word a subtype swap can find -- it is a
-  -- damage kind (CR 120.1a).
+  -- and the duration. `kind` is not a word a subtype swap can find: it says
+  -- combat (CR 510) or noncombat, which is a rules category rather than printed
+  -- vocabulary.
   --
   -- Written as a RECORD UPDATE, Effect.Replace's shape above: a sixth
   -- word-bearing field is then dropped visibly rather than absorbed by a
@@ -2299,9 +2300,9 @@ rewriteEffect pairs effect = case effect of
   -- FENCES, the neighbouring shields' shape: Turn the Tables writes an InSlot at
   -- each end and Oracle's Attendants an InSlot and an `EachMatching IsSource`, on
   -- all three of which rewriteObjectRef is the identity -- a slot name is not a
-  -- word, and IsSource holds none -- and both write UntilEndOfTurn, on which
-  -- rewriteDuration is the identity too. So mutating any of those three lines
-  -- reddens nothing.
+  -- word, and IsSource holds none -- and every redirect in data/cards/ writes
+  -- UntilEndOfTurn, on which rewriteDuration is the identity too. So mutating any
+  -- of those three lines reddens nothing.
   Effect.RedirectDamage r ->
     Effect.RedirectDamage
       r
