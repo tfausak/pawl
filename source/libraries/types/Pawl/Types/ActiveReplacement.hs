@@ -112,10 +112,15 @@ data ActiveReplacement = MkActiveReplacement
     -- Filter.IsBound name one object rather than a class (Dire Fleet Daredevil's
     -- "that spell"), which a printed Filter cannot do.
     --
-    -- EMPTY for a row installed outside a resolution, and for one whose pattern
-    -- names no slot; the projection's side of Pawl.Engine.Replacement.collect
-    -- carries none at all, a permanent's static ability having no resolution
-    -- behind it.
+    -- EMPTY for a row installed outside a resolution: the projection's side of
+    -- Pawl.Engine.Replacement.collect carries none at all, a permanent's static
+    -- ability having no resolution behind it.
+    --
+    -- NARROWED to what the row itself names, so that CR 609.7a can read this map
+    -- as the objects the waiting effect refers to. That holds for the damage rows
+    -- Pawl.Engine.Resolve.installDamageRow builds, which are empty for a shield
+    -- naming no slot; the row an Effect.Replace installs still carries the whole
+    -- resolution's map, see #2769.
     --
     -- REWRITTEN by CR 400.7h: a card cast under a permission this row's source
     -- granted becomes a new object (CR 400.7), and Pawl.Engine.Cast.followIntoSpell
