@@ -2323,8 +2323,8 @@ rewriteEffect pairs effect = case effect of
   Effect.RemoveCounters x -> Effect.RemoveCounters x {RemoveCounters.quantity = rewriteQuantity pairs (RemoveCounters.quantity x)}
   -- Only the destination descends: CR 122.8 names no kind and no count, so the
   -- ObjectRef is the one place a subtype word can hide.
-  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from ref) ->
-    Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from (rewriteObjectRef pairs ref))
+  Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from kind ref) ->
+    Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from kind (rewriteObjectRef pairs ref))
   -- BOTH refs and the count. Filter.rewrite renames no slot, so the bound slot is
   -- not rewritten, but either ref may carry a filter -- Spike Cannibal's "all
   -- creatures" on the first side, Forgotten Ancient's "other creatures" on the
