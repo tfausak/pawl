@@ -276,10 +276,14 @@ For each opcode the producer needs:
 - Trace from the producer's shape to the call and name the function that builds
   the context. `Filter.Context`'s context-relative fields are empty in
   `Filter.contextFor`; its header says which positions that is honest for.
-- Ask what the atom answers against an empty field. `Filter.IsBound`,
-  `SameNameAsBound`, `IsHostOfSource` and `ControlledByRecipient` answer False
-  rather than raising; `Quantity.AgainstSlot` answers unanswered. Neither is
-  distinguishable from a rule that does not apply.
+- Ask what the atom answers against an empty field, and ask it per ATOM ---
+  there is no rule the record imposes. `Filter.IsBound`, `SameNameAsBound`,
+  `IsHostOfSource` and `ControlledByRecipient` answer False rather than raising;
+  `Quantity.AgainstSlot` answers unanswered. Neither is distinguishable from a
+  rule that does not apply. `SameControllerAsBound` answers TRUE instead, so its
+  vacuous read WIDENS the offer rather than emptying it, and only
+  `Pawl.CardSpec`'s position lint keeps a card out of the positions that leave
+  `slotControllers` empty.
 - Read the guardrail and say which applies. `Pawl.CardSpec` fences some fields
   with a position lint; `recipient` carries none, and `slotObjects` carries one
   only for the wish filter, whose candidates are not objects at all.
