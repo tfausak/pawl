@@ -107,8 +107,8 @@ allTargetSlots m = Map.unions (fmap Mode.targetSlots (Foldable.toList (Modal.mod
 -- first and the rule's "different targets" would be unreachable.
 --
 -- Occurrence 0 keeps the PRINTED name, so a selection with no repeat -- which is
--- every selection in the pool but Mystic Confluence's, and most of that card's --
--- binds exactly the names it always did, and nothing downstream of a
+-- every selection in the pool but the two cards writing CR 700.2d's instruction,
+-- and most of even those -- binds exactly the names it always did, and nothing downstream of a
 -- repeat-free cast can tell this function was ever called. Later occurrences take
 -- a suffix a card cannot print: Pawl.CardSpec rejects a declared slot name
 -- containing '#'.

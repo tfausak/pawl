@@ -31,6 +31,12 @@
 -- targets, so its case is about CR 601.2c's one announcement over two slots
 -- rather than about the pool alone.
 --
+-- Two synthetics sit with it, one per axis the same scope has: Synthetic Exhume
+-- the Archive fixes its card count at two, so a board splitting two cards
+-- between two graveyards has no coherent announcement at all, and Synthetic
+-- Recurring Reclamation puts the mode in CR 700.2d's repeat, where the scope has
+-- to name its own occurrence's player slot rather than the first occurrence's.
+--
 -- Fall of the Hammer is beside it because it is the other way one slot can
 -- depend on another: not the POOL a slot draws from but the FILTER it is
 -- narrowed by, which is CR 601.2c's "another" between two slots of one
@@ -1667,8 +1673,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- THE WRONG ANSWER IS WEAKER THAN PRINTED, not stricter, which is what makes
   -- the case worth a board: an unrenamed scope judges occurrence 1's card against
   -- whatever OCCURRENCE 0 named, so naming bob for occurrence 0 and carol for
-  -- occurrence 1 lets a card out of BOB's graveyard be shuffled into CAROL's
-  -- library.
+  -- occurrence 1 admits a card out of BOB's graveyard for her occurrence.
+  --
+  -- The DESTINATION cannot show it. CR 400.3 sends an object that would go to a
+  -- library other than its owner's to its owner's instead, so the misjudged card
+  -- lands in bob's library whichever player occurrence 1 named -- what
+  -- discriminates is that it MOVES AT ALL, the whole announcement being reversed
+  -- when the rename holds.
   --
   -- TWO RUNS off one board, differing in exactly one thing -- which player
   -- occurrence 1 names -- with the same three Forests paying the same {2}{G},
@@ -1690,8 +1701,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
            in (cast, S.runPure (aimingReclamation other hisId hisOtherId) cast Stack.resolveTop)
         (castAtCarol, atCarol) = run S.carol
         (_, atBob) = run S.bob
-    Spec.assertEqWith s "occurrence 1 naming carol, bob's Bolt never reaches her library" (namesIn Zone.Library S.carol atCarol) []
-    Spec.assertEqWith s "both his cards stay in his graveyard, the whole announcement having been reversed (CR 601.2e)" (namesIn Zone.Graveyard S.bob atCarol) [S.nameOf (Printing.card piker), S.nameOf (Printing.card bolt)]
+    Spec.assertEqWith s "occurrence 1 naming carol, both of bob's cards stay in his graveyard: the announcement is reversed (CR 601.2e)" (namesIn Zone.Graveyard S.bob atCarol) [S.nameOf (Printing.card piker), S.nameOf (Printing.card bolt)]
+    Spec.assertEqWith s "so nothing reaches his library either" (namesIn Zone.Library S.bob atCarol) []
     Spec.assertEqWith s "with nothing on the stack" (length (GameState.stack castAtCarol)) 0
     Spec.assertBool s (elem spellId (Game.zoneMembers Zone.Hand S.alice castAtCarol)) "and the spell back in alice's hand"
     Spec.assertEqWith s "occurrence 1 naming bob instead, both cards reach his library" (namesIn Zone.Library S.bob atBob) [S.nameOf (Printing.card piker), S.nameOf (Printing.card bolt)]

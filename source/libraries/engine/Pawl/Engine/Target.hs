@@ -917,7 +917,8 @@ abilityRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Ga
 --         over it is every card the announcement could reach -- a superset of
 --         any one coherent answer, which selectionLegal then judges whole. No
 --         order between the two slots is invented, which is what a
---         one-slot-at-a-time prompt would have to do.
+--         one-slot-at-a-time prompt would have to do. The SET stays the union;
+--         it is the COUNT that slotCapacities narrows to one coherent answer.
 --       - CR 608.2b re-checks a spell whose slots are FILLED, so Resolve passes
 --         the chosen targets and the union is over the one player named.
 --
