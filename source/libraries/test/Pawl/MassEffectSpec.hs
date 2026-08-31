@@ -2732,11 +2732,14 @@ communeWithLavaSpec s registry =
               -- and the bind slot is a separate position this case says nothing
               -- about.
               depthOf q = Effect.Reveal (Reveal.MkReveal (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) q)) Nothing)
+          -- SlotArity.Amount and not One: the depth reads the slot's amount
+          -- rather than an object, so the entry is a read with no arity claim on
+          -- it (Pawl.Engine.Resolve.quantitySlots).
           Spec.assertEqWith
             s
             "a depth naming a slot is reported, so the CR 603.3b dataflow lint sees it"
             (Resolve.slotsOf (depthOf (Quantity.InSlot slot)))
-            (Map.singleton slot SlotArity.One)
+            (Map.singleton slot SlotArity.Amount)
           Spec.assertEqWith
             s
             "and a literal depth names none, so the report is the depth's and not the arm's"
@@ -2776,7 +2779,7 @@ communeWithLavaSpec s registry =
               Resolve.readsX [damageDepthOf (Quantity.InSlot Binding.variableX)],
               Resolve.slotsAreExhaustive (damageDepthOf (Quantity.LifeTotal (PlayerRef.InSlot slot)))
             )
-            (Map.singleton slot SlotArity.One, True, False)
+            (Map.singleton slot SlotArity.Amount, True, False)
           -- And the same three off CR 122.5's GIVER, which is the seam's newest
           -- reader: `from` was a bare SlotName until it was widened to a whole
           -- ObjectRef, and two of the three arms above kept compiling while
@@ -2798,7 +2801,7 @@ communeWithLavaSpec s registry =
               Resolve.readsX [giverDepthOf (Quantity.InSlot Binding.variableX)],
               Resolve.slotsAreExhaustive (giverDepthOf (Quantity.LifeTotal (PlayerRef.InSlot slot)))
             )
-            (Map.fromList [(slot, SlotArity.One), (SlotName.MkSlotName (Text.pack "recipient"), SlotArity.One)], True, False)
+            (Map.fromList [(slot, SlotArity.Amount), (SlotName.MkSlotName (Text.pack "recipient"), SlotArity.One)], True, False)
           Spec.assertEqWith
             s
             "and a literal depth reads no X and states its slots whole, so the answers are the depth's"

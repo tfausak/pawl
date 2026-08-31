@@ -931,6 +931,69 @@ slots quantity = case quantity of
   -- the D4 lint. The payload may hide slots of its own.
   Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Set.insert slot (slots inner)
 
+-- `slots` above split by WHICH HALF of the binding the read is of: the subset it
+-- reports that names an OBJECT. Exactly the AgainstSlot arms, which aim an inner
+-- number at the object a slot names and reach Filter.slotOneObject to find it --
+-- and that declines a slot naming several rather than picking one of them
+-- (Binding.onlyOne's doctrine), so such a read is damaged by a plural slot.
+--
+-- The difference from `slots` is the InSlot arm, which reads the slot's AMOUNT
+-- (Binding.amountOf, see evaluateAgainst above) and reaches slotOneObject on no
+-- road at all. Pawl.Types.SlotName is one flat namespace, so a card MAY name an
+-- amount slot what a plural target slot is named; classifying that read as a
+-- singular OBJECT read is what would reject such a card for a reason that is not
+-- about it; see #2774. Resolve.quantitySlots is where the two halves are rejoined,
+-- as presence for the D4 dataflow lint and arity for the count lint.
+--
+-- Exhaustive with no fallthrough, slotsAreExhaustive's shape and for its reason:
+-- a new arm naming a slot must answer here rather than inherit `slots`' answer.
+objectSlots :: Quantity -> Set SlotName
+objectSlots quantity = case quantity of
+  -- The amount reader, left out for the reason above.
+  Quantity.InSlot _ -> Set.empty
+  Quantity.Literal _ -> Set.empty
+  Quantity.ManaValue -> Set.empty
+  Quantity.Power -> Set.empty
+  Quantity.Toughness -> Set.empty
+  Quantity.Star -> Set.empty
+  -- DESCENT: a composite's payload is card text like any other, and `slots`
+  -- descends into each of these three the same way.
+  Quantity.Plus (Plus.MkPlus a b) -> Set.union (objectSlots a) (objectSlots b)
+  Quantity.Halved (Halved.MkHalved _ inner) -> objectSlots inner
+  Quantity.Negate a -> objectSlots a
+  -- DESCENT into a Greatest's per-member number, which may aim at a slot of its
+  -- own; the other two aggregations carry no number to ask.
+  Quantity.Count c -> Count.slots objectSlots c
+  -- Every remaining arm names no slot at all, `slots` saying the same of each:
+  -- the references they carry are PlayerRefs, which name a target slot neither
+  -- walk reports and Resolve.slotsOf cannot recover from here (#1079).
+  Quantity.ManaCount _ -> Set.empty
+  Quantity.LifeTotal _ -> Set.empty
+  Quantity.Speed _ -> Set.empty
+  Quantity.IsMonarch _ -> Set.empty
+  Quantity.IsStartingPlayer _ -> Set.empty
+  Quantity.IsActivePlayer _ -> Set.empty
+  Quantity.PlayerCounters {} -> Set.empty
+  Quantity.ObjectCounters _ -> Set.empty
+  Quantity.ObjectCountersOfAnyKind -> Set.empty
+  Quantity.HasDesignation _ -> Set.empty
+  Quantity.ClassLevel -> Set.empty
+  Quantity.WasKicked -> Set.empty
+  Quantity.SnowWasSpent -> Set.empty
+  Quantity.OpponentsAttacked _ -> Set.empty
+  Quantity.CardsDiscardedThisTurn _ -> Set.empty
+  Quantity.LifeGainedThisTurn _ -> Set.empty
+  Quantity.PlayersDealtDamageThisTurn _ -> Set.empty
+  Quantity.SpellsCastLastTurn _ -> Set.empty
+  Quantity.DungeonsCompleted _ -> Set.empty
+  Quantity.EnteredThisTurn -> Set.empty
+  Quantity.EnteredFrom _ -> Set.empty
+  Quantity.WasCastFrom _ -> Set.empty
+  Quantity.BlockersBeyondFirst -> Set.empty
+  -- The one arm with an answer, and DESCENT beside it: the payload is evaluated
+  -- against the named object and may aim at a further slot of its own.
+  Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Set.insert slot (objectSlots inner)
+
 -- CR 603.3b: is `slots` above the WHOLE of what evaluating this quantity reads
 -- off the resolving object's bindings? It is not wherever a PlayerRef is nested
 -- inside one: that names a TARGET slot, which `slots` leaves to
