@@ -1624,11 +1624,11 @@ evolvingHumanAt oid p = case p of
 -- card type and is a static ability, so it is a Pawl.Types.PrintedReplacement
 -- rather than this opcode.
 --
--- The board discriminates the two readings by WHICH ATTACKER's damage turns
--- aside: bob's Human and bob's Goblin each swing a different amount at alice, and
--- exactly one of them is the source the shield chose. Three distinct numbers --
--- the Goblin's 4, the Human's 3, alice's starting 20 -- so no two readings land
--- on the same life total.
+-- The board discriminates the two readings by WHICH SOURCE's damage turns aside:
+-- bob's Human and bob's Goblin each deal a different amount to alice, and exactly
+-- one of them is the source CR 609.7a's choice landed on. Three distinct numbers
+-- -- the Goblin's 4, the Human's 3, alice's starting 20 -- so no two readings
+-- land on the same life total.
 --
 -- Two seats is enough: the card says "you" and "target creature you control" and
 -- names no opponent, so the three-seat trap does not apply. Alice's redirect
