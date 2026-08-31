@@ -60,6 +60,7 @@ module Pawl.TargetSpec where
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural.Type
@@ -94,6 +95,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -196,6 +198,63 @@ aimingDwellShuffling :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 aimingDwellShuffling oids p = case p of
   Prompt.Shuffle ids -> reverse ids
   _ -> aimingDwell oids p
+
+-- aimingDwell for the case that turns on the OFFERED COUNT: bob in the player
+-- slot again, `oids` many cards announced, and then as many of `oids` as the
+-- engine actually asked for, taken off the front.
+--
+-- Reading the count out of Prompt.ChooseTargets is the whole difference. The
+-- other answerer names its whole list whatever it is asked, so an announcement
+-- the engine narrowed and one it did not both end in a reversal -- of the count
+-- check in the one case and of the joint check in the other -- and the case
+-- could not tell them apart.
+aimingDwellObeying :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+aimingDwellObeying oids p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const (Natural.length oids)) offers
+  Prompt.ChooseTargets _ _ _ asked ->
+    Map.mapWithKey
+      ( \slot (n, _) ->
+          if slot == SlotName.MkSlotName (Text.pack "player")
+            then Set.singleton (Recipient.ToPlayer S.bob)
+            else Set.fromList (fmap Recipient.ToObject (take (Natural.toIntSaturating n) oids))
+      )
+      asked
+  _ -> S.identityAnswer p
+
+-- CR 700.2d's whole announcement for Synthetic Recurring Reclamation with its
+-- first mode chosen twice: occurrence 0 names bob and `his`, occurrence 1 names
+-- `other` and `hisOther` -- a card in BOB's graveyard whichever player that is.
+-- The two runs differ only in `other`.
+--
+-- Pinned per slot NAME rather than searched, and the suffixed names are
+-- Modal.instanceSlot's. CR 601.2c offers occurrence 1 the union over every
+-- player its own slot could still take, so bob's second card is offered for
+-- carol's occurrence either way -- what the rename decides is whether the JOINT
+-- CHECK still admits it.
+aimingReclamation :: PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimingReclamation other his hisOther p = case p of
+  Prompt.ChooseModes {} -> Seq.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 0]
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const 1) offers
+  Prompt.ChooseTargets _ _ _ asked ->
+    Map.mapWithKey
+      ( \slot (n, _) ->
+          let named name = slot == SlotName.MkSlotName (Text.pack name)
+              wanted
+                | named "player" = [Recipient.ToPlayer S.bob]
+                | named "player#1" = [Recipient.ToPlayer other]
+                | named "cards" = [Recipient.ToObject his]
+                | otherwise = [Recipient.ToObject hisOther]
+           in Set.fromList (take (Natural.toIntSaturating n) wanted)
+      )
+      asked
+  _ -> S.identityAnswer p
+
+-- The printed names of the cards in one player's copy of a zone (CR 400.1),
+-- sorted so the assertion does not depend on object-id order. Names rather than
+-- ids because a card that changes zones is a NEW object (CR 400.7).
+namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
+namesIn zone pid gs =
+  List.sort (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs))
 
 -- CR 601.2c's whole announcement for Fall of the Hammer: `dealerId` in the
 -- dealer slot and `victimId` in the victim slot. Both counts are fixed at one,
@@ -1515,6 +1574,128 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "and both arrive in his library" (length (Game.zoneMembers Zone.Library S.bob atBoth)) 2
     Spec.assertEqWith s "naming bob and a card in CAROL's graveyard, the cast is reversed (CR 601.2)" (length (GameState.stack castAtCarol)) 0
     Spec.assertBool s (elem dwellId (Game.zoneMembers Zone.Hand S.alice castAtCarol)) "and the spell is back in alice's hand"
+
+  -- CR 601.2c: "If the spell has a variable number of targets, the player
+  -- announces how many targets they will choose before they announce those
+  -- targets." How many they WILL choose -- so a number they could not then choose
+  -- legally is not one to offer. Dwell on the Past's card slot is offered the
+  -- union over the player slot's candidates (the case above pins that offer), and
+  -- CR 400.1 gives each player their own graveyard, so no ONE answer can reach
+  -- two graveyards at once.
+  --
+  -- Target.slotCapacities is the narrowing: the ceiling for a graveyard-scoped
+  -- slot is the largest per-player total, not the union's size. Without it a
+  -- caster announces two, names the only two cards there are, and CR 601.2e
+  -- returns the game to before the spell was proposed.
+  --
+  -- THREE SEATS, and the two cards are split ONE APIECE between bob and carol,
+  -- which is the whole discriminator: the union holds two and every graveyard
+  -- holds one.
+  --
+  -- The answerer OBEYS the count the engine came back with rather than naming
+  -- both cards outright. An answerer that named both would fail selectionLegal's
+  -- count check under the fix and its joint check without it -- a reversal either
+  -- way, and the case would pass whatever the engine offered.
+  Spec.it s "CR 601.2c Dwell on the Past cannot be aimed at more cards than one graveyard holds" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    dwell <- S.printingOf s registry "Dwell on the Past"
+    let (hisId, g1) = S.addGraveyardCard piker S.bob (S.landsFor forest S.alice 2 S.threePlayerGame)
+        (hersId, g2) = S.addGraveyardCard bolt S.carol g1
+        (board, dwellId) = S.handOne dwell g2
+        cast = S.runPure (aimingDwellObeying [hisId, hersId]) board (S.cast S.alice dwellId)
+        resolved = S.runPure (aimingDwellObeying [hisId, hersId]) cast Stack.resolveTop
+    Spec.assertEqWith s "asking for two, alice gets the one bob's graveyard holds: the Piker is in his library" (namesIn Zone.Library S.bob resolved) [S.nameOf (Printing.card piker)]
+    Spec.assertEqWith s "and out of his graveyard" (namesIn Zone.Graveyard S.bob resolved) []
+    Spec.assertEqWith s "carol's Bolt is untouched, never reachable beside bob" (namesIn Zone.Graveyard S.carol resolved) [S.nameOf (Printing.card bolt)]
+    Spec.assertEqWith s "and her library is empty" (namesIn Zone.Library S.carol resolved) []
+    Spec.assertEqWith s "the spell was cast rather than reversed (CR 601.2e)" (length (GameState.stack cast)) 1
+    Spec.assertBool s (notElem dwellId (Game.zoneMembers Zone.Hand S.alice cast)) "so it is not back in alice's hand"
+
+  -- The same narrowing on the FLOOR rather than the ceiling, which is CR 601.2c's
+  -- other half: "In some cases, the number of targets will be defined by the
+  -- spell's text." A slot whose count is fixed at two has no announcement to
+  -- narrow -- the whole spell is illegal to cast when no coherent answer exists,
+  -- and CR 601.2e's reversal is a worse prompt than never offering the cast.
+  --
+  -- Synthetic Exhume the Archive {1}{G} Sorcery (data/cards/synthetic-exhume-the-archive.json):
+  -- "Target player shuffles two target cards from their graveyard into their
+  -- library." SYNTHETIC because every printing whose target slot draws from
+  -- another slot's graveyard prints a minimum of zero -- Scryfall
+  -- o:"cards from their graveyard" -o:"up to" -o:"any number", 2026-08-31, no
+  -- hit with a targeted card slot; Dwell on the Past, Gaea's Blessing, Krosan
+  -- Reclamation, Memory's Journey, Quandrix Command, Rite of Renewal, Stream of
+  -- Consciousness and Witness the Future all say "up to", and Loaming Shaman says
+  -- "any number". Nothing in the CR forbids the card: rule 601.2c's own "the
+  -- number of targets will be defined by the spell's text" is exactly this shape.
+  --
+  -- TWO BOARDS differing in exactly one thing -- which graveyard the Bolt sits in
+  -- -- with the same two Forests paying the same {1}{G} and the Piker in bob's
+  -- graveyard both times.
+  Spec.it s "CR 601.2c a spell demanding two cards from one graveyard is uncastable when no one graveyard holds two" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    exhume <- S.printingOf s registry "Synthetic Exhume the Archive"
+    let (_, g1) = S.addGraveyardCard piker S.bob (S.landsFor forest S.alice 2 S.threePlayerGame)
+        boardWith pid = S.handOne exhume (snd (S.addGraveyardCard bolt pid g1))
+        (together, togetherId) = boardWith S.bob
+        (split, splitId) = boardWith S.carol
+    Spec.assertBool s (S.castable S.alice togetherId together) "with both cards in bob's graveyard the spell has a coherent announcement"
+    Spec.assertBool s (not (S.castable S.alice splitId split)) "split one apiece it has none, though the union still holds two"
+
+  -- CR 700.2d: "If a particular mode is chosen multiple times, the spell is
+  -- treated as if that mode appeared that many times in sequence. If that mode
+  -- requires a target, the same player or object may be chosen as the target for
+  -- each of those modes, or different targets may be chosen." Different targets
+  -- is what Pawl.Engine.Modal.instanceSlot's per-occurrence rename buys, and a
+  -- slot's POOL may name a sibling slot by its printed name -- so occurrence 1's
+  -- graveyard scope has to follow the rename or it reads OCCURRENCE 0's player.
+  --
+  -- Synthetic Recurring Reclamation {2}{G} Sorcery (data/cards/synthetic-recurring-reclamation.json):
+  -- "Choose two. You may choose the same mode more than once. -- Target player
+  -- shuffles up to two target cards from their graveyard into their library. --
+  -- Draw a card." SYNTHETIC because the two printed sets do not intersect:
+  -- Scryfall o:"choose the same mode more than once", 2026-08-31, returns 22
+  -- cards, and no mode of any of them targets a card in another slot's graveyard
+  -- (the graveyard modes of the Confluence and Season cycles say "your
+  -- graveyard", and Unite the Coalition's "exile target player's graveyard" is a
+  -- resolution-time sweep, which reads printed names off Modal.instanceView and
+  -- never this path). CR 700.2d states the shape outright.
+  --
+  -- THE WRONG ANSWER IS WEAKER THAN PRINTED, not stricter, which is what makes
+  -- the case worth a board: an unrenamed scope judges occurrence 1's card against
+  -- whatever OCCURRENCE 0 named, so naming bob for occurrence 0 and carol for
+  -- occurrence 1 lets a card out of BOB's graveyard be shuffled into CAROL's
+  -- library.
+  --
+  -- TWO RUNS off one board, differing in exactly one thing -- which player
+  -- occurrence 1 names -- with the same three Forests paying the same {2}{G},
+  -- the same two cards in bob's graveyard and the same modes chosen. The bob run
+  -- is what keeps the carol run from passing off a spell that never worked.
+  --
+  -- THREE SEATS: with alice and bob alone the two occurrences would name one
+  -- player and the rename could not be observed.
+  Spec.it s "CR 700.2d a repeated mode's graveyard scope follows its own occurrence, not the first" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    reclamation <- S.printingOf s registry "Synthetic Recurring Reclamation"
+    let (hisId, g1) = S.addGraveyardCard piker S.bob (S.landsFor forest S.alice 3 S.threePlayerGame)
+        (hisOtherId, g2) = S.addGraveyardCard bolt S.bob g1
+        (board, spellId) = S.handOne reclamation g2
+        run other =
+          let cast = S.runPure (aimingReclamation other hisId hisOtherId) board (S.cast S.alice spellId)
+           in (cast, S.runPure (aimingReclamation other hisId hisOtherId) cast Stack.resolveTop)
+        (castAtCarol, atCarol) = run S.carol
+        (_, atBob) = run S.bob
+    Spec.assertEqWith s "occurrence 1 naming carol, bob's Bolt never reaches her library" (namesIn Zone.Library S.carol atCarol) []
+    Spec.assertEqWith s "both his cards stay in his graveyard, the whole announcement having been reversed (CR 601.2e)" (namesIn Zone.Graveyard S.bob atCarol) [S.nameOf (Printing.card piker), S.nameOf (Printing.card bolt)]
+    Spec.assertEqWith s "with nothing on the stack" (length (GameState.stack castAtCarol)) 0
+    Spec.assertBool s (elem spellId (Game.zoneMembers Zone.Hand S.alice castAtCarol)) "and the spell back in alice's hand"
+    Spec.assertEqWith s "occurrence 1 naming bob instead, both cards reach his library" (namesIn Zone.Library S.bob atBob) [S.nameOf (Printing.card piker), S.nameOf (Printing.card bolt)]
+    Spec.assertEqWith s "leaving his graveyard empty" (namesIn Zone.Graveyard S.bob atBob) []
 
   -- CR 601.2c's other sibling-slot reading, and the one the rule states in its
   -- own words: "The same target can't be chosen multiple times for any one

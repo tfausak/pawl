@@ -30,6 +30,7 @@ data GraveyardScope
     -- caller has; see Pawl.Engine.Target.graveyardScopePlayers.
     --
     -- The PRINTED slot name, which a REPEATED mode's later occurrences rename
-    -- (Pawl.Engine.Modal.instanceSlot) and this payload does not follow (#1297).
+    -- alongside the slot keys (Pawl.Engine.Modal.instanceTargetSlots), so the
+    -- payload names that occurrence's own slot (CR 700.2d).
     InSlot SlotName.SlotName
   deriving (Eq, Ord, Show)
