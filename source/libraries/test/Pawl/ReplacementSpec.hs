@@ -1501,14 +1501,16 @@ evolvingDogAt oid p = case p of
 -- 2026-08-30, read for a creature type or a basic land type in the prevention
 -- clause, sorts the hits three ways. The ones that restrict no recipient at all
 -- (Arachnogenesis, Galadhrim Ambush, Repel the Abominable, That's No Moonmist,
--- Frontline Strategist) cannot spell this opcode's required ref and take
--- Effect.Replace's DamageR instead, which is the shape data/cards/moonmist.json
--- already writes; a text change reaching THAT shape is proved by
--- Pawl.CounterspellSpec's evolved Moonmist. The static abilities (Drogskol
--- Reinforcements, Rescue Retriever, Marble Priest) install no shield at
--- resolution. Pack Leader's "to Dogs you control" reaches the unbounded shield's
--- own whatRecipient, which the group above proves, but no printing aims a text
--- changer at it.
+-- Frontline Strategist) name neither a ref nor a description, so this opcode
+-- installs no row for them at all, and they take Effect.Replace's DamageR
+-- instead -- the shape data/cards/moonmist.json already writes, and a text
+-- change reaching THAT shape is proved by Pawl.CounterspellSpec's evolved
+-- Moonmist. The static abilities (Drogskol Reinforcements, Rescue Retriever,
+-- Marble Priest) install no shield at resolution. Pack Leader's "to Dogs you
+-- control" is a printing that reaches a THIRD field, the unbounded shield's own
+-- whatRecipient, and the "Pack Leader (CR 611.2c)" group above proves the swap
+-- through it with Artificial Evolution -- so this card is synthetic for the two
+-- fields named below and for nothing else.
 --
 -- BOTH filters on ONE card, because they sit on the two different opcodes: CR
 -- 615.1's unbounded shield describes its source in whatSource, and CR 615.7's
