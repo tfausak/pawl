@@ -17,14 +17,17 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ChooseBetween as ChooseBetween
 import Pawl.Types.Effect (Effect)
+import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.Pool as Pool
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotName as SlotName
 import Pawl.Types.TargetSlot (TargetSlot)
+import qualified Pawl.Types.TargetSlot as TargetSlot
 
 -- Each mode's effects, in printed (mode, then written) order (CR 608.2c) -- one
 -- inner list per mode, kept apart. The shape a caller wants when the MODE is
@@ -104,9 +107,10 @@ allTargetSlots m = Map.unions (fmap Mode.targetSlots (Foldable.toList (Modal.mod
 -- first and the rule's "different targets" would be unreachable.
 --
 -- Occurrence 0 keeps the PRINTED name, so a selection with no repeat -- which is
--- every selection in the pool but Mystic Confluence's, and most of that card's --
--- binds exactly the names it always did, and nothing downstream of a
--- repeat-free cast can tell this function was ever called. Later occurrences take
+-- every selection in the pool but the ones the two cards writing CR 700.2d's
+-- instruction allow, and most of even those -- binds exactly the names it always
+-- did, and nothing downstream of a repeat-free cast can tell this function was
+-- ever called. Later occurrences take
 -- a suffix a card cannot print: Pawl.CardSpec rejects a declared slot name
 -- containing '#'.
 instanceSlot :: ModeInstance.ModeInstance -> SlotName -> SlotName
@@ -169,9 +173,47 @@ modesTargetSlots chosen m = Map.unions (fmap (\mi -> instanceTargetSlots mi m) (
 -- One chosen instance's target slots, renamed under that instance's slot names.
 -- The inverse of the projection instanceView applies before running the
 -- instance's effects, which still read the printed names.
+--
+-- The KEYS are not the whole rename: a slot's pool may itself name a sibling slot
+-- (Pawl.Types.GraveyardScope's InSlot, Dwell on the Past's "their graveyard"),
+-- and that payload is the printed name too. Renaming the keys alone would leave
+-- occurrence 1's pool pointing at occurrence 0's slot, so CR 700.2d's "different
+-- targets may be chosen" would silently read the first occurrence's player.
 instanceTargetSlots :: ModeInstance.ModeInstance -> Modal.Modal card ability -> Map SlotName TargetSlot
 instanceTargetSlots mi m =
-  Map.mapKeys (instanceSlot mi) (maybe Map.empty Mode.targetSlots (modeAtIndex (ModeInstance.index mi) m))
+  Map.mapKeys (instanceSlot mi) (fmap (instanceScope mi) (maybe Map.empty Mode.targetSlots (modeAtIndex (ModeInstance.index mi) m)))
+
+-- CR 700.2d applied to the slot NAME a target slot's pool carries, so the pool
+-- follows its mode's occurrence exactly as the key does.
+--
+-- Only the pool: a Filter that reads a sibling slot (Filter.ControlledByBound and
+-- the atoms beside it) carries the same hazard and is not renamed here (gap
+-- #2802). No printed card writes one inside a repeatable mode.
+instanceScope :: ModeInstance.ModeInstance -> TargetSlot -> TargetSlot
+instanceScope mi slot = slot {TargetSlot.pool = instancePool mi (TargetSlot.pool slot)}
+
+-- instanceScope's rename over the pool itself: the two arms carrying a
+-- GraveyardScope, and every other pool unchanged.
+instancePool :: ModeInstance.ModeInstance -> Pool.Pool -> Pool.Pool
+instancePool mi pool = case pool of
+  Pool.CardsInGraveyard scope -> Pool.CardsInGraveyard (instanceGraveyardScope mi scope)
+  Pool.CreaturesAndCardsInGraveyard scope -> Pool.CreaturesAndCardsInGraveyard (instanceGraveyardScope mi scope)
+  Pool.Creatures -> pool
+  Pool.Players -> pool
+  Pool.AnyTarget -> pool
+  Pool.Permanents -> pool
+  Pool.Spells -> pool
+  Pool.Abilities -> pool
+  Pool.SpellsAndPermanents -> pool
+  Pool.PlayersAndPlaneswalkers -> pool
+  Pool.CardsInExile -> pool
+
+-- CR 109.5's Scoped arm names no slot and is untouched; InSlot's is the printed
+-- name instanceSlot rewrites.
+instanceGraveyardScope :: ModeInstance.ModeInstance -> GraveyardScope.GraveyardScope -> GraveyardScope.GraveyardScope
+instanceGraveyardScope mi scope = case scope of
+  GraveyardScope.Scoped _ -> scope
+  GraveyardScope.InSlot slot -> GraveyardScope.InSlot (instanceSlot mi slot)
 
 -- CR 700.2d: the binding-shaped environment ONE chosen instance's effects read.
 -- Three parts, and each is a rule rather than a convenience:
