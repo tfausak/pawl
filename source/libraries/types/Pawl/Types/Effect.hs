@@ -769,8 +769,22 @@ data Effect card ability
     --
     -- The "MAY" is subsumed rather than carried as a second decision: the
     -- printed amount is "ANY amount", zero included, so declining and paying
-    -- nothing are the same answer. Not implemented: "pay ONE OR MORE {E}", whose
-    -- floor is 1 and whose "If you do" is CR 118.12's branch (#1919).
+    -- nothing are the same answer.
+    --
+    -- "You may pay ONE OR MORE {E}" is this opcode too (Localized Destruction),
+    -- and its floor of 1 is not a second capability. Every printing of that
+    -- clause hangs a CR 118.12 branch off it that reads "one or more paid", so
+    -- decline-or-1..N and 0..N offer the same answers and take the branch on the
+    -- same ones -- Scryfall o:"{E}" o:"paid this way", 2026-08-31, seven cards,
+    -- none reading the payment any other way. Vault 112: Sadistic Simulation
+    -- prints the two spellings side by side, "Pay any amount of {E}. If you paid
+    -- one or more {E} this way".
+    --
+    -- That branch is a CLAUSE rider rather than anything here: the condition
+    -- Quantity.InSlot >= 1 over the slot below, which is how the corpus already
+    -- writes "if you did" over a bound amount (Goldberry, River-Daughter).
+    -- Pawl.VariableEffectSpec's "CR 118.12 paying nothing declines the offer" is
+    -- what proves paying zero does not take it.
     --
     -- The slot is not optional. Every printing reads the amount back ("that
     -- much", "for each {E} paid this way", "the amount of {E} paid this way"),

@@ -838,17 +838,25 @@ data Context = MkContext
     slotControllers :: Map.Map SlotName.SlotName (Set.Set PlayerId.PlayerId),
     -- CR 601.2b / 603.2: the NUMBERS the surrounding announcement's bindings hold,
     -- keyed by slot -- "that much" as the trigger's own event stamped it
-    -- (Pawl.Engine.Binding.eventAmount), and the X a caster just named
-    -- (Pawl.Engine.Binding.variableX). No Filter atom reads this map; it is a
-    -- channel THROUGH the context to Pawl.Engine.Quantity's InSlot arm, which
-    -- Pawl.Engine.Target.slotContext evaluates a target slot's CR 202.3 computed
-    -- bound in, and which has no other way to reach an announcement not yet stamped
-    -- on an object: CR 603.3d chooses a trigger's targets before the ability object
-    -- carries any binding at all, and CR 601.2c chooses a spell's before CR 601.2i
-    -- stamps the X onto it.
+    -- (Pawl.Engine.Binding.eventAmount), the X a caster just named
+    -- (Pawl.Engine.Binding.variableX), and the amount an effect of the resolution
+    -- itself stamped on a slot (Pawl.Engine.Resolve.bindAmountSlot).
+    --
+    -- TWO readers. It is a channel THROUGH the context to Pawl.Engine.Quantity's
+    -- InSlot arm, which Pawl.Engine.Target.slotContext evaluates a target slot's
+    -- CR 202.3 computed bound in, and which has no other way to reach an
+    -- announcement not yet stamped on an object: CR 603.3d chooses a trigger's
+    -- targets before the ability object carries any binding at all, and CR 601.2c
+    -- chooses a spell's before CR 601.2i stamps the X onto it. It is also what the
+    -- PowerIsAmountInSlot atom compares a candidate's power against, which is a
+    -- read `matches` makes directly.
+    --
+    -- TWO fillers with it: Pawl.Engine.Resolve.effectContext supplies the
+    -- resolving object's own stamped amounts, which is the position that atom is
+    -- written in.
     --
     -- Empty in contextFor and contextComparingPower below, so a bound evaluated
-    -- anywhere but a target slot reads no announcement. What that unfilled read
+    -- outside a target slot and outside a resolution reads no announcement. What that unfilled read
     -- then ANSWERS is Pawl.Engine.Quantity's InSlot arm's call, not this record's:
     -- each reader of each field here picks its own vacuous direction, and
     -- slotControllers above is the one that picks the widening one.
@@ -1031,6 +1039,14 @@ matches context view predicate = case predicate of
   -- reversed, and False on an absent power at either end for the same reason.
   Filter.PowerGreaterThanSource -> case (power view, sourcePower context) of
     (Just p, Just s) -> p > s
+    _ -> False
+  -- CR 208.1 against a number an earlier clause of the resolution bound --
+  -- Localized Destruction's "power equal to the amount of {E} paid this way".
+  -- False unless both are readable, the two source-comparing arms above and for
+  -- their reason: a candidate with no power is not a creature with that power,
+  -- and a slot naming no amount names no power to equal.
+  Filter.PowerIsAmountInSlot slot -> case (power view, Map.lookup slot (boundAmounts context)) of
+    (Just p, Just n) -> p == toInteger n
     _ -> False
   -- CR 202.3, and answerable in every zone -- see the View field's own note.
   -- Vacuously False for a player, which has no mana value to compare.
@@ -1403,6 +1419,9 @@ rewrite pairs predicate = case predicate of
   -- 612.1 finds no word in it to swap.
   Filter.PowerLessThanSource -> predicate
   Filter.PowerGreaterThanSource -> predicate
+  -- Untouched for the two above's reason: a slot name is not a word CR 612.1's
+  -- swap can find in the text.
+  Filter.PowerIsAmountInSlot _ -> predicate
   Filter.ManaValueAtMost _ -> predicate
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
@@ -1822,6 +1841,10 @@ bakeBound players predicate = case predicate of
   Filter.PowerAtMost _ -> predicate
   Filter.PowerLessThanSource -> predicate
   Filter.PowerGreaterThanSource -> predicate
+  -- Untouched: CR 603.2's map holds PLAYERS, and this atom's slot names a
+  -- number. It stays answerable where it is written, boundAmounts carrying the
+  -- number into the match rather than a substitution making it.
+  Filter.PowerIsAmountInSlot _ -> predicate
   Filter.ManaValueAtMost _ -> predicate
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
@@ -1941,6 +1964,7 @@ manaValueThresholds predicate = case predicate of
   Filter.PowerAtMost _ -> []
   Filter.PowerLessThanSource -> []
   Filter.PowerGreaterThanSource -> []
+  Filter.PowerIsAmountInSlot _ -> []
   Filter.ControlledBy _ -> []
   Filter.ControlledByDefendingPlayer -> []
   Filter.ControlledByBound _ -> []
@@ -2055,6 +2079,7 @@ statesAQuality predicate = case predicate of
   Filter.PowerAtMost _ -> True
   Filter.PowerLessThanSource -> True
   Filter.PowerGreaterThanSource -> True
+  Filter.PowerIsAmountInSlot _ -> True
   Filter.ControlledBy _ -> True
   Filter.ControlledByDefendingPlayer -> True
   Filter.ControlledByBound _ -> True
@@ -2152,6 +2177,12 @@ boundSlots predicate = case predicate of
   -- fires on this set, and CR 601.2c's joint check is the whole of what enforces
   -- this atom (the offer widens for it).
   Filter.SameControllerAsBound slot -> Set.singleton slot
+  -- Reported for IsBound's reason and answerable in the same place: the number
+  -- rides the Context `matches` is already handed, one field along again
+  -- (boundAmounts). The dataflow lint is what this report is for -- a card whose
+  -- filter reads an amount no clause of the mode ever bound is then a failing
+  -- test rather than a sweep that silently admits nothing.
+  Filter.PowerIsAmountInSlot slot -> Set.singleton slot
   Filter.And fs -> foldMap boundSlots fs
   Filter.Or fs -> foldMap boundSlots fs
   Filter.Not f -> boundSlots f

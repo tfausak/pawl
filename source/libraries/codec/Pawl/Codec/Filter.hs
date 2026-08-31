@@ -47,6 +47,7 @@ codec keywordCodec =
       Arm.payload "PowerAtMost" Common.integer Filter.PowerAtMost (\x -> case x of Filter.PowerAtMost y -> Just y; _ -> Nothing),
       Arm.nullary "PowerLessThanSource" Filter.PowerLessThanSource,
       Arm.nullary "PowerGreaterThanSource" Filter.PowerGreaterThanSource,
+      Arm.payload "PowerIsAmountInSlot" SlotName.codec Filter.PowerIsAmountInSlot (\x -> case x of Filter.PowerIsAmountInSlot y -> Just y; _ -> Nothing),
       Arm.nullary "ControlledByDefendingPlayer" Filter.ControlledByDefendingPlayer,
       Arm.payload "ControlledByBound" SlotName.codec Filter.ControlledByBound (\x -> case x of Filter.ControlledByBound y -> Just y; _ -> Nothing),
       -- Runtime-only, and accepted here anyway: the codec must stay total, so a

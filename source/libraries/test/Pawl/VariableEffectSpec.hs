@@ -1887,6 +1887,87 @@ harnessedBoard s registry = do
       banked = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice inHand
   pure (wallId, snd (Engine.runGamePure S.identityAnswer banked (S.cast S.alice spellId)))
 
+-- CR 118.12's branch over an amount the payer names as the spell RESOLVES: "you
+-- may pay one or more {E}. If you do, [effect]". The floor of one is not a
+-- capability of its own -- see Pawl.Types.Effect.PayAnyEnergy -- so the shape is
+-- Effect.PayAnyEnergy under a clause whose CR 701.46a-style condition reads the
+-- amount back (Quantity.InSlot >= 1), and the number it bound is what the swept
+-- filter compares a power against (Filter.PowerIsAmountInSlot).
+--
+-- Localized Destruction {3}{W}{W} Sorcery (data/cards/localized-destruction.json):
+-- "You get {E} (an energy counter), then you may pay one or more {E}. If you do,
+-- each creature you control with power equal to the amount of {E} paid this way
+-- gains indestructible until end of turn. / Destroy all creatures." Name, cost,
+-- type line and oracle text checked against Scryfall 2026-08-31.
+--
+-- WHY THIS CARD of the three that print the clause: Aether Refinery and Pia
+-- Nalaar, Chief Mechanic read the amount into an X/X token's power, which is CR
+-- 111.3's defined characteristic value and which no card in the pool reaches yet
+-- -- Miming Slime's is a board tally rather than a binding.
+localizedDestructionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+localizedDestructionSpec s registry =
+  Spec.describe s "Localized Destruction (CR 118.12)" $ do
+    -- alice banks two {E}, the spell gives her a third, and she pays two of the
+    -- three. Every creature on the board has a distinct power, so only one
+    -- reading of "power equal to the amount paid" saves the Evangel.
+    Spec.it s "CR 118.12 the creature whose power is the amount paid survives the sweep" $ do
+      cast <- localizedBoard s registry
+      let after = S.runPure (paying 2) cast Stack.resolveTop
+      Spec.assertEqWith s "alice's 2/2 gained indestructible and is still on the battlefield" (S.countOnBattlefieldByName (localizedName "Cabal Evangel") S.alice after) 1
+      Spec.assertEqWith s "her 3/3 did not and is gone" (S.countOnBattlefieldByName (localizedName "Hill Giant") S.alice after) 0
+      Spec.assertEqWith s "nor did her 1/1" (S.countOnBattlefieldByName (localizedName "Gnat Miser") S.alice after) 0
+      Spec.assertEqWith s "nor her 0/8" (S.countOnBattlefieldByName (localizedName "Wall of Stone") S.alice after) 0
+      -- CR 109.5's "you control": bob's 2/4 has the power the clause names and
+      -- not the controller, which two seats are what tell apart.
+      Spec.assertEqWith s "bob's 2/4 shares the power but not the controller, so it is gone" (S.countOnBattlefieldByName (localizedName "Foriysian Brigade") S.bob after) 0
+      Spec.assertEqWith s "and two of alice's three energy counters are spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 1
+    -- The same board, differing in the answer alone. Paying nothing is how the
+    -- printed "may" is declined, so CR 118.12's "if you do" is not taken -- and
+    -- the Wall's power is the very zero that was paid, so an unbranched clause
+    -- would save it.
+    Spec.it s "CR 118.12 paying nothing declines the offer, so no power matches at all" $ do
+      cast <- localizedBoard s registry
+      let after = S.runPure (paying 0) cast Stack.resolveTop
+      Spec.assertEqWith s "alice's 0/8 is gone although zero is what she paid" (S.countOnBattlefieldByName (localizedName "Wall of Stone") S.alice after) 0
+      Spec.assertEqWith s "her 2/2 is gone with it" (S.countOnBattlefieldByName (localizedName "Cabal Evangel") S.alice after) 0
+      Spec.assertEqWith s "and every energy counter she has is still hers" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 3
+
+-- CR 400.7: the assertions above name printed names rather than object ids, an
+-- id being no more the object it started as than a new object is.
+localizedName :: String -> CardName.CardName
+localizedName = CardName.MkCardName . Text.pack
+
+-- alice holds Localized Destruction with five Plains untapped for its {3}{W}{W}
+-- and two {E} already banked; she controls a Wall of Stone (0/8), a Gnat Miser
+-- (1/1), a Cabal Evangel (2/2) and a Hill Giant (3/3), and bob a Foriysian
+-- Brigade (2/4). Four distinct powers under one controller and a fifth creature
+-- under the other, so the sweep's power test and its controller test cannot be
+-- answered by one another. Returns the state with the spell cast and waiting.
+localizedBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
+localizedBoard s registry = do
+  plains <- S.printingOf s registry "Plains"
+  wall <- S.printingOf s registry "Wall of Stone"
+  miser <- S.printingOf s registry "Gnat Miser"
+  evangel <- S.printingOf s registry "Cabal Evangel"
+  giant <- S.printingOf s registry "Hill Giant"
+  brigade <- S.printingOf s registry "Foriysian Brigade"
+  destruction <- S.printingOf s registry "Localized Destruction"
+  let placed =
+        snd
+          . S.addCreature brigade S.bob
+          . snd
+          . S.addCreature giant S.alice
+          . snd
+          . S.addCreature evangel S.alice
+          . snd
+          . S.addCreature miser S.alice
+          . snd
+          . S.addCreature wall S.alice
+          $ S.landsInPlay plains 5
+      (inHand, spellId) = S.handOne destruction placed
+      banked = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice inHand
+  pure (snd (Engine.runGamePure S.identityAnswer banked (S.cast S.alice spellId)))
+
 -- Answers Prompt.ChoosePaidEnergy with a fixed amount, deferring everything else
 -- to S.identityAnswer. PINNED rather than read off the prompt's own bound, so a
 -- mutation to that bound cannot quietly repair the answer.
@@ -1910,3 +1991,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   blightCostSpec s registry
   soulfireEruptionSpec s registry
   payAnyEnergySpec s registry
+  localizedDestructionSpec s registry
