@@ -10829,11 +10829,13 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.LoseControlOfBound _ -> False
   -- CR 309.4c's event is a venture marker moving, not an ability triggering.
   TriggerCondition.RoomEntered _ -> False
+  -- CR 309.7's event is a dungeon card leaving the game, not an ability
+  -- triggering, so it takes CR 603.3b's first pass too.
+  TriggerCondition.PlayerCompletesDungeon _ -> False
   -- Four keyword actions, none of them an ability triggering: CR 701.22a,
   -- CR 701.25a, CR 702.170b and CR 701.44a each describe something a player
   -- or a permanent DOES, so all four take CR 603.3b's first pass.
   TriggerCondition.PlayerScries _ -> False
-  TriggerCondition.PlayerCompletesDungeon _ -> False
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
@@ -11587,6 +11589,9 @@ eventBindingSlots cond = case cond of
   -- than in the event's bindings. The dungeon card itself arrives under CR 113.7a's
   -- reserved source slot, which every borne trigger gets at placement.
   TriggerCondition.RoomEntered _ -> Set.empty
+  -- Nothing either: CR 309.7 names the completing player, and Dungeon Crawler's
+  -- payload points at no one -- it returns itself.
+  TriggerCondition.PlayerCompletesDungeon _ -> Set.empty
   -- Nothing, for all four keyword actions. CR 701.22d and CR 701.25d name a
   -- player and CR 702.170a and CR 701.44b an object, but no printed payload
   -- under any of them points at one: Matoya, Archon Elder draws, Aloe
@@ -11595,7 +11600,6 @@ eventBindingSlots cond = case cond of
   -- what would earn a slot, and eventBindings has no arm for any of the four
   -- until one does.
   TriggerCondition.PlayerScries _ -> Set.empty
-  TriggerCondition.PlayerCompletesDungeon _ -> Set.empty
   TriggerCondition.PlayerSurveils _ -> Set.empty
   TriggerCondition.SelfBecomesPlotted -> Set.empty
   TriggerCondition.PermanentExplores _ -> Set.empty
@@ -12115,13 +12119,15 @@ looksBack condition = case condition of
   -- CR 603.10a is about a bearer that left the battlefield, and CR 309.2c keeps a
   -- dungeon card in the command zone until it leaves the game.
   TriggerCondition.RoomEntered _ -> False
+  -- Not on CR 603.10a's list either, and CR 309.2c takes the dungeon card out of
+  -- the GAME rather than to a zone, so CR 603.10's first sentence governs.
+  TriggerCondition.PlayerCompletesDungeon _ -> False
   -- None of the four is on CR 603.10a's list, and none is a zone change at
   -- all: CR 701.22a moves cards within one library, CR 701.25a and CR 701.44a
   -- do move cards but their events say the keyword action COMPLETED rather
   -- than that anything left a zone, and CR 702.170b's exile is a card leaving
   -- a HAND. So CR 603.10's first sentence governs all four.
   TriggerCondition.PlayerScries _ -> False
-  TriggerCondition.PlayerCompletesDungeon _ -> False
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
@@ -13445,9 +13451,16 @@ zonesTriggeredFrom cond = case cond of
   -- scry, the surveil nor the explore is a condition that cannot trigger from
   -- the battlefield, so CR 113.6k's exception does not apply.
   TriggerCondition.PlayerScries _ -> battlefield
-  TriggerCondition.PlayerCompletesDungeon _ -> battlefield
   TriggerCondition.PlayerSurveils _ -> battlefield
   TriggerCondition.PermanentExplores _ -> battlefield
+  -- CR 113.6's default again, and NOT the graveyard, though Dungeon Crawler
+  -- watches from there: completing a dungeon is a condition a battlefield
+  -- permanent could watch perfectly well, so CR 113.6k's exception does not
+  -- apply. What puts Dungeon Crawler's ability in the graveyard is CR 113.6m,
+  -- read off its effect by `zoneFunctionedFrom` above -- Squee, Goblin Nabob's
+  -- road, proved by Pawl.DungeonSpec's "CR 309.7 completing a dungeon triggers
+  -- Dungeon Crawler out of the graveyard".
+  TriggerCondition.PlayerCompletesDungeon _ -> battlefield
   -- CR 113.6's default again: Feywild Trickster is a creature, and nothing
   -- about rolling a die is a condition that cannot trigger from the
   -- battlefield.
@@ -13729,11 +13742,12 @@ controllerTurnScoped :: TriggerCondition -> Bool
 controllerTurnScoped cond = case cond of
   -- CR 309.4c names no turn at all.
   TriggerCondition.RoomEntered _ -> False
+  -- CR 309.7 names no turn either.
+  TriggerCondition.PlayerCompletesDungeon _ -> False
   -- None of the four keyword-action conditions names a turn: CR 701.22,
   -- CR 701.25, CR 702.170 and CR 701.44 each state when their event happens
   -- and say nothing about whose turn it is.
   TriggerCondition.PlayerScries _ -> False
-  TriggerCondition.PlayerCompletesDungeon _ -> False
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
@@ -14007,12 +14021,14 @@ stateTriggers gs
               -- CR 309.4c is an EVENT trigger too: the marker MOVING into the room
               -- is what fires it, not the marker sitting there.
               TriggerCondition.RoomEntered _ -> False
+              -- CR 603.2 again: CR 309.7's completion is the dungeon card's
+              -- removal happening, not a state that could be true standing still.
+              TriggerCondition.PlayerCompletesDungeon _ -> False
               -- CR 603.2 event triggers, all four: a scry, a surveil, a card
               -- becoming plotted and an explore are things that HAPPEN, each with
               -- its own log entry, and none of them is a CR 603.8 state that could
               -- be true standing still.
               TriggerCondition.PlayerScries _ -> False
-              TriggerCondition.PlayerCompletesDungeon _ -> False
               TriggerCondition.PlayerSurveils _ -> False
               TriggerCondition.SelfBecomesPlotted -> False
               TriggerCondition.PermanentExplores _ -> False
