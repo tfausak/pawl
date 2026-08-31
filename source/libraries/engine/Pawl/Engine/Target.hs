@@ -1284,8 +1284,9 @@ pileMembers perspective pile legal gs =
 -- membership in `sets` alone would let a caster take a card from one player's
 -- graveyard while targeting another -- or name one creature in both of Fall of
 -- the Hammer's slots, which rule 601.2c's "another" forbids. Re-deriving the
--- dependent slots against `chosen` -- exactly the derivation CR 608.2b will make
--- at resolution -- judges the announcement as the single act the rule makes it,
+-- dependent slots against `chosen` under `seed` -- exactly the derivation CR
+-- 608.2b will make at resolution, which reads the object's whole binding
+-- environment -- judges the announcement as the single act the rule makes it,
 -- with neither slot resolved before the other. jointlyJudged is which slots those
 -- are, in both readings.
 --
@@ -1294,8 +1295,22 @@ pileMembers perspective pile legal gs =
 -- returns the game to before the spell was proposed, the same posture CR 601.2b's
 -- unaffordable X announcement already takes. Narrowing the offered count
 -- to what a coherent answer could reach is not implemented (#1296).
-selectionLegal :: Maybe PlayerId -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Map SlotName (Set Recipient) -> GameState -> Bool
-selectionLegal perspective source x slots sets chosen gs =
+--
+-- `seed` is the announcement's OWN bindings, the same map the offer was computed
+-- against (legalSets) -- CR 601.2b's X for a cast, and nothing at all for an
+-- activation, whose X does not reach a slot yet (#2672). The joint check joins it
+-- UNDER the chosen targets, exactly as legalSetsGiven's second pass does, so the
+-- re-derivation reads the same environment the offer did: a slot's CR 202.3
+-- computed bound reading Binding.variableX (Pawl.TargetSpec's "CR 601.2c the
+-- joint check re-derives a jointly judged slot against the announced X") is
+-- answerable here rather than vacuously unmeetable, and the offer and this
+-- re-check cannot disagree about one announcement.
+--
+-- The seed reaches the BINDINGS and not jointlyJudged's `declared`: that argument
+-- is the announcement's declared slot names, and its own haddock is why a slot
+-- filter naming a seed entry must stay out of this check.
+selectionLegal :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Map SlotName (Set Recipient) -> GameState -> Bool
+selectionLegal perspective seed source x slots sets chosen gs =
   Set.isSubsetOf (Map.keysSet chosen) (Map.keysSet sets)
     && and (Map.elems (Map.mapWithKey slotLegal slots))
     && and (Map.elems (Map.mapWithKey coherent (Map.filter (jointlyJudged (Map.keysSet slots)) slots)))
@@ -1325,7 +1340,7 @@ selectionLegal perspective source x slots sets chosen gs =
     coherent slot targetSlot =
       Set.isSubsetOf
         (Map.findWithDefault Set.empty slot chosen)
-        (legalRecipientsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective False (fmap Binding.toRecipients chosen) source targetSlot gs)
+        (legalRecipientsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective False (Map.union (fmap Binding.toRecipients chosen) seed) source targetSlot gs)
 
 -- CR 700.2a: the mode indices every one of whose target slots can be filled --
 -- that is, has at least as many legal recipients as its count demands (a mode
