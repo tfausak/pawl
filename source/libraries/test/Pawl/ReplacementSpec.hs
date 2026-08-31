@@ -1789,6 +1789,75 @@ partingWardSpec s registry = Spec.describe s "Synthetic Parting Ward (CR 609.7a)
     Spec.assertEqWith s "setup: that row names no slot, so it captured none" (foldMap ActiveReplacement.slots (GameState.replacements armed)) Map.empty
     Spec.assertBool s (plainsId /= destroyed && plainsId /= fireEater) "setup: the id the twin names is a Plains and neither of the two creatures"
 
+-- CR 615.1's shield narrowed at BOTH ends of the damage event, whose producer is
+-- Synthetic Selective Muzzle ({1}{W} Instant: "Prevent all damage that target
+-- creature would deal to creatures you control this turn.").
+--
+-- The rule's shield watches a damage EVENT, and nothing in CR 615 says a card may
+-- name only one end of one: the source half is CR 601.2c's target, baked into
+-- DamagePattern.whichSource, and the recipient half is CR 611.2c's live
+-- description on DamagePattern.whatRecipient, which Replacement re-asks at each
+-- event. Before this card Pawl.Engine.Resolve dropped the description on that
+-- direction, so a card printing both would have prevented the target's damage to
+-- everything.
+--
+-- SYNTHETIC because no printing installs such a shield by RESOLVING. Scryfall
+-- o:/prevent all .*damage.*dealt by/, o:/dealt by .+ to /, o:prevent o:/would
+-- deal to/ and o:prevent o:/to you by/, 2026-08-31: the pool's by-direction
+-- shields name their source and stop there (Dovin, Hand of Control, Old Fat
+-- Spider Can't See Me), and the two printings that narrow both ends -- Goblin
+-- Furrier's "prevent all damage that this creature would deal to snow creatures"
+-- and Indentured Oaf's the same for red creatures -- are STATIC abilities, so
+-- they ride Pawl.Types.PrintedReplacement's own DamagePattern (Stormwild
+-- Capridor's carrier) and never reach this opcode. What would refute this is a
+-- spell or activated ability whose prevention names a source and restricts the
+-- recipients.
+--
+-- Two seats is enough: the card says "you control" and names no opponent, so the
+-- three-seat trap does not apply. bob owns the muzzled creature and the
+-- uncovered recipient alike, which is what the description has to tell apart.
+selectiveMuzzleSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+selectiveMuzzleSpec s registry = Spec.describe s "Synthetic Selective Muzzle (CR 615.1)" $ do
+  Spec.it s "CR 615.1 the shield covers only the recipients the card describes" $ do
+    plains <- S.printingOf s registry "Plains"
+    muzzle <- S.printingOf s registry "Synthetic Selective Muzzle"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    tracker <- S.printingOf s registry "Ainok Tracker"
+    let (muzzled, g1) = S.addCreature piker S.bob (S.landsInPlay plains 2)
+        (bystander, g2) = S.addCreature tracker S.bob g1
+        (covered, g3) = S.addCreature mammoth S.alice g2
+        (muzzleId, g4) = S.addHandCard muzzle S.alice g3
+        ready =
+          g4
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        shielded = S.runPure (targetingOnly muzzled) ready (S.cast S.alice muzzleId Monad.>> Stack.resolveTop)
+        hit src recipient n =
+          DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+        -- ONE board for every case below, so each pair differs in the source or
+        -- the recipient alone.
+        strike src recipient n = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit src recipient n])
+    -- THE gameplay assertion: the shielded source's damage to a creature the
+    -- description does NOT admit lands whole. A row built from the source alone
+    -- prevents it and leaves 0.
+    Spec.assertEqWith s "the 3 the muzzled creature deals to bob's own creature lands whole" (S.damageOf bystander (strike muzzled (Recipient.ToCreature bystander) 3)) (Just 3)
+    -- The same reading one recipient KIND over: CR 120.3a's other kind of
+    -- recipient satisfies no object filter, so a player is uncovered too.
+    Spec.assertEqWith s "and the 4 it deals to alice herself lands whole" (S.lifeOf S.alice (strike muzzled (Recipient.ToPlayer S.alice) 4)) (Just 16)
+    -- The covering direction, differing from the first case in the RECIPIENT
+    -- alone: without it the two above could pass on a shield that was never
+    -- installed.
+    Spec.assertEqWith s "the 2 it deals to a creature alice controls is prevented whole" (S.damageOf covered (strike muzzled (Recipient.ToCreature covered) 2)) (Just 0)
+    -- Its twin differing in the SOURCE alone: the same covered creature takes
+    -- another creature's damage in full, so the case above is the shield rather
+    -- than a blanket over alice's board.
+    Spec.assertEqWith s "while bob's other creature deals it the whole 5" (S.damageOf covered (strike bystander (Recipient.ToCreature covered) 5)) (Just 5)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "setup: the Muzzle installed exactly one row" (length (GameState.replacements shielded)) 1
+
 -- CR 609.7a's third class read off what a resolution BAKED into a waiting row
 -- rather than off what the row captured, whose producers are Healing Grace ({W}
 -- Instant: "Prevent the next 3 damage that would be dealt to any target this turn
@@ -6832,6 +6901,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   wardingChantSpec s registry
   communalBulwarkSpec s registry
   partingWardSpec s registry
+  selectiveMuzzleSpec s registry
   healingGraceReferentSpec s registry
   galvanicBlastReferentSpec s registry
   turnTheBladeSpec s registry

@@ -42,11 +42,12 @@ data PreventAllDamage effect = MkPreventAllDamage
     -- covered too and one that stops being one is not. That is the whole reason
     -- this is not spelled as an @EachMatching@ ref above.
     --
-    -- Read on the DealtTo side only: a shield pinned to the other side of the
-    -- event names no recipient at all, and describes its source in @whatSource@
-    -- below instead. A card writing one beside DealtBy would install a shield
-    -- broader than it printed, which Pawl.CardSpec's byDirectionRecipientOffends
-    -- rejects.
+    -- Read on BOTH sides of @direction@: CR 615.1's shield watches a damage
+    -- EVENT, so a card may narrow the source end and the recipient end at once
+    -- (Goblin Furrier's "prevent all damage that this creature would deal to
+    -- snow creatures"), and beside DealtBy this description and @ref@ are the two
+    -- ends rather than two spellings of one. What that costs on the DealtTo side
+    -- is that the two ARE alternatives there, @ref@ being a recipient too.
     --
     -- No PLAYER half beside it, where Pawl.Types.PreventNextDamage carries
     -- @whoRecipient@. Printings that want both halves exist -- Safe Passage's
