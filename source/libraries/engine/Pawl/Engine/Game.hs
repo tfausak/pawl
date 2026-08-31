@@ -294,6 +294,15 @@ removeFromCombat oid gs =
           }
    in gs {GameState.combat = c1}
 
+-- CR 509.1g: is this creature blocking? Combat.blockers is keyed by ATTACKER, so
+-- the answer is membership in some attacker's set rather than a key lookup.
+--
+-- The ONE fold, so Pawl.Engine.Projection's live Filter.blocking and the
+-- CR 608.2h record Pawl.Types.LastKnown.blocking keeps cannot answer it
+-- differently -- sourceIsToken's posture one field over.
+isBlocking :: ObjectId -> GameState -> Bool
+isBlocking oid gs = any (Set.member oid) (Map.elems (Combat.blockers (GameState.combat gs)))
+
 removeFromZones :: PlayerId -> ObjectId -> GameState -> GameState
 removeFromZones pid oid gs =
   gs

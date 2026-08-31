@@ -381,6 +381,14 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- reports is Pawl.Types.ProductionTag, the closed half of what a unit carries,
   -- and this arm asks it for one member.
   Quantity.SnowWasSpent -> fmap (\view -> if Set.member ProductionTag.Snow (Filter.manaSpentTags view) then 1 else 0) mView
+  -- CR 111.6's status as a 0/1, WasKicked's arm in every respect. Filter.token
+  -- rather than Game.isToken: reading the object directly answers False for an
+  -- id naming nothing, which is the whole case this arm exists for (#1102).
+  Quantity.WasToken -> fmap (\view -> if Filter.token view then 1 else 0) mView
+  -- CR 509.1g's combat fact as a 0/1, WasToken's arm in every respect --
+  -- including the reader, since a creature that has died is out of
+  -- GameState.combat as well as out of GameState.objects (#991).
+  Quantity.WasBlocking -> fmap (\view -> if Filter.blocking view then 1 else 0) mView
   -- CR 508.3b: how many of that player's opponents were declared attacked this
   -- combat phase. LifeTotal's arm in shape -- live, one player only, resolved
   -- through the same playersOf, and Nothing for a reference naming
@@ -812,6 +820,8 @@ substituteStar star quantity = case quantity of
   Quantity.ClassLevel -> quantity
   Quantity.WasKicked -> quantity
   Quantity.SnowWasSpent -> quantity
+  Quantity.WasToken -> quantity
+  Quantity.WasBlocking -> quantity
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.CardsDiscardedThisTurn _ -> quantity
   Quantity.LifeGainedThisTurn _ -> quantity
@@ -942,6 +952,8 @@ slots quantity = case quantity of
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
   Quantity.SnowWasSpent -> Set.empty
+  Quantity.WasToken -> Set.empty
+  Quantity.WasBlocking -> Set.empty
   -- And a ninth PlayerRef in that same position, CR 508.3b's record having
   -- nothing else on it.
   Quantity.OpponentsAttacked _ -> Set.empty
@@ -1025,6 +1037,8 @@ objectSlots quantity = case quantity of
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
   Quantity.SnowWasSpent -> Set.empty
+  Quantity.WasToken -> Set.empty
+  Quantity.WasBlocking -> Set.empty
   Quantity.OpponentsAttacked _ -> Set.empty
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
   Quantity.LifeGainedThisTurn _ -> Set.empty
@@ -1086,6 +1100,8 @@ nestedRefs quantity = case quantity of
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
   Quantity.SnowWasSpent -> Set.empty
+  Quantity.WasToken -> Set.empty
+  Quantity.WasBlocking -> Set.empty
   Quantity.OpponentsAttacked ref -> Set.singleton (Left ref)
   Quantity.CardsDiscardedThisTurn ref -> Set.singleton (Left ref)
   Quantity.LifeGainedThisTurn ref -> Set.singleton (Left ref)
@@ -1265,6 +1281,8 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.ClassLevel -> quantity
   Quantity.WasKicked -> quantity
   Quantity.SnowWasSpent -> quantity
+  Quantity.WasToken -> quantity
+  Quantity.WasBlocking -> quantity
   Quantity.EnteredThisTurn -> quantity
   Quantity.BlockersBeyondFirst -> quantity
   where
@@ -1373,6 +1391,8 @@ readsX quantity = case quantity of
   Quantity.ClassLevel -> False
   Quantity.WasKicked -> False
   Quantity.SnowWasSpent -> False
+  Quantity.WasToken -> False
+  Quantity.WasBlocking -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False
   Quantity.LifeGainedThisTurn _ -> False

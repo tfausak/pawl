@@ -14,7 +14,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.LastKnown as LastKnown
 
--- | All eight axes, none derivable from another: the type's own haddock says why
+-- | All nine axes, none derivable from another: the type's own haddock says why
 -- CR 608.2h needs each of them beside the projection.
 codec :: Codec.Codec LastKnown.LastKnown
 codec = Fields.object $ do
@@ -26,6 +26,7 @@ codec = Fields.object $ do
   copiable <- Fields.required "copiable" ProjectedCharacteristics.codec LastKnown.copiable
   attachedTo <- Fields.required "attachedTo" (Common.maybe Recipient.codec) LastKnown.attachedTo
   chosenNames <- Fields.required "chosenNames" (Common.set CardName.codec) LastKnown.chosenNames
+  blocking <- Fields.required "blocking" Common.boolean LastKnown.blocking
   pure
     LastKnown.MkLastKnown
       { LastKnown.characteristics = characteristics,
@@ -35,5 +36,6 @@ codec = Fields.object $ do
         LastKnown.counters = counters,
         LastKnown.copiable = copiable,
         LastKnown.attachedTo = attachedTo,
-        LastKnown.chosenNames = chosenNames
+        LastKnown.chosenNames = chosenNames,
+        LastKnown.blocking = blocking
       }
