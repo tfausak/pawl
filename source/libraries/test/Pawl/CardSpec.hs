@@ -2354,8 +2354,9 @@ isPreventionShield effect = case effect of
 -- installDamageRow at all, so a described recipient beside that direction is text
 -- nothing performs and the shield installed would be BROADER than the card
 -- printed (#2765). Until that side carries the description, this lint is what
--- stops one being written. A card mentioning both sides is written as two
--- shields, which is how Dovin, Hand of Control is written in data/cards/.
+-- stops one being written. In data/cards/, a card mentioning both sides of the
+-- damage event is written as two shields instead -- Dovin, Hand of Control's one
+-- ability prints both.
 byDirectionRecipientOffends :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 byDirectionRecipientOffends effect = case effect of
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ whatRecipient direction _ _ _) ->
