@@ -1863,7 +1863,13 @@ handActionSlotsOffend card =
 -- one -- and no compiler catches that, so it is caught here.
 --
 -- Read off the same Resolve.modeSlots the D4 lint reads, whose join keeps the
--- narrower arity: a slot two effects of one mode read both ways is One.
+-- narrower arity: a slot two effects of one mode read both ways is One. The two
+-- lints ask different questions of the one map -- D4 asks its KEYS whether the
+-- slot is read at all, this asks its VALUES how many recipients the read sees --
+-- which is what SlotArity.Amount parts: a Quantity.InSlot names the slot's
+-- amount rather than its objects (Pawl.Engine.Binding.amountOf), so it is a read
+-- D4 must count and no arity claim for this lint to reject a plural slot on;
+-- see #2774.
 modalCountsOffend :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 modalCountsOffend modal =
   let modeOffends mode =
@@ -4253,78 +4259,6 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.And fs -> concatMap filterSlotsReadSingly fs
   Filter.Type.Or fs -> concatMap filterSlotsReadSingly fs
   Filter.Type.Not f -> filterSlotsReadSingly f
-
--- Every SlotName a Quantity reads as ONE OBJECT -- today exactly the
--- Quantity.AgainstSlot arms in it, which aim an inner number at the object a
--- slot names, through Pawl.Engine.Filter.slotOneObject. That declines a slot
--- naming several rather than picking one of them (Pawl.Engine.Binding.onlyOne's
--- doctrine), so the whole number is unanswered in silence.
---
--- NOT Pawl.Engine.Quantity.slots, which reports the OTHER slot-naming arm too.
--- Quantity.InSlot reads an AMOUNT -- Pawl.Engine.Binding.amountOf off
--- Binding.amount, falling back to the announcing object, to
--- Filter.Context's boundAmounts and to GameState.ambientAmounts -- and reaches
--- slotOneObject on no road at all. Pawl.Types.SlotName is one flat namespace, so
--- a card MAY name an amount slot what a plural binder named; the binders on this
--- lint's other side write Binding.objects and never Binding.amount, so such a
--- card reads its own rolled or announced number and the group is not in its way.
--- Reporting it would reject that card for a reason that is not about it. That is
--- the same disjointness filterSlotsReadSingly claims for ControlledByBound's
--- player slots, one field over.
---
--- Exhaustive with no fallthrough, filterSlotsReadSingly's shape and for its
--- reason: a new arm naming a slot must answer here rather than inherit
--- Quantity.slots' answer.
-quantitySlotsReadSingly :: Quantity.Type.Quantity -> [SlotName.SlotName]
-quantitySlotsReadSingly quantity = case quantity of
-  -- The amount reader, left alone for the reason above.
-  Quantity.Type.InSlot _ -> []
-  Quantity.Type.Literal _ -> []
-  Quantity.Type.ManaValue -> []
-  Quantity.Type.Power -> []
-  Quantity.Type.Toughness -> []
-  Quantity.Type.Star -> []
-  -- DESCENT: a composite's payload is card text like any other.
-  Quantity.Type.Plus (Plus.MkPlus a b) -> quantitySlotsReadSingly a <> quantitySlotsReadSingly b
-  Quantity.Type.Halved (Halved.MkHalved _ inner) -> quantitySlotsReadSingly inner
-  Quantity.Type.Negate a -> quantitySlotsReadSingly a
-  -- DESCENT into a Greatest's per-member number, which may aim at a slot of its
-  -- own; the other two aggregations carry no number to ask. The Scope beside it
-  -- holds a PlayerRef, whose slot is a TARGET one this walk never reports --
-  -- Quantity.slots leaves it to Resolve.slotsOf, which cannot see it (#1079).
-  Quantity.Type.Count c -> case Count.Type.aggregation c of
-    Aggregation.Members -> []
-    Aggregation.DistinctCardTypes -> []
-    Aggregation.Greatest inner -> quantitySlotsReadSingly inner
-  -- Every remaining arm names no slot this lint can read. The PlayerRefs among
-  -- them are readSinglyInPlayerRefs' axis rather than this one, and buried where
-  -- neither walk reaches them anyway (#1079).
-  Quantity.Type.ManaCount _ -> []
-  Quantity.Type.LifeTotal _ -> []
-  Quantity.Type.Speed _ -> []
-  Quantity.Type.IsMonarch _ -> []
-  Quantity.Type.IsStartingPlayer _ -> []
-  Quantity.Type.IsActivePlayer _ -> []
-  Quantity.Type.PlayerCounters {} -> []
-  Quantity.Type.ObjectCounters _ -> []
-  Quantity.Type.ObjectCountersOfAnyKind -> []
-  Quantity.Type.HasDesignation _ -> []
-  Quantity.Type.ClassLevel -> []
-  Quantity.Type.WasKicked -> []
-  Quantity.Type.SnowWasSpent -> []
-  Quantity.Type.OpponentsAttacked _ -> []
-  Quantity.Type.CardsDiscardedThisTurn _ -> []
-  Quantity.Type.LifeGainedThisTurn _ -> []
-  Quantity.Type.PlayersDealtDamageThisTurn _ -> []
-  Quantity.Type.SpellsCastLastTurn _ -> []
-  Quantity.Type.DungeonsCompleted _ -> []
-  Quantity.Type.EnteredThisTurn -> []
-  Quantity.Type.EnteredFrom _ -> []
-  Quantity.Type.WasCastFrom _ -> []
-  Quantity.Type.BlockersBeyondFirst -> []
-  -- The one arm with an answer, and DESCENT beside it: the payload is evaluated
-  -- against the named object and may aim at a further slot of its own.
-  Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> slot : quantitySlotsReadSingly inner
 
 -- The Filters a DamagePattern carries -- its source half and its printed
 -- recipient half, the two axes of that type that ARE predicates over an object.
@@ -7179,11 +7113,25 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- takes two targets and whose only reader is Effect.Sacrifice, a bare SlotName.
   Spec.it s "the lint itself catches a multi-target slot read one at a time" $ do
     let slot = SlotName.MkSlotName (Text.pack "creature")
-        modeWith targetSlot reader =
+        modeReading targetSlot readers =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton reader))) (Map.singleton slot targetSlot)))
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList readers))) (Map.singleton slot targetSlot)))
             (ModeSelection.ChooseExactly 1)
+        modeWith targetSlot reader = modeReading targetSlot [reader]
         two = TargetSlot.upTo 2 Pool.Creatures Nothing
+        -- A NUMBER reading the same name: Quantity.InSlot asks for the slot's
+        -- amount (Pawl.Engine.Binding.amountOf), never for an object.
+        amountReader = Effect.Bolster (Quantity.Type.InSlot slot)
+        -- ONE number reading the same name both ways: the sum of that amount and
+        -- an inner number aimed at the object the slot names.
+        bothReader =
+          Effect.Bolster
+            ( Quantity.Type.Plus
+                ( Plus.MkPlus
+                    (Quantity.Type.InSlot slot)
+                    (Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot (Quantity.Type.Literal 1)))
+                )
+            )
     Spec.assertBool
       s
       (modalCountsOffend (modeWith two (Effect.Sacrifice slot)))
@@ -7206,6 +7154,38 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (modalCountsOffend (modeWith (TargetSlot.anyNumber Pool.Creatures Nothing) (Effect.Sacrifice slot)))
       "an unbounded slot read as one object offends too"
+    -- The OTHER slot-naming arm of a number, on the offending board's own slot:
+    -- an amount read is no arity claim, so the two-target slot is legal beside
+    -- it. The pair differs from the first assertion in the READER alone -- same
+    -- slot, same count -- so it proves the lint discriminates rather than
+    -- rejecting every number that names a plural slot; see #2774.
+    Spec.assertBool
+      s
+      (not (modalCountsOffend (modeWith two amountReader)))
+      "and a two-target slot read as an amount does not offend"
+    -- The half neither board above can prove: a classification that dropped the
+    -- amount read from the arity map by dropping it from the map ALTOGETHER
+    -- would pass both, and silently stop the D4 dataflow lint seeing the read.
+    -- Asserted on the map itself, that lint reading exactly these keys.
+    Spec.assertEqWith
+      s
+      "and the D4 lint still sees the amount read"
+      (fmap (Map.keysSet . Resolve.modeSlots) (Foldable.toList (Modal.modes (modeWith two amountReader))))
+      [Set.singleton slot]
+    -- And the two reads of one slot, which the boards above cannot tell apart
+    -- either: an amount read must not MASK an object read of the same name.
+    -- Twice, because the two reads meet in two different joins -- inside one
+    -- number (Resolve.quantitySlots' own left-biased union) and across two
+    -- effects of one mode (Resolve.joinTwo's min) -- and each keeps the narrower
+    -- answer on its own.
+    Spec.assertBool
+      s
+      (modalCountsOffend (modeWith two bothReader))
+      "and one number reading the slot both ways offends"
+    Spec.assertBool
+      s
+      (modalCountsOffend (modeReading two [amountReader, Effect.Sacrifice slot]))
+      "as does an object read beside an amount read of the same slot"
   -- The sweep above passes VACUOUSLY on the rejecting side: no committed
   -- activated ability reads a slot it is not given, so the REJECTING direction is
   -- proven here instead, against hand-built offenders and against the four real
@@ -7862,18 +7842,22 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           | ref <- refs,
             (slot, SlotArity.One) <- Map.toList (Resolve.playerRefSlots ref)
           ]
-        -- The reading side's fifth carrier: a NUMBER, whose singular reads are
-        -- quantitySlotsReadSingly -- Quantity.AgainstSlot and nothing else. NOT
-        -- Resolve.quantitySlots, which classifies every slot Quantity.slots
-        -- reports at SlotArity.One and so answers for Quantity.InSlot too: that
-        -- arm reads an AMOUNT and no object, so it is a different namespace
-        -- rather than a singular read of this one; see #2772.
+        -- The reading side's fifth carrier: a NUMBER. Resolve.quantitySlots'
+        -- SlotArity.One entries are exactly the Quantity.AgainstSlot arms, which
+        -- aim an inner number at the object a slot names and so reach
+        -- Pawl.Engine.Filter.slotOneObject. A Quantity.InSlot reads the slot's
+        -- AMOUNT instead and is reported at SlotArity.Amount, a different
+        -- namespace rather than a singular read of this one; see #2772.
         --
         -- No subtraction of a minted object's text, which readSinglyInFilters
         -- needs: effectQuantities does not descend into the card a Create or a
         -- Conjure carries.
         readSinglyInQuantities effects =
-          concatMap quantitySlotsReadSingly (concatMap effectQuantities effects)
+          [ slot
+          | effect <- effects,
+            quantity <- effectQuantities effect,
+            (slot, SlotArity.One) <- Map.toList (Resolve.quantitySlots quantity)
+          ]
         -- The three READING sides at once: this resolution's own effects, the
         -- conditions of the delayed abilities it arms, and the PlayerRefs its
         -- CLAUSES hold. CR 603.7c is what puts the second there -- the entry

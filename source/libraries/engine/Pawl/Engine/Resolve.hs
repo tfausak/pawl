@@ -290,9 +290,22 @@ oneSlot slot = Map.singleton slot SlotArity.One
 insertOne :: SlotName -> Map.Map SlotName SlotArity -> Map.Map SlotName SlotArity
 insertOne slot = joinTwo (oneSlot slot)
 
--- A Quantity evaluates against one object, so its slots are read singly.
+-- The slots a Quantity reads, on both halves of Pawl.Types.SlotName's one flat
+-- namespace. Quantity.objectSlots names an OBJECT and evaluates against it, so a
+-- slot naming several leaves Pawl.Engine.Filter.slotOneObject with nothing to
+-- pick and the whole number unanswered -- SlotArity.One. Every other slot
+-- Quantity.slots reports is a Quantity.InSlot, which reads the slot's AMOUNT
+-- instead (Pawl.Engine.Binding.amountOf) and cannot be damaged by a plural slot
+-- at all -- SlotArity.Amount, an entry stating a read without claiming an arity.
+--
+-- Both halves are reported so that the KEYS stay Quantity.slots' whole answer:
+-- an InSlot read is a read, and the D4 dataflow lint counts it; see #2774.
+-- Map.union is left-biased, so a slot read both ways is One.
 quantitySlots :: Quantity.Type.Quantity -> Map.Map SlotName SlotArity
-quantitySlots = Map.fromSet (const SlotArity.One) . Quantity.slots
+quantitySlots quantity =
+  Map.union
+    (Map.fromSet (const SlotArity.One) (Quantity.objectSlots quantity))
+    (Map.fromSet (const SlotArity.Amount) (Quantity.slots quantity))
 
 -- The Quantities an entry rider carries: CR 122.6's count per counter kind, which
 -- a card may write as anything a Quantity spells. A position the three walkers
@@ -918,10 +931,12 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- DEFINITION, not a read: see boundSlots below.
   --
   -- The `from` side reports SlotArity.Many, every ObjectRef.InSlot being a
-  -- whole-set read. A slot the COUNT also names still comes out One: joinTwo is
-  -- Map.unionWith min and a Quantity reads singly, so Black Panther's `land` --
-  -- named by both halves -- keeps the arity that says "up to two target
-  -- creatures" cannot fill it.
+  -- whole-set read. A slot the COUNT names as an OBJECT still comes out One:
+  -- joinTwo is Map.unionWith min and a Quantity.AgainstSlot reads its object
+  -- singly, so Black Panther's `land` -- named by both halves -- keeps the arity
+  -- that says "up to two target creatures" cannot fill it. A count reading that
+  -- same name's AMOUNT would not narrow it, reading no object at all
+  -- (quantitySlots above).
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ to) -> insertOne to (foldMap quantitySlots (MovedKinds.quantityOf kinds))
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantitySlots quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantitySlots quantity
