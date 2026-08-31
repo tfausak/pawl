@@ -5304,7 +5304,7 @@ sirenBoard siren jace piker centaur =
 -- controller each combat if able / When enchanted creature dies, draw a card").
 -- Alluring Siren above is the same axis on the resolution-created carrier;
 -- Curse of the Nightly Hunt, in attackCostSpec, is the printed carrier with the
--- axis absent, and is the control every case here is written against.
+-- axis absent, and is the control the last two cases are written against.
 --
 -- The Aura's object is a RELATION -- Pawl.Types.RequiredDefender's
 -- ControllerOfAttached -- rather than a player it names, which is why the two
@@ -5322,7 +5322,14 @@ publicEnemySpec s registry = Spec.describe s "PublicEnemy" $ do
     enemy <- S.printingOf s registry "Public Enemy"
     piker <- S.printingOf s registry "Goblin Piker"
     let (base, mine, theirs, hers) = S.threePlayerCombat [piker] [piker] [piker]
-        defending = base {GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.bob}}
+        -- threePlayerCombat sits at the beginning of combat with no defending
+        -- player, since CR 703.4h is what fills that in; a direct-call test
+        -- states both, as combatBoardOf does for two seats.
+        defending =
+          base
+            { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+              GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.bob}
+            }
         enchanting host =
           let (aura, withAura) = S.addCreature enemy S.alice defending
            in S.attach aura host withAura
