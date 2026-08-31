@@ -752,9 +752,12 @@ viewWithLastKnown src gs oid =
 -- makes is False for exactly the creature CR 603.4's intervening "if" on a
 -- dies-trigger asks about (Guildsworn Prowler).
 --
--- Not implemented: the record carries no `attacking`, `blocked` or
--- `attackingPlayer`, so those three still read live and answer False for a gone
--- creature (#991).
+-- Not implemented: the record carries no `attacking`, so that field and the
+-- three that hang off the same GameState.combat lookup still read live and
+-- answer for a gone creature as though it had never been in combat (#991).
+-- The neighbouring `attackedThisTurn` needs no record at all: CR 608.2i makes it
+-- a fold over GameState.events, which CR 511.3 does not clear and the death does
+-- not touch.
 viewWithLastKnownAnywhere :: GameState -> Count.ViewOf
 viewWithLastKnownAnywhere gs oid =
   if Map.member oid (GameState.objects gs)
