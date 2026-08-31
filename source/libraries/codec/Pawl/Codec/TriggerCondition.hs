@@ -75,6 +75,7 @@ codec =
       Arm.payload "PermanentsDie" filterCodec TriggerCondition.PermanentsDie (\x -> case x of TriggerCondition.PermanentsDie y -> Just y; _ -> Nothing),
       Arm.nullary "SelfLeavesTheBattlefield" TriggerCondition.SelfLeavesTheBattlefield,
       Arm.payload "PermanentLeavesTheBattlefield" filterCodec TriggerCondition.PermanentLeavesTheBattlefield (\x -> case x of TriggerCondition.PermanentLeavesTheBattlefield y -> Just y; _ -> Nothing),
+      Arm.payload "PermanentReturnedToHand" filterCodec TriggerCondition.PermanentReturnedToHand (\x -> case x of TriggerCondition.PermanentReturnedToHand y -> Just y; _ -> Nothing),
       Arm.nullary "AttachedCreatureDies" TriggerCondition.AttachedCreatureDies,
       Arm.nullary "AttachedCreatureBecomesTapped" TriggerCondition.AttachedCreatureBecomesTapped,
       Arm.nullary "HauntedCreatureDies" TriggerCondition.HauntedCreatureDies,

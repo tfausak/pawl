@@ -401,6 +401,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PermanentLeavesTheBattlefield (Filter.Not Filter.IsSource))
       " {\"type\":\"PermanentLeavesTheBattlefield\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}} "
+  -- The arm above with one destination named, so a separate tag: the Filter is a
+  -- predicate over the object and could not carry where the object went. Justice,
+  -- Vance Astrovik's printed Filter, which is what the corpus spells.
+  Spec.it s "PermanentReturnedToHand round-trips with its Filter" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentReturnedToHand (Filter.And [Filter.Not Filter.IsSource, Filter.ControlledBy PlayerRelation.You]))
+      " {\"type\":\"PermanentReturnedToHand\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]}} "
   -- CR 700.4's death read off the enchanted permanent. Nullary: the link it
   -- matches on is board state, HauntedCreatureDies' reason.
   Spec.it s "AttachedCreatureDies" $
