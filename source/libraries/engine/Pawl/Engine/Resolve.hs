@@ -864,9 +864,10 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.BecomeCopy {} -> Map.empty
   Effect.CopySpell {} -> Map.empty
   -- The Duration and Condition each carry Quantities; a Quantity.InSlot is a read.
-  -- The pattern's Filter is a READ too: Filter.IsBound in one names an object an
-  -- earlier effect of this same resolution defined (Dire Fleet Daredevil's "that
-  -- spell"), which is what the row's captured environment answers at CR 616.1.
+  -- The ROW's own Filters and Quantities are READS too (replacementRowReads):
+  -- Filter.IsBound in one names an object an earlier effect of this same
+  -- resolution defined (Dire Fleet Daredevil's "that spell"), which is what the
+  -- row's captured environment answers at CR 616.1.
   Effect.Replace (Replace.MkReplace duration _ _ condition re) ->
     joinSlots [durationSlots duration, joinSlots (fmap conditionSlots (Maybe.maybeToList condition)), replacementRowSlots re]
   Effect.SkipNextPhase {} -> Map.empty
@@ -1180,6 +1181,13 @@ addFilter filter_ (filters, quantities) = (filter_ : filters, quantities)
 -- gaining a Filter or a Quantity must answer here rather than have its reads go
 -- undeclared. The arms answering nothing carry Naturals, constructors and literal
 -- card data, none of which can name a slot.
+--
+-- Every arm here is a REGRESSION FENCE rather than a proven behaviour: no
+-- Effect.Replace in data/cards/ carries an EntryR whose rewrite is anything but
+-- Tapped, so neutralizing any arm leaves the whole suite green. They are written
+-- because the narrowing one caller over is only sound if this list is complete --
+-- a rewrite read left out is a slot the installed row does not carry, and the
+-- Filter or Quantity that wanted it then answers vacuously at the event.
 entryRewriteReads :: EntryRewrite.EntryRewrite (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
 entryRewriteReads rewrite = case rewrite of
   EntryRewrite.AsCopy asCopy -> ([AsCopy.eligible asCopy], [])
@@ -3639,11 +3647,13 @@ referredToSources gs =
 -- The objects a waiting row names BY ID: what card data cannot write, so what no
 -- Filter and no captured slot holds, and what CR 609.7a's "any object referred to
 -- by ... a replacement or prevention effect that's waiting to apply" reaches only
--- through here. Only the damage arm has any, all three baked by
--- installDamageRow -- CR 609.7a's chosen source or CR 601.2c's targeted one, CR
--- 611.2c's named recipient, and CR 614.9's baked destination -- and each is
--- exactly the rule's parenthetical case, an object that may no longer be in the
--- zone it used to be in.
+-- through here. Only the damage arm has any -- CR 609.7a's chosen source or CR
+-- 601.2c's targeted one, CR 611.2c's named recipient, and CR 614.9's baked
+-- destination -- and each is written as a resolution installs the row
+-- (installDamageRow), a card's own redirection naming its destination by
+-- description instead (DamageRewrite.RedirectMatching, Pariah). Each is exactly
+-- the rule's parenthetical case, an object that may no longer be in the zone it
+-- used to be in.
 --
 -- PLAYER recipients drop out, referentsOfBindings' reason: the rule's four classes
 -- are all objects.

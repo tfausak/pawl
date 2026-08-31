@@ -1887,9 +1887,10 @@ healingGraceReferentSpec s registry = Spec.describe s "Healing Grace and Auriok 
 -- Fire-Eater the damage.
 --
 -- The card is the shape the row's over-capture needed and the pool had all along:
--- metalcraft is a CR 614.1a self-replacement installed as its own effect
--- (Effect.Replace) beside the damage clause, and the resolution's `target` slot --
--- bound at CR 601.2c, one clause over -- is no part of what that row describes.
+-- metalcraft is a CR 614.15 self-replacement installed as its own Effect.Replace,
+-- ahead of the DealDamage sharing its clause, and the resolution's `target` slot
+-- -- bound at CR 601.2c, and read by that other effect alone -- is no part of what
+-- the row describes.
 -- Its pattern is Filter.IsSource, its rewrite a literal 4 and its clause a count
 -- of artifacts; none names a slot, so the row refers to no object at all.
 --
