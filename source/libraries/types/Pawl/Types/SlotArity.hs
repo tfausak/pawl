@@ -31,6 +31,6 @@ data SlotArity
   | -- | The reader takes no recipient at all: it reads the slot's AMOUNT half
     -- (Pawl.Engine.Binding.amountOf) rather than its objects or players, which is
     -- Quantity.InSlot and nothing else. Last so that `min` lets any object read
-    -- of the same slot win (#2774).
+    -- of the same slot win; see #2774.
     Amount
   deriving (Eq, Ord, Show)

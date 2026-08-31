@@ -1868,8 +1868,8 @@ handActionSlotsOffend card =
 -- slot is read at all, this asks its VALUES how many recipients the read sees --
 -- which is what SlotArity.Amount parts: a Quantity.InSlot names the slot's
 -- amount rather than its objects (Pawl.Engine.Binding.amountOf), so it is a read
--- D4 must count and no arity claim for this lint to reject a plural slot on
--- (#2774).
+-- D4 must count and no arity claim for this lint to reject a plural slot on;
+-- see #2774.
 modalCountsOffend :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 modalCountsOffend modal =
   let modeOffends mode =
@@ -7116,6 +7116,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- A NUMBER reading the same name: Quantity.InSlot asks for the slot's
         -- amount (Pawl.Engine.Binding.amountOf), never for an object.
         amountReader = Effect.Bolster (Quantity.Type.InSlot slot)
+        -- ONE number reading the same name both ways: the sum of that amount and
+        -- an inner number aimed at the object the slot names.
+        bothReader =
+          Effect.Bolster
+            ( Quantity.Type.Plus
+                ( Plus.MkPlus
+                    (Quantity.Type.InSlot slot)
+                    (Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot (Quantity.Type.Literal 1)))
+                )
+            )
     Spec.assertBool
       s
       (modalCountsOffend (modeWith two (Effect.Sacrifice slot)))
@@ -7142,7 +7152,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- an amount read is no arity claim, so the two-target slot is legal beside
     -- it. The pair differs from the first assertion in the READER alone -- same
     -- slot, same count -- so it proves the lint discriminates rather than
-    -- rejecting every number that names a plural slot (#2774).
+    -- rejecting every number that names a plural slot; see #2774.
     Spec.assertBool
       s
       (not (modalCountsOffend (modeWith two amountReader)))
@@ -7156,13 +7166,20 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "and the D4 lint still sees the amount read"
       (fmap (Map.keysSet . Resolve.modeSlots) (Foldable.toList (Modal.modes (modeWith two amountReader))))
       [Set.singleton slot]
-    -- And the two reads of one slot in one mode, which the boards above cannot
-    -- tell apart either: Resolve.joinTwo keeps the narrower answer, so an object
-    -- read beside an amount read of the same name still offends.
+    -- And the two reads of one slot, which the boards above cannot tell apart
+    -- either: an amount read must not MASK an object read of the same name.
+    -- Twice, because the two reads meet in two different joins -- inside one
+    -- number (Resolve.quantitySlots' own left-biased union) and across two
+    -- effects of one mode (Resolve.joinTwo's min) -- and each keeps the narrower
+    -- answer on its own.
+    Spec.assertBool
+      s
+      (modalCountsOffend (modeWith two bothReader))
+      "and one number reading the slot both ways offends"
     Spec.assertBool
       s
       (modalCountsOffend (modeReading two [amountReader, Effect.Sacrifice slot]))
-      "and an object read beside an amount read of the same slot offends"
+      "as does an object read beside an amount read of the same slot"
   -- The sweep above passes VACUOUSLY on the rejecting side: no committed
   -- activated ability reads a slot it is not given, so the REJECTING direction is
   -- proven here instead, against hand-built offenders and against the four real
@@ -7824,7 +7841,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- aim an inner number at the object a slot names and so reach
         -- Pawl.Engine.Filter.slotOneObject. A Quantity.InSlot reads the slot's
         -- AMOUNT instead and is reported at SlotArity.Amount, a different
-        -- namespace rather than a singular read of this one (#2772).
+        -- namespace rather than a singular read of this one; see #2772.
         --
         -- No subtraction of a minted object's text, which readSinglyInFilters
         -- needs: effectQuantities does not descend into the card a Create or a

@@ -299,7 +299,7 @@ insertOne slot = joinTwo (oneSlot slot)
 -- at all -- SlotArity.Amount, an entry stating a read without claiming an arity.
 --
 -- Both halves are reported so that the KEYS stay Quantity.slots' whole answer:
--- an InSlot read is a read, and the D4 dataflow lint counts it (#2774).
+-- an InSlot read is a read, and the D4 dataflow lint counts it; see #2774.
 -- Map.union is left-biased, so a slot read both ways is One.
 quantitySlots :: Quantity.Type.Quantity -> Map.Map SlotName SlotArity
 quantitySlots quantity =
@@ -931,10 +931,12 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- DEFINITION, not a read: see boundSlots below.
   --
   -- The `from` side reports SlotArity.Many, every ObjectRef.InSlot being a
-  -- whole-set read. A slot the COUNT also names still comes out One: joinTwo is
-  -- Map.unionWith min and a Quantity reads singly, so Black Panther's `land` --
-  -- named by both halves -- keeps the arity that says "up to two target
-  -- creatures" cannot fill it.
+  -- whole-set read. A slot the COUNT names as an OBJECT still comes out One:
+  -- joinTwo is Map.unionWith min and a Quantity.AgainstSlot reads its object
+  -- singly, so Black Panther's `land` -- named by both halves -- keeps the arity
+  -- that says "up to two target creatures" cannot fill it. A count reading that
+  -- same name's AMOUNT would not narrow it, reading no object at all
+  -- (quantitySlots above).
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ to) -> insertOne to (foldMap quantitySlots (MovedKinds.quantityOf kinds))
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantitySlots quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantitySlots quantity

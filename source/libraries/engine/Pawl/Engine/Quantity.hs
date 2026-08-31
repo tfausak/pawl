@@ -942,7 +942,7 @@ slots quantity = case quantity of
 -- road at all. Pawl.Types.SlotName is one flat namespace, so a card MAY name an
 -- amount slot what a plural target slot is named; classifying that read as a
 -- singular OBJECT read is what would reject such a card for a reason that is not
--- about it (#2774). Resolve.quantitySlots is where the two halves are rejoined,
+-- about it; see #2774. Resolve.quantitySlots is where the two halves are rejoined,
 -- as presence for the D4 dataflow lint and arity for the count lint.
 --
 -- Exhaustive with no fallthrough, slotsAreExhaustive's shape and for its reason:
