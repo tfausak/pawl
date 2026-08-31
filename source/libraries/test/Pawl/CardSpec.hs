@@ -7161,6 +7161,55 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (any triggeredAbilityOffends (Face.triggeredAbilities (S.combinedFace trygon))))
       "the real card's own trigger is accepted"
+  -- The same equality on the slot's THIRD read, beside its pool's and its
+  -- filter's: CR 202.3's computed bound (Resolve.targetSlotSlots). A bound may
+  -- name CR 603.2's "that player" through a PlayerRef buried INSIDE the number --
+  -- "with mana value X or less, where X is the amount of life that player gained
+  -- this turn" -- and Quantity.slots does not report that read, only
+  -- Quantity.nestedRefs does. Without it the pairing is invisible and a card could
+  -- bound a slot by a player its condition never binds, which is the dead bound
+  -- the fold exists to catch.
+  Spec.it s "the lint itself catches a computed bound naming a slot through a player" $ do
+    let target = SlotName.MkSlotName (Text.pack "target")
+        -- Celestine, the Living Saint's own bound, one reference over: hers reads
+        -- the caster's life gain, this reads the trigger's player.
+        bounded amount =
+          Mode.MkMode
+            (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Tap (ObjectRef.InSlot target)))))
+            (Map.singleton target (TargetSlot.withAmount amount (TargetSlot.required Pool.Permanents (Just Filter.Type.ManaValueAtMostAmount))))
+        thatPlayer = Quantity.Type.LifeGainedThisTurn (PlayerRef.InSlot Binding.triggerPlayer)
+        you = Quantity.Type.LifeGainedThisTurn (PlayerRef.Relative PlayerRelation.You)
+    Spec.assertBool
+      s
+      (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfEnters [bounded thatPlayer]))
+      "CR 603.2 thatPlayer inside a bound under an enters trigger is rejected"
+    Spec.assertBool
+      s
+      (not (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfDealsCombatDamageToPlayer [bounded thatPlayer])))
+      "and under a combat-damage trigger it is accepted"
+    -- The pair that differs in exactly one thing: the same bound on the same
+    -- trigger, reading CR 109.5's caster instead of a slot, stays accepted -- so
+    -- the lint reads the reference rather than rejecting every computed bound.
+    Spec.assertBool
+      s
+      (not (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfEnters [bounded you])))
+      "where a bound naming no slot at all is accepted"
+    -- And the OTHER read Quantity.slots does not report: CR 400.7j's fold, which
+    -- names a slot outright rather than through a reference. Asserted on the map
+    -- itself, there being no trigger condition that binds an ordinary target slot
+    -- for the lint to accept it against.
+    let overBound =
+          Quantity.Type.Count
+            ( Count.Type.MkCount
+                (Scope.OverBound target)
+                (Filter.Type.And [])
+                Aggregation.Members
+            )
+    Spec.assertEqWith
+      s
+      "a bound folding over the objects a slot names reports that slot"
+      (Map.keysSet (Resolve.targetSlotSlots (TargetSlot.withAmount overBound (TargetSlot.required Pool.Permanents Nothing))))
+      (Set.singleton target)
   -- The same equality over a card's ACTIVATED abilities, the one carrier with no
   -- event slot answering a read at all: an activation is not an event. See
   -- activatedAbilityOffends for the whole of it.

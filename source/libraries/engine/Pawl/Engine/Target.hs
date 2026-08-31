@@ -1397,8 +1397,9 @@ fillableModesGiven pcs grants pools perspective seed source extra modal gs =
             -- is why: Pawl.CardSpec's "every slot a triggered ability reads is
             -- bound for its condition" subtracts Event.eventBindingSlots from the
             -- read side, and Resolve.modeSlots reports a slot's `amount` reads into
-            -- it -- so a bound naming a slot the condition does not supply fails
-            -- "no dangling triggered-ability slot" before it can reach a board.
+            -- it -- the ones a PlayerRef buried in the number names included -- so
+            -- a bound naming a slot the condition does not supply fails "no
+            -- dangling triggered-ability slot" before it can reach a board.
             -- Venerable Warsinger is the pool's one such bound, and its condition's
             -- arm supplies Binding.eventAmount unconditionally.
             sets = legalSetsGiven pcs grants pools perspective True seed source slots gs

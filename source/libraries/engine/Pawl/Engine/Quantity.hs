@@ -898,9 +898,11 @@ slots quantity = case quantity of
   -- no slot at all, and PlayerRef.InSlot names a TARGET slot, which is
   -- Resolve's half of the lint. Count's Scope is in the same position.
   --
-  -- Resolve.slotsOf does NOT in fact recover such a nested ref, so no lint sees
-  -- it (#1079). slotsAreExhaustive below reports these arms so the CR 603.3b
-  -- elision cannot rest on the gap.
+  -- Resolve.slotsOf does NOT in fact recover such a nested ref, so inside an
+  -- EFFECT's quantity no lint sees it (#1079). nestedRefs below reports these
+  -- arms, which is what Resolve.targetSlotSlots reads for a CR 202.3 computed
+  -- bound and what slotsAreExhaustive reads so the CR 603.3b elision cannot rest
+  -- on the gap.
   Quantity.ManaCount _ -> Set.empty
   -- The same position a third time: this arm's PlayerRef.InSlot names a TARGET
   -- slot, not an amount one.
@@ -1022,59 +1024,87 @@ objectSlots quantity = case quantity of
   -- against the named object and may aim at a further slot of its own.
   Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Set.insert slot (objectSlots inner)
 
--- CR 603.3b: is `slots` above the WHOLE of what evaluating this quantity reads
--- off the resolving object's bindings? It is not wherever a PlayerRef is nested
--- inside one: that names a TARGET slot, which `slots` leaves to
--- Resolve.slotsOf -- and slotsOf cannot see a reference buried in a quantity.
--- Resolve.slotsAreExhaustive is the sole caller and carries the whole account.
+-- Every read of a slot this quantity makes that `slots` above does not report: a
+-- PlayerRef nested inside it, which names a TARGET slot rather than an amount one
+-- and which `slots` leaves to Resolve.slotsOf -- and slotsOf cannot see a
+-- reference buried in a quantity (#1079) -- plus CR 400.7j's Scope.OverBound,
+-- which names a slot outright. `Left` is a reference, whose ARITY only the reader
+-- knows (Resolve.playerRefSlots); `Right` is a slot named directly.
 --
--- One arm per constructor, no wildcard, for that function's reason: a new
--- quantity arm carrying a reference must answer here rather than default to True
--- and license an unsound elision.
-slotsAreExhaustive :: Quantity -> Bool
-slotsAreExhaustive quantity = case quantity of
-  Quantity.Literal _ -> True
-  Quantity.ManaValue -> True
-  Quantity.Power -> True
-  Quantity.Toughness -> True
-  Quantity.InSlot _ -> True
-  Quantity.Star -> True
-  Quantity.Plus (Plus.MkPlus a b) -> slotsAreExhaustive a && slotsAreExhaustive b
+-- Two callers want different halves of it, which is why this is the set of reads
+-- rather than the Bool below: slotsAreExhaustive asks whether any of them names a
+-- slot at all, and Pawl.Engine.Resolve.targetSlotSlots turns them into the slots a
+-- CR 202.3 computed bound reads, so the D4 dataflow lint can see a bound naming a
+-- slot its carrier never binds.
+--
+-- One arm per constructor, no wildcard, for `slots`' reason: a new quantity arm
+-- carrying a reference must answer here rather than default to reading nothing,
+-- which would both hide a dead bound and license an unsound elision.
+nestedRefs :: Quantity -> Set (Either PlayerRef.PlayerRef SlotName)
+nestedRefs quantity = case quantity of
+  Quantity.Literal _ -> Set.empty
+  Quantity.ManaValue -> Set.empty
+  Quantity.Power -> Set.empty
+  Quantity.Toughness -> Set.empty
+  -- The amount reader, which `slots` above reports itself.
+  Quantity.InSlot _ -> Set.empty
+  Quantity.Star -> Set.empty
+  Quantity.Plus (Plus.MkPlus a b) -> Set.union (nestedRefs a) (nestedRefs b)
   -- Plus' answer: the rounding hides no reference, so what the payload hides is
   -- the whole question.
-  Quantity.Halved (Halved.MkHalved _ inner) -> slotsAreExhaustive inner
-  Quantity.Negate a -> slotsAreExhaustive a
-  -- Both halves `slots` skips: the Scope's PlayerRef, and the per-member
-  -- quantity of a Greatest, which may hide one of its own.
-  Quantity.Count c ->
-    scopeIsSlotless (Count.Type.scope c)
-      && not (Count.anyQuantity (not . slotsAreExhaustive) c)
-  Quantity.ManaCount c -> playerRefIsSlotless (ManaCount.Type.player c)
-  Quantity.LifeTotal ref -> playerRefIsSlotless ref
-  Quantity.Speed ref -> playerRefIsSlotless ref
-  Quantity.IsMonarch ref -> playerRefIsSlotless ref
-  Quantity.IsStartingPlayer ref -> playerRefIsSlotless ref
-  Quantity.IsActivePlayer ref -> playerRefIsSlotless ref
-  Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref _) -> playerRefIsSlotless ref
-  Quantity.ObjectCounters _ -> True
-  Quantity.ObjectCountersOfAnyKind -> True
-  Quantity.HasDesignation _ -> True
-  Quantity.ClassLevel -> True
-  Quantity.WasKicked -> True
-  Quantity.SnowWasSpent -> True
-  Quantity.OpponentsAttacked ref -> playerRefIsSlotless ref
-  Quantity.CardsDiscardedThisTurn ref -> playerRefIsSlotless ref
-  Quantity.LifeGainedThisTurn ref -> playerRefIsSlotless ref
-  Quantity.PlayersDealtDamageThisTurn ref -> playerRefIsSlotless ref
-  Quantity.SpellsCastLastTurn ref -> playerRefIsSlotless ref
-  Quantity.DungeonsCompleted ref -> playerRefIsSlotless ref
-  Quantity.EnteredThisTurn -> True
-  Quantity.EnteredFrom inZone -> playerRefIsSlotless (InZone.player inZone)
-  Quantity.WasCastFrom inZone -> playerRefIsSlotless (InZone.player inZone)
-  Quantity.BlockersBeyondFirst -> True
-  -- True because `slots` above DOES report this arm's slot, unlike the nested
-  -- PlayerRefs -- so the reported set is the whole of what evaluating it reads.
-  Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> slotsAreExhaustive inner
+  Quantity.Halved (Halved.MkHalved _ inner) -> nestedRefs inner
+  Quantity.Negate a -> nestedRefs a
+  -- Both halves `slots` skips: the Scope's own read, and the per-member quantity
+  -- of a Greatest, which may hide a reference of its own.
+  Quantity.Count c -> Set.union (scopeRefs (Count.Type.scope c)) (Count.slots nestedRefs c)
+  Quantity.ManaCount c -> Set.singleton (Left (ManaCount.Type.player c))
+  Quantity.LifeTotal ref -> Set.singleton (Left ref)
+  Quantity.Speed ref -> Set.singleton (Left ref)
+  Quantity.IsMonarch ref -> Set.singleton (Left ref)
+  Quantity.IsStartingPlayer ref -> Set.singleton (Left ref)
+  Quantity.IsActivePlayer ref -> Set.singleton (Left ref)
+  Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref _) -> Set.singleton (Left ref)
+  Quantity.ObjectCounters _ -> Set.empty
+  Quantity.ObjectCountersOfAnyKind -> Set.empty
+  Quantity.HasDesignation _ -> Set.empty
+  Quantity.ClassLevel -> Set.empty
+  Quantity.WasKicked -> Set.empty
+  Quantity.SnowWasSpent -> Set.empty
+  Quantity.OpponentsAttacked ref -> Set.singleton (Left ref)
+  Quantity.CardsDiscardedThisTurn ref -> Set.singleton (Left ref)
+  Quantity.LifeGainedThisTurn ref -> Set.singleton (Left ref)
+  Quantity.PlayersDealtDamageThisTurn ref -> Set.singleton (Left ref)
+  Quantity.SpellsCastLastTurn ref -> Set.singleton (Left ref)
+  Quantity.DungeonsCompleted ref -> Set.singleton (Left ref)
+  Quantity.EnteredThisTurn -> Set.empty
+  Quantity.EnteredFrom inZone -> Set.singleton (Left (InZone.player inZone))
+  Quantity.WasCastFrom inZone -> Set.singleton (Left (InZone.player inZone))
+  Quantity.BlockersBeyondFirst -> Set.empty
+  -- Its own slot is left out because `slots` above DOES report it, unlike the
+  -- nested PlayerRefs; the payload is walked like any other.
+  Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> nestedRefs inner
+
+-- A scope's own read. Both scopes that name players take a PlayerRef and CR
+-- 608.2i's look-back names nothing, so the same question as the arms above --
+-- except CR 400.7j's fold, which names a slot rather than a reference.
+--
+-- The OverBound arm's read is PROVEN rather than fenced: Pawl.CardSpec's "the
+-- lint itself catches a computed bound naming a slot through a player" plants a
+-- bound scoped this way and asserts the slot is reported.
+scopeRefs :: Scope.Scope -> Set (Either PlayerRef.PlayerRef SlotName)
+scopeRefs scope = case scope of
+  Scope.InZone (InZone.MkInZone _ ref) -> Set.singleton (Left ref)
+  Scope.InHistory _ -> Set.empty
+  Scope.OverPlayers ref -> Set.singleton (Left ref)
+  Scope.OverBound slot -> Set.singleton (Right slot)
+
+-- CR 603.3b: is `slots` above the WHOLE of what evaluating this quantity reads
+-- off the resolving object's bindings? It is not wherever nestedRefs above finds
+-- a read that names a slot -- a nested PlayerRef that reads one, or a scope that
+-- names one outright. Resolve.slotsAreExhaustive is the sole caller and carries
+-- the whole account.
+slotsAreExhaustive :: Quantity -> Bool
+slotsAreExhaustive = all (either playerRefIsSlotless (const False)) . nestedRefs
 
 -- Only InSlot names a slot; the other three are answered from the evaluation
 -- context alone (Resolve.playerRefSlots says the same thing as a set).
@@ -1270,22 +1300,6 @@ mapScope f scope = case scope of
   -- CR 400.7j's fold names a SLOT rather than a player reference, so there is
   -- nothing here for either baking to rewrite.
   Scope.OverBound _ -> scope
-
--- CR 608.2i's look-back names no player and no slot; a zone scope names whose
--- zone it is, and a player scope names the players themselves -- the same
--- reference either way, so the same question.
-scopeIsSlotless :: Scope.Scope -> Bool
-scopeIsSlotless scope = case scope of
-  Scope.InZone (InZone.MkInZone _ ref) -> playerRefIsSlotless ref
-  Scope.InHistory _ -> True
-  Scope.OverPlayers ref -> playerRefIsSlotless ref
-  -- False for PlayerRef.InSlot's reason, one position over: this arm reads a
-  -- slot and `slots` above does not report it, so the reported set is not the
-  -- whole of what evaluating the count reads (#1079). Stated from the rule
-  -- rather than from a test: answering True leaves the suite green, CR 603.3b's
-  -- elision being a trigger-ordering question that nothing in data/cards/ writing
-  -- this scope on a TRIGGERED ability could reach.
-  Scope.OverBound _ -> False
 
 -- Does this quantity read CR 601.2b's announced X? Since #14 retired X's
 -- dedicated constructor, that read is a Quantity.InSlot naming
