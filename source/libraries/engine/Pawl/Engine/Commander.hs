@@ -23,14 +23,14 @@
 --     (#940) -- both are deck-legality rules, and pawl validates no deck.
 --   * Two commanders via partner or a background (#939).
 --   * The Brawl and Oathbreaker variants (CR 903.12 and beyond).
---   * CR 903.9b's "may apply more than once to the same event" (#2264) and CR
---     903.9c's melded or merged commander (#2265).
 module Pawl.Engine.Commander where
 
+import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Game as Game
@@ -64,6 +64,12 @@ designate pid printingId gs =
 -- card from the deck its owner brought -- a stolen commander is still its owner's
 -- commander, which is also what makes CR 903.9 send it to its owner's command
 -- zone rather than the thief's.
+isCommander :: ObjectId -> GameState -> Bool
+isCommander oid gs = Maybe.isJust (commanderPrintingOf oid gs)
+
+-- | CR 903.3's designation, read off whichever card represents this object: the
+-- printing of the owner's commander when one of them is it, and Nothing
+-- otherwise.
 --
 -- Matches on the PRINTING ID, which is exact under CR 903.5's singleton rule and
 -- is the only thing that survives CR 400.7's fresh id. Setup.createDeck is what
@@ -71,27 +77,43 @@ designate pid printingId gs =
 -- the designation and the object name the same entry. Pawl does not enforce rule
 -- 903.5 (#940), so a deck holding two copies of its commander would have both
 -- answer True here.
-isCommander :: ObjectId -> GameState -> Bool
-isCommander oid gs = case Game.lookupObject oid gs of
-  Nothing -> False
-  Just obj -> case Object.source obj of
-    Source.OfCard printingId ->
-      fmap Player.commander (Map.lookup (Object.owner obj) (GameState.players gs)) == Just (Just printingId)
-    -- False for a MELDED PERMANENT, which is conservative rather than a reading
-    -- of CR 903.3: that rule makes the designation an attribute of the CARD, and
-    -- CR 903.9c speaks of "a commander [that] is a melded permanent" in as many
-    -- words, so the rules do call such a permanent a commander. The one road
-    -- this answer feeds that would then misfire is CR 903.9b's offer below,
-    -- which redirects the whole object -- and CR 903.9c replaces that procedure
-    -- for a melded permanent with one that splits the components. False keeps
-    -- the wrong procedure from running until the right one exists (#2265).
-    --
-    -- The graveyard-and-exile road needs nothing from this arm, and that is why
-    -- the conservative answer costs nothing there: CR 712.21's departure split
-    -- (Pawl.Engine.Event) has already put each component into the zone as its own
-    -- Source.OfCard object by the time `returnable` below asks, so rule 903.9a is
-    -- applied to CARDS and the arm above answers for them.
-    _ -> False
+--
+-- CARDS in the plural, which is CR 903.9c: "if a commander is a melded permanent
+-- or a merged permanent" -- so the rules do call such a permanent a commander,
+-- and the designation sits on one of the cards representing it rather than on
+-- the permanent. Game.componentsOf is the plural read, a classifier over Source
+-- and never a case on Source.OfMeld, so CR 730.3's merged permanent (#874)
+-- arrives through the same door.
+--
+-- What this answers FOR a melded permanent is the component card, which is
+-- exactly what CR 903.9c's procedure needs to single out -- see
+-- `commandZoneComponent`. Every other reader wants the Bool: rule 903.10a's
+-- tally (`commanderOwnerOf`) counts a melded commander's combat damage, and rule
+-- 903.8's cast permission cannot be reached by one, since no melded permanent is
+-- ever in the command zone to be cast from.
+commanderPrintingOf :: ObjectId -> GameState -> Maybe PrintingId.PrintingId
+commanderPrintingOf oid gs = do
+  obj <- Game.lookupObject oid gs
+  designated <- Player.commander =<< Map.lookup (Object.owner obj) (GameState.players gs)
+  let cards = case Object.source obj of
+        Source.OfCard printingId -> Seq.singleton printingId
+        source -> Game.componentsOf source
+  Monad.guard (elem designated cards)
+  pure designated
+
+-- | CR 903.9c: the one card of a melded or merged permanent that goes to the
+-- command zone when its owner accepts CR 903.9b's offer -- "the card that
+-- represents it and is a commander" -- or Nothing when the object is a single
+-- card and the whole of it moves instead.
+--
+-- Gated on the object HAVING components rather than on `commanderPrintingOf`
+-- alone: an ordinary commander card is its own designation, and rule 903.9c's
+-- split has nothing to divide there.
+commandZoneComponent :: ObjectId -> GameState -> Maybe PrintingId.PrintingId
+commandZoneComponent oid gs = do
+  obj <- Game.lookupObject oid gs
+  Monad.guard (not (Seq.null (Game.componentsOf (Object.source obj))))
+  commanderPrintingOf oid gs
 
 -- | CR 903.10a's key: the owner of the commander that dealt this damage, or
 -- Nothing when the source was not a commander at all.
@@ -194,7 +216,7 @@ taxCandidates pid oid gs cost =
 --
 -- Moved.arrivals and not ZoneChange.object alone, which is CR 903.9a read over
 -- CR 712.21's split rather than CR 903.9c: rule 903.9c governs only the CR 903.9b
--- replacement (#2265), while this is the state-based action, and a melded
+-- replacement, while this is the state-based action, and a melded
 -- permanent's departure puts TWO cards into the graveyard or exile. Rule 903.9a
 -- asks its question of each object in that zone, so each arrival is asked, and the
 -- one that is a commander may be either of them. Reading the first alone would
@@ -243,9 +265,17 @@ returnable events gs =
 -- object headed for any hand or library goes to its OWNER's, so every move this
 -- admits is already the rule's.
 --
--- Not implemented: rule 903.9b's "may apply more than once to the same event",
--- which is its named exception to CR 614.5 (#2264); CR 903.9c's melded or merged
--- commander (#2265); and a place for the offer in the CR 616.1 ordering, where CR
+-- CR 903.9b's "may apply more than once to the same event", its named exception
+-- to CR 614.5, needs nothing here: this is asked once per proposed zone change,
+-- and CR 608.2f's batch reaches the funnel one member at a time, so a spell
+-- returning two commanders in one event puts the question to each owner.
+-- Pawl.CommanderSpec's "the offer applies once per commander in the same event"
+-- is the proof, over Evacuation.
+--
+-- CR 903.9c's melded or merged commander is the ANSWER's other shape rather than
+-- a second question, and Pawl.Engine.Event.offerCommandZone is where it is read.
+--
+-- Not implemented: a place for the offer in the CR 616.1 ordering, where CR
 -- 616.1e leaves the affected player free to pick among applicable effects (#2266).
 commandZoneOffer :: ZoneChange.ZoneChange -> GameState -> Maybe PlayerId
 commandZoneOffer zc gs
