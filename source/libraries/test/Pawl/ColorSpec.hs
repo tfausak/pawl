@@ -138,6 +138,22 @@ aimAtObject oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
   _ -> S.identityAnswer p
 
+-- aimAtObject for a Pool.Creatures slot, whose recipients are ToCreature rather
+-- than ToObject. ProjectionSpec.aimAtCreature's shape, duplicated per this
+-- suite's group-local-helper convention.
+aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtCreature oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
+  _ -> S.identityAnswer p
+
+-- Put a one-target creature spell into alice's hand, cast it AT `victimId`, and
+-- resolve it. `board` must already hold enough untapped lands for the cost.
+castAtCreature :: ObjectId.ObjectId -> Printing.Printing -> GameState.GameState -> GameState.GameState
+castAtCreature victimId printing board =
+  let (gs, spellId) = S.handOne printing board
+      cast = snd (Engine.runGamePure (aimAtCreature victimId) gs (S.cast S.alice spellId))
+   in snd (Engine.runGamePure (aimAtCreature victimId) cast Stack.resolveTop)
+
 -- Casts Red Elemental Blast: chooses mode `idx` at CR 700.2's mode prompt and
 -- aims every target slot at `oid` -- both of the card's pools (Pool.Spells and
 -- Pool.Permanents) answer with ToObject. ModalSpec.chooseModeAt's shape,
@@ -576,6 +592,40 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         gs = snd (Engine.runGamePure choosingBlue cast Stack.resolveTop)
     Spec.assertEqWith s "colourless before the Servant resolves" (Projection.colorsOf droneId withSliv) Set.empty
     Spec.assertEqWith s "blue after it does" (Projection.colorsOf droneId gs) $ Set.singleton Color.Blue
+
+  -- THE THIRD ROUTE INTO DEVOID. A keyword a RESOLUTION grants is stored as a
+  -- continuous effect (CR 611.2c) rather than re-derived from a static ability,
+  -- and the colour half has to come with it: CR 604.3a(2) denies the granted
+  -- instance CDA status, so it is an ordinary layer-5 effect (CR 613.1e) stamped
+  -- at creation (CR 613.7b).
+  --
+  -- Synthetic Colorless Blessing ("target creature gains devoid until end of
+  -- turn") is the producer. No printing reaches this arm: Scryfall
+  -- `o:devoid -keyword:devoid include:extras`, 2026-08-31, returns Corrupted
+  -- Crossroads (a mana restriction), Slivdrazi Monstrosity (the STATIC grant the
+  -- case above uses) and Oddric, Lunar Marquis alone. Oddric does grant devoid by
+  -- a triggered ability's resolution, but its one sentence also grants banding,
+  -- flanking, horsemanship, ingest and tantrum, which Pawl.Types.Keyword cannot
+  -- name, each under its own intervening condition -- transcribing it would leave
+  -- pawl's card weaker than printed.
+  --
+  -- Bad Moon is the READER: its affected set is "black creatures", asked at layer
+  -- 7c against a projection that has already applied layer 5, so the Rats' power
+  -- is what says whether the colour half arrived. 2 and 1 are distinct on
+  -- purpose; a grant that changes no colour leaves 2.
+  Spec.it s "CR 702.114a devoid granted by a RESOLUTION makes the creature colourless" $ do
+    island <- S.printingOf s registry "Island"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
+    blessing <- S.printingOf s registry "Synthetic Colorless Blessing"
+    let (_, withMoon) = S.addCreature badMoon S.alice (S.landsInPlay island 2)
+        (ratsId, before) = S.addCreature typhoidRats S.alice withMoon
+        after = castAtCreature ratsId blessing before
+    Spec.assertEqWith s "Bad Moon pumps the black 1/1 before the spell resolves" (Projection.powerOf ratsId before) $ Just 2
+    Spec.assertEqWith s "and stops once the granted devoid has cleared the black" (Projection.powerOf ratsId after) $ Just 1
+    Spec.assertEqWith s "black before" (Projection.colorsOf ratsId before) $ Set.singleton Color.Black
+    Spec.assertEqWith s "colourless after" (Projection.colorsOf ratsId after) Set.empty
+    Spec.assertBool s (Projection.hasKeyword Keyword.Devoid ratsId after) "and the keyword itself is there (CR 613.1f layer 6)"
 
   Spec.it s "CR 613.3 devoid beats an OLDER layer-5 'in addition' effect" $ do
     -- THE GATE. Painter's Servant is cast and resolves FIRST, naming blue as it
