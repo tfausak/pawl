@@ -12,20 +12,13 @@ module Pawl.Types.ConjureDestination where
 -- exhaustive case over the seven would be answering about zones no printing
 -- reaches.
 --
--- Not implemented: a graveyard (Shellfish Scholar\'s "conjure a card named Think
--- Twice into your graveyard") and the battlefield (Gilt-Leaf Alchemist\'s
--- "conjure a card named Forest onto the battlefield"), which is the expensive one
--- -- that arrival is an ENTRY and wants CR 614's replacements and CR 603's
--- triggers, where a hand, library or exile arrival is no zone change at all
--- (#2638).
---
 -- Not implemented: exile (Dazzling Flameweaver\'s "conjure a random card from
 -- Dazzling Flameweaver\'s spellbook into exile", Gyox, Brutal Carnivora\'s
 -- "conjure X duplicates of it into exile"), which is an axis of its own rather
--- than a third zone on the line above -- Scryfall @o:conjure o:exile@,
+-- than a fifth arm nothing else was waiting on -- Scryfall @o:conjure o:exile@,
 -- 2026-08-29, five printings name this destination and not one of them names the
--- card it conjures, so each is held out by #2643 as well and the arm above
--- landing would leave this one still unreachable (#2653).
+-- card it conjures, so each is held out by #2643 as well and no board reaches
+-- such an arm (#2653).
 data ConjureDestination
   = -- | Emporium Thopterist\'s "conjure a card named Ornithopter into your
     -- hand".
@@ -51,4 +44,21 @@ data ConjureDestination
     -- immediately, which makes the end unobservable there. Pampered Loamfrill is
     -- the one that would OBSERVE it, since it never shuffles (#2638).
     Library
+  | -- | Shellfish Scholar\'s "conjure a card named Think Twice into your
+    -- graveyard" (CR 404.1).
+    Graveyard
+  | -- | Grave Studies\' "conjure a card named Teacher\'s Pest onto the
+    -- battlefield" (CR 403.1).
+    --
+    -- The only arm that is an ENTRY: the other three put the card into a zone
+    -- and stop, where this one wants CR 616.1's entry loop and the CR 603.6a
+    -- trigger scan, so Pawl.Engine.Event.conjureOntoBattlefield is a road of its
+    -- own rather than a third argument to Pawl.Engine.Event.conjure.
+    --
+    -- Not implemented: a STATED status. The arrival is untapped and out of
+    -- combat, which is CR 110.5b's default and what this arm\'s producer prints,
+    -- but several printings state otherwise and this arm cannot carry it --
+    -- Thendar, the Overminer\'s "onto the battlefield tapped" and Kari Zev, Crew
+    -- of Two\'s "onto the battlefield tapped and attacking" (#2638).
+    Battlefield
   deriving (Bounded, Enum, Eq, Ord, Show)
