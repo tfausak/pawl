@@ -2145,7 +2145,7 @@ statesAQuality predicate = case predicate of
 -- them and `renameBound` REWRITES them. One walk rather than two, because the two
 -- consumers disagreeing about which atoms name a slot is a live defect shape --
 -- CR 700.2d's per-occurrence rename skipped every atom here while the lint below
--- reported them (#2802).
+-- reported them; see #2802.
 --
 -- The same descent `bakeBound` makes, and deliberately so: a position that
 -- function does not bake is a position this one must not report as read, or the

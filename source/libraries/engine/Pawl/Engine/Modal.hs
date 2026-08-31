@@ -188,7 +188,7 @@ instanceTargetSlots mi m = maybe Map.empty (modeInstanceTargetSlots mi) (modeAtI
 -- index, which is what CR 608.2b's re-check holds: Pawl.Engine.Resolve walks the
 -- chosen modes themselves. ONE builder, because the announcement's map and the
 -- re-check's map disagreeing about which slot belongs to which occurrence is
--- exactly the defect (#2806).
+-- exactly the defect; see #2806.
 modeInstanceTargetSlots :: ModeInstance.ModeInstance -> Mode.Mode card ability -> Map SlotName TargetSlot
 modeInstanceTargetSlots mi mode = Map.mapKeys (instanceSlot mi) (fmap (instanceScope mi) (Mode.targetSlots mode))
 

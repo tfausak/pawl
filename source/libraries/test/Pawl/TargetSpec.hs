@@ -1741,7 +1741,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- CR 700.2d one object type over: the case above is a SPELL, and an activated
   -- ability re-checks CR 608.2b's targets down a second path of its own
   -- (Pawl.Engine.Resolve.resolveModesWith), which built that map without the
-  -- per-occurrence rename the announcement had made (#2806). The announcement is
+  -- per-occurrence rename the announcement had made; see #2806. The announcement is
   -- not what is under test -- Pawl.Engine.Activate goes through
   -- Modal.modesTargetSlots and always renamed -- so the ability reaches the stack
   -- either way, and what CR 608.2b decides is whether occurrence 1's card is
