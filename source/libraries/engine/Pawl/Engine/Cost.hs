@@ -1015,8 +1015,10 @@ zoneOfComponent component = case component of
   CostComponent.TapForTotalPower {} -> Nothing
   CostComponent.TapPermanents {} -> Nothing
   -- Nothing, and NOT Just Zone.Battlefield: CR 113.6m is about an ability that
-  -- moves THE OBJECT IT'S ON, and these move OTHER permanents or cards.
+  -- moves THE OBJECT IT'S ON, and this moves OTHER permanents.
   CostComponent.ReturnPermanents {} -> Nothing
+  -- Nothing, and NOT Just Zone.Graveyard: rule 113.6m again, and these move
+  -- OTHER cards.
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.DiscardCards {} -> Nothing

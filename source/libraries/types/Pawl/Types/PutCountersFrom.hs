@@ -10,16 +10,19 @@ import qualified Pawl.Types.SlotName as SlotName
 -- NO QUANTITY, where Pawl.Types.PutCounters carries one: rule 122.8 names no
 -- count at all -- "the same number of each kind of counter the first object
 -- had" -- so what crosses is a per-kind tally, which no Quantity can spell.
--- `kind` is the one thing the card may settle, rule 122.8's second sentence:
+-- `kind` is the one thing the card may settle, rule 122.8's third sentence:
 -- 'Nothing' is Iron Apprentice's "put those counters", every kind the first
 -- object had, and 'Just' is Selfless Police Captain's "put its +1\/+1
 -- counters", that kind's tally alone.
 --
 -- One kind and not a set, though the rule says "kind(s)": no printing names two.
--- Scryfall @oracle:\/put (its|those) [^ ]+ counters\/@ with
--- @unique=cards&include_extras=true@, 2026-08-31, returns Selfless Police
--- Captain and Joraga Peach, each naming +1\/+1 alone. A printing saying "put its
--- +1\/+1 and shield counters on target creature" would refute that.
+-- Scryfall @oracle:\/put (its|those)[^.]*counters on\/@ with
+-- @unique=cards&include_extras=true@, 2026-08-31: of everything it returns, only
+-- Selfless Police Captain ("put its +1\/+1 counters on") and Joraga Peach ("Put
+-- its +1\/+1 counters onto") name a kind at all, and each names one. A printing
+-- saying "put its +1\/+1 and shield counters on target creature" would refute
+-- that, and this query would find it -- a @[^ ]+@ one would not, that class
+-- reaching a single token where the refuting text spans three.
 --
 -- NOT Pawl.Types.MoveCounters with MovedKinds.Every or MovedKinds.EveryOfKind,
 -- though the printed text reads like one: rule 122.8 says in as many words that
