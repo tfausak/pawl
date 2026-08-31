@@ -2043,7 +2043,9 @@ representativeEvents cond =
         TriggerCondition.SelfLeavesTheBattlefield ->
           moved Zone.Battlefield Zone.Graveyard NonEmpty.:| [moved Zone.Battlefield Zone.Hand, GameEvent.LeftTheGame departed]
         -- The bystander reading of the arm above, whose three events are the same
-        -- three and whose floor is empty for the same two reasons.
+        -- three. Its CR 400.7e arrival is withheld for the same two reasons, but
+        -- the floor is NOT empty: CR 603.10a's departed permanent is bound by
+        -- every one of the three, which is what these events pin.
         TriggerCondition.PermanentLeavesTheBattlefield _ ->
           moved Zone.Battlefield Zone.Graveyard NonEmpty.:| [moved Zone.Battlefield Zone.Hand, GameEvent.LeftTheGame departed]
         -- SelfDies' event, since CR 700.4 is the same word: the haunted creature

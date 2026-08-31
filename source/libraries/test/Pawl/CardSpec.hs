@@ -2763,6 +2763,7 @@ reservedSlots =
       Binding.gatePlayers,
       Binding.mayPlayers,
       Binding.became,
+      Binding.departedPermanent,
       Binding.eventAmount,
       Binding.sacrificedCount,
       Binding.sacrificedPermanent,

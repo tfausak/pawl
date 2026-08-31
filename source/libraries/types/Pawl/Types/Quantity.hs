@@ -319,10 +319,10 @@ data Quantity
     ObjectCounters (CounterKind.CounterKind Keyword.Keyword)
   | -- | CR 122.1: how many counters of EVERY kind are on the OBJECT this quantity
     -- is evaluated against, summed -- Savanti Romero, Time's Exile's "where X is
-    -- the number of counters on Savanti Romero". Angelic Sleuth's "if it had
-    -- counters on it" is the same sum read as a Boolean, and is a different
-    -- card's whole question; what keeps that one out of the pool is not this arm
-    -- but the missing binding for the permanent that left (#2347).
+    -- the number of counters on Savanti Romero". Resourceful Defense's "if it had
+    -- counters on it" is the same sum read as a Boolean, aimed by an AgainstSlot
+    -- at Pawl.Engine.Binding's departedPermanent; Angelic Sleuth wants that and
+    -- nothing else and is still unwritten (#2347).
     --
     -- ObjectCounters above in every respect but the kind: the same object (the one
     -- the evaluation is aimed at), the same injected ViewOf, and so the same CR

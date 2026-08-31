@@ -3810,24 +3810,32 @@ slotGroups :: ObjectId -> GameState -> Map.Map SlotName (Seq.Seq ObjectId)
 slotGroups resolving gs = Binding.groupsOf (maybe Map.empty Object.bindings (Game.lookupObject resolving gs))
 
 -- CR 608.2h's reader for one resolution: Projection.viewWithLastKnown, which
--- answers the SOURCE off its last known information, widened to the permanent a
--- COST payment sacrificed (Binding.sacrificedPermanent).
+-- answers the SOURCE off its last known information, widened to two reserved
+-- slots whose object is gone by construction.
 --
--- That slot's object is gone by construction -- CR 601.2h paid the cost before
--- the ability was on the stack at all, and CR 701.21a put the permanent in a
+-- Binding.sacrificedPermanent is the first -- CR 601.2h paid the cost before the
+-- ability was on the stack at all, and CR 701.21a put the permanent in a
 -- graveyard as a new object (CR 400.7) -- so viewWithLastKnown's blank answer for
 -- a non-source object would leave Jarad, Golgari Lich Lord's "the sacrificed
 -- creature's power" permanently unanswerable.
 --
+-- Binding.departedPermanent is the second, and CR 603.10a is why: what a
+-- leaves-the-battlefield trigger says "it" about is the permanent as it last
+-- existed on the battlefield, which CR 400.7 has already deleted by the time the
+-- ability resolves. Resourceful Defense's "put those counters" reads its whole CR
+-- 122.8 tally through here.
+--
 -- The blank is still right for every OTHER non-source id, and that is why this
--- names one slot rather than lifting the scope: those ids are TARGETS, and CR
--- 608.2b wants a target that has left to answer with nothing. A slot the payment
--- defined was never a target (CR 115.10a).
+-- names two slots rather than lifting the scope: those ids are TARGETS, and CR
+-- 608.2b wants a target that has left to answer with nothing. Neither slot here
+-- was ever a target (CR 115.10a).
 effectViewOf :: ObjectId -> Map.Map SlotName (Set Recipient) -> GameState -> ObjectId -> Maybe Filter.View
 effectViewOf source legal gs oid =
-  if Map.lookup Binding.sacrificedPermanent (effectSlotObjects legal) == Just oid
-    then Projection.viewWithLastKnownAnywhere gs oid
-    else Projection.viewWithLastKnown source gs oid
+  let slots = effectSlotObjects legal
+      lookBack slot = Map.lookup slot slots == Just oid
+   in if lookBack Binding.sacrificedPermanent || lookBack Binding.departedPermanent
+        then Projection.viewWithLastKnownAnywhere gs oid
+        else Projection.viewWithLastKnown source gs oid
 
 -- The amount ONE RECIPIENT of a per-player instruction reads, which need not be
 -- the amount the rest of the table reads (Stronghold Discipline). Every opcode
@@ -7253,13 +7261,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- The tally comes off the VIEW rather than off Object.counters, which is what
     -- makes CR 608.2h answer it: `effectViewOf` hands the resolving SOURCE its
     -- last known information, and Iron Apprentice's "when this creature dies" is
-    -- read off the source itself.
-    --
-    -- Not implemented: a `from` slot naming some OTHER object that has left reads
-    -- an empty tally, since CR 608.2b wants a gone target blank and no reserved
-    -- slot names a departing bystander yet -- Resourceful Defense's "whenever a
-    -- permanent you control leaves the battlefield" is the shape that needs one
-    -- (#2694).
+    -- read off the source itself. A `from` slot naming a departing BYSTANDER is
+    -- Binding.departedPermanent, the other id effectViewOf looks back for --
+    -- Resourceful Defense's "whenever a permanent you control leaves the
+    -- battlefield", proved in Pawl.PutCounterSpec.
     let viewOf = effectViewOf source legal gs
         -- CR 608.2c: the set is swept as this instruction is reached, and an
         -- illegal slot (CR 608.2b) or a player recipient answers with nobody.
