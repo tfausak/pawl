@@ -164,7 +164,8 @@ data Filter keyword
     -- (ControlledByBound, IsBound) carry for that reason.
     --
     -- EXACT equality, not a bound: the printed clause names a power rather than a
-    -- ceiling, and no printing asks for an inequality against a bound amount.
+    -- ceiling. Widening to an inequality is what a card asking for one would
+    -- earn, ManaValueAtMostAmount's own reason turned around.
     --
     -- Pawl.Engine.Filter.Context's boundAmounts is where the number arrives,
     -- filled for an effect's sweep by Pawl.Engine.Resolve.effectContext.
@@ -179,8 +180,8 @@ data Filter keyword
     -- may reach. Nothing in the pool asks for a mana value floor, and an unused
     -- arm is the speculative construction the project forbids.
     --
-    -- Answerable OFF the battlefield, as the two power atoms above are and for
-    -- the same reason: rule 202.3 reads the printed mana cost, which exists in
+    -- Answerable OFF the battlefield, as the two literal power atoms above are
+    -- and for the same reason: rule 202.3 reads the printed mana cost, which exists in
     -- every zone, and the graveyard is where the card asking is looking (CR 115.2's
     -- other zone half, via Pool.CardsInGraveyard). No Modification writes a mana
     -- cost, so there is nothing projected to read instead.

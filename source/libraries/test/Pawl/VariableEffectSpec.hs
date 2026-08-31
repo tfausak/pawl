@@ -1900,10 +1900,13 @@ harnessedBoard s registry = do
 -- gains indestructible until end of turn. / Destroy all creatures." Name, cost,
 -- type line and oracle text checked against Scryfall 2026-08-31.
 --
--- WHY THIS CARD of the three that print the clause: Aether Refinery and Pia
--- Nalaar, Chief Mechanic read the amount into an X/X token's power, which is CR
--- 111.3's defined characteristic value and which no card in the pool reaches yet
--- -- Miming Slime's is a board tally rather than a binding.
+-- WHY THIS CARD of the five printings (Scryfall o:"one or more {E}",
+-- 2026-08-31): Aether Refinery and Pia Nalaar, Chief Mechanic read the amount
+-- into an X/X token's power, CR 111.3's defined characteristic value, which no
+-- card in data/cards/ reaches -- Miming Slime's X is a board tally rather than a
+-- binding (gap #2813). Territorial Aetherkite's rider is CR 603.12's "when you do" rather
+-- than CR 118.12's, and Rampaging Aetherhood's energy GAIN is a quantity of its
+-- own.
 localizedDestructionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 localizedDestructionSpec s registry =
   Spec.describe s "Localized Destruction (CR 118.12)" $ do

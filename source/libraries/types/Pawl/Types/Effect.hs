@@ -773,12 +773,13 @@ data Effect card ability
     --
     -- "You may pay ONE OR MORE {E}" is this opcode too (Localized Destruction),
     -- and its floor of 1 is not a second capability. Every printing of that
-    -- clause hangs a CR 118.12 branch off it that reads "one or more paid", so
-    -- decline-or-1..N and 0..N offer the same answers and take the branch on the
-    -- same ones -- Scryfall o:"{E}" o:"paid this way", 2026-08-31, seven cards,
-    -- none reading the payment any other way. Vault 112: Sadistic Simulation
-    -- prints the two spellings side by side, "Pay any amount of {E}. If you paid
-    -- one or more {E} this way".
+    -- clause hangs a branch off it keyed on "one or more paid" -- CR 118.12's
+    -- "if you do" on four of the five, CR 603.12's "when you do" on Territorial
+    -- Aetherkite -- so decline-or-1..N and 0..N offer the same answers and take
+    -- the branch on the same ones. Vault 112: Sadistic Simulation prints the two
+    -- spellings side by side, "Pay any amount of {E}. If you paid one or more
+    -- {E} this way". Scryfall o:"one or more {E}", 2026-08-31, eleven cards, of
+    -- which five print the clause and none reads the payment any other way.
     --
     -- That branch is a CLAUSE rider rather than anything here: the condition
     -- Quantity.InSlot >= 1 over the slot below, which is how the corpus already

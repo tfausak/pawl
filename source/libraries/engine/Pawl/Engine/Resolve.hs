@@ -2261,11 +2261,12 @@ recordTaken admitted cIdx ran = if admitted then Set.insert cIdx ran else ran
 -- 608.2b's surviving ones -- a target THIS resolution moved is not one that
 -- became illegal before it.
 --
--- The GROUP bindings come in beside them, from the same live read the caller
--- takes the chosen slots off, so a gate can ask after a batch an earlier clause
--- named (CR 115.10a). Under the printed slot names, which is how every other
--- group read is written (slotBindings) and unlike the chosen map, which the caller
--- has projected into CR 700.2d's mode instance.
+-- The resolving object's WHOLE binding map comes in beside them, from the same
+-- live read the caller takes the chosen slots off, so a gate can ask after a
+-- batch an earlier clause named (CR 115.10a) and after an amount an earlier
+-- clause stamped. Under the printed slot names, which is how every other live
+-- read is written (slotBindings) and unlike the chosen map, which the caller has
+-- projected into CR 700.2d's mode instance.
 gateHolds :: PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName Binding.Type.Binding -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game Bool
 gateHolds controller source chosen bindings clause = case Clause.condition clause of
   Nothing -> pure True
@@ -3780,6 +3781,10 @@ referentsOfBindings bindings =
 -- read live off the resolving object (slotBindings) instead. It reaches
 -- Filter.IsBound whole, and the singular readers decline it
 -- (Filter.slotOneObject).
+--
+-- The AMOUNTS ride the same live read, which is why the parameter is the whole
+-- binding map rather than the groups alone: a number an earlier clause stamped
+-- (bindAmountSlot) is on the resolving object exactly as a group is.
 effectContext :: PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName Binding.Type.Binding -> Filter.Context
 effectContext controller source legal bindings =
   (Filter.contextWithSlots (Just controller) (Just source) (Binding.withGroups (effectSlotObjects legal) (Binding.groupsOf bindings)))
