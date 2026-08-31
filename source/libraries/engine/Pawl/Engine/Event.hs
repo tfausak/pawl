@@ -11220,15 +11220,17 @@ eventBindings bearerBecame cond event = case (cond, event) of
 -- ahead of the recipient path for ObjectRef.InSlot.
 --
 -- The shape is conditional because the two readers are: an ObjectRef reads
--- either, while a bare SlotName (Effect.MoveCounters' `to`, Effect.ExileHaunting's
--- `card`, Pawl.Engine.Resolve's legalOne) reads only the recipient. Every
+-- either, while a bare SlotName (Effect.ExileHaunting's `card`,
+-- Pawl.Engine.Resolve's legalOne) reads only the recipient. Every
 -- condition that can carry a split is a battlefield DEPARTURE -- CR 712.21's own
 -- scope -- and the pool's three readers under those (Promise of Tomorrow, Yedora
 -- Grave Gardener and Endless Cockroaches, all under SelfDies or PermanentDies)
 -- spend the slot as an ObjectRef, so the group reaches every one of them.
 --
--- Two bare-SlotName readers exist and neither is reachable. Agent's Toolkit and
--- Unstable Shapeshifter hang on PermanentEnters, which cannot split. Rule
+-- Two bare-SlotName readers exist and neither is reachable. Unstable
+-- Shapeshifter hangs on PermanentEnters, which cannot split -- Agent's Toolkit
+-- hangs there too and is no longer one of these at all, CR 122.5's destination
+-- having become an ObjectRef. Rule
 -- 702.55a's haunt ability (Pawl.Engine.Keyword) hands Binding.became to
 -- Effect.ExileHaunting under SelfDies, which CAN split -- but haunt is granted by
 -- no card and printed on neither half of the pool's one meld pair, so no board

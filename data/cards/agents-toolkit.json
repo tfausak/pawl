@@ -164,7 +164,10 @@
                             "type": "InSlot",
                             "value": "self"
                           },
-                          "to": "became"
+                          "to": {
+                            "type": "InSlot",
+                            "value": "became"
+                          }
                         }
                       }
                     ],

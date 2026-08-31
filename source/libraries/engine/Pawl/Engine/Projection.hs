@@ -2325,15 +2325,16 @@ rewriteEffect pairs effect = case effect of
   -- ObjectRef is the one place a subtype word can hide.
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from ref) ->
     Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from (rewriteObjectRef pairs ref))
-  -- BOTH the first side's ref and the count. Filter.rewrite renames no slot, so
-  -- neither bare slot is rewritten, but the ref carries Spike Cannibal's "all
-  -- creatures" and a subtype word there is as changeable as any other (CR 612.1);
+  -- BOTH refs and the count. Filter.rewrite renames no slot, so the bound slot is
+  -- not rewritten, but either ref may carry a filter -- Spike Cannibal's "all
+  -- creatures" on the first side, Forgotten Ancient's "other creatures" on the
+  -- second -- and a subtype word there is as changeable as any other (CR 612.1);
   -- the count is a Quantity and goes through rewriteMovedKinds, PutCounters' case
   -- above.
   -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
   -- printed keyword through the swap, PutCounters' case above (#1840).
   Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds slot to) ->
-    Effect.MoveCounters (MoveCounters.MkMoveCounters (rewriteObjectRef pairs from) (rewriteMovedKinds pairs kinds) slot to)
+    Effect.MoveCounters (MoveCounters.MkMoveCounters (rewriteObjectRef pairs from) (rewriteMovedKinds pairs kinds) slot (rewriteObjectRef pairs to))
   -- A player counter kind is a closed list (CR 122.1f, CR 122.1i, CR 107.14, and
   -- CR 122.1's bare first sentence) with no subtype word in it, so only the count
   -- descends.
@@ -2986,6 +2987,7 @@ rewriteMovedKinds pairs kinds = case kinds of
   MovedKinds.EveryOfKind _ -> kinds
   MovedKinds.Chosen quantity -> MovedKinds.Chosen (rewriteQuantity pairs quantity)
   MovedKinds.AnyNumber -> kinds
+  MovedKinds.AtLeastOne -> kinds
   MovedKinds.AnyNumberOfKind _ -> kinds
   MovedKinds.EachAbsentKind -> kinds
   MovedKinds.UpToOneChosen -> kinds

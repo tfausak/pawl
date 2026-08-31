@@ -539,7 +539,7 @@ objectRefPositions =
     ("redirect-damage", Effect.RedirectDamage (RedirectDamage.MkRedirectDamage Duration.UntilEndOfTurn Nothing (plantedRef "rd-from") (plantedRef "rd-to") Nothing), [plantedRef "rd-from", plantedRef "rd-to"]),
     ("counter", Effect.Counter (Counter.MkCounter (plantedRef "co") Nothing), [plantedRef "co"]),
     ("put-counters", Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) (plantedRef "pc")), [plantedRef "pc"]),
-    ("move-counters", Effect.MoveCounters (MoveCounters.MkMoveCounters (plantedRef "mc") MovedKinds.Every Nothing (SlotName.MkSlotName (Text.pack "taker"))), [plantedRef "mc"]),
+    ("move-counters", Effect.MoveCounters (MoveCounters.MkMoveCounters (plantedRef "mc-from") MovedKinds.Every Nothing (plantedRef "mc-to")), [plantedRef "mc-from", plantedRef "mc-to"]),
     ("put-counters-from", Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom (SlotName.MkSlotName (Text.pack "giver")) (plantedRef "pf")), [plantedRef "pf"]),
     ("tap", Effect.Tap (plantedRef "ta"), [plantedRef "ta"]),
     ("untap", Effect.Untap (plantedRef "un"), [plantedRef "un"]),
@@ -5129,12 +5129,13 @@ effectFilters effect = case effect of
   -- The destination only, PutCounters' framing: `from` is a bare SlotName and
   -- carries no Filter.
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ ref) -> frame SourceHostFramed (objectRefFilters ref)
-  -- THREE positions, PutCounters' framing: the first side is an ObjectRef and
-  -- carries Spike Cannibal's "all creatures", where the destination is a bare
-  -- SlotName and carries no Filter. The moved kinds hold both of the others --
-  -- a count under the two arms that write one (MovedKinds.quantityOf) and CR
-  -- 122.1b's kind under the three that name one (MovedKinds.kindOf); see #2728.
-  Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds _ _) -> frame Unframed (foldMap counterKindFilters (MovedKinds.kindOf kinds) <> foldMap quantityFilters (MovedKinds.quantityOf kinds)) <> frame SourceHostFramed (objectRefFilters from)
+  -- FOUR positions, PutCounters' framing: BOTH sides are ObjectRefs and carry a
+  -- Filter apiece -- Spike Cannibal's "all creatures" on the first, Forgotten
+  -- Ancient's "other creatures" on the second. The moved kinds hold the other
+  -- two -- a count under the two arms that write one (MovedKinds.quantityOf) and
+  -- CR 122.1b's kind under the three that name one (MovedKinds.kindOf); see
+  -- #2728.
+  Effect.MoveCounters (MoveCounters.MkMoveCounters from kinds _ to) -> frame Unframed (foldMap counterKindFilters (MovedKinds.kindOf kinds) <> foldMap quantityFilters (MovedKinds.quantityOf kinds)) <> frame SourceHostFramed (objectRefFilters from <> objectRefFilters to)
   -- The count and CR 122.1b's kind, PutCounters' two unframed positions: the
   -- slot beside them is a bare SlotName and carries no Filter.
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity _) -> frame Unframed (counterKindFilters kind <> quantityFilters quantity)
@@ -5376,11 +5377,12 @@ effectObjectRefs effect = case effect of
   Effect.Counter (Counter.MkCounter ref _) -> read_ [ref]
   Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> read_ [ref]
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ ref) -> read_ [ref]
-  -- The first side only: the destination is a bare SlotName. A READ -- CR 122.5
-  -- takes no choice of WHICH object the counters leave, so this arm goes through
-  -- the pure objectRefObjects and a chooser-shaped ref written here would name
-  -- nothing.
-  Effect.MoveCounters (MoveCounters.MkMoveCounters from _ _ _) -> read_ [from]
+  -- BOTH sides, each a READ -- CR 122.5 takes no choice of WHICH objects the
+  -- counters leave or land on, so this arm goes through the pure objectRefObjects
+  -- and a chooser-shaped ref written on either side would name nothing. WHICH
+  -- counters go to which recipient IS a choice, and it is asked of the answer
+  -- rather than of the ref (Prompt.ChooseDistributedMovedCounters).
+  Effect.MoveCounters (MoveCounters.MkMoveCounters from _ _ to) -> read_ [from, to]
   Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
@@ -7424,7 +7426,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Count counted)))
                 (MovedKinds.EveryOfKind CounterKind.PlusOnePlusOne)
                 Nothing
-                (SlotName.MkSlotName (Text.pack "recipient"))
+                (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "recipient")))
             )
     Spec.assertEqWith s "a counter move's giver puts its depth's Count in the sweep" (effectCounts moving) [counted]
   -- CR 208.1 / 208.2: a printed power or toughness box holds a number, or a value
@@ -7828,11 +7830,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- CR 122.8's read.
           Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _) -> [from]
           Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ _ slot) -> [slot]
-          -- CR 122.5's DESTINATION alone: the first side is an ObjectRef and goes
-          -- through objectRefObjects, which reads slotGroup and moves counters off
-          -- every member. Not MoveCounters' third slot either, which this opcode
-          -- WRITES a count into rather than reading an object out of.
-          Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ _ to) -> [to]
+          -- CR 122.5 names NO slot read singly: both its sides are ObjectRefs and
+          -- go through objectRefObjects, which reads slotGroup and moves counters
+          -- off every member of one and onto every member of the other. Its third
+          -- slot is not one either, being a count this opcode WRITES rather than
+          -- an object it reads.
           _ -> []
         -- The slots a Filter these effects carry reads singly, MINUS the ones a
         -- card they MINT carries. effectFilters is the traversal rather than a
@@ -9436,7 +9438,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           [ ("EntryRiders' kinds", holds (riderFilters riders)),
             ("Effect.PutCounters' kind", holds (effectFilters (Effect.PutCounters (PutCounters.MkPutCounters kind one anywhere)))),
             ("Effect.RemoveCounters' kind", holds (effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind one slot)))),
-            ("Effect.MoveCounters' kinds", holds (effectFilters (Effect.MoveCounters (MoveCounters.MkMoveCounters anywhere (MovedKinds.Named kind one) Nothing slot)))),
+            ("Effect.MoveCounters' kinds", holds (effectFilters (Effect.MoveCounters (MoveCounters.MkMoveCounters anywhere (MovedKinds.Named kind one) Nothing anywhere)))),
             ("Quantity.ObjectCounters' kind", holds (quantityFilters (Quantity.Type.ObjectCounters kind))),
             ("CR 714.2b's threshold", holds (triggerConditionFilters (TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached kind 2)))),
             ("CR 310.12b's last removal", holds (triggerConditionFilters (TriggerCondition.SelfLastCounterRemoved kind))),

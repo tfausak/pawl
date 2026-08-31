@@ -993,8 +993,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.MoveCounters (MoveCounters.MkMoveCounters (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))) (MovedKinds.Chosen (Quantity.Literal 1)) Nothing (SlotName.MkSlotName (Text.pack "became"))))
-      " {\"type\":\"MoveCounters\",\"value\":{\"from\":{\"type\":\"InSlot\",\"value\":\"self\"},\"to\":\"became\"}} "
+      (Effect.MoveCounters (MoveCounters.MkMoveCounters (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))) (MovedKinds.Chosen (Quantity.Literal 1)) Nothing (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became")))))
+      " {\"type\":\"MoveCounters\",\"value\":{\"from\":{\"type\":\"InSlot\",\"value\":\"self\"},\"to\":{\"type\":\"InSlot\",\"value\":\"became\"}}} "
   -- CR 122.8: a fourth tag, and the only counter opcode whose payload names
   -- neither a kind nor a count -- the whole tally the read object had is what
   -- crosses.

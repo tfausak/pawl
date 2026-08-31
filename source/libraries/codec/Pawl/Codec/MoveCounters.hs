@@ -21,15 +21,14 @@ import qualified Pawl.Types.Quantity as Quantity
 -- that is what "move a counter" with nothing looking back at it means, so a card
 -- that says only that writes neither key.
 --
--- `from` is an ObjectRef and `to` a bare SlotName, which the type's haddock
--- explains; the two sides are therefore spelled differently on the wire, an
--- object for the first and a string for the second.
+-- Both sides are ObjectRefs, which the type's haddock explains, so the two are
+-- spelled the same way on the wire and either may name a group.
 codec :: Codec.Codec MoveCounters.MoveCounters
 codec = Fields.object $ do
   from <- Fields.required "from" ObjectRef.codec MoveCounters.from
   kinds <- Fields.defaulted "kinds" (MovedKinds.Type.Chosen (Quantity.Literal 1)) MovedKinds.codec MoveCounters.kinds
   slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) MoveCounters.slot
-  to <- Fields.required "to" SlotName.codec MoveCounters.to
+  to <- Fields.required "to" ObjectRef.codec MoveCounters.to
   pure
     MoveCounters.MkMoveCounters
       { MoveCounters.from = from,

@@ -36,7 +36,10 @@
                           "kinds": {
                             "type": "AnyNumber"
                           },
-                          "to": "to"
+                          "to": {
+                            "type": "InSlot",
+                            "value": "to"
+                          }
                         }
                       }
                     ]

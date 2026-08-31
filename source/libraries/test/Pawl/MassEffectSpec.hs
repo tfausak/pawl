@@ -2786,13 +2786,15 @@ communeWithLavaSpec s registry =
           -- reading only the moved kinds' count -- so a depth nested in the giver
           -- was invisible to both (#2729). The moved kinds are EveryOfKind, which
           -- writes no count of its own, so every answer here is the ref's depth.
+          -- The destination reports SlotArity.Many beside it, both sides being
+          -- ObjectRefs since the second one was widened to a group too.
           let giverDepthOf q =
                 Effect.MoveCounters
                   ( MoveCounters.MkMoveCounters
                       (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) q))
                       (MovedKinds.EveryOfKind CounterKind.PlusOnePlusOne)
                       Nothing
-                      (SlotName.MkSlotName (Text.pack "recipient"))
+                      (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "recipient")))
                   )
           Spec.assertEqWith
             s
@@ -2801,7 +2803,7 @@ communeWithLavaSpec s registry =
               Resolve.readsX [giverDepthOf (Quantity.InSlot Binding.variableX)],
               Resolve.slotsAreExhaustive (giverDepthOf (Quantity.LifeTotal (PlayerRef.InSlot slot)))
             )
-            (Map.fromList [(slot, SlotArity.Amount), (SlotName.MkSlotName (Text.pack "recipient"), SlotArity.One)], True, False)
+            (Map.fromList [(slot, SlotArity.Amount), (SlotName.MkSlotName (Text.pack "recipient"), SlotArity.Many)], True, False)
           Spec.assertEqWith
             s
             "and a literal depth reads no X and states its slots whole, so the answers are the depth's"

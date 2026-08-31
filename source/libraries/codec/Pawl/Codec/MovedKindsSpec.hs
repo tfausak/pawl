@@ -52,6 +52,10 @@ spec s = Spec.describe s "Pawl.Codec.MovedKinds" $ do
   -- count, both being the player's to pick, so the tag is the whole of it.
   Spec.it s "AnyNumber" $
     Common.assertCodec s MovedKinds.codec MovedKinds.AnyNumber " {\"type\":\"AnyNumber\"} "
+  -- Goldberry, River-Daughter's "move one or more counters": AnyNumber above with
+  -- the empty answer excluded, and its own tag for that reason.
+  Spec.it s "AtLeastOne" $
+    Common.assertCodec s MovedKinds.codec MovedKinds.AtLeastOne " {\"type\":\"AtLeastOne\"} "
   -- Scrounging Bandar's "move any number of +1/+1 counters": the kind is all the
   -- card settles, the count being the player's to pick, so the payload is
   -- EveryOfKind's and the tag is what tells the two apart. Arm.tagged compiles
