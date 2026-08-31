@@ -2170,6 +2170,13 @@ isDamageR replacement = case replacement of
 -- row per named object and one row for a description, leaving a shield that names
 -- nothing with no row to install and the card silently doing less than it
 -- printed.
+--
+-- Not implemented: a shield covering EVERY recipient, which is what a card naming
+-- only its source needs (Burrenton Forge-Tender's "prevent all damage a red
+-- source of your choice would deal this turn"). @whatRecipient@ describes
+-- permanents and the unbounded shield has no player half, so "everything" has no
+-- spelling and such a card would install nothing at all (#2101). Until it does,
+-- this lint is what stops one being written.
 shieldNamingNothingOffends :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 shieldNamingNothingOffends effect = case effect of
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref whatRecipient whoRecipient _ _ _) ->
@@ -8184,8 +8191,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace (any shieldNamingNothingOffends . cardResolutionEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: with no prevention shield in the pool at
-    -- all this would pass whatever a card said. Mending Hands and Inkshield print
-    -- the counted and the unbounded one.
+    -- all this would pass whatever a card said. Mending Hands prints the counted
+    -- shield and Inkshield the unbounded one.
     Spec.assertBool s (any (anyFace (any isPreventionShield . cardResolutionEffects) . Printing.card) ps) "the pool has a card printing a prevention shield"
     Spec.assertEqWith s "every shield says what it covers (CR 615.1)" (fmap (S.nameOf . Printing.card) offenders) []
   -- The rejecting direction, proven against real cards rather than a card file,
@@ -8220,8 +8227,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no card restricts a by-direction prevention shield to described recipients" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace (any byDirectionRecipientOffends . cardResolutionEffects) . Printing.card) ps
-    -- Guards against a vacuous sweep: Dovin, Hand of Control is the card that
-    -- prints a by-direction shield at all.
+    -- Guards against a vacuous sweep: with no by-direction shield in the pool at
+    -- all this would pass whatever a card said. Dovin, Hand of Control and Old
+    -- Fat Spider Can't See Me print one.
     Spec.assertBool s (any (anyFace (any isByDirectionShield . cardResolutionEffects) . Printing.card) ps) "the pool has a card printing a by-direction shield"
     Spec.assertEqWith s "a shield pinned to the source side describes no recipient (CR 615.1)" (fmap (S.nameOf . Printing.card) offenders) []
   -- The rejecting direction, proven against Dovin, whose one ability prints both
