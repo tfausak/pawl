@@ -3295,8 +3295,11 @@ offerCast resolving caster slot optionality offer = do
 -- folded: `describedRecipient` below is written onto ONE row, which CR 615.7's
 -- "such effects count only the amount of damage; the number of events or sources
 -- dealing it doesn't matter" makes a single shared pool over every recipient it
--- admits. Divine Deflection is the producer, and Pawl.Engine.Replacement's
+-- admits. Divine Deflection is the countdown's producer, and Pawl.Engine.Replacement's
 -- rewriteRemaining is where one row spends per point rather than per recipient.
+-- CR 615.1's UNBOUNDED shield (Pack Leader) has no amount for that rule to be
+-- about, so one row there is simply the row a description needs: with nothing to
+-- count down, a row per admitted recipient would prevent exactly the same damage.
 --
 -- The `rider` is CR 615.5's additional effect, Nothing for a row that has none;
 -- a redirection is not a prevention, so RedirectDamage never passes one.
@@ -6398,8 +6401,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- data/cards/ leaves them trivial.
       --
       -- The DESCRIBED recipient side is not read here either: a shield pinned to
-      -- the source side names no recipient at all, and what its source looks like
-      -- is `printedSource` one field over.
+      -- the source side names no recipient at all, and CR 609.7b's predicate over
+      -- what its source looks like is `printedSource`.
       DamageDirection.DealtBy ->
         State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind DamageRewrite.PreventAll rider printedSource (Nothing, Nothing)) g0 (fmap (\oid -> (Nothing, Just (Filter.Type.And [], oid))) (Maybe.mapMaybe Recipient.objectOf named))
       DamageDirection.DealtTo ->

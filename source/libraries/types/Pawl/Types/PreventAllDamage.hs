@@ -41,8 +41,8 @@ data PreventAllDamage effect = MkPreventAllDamage
     -- this is not spelled as an @EachMatching@ ref above.
     --
     -- Read on the DealtTo side only: a shield pinned to the other side of the
-    -- event describes its source in @whatSource@ below, which is the same
-    -- question one field over.
+    -- event names no recipient at all, and describes its source in @whatSource@
+    -- below instead.
     whatRecipient :: Maybe (Filter.Filter Keyword.Keyword),
     -- | Which SIDE of the damage event the objects @ref@ names sit on -- the
     -- recipients (Inkshield, Selfless Squire) or the SOURCE (Dovin, Hand of

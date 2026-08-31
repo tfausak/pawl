@@ -2246,12 +2246,12 @@ rewriteEffect pairs effect = case effect of
   -- `direction` are not words a subtype swap can find -- a damage kind, CR
   -- 109.5's player relation and which side of the event the ref sits on.
   --
-  -- Three of the Filters are PROVEN: PreventAllDamage's whatSource and
-  -- PreventNextDamage's whatRecipient by Pawl.ReplacementSpec's "Synthetic
-  -- Warding Chant (CR 612.1)" group, and PreventAllDamage's whatRecipient by that
-  -- file's "Pack Leader (CR 611.2c)" group, where Artificial Evolution swaps the
-  -- word before the attack trigger resolves. The
-  -- refs and the two chosenSource fields are REGRESSION FENCES, TurnFaceDown's
+  -- Three of the Filters are PROVEN. PreventAllDamage's whatSource and
+  -- PreventNextDamage's whatRecipient are proven by Pawl.ReplacementSpec's
+  -- "Synthetic Warding Chant (CR 612.1)" group; PreventAllDamage's whatRecipient
+  -- by that file's "Pack Leader (CR 611.2c)" group, where Artificial Evolution
+  -- swaps the word before the attack trigger resolves. The refs and the two
+  -- chosenSource fields are REGRESSION FENCES, TurnFaceDown's
   -- shape above: every ref data/cards writes at these positions is an InSlot, on
   -- which rewriteObjectRef is the identity, and every chosenSource it writes
   -- (Auriok Replica, Healing Grace, Samite Ministration) is the trivial
