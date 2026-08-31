@@ -3478,6 +3478,9 @@ keywordFilters keyword = keywordFramed $ case keyword of
   -- CR 702.105a is payload-free too, and names no quality at all: what its minted
   -- ability compares is life totals, which no Filter reaches.
   Keyword.Dethrone -> []
+  -- CR 702.102a is payload-free: the permission names no quality, and the halves
+  -- it fuses are the CARD's own faces rather than anything this value carries.
+  Keyword.Fuse -> []
   Keyword.StartYourEngines -> []
   -- CR 701.43d is payload-free: the linked trigger it permits is the CARD's own
   -- TriggeredAbility, so any Filter in it is swept there rather than here.
@@ -6335,6 +6338,24 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                   then Nothing
                   else Just (path <> ": belongs at " <> Text.unpack (Slug.unwrap belongs) <> ".json")
     Spec.assertEqWith s "every file is filed under its own name" (Maybe.mapMaybe offends loaded) []
+  -- CR 702.102: every card that prints fuse can actually BE fused.
+  --
+  -- Pawl.Engine.Card.fusedFace answers Nothing for a fuse card whose halves are
+  -- modal or whose halves name a target slot alike, and either would be a card
+  -- quietly offering two halves where the printing offers three casts. Slot names
+  -- are card DATA and never printed, so the second is always the card file's to
+  -- fix; the first is a capability nothing in the pool needs yet (gap #2794).
+  Spec.it s "CR 702.102 every card with fuse has a fused face" $ do
+    root <- Registry.defaultRoot
+    loaded <- Registry.loadRoot root
+    Spec.assertBool s (not (null loaded)) "the corpus is not empty"
+    let offends (path, result) = case result of
+          Left reason -> Just (path <> ": " <> Text.unpack reason)
+          Right card ->
+            if Set.member Keyword.Fuse (Face.keywords (Card.combined card)) && Maybe.isNothing (Card.fusedFace card)
+              then Just (path <> ": prints fuse and cannot be fused")
+              else Nothing
+    Spec.assertEqWith s "every card with fuse fuses" (Maybe.mapMaybe offends loaded) []
   -- The other direction: the sweep above SLUGIFIES the stem before comparing
   -- it to Registry.filedAs, so a committed Wax-Wane.json would still pass it --
   -- Slug.fromText normalizes rather than validates, folding case away before

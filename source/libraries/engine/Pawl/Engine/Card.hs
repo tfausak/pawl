@@ -9,6 +9,7 @@
 module Pawl.Engine.Card where
 
 import Control.Applicative ((<|>))
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
@@ -31,9 +32,11 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
+import qualified Pawl.Types.ModeSelection as ModeSelection
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -499,6 +502,90 @@ castableFaces card = case Card.layout card of
   -- 712.4c's refusal to transform both land on `backFace` and `turnedOver`
   -- below, and both answer Nothing for this layout.
   Layout.Meld -> [NonEmpty.head (Card.faces card)]
+
+-- CR 702.102: the ONE face a fused split spell has, and Nothing for every card
+-- that cannot be fused. Not in `castableFaces` above and never offered beside its
+-- halves there, because rule 702.102a states a zone this function cannot see --
+-- "fuse is a static ability found on some split cards that applies WHILE THE CARD
+-- WITH FUSE IS IN A PLAYER'S HAND" -- so Pawl.Engine.Cast.castableSpells, which
+-- has the zone, is what offers it. Every other road to a cast (an effect's offer,
+-- Pawl.Engine.Resolve.offerCast) therefore reaches the halves alone. Not
+-- implemented: fusing under a permission an effect grants for a cast from the
+-- hand (gap #2794).
+--
+-- Built on `combined`, which is CR 702.102b read rather than restated: "a fused
+-- split spell has the combined characteristics of its two halves. (See rule
+-- 709.4.)", and CR 709.4d says it back. So the name (CR 709.4a's pair, rendered),
+-- the type line, the keywords and above all the mana cost -- rule 702.102c's
+-- "total cost of a fused split spell includes the mana cost of each half" is CR
+-- 709.4b's concatenation and needs no arm of its own -- all arrive already right.
+--
+-- What `combined` does NOT carry is the payload, which is this function's whole
+-- job: merge2 leaves Face.spell as the left half's because CR 709.3b puts one half
+-- on the stack, and fuse is the printing that puts BOTH there. CR 702.102d fixes
+-- the order -- "the controller of the spell follows the instructions of the left
+-- half and then follows the instructions of the right half" -- which is the
+-- clauses of the halves concatenated in printed order, one mode.
+--
+-- SPLIT alone. A Room is a split card too (CR 709.5) and no printing gives one
+-- fuse; the layouts with two faces that are not split cards (Adventure,
+-- ModalDoubleFaced, Transforming, Meld) are not what rule 702.102a's "found on
+-- some split cards" reaches.
+fusedFace :: Card.Card -> Maybe (Face.Face Card.Card)
+fusedFace card = case Card.layout card of
+  Layout.Split | Keyword.hasFuse (Face.keywords (combined card)) -> do
+    spell <- fuseSpells (fmap Face.spell (Card.faces card))
+    pure ((combined card) {Face.spell = spell})
+  _ -> Nothing
+
+-- CR 702.102d's ordering, one pair of halves at a time: the left half's clauses
+-- and then the right half's, in ONE mode, with the two halves' target namespaces
+-- unioned.
+--
+-- NOTHING for a half that is modal, which is what keeps that union honest: CR
+-- 601.2c fills the CHOSEN mode's slots, and two halves offering two mode lists
+-- each would be a cross product this does not build. Every printed fuse card is a
+-- pair of non-modal halves. Not implemented: fusing a modal half (gap #2794).
+--
+-- NOTHING as well for two halves whose slot names collide, since Map.union would
+-- silently drop one half's slot and leave that half's effects pointing at the
+-- other half's target. Slot names are card DATA and never printed, so a card can
+-- always name them apart; Pawl.CardSpec's fuse lint is what holds every corpus
+-- card to it, loudly, rather than leaving a colliding card quietly unfusable.
+fuseSpells ::
+  NonEmpty.NonEmpty (Modal.Type.Modal Card.Card (GrantedAbility.GrantedAbility Card.Card)) ->
+  Maybe (Modal.Type.Modal Card.Card (GrantedAbility.GrantedAbility Card.Card))
+fuseSpells spells = do
+  modes <- traverse soleMode spells
+  merged <- Foldable.foldlM mergeDisjointModes (NonEmpty.head modes) (NonEmpty.tail modes)
+  pure (Modal.Type.MkModal (Seq.singleton merged) (ModeSelection.ChooseExactly 1))
+
+-- The one mode a NON-MODAL payload is (Pawl.Types.Modal's own header: "a
+-- non-modal payload is one Mode with ChooseExactly 1"), and Nothing for a modal
+-- one.
+soleMode ::
+  Modal.Type.Modal Card.Card (GrantedAbility.GrantedAbility Card.Card) ->
+  Maybe (Mode.Mode Card.Card (GrantedAbility.GrantedAbility Card.Card))
+soleMode modal = case (Foldable.toList (Modal.Type.modes modal), Modal.Type.selection modal) of
+  ([mode], ModeSelection.ChooseExactly 1) -> Just mode
+  _ -> Nothing
+
+-- CR 702.102d again, and the collision refusal fuseSpells' header states: the
+-- left half's clauses then the right half's, with both halves' target slots --
+-- unless the two name a slot alike, where there is no honest union to take.
+mergeDisjointModes ::
+  Mode.Mode Card.Card (GrantedAbility.GrantedAbility Card.Card) ->
+  Mode.Mode Card.Card (GrantedAbility.GrantedAbility Card.Card) ->
+  Maybe (Mode.Mode Card.Card (GrantedAbility.GrantedAbility Card.Card))
+mergeDisjointModes l r =
+  if Map.null (Map.intersection (Mode.targetSlots l) (Mode.targetSlots r))
+    then
+      Just
+        Mode.MkMode
+          { Mode.clauses = Mode.clauses l <> Mode.clauses r,
+            Mode.targetSlots = Map.union (Mode.targetSlots l) (Mode.targetSlots r)
+          }
+    else Nothing
 
 -- The face `castableFaces` above offers only because CR 702.162a's more than
 -- meets the eye put it there: the back face of a nonmodal transforming card
