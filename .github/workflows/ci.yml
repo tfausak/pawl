@@ -26,7 +26,6 @@ jobs:
           nix develop .#ci --command cabal configure \
             --disable-executable-dynamic \
             --disable-shared \
-            --enable-benchmarks \
             --enable-tests \
             --flags=pedantic \
             --ghc-options='+RTS -A64m -RTS' \
