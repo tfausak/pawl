@@ -1,0 +1,27 @@
+# The from-scratch Nix build, which CI no longer runs on every pull request.
+# Nothing waits on this, so it substitutes its dependencies from cache.nixos.org
+# rather than restoring a five gigabyte store from the Actions cache, leaving
+# that whole budget to CI's dist-newstyle. A pull request that edits flake.nix
+# needs a manual dispatch to check it before merging.
+name: Nightly
+on:
+  schedule:
+    - cron: 0 9 * * *
+  workflow_dispatch:
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: nixbuild/nix-quick-install-action@v35
+        with:
+          nix_conf: max-jobs = auto
+      - run: nix build --print-build-logs
+      - run: nix build --print-build-logs --out-link benchmark .#benchmark
+      - run: cp benchmark/bench.csv .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pawl-${{ github.sha }}-bench
+          path: bench.csv

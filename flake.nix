@@ -118,6 +118,17 @@
           pkgs = nixpkgs.legacyPackages.${system};
         in
         {
+          # What CI's incremental Cabal build runs in. GHC has to come from the
+          # flake rather than a setup action, since PerformanceSpec's allocation
+          # ceilings shift across compiler versions; keeping it to the compiler
+          # and Cabal spares the runner the rest of the default shell.
+          ci = pkgs.mkShell {
+            nativeBuildInputs = [
+              pkgs.cabal-install
+              pkgs.ghc
+            ];
+          };
+
           default = pkgs.mkShell {
             nativeBuildInputs = [
               cabal-gild.packages.${system}.default
