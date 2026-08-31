@@ -15,21 +15,24 @@ spec s = Spec.describe s "Pawl.Codec.SetHalfLocked" $ do
       s
       SetHalfLocked.codec
       ( SetHalfLocked.MkSetHalfLocked
-          { SetHalfLocked.locked = True,
+          { SetHalfLocked.every = False,
+            SetHalfLocked.locked = True,
             SetHalfLocked.slot = SlotName.MkSlotName (Text.pack "target")
           }
       )
-      " {\"locked\":true,\"slot\":\"target\"} "
-  -- CR 709.5f: and unlock one. Both settings, since the wire tells them apart by
-  -- one key and a card that wrote the wrong one reads as the other rule.
+      " {\"every\":false,\"locked\":true,\"slot\":\"target\"} "
+  -- CR 709.5f: and unlock every locked one. Both settings of both keys, since
+  -- the wire tells them apart by one key each and a card that wrote the wrong one
+  -- reads as the other rule, or as the other quantity.
   Spec.it s "MkSetHalfLocked, the unlock setting" $
     Common.assertCodec
       s
       SetHalfLocked.codec
       ( SetHalfLocked.MkSetHalfLocked
-          { SetHalfLocked.locked = False,
+          { SetHalfLocked.every = True,
+            SetHalfLocked.locked = False,
             SetHalfLocked.slot = SlotName.MkSlotName (Text.pack "self")
           }
       )
-      " {\"locked\":false,\"slot\":\"self\"} "
+      " {\"every\":true,\"locked\":false,\"slot\":\"self\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s SetHalfLocked.codec

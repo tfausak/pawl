@@ -974,7 +974,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Unsuspect _ -> Map.empty
   -- A READ, Designate's: the slot names the permanent whose half is locked or
   -- unlocked. WHICH half is chosen at resolution and is no slot of any kind.
-  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ slot) -> oneSlot slot
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _ slot) -> oneSlot slot
   -- A READ, Designate's: the slot names where rule 702.100a's counter goes.
   Effect.Evolve slot -> oneSlot slot
   Effect.Mentor slot -> oneSlot slot
@@ -1448,7 +1448,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> True
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> True
   Effect.Unsuspect _ -> True
-  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> True
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> True
   Effect.Evolve _ -> True
   Effect.Mentor _ -> True
   Effect.Train _ -> True
@@ -1608,7 +1608,7 @@ readsX = any effectReadsX
       Effect.Designate (Designate.MkDesignate _ _) -> False
       Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
       Effect.Unsuspect _ -> False
-      Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> False
+      Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> False
       Effect.Evolve _ -> False
       Effect.Mentor _ -> False
       Effect.Train _ -> False
@@ -1850,7 +1850,7 @@ boundSlots effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> Set.empty
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> Set.empty
   Effect.Unsuspect _ -> Set.empty
-  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> Set.empty
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> Set.empty
   Effect.Evolve _ -> Set.empty
   Effect.Mentor _ -> Set.empty
   Effect.Train _ -> Set.empty
@@ -7071,9 +7071,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- A player recipient, an illegal slot (CR 608.2b) and an id naming no object
   -- all write nothing -- Designate's postures.
   --
-  -- Casing on `locked` is not casing on an effect's identity: it is one payload
-  -- of one opcode, which is the argument Effect.Designate's own haddock makes.
-  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked locked slot) ->
+  -- Casing on `locked` and on `every` is not casing on an effect's identity: both
+  -- are payloads of one opcode, which is the argument Effect.Designate's own
+  -- haddock makes.
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked every locked slot) ->
     case legalOne slot legal of
       Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure ()
@@ -7082,14 +7083,23 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           let halves = fmap Face.name (if locked then Room.unlockedHalves target gs else Room.lockedHalves target gs)
           case halves of
             [] -> pure ()
-            first : rest -> do
-              half <- case rest of
-                [] -> pure first
-                second : more -> do
-                  let offered = first NonEmpty.:| (second : more)
-                  answered <- Game.choose (Prompt.ChooseHalf (Decide.deciderFor controller gs) controller target offered)
-                  pure (if List.elem answered (NonEmpty.toList offered) then answered else first)
-              if locked then Event.lockHalf target half else Event.unlockHalf target half
+            first : rest
+              -- "each locked door", which names them rather than choosing among
+              -- them, so CR 709.5f's "chooses" has nothing to ask and no prompt
+              -- is raised. The unlock is ONE write for CR 709.5i's sake; the
+              -- lock is a fold, rule 709.5g having no completion to record.
+              | every ->
+                  if locked
+                    then Monad.mapM_ (Event.lockHalf target) halves
+                    else Event.unlockHalves controller target (Set.fromList halves)
+              | otherwise -> do
+                  half <- case rest of
+                    [] -> pure first
+                    second : more -> do
+                      let offered = first NonEmpty.:| (second : more)
+                      answered <- Game.choose (Prompt.ChooseHalf (Decide.deciderFor controller gs) controller target offered)
+                      pure (if List.elem answered (NonEmpty.toList offered) then answered else first)
+                  if locked then Event.lockHalf target half else Event.unlockHalves controller target (Set.singleton half)
       _ -> pure ()
   -- CR 702.100a's counter and CR 702.100b's marker: the creature evolves only if
   -- the placement actually put one or more counters on it.

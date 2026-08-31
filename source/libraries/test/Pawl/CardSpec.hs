@@ -7911,7 +7911,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           Effect.OfferCast (OfferCast.MkOfferCast slot _ _ _) -> [slot]
           Effect.Designate (Designate.MkDesignate _ slot) -> [slot]
           Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ slot) -> [slot]
-          Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ slot) -> [slot]
+          Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _ slot) -> [slot]
           Effect.Evolve slot -> [slot]
           Effect.Mentor slot -> [slot]
           Effect.Train slot -> [slot]

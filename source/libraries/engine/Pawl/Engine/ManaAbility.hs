@@ -253,7 +253,7 @@ manaProduced effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> Nothing
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> Nothing
   Effect.Unsuspect _ -> Nothing
-  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> Nothing
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> Nothing
   Effect.Evolve _ -> Nothing
   Effect.Mentor _ -> Nothing
   Effect.Train _ -> Nothing
@@ -452,7 +452,7 @@ movesLibraryCard effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> False
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
   Effect.Unsuspect _ -> False
-  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> False
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> False
   Effect.Evolve _ -> False
   Effect.Mentor _ -> False
   Effect.Train _ -> False

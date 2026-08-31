@@ -4,6 +4,7 @@ module Pawl.Codec.HalfUnlocked where
 
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.ObjectId as ObjectId
+import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -15,11 +16,13 @@ import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 codec :: Codec.Codec HalfUnlocked.HalfUnlocked
 codec = Fields.object $ do
   object <- Fields.required "object" ObjectId.codec HalfUnlocked.object
+  actor <- Fields.required "actor" PlayerId.codec HalfUnlocked.actor
   name <- Fields.required "name" CardName.codec HalfUnlocked.name
   fully <- Fields.required "fully" Common.boolean HalfUnlocked.fully
   pure
     HalfUnlocked.MkHalfUnlocked
       { HalfUnlocked.object = object,
+        HalfUnlocked.actor = actor,
         HalfUnlocked.name = name,
         HalfUnlocked.fully = fully
       }

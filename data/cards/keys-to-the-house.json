@@ -99,6 +99,7 @@
                       {
                         "type": "SetHalfLocked",
                         "value": {
+                          "every": false,
                           "locked": true,
                           "slot": "target"
                         }
@@ -111,6 +112,7 @@
                       {
                         "type": "SetHalfLocked",
                         "value": {
+                          "every": false,
                           "locked": false,
                           "slot": "target"
                         }
