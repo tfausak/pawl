@@ -5,6 +5,7 @@ import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
@@ -51,8 +52,8 @@ data CostComponent keyword
     -- SacrificeThis' shape: it names ONE object, the object the cost is on, and
     -- offers nothing to choose, so folding it into a count-plus-criterion form
     -- would invent a CR 601.2h prompt the rules do not have. A cost returning
-    -- some OTHER permanent would be a second constructor, the call
-    -- ExileThisFromGraveyard and ExileCardsFromGraveyard already document.
+    -- some OTHER permanent is ReturnPermanents below, the split
+    -- ExileThisFromGraveyard and ExileCardsFromGraveyard already draw.
     --
     -- NO ZONE FIELD. The destination is fixed, and CR 400.3 makes it
     -- owner-relative inside Pawl.Engine.Event's funnel -- "if an object would go
@@ -162,6 +163,22 @@ data CostComponent keyword
     -- Pawl.Engine.Cost.requiresSicknessCheck -- see that function. The tapped
     -- permanent may have arrived this turn.
     TapPermanents (TapPermanents.TapPermanents keyword)
+  | -- | Return exactly this many permanents matching the Filter to their
+    -- owners' hands, chosen by the payer. Meloku the Clouded Mirror's "{1},
+    -- Return a land you control to its owner's hand" is the printing, and the
+    -- whole of "a land you control" rides the Filter -- CR 118.1's "an action
+    -- or payment necessary to take another action" is the rule, rule 601.2f
+    -- naming tapping, sacrificing and discarding as examples rather than an
+    -- exhaustive list.
+    --
+    -- TapPermanents' shape (a count plus a criterion) over ReturnThis' action:
+    -- that one names the object the cost is on and offers nothing to choose,
+    -- which is SacrificeThis' distinction from Sacrifice drawn again.
+    --
+    -- The DESTINATION needs no field, ReturnThis' reason: CR 400.3 sends an
+    -- object that would go to another player's hand to its owner's, so the bare
+    -- zone already spells the printed "its owner's".
+    ReturnPermanents (ReturnPermanents.ReturnPermanents keyword)
   | -- | CR 601.2f: discard this many cards matching the Filter from hand
     -- (Cathartic Reunion's two of any card, Magmatic Insight's one land card).
     -- CR 701.9b gives the choice to the discarding player, so this is a prompt

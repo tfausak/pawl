@@ -99,6 +99,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -568,6 +569,7 @@ substituteXInComponent x component = case component of
   CostComponent.Sacrifice {} -> component
   CostComponent.TapForTotalPower {} -> component
   CostComponent.TapPermanents {} -> component
+  CostComponent.ReturnPermanents {} -> component
   CostComponent.DiscardCards {} -> component
   CostComponent.DiscardThis _ -> component
   CostComponent.PutCardFromHandOntoBattlefield _ -> component
@@ -614,6 +616,7 @@ componentHasVariable component = case component of
   CostComponent.Sacrifice {} -> False
   CostComponent.TapForTotalPower {} -> False
   CostComponent.TapPermanents {} -> False
+  CostComponent.ReturnPermanents {} -> False
   CostComponent.DiscardCards {} -> False
   CostComponent.DiscardThis _ -> False
   CostComponent.PutCardFromHandOntoBattlefield _ -> False
@@ -690,6 +693,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.Sacrifice {} -> False
   CostComponent.TapForTotalPower {} -> False
   CostComponent.TapPermanents {} -> False
+  CostComponent.ReturnPermanents {} -> False
   CostComponent.DiscardCards {} -> False
   CostComponent.DiscardThis _ -> False
   CostComponent.PutCardFromHandOntoBattlefield _ -> False
@@ -931,6 +935,7 @@ loyaltyAmountOf component = case component of
   CostComponent.Sacrifice {} -> Nothing
   CostComponent.TapForTotalPower {} -> Nothing
   CostComponent.TapPermanents {} -> Nothing
+  CostComponent.ReturnPermanents {} -> Nothing
   CostComponent.DiscardCards {} -> Nothing
   CostComponent.DiscardThis _ -> Nothing
   CostComponent.PutCardFromHandOntoBattlefield _ -> Nothing
@@ -1009,8 +1014,9 @@ zoneOfComponent component = case component of
   -- any zone and CR 113.6's default stands.
   CostComponent.TapForTotalPower {} -> Nothing
   CostComponent.TapPermanents {} -> Nothing
-  -- Nothing, and NOT Just Zone.Graveyard: CR 113.6m is about an ability that
-  -- moves THE OBJECT IT'S ON, and these move OTHER cards.
+  -- Nothing, and NOT Just Zone.Battlefield: CR 113.6m is about an ability that
+  -- moves THE OBJECT IT'S ON, and these move OTHER permanents or cards.
+  CostComponent.ReturnPermanents {} -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.DiscardCards {} -> Nothing
@@ -1070,6 +1076,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.Sacrifice {} -> False
   CostComponent.TapForTotalPower {} -> False
   CostComponent.TapPermanents {} -> False
+  CostComponent.ReturnPermanents {} -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
@@ -1182,6 +1189,19 @@ tapCandidates pid oid criterion gs =
       matches candidate =
         Filter.matches context (Projection.viewOfObject candidate gs) criterion
    in List.sort (filter matches (Set.toList (GameState.battlefield gs)))
+
+-- The permanents this player may return to hand to pay a ReturnPermanents
+-- component on `oid`: `tapCandidates`' pool exactly, which is what an alias
+-- rather than a second walk says -- both ask which battlefield objects the
+-- criterion admits, from the payer's perspective and against `oid` as the
+-- source. The NAMES are what differ, so each cost's arm reads the pool under
+-- the action it takes.
+--
+-- NOT narrowed to what the payer controls, `tapCandidates`' reading: a card
+-- that wants it prints it (Meloku the Clouded Mirror's criterion carries
+-- `ControlledBy You`).
+returnCandidates :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+returnCandidates = tapCandidates
 
 -- The power a candidate contributes to CR 702.122a's total. Zero for a permanent
 -- with no power at all, which after CR 208.3 is every noncreature one.
@@ -1309,6 +1329,12 @@ claimOf pid oid component gs = case component of
   -- since an already-tapped candidate spends no untapped-ness.
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) ->
     claim ClaimAxis.Tapping (Set.fromList (tapCandidates pid oid criterion gs)) n
+  -- The battlefield pool SacrificeThis and ReturnThis draw on, on their axis
+  -- and not the tapping one: a permanent returned to hand is as gone from the
+  -- battlefield as one sacrificed, so a cost that returns and a cost that
+  -- sacrifices compete for the same objects.
+  CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) ->
+    claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (returnCandidates pid oid criterion gs)) n
   CostComponent.PayLife _ -> Nothing
   CostComponent.PayLifeX -> Nothing
   CostComponent.PayEnergy _ -> Nothing
@@ -1605,6 +1631,7 @@ uncountedCeiling component = case component of
   CostComponent.Sacrifice {} -> Nothing
   CostComponent.SacrificeThis -> Nothing
   CostComponent.ReturnThis -> Nothing
+  CostComponent.ReturnPermanents {} -> Nothing
   CostComponent.DiscardCards {} -> Nothing
   CostComponent.DiscardThis _ -> Nothing
   CostComponent.PutCardFromHandOntoBattlefield _ -> Nothing
@@ -1784,6 +1811,7 @@ lifeOwedByComponent component = case component of
   CostComponent.Sacrifice {} -> 0
   CostComponent.TapForTotalPower {} -> 0
   CostComponent.TapPermanents {} -> 0
+  CostComponent.ReturnPermanents {} -> 0
   CostComponent.DiscardCards {} -> 0
   CostComponent.DiscardThis _ -> 0
   CostComponent.PutCardFromHandOntoBattlefield _ -> 0
@@ -1824,6 +1852,7 @@ plusOneCountersOwedByComponent component = case component of
   CostComponent.Sacrifice {} -> 0
   CostComponent.TapForTotalPower {} -> 0
   CostComponent.TapPermanents {} -> 0
+  CostComponent.ReturnPermanents {} -> 0
   CostComponent.DiscardCards {} -> 0
   CostComponent.DiscardThis _ -> 0
   CostComponent.PutCardFromHandOntoBattlefield _ -> 0
@@ -1901,6 +1930,13 @@ canPayComponent pid oid component gs = case component of
   -- the test that `jointlyPayable` asks them together.
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) ->
     Natural.length (tapCandidates pid oid criterion gs) >= n
+  -- CR 118.3: this player must have at least `n` permanents the criterion
+  -- admits to return. TapPermanents' arm above over a different action, and
+  -- WITHOUT CR 101.2's sacrifice prohibition for the reason ReturnThis' arm
+  -- gives. This component ALONE, Sacrifice's caveat; `jointlyPayable` asks the
+  -- components together.
+  CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) ->
+    Natural.length (returnCandidates pid oid criterion gs) >= n
   -- CR 601.2f: payable only if the hand holds at least that many cards the
   -- criterion admits -- Magmatic Insight is uncastable out of a landless hand
   -- however many cards it holds.
@@ -2224,6 +2260,7 @@ paidInSecondPass component = case component of
   CostComponent.SacrificeThis -> False
   CostComponent.Sacrifice {} -> False
   CostComponent.ReturnThis -> False
+  CostComponent.ReturnPermanents {} -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
@@ -2300,6 +2337,10 @@ orderSensitive component = case component of
   -- prints this component and its cost has no second order-sensitive part, so
   -- `orderObservable` is False whichever way this answers.
   CostComponent.ReturnThis -> True
+  -- A FENCE rather than proven behaviour, ReturnThis' above and for its reason:
+  -- Meloku the Clouded Mirror is the one card that prints this component and its
+  -- cost has no second order-sensitive part.
+  CostComponent.ReturnPermanents {} -> True
   CostComponent.DiscardCards {} -> True
   CostComponent.DiscardThis _ -> True
   CostComponent.PutCardFromHandOntoBattlefield _ -> True
@@ -2771,6 +2812,31 @@ payComponent moment pid oid component = case component of
       then do
         Monad.mapM_ tapObject (Set.toAscList chosen)
         pure (Payment.Paid (Map.singleton Binding.tappedPermanent (Set.map Recipient.ToObject chosen)))
+      else pure Payment.Unpaid
+  -- CR 118.1 as a cost: the payer chooses WHICH permanents go back, so this is a
+  -- prompt. TapPermanents' posture above -- the count is exact, so as many
+  -- candidates as the count leaves one legal answer and the prompt is elided --
+  -- and reject-not-repair, Sacrifice's.
+  --
+  -- Through Event.changeZone, the CR 400.7 funnel, and never a direct zone poke:
+  -- ReturnThis' call and for its reason, with CR 400.3 making the bare Zone.Hand
+  -- the printed "its owner's".
+  --
+  -- Binds NO slot, unlike the two arms above: no card in `data/cards/` reads
+  -- what its own cost returned, and a returned permanent is a new object (CR
+  -- 400.7) that last known information would have to answer for.
+  CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) -> do
+    gs <- State.get
+    let candidates = returnCandidates pid oid criterion gs
+        decider = Decide.deciderFor pid gs
+    chosen <-
+      if Natural.length candidates <= n
+        then pure (Set.fromList candidates)
+        else Game.choose (Prompt.ChooseReturns decider pid oid candidates n)
+    if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
+      then do
+        Monad.mapM_ (\returned -> Event.changeZone returned Zone.Hand) (Set.toAscList chosen)
+        pure bindsNothing
       else pure Payment.Unpaid
   -- CR 701.9b: the discarding player chooses which cards, so this is a prompt.
   -- Elided only when forced -- as many MATCHING cards in hand as the count, which

@@ -92,6 +92,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Sickness as Sickness
@@ -1725,6 +1726,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   springleafDrumSpec s registry
   morcantSpec s registry
   unerringSlingSpec s registry
+  melokuSpec s registry
   barkhideTrollSpec s registry
   millikinSpec s registry
 
@@ -2520,6 +2522,145 @@ unerringSlingSpec s registry = Spec.describe s "Unerring Sling" $ do
     Spec.assertEqWith s "the Elf's 1 power, not the Giant's 3" (S.damageOf griffinId resolved) (Just 1)
     Spec.assertBool s (S.onBattlefield griffinId (S.settleSba resolved)) "so the 2/3 Griffin survives"
     Spec.assertBool s (isTapped elfId activated) "the cost tapped the Elf"
+
+-- Meloku the Clouded Mirror {4}{U} 2\/4 Legendary Creature -- Moonfolk Wizard:
+-- "Flying. {1}, Return a land you control to its owner's hand: Create a 1\/1
+-- blue Illusion creature token with flying." The gate card for CostComponent's
+-- ReturnPermanents -- a count plus a criterion over a return to hand, which
+-- ReturnThis cannot express (it names the object the cost is on).
+--
+-- alice's board is Meloku, a Llanowar Elves for the {1}, and the lands the
+-- caller names. TWO lands of DIFFERENT printings make the prompt a real choice
+-- and make WHICH one went back visible by name -- an id read would not: a
+-- permanent returned to hand is a new object (CR 400.7).
+--
+-- The Elves and not a third land pays the mana, so the negative board below can
+-- drop every land alice controls and still afford the mana half.
+melokuBoard :: Printing.Printing -> Printing.Printing -> [(Printing.Printing, PlayerId.PlayerId)] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+melokuBoard meloku elves lands =
+  let (melokuId, gs0) = S.addCreature meloku S.alice (Setup.emptyGame S.bothPlayers)
+      (_, gs1) = S.addCreature elves S.alice gs0
+      add (ids, gs) (land, pid) = let (oid, gsN) = addLand land pid gs in (ids <> [oid], gsN)
+      (landIds, gs2) = List.foldl' add ([], gs1) lands
+   in ( melokuId,
+        landIds,
+        gs2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- One untapped land under pid, and its id -- S.landsFor hands back only a board,
+-- so the new object is the one the battlefield gained.
+addLand :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+addLand land pid gs =
+  let after = S.landsFor land pid 1 gs
+   in ( case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield gs)) of
+          [oid] -> oid
+          _ -> S.noSource,
+        after
+      )
+
+-- The first of a fixture's land ids, S.noSource for the empty list its callers
+-- never build -- total, since -Wx-partial refuses `head`.
+firstOf :: [ObjectId.ObjectId] -> ObjectId.ObjectId
+firstOf = Maybe.fromMaybe S.noSource . Maybe.listToMaybe
+
+-- Answer Prompt.ChooseReturns with one named permanent, FILTERED against the
+-- offer rather than hand-built: an answer the engine did not offer is rejected
+-- by Cost.payComponent, so filtering is what keeps the assertion about the
+-- engine's own candidates.
+returning :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+returning wanted p = case p of
+  Prompt.ChooseReturns _ _ _ candidates _ -> Set.fromList (filter (== wanted) candidates)
+  _ -> S.identityAnswer p
+
+-- Answer Prompt.ChooseReturns with nothing at all, which is not a size-1 subset
+-- -- the reject-not-repair probe.
+returningNothing :: Prompt.Prompt r -> r
+returningNothing p = case p of
+  Prompt.ChooseReturns {} -> Set.empty
+  _ -> S.identityAnswer p
+
+-- The names in pid's hand. NAMES and not ids: CR 400.7 makes the returned
+-- permanent a new object, so an id-keyed read would miss it however the cost was
+-- paid.
+handNames :: PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
+handNames pid gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Hand pid gs)
+
+melokuSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+melokuSpec s registry = Spec.describe s "Meloku the Clouded Mirror" $ do
+  -- CR 118.1: the cost names HOW MANY permanents go back and the payer names
+  -- WHICH. Two lands, a count of one, so the prompt is raised.
+  Spec.it s "CR 118.1 the payer chooses which land the cost returns" $ do
+    meloku <- S.printingOf s registry "Meloku the Clouded Mirror"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    let (melokuId, landIds, gs) = melokuBoard meloku elves [(island, S.alice), (mountain, S.alice)]
+        islandId = firstOf landIds
+        after = S.runPure (returning islandId) gs (Activate.activateAbility S.alice melokuId (theAbility meloku))
+    Spec.assertEqWith s "the Island is in alice's hand" (handNames S.alice after) [S.printingName island]
+    Spec.assertEqWith s "and the Mountain is still on the battlefield" (S.countOnBattlefieldByName (S.printingName mountain) S.alice after) 1
+    Spec.assertEqWith s "the Island is not" (S.countOnBattlefieldByName (S.printingName island) S.alice after) 0
+    Spec.assertEqWith s "the ability is on the stack, its cost paid" (length (GameState.stack after)) 1
+  -- The discriminating twin: the same board, one different answer. If the engine
+  -- picked a land itself, both cases would pass.
+  Spec.it s "the choice is the player's: the other answer returns the other land" $ do
+    meloku <- S.printingOf s registry "Meloku the Clouded Mirror"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    let (melokuId, landIds, gs) = melokuBoard meloku elves [(island, S.alice), (mountain, S.alice)]
+        mountainId = firstOf (reverse landIds)
+        after = S.runPure (returning mountainId) gs (Activate.activateAbility S.alice melokuId (theAbility meloku))
+    Spec.assertEqWith s "the Mountain is in alice's hand" (handNames S.alice after) [S.printingName mountain]
+    Spec.assertEqWith s "and the Island is still on the battlefield" (S.countOnBattlefieldByName (S.printingName island) S.alice after) 1
+    Spec.assertEqWith s "the ability is on the stack, its cost paid" (length (GameState.stack after)) 1
+  -- Reject-not-repair, Cost.payComponent's posture: an answer that is not a
+  -- size-1 subset leaves the whole cost unpaid, and CR 601.2h's ban on partial
+  -- payments is what puts both lands back on the battlefield.
+  Spec.it s "CR 601.2h an answer of the wrong size pays nothing at all" $ do
+    meloku <- S.printingOf s registry "Meloku the Clouded Mirror"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    let (melokuId, _, gs) = melokuBoard meloku elves [(island, S.alice), (mountain, S.alice)]
+        after = S.runPure returningNothing gs (Activate.activateAbility S.alice melokuId (theAbility meloku))
+    Spec.assertEqWith s "alice's hand is empty" (handNames S.alice after) []
+    Spec.assertEqWith s "the Island stayed" (S.countOnBattlefieldByName (S.printingName island) S.alice after) 1
+    Spec.assertEqWith s "the Mountain stayed" (S.countOnBattlefieldByName (S.printingName mountain) S.alice after) 1
+    Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack after)) 0
+  -- The negative, a PAIR of boards differing in exactly one thing: who controls
+  -- the Island. The Llanowar Elves pays the {1} on both, so the mana half is
+  -- identical and an unpayable component is the only thing that can withhold the
+  -- activation.
+  Spec.it s "CR 118.3 a land nobody you-control admits means no activation" $ do
+    meloku <- S.printingOf s registry "Meloku the Clouded Mirror"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    island <- S.printingOf s registry "Island"
+    let (payableId, landIds, payable) = melokuBoard meloku elves [(island, S.alice)]
+        unpayable = S.giveControl (firstOf landIds) S.bob payable
+        component = CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents 1 (Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.ControlledBy PlayerRelation.You]))
+    Spec.assertBool s (Activate.activatable S.alice payableId (theAbility meloku) payable) "a land alice controls: activatable"
+    Spec.assertBool s (not (Activate.activatable S.alice payableId (theAbility meloku) unpayable)) "the same land under bob: not"
+    Spec.assertBool s (Cost.canPayComponent S.alice payableId component payable) "and the component itself is payable on the one board"
+    Spec.assertBool s (not (Cost.canPayComponent S.alice payableId component unpayable)) "and not on the other"
+  -- CR 400.3: the destination is the OWNER's hand, not the payer's. alice
+  -- controls bob's Island through a control effect, so "a land you control"
+  -- admits it and the return still lands in bob's hand.
+  Spec.it s "CR 400.3 a land its payer does not own goes back to its owner's hand" $ do
+    meloku <- S.printingOf s registry "Meloku the Clouded Mirror"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    island <- S.printingOf s registry "Island"
+    let (melokuId, landIds, gs0) = melokuBoard meloku elves [(island, S.bob)]
+        borrowed = firstOf landIds
+        gs = S.giveControl borrowed S.alice gs0
+        after = S.runPure (returning borrowed) gs (Activate.activateAbility S.alice melokuId (theAbility meloku))
+    Spec.assertEqWith s "the Island is in bob's hand" (handNames S.bob after) [S.printingName island]
+    Spec.assertEqWith s "and not in alice's" (handNames S.alice after) []
+    Spec.assertEqWith s "the ability is on the stack, its cost paid" (length (GameState.stack after)) 1
 
 -- alice with Everbark Shaman settled on the battlefield, `buried` in her own
 -- graveyard, and Maskwood Nexus beside the Shaman when `withNexus`. Priority in
