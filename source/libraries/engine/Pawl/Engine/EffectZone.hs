@@ -185,7 +185,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Designate (Designate.MkDesignate _ _) -> Nothing
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> Nothing
   Effect.Unsuspect _ -> Nothing
-  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _) -> Nothing
+  Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> Nothing
   Effect.Evolve _ -> Nothing
   Effect.Mentor _ -> Nothing
   Effect.Train _ -> Nothing

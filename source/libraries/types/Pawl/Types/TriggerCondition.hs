@@ -989,12 +989,10 @@ data TriggerCondition
     -- difference from SelfHalfUnlocked: Balemurk Leech watches every Room. Names
     -- no half, the rule being about the permanent.
     --
-    -- The PlayerRelation reads the permanent's CONTROLLER, which is a reading of
-    -- the printed "YOU fully unlock" and not the same sentence.
-    --
-    -- Not implemented: the actor. GameEvent.HalfUnlocked carries none, and CR
-    -- 709.5f's keyword action reaches Pawl.Engine.Event.unlockHalf with no payer
-    -- (#961).
+    -- The PlayerRelation reads the player who UNLOCKED, which rule 709.5i's own
+    -- "a player fully unlocks" makes the subject of the printed "you". Proved by
+    -- Pawl.RoomSpec's "CR 709.5i 'you' is the player who unlocked, not the Room's
+    -- controller".
     RoomFullyUnlocked PlayerRelation.PlayerRelation
   | -- | CR 603.1b: several conditions, ANY of which fires the ONE ability that
     -- bears them (Balemurk Leech). One ability rather than two is observable --

@@ -222,6 +222,52 @@ activateKeys keys keysId answer gs =
   let activated = snd (Engine.runGamePure answer gs (Activate.activateAbility S.alice keysId (lockAbility keys)))
    in resolveAll (settle (snd (Engine.runGamePure answer activated Stack.resolveTop)))
 
+-- Synthetic Skeleton Key's only ability, "{T}: Unlock each locked door of target
+-- Room". A no-mode ability with an unpayable cost keeps the helper total, for
+-- lockAbility's reason above.
+keyAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
+keyAbility key = case Face.activatedAbilities (S.combinedFace key) of
+  ability : _ -> ability
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.MkCost Nothing []) (Modal.MkModal Seq.empty (ModeSelection.ChooseExactly 1)) [] Nothing Nothing
+
+-- The board the two foreign-unlock cases share: bob's Room, a Balemurk Leech
+-- apiece for alice and bob, and alice's Skeleton Key. The Room is PLACED rather
+-- than cast, so it arrives under bob with the designations the case wants and no
+-- entry event -- which is what keeps the Leeches' other arm ("an enchantment you
+-- control enters") out of the arithmetic entirely, leaving CR 709.5i the only
+-- thing that can move a life total.
+--
+-- Returns the Room permanent, the Key and the board.
+foreignRoom ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Set.Set CardName.CardName ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, Printing.Printing, GameState.GameState)
+foreignRoom s registry doors = do
+  (_, _, gs) <- setUp s registry
+  room <- S.printingOf s registry "Roaring Furnace"
+  leech <- S.printingOf s registry "Balemurk Leech"
+  key <- S.printingOf s registry "Synthetic Skeleton Key"
+  let (permId, withRoom) = S.addCreature room S.bob gs
+      opened o = o {Object.unlockedHalves = doors}
+      shown = withRoom {GameState.objects = Map.adjust opened permId (GameState.objects withRoom)}
+      (_, withAlices) = S.addCreature leech S.alice shown
+      (_, withBobs) = S.addCreature leech S.bob withAlices
+      (keyId, board) = S.addCreature key S.alice withBobs
+  pure (permId, keyId, key, board)
+
+-- Activate the Key at the Room and resolve everything. The TARGET is answered by
+-- filtering the offered recipients, keysAnswer's reason.
+turnKey :: Printing.Printing -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+turnKey key keyId room gs =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseTargets _ _ _ asked -> fmap (Set.filter ((==) (Just room) . Recipient.objectOf) . snd) asked
+        _ -> S.identityAnswer p
+      activated = snd (Engine.runGamePure answer gs (Activate.activateAbility S.alice keyId (keyAbility key)))
+   in resolveAll (settle (snd (Engine.runGamePure answer activated Stack.resolveTop)))
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Room" $ do
   -- CR 709.5's first words are "Some split cards are permanent cards with a
@@ -585,6 +631,62 @@ spec s registry = Spec.describe s "Room" $ do
         Spec.assertEqWith s "and carol one more" (S.lifeOf S.carol opened) (Just 18)
         Spec.assertEqWith s "and alice still nothing" (S.lifeOf S.alice opened) (Just 20)
       other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
+  -- CR 709.5i's PLAYER. Rule 709.5i's own subject is "a player 'fully unlocks' a
+  -- permanent", and CR 109.5 makes Balemurk Leech's printed "you" that player --
+  -- not the Room's controller, which the sentence never names. Every printing
+  -- makes the two coincide: Keys to the House, Marina Vendrell and Ghostly
+  -- Keybearer all say "a Room you control", and CR 709.5e's special action is
+  -- controller-only by rule. Synthetic Skeleton Key is the card that separates
+  -- them, "{T}: Unlock each locked door of target Room" naming no controller,
+  -- which CR 709.5f permits -- that rule says only that "a player chooses a
+  -- locked half of that permanent".
+  --
+  -- One door already open, so this is rule 709.5i's FIRST branch and the plural
+  -- write below is not what is under test: alice opens bob's remaining door and
+  -- exactly one of the two Leeches may fire. THREE SEATS make the answer
+  -- readable in one life total either way -- alice's Leech costs bob and carol a
+  -- life, bob's would cost alice and carol -- so carol, who loses one under both
+  -- readings, is the liveness check and the other two are the discriminator.
+  Spec.it s "CR 709.5i 'you' is the player who unlocked, not the Room's controller" $ do
+    (permId, keyId, key, board) <- foreignRoom s registry (Set.singleton furnaceName)
+    let after = turnKey key keyId permId board
+    -- THE ASSERTION: alice unlocked, so alice's Leech is the one that fired.
+    Spec.assertEqWith s "the unlocker's Leech costs bob a life" (S.lifeOf S.bob after) (Just 19)
+    -- The other reading, refused: bob controls the Room and his Leech is silent.
+    Spec.assertEqWith s "and the Room controller's Leech costs alice nothing" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "carol, an opponent of both, loses exactly one" (S.lifeOf S.carol after) (Just 19)
+    -- The control: a board where nothing was unlocked would satisfy the negative
+    -- above for free.
+    Spec.assertEqWith
+      s
+      "the control: the second door really opened"
+      (fmap Object.unlockedHalves (Game.lookupObject permId after))
+      (Just (Set.fromList [furnaceName, saunaName]))
+  -- CR 709.5i's SECOND branch: "or when it has neither designation and gains
+  -- both." Both doors shut, and "unlock each locked door" gives both designations
+  -- in one write -- the only way to reach that branch, since CR 709.5d's entry
+  -- gives at most one (a player casts one half, CR 709.3) and CR 709.5e's and CR
+  -- 709.5f's singular choices give one each.
+  --
+  -- What the case pins is that the ability triggers ONCE. Pawl.Engine.Event's
+  -- write records one event per door, CR 709.5h asking its question of each; a
+  -- writer that flagged both as completing the card would fire the Leech twice
+  -- and cost bob two life rather than one. That is the difference 19 and 18 name,
+  -- and it is the whole content of the second branch -- two sequential unlocks
+  -- produce the same one trigger, so the branch is otherwise indistinguishable
+  -- from the first.
+  Spec.it s "CR 709.5i a Room that gains both designations at once fires once" $ do
+    (permId, keyId, key, board) <- foreignRoom s registry Set.empty
+    let after = turnKey key keyId permId board
+    -- THE ASSERTION: one trigger, so one life apiece and no more.
+    Spec.assertEqWith s "gaining both designations costs bob one life" (S.lifeOf S.bob after) (Just 19)
+    Spec.assertEqWith s "and carol one" (S.lifeOf S.carol after) (Just 19)
+    Spec.assertEqWith s "and alice, who unlocked, nothing" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith
+      s
+      "the control: both doors really opened, in one write"
+      (fmap Object.unlockedHalves (Game.lookupObject permId after))
+      (Just (Set.fromList [furnaceName, saunaName]))
   -- CR 116.2m / 709.5e's TIMING: "A player can take this action any time they
   -- have priority and the stack is empty during a main phase of their turn."
   --

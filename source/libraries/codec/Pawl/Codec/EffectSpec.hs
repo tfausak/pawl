@@ -1533,8 +1533,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked True (SlotName.MkSlotName (Text.pack "target"))))
-      " {\"type\":\"SetHalfLocked\",\"value\":{\"locked\":true,\"slot\":\"target\"}} "
+      (Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked False True (SlotName.MkSlotName (Text.pack "target"))))
+      " {\"type\":\"SetHalfLocked\",\"value\":{\"every\":false,\"locked\":true,\"slot\":\"target\"}} "
   Spec.it s "Evolve" $
     Common.assertJsonCodec
       s

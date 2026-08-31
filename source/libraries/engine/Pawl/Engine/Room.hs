@@ -179,4 +179,6 @@ unlock pid oid half = do
           Payment.Unpaid -> State.put before
           -- Dropped, Pawl.Engine.Ignore's reason: CR 116.2m's special action
           -- resolves nothing whose effects could read a slot.
-          Payment.Paid _ -> Event.unlockHalf oid half
+          -- CR 709.5e names the actor itself: the player who paid the unlock
+          -- cost is the one who unlocked the door.
+          Payment.Paid _ -> Event.unlockHalves pid oid (Set.singleton half)

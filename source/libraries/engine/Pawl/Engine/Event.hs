@@ -2820,47 +2820,64 @@ designateProtector oid = do
         let stamp o = o {Object.protector = picked}
          in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
 
--- CR 709.5f / 709.5c: give this permanent the unlocked designation for one of
--- its halves -- the single door every unlock goes through, and the only writer of
--- Object.unlockedHalves after the entry designation the move itself writes (CR
--- 709.5d, changeZoneAttaching's mkObj).
+-- CR 709.5f / 709.5c: give this permanent the unlocked designations for the
+-- halves named -- the single door every unlock goes through, and the only writer
+-- of Object.unlockedHalves after the entry designation the move itself writes
+-- (CR 709.5d, changeZoneAttaching's mkObj).
+--
+-- A SET and not one half, which is CR 709.5i's second branch: "when it has
+-- neither designation and gains both" is a transition only a write that gives
+-- both at once can produce, and rule 709.5f's own singular wording is the
+-- instruction's shape rather than this writer's. Every designation lands in one
+-- State.modify', so nothing can observe the permanent midway.
+--
+-- ONE EVENT PER DESIGNATION, since CR 709.5h asks its question about a
+-- particular half; CR 709.5i's flag rides on exactly one of them, for the reason
+-- Pawl.Types.HalfUnlocked's own comment gives.
 --
 -- IDEMPOTENT, and that is CR 709.5h rather than defensiveness: the trigger fires
 -- "when that permanent IS GIVEN the appropriate unlocked designation", so a
 -- permanent that already has it is given nothing and nothing fires. CR 709.5e's
 -- special action and CR 709.5f's keyword action both choose a LOCKED half, so
 -- neither reaches this with a door already open; an effect that unlocks without
--- choosing would.
+-- choosing can, and the difference is filtered out here rather than by a caller.
 --
 -- The EVENT is recorded here rather than by the caller, so the two cannot drift:
 -- CR 709.5h is a fact about the designation being given, and this is where it is
 -- given.
 --
+-- The ACTOR is CR 709.5h/709.5i's "a player unlocks", passed in because only the
+-- caller knows it: rule 709.5e's payer, or the controller of the resolving
+-- object carrying out rule 709.5f's instruction.
+--
 -- CR 709.5g's LOCK is lockHalf below, this function's inverse.
-unlockHalf :: ObjectId -> CardName.CardName -> Game ()
-unlockHalf oid half = do
+unlockHalves :: PlayerId -> ObjectId -> Set.Set CardName.CardName -> Game ()
+unlockHalves actor oid halves = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure ()
-    Just obj ->
-      Monad.unless (Set.member half (Object.unlockedHalves obj)) $ do
-        let opened = Set.insert half (Object.unlockedHalves obj)
+    Just obj -> do
+      let given = Set.difference halves (Object.unlockedHalves obj)
+          opened = Set.union (Object.unlockedHalves obj) given
+      Monad.unless (Set.null given) $ do
         State.modify' $ \g ->
           let open o = o {Object.unlockedHalves = opened}
            in g {GameState.objects = Map.adjust open oid (GameState.objects g)}
-        State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid half (fullyUnlockedAfter opened (Game.cardOf oid gs)))))
+        let fully = fullyUnlockedAfter opened (Game.cardOf oid gs)
+        Monad.forM_ (Set.toAscList given) $ \half ->
+          State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid actor half (fully && Set.lookupMax given == Just half))))
 
 -- CR 709.5g: take one unlocked designation back away -- "that permanent loses
--- the appropriate unlocked designation". unlockHalf's inverse and the single
+-- the appropriate unlocked designation". unlockHalves's inverse and the single
 -- door every lock goes through, so the two writers of Object.unlockedHalves that
 -- ADD a designation have exactly one that removes one.
 --
--- NO EVENT, unlike unlockHalf: rules 709.5h and 709.5i are the only rules that
+-- NO EVENT, unlike unlockHalves: rules 709.5h and 709.5i are the only rules that
 -- ask a trigger about an unlocked designation and both ask about GAINING one, so
 -- there is nothing for a lock to fire. GameEvent.HalfUnlocked's own comment
 -- carries that argument for the type.
 --
--- Unguarded, where unlockHalf guards: the deletion is idempotent on its own, and
+-- Unguarded, where unlockHalves guards: the deletion is idempotent on its own, and
 -- with no event to suppress there is no transition to detect. CR 709.5g's own
 -- "chooses an unlocked half" is what keeps a caller from reaching this with a
 -- door already shut.
@@ -2876,7 +2893,7 @@ lockHalf oid half =
 -- designation and gains both."
 --
 -- Taking the designation set rather than the object, so both writers of
--- Object.unlockedHalves -- unlockHalf above and changeZoneAttaching's mkObj
+-- Object.unlockedHalves -- unlockHalves above and changeZoneAttaching's mkObj
 -- below, which is CR 709.5d's entry designation -- can hand over the set they are
 -- about to store rather than re-reading a GameState that has or has not been
 -- modified yet. THE SAME helper at both, so the two cannot drift apart about what
@@ -4183,7 +4200,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- of whether it was given that designation while entering the
               -- battlefield or after entering the battlefield", so the entry
               -- designation `unlocking` wrote into mkObj above needs its event too.
-              -- Recorded rather than routed through unlockHalf, which would find the
+              -- Recorded rather than routed through unlockHalves, which would find the
               -- door already open and record nothing: writing the designation inside
               -- the move is what CR 709.5d's "as it enters" asks for, and the event is
               -- what CR 709.5h asks for -- two rules, and the entry is the one place
@@ -4196,16 +4213,22 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- which is logged first.
               --
               -- CR 709.5i's flag is computed here too, through the same
-              -- `fullyUnlockedAfter` unlockHalf uses, and against the designations
+              -- `fullyUnlockedAfter` unlockHalves uses, and against the designations
               -- `mkObj` actually wrote. Reading `shown` back rather than the stored
               -- object, so the two writers answer the question the same way from the
-              -- same input. Always False today, and that is CR 709.5d rather than a
-              -- shortcut: an entry gives at most ONE designation, so a two-door Room
-              -- can never arrive fully unlocked. CR 709.5i's second branch -- a
-              -- permanent that "has neither designation and gains both" -- is
-              -- therefore unreachable and untested (#962).
+              -- same input. Always False on THIS route, and that is CR 709.5d rather
+              -- than a shortcut: an entry gives at most ONE designation, so a
+              -- two-door Room can never arrive fully unlocked. CR 709.5i's second
+              -- branch is reached from unlockHalves instead, which can give both at
+              -- once.
+              --
+              -- The ACTOR is CR 110.2a's entry controller, the `chooser` above:
+              -- rule 709.5d gives the designation with no player taking an action,
+              -- and the permanent's own controller is the only player the rule
+              -- connects to it -- which is also the player a Room's own "when you
+              -- unlock this door" reads as "you" (CR 109.5).
               Monad.forM_ (if unlocking then Maybe.maybeToList shown else []) $ \half ->
-                State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked newId half (fullyUnlockedAfter (foldMap Set.singleton shown) (Game.cardOf oid gs)))))
+                State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked newId (Maybe.fromMaybe pid under) half (fullyUnlockedAfter (foldMap Set.singleton shown) (Game.cardOf oid gs)))))
               -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
               -- what an enters trigger scans -- alongside the id it had in `fromZone`,
               -- which is the key `lastKnown` is filed under and so the only route back
@@ -9359,7 +9382,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 709.5h fires "when a player unlocks a PARTICULAR half", so a Room whose
   -- other door was the one that opened must not fire this ability.
   TriggerCondition.SelfHalfUnlocked half -> case event of
-    GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid name _) -> oid == bearer && name == half
+    GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid _ name _) -> oid == bearer && name == half
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
@@ -9843,18 +9866,17 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- the board, so the bearer contributes only CR 109.5's perspective through
   -- `you`.
   --
-  -- The controller is read off the LIVE board rather than off the event, since
-  -- the event carries none. Projection.controllerOf falls back to the owner for a
-  -- permanent that has since left, which is CR 109.5's own answer for an object
-  -- outside the battlefield; nothing in the pool can move a Room between the
-  -- designation and the CR 117.5 boundary that scans for this.
-  --
-  -- Whose ACTION opened the door is a different question, and not this one (#961).
+  -- The relation is resolved against the player who UNLOCKED, which is rule
+  -- 709.5i's own subject ("when a player 'fully unlocks' a permanent") read
+  -- through CR 109.5's "you". The Room's CONTROLLER is the other reading and is
+  -- rejected: the printed sentence puts "you" in the subject position and leaves
+  -- "a Room" unqualified, so it is the act and not the permanent that "you"
+  -- selects. The two readings agree on every printing, every printed unlock
+  -- naming a Room its own controller controls; the actor is carried on the event
+  -- because by the time this runs the board may have moved on.
   TriggerCondition.RoomFullyUnlocked relation -> case event of
-    GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid _ fully) ->
-      fully && case Projection.controllerOf oid gs of
-        Nothing -> False
-        Just controller -> PlayerRelation.holds relation you controller
+    GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked _ actor _ fully) ->
+      fully && PlayerRelation.holds relation you actor
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False

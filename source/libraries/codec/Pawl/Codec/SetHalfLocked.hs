@@ -12,10 +12,12 @@ import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 -- written by Pawl.Codec.Effect's SetHalfLocked arm.
 codec :: Codec.Codec SetHalfLocked.SetHalfLocked
 codec = Fields.object $ do
+  every <- Fields.required "every" Common.boolean SetHalfLocked.every
   locked <- Fields.required "locked" Common.boolean SetHalfLocked.locked
   slot <- Fields.required "slot" SlotName.codec SetHalfLocked.slot
   pure
     SetHalfLocked.MkSetHalfLocked
-      { SetHalfLocked.locked = locked,
+      { SetHalfLocked.every = every,
+        SetHalfLocked.locked = locked,
         SetHalfLocked.slot = slot
       }
