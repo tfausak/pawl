@@ -233,6 +233,8 @@ library codec
     Pawl.Codec.ComparesSpec
     Pawl.Codec.Comparison
     Pawl.Codec.ComparisonSpec
+    Pawl.Codec.CompletedDungeon
+    Pawl.Codec.CompletedDungeonSpec
     Pawl.Codec.Condition
     Pawl.Codec.ConditionSpec
     Pawl.Codec.Conjure
@@ -1369,6 +1371,7 @@ library types
     Pawl.Types.CommandZoneDecision
     Pawl.Types.Compares
     Pawl.Types.Comparison
+    Pawl.Types.CompletedDungeon
     Pawl.Types.Concession
     Pawl.Types.Condition
     Pawl.Types.Conjure

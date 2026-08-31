@@ -803,6 +803,18 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerScries PlayerRelation.Opponent)
       " {\"type\":\"PlayerScries\",\"value\":{\"type\":\"Opponent\"}} "
+  -- CR 309.7. Both relations, for PlayerScries' reason above.
+  Spec.it s "PlayerCompletesDungeon round-trips both relations" $ do
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerCompletesDungeon PlayerRelation.You)
+      " {\"type\":\"PlayerCompletesDungeon\",\"value\":{\"type\":\"You\"}} "
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerCompletesDungeon PlayerRelation.Opponent)
+      " {\"type\":\"PlayerCompletesDungeon\",\"value\":{\"type\":\"Opponent\"}} "
   Spec.it s "PlayerSurveils round-trips both relations" $ do
     Common.assertCodec
       s

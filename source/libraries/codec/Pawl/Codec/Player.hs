@@ -2,6 +2,7 @@
 
 module Pawl.Codec.Player where
 
+import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.PrintingId as PrintingId
@@ -37,6 +38,7 @@ codec = Fields.object $ do
   dungeons <- Fields.required "dungeons" (Common.set PrintingId.codec) Player.dungeons
   outsideTheGame <- Fields.required "outsideTheGame" (Common.naturalMap PrintingId.codec Common.natural) Player.outsideTheGame
   completedDungeons <- Fields.required "completedDungeons" Common.natural Player.completedDungeons
+  completedDungeonNames <- Fields.required "completedDungeonNames" (Common.set CardName.codec) Player.completedDungeonNames
   pure
     Player.MkPlayer
       { Player.life = life,
@@ -49,5 +51,6 @@ codec = Fields.object $ do
         Player.commanderDamage = commanderDamage,
         Player.dungeons = dungeons,
         Player.outsideTheGame = outsideTheGame,
-        Player.completedDungeons = completedDungeons
+        Player.completedDungeons = completedDungeons,
+        Player.completedDungeonNames = completedDungeonNames
       }

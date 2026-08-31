@@ -699,6 +699,7 @@ quantityCounts quantity = case quantity of
   -- CR 309.7's tally of completed dungeons, read off the player: a PlayerRef and
   -- nothing else, so no Count and no Filter here either.
   Quantity.Type.DungeonsCompleted _ -> []
+  Quantity.Type.CompletedDungeon {} -> []
   -- CR 400.7's logged entry, read against the object the quantity is aimed at: no
   -- reference at all, so no Count and no Filter here either.
   Quantity.Type.EnteredThisTurn -> []
@@ -946,6 +947,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 603.7's slot-named condition holds a SlotName, which is no Count.
   TriggerCondition.LoseControlOfBound _ -> []
   TriggerCondition.RoomEntered _ -> []
+  -- CR 309.7's condition carries a PlayerRelation, which is no Count.
+  TriggerCondition.PlayerCompletesDungeon _ -> []
   -- CR 701.22d and CR 701.25d carry a PlayerRelation and CR 702.170a nothing
   -- at all, so none of the three holds a Count. CR 701.44b holds a Filter, and
   -- a Filter holds no Count for PermanentEnters' reason above.
@@ -1760,6 +1763,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.PlayersDealtDamageThisTurn {} -> False
   Quantity.Type.SpellsCastLastTurn {} -> False
   Quantity.Type.DungeonsCompleted {} -> False
+  Quantity.Type.CompletedDungeon {} -> False
   Quantity.Type.EnteredThisTurn -> False
   Quantity.Type.EnteredFrom {} -> False
   Quantity.Type.WasCastFrom {} -> False
@@ -3768,6 +3772,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.PlayersDealtDamageThisTurn _ -> []
   Quantity.Type.SpellsCastLastTurn _ -> []
   Quantity.Type.DungeonsCompleted _ -> []
+  Quantity.Type.CompletedDungeon {} -> []
   Quantity.Type.EnteredThisTurn -> []
   Quantity.Type.EnteredFrom _ -> []
   Quantity.Type.WasCastFrom _ -> []
@@ -3993,6 +3998,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- the slot holds was selected by the arming spell's own target slot.
   TriggerCondition.LoseControlOfBound _ -> []
   TriggerCondition.RoomEntered _ -> []
+  -- CR 309.7's condition carries a PlayerRelation, which is no Filter.
+  TriggerCondition.PlayerCompletesDungeon _ -> []
   -- CR 701.22d and CR 701.25d carry a PlayerRelation and CR 702.170a nothing,
   -- so none of them holds a Filter.
   TriggerCondition.PlayerScries _ -> []
@@ -4156,6 +4163,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.LoseControlOfBound slot -> [slot]
   TriggerCondition.RoomEntered _ -> []
   TriggerCondition.PlayerScries _ -> []
+  TriggerCondition.PlayerCompletesDungeon _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []

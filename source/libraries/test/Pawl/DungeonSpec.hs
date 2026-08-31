@@ -40,11 +40,13 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
@@ -241,6 +243,22 @@ dungeonBoard island door dungeons lands =
       (dungeonIds, g2) = List.foldl' intern ([], g1) dungeons
       owned p = p {Player.dungeons = Set.fromList dungeonIds}
    in (doorId, g2 {GameState.players = Map.adjust owned S.alice (GameState.players g2)})
+
+-- The names of the cards in one of a player's zones. What both cases below read,
+-- because CR 400.7 makes a returned card a new object with a new id and only its
+-- printed name survives the trip.
+namesIn :: Zone.Zone -> PlayerId -> GameState.GameState -> Set.Set CardName.CardName
+namesIn zone pid gs = Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
+
+-- `paying`, but taking every "may" offered.
+--
+-- The only optional clause either case below can raise is the one being read --
+-- Dungeon Crawler's return, and Acererak's own trigger is mandatory -- so this is
+-- not a blanket yes standing in for a specific answer.
+payingOptional :: Prompt.Prompt r -> r
+payingOptional p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> paying p
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
@@ -621,3 +639,93 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
       (fmap (\oid -> Map.lookup CounterKind.PlusOnePlusOne (maybe Map.empty Object.counters (Game.lookupObject oid atThrone))) (inPlayNamed "\"Cabal Evangel\"" atThrone))
       [Just 3]
     Spec.assertBool s (all (\oid -> Projection.hasKeyword (Keyword.Hexproof Nothing) oid atThrone) (inPlayNamed "\"Cabal Evangel\"" atThrone)) "and hexproof until alice's next turn"
+  -- CR 309.7: completing a dungeon is an EVENT, so "whenever you complete a
+  -- dungeon" can be transcribed. Dungeon Crawler {B} Creature -- Zombie 2/1,
+  -- "This creature enters tapped. Whenever you complete a dungeon, you may
+  -- return this card from your graveyard to your hand." (name, cost, type line,
+  -- P\/T and Oracle text checked against Scryfall, 2026-08-31.)
+  --
+  -- CR 113.6m is what lets it watch from the graveyard: the condition triggers
+  -- perfectly well from the battlefield, and only the effect's own "from your
+  -- graveyard" pins the ability there -- Pawl.ZoneTriggerSpec's Squee, Goblin
+  -- Nabob is the same sentence on an upkeep trigger.
+  --
+  -- TWO boards differing in exactly one thing: FOUR ventures down the first arrow
+  -- of Lost Mine of Phandelver, which the case above proves ends with the dungeon
+  -- removed from the game, against THREE, which leaves the marker one room short.
+  -- Read on the printed name (CR 400.7 gives the returned card a fresh id).
+  Spec.it s "CR 309.7 completing a dungeon triggers Dungeon Crawler out of the graveyard" $ do
+    island <- S.printingOf s registry "Island"
+    door <- S.printingOf s registry "Secret Door"
+    lostMine <- S.printingOf s registry "Lost Mine of Phandelver"
+    crawler <- S.printingOf s registry "Dungeon Crawler"
+    let crawlerName = CardName.MkCardName (Text.pack "Dungeon Crawler")
+        (doorId, base) = dungeonBoard island door [lostMine] 30
+        (_, gs) = S.addGraveyardCard crawler S.alice base
+        completed = ventureTimes 4 payingOptional (ventureAbility door) doorId gs
+        short = ventureTimes 3 payingOptional (ventureAbility door) doorId gs
+    -- The gameplay-level assertion, and FIRST, so no fence below can absorb a
+    -- mutation ahead of it.
+    Spec.assertBool s (Set.member crawlerName (namesIn Zone.Hand S.alice completed)) "Dungeon Crawler is in alice's hand"
+    Spec.assertBool s (not (Set.member crawlerName (namesIn Zone.Graveyard S.alice completed))) "and no longer in her graveyard"
+    -- The negative half of the same pair: one venture short, the dungeon is still
+    -- in the command zone and nothing has been completed.
+    Spec.assertBool s (Set.member crawlerName (namesIn Zone.Graveyard S.alice short)) "three ventures leave it in the graveyard"
+    Spec.assertBool s (not (Set.member crawlerName (namesIn Zone.Hand S.alice short))) "and out of hand"
+    Spec.assertEqWith s "because the dungeon is still in the command zone" (length (dungeonsOf S.alice short)) 1
+    Spec.assertEqWith s "where four ventures removed it" (dungeonsOf S.alice completed) []
+    Spec.assertBool s (elem (GameEvent.DungeonCompleted S.alice) (S.eventsOf completed)) "and the completion was recorded as an event"
+  -- CR 309.7 read of a NAMED dungeon. Acererak the Archlich {2}{B} Legendary
+  -- Creature -- Zombie Wizard 5\/5, "When Acererak enters, if you haven't
+  -- completed Tomb of Annihilation, return Acererak to its owner's hand and
+  -- venture into the dungeon." (name, cost, type line, P\/T and Oracle text
+  -- checked against Scryfall, 2026-08-31.)
+  --
+  -- THREE boards. The first is the gate -- nothing completed, so the CR 603.4
+  -- intervening "if" holds and Acererak bounces. The other two differ in EXACTLY
+  -- one thing, the dungeon alice owns and therefore completes, and are what
+  -- separate the named read from the tally: both leave
+  -- Player.completedDungeons at 1, so an implementation reading the count
+  -- answers them the same way and one of the two goes red.
+  --
+  -- Read on the printed name in each zone rather than on an object id, because
+  -- CR 400.7 makes the returned card a new object.
+  Spec.it s "CR 309.7 / 603.4 Acererak asks WHICH dungeon was completed, not how many" $ do
+    island <- S.printingOf s registry "Island"
+    door <- S.printingOf s registry "Secret Door"
+    lostMine <- S.printingOf s registry "Lost Mine of Phandelver"
+    tomb <- S.printingOf s registry "Tomb of Annihilation"
+    acererak <- S.printingOf s registry "Acererak the Archlich"
+    let acererakName = CardName.MkCardName (Text.pack "Acererak the Archlich")
+        -- Acererak arrives with CR 603.6a's enters event, so the trigger is
+        -- gathered, placed and then resolved off the same board every case uses.
+        arrive gs =
+          let (_, entered) = S.entersWithTrigger acererak S.alice gs
+           in resolveAll payingOptional (S.runPure payingOptional entered Engine.settleForPriority)
+        completing dungeon =
+          let (doorId, gs) = dungeonBoard island door [dungeon] 30
+           in ventureTimes 4 payingOptional (ventureAbility door) doorId gs
+        untouched = snd (dungeonBoard island door [lostMine] 30)
+        afterNothing = arrive untouched
+        afterLostMine = arrive (completing lostMine)
+        afterTomb = arrive (completing tomb)
+    -- The gameplay-level assertions, and FIRST, so no fence below can absorb a
+    -- mutation ahead of them.
+    Spec.assertBool s (Set.member acererakName (namesIn Zone.Hand S.alice afterNothing)) "having completed nothing, Acererak returns to hand"
+    Spec.assertBool s (Set.member acererakName (namesIn Zone.Hand S.alice afterLostMine)) "having completed Lost Mine of Phandelver, Acererak still returns to hand"
+    Spec.assertBool s (Set.member acererakName (namesIn Zone.Battlefield S.alice afterTomb)) "having completed Tomb of Annihilation, Acererak stays on the battlefield"
+    Spec.assertBool s (not (Set.member acererakName (namesIn Zone.Battlefield S.alice afterLostMine))) "and is off the battlefield on the Lost Mine board"
+    -- Neither of the two discriminating boards is green because nothing happened:
+    -- each really completed one dungeon, and the tally cannot tell them apart.
+    Spec.assertEqWith
+      s
+      "both boards completed exactly one dungeon"
+      (fmap (fmap Player.completedDungeons . Map.lookup S.alice . GameState.players) [afterLostMine, afterTomb])
+      [Just 1, Just 1]
+    Spec.assertEqWith
+      s
+      "and they differ only in its name"
+      (fmap (fmap Player.completedDungeonNames . Map.lookup S.alice . GameState.players) [afterLostMine, afterTomb])
+      [ Just (Set.singleton (CardName.MkCardName (Text.pack "Lost Mine of Phandelver"))),
+        Just (Set.singleton (CardName.MkCardName (Text.pack "Tomb of Annihilation")))
+      ]
