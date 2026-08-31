@@ -217,8 +217,7 @@ data TriggerCondition
     --
     -- CR 508.3e's "[a player] attacks [another player]" reads the same event,
     -- and PlayerAttacksPlayer below is that arm: this one names the ATTACKED
-    -- player by attachment, that one names the ATTACKING player by relation and
-    -- leaves the attacked side unqualified.
+    -- player by attachment, that one names both subjects by relation.
     --
     -- Not implemented: rule 508.3b's planeswalker and battle subjects -- the
     -- sweep above turned up no card writing one, and GameEvent.BecameAttacked
@@ -285,12 +284,11 @@ data TriggerCondition
     -- says -- Scryfall o:"attack a player", 2026-08-24, twenty-four cards and
     -- not one of them narrows it.
     --
-    -- Only You is observable on the ATTACKED side: CR 506.2a has the attacking
-    -- player choose an opponent to attack and CR 802.2 makes every one of their
-    -- opponents a defending player, so Opponent and AnyPlayer pick the same
-    -- seats on every legal declaration. The arm carries a full relation anyway
-    -- because that is the shape rule 508.3e's second subject takes, and because
-    -- the attacker side beside it needs all three.
+    -- Both relations are read against CR 109.5's "you" and not against each
+    -- other, so Opponent on the ATTACKED side would say "somebody other than me
+    -- was attacked" rather than restate CR 506.2a's requirement that the
+    -- defending player be an opponent of the attacker. Only You is in print
+    -- there today.
     --
     -- CR 508.3b's per-TARGET arity and not rule 508.3d's, so this reads
     -- GameEvent.BecameAttacked where PlayerAttacks above reads
@@ -305,10 +303,10 @@ data TriggerCondition
     -- off the same event, because that is what the printed payloads read --
     -- Seifer's "goad target creature that player controls", Karazikar, the Eye
     -- Tyrant's and Gornog, the Red Reaper's the same. The ATTACKING player is
-    -- not bound: no printing of this shape points back at it that the payload's
-    -- own "you" cannot say -- Archnemesis' "attach this Aura to that player" is
-    -- the one that would, and it wants attaching an Aura to a player besides
-    -- (gap #2154).
+    -- not bound.
+    --
+    -- Not implemented: the ATTACKING player as a bound slot, which Archnemesis'
+    -- "attach this Aura to that player" needs (#2810).
     --
     -- ONLY AttackTarget.OfPlayer matches, which is rule 508.3e's last sentence
     -- in as many words -- "it won't trigger if a creature attacks a planeswalker

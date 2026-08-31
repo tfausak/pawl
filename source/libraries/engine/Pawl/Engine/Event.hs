@@ -6989,13 +6989,14 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- attacker would agree today, rule 508.1 letting only the active player
   -- declare, but the rule asks who declared.
   --
-  -- Both sides are also QUALIFIED, each by its own relation against the same
-  -- CR 109.5 perspective: Lulu, Stern Guardian's "whenever an opponent attacks
-  -- you" is Opponent over the declarer and You over the target, where Seifer's
-  -- "whenever you attack a player" is You and AnyPlayer. Only You discriminates
-  -- on the attacked side -- CR 506.2a has the attacking player choose an
-  -- opponent to attack and CR 802.2 makes all their opponents defending
-  -- players, so Opponent and AnyPlayer pick the same seats there.
+  -- Both sides are QUALIFIED, each by its own relation: Lulu, Stern Guardian's
+  -- "whenever an opponent attacks you" is Opponent over the declarer and You
+  -- over the target, where Seifer's "whenever you attack a player" is You and
+  -- AnyPlayer. Both are read against CR 109.5's "you" -- the ability's
+  -- controller -- and not against each other, so Opponent on the ATTACKED side
+  -- would say "somebody other than me was attacked" rather than restate CR
+  -- 506.2a's requirement that the defending player be an opponent of the
+  -- attacker.
   --
   -- ONLY AttackTarget.OfPlayer, which is rule 508.3e's last sentence in as many
   -- words: "it won't trigger if a creature attacks a planeswalker or a battle".
@@ -11044,10 +11045,9 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- CR 508.3e's SECOND subject, off the same event and under the same reserved
   -- slot: whom the declaration was aimed at, which is what "that player" means
   -- in Seifer, Balamb Rival's "goad target creature that player controls". The
-  -- ATTACKING player the event also carries goes unbound, the CreatureAttacksYou
-  -- arm above's reasoning -- no printing of this shape points back at it that
-  -- CR 109.5's "you" cannot say, and #2154 is where the ones that do are
-  -- tracked.
+  --
+  -- Not implemented: the ATTACKING player the event also carries, which
+  -- Archnemesis' "attach this Aura to that player" needs (#2810).
   --
   -- The narrowing to AttackTarget.OfPlayer is matchesTrigger's, re-stated here
   -- because this function is not given its answer: an event this condition

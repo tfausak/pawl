@@ -4197,10 +4197,10 @@ luluSpec s registry =
           case (mine, theirs) of
             ([first, second], [_]) -> do
               let after = atBlockers (answering S.bob [first, second] second) gs
-              Spec.assertEqWith s "CR 121.6a the Piker the trigger named has a stun counter" (stunOn second after) (Just 1)
+              Spec.assertEqWith s "CR 122.1d the Piker the trigger named has a stun counter" (stunOn second after) (Just 1)
               Spec.assertEqWith s "and the Piker it did not name has none" (stunOn first after) (Just 0)
               Spec.assertEqWith s "CR 508.3e one trigger, from the one attacked player" (fired after) 1
-              Spec.assertEqWith s "CR 506.2a and both Pikers really were declared at bob" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.bob), (second, AttackTarget.OfPlayer S.bob)])
+              Spec.assertEqWith s "CR 508.1b and both Pikers really were declared at bob" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.bob), (second, AttackTarget.OfPlayer S.bob)])
             _ -> Spec.assertFailure s "fixture should give alice two Pikers and bob a Lulu"
         -- The same board with CR 506.2a's answer moved to carol, and nothing
         -- else changed. This is the leg the attacked relation buys: a payload
@@ -4219,8 +4219,8 @@ luluSpec s registry =
             ([first, second], [_]) -> do
               let after = atBlockers (answering S.carol [first, second] second) gs
               Spec.assertEqWith s "CR 508.3e no trigger at all" (fired after) 0
-              Spec.assertEqWith s "CR 121.6a and neither Piker is stunned" (stunOn second after, stunOn first after) (Just 0, Just 0)
-              Spec.assertEqWith s "CR 506.2a and both Pikers really were declared at carol" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.carol), (second, AttackTarget.OfPlayer S.carol)])
+              Spec.assertEqWith s "CR 122.1d and neither Piker is stunned" (stunOn second after, stunOn first after) (Just 0, Just 0)
+              Spec.assertEqWith s "CR 508.1b and both Pikers really were declared at carol" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.carol), (second, AttackTarget.OfPlayer S.carol)])
             _ -> Spec.assertFailure s "fixture should give alice two Pikers and bob a Lulu"
 
 -- CR 122.1's experience counters READ, with Ezuri, Claw of Progress {2}{G}{U}
