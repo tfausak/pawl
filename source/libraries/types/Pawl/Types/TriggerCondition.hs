@@ -11,6 +11,7 @@ import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBl
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -276,11 +277,20 @@ data TriggerCondition
     -- three or more creatures" needs (#2226).
     PlayerAttacksWith PlayerAttacksWith.PlayerAttacksWith
   | -- | CR 508.3e: "whenever [a player] attacks [another player]" -- Seifer,
-    -- Balamb Rival's "whenever you attack a player". The payload is which player
-    -- rule 508.3e names FIRST, the one who declared; the second subject is the
-    -- rule's bare "[another player]", left unqualified because every printing
-    -- this arm serves prints it bare -- Scryfall o:"attack a player",
-    -- 2026-08-24, twenty-four cards and not one of them narrows that side.
+    -- Balamb Rival's "whenever you attack a player", Lulu, Stern Guardian's
+    -- "whenever an opponent attacks you". The payload names BOTH of rule
+    -- 508.3e's subjects: `attacker` is the one who declared, `attacked` the one
+    -- the declaration was aimed at. A card leaving the second subject bare
+    -- writes AnyPlayer there, which is what every printing of Seifer's shape
+    -- says -- Scryfall o:"attack a player", 2026-08-24, twenty-four cards and
+    -- not one of them narrows it.
+    --
+    -- Only You is observable on the ATTACKED side: CR 506.2a has the attacking
+    -- player choose an opponent to attack and CR 802.2 makes every one of their
+    -- opponents a defending player, so Opponent and AnyPlayer pick the same
+    -- seats on every legal declaration. The arm carries a full relation anyway
+    -- because that is the shape rule 508.3e's second subject takes, and because
+    -- the attacker side beside it needs all three.
     --
     -- CR 508.3b's per-TARGET arity and not rule 508.3d's, so this reads
     -- GameEvent.BecameAttacked where PlayerAttacks above reads
@@ -295,8 +305,10 @@ data TriggerCondition
     -- off the same event, because that is what the printed payloads read --
     -- Seifer's "goad target creature that player controls", Karazikar, the Eye
     -- Tyrant's and Gornog, the Red Reaper's the same. The ATTACKING player is
-    -- not bound: no printing points back at it that the payload's own "you"
-    -- cannot say.
+    -- not bound: no printing of this shape points back at it that the payload's
+    -- own "you" cannot say -- Archnemesis' "attach this Aura to that player" is
+    -- the one that would, and it wants attaching an Aura to a player besides
+    -- (gap #2154).
     --
     -- ONLY AttackTarget.OfPlayer matches, which is rule 508.3e's last sentence
     -- in as many words -- "it won't trigger if a creature attacks a planeswalker
@@ -305,11 +317,7 @@ data TriggerCondition
     -- battlefield attacking, holds by construction: CR 508.4 says such a
     -- creature was never declared, and Pawl.Engine.Combat.putOntoBattlefieldAttacking
     -- records no event.
-    --
-    -- Not implemented: a NAMED attacked side, which "whenever a player attacks
-    -- you" needs -- Mirkwood Trapper and Lulu, Stern Guardian print it, and each
-    -- wants a second capability besides (#2281).
-    PlayerAttacksPlayer PlayerRelation.PlayerRelation
+    PlayerAttacksPlayer PlayerAttacksPlayer.PlayerAttacksPlayer
   | -- | CR 702.105a: dethrone -- SelfAttacks narrowed by whom the bearer
     -- attacked. The attacked player comes from Combat.attackers rather than the
     -- event, and that is the whole narrowing: the event carries CR 508.5's

@@ -101,6 +101,7 @@ import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -2279,9 +2280,11 @@ everyTriggerCondition =
     TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.You (Filter.Type.And [])),
     TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.Opponent (Filter.Type.And [])),
     TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.AnyPlayer (Filter.Type.And [])),
-    TriggerCondition.PlayerAttacksPlayer PlayerRelation.You,
-    TriggerCondition.PlayerAttacksPlayer PlayerRelation.Opponent,
-    TriggerCondition.PlayerAttacksPlayer PlayerRelation.AnyPlayer,
+    TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.You PlayerRelation.AnyPlayer),
+    TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.Opponent PlayerRelation.AnyPlayer),
+    TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.AnyPlayer PlayerRelation.AnyPlayer),
+    TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.Opponent PlayerRelation.You),
+    TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.AnyPlayer PlayerRelation.Opponent),
     TriggerCondition.SelfAttacksPlayerWithMostLife,
     TriggerCondition.SelfBlocks,
     TriggerCondition.SelfBlocksAtLeast 2,

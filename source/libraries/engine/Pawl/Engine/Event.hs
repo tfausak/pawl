@@ -154,6 +154,7 @@ import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesign
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -6988,12 +6989,13 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- attacker would agree today, rule 508.1 letting only the active player
   -- declare, but the rule asks who declared.
   --
-  -- The attacked side is UNQUALIFIED, rule 508.3e's "[another player]" as every
-  -- printing of this shape leaves it -- Pawl.Types.TriggerCondition's arm says
-  -- which cards would narrow it (#2281). A relation there would be nearly
-  -- unobservable besides: CR 506.2 and CR 802.2 make every defending player an
-  -- opponent of the attacker, so Opponent and AnyPlayer would pick the same
-  -- seats on every legal declaration.
+  -- Both sides are also QUALIFIED, each by its own relation against the same
+  -- CR 109.5 perspective: Lulu, Stern Guardian's "whenever an opponent attacks
+  -- you" is Opponent over the declarer and You over the target, where Seifer's
+  -- "whenever you attack a player" is You and AnyPlayer. Only You discriminates
+  -- on the attacked side -- CR 506.2a has the attacking player choose an
+  -- opponent to attack and CR 802.2 makes all their opponents defending
+  -- players, so Opponent and AnyPlayer pick the same seats there.
   --
   -- ONLY AttackTarget.OfPlayer, which is rule 508.3e's last sentence in as many
   -- words: "it won't trigger if a creature attacks a planeswalker or a battle".
@@ -7005,9 +7007,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- No bearer test, PlayerAttacks' bystanding posture above: rule 508.3e's two
   -- subjects are both players, so a Seifer held out of combat still triggers on
   -- its controller's attack.
-  TriggerCondition.PlayerAttacksPlayer relation -> case event of
+  TriggerCondition.PlayerAttacksPlayer subjects -> case event of
     GameEvent.BecameAttacked payload -> case BecameAttacked.target payload of
-      AttackTarget.OfPlayer _ -> PlayerRelation.holds relation you (BecameAttacked.attacker payload)
+      AttackTarget.OfPlayer attacked ->
+        PlayerRelation.holds (PlayerAttacksPlayer.attacker subjects) you (BecameAttacked.attacker payload)
+          && PlayerRelation.holds (PlayerAttacksPlayer.attacked subjects) you attacked
       AttackTarget.OfPlaneswalker _ -> False
       AttackTarget.OfBattle _ -> False
     GameEvent.AttackerDeclared {} -> False
@@ -13660,7 +13664,7 @@ controllerTurnScoped cond = case cond of
   -- The same comparison over the ATTACKING side, which is the field rule
   -- 508.3e's event pins to the active player; the attacked side says nothing
   -- about whose turn it is.
-  TriggerCondition.PlayerAttacksPlayer relation -> relation == PlayerRelation.You
+  TriggerCondition.PlayerAttacksPlayer subjects -> PlayerAttacksPlayer.attacker subjects == PlayerRelation.You
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
