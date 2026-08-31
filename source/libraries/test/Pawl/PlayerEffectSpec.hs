@@ -4670,7 +4670,7 @@ yawgmothsWillSpec s registry =
           Spec.assertBool s (not (S.castable S.alice his after)) "alice may not cast the copy in bob's graveyard"
           Spec.assertBool s (not (any (S.isCastOf his) (Action.legalActions S.alice after))) "nor is it offered to her"
           Spec.assertBool s (S.castable S.alice hers after) "though the identical copy in her own graveyard is castable"
-          Spec.assertBool s (PlayerEffect.mayCastFromGraveyard S.alice his after) "so the refusal is the zone's and not the permission's"
+          Spec.assertBool s (PlayerEffect.mayCastFromGraveyard S.alice his after) "so the refusal is not this permission's own filter"
 
         -- The permission names a ZONE, not a TIME, which is the flashback ruling
         -- one rule over ("you can cast a sorcery using flashback only when you
