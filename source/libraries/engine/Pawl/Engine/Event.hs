@@ -722,20 +722,30 @@ placeObject pid mkObj dest position = do
 -- Not routed through Event.changeZone for that shared reason: a zone change
 -- would announce a departure from a zone the card was never in.
 --
+-- The MATERIALIZATION only. A battlefield destination is an entry as well, and
+-- CR 616.1's loop and the CR 603.6a scan run after this rather than inside it --
+-- see conjureOntoBattlefield, which is the one caller passing that zone.
+--
 -- `position` is CR 401.2's end for a LIBRARY destination and inert elsewhere,
 -- placeObject's own note; Game.insertIntoZone is the only reader.
 --
--- Sickness.Sick rather than Settled: nothing here puts the card onto the
--- battlefield, and CR 302.6's summoning sickness is settled by the entry that
--- eventually does.
-mintCard :: PlayerId -> PrintingId.PrintingId -> Zone -> LibraryPosition.LibraryPosition -> GameState.GameState -> (ObjectId, GameState.GameState)
-mintCard pid printingId dest position gs =
+-- Sickness.Sick either way: CR 302.6 asks whether the permanent has been under
+-- its controller's control continuously since their most recent turn began, and
+-- a card minted straight onto the battlefield has not; one minted into any other
+-- zone is settled by the entry that eventually puts it there.
+--
+-- `under` is CR 110.2a's controller for a BATTLEFIELD mint -- "if an effect
+-- instructs a player to put an object onto the battlefield, that object enters
+-- the battlefield under that player's control" -- and Nothing for every other
+-- zone, where CR 110.2 leaves the object no controller to record.
+mintCard :: PlayerId -> Maybe PlayerId -> PrintingId.PrintingId -> Zone -> LibraryPosition.LibraryPosition -> GameState.GameState -> (ObjectId, GameState.GameState)
+mintCard pid under printingId dest position gs =
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = pid,
-            Object.enteredUnder = Nothing,
+            Object.enteredUnder = under,
             Object.source = Source.OfCard printingId,
             Object.zone = dest,
             Object.tapped = TapState.Untapped,
@@ -798,7 +808,41 @@ mintCard pid printingId dest position gs =
 conjure :: PlayerId -> Card -> Zone -> LibraryPosition.LibraryPosition -> Game ObjectId
 conjure pid card dest position = do
   printingId <- State.state (Game.intern (Printing.MkPrinting card))
-  State.state (mintCard pid printingId dest position)
+  State.state (mintCard pid Nothing printingId dest position)
+
+-- The same keyword action with the BATTLEFIELD as its destination, which is the
+-- one arrival that is an entry: `conjure` above puts the card into a zone and
+-- stops, where this runs CR 616.1's replacement loop and records the event CR
+-- 603.6a's trigger scan reads.
+--
+-- createTokens is the model, and the whole batch is minted before any member
+-- enters for that function's reason: CR 614.12 checks "the characteristics of
+-- the permanent as it would exist on the battlefield", and `siblingsOf` is what
+-- hands each entry loop the others. Marwyn's Kindred's "conjure a card named
+-- Marwyn, the Nurturer and X cards named Llanowar Elves onto the battlefield" is
+-- the printed batch; no card in data/cards/ conjures more than one onto the
+-- battlefield, so the batch behaviour here is a regression fence rather than a
+-- test-backed one.
+--
+-- CR 110.5b's defaults throughout: nothing here taps the arrival or puts it into
+-- combat, which is what this road's producer prints;
+-- Pawl.Types.ConjureDestination names the printings that state otherwise.
+--
+-- CR 110.2a's `Just controller` is correct by construction and unobservable: a
+-- conjured card's OWNER is the player who conjured it (mintCard's `pid`, the
+-- same seat), and Projection.defaultControllerOf answers the owner when
+-- `enteredUnder` is Nothing, so no board can tell the two writings apart.
+-- Mutating it to Nothing leaves Pawl.ConjureSpec green, and would stop doing so
+-- the day a printing names a conjurer other than the resolving controller
+-- (#2638).
+conjureOntoBattlefield :: PlayerId -> Card -> Natural -> Game (Seq.Seq ObjectId)
+conjureOntoBattlefield controller card count = do
+  printingId <- State.state (Game.intern (Printing.MkPrinting card))
+  ids <- Monad.replicateM (Natural.toIntSaturating count) (State.state (mintCard controller (Just controller) printingId Zone.Battlefield LibraryPosition.defaultValue))
+  let siblingsOf oid = Set.delete oid (Set.fromList ids)
+  Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
+  Monad.mapM_ recordMintedEntry ids
+  pure (Seq.fromList ids)
 
 -- CR 114.2: a player gets an emblem with the given abilities, put into the
 -- command zone and both owned and controlled by them. CR 613.7a: its entry
@@ -5043,14 +5087,16 @@ createTokens controller card copy n tapped entering = do
           -- No prior incarnation to snapshot, so a token's last known information
           -- IS what it is now (CR 111.3). Recorded after every entry loop, so the
           -- events describe settled objects.
-          Monad.mapM_ recordTokenEntry ids
+          Monad.mapM_ recordMintedEntry ids
           pure ids
 
--- Nothing departed, so `departed` is the token's own id. Harmless rather than a
+-- Nothing departed, so `departed` is the arrival's own id. Harmless rather than a
 -- fiction readers must know about: from == to == Battlefield already fails every
--- departure test (CR 603.6c), and a token has no `lastKnown` entry to find.
-recordTokenEntry :: ObjectId -> Game ()
-recordTokenEntry newId = do
+-- departure test (CR 603.6c), and neither road that reaches this has a
+-- `lastKnown` entry to find -- a token has no prior incarnation (CR 111.3), and a
+-- conjured card was in no zone.
+recordMintedEntry :: ObjectId -> Game ()
+recordMintedEntry newId = do
   placed <- State.get
   let snapshot = Projection.project newId placed
   State.modify' (recordEvent (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange newId newId Zone.Battlefield Zone.Battlefield) snapshot)))
@@ -5202,7 +5248,7 @@ meld controller victims resultCard = do
       runEntry Set.empty newId
       -- CR 603.6a's enters-the-battlefield triggers scan this, and it is recorded
       -- after the entry loop so the snapshot describes a settled permanent --
-      -- recordTokenEntry's reasons, one zone over. `from` is where the cards were,
+      -- recordMintedEntry's reasons, one zone over. `from` is where the cards were,
       -- so an "enters from exile" read sees the truth of rule 701.42a.
       --
       -- Not implemented: a ZoneChange names ONE departing incarnation and ONE
@@ -8177,9 +8223,10 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- zone.
   --
   -- The `to /= Battlefield` guard is that rule's own word "another", and is
-  -- load-bearing: recordTokenEntry files a battlefield-to-battlefield pseudo-move
-  -- whose `departed` is the token's own id, so a token bearing this condition
-  -- would fire on its own creation without it.
+  -- load-bearing: recordMintedEntry files a battlefield-to-battlefield pseudo-move
+  -- whose `departed` is the arrival's own id, so a permanent minted straight onto
+  -- the battlefield -- a token, a melded permanent, a conjured card -- would fire
+  -- this condition on its own creation without it.
   --
   -- Matched on `departed` for SelfDies' reason (CR 603.10a).
   --
@@ -12387,7 +12434,8 @@ eventTriggers events gs =
       -- battlefield" arrive as a matcher arm alone.
       --
       -- The `to /= Battlefield` guard is CR 603.6c's own word "another": the
-      -- pseudo-move recordTokenEntry emits for a new token is not a departure.
+      -- pseudo-move recordMintedEntry emits for a permanent minted straight onto
+      -- the battlefield is not a departure.
       --
       -- The departing id is what the placed trigger carries as its SOURCE (CR
       -- 113.7a). CR 603.6c's arriving incarnation is a SECOND slot rather than a

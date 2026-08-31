@@ -1,0 +1,167 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Shellfish Scholar",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "PermanentEnters",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasSubtype",
+                  "value": {
+                    "type": "Rat"
+                  }
+                },
+                {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                }
+              ]
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Conjure",
+                        "value": {
+                          "card": {
+                            "faces": [
+                              {
+                                "keywords": [
+                                  {
+                                    "type": "Flashback",
+                                    "value": {
+                                      "mana": [
+                                        {
+                                          "type": "Generic",
+                                          "value": 2
+                                        },
+                                        {
+                                          "type": "OfType",
+                                          "value": {
+                                            "type": "Colored",
+                                            "value": {
+                                              "type": "Blue"
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ],
+                                "manaCost": [
+                                  {
+                                    "type": "Generic",
+                                    "value": 1
+                                  },
+                                  {
+                                    "type": "OfType",
+                                    "value": {
+                                      "type": "Colored",
+                                      "value": {
+                                        "type": "Blue"
+                                      }
+                                    }
+                                  }
+                                ],
+                                "name": "Think Twice",
+                                "spell": {
+                                  "modes": [
+                                    {
+                                      "clauses": [
+                                        {
+                                          "effects": [
+                                            {
+                                              "type": "Draw",
+                                              "value": {
+                                                "player": {
+                                                  "type": "Relative",
+                                                  "value": {
+                                                    "type": "You"
+                                                  }
+                                                },
+                                                "quantity": {
+                                                  "type": "Literal",
+                                                  "value": 1
+                                                }
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                "typeLine": {
+                                  "types": [
+                                    {
+                                      "type": "Instant"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "destination": {
+                            "type": "Graveyard"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Rat"
+          },
+          {
+            "type": "Wizard"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
