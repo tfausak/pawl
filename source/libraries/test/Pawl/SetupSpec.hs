@@ -658,17 +658,21 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     Spec.assertEqWith s "CR 729.4a: a GameEvent.LeftTheGame names it in the main game's log" leftEvents [elfId]
     Spec.assertEqWith s "CR 608.2h: its last known information is filed under the id it had" (Map.member elfId (GameState.lastKnown after)) True
 
-  -- CR 603.6c's second trigger event on the OTHER road out of the game -- CR
-  -- 729.4a's crossing, where the departure road above it is CR 800.4a. Three
-  -- seats, each doing a job, exactly as Pawl.DepartureSpec's pair does for that
-  -- road: alice OWNS the Thragtusk, carol CONTROLS it and so takes CR 603.3a's
-  -- trigger, and bob is the bystander the token count is checked against.
+  -- CR 729.4a: "abilities in the main game that trigger on objects leaving a
+  -- main-game zone will trigger, but they won't be put onto the stack until the
+  -- main game resumes." A leaves-the-battlefield ability (CR 603.6c) is such an
+  -- ability, and the crossing is the OTHER road out of the game -- rule 603.6c's
+  -- own second clause names only CR 800.4a's, which Pawl.DepartureSpec covers.
+  --
+  -- Three seats, each doing a job, exactly as that spec's pair does: alice OWNS
+  -- the Thragtusk, carol CONTROLS it and so takes CR 603.3a's trigger, and bob
+  -- is the bystander the token count is checked against.
   --
   -- The trigger can only be read from CR 608.2h last known information: the
   -- crossed permanent is not merely off the battlefield by the CR 117.5 scan, it
   -- is out of the main game, so neither the live board nor the per-group sample
   -- has anything to find.
-  Spec.it s "CR 603.6c/729.4a a phased-in permanent a subgame takes triggers its leaves-the-battlefield ability" $ do
+  Spec.it s "CR 729.4a a phased-in permanent a subgame takes triggers its leaves-the-battlefield ability" $ do
     thragtusk <- S.printingOf s registry "Thragtusk"
     let (tusk, g1) = S.addCreature thragtusk S.alice S.threePlayerGame
         parent = S.giveControl tusk S.carol g1
@@ -678,7 +682,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     Spec.assertEqWith s "carol controls the creature alice owns" (Projection.controllerOf tusk parent) (Just S.carol)
     Spec.assertEqWith s "it is phased in, so the pair's one difference is genuinely absent here" (Map.member tusk (GameState.phasedOut parent)) False
     Spec.assertEqWith s "the subgame's wish took it out of the main game" (Game.lookupObject tusk after) Nothing
-    Spec.assertEqWith s "CR 603.6c: carol got the Beast the leaves-the-battlefield ability makes" (S.countOnBattlefieldByName beastToken S.carol after) 1
+    Spec.assertEqWith s "CR 729.4a: carol got the Beast the leaves-the-battlefield ability makes" (S.countOnBattlefieldByName beastToken S.carol after) 1
     Spec.assertEqWith s "and nobody else did" (fmap (\pid -> S.countOnBattlefieldByName beastToken pid after) [S.alice, S.bob]) [0, 0]
 
   -- CR 702.26b: "except for rules and effects that specifically mention
@@ -707,7 +711,10 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
         after = resolveTriggers (Setup.applyCrossings crossedSub parent)
     Spec.assertEqWith s "it is phased out" (Phasing.isPhasedOut tusk parent) True
     Spec.assertEqWith s "and carol still controls it, so CR 702.26b is not answering by handing it back" (Projection.controllerOf tusk parent) (Just S.carol)
-    Spec.assertEqWith s "CR 729.4: a phased-out main-game permanent is still offered to the subgame" (Maybe.isJust broughtInId) True
+    -- The fixture's own precondition, and the reading recorded at
+    -- Setup.applyCrossings: CR 729.4 puts every main-game object outside the
+    -- subgame, so the wish reaches this one and the crossing happens at all.
+    Spec.assertEqWith s "the subgame's wish did reach it (CR 729.4)" (Maybe.isJust broughtInId) True
     -- The rule under test, ahead of every proxy below it.
     Spec.assertEqWith s "CR 702.26b: no zone-change ability triggered" (fmap (\pid -> S.countOnBattlefieldByName beastToken pid after) [S.alice, S.bob, S.carol]) [0, 0, 0]
     Spec.assertEqWith s "CR 729.4a: it left the main game just the same" (Game.lookupObject tusk after) Nothing
