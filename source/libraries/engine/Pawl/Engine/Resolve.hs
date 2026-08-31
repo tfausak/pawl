@@ -1239,9 +1239,12 @@ turnUpRewriteReads rewrite = case rewrite of
   TurnUpRewrite.WithCounters counters -> ([], Map.elems (WithCounters.counters counters))
   TurnUpRewrite.MayAttachTo filter_ -> ([filter_], [])
 
--- replacementRowReads as a slot map. Arity One throughout, since a Filter.IsBound
--- is a membership test rather than a target slot and Quantity.slots answers the
--- same way.
+-- replacementRowReads as a slot map. Arity One for every FILTER read, a
+-- Filter.IsBound being a membership test rather than a target slot; the QUANTITY
+-- half is quantitySlots' answer, so a Quantity.InSlot reports SlotArity.Amount --
+-- CR 614.1c's WithCounters and CR 702.37b's are the two rewrites that can carry
+-- one. The two capture sites take Map.keysSet, so the arity reaches only slotsOf's
+-- Replace arm.
 replacementRowSlots :: ReplacementEffect.ReplacementEffect (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Map.Map SlotName SlotArity
 replacementRowSlots re =
   let (filters, quantities) = replacementRowReads re
@@ -6580,7 +6583,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Leader's "to Dogs you control"), PreventNextDamage's split exactly: CR
     -- 611.2c leaves that set live, so the row carries the predicate and
     -- Replacement re-asks it at each damage event rather than sweeping it here.
-    -- A card writing both spellings is read as the description alone.
+    -- A DealtTo card writing both spellings is read as the description alone;
+    -- beside DealtBy the two are not alternatives at all, the ref naming the
+    -- SOURCE there and the description the recipients, so both ride the row.
     gs <- State.get
     let named = foldMap (objectRefRecipients legal resolving controller source gs) ref
         -- Through effectContext rather than Filter.contextFor, so CR 609.7a's
@@ -6609,9 +6614,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- question the source half of the row answers.
     case direction of
       -- A DealtBy row watches CR 120.1's source, which is always an OBJECT, so a
-      -- player the ref named drops out -- and it names no recipient, so the
-      -- damage Dovin, Hand of Control's shielded permanent would deal to a
-      -- PLAYER is prevented as much as the damage it would deal to a permanent.
+      -- player the ref named drops out. A card describing no recipient names
+      -- none on the row either, so the damage Dovin, Hand of Control's shielded
+      -- permanent would deal to a PLAYER is prevented as much as the damage it
+      -- would deal to a permanent.
       --
       -- The source half here is CR 601.2c's TARGET, and CR 609.7a's player
       -- CHOICE is a different question, so the chosenSource field is not read on
@@ -6625,11 +6631,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- name, so they are threaded on this side too; every by-direction card in
       -- data/cards/ leaves them trivial.
       --
-      -- The DESCRIBED recipient side is not read here either: a shield pinned to
-      -- the source side names no recipient at all, and CR 609.7b's predicate over
-      -- what its source looks like is `printedSource`.
+      -- The DESCRIBED recipient rides this side too: CR 615.1's shield watches a
+      -- damage EVENT, and a card may narrow either end of it (Goblin Furrier's
+      -- "prevent all damage that this creature would deal to snow creatures"), so
+      -- the two halves conjoin on the row rather than the description being
+      -- dropped for the source's sake. `rows` is not consulted here -- the fold is
+      -- over the ids the ref named, and each row bakes CR 601.2c's source beside
+      -- the live predicate.
       DamageDirection.DealtBy ->
-        State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) (Filter.slotObjects context) controller source duration kind DamageRewrite.PreventAll rider printedSource (Nothing, Nothing)) g0 (fmap (\oid -> (Nothing, Just (Filter.Type.And [], oid))) (Maybe.mapMaybe Recipient.objectOf named))
+        State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) (Filter.slotObjects context) controller source duration kind DamageRewrite.PreventAll rider printedSource (whatRecipient, Nothing)) g0 (fmap (\oid -> (Nothing, Just (Filter.Type.And [], oid))) (Maybe.mapMaybe Recipient.objectOf named))
       DamageDirection.DealtTo ->
         -- No recipient is CR 608.2b's gone target, so there is nothing to shield
         -- and CR 609.7a's choice -- a choice existing only to be baked into a
