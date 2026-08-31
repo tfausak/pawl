@@ -2032,6 +2032,153 @@ galvanicBlastReferentSpec s registry = Spec.describe s "Galvanic Blast (CR 609.7
     Spec.assertEqWith s "setup: that row names no slot, so it captured none" (foldMap ActiveReplacement.slots (GameState.replacements armed)) Map.empty
     Spec.assertBool s (landId /= destroyed && landId /= fireEater) "setup: the id the twin names is a land and neither creature"
 
+-- CR 609.7a's third class read off the SLOTS a waiting row captured rather than
+-- off the ids a resolution baked into it, whose producers are Synthetic Communal
+-- Bulwark ({1}{W} Instant: "Prevent the next 3 damage that would be dealt this
+-- turn to you and to target creature.") for the row that refers, Ghitu Fire-Eater
+-- for the object it refers to, and Healing Grace for the later chooser.
+--
+-- The captured map is the one carrier of a waiting row the two cases above cannot
+-- reach: Healing Grace's row names no slot and Galvanic Blast's metalcraft row
+-- names none either, which is what that case proves by exclusion. The Bulwark's
+-- DamagePattern.whatRecipient is a Filter.IsBound over its target slot, so
+-- Resolve.installDamageRow's restriction keeps exactly that slot and CR 609.7a's
+-- "any object referred to by ... a replacement or prevention effect that's
+-- waiting to apply" reaches the creature through it.
+--
+-- WHY THE FIRE-EATER HAS TO DEPART FIRST: every one of the rule's other three
+-- classes would otherwise offer it anyway. Its own ability sacrifices it as a
+-- cost and then resolves, so by the time Healing Grace is cast the id is on no
+-- battlefield, is no spell and sits in no command zone -- the parenthesis's "even
+-- if that object is no longer in the zone it used to be in".
+--
+-- HEALING GRACE rather than Auriok Replica as the chooser, which the two cases
+-- above use: the Replica's shield covers "you" and so does the Bulwark's, so the
+-- two would overlap and no life total could be attributed to one of them. Healing
+-- Grace's shield is aimed at bob's Ainok Tracker, whom the Bulwark covers on
+-- neither of its two ends.
+--
+-- Two seats is enough: neither card names an opponent. bob owns the creature the
+-- damage lands on, so the shield's recipient is on the other side of the table
+-- from its chosen source.
+communalBulwarkReferentSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+communalBulwarkReferentSpec s registry = Spec.describe s "Synthetic Communal Bulwark and Healing Grace (CR 609.7a)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+  Spec.it s "CR 609.7a a source only a waiting row's captured slot still names is offered" $ do
+    plains <- S.printingOf s registry "Plains"
+    ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
+    bulwark <- S.printingOf s registry "Synthetic Communal Bulwark"
+    healingGrace <- S.printingOf s registry "Healing Grace"
+    trackerPrinting <- S.printingOf s registry "Ainok Tracker"
+    let (fireEater, g1) = S.addCreature ghitu S.alice (Setup.emptyGame S.bothPlayers)
+        (victim, g2) = S.addCreature trackerPrinting S.bob g1
+        -- Three Plains: two pay the Bulwark's {1}{W}, the third Healing Grace's {W}.
+        g3 = S.landsFor plains S.alice 3 g2
+        (bulwarkId, g4) = S.addHandCard bulwark S.alice g3
+        (graceId, g5) = S.addHandCard healingGrace S.alice g4
+        ready =
+          g5
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        -- The Bulwark resolved onto the Fire-Eater, so its row's captured map
+        -- holds that one slot.
+        shielded = S.runPure (targetingOnly fireEater) ready (S.cast S.alice bulwarkId Monad.>> Stack.resolveTop)
+        -- Then the Fire-Eater pays itself as a cost and its ability resolves,
+        -- leaving the stack empty and the id naming nothing. The 2 goes at BOB,
+        -- whom the Bulwark's shield covers on neither end.
+        armed = S.runPure (aimPlayer S.bob) shielded (Activate.activateAbility S.alice fireEater (theAbility ghitu) Monad.>> Stack.resolveTop)
+        rest = S.cast S.alice graceId Monad.>> Stack.resolveTop
+        after src = S.runPure (aimAndChoose victim src) armed rest
+        strike gs = S.runPure S.identityAnswer gs (Damage.applyDamage [hit fireEater (Recipient.ToCreature victim) 3])
+        -- The lands were placed last, so the battlefield's highest id is a Plains.
+        plainsId = Set.findMax (GameState.battlefield armed)
+    -- THE gameplay assertion: alice named the Fire-Eater, which by now only the
+    -- Bulwark's captured slot still names, and Healing Grace's shield watches it.
+    Spec.assertEqWith s "the source only the waiting row's captured slot names is offered, and its 3 is prevented" (S.damageOf victim (strike (after fireEater))) (Just 0)
+    -- Its twin on the same board, differing in the ANSWER alone: a Plains is a
+    -- permanent and always was a legal choice, and shields nothing here -- so the
+    -- 0 above is not "everything was prevented".
+    Spec.assertEqWith s "naming a Plains instead leaves that same 3 landing in full" (S.damageOf victim (strike (after plainsId))) (Just 3)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "alice was OFFERED the captured source and answered it" (chosenSourcesIn (answersFor (aimAndChoose victim fireEater) armed rest)) [fireEater]
+    Spec.assertBool s (Maybe.isNothing (Game.lookupObject fireEater armed)) "setup: the cost really did remove the Fire-Eater, so the id names nothing"
+    Spec.assertEqWith s "setup: the Bulwark left exactly one floating row, and the stack is empty" (length (GameState.replacements armed), GameState.stack armed) (1, [])
+    Spec.assertEqWith s "setup: that row captured the one slot its recipient names, holding the Fire-Eater" (foldMap (foldMap Set.toList . ActiveReplacement.slots) (GameState.replacements armed)) [fireEater]
+    Spec.assertBool s (plainsId /= fireEater && plainsId /= victim) "setup: the id the twin names is a Plains and neither creature"
+
+-- CR 609.7a's third class off its LAST carrier, whose producers are Come Back
+-- Wrong ({2}{B} Sorcery: "Destroy target creature. If a creature card is put into
+-- a graveyard this way, return it to the battlefield under your control.
+-- Sacrifice it at the beginning of your next end step.") for the delayed
+-- triggered ability that refers, Goblin Piker for the object it refers to, and
+-- Auriok Replica for the later chooser.
+--
+-- The rule admits "any object referred to by ... a delayed triggered ability
+-- that's waiting to trigger (even if that object is no longer in the zone it used
+-- to be in)". CR 603.7c is why the entry carries an environment at all, and
+-- Resolve's ArmDelayedTrigger arm captures the resolution's bindings into it, so
+-- the `target` slot -- the id the creature had ON THE BATTLEFIELD, before CR
+-- 400.7 made it two further objects in the graveyard and back -- rides the entry
+-- and nothing else.
+--
+-- WHY THE ENTRY IS THE ONLY CARRIER HERE, which is what the setup assertions pay
+-- for: this board never installs a replacement row at all, and the stack is empty
+-- when the Replica's chooser runs. The battlefield holds the RETURNED permanent,
+-- a third object with a third id, so the id under test is in no zone and named by
+-- nothing but the waiting entry. Its trigger condition is the beginning of
+-- alice's end step and this board never advances a step, so the entry is still
+-- waiting.
+--
+-- Two seats is enough: neither card names an opponent, and bob owns the creature
+-- Come Back Wrong destroys.
+comeBackWrongSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+comeBackWrongSpec s registry = Spec.describe s "Come Back Wrong and Auriok Replica (CR 609.7a)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+  Spec.it s "CR 609.7a a source only a waiting delayed trigger still refers to is offered" $ do
+    plains <- S.printingOf s registry "Plains"
+    swamp <- S.printingOf s registry "Swamp"
+    replica <- S.printingOf s registry "Auriok Replica"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    comeBack <- S.printingOf s registry "Come Back Wrong"
+    let (departed, g1) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
+        (replicaId, g2) = S.addCreature replica S.alice g1
+        -- Three Swamps for the Sorcery's {2}{B} and two Plains for the Replica's
+        -- {W}, turnTheBladeBoard's reason: the Sorcery is paid first and spends
+        -- at most three lands, so a Plains survives however the payment picks.
+        g3 = S.landsFor swamp S.alice 3 g2
+        g4 = S.landsFor plains S.alice 2 g3
+        (comeBackId, g5) = S.addHandCard comeBack S.alice g4
+        ready =
+          g5
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        -- The lands were placed last, so `ready`'s highest battlefield id is a
+        -- Plains. Read BEFORE the cast, since the returned permanent enters last
+        -- of all and would otherwise be the maximum.
+        plainsId = Set.findMax (GameState.battlefield ready)
+        armed = S.runPure (targetingOnly departed) ready (S.cast S.alice comeBackId Monad.>> Stack.resolveTop)
+        rest = Activate.activateAbility S.alice replicaId (theAbility replica) Monad.>> Stack.resolveTop
+        after src = S.runPure (chooseDamageSourceOf src) armed rest
+        strike gs = S.runPure S.identityAnswer gs (Damage.applyDamage [hit departed (Recipient.ToPlayer S.alice) 3])
+    -- THE gameplay assertion: alice named the id only the waiting entry still
+    -- refers to, and the Replica's shield watches it.
+    Spec.assertEqWith s "the source only the waiting delayed trigger names is offered, and its 3 is prevented" (S.lifeOf S.alice (strike (after departed))) (Just 20)
+    -- Its twin on the same board, differing in the ANSWER alone: a Plains is a
+    -- permanent and always was a legal choice, and shields nothing here.
+    Spec.assertEqWith s "naming a Plains instead leaves that same 3 landing in full" (S.lifeOf S.alice (strike (after plainsId))) (Just 17)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "alice was OFFERED the departed source and answered it" (chosenSourcesIn (answersFor (chooseDamageSourceOf departed) armed rest)) [departed]
+    Spec.assertBool s (Maybe.isNothing (Game.lookupObject departed armed)) "setup: CR 400.7 really did retire the battlefield id, so it names nothing"
+    Spec.assertEqWith s "setup: the resolution armed exactly one delayed trigger" (Seq.length (GameState.delayedTriggers armed)) 1
+    Spec.assertEqWith s "setup: no row is waiting and the stack is empty, so only that entry can name the id" (length (GameState.replacements armed), GameState.stack armed) (0, [])
+    Spec.assertBool s (plainsId /= departed) "setup: the id the twin names is a Plains and not the departed creature"
+
 -- CR 612.1 through a REDIRECTION's own chosen-source predicate (CR 609.7a),
 -- whose producer is Synthetic Turn the Blade ({1}{W} Instant: "The next time a
 -- Human of your choice would deal damage to you this turn, that damage is dealt
@@ -2133,6 +2280,75 @@ turnTheBladeBoard s registry evolve = do
         [] -> onStack
       installed = S.runPure S.identityAnswer (if evolve then evolved else onStack) Stack.resolveTop
   pure (bobHuman, bobGoblin, cat, installed)
+
+-- CR 608.2h's LAST KNOWN INFORMATION on the other side of CR 609.7a's chooser:
+-- the rule's third class admits an object "no longer in the zone it used to be
+-- in", and a card that NARROWS the choice has to read that object's properties
+-- off something. Synthetic Turn the Blade supplies the narrowing ("a Human of
+-- your choice"), Ghitu Fire-Eater ({2}{R} Creature -- Human Nomad 2/2, "{T},
+-- Sacrifice this creature: It deals damage equal to its power to any target")
+-- the departed Human, and Prodigal Sorcerer ({2}{U} Creature -- Human Wizard
+-- 1/1) the living one.
+--
+-- The two readings differ in the OFFERED SET, not in the recheck: a departed id
+-- projects blank, so under the bare projection the Fire-Eater satisfies no
+-- subtype filter and the pool collapses to bob's Sorcerer alone -- one candidate,
+-- so CR 609.7a's choice is made with no prompt and the redirection watches a
+-- source alice never picked. Read through last known information the pool holds
+-- both, alice is asked, and the redirection watches the object whose damage this
+-- board is about. Pawl.Engine.Replacement.matchesDamageSource rechecks under CR
+-- 609.7b with the same pair, so the choice and the recheck cannot read one source
+-- two ways.
+--
+-- ORDER is the whole of the setup: the Fire-Eater's ability goes on the stack
+-- FIRST, so the id is still a referent of an object on the stack when the Blade
+-- resolves; what the classes cannot supply is the Human, which only CR 608.2h
+-- can. The Blade resolves next and the ability last, so the 2 is dealt with the
+-- redirection already waiting.
+--
+-- Two seats is enough: the card says "you" and "target creature you control" and
+-- names no opponent. Alice's redirect destination is a Cat Warrior (Jedit
+-- Ojanen), which is neither Human nor a source of anything here.
+turnTheBladeLastKnownSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+turnTheBladeLastKnownSpec s registry = Spec.describe s "Synthetic Turn the Blade (CR 608.2h)" $ do
+  Spec.it s "CR 608.2h a departed source is narrowed by its last known information, so a Human that has left is choosable" $ do
+    plains <- S.printingOf s registry "Plains"
+    blade <- S.printingOf s registry "Synthetic Turn the Blade"
+    ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    let (fireEater, g1) = S.addCreature ghitu S.alice (Setup.emptyGame S.bothPlayers)
+        (bobHuman, g2) = S.addCreature sorcerer S.bob g1
+        (cat, g3) = S.addCreature jedit S.alice g2
+        g4 = S.landsFor plains S.alice 2 g3
+        (bladeId, g5) = S.addHandCard blade S.alice g4
+        ready =
+          g5
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        -- The Fire-Eater's ability alone, aimed at alice: the cost has already
+        -- removed the creature, so the Human under test is departed before the
+        -- Blade is even cast.
+        armed = S.runPure (aimPlayer S.alice) ready (Activate.activateAbility S.alice fireEater (theAbility ghitu))
+        rest = S.cast S.alice bladeId Monad.>> Stack.resolveTop Monad.>> Stack.resolveTop
+        after src = S.runPure (aimAndChoose cat src) armed rest
+    -- THE gameplay assertion: the departed Human alice chose is the source the
+    -- redirection watches, so its 2 lands on her Cat. Under the bare projection
+    -- the Fire-Eater is not a Human, is never offered, and the Cat takes nothing.
+    Spec.assertEqWith s "the departed Human alice chose has its 2 redirected onto her Cat" (S.damageOf cat (after fireEater)) (Just 2)
+    Spec.assertEqWith s "so alice loses none of that 2" (S.lifeOf S.alice (after fireEater)) (Just 20)
+    -- Its twin on the same board, differing in the ANSWER alone and naming the
+    -- Human that never left: the redirection then watches a source that deals
+    -- nothing here, so the 2 reaches alice and her Cat is untouched.
+    Spec.assertEqWith s "naming bob's living Human instead leaves that 2 on alice" (S.lifeOf S.alice (after bobHuman)) (Just 18)
+    Spec.assertEqWith s "with her Cat taking none of it" (S.damageOf cat (after bobHuman)) (Just 0)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "alice was OFFERED the departed Human and answered it" (chosenSourcesIn (answersFor (aimAndChoose cat fireEater) armed rest)) [fireEater]
+    Spec.assertBool s (Maybe.isNothing (Game.lookupObject fireEater armed)) "setup: the cost really did remove the Fire-Eater, so the id names nothing"
+    Spec.assertEqWith s "setup: the Blade installed exactly one redirection" (length (GameState.replacements (after fireEater))) 1
+    Spec.assertBool s (bobHuman /= fireEater && cat /= fireEater) "setup: the two Humans are different objects, and neither is the Cat"
 
 -- CR 615.5's ADDITIONAL EFFECT, whose producer is Test of Faith ({1}{W} Instant:
 -- "Prevent the next 3 damage that would be dealt to target creature this turn.
@@ -6905,7 +7121,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   selectiveMuzzleSpec s registry
   healingGraceReferentSpec s registry
   galvanicBlastReferentSpec s registry
+  communalBulwarkReferentSpec s registry
+  comeBackWrongSpec s registry
   turnTheBladeSpec s registry
+  turnTheBladeLastKnownSpec s registry
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
   worshipSpec s registry
