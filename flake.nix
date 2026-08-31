@@ -116,18 +116,26 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+          ci = pkgs.mkShell {
+            nativeBuildInputs = [
+              pkgs.cabal-install
+              pkgs.ghc
+            ];
+          };
         in
         {
+          inherit ci;
+
           default = pkgs.mkShell {
+            inputsFrom = [ ci ];
+
             nativeBuildInputs = [
               cabal-gild.packages.${system}.default
               hooky.packages.${system}.default
               pkgs.bash
-              pkgs.cabal-install
               pkgs.coreutils
               pkgs.fzf
               pkgs.gh
-              pkgs.ghc
               pkgs.ghcid
               pkgs.git
               pkgs.hlint
