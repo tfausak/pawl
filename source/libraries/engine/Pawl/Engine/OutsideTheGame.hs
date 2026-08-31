@@ -162,7 +162,7 @@ bringInto payload source pid = do
 -- spend.
 bringIn :: PlayerId -> PrintingId.PrintingId -> GameState.GameState -> (ObjectId, GameState.GameState)
 bringIn pid printingId gs =
-  let (oid, gs1) = Event.mintCard pid printingId Zone.Hand LibraryPosition.defaultValue gs
+  let (oid, gs1) = Event.mintCard pid Nothing printingId Zone.Hand LibraryPosition.defaultValue gs
       -- One copy, not the entry: CR 100.2a's four-card limit is applied to the
       -- combined deck and sideboard (CR 100.4a), so copies of a card are COUNTED
       -- and a player who set aside two can be brought the second one later.
@@ -181,7 +181,7 @@ bringInFrom :: PlayerId -> ObjectId -> GameState.GameState -> (Maybe ObjectId, G
 bringInFrom pid outerId gs = case Map.lookup outerId (GameState.outsideObjects gs) of
   Nothing -> (Nothing, gs)
   Just entry ->
-    let (oid, gs1) = Event.mintCard pid (OutsideObject.printing entry) Zone.Hand LibraryPosition.defaultValue gs
+    let (oid, gs1) = Event.mintCard pid Nothing (OutsideObject.printing entry) Zone.Hand LibraryPosition.defaultValue gs
      in ( Just oid,
           gs1
             { GameState.outsideObjects = Map.delete outerId (GameState.outsideObjects gs1),

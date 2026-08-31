@@ -6268,7 +6268,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         State.modify' (bindSlot resolving slot named)
   -- Alchemy's conjure keyword action. Digital-only, so there is no rule to cite;
   -- what the CR settles is that the result is a CARD and not CR 111.1's token,
-  -- which is what Pawl.Engine.Event.conjure mints.
+  -- which is what Pawl.Engine.Event's conjure and conjureOntoBattlefield mint.
   --
   -- The card and the destination are read off no board -- the one is literal
   -- text and the other a constructor -- but the COUNT is a Quantity, so it takes
@@ -6283,19 +6283,27 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
-        -- Neither arrival is a zone change -- the card was in no zone to leave --
-        -- so nothing triggers and nothing is revealed either way.
+        -- Three of the four arrivals are no zone change -- the card was in no
+        -- zone to leave -- so nothing triggers and nothing is revealed. The
+        -- BATTLEFIELD is the exception and takes its own road below, because CR
+        -- 616.1's entry loop and CR 603.6a's trigger scan both have to see a
+        -- permanent enter.
         --
         -- Not implemented: a stated library position. Every arrival takes
         -- LibraryPosition.defaultValue, which is the BOTTOM, and the printings
         -- that state an end all say the TOP -- Pawl.Types.ConjureDestination's
         -- Library arm names them and says why none of them is in data/cards/
         -- (#2638).
-        zone = case destination of
-          ConjureDestination.Hand -> Zone.Hand
-          ConjureDestination.Library -> Zone.Library
+        intoZone zone n = Monad.replicateM_ (Integer.toIntSaturating n) (Monad.void (Event.conjure controller card zone LibraryPosition.defaultValue))
     case evaluateForRecipient viewOf context gs resolving source controller quantity of
-      Just n | n > 0 -> Monad.replicateM_ (Integer.toIntSaturating n) (Monad.void (Event.conjure controller card zone LibraryPosition.defaultValue))
+      Just n
+        | n > 0 -> case destination of
+            ConjureDestination.Hand -> intoZone Zone.Hand n
+            ConjureDestination.Library -> intoZone Zone.Library n
+            ConjureDestination.Graveyard -> intoZone Zone.Graveyard n
+            -- CR 110.2a: the resolving controller is who the permanent enters
+            -- under, which conjureOntoBattlefield stamps.
+            ConjureDestination.Battlefield -> Monad.void (Event.conjureOntoBattlefield controller card (Integer.toNaturalSaturating n))
       _ -> pure ()
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref entry) -> do
     gs <- State.get
