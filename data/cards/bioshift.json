@@ -40,7 +40,10 @@
                           "type": "PlusOnePlusOne"
                         }
                       },
-                      "to": "to"
+                      "to": {
+                        "type": "InSlot",
+                        "value": "to"
+                      }
                     }
                   }
                 ]

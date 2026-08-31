@@ -15,7 +15,13 @@ import qualified Pawl.Types.Quantity as Quantity
 -- counters", which names no kind and asks nothing either, because every kind
 -- crosses -- that is 'Every'. Resourceful Defense says "move any number of
 -- counters", which names neither a kind nor a count and asks for BOTH at once
--- (Pawl.Types.Prompt's ChooseMovedCounters) -- that is 'AnyNumber'. Scrounging
+-- (Pawl.Types.Prompt's ChooseMovedCounters) -- that is 'AnyNumber'. Goldberry,
+-- River-Daughter's second ability says "move one or more counters", which is that
+-- same question with the empty answer excluded (Pawl.Types.Prompt's
+-- ChooseMovedCountersAtLeastOne) -- that is 'AtLeastOne', and it is why
+-- 'AnyNumber' cannot stand in for it either: an answer of none would leave the
+-- printed "if you do, draw a card" unfired, which is weaker than printed in the
+-- answerer's favour. Scrounging
 -- Bandar says "move any number of +1\/+1 counters", which names the kind on the
 -- card and leaves the count to the player -- that is 'AnyNumberOfKind', 'Named'
 -- and 'AnyNumber' each taken half way, and it is why 'AnyNumber' cannot stand
@@ -31,7 +37,7 @@ import qualified Pawl.Types.Quantity as Quantity
 -- object for anything but rule 122.5's own impossibilities. The others are not
 -- that one narrowed: rule 122.5's second impossibility ("the first object
 -- doesn't have the appropriate kind of counter on it") is the whole of the
--- check under 'Named', is vacuous under 'Chosen', 'AnyNumber' and
+-- check under 'Named', is vacuous under 'Chosen', 'AnyNumber', 'AtLeastOne' and
 -- 'UpToOneChosen' since the kinds ON the object are what is offered, and under
 -- 'Every', 'EveryOfKind', 'AnyNumberOfKind' and 'EachAbsentKind' is what
 -- empties the batch rather than what forbids it.
@@ -45,13 +51,14 @@ import qualified Pawl.Types.Quantity as Quantity
 -- count of one would take one counter off each permanent too. What no arm could
 -- say is "UP TO": rule 122.5's move happens wherever it is possible, so a card
 -- that lets the player leave a given first object alone is asking a question
--- none of the others ask -- #2702's zero-versus-one, read the other way round.
+-- none of the others ask -- 'AtLeastOne''s zero-versus-one, read the other way
+-- round.
 --
 -- The count rides on the two arms that HAVE one rather than on a field beside
 -- them, because no other arm has one to carry: "all counters" and "all +1/+1
 -- counters" are a tally read off the first object and a Quantity is one number,
--- "any number" and "any number of +1\/+1 counters" are the player's answer rather
--- than the card's, and "a counter of each kind" and "up to one counter" fix the
+-- "any number", "one or more" and "any number of +1\/+1 counters" are the player's
+-- answer rather than the card's, and "a counter of each kind" and "up to one counter" fix the
 -- count at one on the wording itself, so a field would have to be ignored under
 -- every one of them and a card could write a count that means nothing.
 --
@@ -66,8 +73,8 @@ import qualified Pawl.Types.Quantity as Quantity
 -- kindless moves carrying more than one counter say "all counters" (Fate
 -- Transfer, Nexus Mentality, The Ozolith -- 'Every'), "any number of counters"
 -- (Resourceful Defense, Slippery Bogbonder, Oozeavite -- 'AnyNumber'), "one or
--- more counters" (Goldberry, River-Daughter's second ability, which is that arm
--- with zero excluded and is not written today, #2702), "a counter of each kind
+-- more counters" (Goldberry, River-Daughter's second ability -- 'AtLeastOne'),
+-- "a counter of each kind
 -- not on Goldberry" (her first -- 'EachAbsentKind') or "up to one counter from
 -- each permanent" (Takesies -- 'UpToOneChosen'), and NONE of them prints a count
 -- above one -- Takesies' "up to one" is a cap, not a tally. A printing saying
@@ -77,12 +84,13 @@ import qualified Pawl.Types.Quantity as Quantity
 -- The same run's KIND-NAMING moves that leave the count to the player all say
 -- "any number of +1\/+1 counters" -- Scrounging Bandar, Bioshift, Aetherborn
 -- Marauder and Forgotten Ancient, every one of them 'AnyNumberOfKind'. Scrounging
--- Bandar and Bioshift are written today, the second one's "another target
--- creature with the same controller" being Filter.SameControllerAsBound over its
--- first slot; Aetherborn Marauder's "from other permanents you control" is a
--- group on the first side, which ObjectRef.EachMatching says; Forgotten
--- Ancient's "onto other creatures" is a group on the SECOND, which nothing says
--- (#2713).
+-- Bandar, Bioshift and Forgotten Ancient are written today -- Bioshift's "another
+-- target creature with the same controller" being Filter.SameControllerAsBound
+-- over its first slot, and Forgotten Ancient's "onto other creatures" a group on
+-- the SECOND side, which Pawl.Types.MoveCounters' `to` says as an
+-- ObjectRef.EachMatching; Aetherborn Marauder's "from other permanents you
+-- control" is a group on the first side, which that type's `from` says the same
+-- way.
 --
 -- @include_extras@ is what makes that run every printing rather than most of
 -- one, and it is the parameter every sweep in this neighbourhood needs: without
@@ -115,6 +123,9 @@ data MovedKinds
   | -- | Resourceful Defense's "move any number of counters": however many of
     -- however many kinds the player picks (CR 122.5).
     AnyNumber
+  | -- | Goldberry, River-Daughter's "move one or more counters": 'AnyNumber' with
+    -- the empty answer excluded, the card's own floor (CR 122.5).
+    AtLeastOne
   | -- | Scrounging Bandar's "move any number of +1\/+1 counters": the kind the
     -- card names, however many of it the player picks (CR 122.5).
     AnyNumberOfKind (CounterKind.CounterKind Keyword.Keyword)
@@ -129,8 +140,9 @@ data MovedKinds
 
 -- | The count the card asks for, for a caller that reads every Quantity an
 -- effect holds. 'Nothing' under 'Every' and 'EveryOfKind', which ask for a tally
--- read off the first object rather than a number, under 'AnyNumber' and
--- 'AnyNumberOfKind', whose count is the player's answer, and under
+-- read off the first object rather than a number, under 'AnyNumber',
+-- 'AtLeastOne' and 'AnyNumberOfKind', whose count is the player's answer, and
+-- under
 -- 'EachAbsentKind' and 'UpToOneChosen', whose one the card never writes down.
 quantityOf :: MovedKinds -> Maybe Quantity.Quantity
 quantityOf x = case x of
@@ -139,6 +151,7 @@ quantityOf x = case x of
   EveryOfKind _ -> Nothing
   Chosen quantity -> Just quantity
   AnyNumber -> Nothing
+  AtLeastOne -> Nothing
   AnyNumberOfKind _ -> Nothing
   EachAbsentKind -> Nothing
   UpToOneChosen -> Nothing
@@ -146,8 +159,8 @@ quantityOf x = case x of
 -- | The kind the CARD names, for a caller that reads every CounterKind an effect
 -- holds -- 'quantityOf''s sibling, one field over. 'Nothing' wherever the card
 -- writes no kind down: 'Every' reads the first object's whole tally,
--- 'EachAbsentKind' reads the destination's, and 'Chosen', 'AnyNumber' and
--- 'UpToOneChosen' ask the player.
+-- 'EachAbsentKind' reads the destination's, and 'Chosen', 'AnyNumber',
+-- 'AtLeastOne' and 'UpToOneChosen' ask the player.
 kindOf :: MovedKinds -> Maybe (CounterKind.CounterKind Keyword.Keyword)
 kindOf x = case x of
   Every -> Nothing
@@ -155,6 +168,7 @@ kindOf x = case x of
   EveryOfKind kind -> Just kind
   Chosen _ -> Nothing
   AnyNumber -> Nothing
+  AtLeastOne -> Nothing
   AnyNumberOfKind kind -> Just kind
   EachAbsentKind -> Nothing
   UpToOneChosen -> Nothing

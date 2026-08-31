@@ -76,6 +76,8 @@ encode p answer = case p of
   Prompt.ChooseDelayedTriggerEvent {} -> Response.ChoseDelayedTriggerEvent answer
   Prompt.ChooseMovedCounter {} -> Response.ChoseMovedCounter answer
   Prompt.ChooseMovedCounters {} -> Response.ChoseMovedCounters answer
+  Prompt.ChooseMovedCountersAtLeastOne {} -> Response.ChoseMovedCountersAtLeastOne answer
+  Prompt.ChooseDistributedMovedCounters {} -> Response.ChoseDistributedMovedCounters answer
   Prompt.ChooseMovedCounterOrNone {} -> Response.ChoseMovedCounterOrNone answer
   Prompt.ChooseCardInGraveyard {} -> Response.ChoseCardInGraveyard answer
   Prompt.ChooseCardInHand {} -> Response.ChoseCardInHand answer
@@ -253,6 +255,12 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseMovedCounters {} -> case response of
     Response.ChoseMovedCounters counters -> Just counters
+    _ -> Nothing
+  Prompt.ChooseMovedCountersAtLeastOne {} -> case response of
+    Response.ChoseMovedCountersAtLeastOne counters -> Just counters
+    _ -> Nothing
+  Prompt.ChooseDistributedMovedCounters {} -> case response of
+    Response.ChoseDistributedMovedCounters counters -> Just counters
     _ -> Nothing
   Prompt.ChooseMovedCounterOrNone {} -> case response of
     Response.ChoseMovedCounterOrNone kind -> Just kind
@@ -595,6 +603,16 @@ defaultAnswer p = case p of
   -- the maximal one -- a default that emptied the first object would rewrite a
   -- board rather than leave it alone.
   Prompt.ChooseMovedCounters {} -> Map.empty
+  -- CR 122.5 again, and the one counter-moving default that DOES move something:
+  -- "one or more" excludes none, so the least-eventful legal answer is a single
+  -- counter of the first kind offered rather than the empty map above.
+  Prompt.ChooseMovedCountersAtLeastOne _ _ _ _ offered -> case Map.lookupMin offered of
+    Nothing -> Map.empty
+    Just (kind, _) -> Map.singleton kind 1
+  -- CR 122.5 once more: a group destination under "any number" includes none, so
+  -- ChooseMovedCounters' default is this prompt's too -- allocate to nobody and
+  -- the board is left alone.
+  Prompt.ChooseDistributedMovedCounters {} -> Map.empty
   -- CR 122.5 once more: "up to one" includes none, and ChooseMovedCounters'
   -- reason for declining is this prompt's too -- a default that took a counter
   -- off the first object would rewrite a board rather than leave it alone.

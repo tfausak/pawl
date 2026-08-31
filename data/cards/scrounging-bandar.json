@@ -86,7 +86,10 @@
                               "type": "PlusOnePlusOne"
                             }
                           },
-                          "to": "target"
+                          "to": {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
                         }
                       }
                     ],

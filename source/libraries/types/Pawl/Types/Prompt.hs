@@ -268,6 +268,53 @@ data Prompt r where
   -- real choice between moving it and not. Not raised where the first object has
   -- no movable kind at all, which moves nothing and leaves nothing to ask.
   ChooseMovedCounters :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural -> Prompt (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural)
+  -- | CR 122.5: WHICH counters a move takes off the first object and how many of
+  -- each, where the card states a FLOOR (Goldberry, River-Daughter's "move one
+  -- or more counters from Goldberry onto another target permanent you
+  -- control"). ChooseMovedCounters' question with the empty answer excluded,
+  -- which is the whole of what separates the two: "any number" includes none,
+  -- where "one or more" does not, and a card whose rider reads "if you do" is
+  -- the reason the difference is observable.
+  --
+  -- Its own constructor although the payload and the answer match
+  -- ChooseMovedCounters' exactly, ChooseMovedCounterOrNone's reason one axis
+  -- over: an empty answer is legal to one prompt and not to the other, so
+  -- Pawl.Engine.Replay's transcript must not let either satisfy the other.
+  --
+  -- The first ObjectId is the object the counters leave, the second the object
+  -- they land on, and the Map is what the first object HAS, engine-pre-filtered
+  -- to the kinds this move could really carry. ChooseMovedCounters' posture
+  -- otherwise: choose, not target, and filtered rather than trusted -- an answer
+  -- moving nothing is repaired to one counter of the first kind offered, since
+  -- rule 122.5 moves a counter wherever it is possible and the card's floor says
+  -- it is.
+  --
+  -- Raised wherever the first object has a movable kind at all, a lone kind
+  -- bearing a lone counter included: the player still chooses WHICH kinds and
+  -- how many above the floor. Not raised where nothing could cross, which moves
+  -- nothing and leaves nothing to ask.
+  ChooseMovedCountersAtLeastOne :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural -> Prompt (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural)
+  -- | CR 122.5: how many counters of each kind a move puts onto EACH of the
+  -- objects it names, where the second side is a whole GROUP (Forgotten
+  -- Ancient's "move any number of +1\/+1 counters from this creature onto other
+  -- creatures"). ChooseMovedCounters' question with the destination opened up:
+  -- there the answer is one tally per kind for the one object the counters land
+  -- on, here it is a tally per kind FOR EACH object, and the sum over the group
+  -- is what comes off the first object.
+  --
+  -- ONE question and not a count followed by a distribution: the card asks for
+  -- neither on its own -- "any number ... onto other creatures" is answered by
+  -- saying where each counter goes, and a player who moves none says so by
+  -- allocating nothing.
+  --
+  -- The ObjectId is the object the counters leave, the Map is what it HAS,
+  -- engine-pre-filtered to the kinds this move could really carry, and the
+  -- NonEmpty is the destinations, each of which can take at least one offered
+  -- kind. ChooseMovedCounters' posture otherwise: choose, not target, and
+  -- filtered rather than trusted -- an object that was not offered is dropped, a
+  -- kind the destination refuses is dropped, and the tallies are clamped in
+  -- offered order to what the first object actually holds.
+  ChooseDistributedMovedCounters :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt (Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural))
   -- | CR 122.5: WHICH counter a move takes off the first object, OR NONE
   -- (Takesies' "move up to one counter from each permanent onto target
   -- permanent"). ChooseMovedCounter's question with declining added, which is

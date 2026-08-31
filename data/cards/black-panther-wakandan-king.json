@@ -45,7 +45,10 @@
                             }
                           },
                           "slot": "moved",
-                          "to": "creature"
+                          "to": {
+                            "type": "InSlot",
+                            "value": "creature"
+                          }
                         }
                       }
                     ]
