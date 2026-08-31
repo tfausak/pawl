@@ -554,19 +554,25 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- LOG. Breathless Knight proves it in Pawl.ConditionSpec: kill the entrant with
   -- the trigger on the stack and the +1/+1 counter still lands.
   --
-  -- The clause is a printed FAMILY, not a card or two: Scryfall o:"entered from",
-  -- 2026-08-30, eight printings, of which seven state it as an intervening "if"
-  -- (Fblthp, the Lost is the eighth, whose "if" opens a second sentence and is
-  -- ordinary English; nothing prints the older "entered the battlefield from"
-  -- wording). Archfiend's Vessel is the one member whose clause and whose effect
-  -- name the SAME object, which is exactly why it cannot observe this: a Vessel
-  -- that left the battlefield fails CR 603.6's find and makes no Demon whichever
-  -- way the re-check answered. Every other member reads the ENTRANT and acts
-  -- elsewhere -- Grist, Voracious Larva transforms Grist, Kotis, Sibsig Champion
-  -- and Breathless Knight put counters on themselves, Celes, Rune Knight puts one
-  -- on each creature you control, Extraordinary Journey draws you a card, Prized
-  -- Amalgam returns its own card -- so killing the entrant between the two checks
-  -- tells a log read from a live-board one.
+  -- The clause is a printed FAMILY, not a card or two: Scryfall
+  -- o:/(was|were) cast from|you cast it from/ o:entered, unique=cards,
+  -- 2026-08-31, nine printings, of which eight state it as an intervening "if"
+  -- (Fblthp, the Lost is the ninth, whose "if" opens a second sentence and so is
+  -- ordinary English by CR 603.4's own parenthetical; nothing prints the older
+  -- "entered the battlefield from" wording). The narrower o:"entered from"
+  -- returns eight and misses Twilight Diviner, whose clause reads "entered or
+  -- were cast from a graveyard".
+  --
+  -- Archfiend's Vessel is the one member whose clause and whose effect name the
+  -- SAME object, which is exactly why it cannot observe this: a Vessel that left
+  -- the battlefield fails CR 603.6's find and makes no Demon whichever way the
+  -- re-check answered. Every other member reads the ENTRANT and acts elsewhere --
+  -- Grist, Voracious Larva transforms Grist, Kotis, Sibsig Champion and
+  -- Breathless Knight put counters on themselves, Celes, Rune Knight puts one on
+  -- each creature you control, Extraordinary Journey draws you a card, Twilight
+  -- Diviner copies one of the entrants, Prized Amalgam returns its own card -- so
+  -- killing the entrant between the two checks tells a log read from a live-board
+  -- one.
   Quantity.EnteredFrom inZone -> do
     oid <- mOid
     pids <- playersOf (InZone.player inZone)
@@ -582,12 +588,34 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- id (Pawl.Types.SpellWasCast.zone). Nothing else records it -- the permanent
   -- has no memory of the spell's origin.
   --
-  -- The reference is asked of the CASTER and of the owner both, which is the whole
-  -- of "you cast it from YOUR graveyard"; the owner half is EnteredFrom's, for CR
-  -- 400.3's reason, and is read the same way for CR 603.4's. Not implemented:
-  -- printings that separate the two -- Breathless Knight's "you cast it from A
-  -- graveyard" among them -- have no exact spelling, and data/cards/ takes the
-  -- stricter reading for the Knight (#2689).
+  -- ONE reference answering THREE questions the rules distinguish: whose copy of
+  -- the zone, who cast the spell, and who owns the card. The owner half is
+  -- EnteredFrom's, for CR 400.3's reason, and is read the same way for CR 603.4's;
+  -- the caster half is CR 601.2a's.
+  --
+  -- What makes the one reference exact is a road pawl does not have rather than
+  -- anything about Magic. CR 400.3 puts a card only in its OWNER's library, hand
+  -- or graveyard, and Cast.zoneCandidates offers a player only their own copy of
+  -- such a zone, so wherever a spell is cast out of one, the caster, the zone's
+  -- owner and the card's owner are the same seat; CR 400.1's shared zones can only
+  -- take PlayerRef.EachPlayer (Pawl.Codec.InZone.undividedShared), where all three
+  -- conjuncts are vacuous. Pawl.PlayerEffectSpec's "CR 400.1 the grant does not
+  -- reach the copy in bob's graveyard" proves that premise. So Breathless Knight's
+  -- "you cast it from A graveyard" IS PlayerRef.Relative You here -- an EachPlayer
+  -- reference would read "anyone cast it", which is weaker -- and Fblthp, the
+  -- Lost's agentless "was cast from your library" is that same seat named from the
+  -- other side.
+  --
+  -- Not implemented: the one road that could separate them is CR 608.2g's offered
+  -- cast, where Cast.castableWhenOffered asks no zone at all, so an effect naming
+  -- a card in an opponent's graveyard casts it from there. No card in data/cards/
+  -- offers such a cast, which leaves the caster conjunct and the owner conjunct a
+  -- regression fence rather than a proved pair: mutating either away leaves the
+  -- suite green, and the reference splits in three the day one lands. Jetsam
+  -- (Flotsam // Jetsam), which offers a cast from each opponent's graveyard, is
+  -- the printing that would refute this; Havengul Lich would reach it through the
+  -- permission road instead, which would first have to widen zoneCandidates
+  -- (#2689).
   --
   -- An object that reached the battlefield any OTHER way answers 0 rather than
   -- Nothing, `spells` coming up empty: a permanent put there by an effect was not

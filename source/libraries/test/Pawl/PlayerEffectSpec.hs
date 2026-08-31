@@ -4649,6 +4649,26 @@ yawgmothsWillSpec s registry =
           Spec.assertBool s (not (S.castable S.bob his bobsTurn)) "and it is not castable even in his own main phase"
           Spec.assertBool s (not (any (S.isCastOf his) (Action.legalActions S.bob bobsTurn))) "nor offered"
 
+        -- CR 400.1 / 400.3: the grant says "your graveyard", and the two copies of
+        -- Sign in Blood differ in nothing but whose graveyard they lie in -- so
+        -- this is that word and nothing else. The case above asked whether BOB
+        -- may cast his own copy; this asks whether ALICE, who holds the grant,
+        -- may reach it, which is the half that decides whether a caster and a
+        -- card's owner can ever come apart on this road.
+        --
+        -- The typed question is asked beside the gate to name WHICH half
+        -- refuses: the permission's filter is empty, so it says yes to bob's copy
+        -- as readily as to hers, and Cast.zoneCandidates -- which offers a player
+        -- only their own copy of a per-player zone -- is what says no.
+        -- Pawl.Engine.Quantity's WasCastFrom arm rests on this (#2689).
+        Spec.it s "CR 400.1 the grant does not reach the copy in bob's graveyard" $ do
+          (willId, hers, his, gs) <- board
+          let after = willResolved willId gs
+          Spec.assertBool s (not (S.castable S.alice his after)) "alice may not cast the copy in bob's graveyard"
+          Spec.assertBool s (not (any (S.isCastOf his) (Action.legalActions S.alice after))) "nor is it offered to her"
+          Spec.assertBool s (S.castable S.alice hers after) "though the identical copy in her own graveyard is castable"
+          Spec.assertBool s (PlayerEffect.mayCastFromGraveyard S.alice his after) "so the refusal is the zone's and not the permission's"
+
         -- The permission names a ZONE, not a TIME, which is the flashback ruling
         -- one rule over ("you can cast a sorcery using flashback only when you
         -- could normally cast a sorcery"). Read beside Cast.instantSpeed rather
