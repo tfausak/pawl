@@ -688,6 +688,8 @@ library codec
     Pawl.Codec.RestartSignalSpec
     Pawl.Codec.Result
     Pawl.Codec.ResultSpec
+    Pawl.Codec.ReturnPermanents
+    Pawl.Codec.ReturnPermanentsSpec
     Pawl.Codec.ReturnWatch
     Pawl.Codec.ReturnWatchSpec
     Pawl.Codec.Reveal
@@ -1629,6 +1631,7 @@ library types
     Pawl.Types.Response
     Pawl.Types.RestartSignal
     Pawl.Types.Result
+    Pawl.Types.ReturnPermanents
     Pawl.Types.ReturnWatch
     Pawl.Types.Reveal
     Pawl.Types.RevealCause

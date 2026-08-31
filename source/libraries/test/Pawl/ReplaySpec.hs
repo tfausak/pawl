@@ -567,6 +567,25 @@ combatReplaySpec s =
             "a ChooseSacrifices transcript entry does not answer it"
             (Replay.decode p (Replay.encode (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1) answer))
             Nothing
+        -- ChooseTaps' payload exactly, so the CROSS-decode is again what
+        -- matters: a shared Response constructor would let a transcript's tap
+        -- entry answer this one, and replay would return a permanent it should
+        -- have tapped.
+        Spec.it s "ChooseReturns records and replays a Set ObjectId" $ do
+          let p = Prompt.ChooseReturns decider S.alice oid [oid, ObjectId.MkObjectId 8] 1
+              answer = Set.singleton (ObjectId.MkObjectId 8)
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+          Spec.assertEqWith
+            s
+            "a ChooseTaps transcript entry does not answer it"
+            (Replay.decode p (Replay.encode (Prompt.ChooseTaps decider S.alice oid [oid, ObjectId.MkObjectId 8] 1) answer))
+            Nothing
+        Spec.it s "defaultAnswer returns the first `count` offered, in order" $
+          Spec.assertEqWith
+            s
+            "the offered prefix"
+            (Replay.defaultAnswer (Prompt.ChooseReturns decider S.alice oid [oid, ObjectId.MkObjectId 8] 1))
+            (Set.singleton oid)
         Spec.it s "defaultAnswer exiles the first `count` offered, in order" $
           Spec.assertEqWith
             s

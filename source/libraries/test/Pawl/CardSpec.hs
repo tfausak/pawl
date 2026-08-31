@@ -243,6 +243,7 @@ import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.RoomIndex as RoomIndex
@@ -3546,6 +3547,8 @@ costComponentFilters component = case component of
   -- CR 601.2f's "tapping permanents": Springleaf Drum's "an untapped creature
   -- you control".
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents _ f) -> [f]
+  -- CR 118.1 as a cost: Meloku the Clouded Mirror's "a land you control".
+  CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents _ f) -> [f]
   -- CR 406.2 as a cost: Headless Skaab's "a creature card from your graveyard".
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard _ f) -> [f]
   -- CR 406.2 again: Circling Vultures' "the top creature card of your

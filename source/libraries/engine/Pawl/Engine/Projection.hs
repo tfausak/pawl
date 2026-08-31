@@ -2321,8 +2321,12 @@ rewriteEffect pairs effect = case effect of
   -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
   -- printed keyword through the swap, PutCounters' case above (#1840).
   Effect.RemoveCounters x -> Effect.RemoveCounters x {RemoveCounters.quantity = rewriteQuantity pairs (RemoveCounters.quantity x)}
-  -- Only the destination descends: CR 122.8 names no kind and no count, so the
-  -- ObjectRef is the one place a subtype word can hide.
+  -- Only the destination descends: CR 122.8 names no count, so the ObjectRef is
+  -- where a subtype word would otherwise hide.
+  --
+  -- Not implemented: a CR 122.1b keyword counter named in the kind -- rule
+  -- 122.8's third sentence, which lets the card settle which kinds cross --
+  -- keeps its printed keyword through the swap, PutCounters' case above (#1840).
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from kind ref) ->
     Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from kind (rewriteObjectRef pairs ref))
   -- BOTH refs and the count. Filter.rewrite renames no slot, so the bound slot is

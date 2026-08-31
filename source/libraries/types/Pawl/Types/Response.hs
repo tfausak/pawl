@@ -429,6 +429,12 @@ data Response
     -- though the payload has the same shape: replaying a transcript against the
     -- wrong one would tap what it should have sacrificed.
     ChoseTaps (Set.Set ObjectId.ObjectId)
+  | -- | CR 118.1: the permanents a player chose to RETURN to their owners\'
+    -- hands to pay a cost. A separate constructor from ChoseTaps above, though
+    -- the payload has the same shape, for that constructor\'s reason: replaying
+    -- a transcript against the wrong one would tap what it should have
+    -- returned.
+    ChoseReturns (Set.Set ObjectId.ObjectId)
   | -- | CR 608.2d: the permanents a player chose out of the ones an effect
     -- offered, where the effect stated no count. A separate constructor from
     -- ChoseSacrifices above, though the payload has the same shape, for

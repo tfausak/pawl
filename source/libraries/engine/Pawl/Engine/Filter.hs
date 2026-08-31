@@ -24,6 +24,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Reinforce as Reinforce
+import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -1739,7 +1740,7 @@ rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (
 -- Of those, only Sacrifice has a producer: Dark Heart of the Wood on an
 -- activation cost, and Lithophage on the cost a trigger offers as it resolves
 -- (CR 118.12). The TapForTotalPower, TapPermanents, DiscardCards,
--- ExileCardsFromGraveyard, ExileTopFromGraveyard and
+-- ExileCardsFromGraveyard, ExileTopFromGraveyard, ReturnPermanents and
 -- PutCardFromHandOntoBattlefield arms are a regression fence: no printing pairs
 -- any of them with a basic land type, so no test can falsify them. Magmatic
 -- Insight's "discard a land card" and Hakbal of the Surging Soul's "a land card
@@ -1750,6 +1751,7 @@ rewriteComponent pairs component = case component of
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) -> CostComponent.Sacrifice (Sacrifice.MkSacrifice n (rewrite pairs criterion))
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) -> CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n (rewrite pairs criterion))
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n (rewrite pairs criterion))
+  CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) -> CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n (rewrite pairs criterion))
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) -> CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n (rewrite pairs criterion))
   CostComponent.ExileTopFromGraveyard criterion -> CostComponent.ExileTopFromGraveyard (rewrite pairs criterion)
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) -> CostComponent.DiscardCards (DiscardCards.MkDiscardCards n (rewrite pairs criterion))

@@ -972,6 +972,15 @@ data Prompt r where
   -- and so admits subsets of any size. Answers as Response.ChoseTaps, shared
   -- with that arm: a transcript records which permanents were tapped.
   ChooseTaps :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
+  -- | Which permanents to RETURN to their owners\' hands to pay a cost that
+  -- names how many of them (CR 118.1; Meloku the Clouded Mirror). ChooseTaps\'
+  -- payload, posture and elision -- asked only when there are more candidates
+  -- than the count -- over a different action.
+  --
+  -- Answers as Response.ChoseReturns, its own constructor rather than
+  -- ChoseTaps: a transcript of one must not satisfy the other, or a replay
+  -- would tap what it should have returned.
+  ChooseReturns :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 701.3a: where an effect that moves an already-attached permanent puts
   -- it. The first ObjectId is the permanent being moved (Crown of the Ages'
   -- targeted Aura); the NonEmpty is the destinations its card text admits.
