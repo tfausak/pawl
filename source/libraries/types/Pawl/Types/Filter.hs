@@ -341,8 +341,10 @@ data Filter keyword
     -- Vacuously False where the slot names no object: the map is empty for most
     -- readers, and an illegal target (CR 608.2b) and a multi-TARGET slot drop out
     -- of it -- the one plural shape this does not admit, no card in data/cards/
-    -- writing the atom over a slot whose count is above one. That is the posture
-    -- every context-relative atom here takes.
+    -- writing the atom over a slot whose count is above one. That direction is
+    -- this atom's own call, not a rule about the type: SameControllerAsBound
+    -- below is vacuously TRUE on ITS unfilled read, for the reason its note
+    -- gives.
     --
     -- READABLE PAST THE RESOLUTION for the one carrier that snapshots the map:
     -- a floating replacement row (Pawl.Types.ActiveReplacement) keeps the
@@ -419,8 +421,9 @@ data Filter keyword
     -- names mean choosing one chooses each, so the test is membership at both ends.
     -- Set intersection is that said once.
     --
-    -- Vacuously False where the source has chosen no name -- the posture every
-    -- context-relative atom here takes. What keeps a card out of the positions that
+    -- Vacuously False where the source has chosen no name -- this atom's call,
+    -- SameControllerAsBound above being the one that widens on its unfilled read
+    -- instead. What keeps a card out of the positions that
     -- cannot answer is Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside
     -- a search's filter".
     HasChosenName

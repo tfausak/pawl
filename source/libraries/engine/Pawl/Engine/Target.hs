@@ -307,8 +307,9 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- Not (IsBound "dealer")), and rule 601.2c makes sharing the default,
             -- so the restriction has to be a Filter the card writes rather than
             -- machinery. What a caller supplies no bindings for stays vacuously
-            -- False, which is the same posture every other context-relative field
-            -- here takes.
+            -- False -- IsBound's own call rather than a posture this record takes
+            -- for every field: slotControllers below is read by an atom that
+            -- WIDENS on the same absence (CR 110.2's SameControllerAsBound).
             --
             -- WIDENING at CR 601.2c is still the offer: legalSetsGiven's first
             -- pass hands every slot the seed alone, so the union is what a

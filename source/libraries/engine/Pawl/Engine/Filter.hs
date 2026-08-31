@@ -713,8 +713,9 @@ data Context = MkContext
     --
     -- False in contextFor and contextComparingPower below, and False at CR 601.2c
     -- and CR 608.2b alike: by then the announcement holds the number, and a bound
-    -- that still cannot be read is vacuously False as every other
-    -- context-relative atom here is. Pawl.Engine.Target.slotContext is the ONE
+    -- that still cannot be read is vacuously False -- the refusing direction, as
+    -- slotNames' atom takes and slotControllers' atom does not.
+    -- Pawl.Engine.Target.slotContext is the ONE
     -- site that can set it True.
     boundUnannounced :: Bool,
     -- CR 508.5: the DEFENDING PLAYER for the source, for the one atom that asks
@@ -804,8 +805,10 @@ data Context = MkContext
     -- object, and no filter that omits the atom ever forces it.
     --
     -- EMPTY in contextFor and contextWithSlots below, so the atom is vacuously
-    -- False in every position but a target slot -- the posture every
-    -- context-relative atom here takes.
+    -- False in every position but a target slot. Which direction an unfilled read
+    -- takes is the ATOM's choice rather than a rule this record imposes: the arm
+    -- in `matches` below decides it, and slotControllers' SameControllerAsBound
+    -- chooses True where this one chooses False.
     --
     -- What keeps a card out of those positions is Pawl.CardSpec's
     -- "CR 709.4a no card asks SameNameAsBound outside a mode's target slot",
@@ -844,8 +847,10 @@ data Context = MkContext
     -- stamps the X onto it.
     --
     -- Empty in contextFor and contextComparingPower below, so a bound evaluated
-    -- anywhere but a target slot reads no announcement -- the vacuous posture every
-    -- context-relative field here takes.
+    -- anywhere but a target slot reads no announcement. What that unfilled read
+    -- then ANSWERS is Pawl.Engine.Quantity's InSlot arm's call, not this record's:
+    -- each reader of each field here picks its own vacuous direction, and
+    -- slotControllers above is the one that picks the widening one.
     boundAmounts :: Map.Map SlotName.SlotName Natural.Natural,
     -- CR 303.4b's "enchanted": WHICH object the SOURCE is attached to, for the one
     -- atom that compares a candidate against it (IsHostOfSource). The id and not a
@@ -869,7 +874,9 @@ data Context = MkContext
     -- leaving it unforced.
     --
     -- Nothing wherever the atom cannot appear, which contextFor below is the
-    -- spelling of -- the posture every context-relative atom here takes. What keeps
+    -- spelling of, and the atom answers False on that Nothing -- its own arm's
+    -- choice, not a rule about this record, slotControllers above being the field
+    -- whose atom chooses True instead. What keeps
     -- a card out of those positions is Pawl.CardSpec's "CR 303.4b no card asks
     -- IsHostOfSource where the source's host is unknown", the sweep sourcePower's
     -- and slotNames' siblings each have.
@@ -893,8 +900,10 @@ data Context = MkContext
     --
     -- EMPTY in contextFor below and so in contextWithSlots and
     -- contextComparingPower too, so the atom is
-    -- vacuously False in every position but a search's filter -- the posture every
-    -- context-relative atom here takes. What keeps a card out of those positions
+    -- vacuously False in every position but a search's filter -- an empty
+    -- intersection, which is this atom's arm answering rather than a posture the
+    -- record enforces; slotControllers' atom answers True on ITS unfilled read.
+    -- What keeps a card out of those positions
     -- is Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside a search's
     -- filter", the sweep sourcePower's, slotNames' and sourceAttachedTo's siblings
     -- each have.
@@ -926,6 +935,17 @@ data Context = MkContext
 -- supplies it -- Pawl.Engine.Resolve's Effect.Search arm, which builds its
 -- context from this function and then overlays sourceChosenNames. See that field
 -- above for the lint that keeps a card to that position.
+--
+-- CR 110.2's same-controller atom (Bioshift) is the one whose unfilled read does
+-- NOT match nothing, so the paragraphs above are a finding per atom rather than
+-- one argument about this record: `slotControllers` is empty here, and the
+-- arm in `matches` reads a slot with no key as a relation with only one party and
+-- ADMITS every candidate. Nothing narrows an offer written against that empty
+-- map; what keeps a card out of the positions it is empty in is Pawl.CardSpec's
+-- "CR 110.2 no card asks SameControllerAsBound outside a mode's target slot"
+-- alone, Pawl.Engine.Target.slotContext being the only filler. An atom added
+-- here owes both halves of the same pair: which way its unfilled read answers,
+-- and what holds a card to the positions that fill it.
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
 contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
 

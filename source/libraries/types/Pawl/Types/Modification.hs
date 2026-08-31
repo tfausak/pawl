@@ -78,8 +78,11 @@ data Modification ability
     -- `perspective` and `source`, and fills `slotObjects` and `slotNames` from
     -- whatever the announcement has already bound -- so a granted enchant naming
     -- IsBound or SameNameAsBound is judged against exactly the context a PRINTED
-    -- one is, and answers False only where the announcement bound
-    -- nothing. A "ControlledBy You" conjunct, the shape
+    -- one is, and each of those two answers False where the announcement bound
+    -- nothing. Which way an unfilled read answers is per ATOM rather than a
+    -- property of that context: CR 110.2's SameControllerAsBound widens instead,
+    -- and Pawl.CardSpec's Framing keeps it out of this slot and the printed one
+    -- alike. A "ControlledBy You" conjunct, the shape
     -- Old-Growth Troll prints, is answered honestly.
     GainEnchant TargetSlot.TargetSlot
   | -- | layer 6, CR 613.1f: this object gains a whole quoted ability, authored on
