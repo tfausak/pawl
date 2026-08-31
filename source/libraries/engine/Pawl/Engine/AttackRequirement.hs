@@ -133,7 +133,6 @@ instances candidates targets gs =
           (Projection.project creature gs)
           gs
       -- CR 612.1: a hacked "Swamps attack each combat if able" requires Islands.
-      --
       fromRequirement source changes requirement =
         let subject = AttackRequirement.subject requirement
          in [ (creature, target)
