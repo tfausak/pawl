@@ -18,6 +18,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -1880,6 +1881,60 @@ goblinWarStrikeChain s registry swap = do
             Stack.resolveTop
   pure (S.runPure S.identityAnswer evolved Stack.resolveTop)
 
+-- CR 612.1 into the SHIELD a resolving spell installs, which is the one carrier
+-- of a replacement effect that is neither a permanent's static row nor a printed
+-- face: Moonmist {1}{G} Instant -- "Transform all Humans. Prevent all combat
+-- damage that would be dealt this turn by creatures other than Werewolves and
+-- Wolves." (checked against Scryfall). alice casts it, optionally has an
+-- Artificial Evolution resolved at the MOONMIST ON THE STACK first, and then the
+-- Moonmist resolves; a hand-built combat batch from bob's three creatures is
+-- settled against the shield it left behind. Returns the Wolf, the Werewolf, the
+-- Piker, the shielded state and the state after the damage.
+--
+-- Three sources whose readings all differ, Pawl.ReplacementSpec's moonmistSpec
+-- reason: Russet Wolves (Creature -- Wolf), Tovolar, Dire Overlord (Creature --
+-- Human Werewolf) and Goblin Piker (Creature -- Goblin Warrior). Swapping
+-- Werewolf for Goblin moves the Piker out of the exclusion and the Werewolf into
+-- it, so the two readings of the rule disagree in opposite directions on one
+-- board and neither an all-prevented nor an all-dealt board can pass either.
+--
+-- Moonmist's OWN first sentence names Human, which the swap does not touch, and
+-- CR 702.145b's daybound refuses Tovolar the transform anyway
+-- (Pawl.DaytimeSpec's restrictionSpec is the proof) -- and both of his faces are
+-- Werewolves, so nothing here rests on which way that goes.
+--
+-- The DAMAGE BATCH is hand-built and the SPELL is not, moonmistSpec's reason.
+-- Five lands so the {1} of the Moonmist cannot strand the {U} of the Evolution.
+moonmistShieldChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+moonmistShieldChain s registry swap = do
+  forest <- S.printingOf s registry "Forest"
+  island <- S.printingOf s registry "Island"
+  wolfPrinting <- S.printingOf s registry "Russet Wolves"
+  werewolfPrinting <- S.printingOf s registry "Tovolar, Dire Overlord"
+  pikerPrinting <- S.printingOf s registry "Goblin Piker"
+  moonmist <- S.printingOf s registry "Moonmist"
+  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+  let base = S.landsFor island S.alice 2 (S.landsInPlay forest 3)
+      (wolf, g1) = S.addCreature wolfPrinting S.bob base
+      (werewolf, g2) = S.addCreature werewolfPrinting S.bob g1
+      (piker, g3) = S.addCreature pikerPrinting S.bob g2
+      (moonmistId, g4) = S.addHandCard moonmist S.alice g3
+      (evolutionId, g5) = S.addHandCard artificialEvolution S.alice g4
+      onStack = S.runPure S.identityAnswer g5 (S.cast S.alice moonmistId)
+      spellId = case GameState.stack onStack of
+        top : _ -> top
+        [] -> ObjectId.MkObjectId 999
+      evolved = case swap of
+        Nothing -> onStack
+        Just (from, to) ->
+          S.runPure (evolveAt spellId from to) onStack $ do
+            S.cast S.alice evolutionId
+            Stack.resolveTop
+      shielded = S.runPure S.identityAnswer evolved Stack.resolveTop
+      hit src n = DamageEvent.MkDamageEvent src (Recipient.ToPlayer S.alice) n False False False 0 Nothing DamageKind.Combat
+      after = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit wolf 3, hit werewolf 3, hit piker 2])
+  pure (wolf, werewolf, piker, shielded, after)
+
 -- CR 612.1 through a quoted ability handed over by a RESOLUTION rather than by
 -- a static ability.
 -- Presence of Gond (Pawl.ActivateSpec) is the static half; this is the half that
@@ -2346,6 +2401,33 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     -- The Evolution DID resolve and DID land on the Clavileño, so the assertions
     -- above are not reading a board where the swap never happened.
     Spec.assertEqWith s "and the Clavileño itself is a Vampire Zombie" (Projection.subtypesOf clavilenoId alive) (Set.fromList [Subtype.Vampire, Subtype.Zombie])
+
+  -- CR 612.1 reaching a FLOATING replacement effect (CR 614.3), which no case
+  -- above touches: every other chain here rewrites something the resolution does
+  -- once, while a Moonmist leaves a shield behind that is asked again at every
+  -- later damage event (CR 609.7b). The words that decide what it spares are
+  -- printed on the spell, so the swap has to land before the shield is built.
+  --
+  -- The control first, so the pair cannot pass on a chain whose Moonmist never
+  -- resolved.
+  Spec.it s "CR 615.1 an unevolved Moonmist spares the Werewolf and the Wolf" $ do
+    (wolf, werewolf, _, shielded, after) <- moonmistShieldChain s registry Nothing
+    Spec.assertEqWith s "the Wolf's and the Werewolf's 3s landed and the Piker's 2 did not" (fmap DamageEvent.source (S.damageEventsOf after)) [wolf, werewolf]
+    Spec.assertEqWith s "so alice is on 14" (S.lifeOf S.alice after) (Just 14)
+    Spec.assertEqWith s "supporting: the Moonmist left one floating shield" (length (GameState.replacements shielded)) 1
+    Spec.assertEqWith s "supporting: alice started on 20" (S.lifeOf S.alice shielded) (Just 20)
+
+  -- And the point: with Werewolf replaced by Goblin, the shield the SAME spell
+  -- installs stops the Werewolf's damage and lets the Goblin's through. The
+  -- Piker and the Werewolf trade places and the untouched Wolf keeps its
+  -- exemption, so a shield built from the printed text produces the control's
+  -- board -- both a different event list and a different life total.
+  Spec.it s "CR 612.1 an evolved Moonmist's shield spares Goblins instead, so the Werewolf's damage is the prevented one" $ do
+    (wolf, _, piker, shielded, after) <- moonmistShieldChain s registry (Just (Subtype.Werewolf, Subtype.Goblin))
+    Spec.assertEqWith s "the Wolf's 3 and the Piker's 2 landed and the Werewolf's 3 did not" (fmap DamageEvent.source (S.damageEventsOf after)) [wolf, piker]
+    Spec.assertEqWith s "so alice is on 15" (S.lifeOf S.alice after) (Just 15)
+    Spec.assertEqWith s "supporting: the Moonmist left one floating shield" (length (GameState.replacements shielded)) 1
+    Spec.assertEqWith s "supporting: alice started on 20" (S.lifeOf S.alice shielded) (Just 20)
 
 -- The one activated ability of a printing that declares exactly one -- Prodigal
 -- Sorcerer's {T}, which is all these fixtures reach for. Nothing for any other
