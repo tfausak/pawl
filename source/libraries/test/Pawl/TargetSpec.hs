@@ -1601,9 +1601,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   --
   -- THREE Walls of Stone, two alice's and one bob's, so the two boards below
   -- differ in exactly one thing -- which creature fills the `to` slot -- with the
-  -- same one hybrid mana paid off the same two lands. A 0/8 body survives the
-  -- move in either direction, where a 2/1 losing its counters would be buried by
-  -- CR 704.5f before the assertion ran.
+  -- same one hybrid mana paid off the same two lands. One printing three times
+  -- over, so nothing but the CONTROLLER can separate the candidates: a filter
+  -- reading any characteristic would admit or refuse all three alike.
   Spec.it s "CR 601.2c Bioshift's second slot cannot be a creature its first slot's controller does not control" $ do
     forest <- S.printingOf s registry "Forest"
     island <- S.printingOf s registry "Island"

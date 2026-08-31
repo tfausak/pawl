@@ -633,8 +633,9 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertEqWith s "and buried under every combinator" (Filter.boundSlots (buried (Filter.Type.SameControllerAsBound slot))) (Set.singleton slot)
 
     -- Vacuously False off a candidate with no controller, whichever way the slot
-    -- is filled: a player is not controlled (CR 108.4), and neither is a card in a
-    -- library.
+    -- is filled: CR 109.1's list of what an object is has no player in it, so a
+    -- player candidate has no controller to compare, and neither has a card in a
+    -- library (CR 108.4).
     Spec.it s "a candidate with no controller matches nothing" $ do
       let noController = blackCreature {Filter.controller = Nothing}
       Spec.assertBool s (not (Filter.matches (controlledBy [0]) noController (Filter.Type.SameControllerAsBound slot))) "no candidate controller"

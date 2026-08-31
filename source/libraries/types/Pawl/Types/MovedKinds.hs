@@ -79,9 +79,10 @@ import qualified Pawl.Types.Quantity as Quantity
 -- Marauder and Forgotten Ancient, every one of them 'AnyNumberOfKind'. Scrounging
 -- Bandar and Bioshift are written today, the second one's "another target
 -- creature with the same controller" being Filter.SameControllerAsBound over its
--- first slot; Aetherborn Marauder's "from other permanents you control" is a group on the
--- first side, which ObjectRef.EachMatching says; Forgotten Ancient's "onto other
--- creatures" is a group on the SECOND, which nothing says (#2713).
+-- first slot; Aetherborn Marauder's "from other permanents you control" is a
+-- group on the first side, which ObjectRef.EachMatching says; Forgotten
+-- Ancient's "onto other creatures" is a group on the SECOND, which nothing says
+-- (#2713).
 --
 -- @include_extras@ is what makes that run every printing rather than most of
 -- one, and it is the parameter every sweep in this neighbourhood needs: without

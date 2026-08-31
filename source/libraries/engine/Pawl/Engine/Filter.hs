@@ -784,7 +784,8 @@ data Context = MkContext
     -- rather than this map and carries its own lint, SameControllerAsBound reads
     -- slotControllers and carries one that matters MORE, its vacuous direction
     -- being True, IsControllerOfBound and ControlledByBound are False wherever
-    -- `matches` reaches them, and no Filter atom carries a Quantity. Pawl.CardSpec's "CR 400.11c no card asks IsBound
+    -- `matches` reaches them, and no Filter atom carries a Quantity.
+    -- Pawl.CardSpec's "CR 400.11c no card asks IsBound
     -- in a wish's filter" is what keeps a card out of that position, and
     -- Pawl.OutsideTheGameSpec proves the atom answers nothing there.
     slotObjects :: Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId),
