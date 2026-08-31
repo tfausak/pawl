@@ -1068,11 +1068,11 @@ targetSlotSlots slot =
       -- (Pawl.Engine.Binding.eventAmount). Target.slotContext is what answers it,
       -- off the announcement the caller hands over.
       --
-      -- A REGRESSION FENCE on its own: the reserved names a carrier binds are
-      -- subtracted from the READ side, so removing this fold reddens nothing by
-      -- itself. What it fences is the pairing -- a card whose bound names an
-      -- amount its CONDITION does not supply (Pawl.Engine.Event.eventBindingSlots)
-      -- is caught only because the read is reported here.
+      -- What it buys is the pairing -- a card whose bound names an amount its
+      -- CONDITION does not supply (Pawl.Engine.Event.eventBindingSlots) is caught
+      -- only because the read is reported here. No card in data/cards/ misauthors
+      -- that pairing, so the proof is a planted one; see amountSlots below for
+      -- which case proves it.
       maybe Map.empty amountSlots (TargetSlot.amount slot)
     ]
   where

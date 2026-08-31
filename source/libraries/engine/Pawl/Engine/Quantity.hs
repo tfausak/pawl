@@ -1038,8 +1038,8 @@ objectSlots quantity = case quantity of
 -- slot its carrier never binds.
 --
 -- One arm per constructor, no wildcard, for `slots`' reason: a new quantity arm
--- carrying a reference must answer here rather than default to reading nothing
--- and license an unsound elision.
+-- carrying a reference must answer here rather than default to reading nothing,
+-- which would both hide a dead bound and license an unsound elision.
 nestedRefs :: Quantity -> Set (Either PlayerRef.PlayerRef SlotName)
 nestedRefs quantity = case quantity of
   Quantity.Literal _ -> Set.empty
