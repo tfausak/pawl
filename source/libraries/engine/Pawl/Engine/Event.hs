@@ -2897,10 +2897,14 @@ lockHalf oid half =
 -- below, which is CR 709.5d's entry designation -- can hand over the set they are
 -- about to store rather than re-reading a GameState that has or has not been
 -- modified yet. THE SAME helper at both, so the two cannot drift apart about what
--- "fully" means; that shared call is the only cover the entry site has, since no
--- board can make its answer True (#962). Computed AT THE WRITE and
--- carried on GameEvent.HalfUnlocked for the reason that event's own comment
--- gives: by the time a trigger is matched the board has moved on.
+-- "fully" means; that shared call is the only cover the ENTRY site has, and no
+-- board can change that -- CR 709.3 makes a player cast one half, so rule 709.5d
+-- gives at most one designation and a two-door Room can never arrive fully
+-- unlocked. Only unlockHalves reaches CR 709.5i's second branch, which
+-- Pawl.RoomSpec's "CR 709.5i a Room that gains both designations at once fires
+-- once" proves. Computed AT THE WRITE and carried on GameEvent.HalfUnlocked for
+-- the reason that event's own comment gives: by the time a trigger is matched the
+-- board has moved on.
 --
 -- ALL the halves and not merely two, though CR 709.5 knows only a left and a
 -- right: the question the rule asks is whether any half is still locked (CR

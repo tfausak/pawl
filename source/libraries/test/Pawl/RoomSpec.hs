@@ -17,7 +17,7 @@
 -- Event.fullyUnlockedAfter at both writers of an unlocked designation and
 -- Event.matchesTrigger's RoomFullyUnlocked and AnyOf arms.
 --
--- THREE printed cards. Roaring Furnace // Steaming Sauna, DSK 230, picked because
+-- THREE printed cards and one synthetic. Roaring Furnace // Steaming Sauna, DSK 230, picked because
 -- its two doors disagree about everything a reader can see -- {1}{R} against
 -- {3}{U}{U}, a triggered ability that fires on the door opening against a
 -- persistent pair (a static "you have no maximum hand size" and an end-step
@@ -26,19 +26,32 @@
 -- makes the subtraction observable at all: a door whose only text is "when you
 -- unlock this door" looks the same whether its text was subtracted or its
 -- trigger simply did not match. And Balemurk Leech, DSK 84, which is the pool's
--- one CR 709.5i trigger and the one card whose ability watches a Room it is not.
+-- one CR 709.5i trigger and the one card whose ability watches a Room it is not
+-- -- and, on the two foreign-unlock cases, the card each of two players holds.
 -- And Keys to the House, DSK 254, which is data/cards' producer of CR 709.5f's
 -- unlock and CR 709.5g's lock as EFFECTS rather than as CR 116.2m's special
--- action, so the two rules the special action cannot reach get a card.
+-- action, so the two rules the special action cannot reach get a card. And
+-- Synthetic Skeleton Key, "{T}: Unlock each locked door of target Room" beside
+-- "{T}: Lock each unlocked door of target Room", which is the two things no
+-- printing does: it names no controller, so the player who unlocks and the Room's
+-- controller come apart (CR 709.5i's "you"), and it names every door, so a
+-- permanent with neither designation can gain both (CR 709.5i's second branch). Every printed unlocker -- Keys to the House, Marina Vendrell,
+-- Ghostly Dancers, Ghostly Keybearer -- says "a Room you control" and "a door",
+-- singular, and CR 709.5e's special action is controller-only by rule (Scryfall
+-- oracle:unlock, 2026-08-31; a printing saying "unlock each door of target Room"
+-- would refute the second half).
 --
 -- Pawl.Engine.Room's own coverage is here rather than beside Resolve's, since
 -- rule 709.5c's derivation is what both the action and the opcode filter their
 -- offers through.
 --
 -- THREE SEATS, so "target creature an opponent controls" cannot coincide with
--- "a creature you control": bob holds the only legal target and carol holds
--- none -- and so that CR 109.5's "each opponent" cannot coincide with "each
--- player", which is what the CR 709.5i case turns on.
+-- "a creature you control": on `setUp`'s board bob holds the only legal target
+-- and carol holds none -- and so that CR 109.5's "each opponent" cannot coincide
+-- with "each player", which is what the CR 709.5i cases turn on. The two
+-- foreign-unlock cases spend the third seat again: carol loses a life under
+-- either reading of "you", so she is the liveness check while alice and bob are
+-- the discriminator.
 module Pawl.RoomSpec where
 
 import qualified Data.List as List
@@ -222,11 +235,13 @@ activateKeys keys keysId answer gs =
   let activated = snd (Engine.runGamePure answer gs (Activate.activateAbility S.alice keysId (lockAbility keys)))
    in resolveAll (settle (snd (Engine.runGamePure answer activated Stack.resolveTop)))
 
--- Synthetic Skeleton Key's only ability, "{T}: Unlock each locked door of target
--- Room". A no-mode ability with an unpayable cost keeps the helper total, for
+-- Synthetic Skeleton Key's two abilities, by index: 0 is "{T}: Unlock each locked
+-- door of target Room" and 1 is "{T}: Lock each unlocked door of target Room" --
+-- CR 709.5f and CR 709.5g in the plural, the pair Keys to the House prints in the
+-- singular. A no-mode ability with an unpayable cost keeps the helper total, for
 -- lockAbility's reason above.
-keyAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
-keyAbility key = case Face.activatedAbilities (S.combinedFace key) of
+keyAbility :: Int -> Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
+keyAbility index key = case drop index (Face.activatedAbilities (S.combinedFace key)) of
   ability : _ -> ability
   [] -> ActivatedAbility.MkActivatedAbility (Cost.MkCost Nothing []) (Modal.MkModal Seq.empty (ModeSelection.ChooseExactly 1)) [] Nothing Nothing
 
@@ -259,13 +274,13 @@ foreignRoom s registry doors = do
 
 -- Activate the Key at the Room and resolve everything. The TARGET is answered by
 -- filtering the offered recipients, keysAnswer's reason.
-turnKey :: Printing.Printing -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-turnKey key keyId room gs =
+turnKey :: Int -> Printing.Printing -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+turnKey index key keyId room gs =
   let answer :: Prompt.Prompt r -> r
       answer p = case p of
         Prompt.ChooseTargets _ _ _ asked -> fmap (Set.filter ((==) (Just room) . Recipient.objectOf) . snd) asked
         _ -> S.identityAnswer p
-      activated = snd (Engine.runGamePure answer gs (Activate.activateAbility S.alice keyId (keyAbility key)))
+      activated = snd (Engine.runGamePure answer gs (Activate.activateAbility S.alice keyId (keyAbility index key)))
    in resolveAll (settle (snd (Engine.runGamePure answer activated Stack.resolveTop)))
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -425,7 +440,7 @@ spec s registry = Spec.describe s "Room" $ do
   --
   -- Keys to the House, DSK 254, {1} Artifact: "{3}, {T}, Sacrifice this
   -- artifact: Lock or unlock a door of target Room you control. Activate only as
-  -- a sorcery." The producer in data/cards, and the one card there whose
+  -- a sorcery." The printed producer in data/cards, and the one card there whose
   -- either-or clause pair (Pawl.Types.Clause.orElse) is MANDATORY -- it prints no
   -- "may" over the two branches, where Twiddle and Teardrop Kami both do.
   --
@@ -649,7 +664,7 @@ spec s registry = Spec.describe s "Room" $ do
   -- readings, is the liveness check and the other two are the discriminator.
   Spec.it s "CR 709.5i 'you' is the player who unlocked, not the Room's controller" $ do
     (permId, keyId, key, board) <- foreignRoom s registry (Set.singleton furnaceName)
-    let after = turnKey key keyId permId board
+    let after = turnKey 0 key keyId permId board
     -- THE ASSERTION: alice unlocked, so alice's Leech is the one that fired.
     Spec.assertEqWith s "the unlocker's Leech costs bob a life" (S.lifeOf S.bob after) (Just 19)
     -- The other reading, refused: bob controls the Room and his Leech is silent.
@@ -677,7 +692,7 @@ spec s registry = Spec.describe s "Room" $ do
   -- from the first.
   Spec.it s "CR 709.5i a Room that gains both designations at once fires once" $ do
     (permId, keyId, key, board) <- foreignRoom s registry Set.empty
-    let after = turnKey key keyId permId board
+    let after = turnKey 0 key keyId permId board
     -- THE ASSERTION: one trigger, so one life apiece and no more.
     Spec.assertEqWith s "gaining both designations costs bob one life" (S.lifeOf S.bob after) (Just 19)
     Spec.assertEqWith s "and carol one" (S.lifeOf S.carol after) (Just 19)
@@ -687,6 +702,26 @@ spec s registry = Spec.describe s "Room" $ do
       "the control: both doors really opened, in one write"
       (fmap Object.unlockedHalves (Game.lookupObject permId after))
       (Just (Set.fromList [furnaceName, saunaName]))
+  -- CR 709.5g in the plural: "To lock half of a permanent, a player chooses an
+  -- unlocked half of that permanent, and that permanent loses the appropriate
+  -- unlocked designation." Skeleton Key's other ability names every unlocked
+  -- door, so both designations come off in one activation.
+  --
+  -- And NOTHING triggers. Rules 709.5h and 709.5i both ask about a permanent
+  -- GAINING a designation, so Pawl.Engine.Event.lockHalf records no event and
+  -- neither Leech fires -- the case that would catch a lock routed through the
+  -- unlock writer.
+  Spec.it s "CR 709.5g locking each door takes both designations back away" $ do
+    (permId, keyId, key, board) <- foreignRoom s registry (Set.fromList [furnaceName, saunaName])
+    let after = turnKey 1 key keyId permId board
+    Spec.assertEqWith
+      s
+      "both doors shut in one activation"
+      (fmap Object.unlockedHalves (Game.lookupObject permId after))
+      (Just Set.empty)
+    Spec.assertEqWith s "and a lock fires no CR 709.5i trigger for bob" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "nor for alice" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "nor for carol" (S.lifeOf S.carol after) (Just 20)
   -- CR 116.2m / 709.5e's TIMING: "A player can take this action any time they
   -- have priority and the stack is empty during a main phase of their turn."
   --

@@ -7071,8 +7071,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- A player recipient, an illegal slot (CR 608.2b) and an id naming no object
   -- all write nothing -- Designate's postures.
   --
-  -- Casing on `locked` is not casing on an effect's identity: it is one payload
-  -- of one opcode, which is the argument Effect.Designate's own haddock makes.
+  -- Casing on `locked` and on `every` is not casing on an effect's identity: both
+  -- are payloads of one opcode, which is the argument Effect.Designate's own
+  -- haddock makes.
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked every locked slot) ->
     case legalOne slot legal of
       Just recipient -> case Recipient.objectOf recipient of
