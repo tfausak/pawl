@@ -43,6 +43,16 @@ data PreventAllDamage effect = MkPreventAllDamage
     -- Read on the DealtTo side only: a shield pinned to the other side of the
     -- event names no recipient at all, and describes its source in @whatSource@
     -- below instead.
+    --
+    -- No PLAYER half beside it, where Pawl.Types.PreventNextDamage carries
+    -- @whoRecipient@. Printings that want both halves exist -- Safe Passage's
+    -- "prevent all damage that would be dealt to you and creatures you control
+    -- this turn" -- and they are written as TWO of these effects. CR 120.3's
+    -- recipient is a player or a permanent, so the two legs never admit the same
+    -- damage event, and CR 615.1's shield has no amount for them to share: two
+    -- rows prevent exactly the damage one two-legged row would. CR 615.7's
+    -- countdown is where that argument fails, its counted amount being the shared
+    -- thing, which is why the field lives there and not here.
     whatRecipient :: Maybe (Filter.Filter Keyword.Keyword),
     -- | Which SIDE of the damage event the objects @ref@ names sit on -- the
     -- recipients (Inkshield, Selfless Squire) or the SOURCE (Dovin, Hand of
