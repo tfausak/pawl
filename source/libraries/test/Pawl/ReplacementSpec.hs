@@ -1602,6 +1602,84 @@ evolvingHumanAt oid p = case p of
   Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Human, Subtype.Goblin)
   _ -> S.identityAnswer p
 
+-- CR 115.10a's bound object inside a floating shield's own recipient
+-- description, whose producer is Synthetic Communal Bulwark ({1}{W} Instant:
+-- "Prevent the next 3 damage that would be dealt this turn to you and to target
+-- creature.").
+--
+-- ONE SHIELD OVER TWO RECIPIENTS is what forces the spelling, and it is a rules
+-- reason rather than a convenience: CR 615.7 counts DAMAGE rather than events or
+-- recipients, so "you and target creature" is a single pool both recipients draw
+-- down. Pawl.Engine.Resolve installs one row per NAMED recipient and one row
+-- altogether for a DESCRIBED one, so writing the creature half as the opcode's
+-- `ref` would give the card two independent pools of 3 -- weaker than printed.
+-- The creature half therefore has to be a predicate on the one row, and the only
+-- predicate that can say "that creature" is Filter.IsBound over the target slot.
+--
+-- SYNTHETIC because no printing writes a bound slot into either of the two
+-- Filters an installed shield carries. Scryfall o:prevent o:"that creature would
+-- deal", o:prevent o:"that player controls", o:prevent o:"creatures that player
+-- controls" and o:prevent o:"they control" -o:"you control", 2026-08-30: every
+-- hit NAMES the object (Dazzling Reflection's "that creature", Delirium's "the
+-- creature"), which pawl writes as the opcode's `ref` and evaluates as the spell
+-- resolves, so none of them reaches the row. What would refute this is a printing
+-- whose shield covers a targeted object ALONGSIDE something else under one
+-- countdown.
+--
+-- Two seats is enough: the card says "you" and names no opponent, so the
+-- three-seat trap does not apply. bob supplies the source, which is a role the
+-- shield says nothing about.
+communalBulwarkSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+communalBulwarkSpec s registry = Spec.describe s "Synthetic Communal Bulwark (CR 115.10a)" $ do
+  Spec.it s "CR 115.10a the shield's description names the object the spell targeted" $ do
+    plains <- S.printingOf s registry "Plains"
+    bulwark <- S.printingOf s registry "Synthetic Communal Bulwark"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base = S.landsInPlay plains 2
+        (warded, g1) = S.addCreature sorcerer S.alice base
+        (unwarded, g2) = S.addCreature piker S.alice g1
+        (attacker, g3) = S.addCreature piker S.bob g2
+        (bulwarkId, g4) = S.addHandCard bulwark S.alice g3
+        ready =
+          g4
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        shielded = S.runPure (targetingOnly warded) ready (S.cast S.alice bulwarkId Monad.>> Stack.resolveTop)
+        hit recipient n =
+          DamageEvent.MkDamageEvent attacker recipient n False False False 0 Nothing DamageKind.Noncombat
+        -- ONE source and one starting board for every case below, so each pair
+        -- differs in the RECIPIENT alone.
+        strike recipient n = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit recipient n])
+    -- THE gameplay assertion: the shield covers the creature the spell targeted,
+    -- which it can only know through the slot bindings the row captured.
+    Spec.assertEqWith s "the 2 to the targeted creature is prevented whole" (S.damageOf warded (strike (Recipient.ToCreature warded) 2)) (Just 0)
+    -- Its twin on the same board, differing in the RECIPIENT alone: alice's other
+    -- creature is not the bound object, so the case above cannot pass on a shield
+    -- that covers every creature she controls.
+    Spec.assertEqWith s "alice's untargeted creature takes the whole 2" (S.damageOf unwarded (strike (Recipient.ToCreature unwarded) 2)) (Just 2)
+    -- The player half of the same description, which no slot answers: it holds
+    -- either way, so the two assertions above cannot both pass because no row was
+    -- installed at all.
+    Spec.assertEqWith s "and the 3 to alice herself is prevented whole" (S.lifeOf S.alice (strike (Recipient.ToPlayer S.alice) 3)) (Just 20)
+    -- CR 615.7's pool is shared, so the creature's 2 leaves 1: a fourth reading
+    -- that the two halves are separate shields would leave 3.
+    Spec.assertEqWith s "CR 615.7 the creature and the player draw down one pool" (S.lifeOf S.alice (S.runPure S.identityAnswer (strike (Recipient.ToCreature warded) 2) (Damage.applyDamage [hit (Recipient.ToPlayer S.alice) 3]))) (Just 18)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "setup: the Bulwark installed exactly one row" (length (GameState.replacements shielded)) 1
+    Spec.assertEqWith s "setup: bob's source is undamaged and unshielded" (S.damageOf attacker (strike (Recipient.ToCreature attacker) 2)) (Just 2)
+
+-- Aims a spell at `oid` by narrowing the offered set to it, evolvingHumanAt
+-- without the word swap: the target is FILTERED out of the offered set rather
+-- than rebuilt, since a hand-built recipient would be dropped at CR 608.2b's
+-- re-read with no error.
+targetingOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+targetingOnly oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
+
 -- CR 612.1 through a REDIRECTION's own chosen-source predicate (CR 609.7a),
 -- whose producer is Synthetic Turn the Blade ({1}{W} Instant: "The next time a
 -- Human of your choice would deal damage to you this turn, that damage is dealt
@@ -6470,6 +6548,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   scarecrowSpec s registry
   packLeaderSpec s registry
   wardingChantSpec s registry
+  communalBulwarkSpec s registry
   turnTheBladeSpec s registry
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
