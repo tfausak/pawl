@@ -300,15 +300,16 @@ enteredFromSpec s registry =
 -- first. The observable fact is therefore not that the two checks disagree but
 -- that the second reads the LOG: kill the entrant and the counter still lands.
 --
--- Stricter than printed in one half. Pawl.Types.InZone carries ONE PlayerRef and
--- Pawl.Engine.Quantity's WasCastFrom arm asks it of the caster and of the
--- entrant's owner alike, so "you cast it from A graveyard" has no exact spelling:
--- PlayerRef.EachPlayer would read "anyone cast it" (weaker) and PlayerRef.Relative
--- You reads "you cast it from your graveyard" (stricter). The card takes the
--- stricter one, so a creature cast out of an OPPONENT's graveyard does not grow
--- the Knight (#2689). The EnteredFrom half needs no such call and is exact:
--- EachPlayer makes its owner conjunct vacuous, which is the printed "a
--- graveyard", and every case below drives that half. The last case drives the
+-- The two disjuncts take their references for different reasons. The EnteredFrom
+-- half is exact on its face: PlayerRef.EachPlayer makes its owner conjunct
+-- vacuous, which is the printed "a graveyard", and every case below drives that
+-- half. The WasCastFrom half is PlayerRef.Relative You, which reads "you cast it
+-- from your graveyard" -- one reference standing for the caster and for the card's
+-- owner alike -- and that is exact only because no road in pawl casts a spell out
+-- of a graveyard that is not the caster's own (CR 400.3, and the pair of gates
+-- #2795 names; Pawl.Engine.Quantity's WasCastFrom arm carries the proof and the
+-- one road that could break it, #2689). EachPlayer would be the wrong call there: it reads
+-- "anyone cast it", which is weaker than printed. The last case drives the
 -- WasCastFrom disjunct's negative -- the Skeleton is cast from a HAND -- and
 -- Archfiend's Vessel above is where its positive is proved.
 --
