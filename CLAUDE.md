@@ -221,7 +221,11 @@ to agents as written. What it doesn't say:
 
 2.  Verify a scripted edit's blast radius. Bulk `sed`/Python rewrites land in
     comments, strings, and the middle of multi-line case bodies. Read the diff
-    and confirm the shape before staging.
+    and confirm the shape before staging. A scripted insertion of constructor
+    arms also lands inside comment groups that COUNT their members ("Four
+    keyword actions, none of them...", "the three whose watcher is..."), which
+    neither `-Werror` nor a mutation sees; move the inserted arm out of the
+    counted group and give it its own comment.
 
 3.  Mutate the change away and re-run. A green suite is not evidence the test
     proves anything. Break the line you just wrote, confirm the new test

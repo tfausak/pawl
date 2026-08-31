@@ -867,13 +867,20 @@ applyCrossings finalSub parent =
       -- Battlefield MEMBERSHIP rather than Object.zone, the way
       -- Departure.objectsLeaveWith reads the same question, since
       -- Pawl.Engine.Phasing takes a phased-out permanent out of that set and
-      -- leaves its Object.zone alone -- and rule 702.26k, which is about a
-      -- departing owner rather than about this road, is the reason that
-      -- distinction is worth drawing at all.
+      -- leaves its Object.zone alone (CR 702.26d).
       --
-      -- Not implemented: so a PHASED-OUT permanent crosses without an event,
-      -- though CR 702.26d leaves it on the battlefield and CR 729.4a carries no
-      -- carve-out of its own (#2468).
+      -- So a PHASED-OUT permanent crosses without an event, and that is CR
+      -- 702.26b rather than an omission: excepting rules that specifically
+      -- mention phased-out permanents, such a permanent "is treated as though it
+      -- does not exist" and "can't affect or be affected by anything else in the
+      -- game". CR 729.4a mentions none, so the main-game abilities it speaks of
+      -- cannot see one leave -- the answer CR 702.26k spells out for the other
+      -- road out of the game. The crossing itself still happens: CR 729.4 puts
+      -- every main-game object outside the subgame, and the wish reaching for it
+      -- belongs to the subgame, which CR 729.1a makes a different game from the
+      -- one rule 702.26b speaks of. Pawl.SetupSpec's "CR 702.26b a phased-out
+      -- permanent a subgame takes leaves the main game and triggers nothing" is
+      -- the proof, against a phased-in leg differing in the phase-out alone.
       cross g oid =
         let noted = case filed g oid of
               Nothing -> g
