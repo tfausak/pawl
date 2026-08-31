@@ -362,6 +362,46 @@ sacrificedPermanent = SlotName.MkSlotName (Text.pack "thatSacrificedPermanent")
 tappedPermanent :: SlotName
 tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
 
+-- CR 603.6c: the reserved slot under which the permanent a leaves-the-battlefield
+-- trigger WATCHED is bound -- the printed "it" in Resourceful Defense's "whenever
+-- a permanent you control leaves the battlefield, if it had counters on it, put
+-- those counters on target permanent you control". Stamped by
+-- Pawl.Engine.Event.eventBindings as the trigger is gathered, alongside
+-- `triggerPlayer` and `became`.
+--
+-- ZoneChange.departed, NOT ZoneChange.object, and the two are the whole reason
+-- this slot is not `became`: CR 400.7e's arriving incarnation is a different
+-- object, which CR 122.2 left with no counters and whose controller CR 108.4a
+-- would hand back as its owner -- and CR 400.7e withholds it entirely for a
+-- hidden destination (CR 400.2), where this slot is bound just the same. What
+-- the card says "it" about is the permanent as it last existed on the
+-- battlefield, which is CR 603.10a's look-back and CR 608.2h's last known
+-- information.
+--
+-- Bound for the BYSTANDER condition only. Under
+-- TriggerCondition.SelfLeavesTheBattlefield and SelfDies the departed id already
+-- IS CR 113.7a's `triggerSource`, so a second name for one object would be the
+-- redundancy SelfPutIntoGraveyardFromAnywhere's empty floor declines.
+-- TriggerCondition.PermanentDies is the same shape and is deliberately left
+-- unbound: no card in `data\/cards\/` reads the dead permanent rather than the
+-- graveyard card it became (#2347).
+--
+-- Every read of it is CR 608.2h's last known information --
+-- Pawl.Engine.Resolve.effectViewOf is what licenses that for this slot, exactly
+-- as it does for `sacrificedPermanent`, and for the same reason: the object is
+-- gone by construction, so viewWithLastKnown's blank answer for a non-source id
+-- would leave the clause permanently unanswerable. The trigger's own intervening
+-- "if" needs no arm there, Pawl.Engine.Event.interveningHolds and
+-- Pawl.Engine.Stack's CR 608.2a re-check both reading the unscoped view already.
+--
+-- Not a target (CR 115.10a; nothing was chosen), so the same CR 608.2b posture
+-- and the same "no card's targetSlots may name it" sweep as `became` and
+-- `sacrificedPermanent`. Swept on the BINDING side too, for `eventAmount`'s
+-- reason: a card writing this name into an effect's bound SlotName would shadow
+-- the event's permanent with its own object.
+departedPermanent :: SlotName
+departedPermanent = SlotName.MkSlotName (Text.pack "thatDepartedPermanent")
+
 -- CR 601.2i: the reserved slot under which a cast trigger's WATCHED SPELL is
 -- bound -- the printed "it" in Presence of the Master's "whenever a player casts
 -- an enchantment spell, counter it", and "that spell" wherever a card spells the
@@ -622,6 +662,10 @@ setBecame oid = Map.insert became (toObject oid)
 -- why the shape differs from setBecame's.
 setBecameGroup :: Seq ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setBecameGroup oids = Map.insert became (toObjects oids)
+
+-- Bind an object under the reserved departedPermanent slot (CR 603.10a).
+setDepartedPermanent :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setDepartedPermanent oid = Map.insert departedPermanent (toObject oid)
 
 -- Bind an object under the reserved castSpell slot (CR 601.2i).
 setCastSpell :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
