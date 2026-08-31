@@ -290,9 +290,22 @@ oneSlot slot = Map.singleton slot SlotArity.One
 insertOne :: SlotName -> Map.Map SlotName SlotArity -> Map.Map SlotName SlotArity
 insertOne slot = joinTwo (oneSlot slot)
 
--- A Quantity evaluates against one object, so its slots are read singly.
+-- The slots a Quantity reads, on both halves of Pawl.Types.SlotName's one flat
+-- namespace. Quantity.objectSlots names an OBJECT and evaluates against it, so a
+-- slot naming several leaves Pawl.Engine.Filter.slotOneObject with nothing to
+-- pick and the whole number unanswered -- SlotArity.One. Every other slot
+-- Quantity.slots reports is a Quantity.InSlot, which reads the slot's AMOUNT
+-- instead (Pawl.Engine.Binding.amountOf) and cannot be damaged by a plural slot
+-- at all -- SlotArity.Amount, an entry stating a read without claiming an arity.
+--
+-- Both halves are reported so that the KEYS stay Quantity.slots' whole answer:
+-- an InSlot read is a read, and the D4 dataflow lint counts it (#2774).
+-- Map.union is left-biased, so a slot read both ways is One.
 quantitySlots :: Quantity.Type.Quantity -> Map.Map SlotName SlotArity
-quantitySlots = Map.fromSet (const SlotArity.One) . Quantity.slots
+quantitySlots quantity =
+  Map.union
+    (Map.fromSet (const SlotArity.One) (Quantity.objectSlots quantity))
+    (Map.fromSet (const SlotArity.Amount) (Quantity.slots quantity))
 
 -- The Quantities an entry rider carries: CR 122.6's count per counter kind, which
 -- a card may write as anything a Quantity spells. A position the three walkers
