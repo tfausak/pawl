@@ -4840,15 +4840,21 @@ hostFramed framing = case framing of
 -- above)? Every framing but a keyword's own, which is not: no evaluator of a
 -- keyword's payload Filter supplies SLOT OBJECTS, so Filter.IsControllerOfBound
 -- reads nothing at any of them. That is the test to put a new evaluator to,
--- rather than a list of today's, and two of the three Pawl.Engine.Filter Context
--- builders settle it by construction -- contextFor and contextComparingPower
--- both write slotObjects empty. The third, contextWithSlots, is reached once:
--- Pawl.Engine.Replacement.candidateContext, for the CR 702.16e quality
--- Pawl.Engine.Keyword transplants into a DamageR's source half, and the slots it
--- is handed are a ReplacementCandidate's -- empty for the PERMANENT candidate a
--- keyword mint always is, since no resolution installed a printed static
--- ability. Filter.HasKeyword is not even a read: it asks Set membership of the
--- whole keyword.
+-- rather than a list of today's: the question is what the EVALUATING context
+-- holds, not how many builders there are -- Pawl.Engine.Filter.contextWithSlots
+-- has six callers and Pawl.Engine.Target.slotContext writes a slot-carrying
+-- Context out by hand. Neither reaches a keyword's payload: CR 702.11d and CR
+-- 702.16b (Pawl.Engine.Target.targetable), CR 702.14c (Pawl.Engine.Combat), CR
+-- 702.16c/d (Pawl.Engine.AttachRestriction), CR 702.16f
+-- (Pawl.Engine.CombatRestriction), a keyword cost's criterion (Pawl.Engine.Cost)
+-- and the CR 702.29e cycling mint's Search filter all evaluate in a context built
+-- with no slots, and the CR 702.16e quality Pawl.Engine.Keyword transplants into
+-- a DamageR's source half goes through candidateContext on the PERMANENT segment,
+-- whose ReplacementCandidate.slots is empty because no resolution installed a
+-- printed static ability. Target.slotContext's map is answered only by
+-- admittedGiven and lastKnownAdmits, which match a target slot's own Filter --
+-- Unframed, never KeywordFramed. Filter.HasKeyword is not even a read: it asks
+-- Set membership of the whole keyword.
 --
 -- The lint is conservative everywhere else, reporting the atom wherever it sits
 -- rather than only where it is answered, so this is the one exemption and it is
