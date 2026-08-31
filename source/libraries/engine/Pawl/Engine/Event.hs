@@ -154,6 +154,7 @@ import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesign
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -6988,12 +6989,14 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- attacker would agree today, rule 508.1 letting only the active player
   -- declare, but the rule asks who declared.
   --
-  -- The attacked side is UNQUALIFIED, rule 508.3e's "[another player]" as every
-  -- printing of this shape leaves it -- Pawl.Types.TriggerCondition's arm says
-  -- which cards would narrow it (#2281). A relation there would be nearly
-  -- unobservable besides: CR 506.2 and CR 802.2 make every defending player an
-  -- opponent of the attacker, so Opponent and AnyPlayer would pick the same
-  -- seats on every legal declaration.
+  -- Both sides are QUALIFIED, each by its own relation: Lulu, Stern Guardian's
+  -- "whenever an opponent attacks you" is Opponent over the declarer and You
+  -- over the target, where Seifer's "whenever you attack a player" is You and
+  -- AnyPlayer. Both are read against CR 109.5's "you" -- the ability's
+  -- controller -- and not against each other, so Opponent on the ATTACKED side
+  -- would say "somebody other than me was attacked" rather than restate CR
+  -- 506.2a's requirement that the defending player be an opponent of the
+  -- attacker.
   --
   -- ONLY AttackTarget.OfPlayer, which is rule 508.3e's last sentence in as many
   -- words: "it won't trigger if a creature attacks a planeswalker or a battle".
@@ -7005,9 +7008,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- No bearer test, PlayerAttacks' bystanding posture above: rule 508.3e's two
   -- subjects are both players, so a Seifer held out of combat still triggers on
   -- its controller's attack.
-  TriggerCondition.PlayerAttacksPlayer relation -> case event of
+  TriggerCondition.PlayerAttacksPlayer subjects -> case event of
     GameEvent.BecameAttacked payload -> case BecameAttacked.target payload of
-      AttackTarget.OfPlayer _ -> PlayerRelation.holds relation you (BecameAttacked.attacker payload)
+      AttackTarget.OfPlayer attacked ->
+        PlayerRelation.holds (PlayerAttacksPlayer.attacker subjects) you (BecameAttacked.attacker payload)
+          && PlayerRelation.holds (PlayerAttacksPlayer.attacked subjects) you attacked
       AttackTarget.OfPlaneswalker _ -> False
       AttackTarget.OfBattle _ -> False
     GameEvent.AttackerDeclared {} -> False
@@ -11040,10 +11045,9 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- CR 508.3e's SECOND subject, off the same event and under the same reserved
   -- slot: whom the declaration was aimed at, which is what "that player" means
   -- in Seifer, Balamb Rival's "goad target creature that player controls". The
-  -- ATTACKING player the event also carries goes unbound, the CreatureAttacksYou
-  -- arm above's reasoning -- no printing of this shape points back at it that
-  -- CR 109.5's "you" cannot say, and #2154 is where the ones that do are
-  -- tracked.
+  --
+  -- Not implemented: the ATTACKING player the event also carries, which
+  -- Archnemesis' "attach this Aura to that player" needs (#2810).
   --
   -- The narrowing to AttackTarget.OfPlayer is matchesTrigger's, re-stated here
   -- because this function is not given its answer: an event this condition
@@ -13660,7 +13664,7 @@ controllerTurnScoped cond = case cond of
   -- The same comparison over the ATTACKING side, which is the field rule
   -- 508.3e's event pins to the active player; the attacked side says nothing
   -- about whose turn it is.
-  TriggerCondition.PlayerAttacksPlayer relation -> relation == PlayerRelation.You
+  TriggerCondition.PlayerAttacksPlayer subjects -> PlayerAttacksPlayer.attacker subjects == PlayerRelation.You
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False

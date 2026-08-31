@@ -44,7 +44,12 @@
           "condition": {
             "type": "PlayerAttacksPlayer",
             "value": {
-              "type": "You"
+              "attacked": {
+                "type": "AnyPlayer"
+              },
+              "attacker": {
+                "type": "You"
+              }
             }
           },
           "modal": {

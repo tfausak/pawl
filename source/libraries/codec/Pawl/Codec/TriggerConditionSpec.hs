@@ -21,6 +21,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -234,26 +235,23 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.You (Filter.HasSubtype Subtype.Bird)))
       " {\"type\":\"PlayerAttacksWith\",\"value\":{\"player\":{\"type\":\"You\"},\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Bird\"}}}} "
-  -- CR 508.3e, whose payload names the ATTACKING side alone -- Seifer, Balamb
-  -- Rival's You, and the AnyPlayer a "whenever a player attacks a player" would
-  -- take. Not the same wire shape as PlayerAttacks above, whose tag differs, so
-  -- neither decodes as the other.
-  Spec.it s "PlayerAttacksPlayer round-trips all three relations" $ do
+  -- CR 508.3e, whose payload names BOTH subjects -- Seifer, Balamb Rival's
+  -- You/AnyPlayer and Lulu, Stern Guardian's Opponent/You. The two keys hold
+  -- DIFFERENT relations in each case, so a codec that crossed them would not
+  -- round-trip. Not the same wire shape as PlayerAttacks above, whose tag
+  -- differs and whose payload is a bare relation, so neither decodes as the
+  -- other.
+  Spec.it s "PlayerAttacksPlayer round-trips both subjects" $ do
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.PlayerAttacksPlayer PlayerRelation.You)
-      " {\"type\":\"PlayerAttacksPlayer\",\"value\":{\"type\":\"You\"}} "
+      (TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.You PlayerRelation.AnyPlayer))
+      " {\"type\":\"PlayerAttacksPlayer\",\"value\":{\"attacker\":{\"type\":\"You\"},\"attacked\":{\"type\":\"AnyPlayer\"}}} "
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.PlayerAttacksPlayer PlayerRelation.Opponent)
-      " {\"type\":\"PlayerAttacksPlayer\",\"value\":{\"type\":\"Opponent\"}} "
-    Common.assertCodec
-      s
-      TriggerCondition.codec
-      (TriggerCondition.PlayerAttacksPlayer PlayerRelation.AnyPlayer)
-      " {\"type\":\"PlayerAttacksPlayer\",\"value\":{\"type\":\"AnyPlayer\"}} "
+      (TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.Opponent PlayerRelation.You))
+      " {\"type\":\"PlayerAttacksPlayer\",\"value\":{\"attacker\":{\"type\":\"Opponent\"},\"attacked\":{\"type\":\"You\"}}} "
   -- CR 508.3b, nullary for the sibling above's reason and one of its own: the
   -- subject is whom the ability's own source is attached to.
   Spec.it s "AttachedPlayerIsAttacked" $
