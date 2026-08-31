@@ -1194,15 +1194,20 @@ slotCapacities x slots sets gs = Map.mapWithKey capacity slots
       let legal = legalOf name
        in case scopeSlot (TargetSlot.pool slot) of
             Nothing -> Natural.length legal
-            Just named ->
-              let candidates = legalOf named
-                  pids = Maybe.mapMaybe playerOf (Set.toList candidates)
-                  k = case Map.lookup named slots of
-                    Nothing -> 0
-                    Just namedSlot -> snd (announcedRange x namedSlot (Natural.length candidates))
-                  per = List.sortBy (flip compare) (fmap (\pid -> Natural.length (Set.intersection legal (graveyardsOf [pid] gs))) pids)
-                  elsewhere = Natural.length (Set.difference legal (graveyardsOf pids gs))
-               in elsewhere + sum (take (Natural.toIntSaturating k) per)
+            -- The scope names a slot this announcement does not declare -- CR
+            -- 603.2's trigger bindings reach a pool as `seed` and never as a
+            -- slot. Nothing here can bound such a slot's answers, so the
+            -- candidate count stands, which is what it was before this function
+            -- existed.
+            Just named -> case Map.lookup named slots of
+              Nothing -> Natural.length legal
+              Just namedSlot ->
+                let candidates = legalOf named
+                    pids = Maybe.mapMaybe playerOf (Set.toList candidates)
+                    k = snd (announcedRange x namedSlot (Natural.length candidates))
+                    per = List.sortBy (flip compare) (fmap (\pid -> Natural.length (Set.intersection legal (graveyardsOf [pid] gs))) pids)
+                    elsewhere = Natural.length (Set.difference legal (graveyardsOf pids gs))
+                 in elsewhere + sum (take (Natural.toIntSaturating k) per)
 
 -- CR 601.2c's two announcements over one slot map, in the rule's own order: how
 -- many targets each variable slot gets, then the targets themselves.
