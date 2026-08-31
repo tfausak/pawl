@@ -4052,6 +4052,9 @@ filterReads f = case f of
   Filter.Type.IsBound _ -> Set.empty
   -- Reads NAMES at both ends, which no Modification writes.
   Filter.Type.SameNameAsBound _ -> Set.empty
+  -- Reads the CANDIDATE's controller, where its sibling above reads names: the
+  -- bound object's controller arrives on the Context, already projected.
+  Filter.Type.SameControllerAsBound _ -> Set.singleton Controller
   -- Reads NAMES at both ends too, HasName's answer one indirection along: the
   -- chosen half is not a projection at all, and no Modification writes the other.
   Filter.Type.HasChosenName -> Set.empty
@@ -4250,6 +4253,9 @@ filterReadsPeers f = case f of
   Filter.Type.IsSource -> False
   Filter.Type.IsBound _ -> False
   Filter.Type.SameNameAsBound _ -> False
+  -- The bound object's controller arrives on the Context, filled by
+  -- Pawl.Engine.Target.slotContext -- no peer projection is read here.
+  Filter.Type.SameControllerAsBound _ -> False
   Filter.Type.HasChosenName -> False
   Filter.Type.IsPlayer _ -> False
   Filter.Type.IsControllerOfBound _ -> False

@@ -336,6 +336,22 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- A THUNK, like the two above: one projection per bound object, paid
             -- for only by a filter that names the atom.
             Filter.slotNames = fmap (foldMap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) targets,
+            -- CR 110.2's other read of the same objects, alongside slotNames above
+            -- and filled the same way: SameControllerAsBound lives in a target
+            -- slot's Filter, this is where one is matched, and the CR 608.2h
+            -- reader is what keeps a bound target that has since left the
+            -- battlefield answerable rather than silently changing the sibling
+            -- slot's legality at CR 608.2b.
+            --
+            -- A KEY PER BOUND SLOT and no more, which is the distinction that
+            -- atom's vacuous direction rests on: `fmap` leaves a slot the
+            -- announcement has not answered yet out of the map entirely, where a
+            -- slot naming an object with no controller (CR 108.4) gets an empty
+            -- set. The first widens and the second refuses.
+            --
+            -- A THUNK, like its siblings: one projection per bound object, paid
+            -- for only by a filter that names the atom.
+            Filter.slotControllers = fmap (foldMap (foldMap (foldMap (maybe Set.empty Set.singleton . Filter.controller) . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) targets,
             -- CR 603.2's NUMBERS out of the same environment: "that much", the
             -- amount the trigger's own event stamped, which the bound below reads
             -- through Quantity.InSlot. Not an atom's input -- no Filter arm reads

@@ -781,9 +781,11 @@ data Context = MkContext
     -- nothing mints an object until Pawl.Engine.OutsideTheGame.bringInto does --
     -- so IsBound is False for every candidate there whatever this map holds. The
     -- other readers cannot reach it either: SameNameAsBound reads slotNames
-    -- rather than this map and carries its own lint, IsControllerOfBound and
-    -- ControlledByBound are False wherever `matches` reaches them, and no Filter
-    -- atom carries a Quantity. Pawl.CardSpec's "CR 400.11c no card asks IsBound
+    -- rather than this map and carries its own lint, SameControllerAsBound reads
+    -- slotControllers and carries one that matters MORE, its vacuous direction
+    -- being True, IsControllerOfBound and ControlledByBound are False wherever
+    -- `matches` reaches them, and no Filter atom carries a Quantity.
+    -- Pawl.CardSpec's "CR 400.11c no card asks IsBound
     -- in a wish's filter" is what keeps a card out of that position, and
     -- Pawl.OutsideTheGameSpec proves the atom answers nothing there.
     slotObjects :: Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId),
@@ -809,6 +811,27 @@ data Context = MkContext
     -- "CR 709.4a no card asks SameNameAsBound outside a mode's target slot",
     -- the sweep sourcePower's and defendingPlayer's siblings each have.
     slotNames :: Map.Map SlotName.SlotName (Set.Set CardName.CardName),
+    -- CR 110.2: the CONTROLLERS of the objects the surrounding announcement's
+    -- slots hold, for the one atom that compares a candidate's against them
+    -- (SameControllerAsBound, Bioshift). `slotNames` above in every respect --
+    -- supplied by the one caller that matches a target slot's Filter
+    -- (Pawl.Engine.Target.slotContext), separate from `slotObjects` because an id
+    -- is not a controller until a board has been asked, lazy so that a filter
+    -- omitting the atom never forces the projection, and read through CR 608.2h's
+    -- last-known reader so a bound object that has left is still answerable.
+    --
+    -- What keeps a card out of the positions this is empty in is Pawl.CardSpec's
+    -- "CR 110.2 no card asks SameControllerAsBound outside a mode's target slot",
+    -- slotNames' sweep with more riding on it: that atom is a silent False
+    -- elsewhere and this one a silent True.
+    --
+    -- ABSENT versus EMPTY is the one place it differs, and the atom's vacuous
+    -- direction is why: a key is here for every slot the caller bound, so a
+    -- missing key is a slot nothing has named yet -- CR 601.2c's offer, made
+    -- before either target is chosen -- and an empty set is a bound object with no
+    -- controller at all (CR 108.4's card in a library). The atom widens on the
+    -- first and refuses on the second.
+    slotControllers :: Map.Map SlotName.SlotName (Set.Set PlayerId.PlayerId),
     -- CR 601.2b / 603.2: the NUMBERS the surrounding announcement's bindings hold,
     -- keyed by slot -- "that much" as the trigger's own event stamped it
     -- (Pawl.Engine.Binding.eventAmount), and the X a caster just named
@@ -904,7 +927,7 @@ data Context = MkContext
 -- context from this function and then overlays sourceChosenNames. See that field
 -- above for the lint that keeps a card to that position.
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
+contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -935,7 +958,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
+contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1084,6 +1107,17 @@ matches context view predicate = case predicate of
   -- naming nothing, and a bound object with no name (CR 708.2a), each leave the
   -- other side empty and answer False without a case of their own.
   Filter.SameNameAsBound slot -> not (Set.disjoint (names view) (Map.findWithDefault Set.empty slot (slotNames context)))
+  -- CR 110.2 compared across two of one announcement's targets, and the one atom
+  -- here that is vacuously TRUE rather than False: a slot the context has no key
+  -- for is one nothing has named yet, and a relation with only one party to it
+  -- constrains nothing. See the atom's own note for why CR 601.2c makes that the
+  -- honest answer -- Pawl.Engine.Target.legalSetsGiven's first pass offers the
+  -- union and selectionLegal's joint check is what narrows. A key that is present
+  -- and EMPTY is the other case: a bound object with no controller (CR 108.4), and
+  -- nothing shares a controller with it.
+  Filter.SameControllerAsBound slot -> case Map.lookup slot (slotControllers context) of
+    Nothing -> True
+    Just pids -> maybe False (`Set.member` pids) (controller view)
   -- CR 201.4 at both ends, the arm above's INTERSECTION for CR 201.4g's reason as
   -- much as CR 709.4a's: choosing one of a set of interchangeable names chooses
   -- each of them, so a candidate showing either matches. A source that has chosen
@@ -1366,6 +1400,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsSource -> predicate
   Filter.IsBound _ -> predicate
   Filter.SameNameAsBound _ -> predicate
+  Filter.SameControllerAsBound _ -> predicate
   Filter.HasChosenName -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched for IsPlayer's reason: CR 612.1 swaps a WORD in the text, and this
@@ -1776,6 +1811,7 @@ bakeBound players predicate = case predicate of
   -- OBJECT. Pawl.Engine.Filter.matches answers it as it stands.
   Filter.IsBound _ -> predicate
   Filter.SameNameAsBound _ -> predicate
+  Filter.SameControllerAsBound _ -> predicate
   Filter.HasChosenName -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched: CR 603.2's binding map holds PLAYERS, and this atom names a slot
@@ -1891,6 +1927,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsSource -> []
   Filter.IsBound _ -> []
   Filter.SameNameAsBound _ -> []
+  Filter.SameControllerAsBound _ -> []
   Filter.HasChosenName -> []
   Filter.IsPlayer _ -> []
   Filter.IsControllerOfBound _ -> []
@@ -2004,6 +2041,7 @@ statesAQuality predicate = case predicate of
   Filter.IsSource -> True
   Filter.IsBound _ -> True
   Filter.SameNameAsBound _ -> True
+  Filter.SameControllerAsBound _ -> True
   -- CR 701.23b's "stated quality" for HasName's reason, one indirection along: the
   -- description is a card name whichever way the name was arrived at, so a search
   -- whose filter is this one may decline to find what it can see.
@@ -2086,6 +2124,11 @@ boundSlots predicate = case predicate of
   -- Reported for the atom above's reason, and answerable in the same place: it
   -- reads the Context too, one field over.
   Filter.SameNameAsBound slot -> Set.singleton slot
+  -- Reported for the atom above's reason and answerable one field along, and here
+  -- the report is BEHAVIOURAL as well as a lint: Pawl.Engine.Target.jointlyJudged
+  -- fires on this set, and CR 601.2c's joint check is the whole of what enforces
+  -- this atom (the offer widens for it).
+  Filter.SameControllerAsBound slot -> Set.singleton slot
   Filter.And fs -> foldMap boundSlots fs
   Filter.Or fs -> foldMap boundSlots fs
   Filter.Not f -> boundSlots f

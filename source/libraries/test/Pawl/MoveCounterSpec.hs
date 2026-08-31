@@ -900,9 +900,11 @@ anyNumberSpec s registry = Spec.describe s "CR 122.5 moving any number of counte
 -- mentions. Its "another target creature" is Filter.Not Filter.IsSource, Joraga
 -- Auxiliary's shape, so no clause of the printed sentence is omitted.
 --
--- Bioshift prints the same spelling on an instant and is cheaper to drive, but
--- its "with the same controller" is a demand on a sibling OBJECT slot that no
--- filter can make, and dropping it would be weaker than printed (#2722).
+-- Bioshift prints the same spelling on an instant and is cheaper to drive;
+-- Pawl.TargetSpec is where it is, its "with the same controller" being what that
+-- case exists to prove. The Bandar stays this group's subject because the boards
+-- below are about which KINDS the prompt offers, which an instant with a second
+-- target slot would only make harder to read.
 --
 -- The counters go on by hand rather than through the printed entry rider, whose
 -- own road is Pawl.ReplacementSpec's: these boards need a tally the printed two

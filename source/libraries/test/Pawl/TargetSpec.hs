@@ -218,6 +218,24 @@ aimingHammer dealerId victimId p = case p of
       asked
   _ -> S.identityAnswer p
 
+-- CR 601.2c's whole announcement for Bioshift: `giverId` in the `from` slot and
+-- `takerId` in the `to` slot, aimingHammer's shape and FILTERED for its reason.
+--
+-- Its second prompt is CR 122.5's "any number": the whole offered tally crosses,
+-- so a case that moves nothing moved nothing because the announcement or the move
+-- refused rather than because the answerer declined.
+aimingBioshift :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimingBioshift giverId takerId p = case p of
+  Prompt.ChooseTargets _ _ _ asked ->
+    Map.mapWithKey
+      ( \slot (_, offered) ->
+          let wanted = if slot == SlotName.MkSlotName (Text.pack "from") then giverId else takerId
+           in Set.filter ((==) (Just wanted) . Recipient.objectOf) offered
+      )
+      asked
+  Prompt.ChooseMovedCounters _ _ _ _ offered -> offered
+  _ -> S.identityAnswer p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- CR 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
@@ -1564,6 +1582,66 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
       (slotNamed "victim")
       (Set.fromList (fmap Recipient.ToCreature [dealerId, wallId, ratsId]))
     Spec.assertEqWith s "and the dealer slot only alice's two" (slotNamed "dealer") (Set.fromList (fmap Recipient.ToCreature [dealerId, wallId]))
+
+  -- CR 601.2c's sibling-slot reading in its POSITIVE form, where the case above is
+  -- the negative one: "another" excludes what a sibling slot holds, and "with the
+  -- same controller" demands something of it -- CR 110.2's controller, which every
+  -- permanent has.
+  --
+  -- Bioshift {G/U} Instant (Gatecrash; name, cost, type line and oracle text
+  -- checked against Scryfall 2026-08-31), data/cards/bioshift.json:
+  --
+  --   Move any number of +1/+1 counters from target creature onto another target
+  --   creature with the same controller.
+  --
+  -- Its `to` slot is And [Not (IsBound "from"), SameControllerAsBound "from"], and
+  -- the second atom is the one this case exists for: written without it the card
+  -- would be WEAKER than printed in the caster's favour, letting counters cross
+  -- between two players' creatures.
+  --
+  -- THREE Walls of Stone, two alice's and one bob's, so the two boards below
+  -- differ in exactly one thing -- which creature fills the `to` slot -- with the
+  -- same one hybrid mana paid off the same two lands. One printing three times
+  -- over, so nothing but the CONTROLLER can separate the candidates: a filter
+  -- reading any characteristic would admit or refuse all three alike.
+  Spec.it s "CR 601.2c Bioshift's second slot cannot be a creature its first slot's controller does not control" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    wall <- S.printingOf s registry "Wall of Stone"
+    bioshift <- S.printingOf s registry "Bioshift"
+    let lands = S.landsFor island S.alice 1 (S.landsFor forest S.alice 1 (Setup.emptyGame S.bothPlayers))
+        (giverId, g1) = S.addCreature wall S.alice lands
+        (mineId, g2) = S.addCreature wall S.alice g1
+        (theirsId, g3) = S.addCreature wall S.bob g2
+        (board, spellId) = S.handOne bioshift (S.addCounter CounterKind.PlusOnePlusOne 3 giverId g3)
+        run takerId =
+          let cast = S.runPure (aimingBioshift giverId takerId) board (S.cast S.alice spellId)
+           in (cast, S.runPure (aimingBioshift giverId takerId) cast Stack.resolveTop)
+        (_, ontoMine) = run mineId
+        (castAtTheirs, ontoTheirs) = run theirsId
+        counters = S.counterOf CounterKind.PlusOnePlusOne
+        slots = Modal.allTargetSlots (Face.spell (S.combinedFace bioshift))
+        offered = Target.legalSets (Just S.alice) Map.empty S.noSource slots board
+        slotNamed name = Map.findWithDefault Set.empty (SlotName.MkSlotName (Text.pack name)) offered
+    Spec.assertEqWith s "alice's first Wall bears the three counters and nothing else does" (fmap (`counters` board) [giverId, mineId, theirsId]) [3, 0, 0]
+    -- THE GAMEPLAY-LEVEL ASSERTIONS, ahead of the reversal's: the counters cross
+    -- between alice's two Walls and do not cross to bob's.
+    Spec.assertEqWith s "naming alice's other Wall, all three counters cross to it" (fmap (`counters` ontoMine) [giverId, mineId]) [0, 3]
+    Spec.assertEqWith s "naming bob's Wall, it receives none" (counters theirsId ontoTheirs) 0
+    Spec.assertEqWith s "and alice's first Wall still bears all three" (counters giverId ontoTheirs) 3
+    -- CR 601.2e, behind the behaviour: the announcement was not one the rule
+    -- allows, so the game returned to before the spell was proposed.
+    Spec.assertEqWith s "the cast is reversed" (length (GameState.stack castAtTheirs)) 0
+    Spec.assertBool s (elem spellId (Game.zoneMembers Zone.Hand S.alice castAtTheirs)) "and the spell is back in alice's hand"
+    -- The union posture, last, and the trap this atom had to avoid: the offer is
+    -- made before either target is chosen, so the `to` slot is still offered every
+    -- creature -- bob's included. A narrowing offer would empty the slot and make
+    -- the spell uncastable rather than restricted.
+    Spec.assertEqWith
+      s
+      "the second slot is offered every creature, bob's own candidate included"
+      (slotNamed "to")
+      (Set.fromList (fmap Recipient.ToCreature [giverId, mineId, theirsId]))
 
   -- CR 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is
   -- a number." Flensing Raptor's enters trigger reads "another target creature
