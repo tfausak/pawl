@@ -514,7 +514,7 @@ lastKnownBlockingSpec s registry =
           swamp <- S.printingOf s registry "Swamp"
           run giant prowler swamp True $ \prowlerId declared killed after -> do
             Spec.assertEqWith s "bob's hand is empty, so CR 603.4's clause was false" (S.handSize S.bob after) 0
-            Spec.assertEqWith s "and it really was blocking before it died" (Projection.viewWithLastKnownAnywhere declared prowlerId >>= Just . Filter.blocking) (Just True)
+            Spec.assertEqWith s "and it really was blocking before it died" (fmap Filter.blocking (Projection.viewWithLastKnownAnywhere declared prowlerId)) (Just True)
             Spec.assertEqWith s "and it really did die" (Set.member prowlerId (GameState.battlefield killed)) False
             Spec.assertEqWith s "so nothing was gathered onto the stack" (length (GameState.stack (settle killed))) 0
 
@@ -526,7 +526,7 @@ lastKnownBlockingSpec s registry =
           swamp <- S.printingOf s registry "Swamp"
           run giant prowler swamp False $ \prowlerId declared killed after -> do
             Spec.assertEqWith s "bob drew his one library card" (S.handSize S.bob after) 1
-            Spec.assertEqWith s "off a Prowler that was never blocking" (Projection.viewWithLastKnownAnywhere declared prowlerId >>= Just . Filter.blocking) (Just False)
+            Spec.assertEqWith s "off a Prowler that was never blocking" (fmap Filter.blocking (Projection.viewWithLastKnownAnywhere declared prowlerId)) (Just False)
             Spec.assertEqWith s "and died the same way" (Set.member prowlerId (GameState.battlefield killed)) False
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
