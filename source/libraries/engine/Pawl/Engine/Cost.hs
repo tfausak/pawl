@@ -1333,6 +1333,11 @@ claimOf pid oid component gs = case component of
   -- and not the tapping one: a permanent returned to hand is as gone from the
   -- battlefield as one sacrificed, so a cost that returns and a cost that
   -- sacrifices compete for the same objects.
+  --
+  -- A FENCE and not proven behaviour, ReturnThis' above and for its reason:
+  -- Meloku the Clouded Mirror's cost states one object-claiming component, so
+  -- Hall's condition groups a single claim and keying it ClaimAxis.Tapping
+  -- instead leaves the suite green.
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) ->
     claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (returnCandidates pid oid criterion gs)) n
   CostComponent.PayLife _ -> Nothing
@@ -1933,8 +1938,11 @@ canPayComponent pid oid component gs = case component of
   -- CR 118.3: this player must have at least `n` permanents the criterion
   -- admits to return. TapPermanents' arm above over a different action, and
   -- WITHOUT CR 101.2's sacrifice prohibition for the reason ReturnThis' arm
-  -- gives. This component ALONE, Sacrifice's caveat; `jointlyPayable` asks the
-  -- components together.
+  -- gives. `claimOf` must agree.
+  --
+  -- REDUNDANT with that claim on every board this pool can build, which is why
+  -- Pawl.CostSpec asks this function directly: relaxing this arm alone leaves
+  -- the gate green, `jointlyPayable`'s empty pool refusing the same activation.
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) ->
     Natural.length (returnCandidates pid oid criterion gs) >= n
   -- CR 601.2f: payable only if the hand holds at least that many cards the

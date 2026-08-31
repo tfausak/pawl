@@ -2605,6 +2605,8 @@ melokuSpec s registry = Spec.describe s "Meloku the Clouded Mirror" $ do
     Spec.assertEqWith s "and the Mountain is still on the battlefield" (S.countOnBattlefieldByName (S.printingName mountain) S.alice after) 1
     Spec.assertEqWith s "the Island is not" (S.countOnBattlefieldByName (S.printingName island) S.alice after) 0
     Spec.assertEqWith s "the ability is on the stack, its cost paid" (length (GameState.stack after)) 1
+    -- And the ability the cost bought does what the card prints.
+    Spec.assertEqWith s "resolving it creates one Illusion token" (length (S.tokensOf (S.runPure (returning islandId) after Stack.resolveTop))) 1
   -- The discriminating twin: the same board, one different answer. If the engine
   -- picked a land itself, both cases would pass.
   Spec.it s "the choice is the player's: the other answer returns the other land" $ do
