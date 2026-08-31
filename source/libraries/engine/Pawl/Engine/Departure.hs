@@ -211,7 +211,7 @@ objectsLeaveWith pid gs =
                 GameState.exilePiles = Map.delete oid (GameState.exilePiles g1)
               }
       -- CR 608.2h: each object ceases here, so this is the last moment its
-      -- information is known -- the same five-part record
+      -- information is known -- the same eight-part record
       -- Event.changeZoneAttaching files at the same point of a zone change, read
       -- from the same board and filed under the id the object had while it
       -- existed. Nothing mints a new incarnation for a departure, so that id is

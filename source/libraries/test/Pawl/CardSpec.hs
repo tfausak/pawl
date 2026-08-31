@@ -4805,10 +4805,11 @@ data Framing
   | -- | A KEYWORD's own Filter -- CR 702.29e's typecycling predicate, CR 702.11d's
     -- "hexproof from", a cost-carrying keyword's CostComponent.Sacrifice, and CR
     -- 122.1b's keyword counter, which carries a whole Keyword. Read off a
-    -- continuous effect or off the printed face through
-    -- Pawl.Engine.Filter.contextFor, which fills neither the resolution's slots
-    -- nor the source's host, so it supplies strictly less than Unframed's
-    -- positions do rather than more.
+    -- continuous effect or off the printed face, and never in a context carrying
+    -- the resolution's SLOTS -- sweptForSingularSlots below is where that is
+    -- argued. `hostFramed` below is the conservative half of the same posture:
+    -- the CR 702.16e route does reach a context filling the source's host, and
+    -- refusing the atom anyway only narrows what a card may write.
     --
     -- The one constructor applied at the LEAF that produces the Filter rather
     -- than at the position that quotes it, which is what `frame` below exists
@@ -4836,13 +4837,18 @@ hostFramed framing = case framing of
   KeywordFramed -> False
 
 -- Is this position's Filter swept for a slot read singly (filterSlotsReadSingly
--- above)? Every framing but a keyword's own, which is not: its evaluator is
--- Pawl.Engine.Filter.contextFor -- Pawl.Engine.Target.targetable's CR 702.11d
--- and CR 702.16b reads, and Pawl.Engine.Resolve's Effect.Search arm, which
--- overlays contextFor for the CR 702.29e ability Pawl.Engine.Keyword.cycling
--- mints with empty target slots -- and that context's slotObjects is empty, so
--- Filter.IsControllerOfBound reads nothing there. Filter.HasKeyword is not even a
--- read: it asks Set membership of the whole keyword.
+-- above)? Every framing but a keyword's own, which is not: no evaluator of a
+-- keyword's payload Filter supplies SLOT OBJECTS, so Filter.IsControllerOfBound
+-- reads nothing at any of them. That is the test to put a new evaluator to,
+-- rather than a list of today's, and two of the three Pawl.Engine.Filter Context
+-- builders settle it by construction -- contextFor and contextComparingPower
+-- both write slotObjects empty. The third, contextWithSlots, is reached once:
+-- Pawl.Engine.Replacement.candidateContext, for the CR 702.16e quality
+-- Pawl.Engine.Keyword transplants into a DamageR's source half, and the slots it
+-- is handed are a ReplacementCandidate's -- empty for the PERMANENT candidate a
+-- keyword mint always is, since no resolution installed a printed static
+-- ability. Filter.HasKeyword is not even a read: it asks Set membership of the
+-- whole keyword.
 --
 -- The lint is conservative everywhere else, reporting the atom wherever it sits
 -- rather than only where it is answered, so this is the one exemption and it is
