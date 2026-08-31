@@ -2294,10 +2294,10 @@ rewriteEffect pairs effect = case effect of
   --
   -- Destructured POSITIONALLY, the prevention arms' shape directly above and
   -- Effect.Replace's above them: a new word-bearing field on the record is then a
-  -- compile error here. The arm this replaced matched `RedirectDamage {}` and
-  -- rewrote nothing at all, which is how it came to skip chosenSource in the
-  -- first place; a record update would have kept that failure mode for the next
-  -- field.
+  -- compile error here. Before the widening that filled these fields in, the arm
+  -- matched `RedirectDamage {}` and rewrote nothing at all, which is how
+  -- chosenSource came to be skipped in the first place; a record update over the
+  -- whole value would have kept that failure mode for the next field.
   --
   -- Only chosenSource is PROVEN, by Pawl.ReplacementSpec's "Synthetic Turn the
   -- Blade (CR 612.1)" group. The two refs and the duration are REGRESSION
