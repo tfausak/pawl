@@ -272,7 +272,9 @@ merge2 l r =
       Face.triggeredAbilities = Face.triggeredAbilities l <> Face.triggeredAbilities r,
       -- Left-biased: two halves that arm a delayed ability under the same
       -- AbilityName do not both survive here, and the right half's is the one
-      -- lost (#652).
+      -- lost (#652). Reachable since fuse landed -- a fused split spell resolves
+      -- off this view (CR 702.102b), where before it was combined-view-only and
+      -- CR 709.3b kept every resolution on one half.
       Face.delayedAbilities = Map.union (Face.delayedAbilities l) (Face.delayedAbilities r),
       -- Unreachable rather than merged: CR 709.4's combined view is a Room's, and
       -- CR 309.2c keeps a dungeon card out of every zone but the command zone, so
@@ -290,11 +292,12 @@ merge2 l r =
       Face.additionalCosts = Face.additionalCosts l <> Face.additionalCosts r,
       Face.alternativeCosts = Face.alternativeCosts l <> Face.alternativeCosts r,
       -- CR 709.4c again: a cost reduction a half prints about itself is an
-      -- ability in that half's text box, so the combined view has both. Never
-      -- exercised -- CR 709.3b puts ONE half on the stack and
-      -- Pawl.Engine.Cost.costsFor prices that half's own face -- but written
-      -- for its neighbours' reason: a record UPDATE would otherwise keep the
-      -- left half's silently.
+      -- ability in that half's text box, so the combined view has both, and CR
+      -- 702.102b gives a fused split spell the same pair. Exercised since fuse
+      -- landed: Pawl.Engine.Cost.selfReductions reads this list off the face a
+      -- proposal stamped, which for a fused cast is `fusedFace` below. Written
+      -- before there was any such cast for its neighbours' reason -- a record
+      -- UPDATE would otherwise keep the left half's silently.
       Face.costReductions = Face.costReductions l <> Face.costReductions r,
       Face.playerAbilities = Face.playerAbilities l <> Face.playerAbilities r,
       Face.blockRequirements = Face.blockRequirements l <> Face.blockRequirements r,
@@ -358,24 +361,46 @@ merge2 l r =
       Face.characteristicPT = firstJust (Face.characteristicPT l) (Face.characteristicPT r),
       -- CR 709.4c: a sentence bounding X is an ability in a half's text box, so
       -- the combined view keeps whichever half prints one. The first, the printed
-      -- boxes above's rule -- and unreachable for the same reason
-      -- Face.costReductions is, CR 709.3b putting ONE half on the stack for
-      -- Pawl.Engine.Cost to price and Pawl.Engine.Cast to announce against. Here
-      -- so that a record UPDATE does not keep the left half's silently.
-      Face.maximumX = firstJust (Face.maximumX l) (Face.maximumX r)
-      -- Face.counterability is NOT listed: record update keeps the left half's,
-      -- and writing `Face.counterability l` here would be a no-op. CR 113.6g is
-      -- a per-half ability, so the combined view taking the left half's is a
-      -- placeholder no split card exercises.
+      -- boxes above's rule. Reachable since fuse landed, Face.costReductions'
+      -- reason: Pawl.Engine.Cost.maximumX prices a fused cast off this view (CR
+      -- 702.102b). Not implemented: two halves each bounding X, where CR 709.4c
+      -- gives the fused spell both ceilings and this field holds one (#2789). No
+      -- printed fuse card has X at all.
+      Face.maximumX = firstJust (Face.maximumX l) (Face.maximumX r),
+      -- CR 709.4c once more: "this spell can't be countered" is an ability in a
+      -- half's text box (CR 113.6g puts it on the stack), so the combined view has
+      -- it if EITHER half prints it -- and CR 702.102b hands that to a fused split
+      -- spell, which is the cast that made this line matter. A record update kept
+      -- the left half's silently until fuse landed, and CR 709.3b made that
+      -- harmless: the half on the stack was the half whose clause was read
+      -- (Pawl.Engine.Event.counterOne, through Game.faceOf).
       --
-      -- Face.spell is deliberately NOT merged either: it stays the left half's,
-      -- and nothing casts it. CR 709.3b means the thing on the stack is ONE half
-      -- for every cast this view is asked about -- castableFaces below is what
-      -- such a cast reads -- so the combined view is never the payload that
-      -- resolves. The one printing that puts BOTH halves on the stack is CR
-      -- 702.102's fuse, and it does not merge them here: `fusedFace` below builds
-      -- that payload over this view, so a fused spell reads rule 702.102d's
-      -- ordering and every other reader of `combined` is untouched.
+      -- A DISJUNCTION and not `firstJust`, because this is a permission-shaped
+      -- field with a default rather than a printed box: Counterable is what a face
+      -- printing nothing carries (Pawl.Codec.Face defaults it), so "the first half
+      -- that has one" would read a silent default as an answer and drop a right
+      -- half's clause.
+      --
+      -- Nothing proves the gameplay path: no printing pairs fuse with a
+      -- can't-be-countered clause -- every fuse card is a Dragon's Maze split card
+      -- plus Takesies // Backsies, and none of them says it -- so what the suite
+      -- holds is the FOLD, in Pawl.CardSpec's "CR 709.4 a split card's
+      -- characteristics are its two halves combined", where only the right half
+      -- carries the clause. The reader beyond it is one line already driven for
+      -- every ordinary spell.
+      Face.counterability =
+        if Face.counterability l == Counterability.CantBeCountered || Face.counterability r == Counterability.CantBeCountered
+          then Counterability.CantBeCountered
+          else Counterability.Counterable
+          --
+          -- Face.spell is deliberately NOT merged either: it stays the left half's,
+          -- and nothing casts it. CR 709.3b means the thing on the stack is ONE half
+          -- for every cast this view is asked about -- castableFaces below is what
+          -- such a cast reads -- so the combined view is never the payload that
+          -- resolves. The one printing that puts BOTH halves on the stack is CR
+          -- 702.102's fuse, and it does not merge them here: `fusedFace` below builds
+          -- that payload over this view, so a fused spell reads rule 702.102d's
+          -- ordering and every other reader of `combined` is untouched.
     }
 
 -- CR 202.1b: "Some objects have no mana cost. This normally includes all land
@@ -582,6 +607,13 @@ soleMode modal = case (Foldable.toList (Modal.Type.modes modal), Modal.Type.sele
 -- CR 702.102d again, and the collision refusal fuseSpells' header states: the
 -- left half's clauses then the right half's, with both halves' target slots --
 -- unless the two name a slot alike, where there is no honest union to take.
+--
+-- The ORDER is written from the rule and is not proved: no board in the pool
+-- separates the two. Wear // Tear's halves destroy different permanents, CR
+-- 601.2c chose both targets before either clause ran, and the slot maps are
+-- disjoint by the refusal below, so swapping the operands here leaves the suite
+-- green. A fuse card whose halves interact -- one half feeding the other's count,
+-- or both touching one permanent -- would be the board that told them apart.
 mergeDisjointModes ::
   Mode.Mode Card.Card (GrantedAbility.GrantedAbility Card.Card) ->
   Mode.Mode Card.Card (GrantedAbility.GrantedAbility Card.Card) ->

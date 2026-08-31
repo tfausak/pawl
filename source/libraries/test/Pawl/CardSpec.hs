@@ -423,7 +423,13 @@ waneFace =
       Face.keywords = Set.singleton Keyword.Trample,
       Face.staticAbilities = [grantsItself Keyword.Trample],
       Face.activatedAbilities = [oneEffectActivated (costOf []) (youDraw 2)],
-      Face.triggeredAbilities = [oneEffectTrigger TriggerCondition.SelfDies (youDraw 2)]
+      Face.triggeredAbilities = [oneEffectTrigger TriggerCondition.SelfDies (youDraw 2)],
+      -- One-sided like the supertype above, and for a field with a DEFAULT rather
+      -- than a printed box: Wax prints nothing, so a fold that reads the left
+      -- half's Counterable as an answer -- or a record update that never looks at
+      -- the right half at all, which is what merge2 did before fuse landed --
+      -- leaves the combined view counterable.
+      Face.counterability = Counterability.CantBeCountered
     }
 
 cardSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -484,6 +490,13 @@ cardSpec s = Spec.describe s "Card" $ do
     Spec.assertEqWith s "the right half's supertype" (TypeLine.supertypes (Face.typeLine c)) (Set.singleton Supertype.Snow)
     -- CR 709.4c again: a keyword is the printed NAME of an ability (CR 702.1).
     Spec.assertEqWith s "each keyword" (Face.keywords c) (Set.fromList [Keyword.Flying, Keyword.Trample])
+    -- CR 709.4c reaches CR 113.6g's clause too -- "this spell can't be countered"
+    -- is an ability in a half's text box -- and CR 702.102b hands the combined
+    -- characteristics to a fused split spell, which is the object that reads this
+    -- field (Pawl.Engine.Event.counterOne, through Game.faceOf). Only Wane prints
+    -- it. What this does NOT reach is that reader: no printing pairs fuse with a
+    -- can't-be-countered clause, so the fold is what the suite holds.
+    Spec.assertEqWith s "the right half's can't-be-countered clause" (Face.counterability c) Counterability.CantBeCountered
     -- The three ability lists CR 709.4c's "each ability in the text box of each
     -- half" reaches, each asserted in PRINTED order (left half then right), so a
     -- merge that concatenated the halves the other way round fails too.
