@@ -248,7 +248,7 @@ populatedFace =
       Face.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You Nothing PlayerEffect.CantCastSpells],
       Face.blockRequirements = [BlockRequirement.MkBlockRequirement Nothing (Just Affected.Attached)],
       Face.blockPermissions = [BlockPermission.MkBlockPermission Affected.Attached (Just (Quantity.Literal 1)) Nothing],
-      Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached Nothing],
+      Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached Nothing Nothing],
       Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached Nothing)],
       Face.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached],
       Face.untapRestrictions = [UntapRestriction.MkUntapRestriction Affected.Attached],
@@ -464,7 +464,7 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached Nothing]}
+        baseFace {Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached Nothing Nothing]}
         (init baseFaceJson <> ",\"attackRequirements\":[{\"subject\":{\"type\":\"Attached\"}}]}")
     Spec.it s "combatRestrictions" $
       Common.assertJsonCodec

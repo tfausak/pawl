@@ -16,6 +16,7 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.RequiredDefender as RequiredDefender
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Zone as Zone
 
@@ -28,7 +29,7 @@ spec s = Spec.describe s "Pawl.Codec.AttackRequirement" $ do
     Common.assertCodec
       s
       AttackRequirement.codec
-      (AttackRequirement.MkAttackRequirement (Affected.AttachedPlayerControls (Filter.HasCardType CardType.Creature)) Nothing)
+      (AttackRequirement.MkAttackRequirement (Affected.AttachedPlayerControls (Filter.HasCardType CardType.Creature)) Nothing Nothing)
       " {\"subject\":{\"type\":\"AttachedPlayerControls\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- Otarian Juggernaut's shape: CR 508.1d's second reading, "or that it attacks
   -- if some condition is met", written as CR 604.2's "as long as" clause over
@@ -39,6 +40,7 @@ spec s = Spec.describe s "Pawl.Codec.AttackRequirement" $ do
       AttackRequirement.codec
       ( AttackRequirement.MkAttackRequirement
           (Affected.Matching Filter.IsSource)
+          Nothing
           ( Just
               ( Condition.Compares
                   ( Compares.MkCompares
@@ -56,4 +58,16 @@ spec s = Spec.describe s "Pawl.Codec.AttackRequirement" $ do
           )
       )
       " {\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}},\"while\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Count\",\"value\":{\"aggregation\":{\"type\":\"Members\"},\"filter\":{\"type\":\"And\",\"value\":[]},\"scope\":{\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Graveyard\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}}}}},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":7}}}} "
+  -- Public Enemy's shape: CR 508.1d's OBJECT axis, which
+  -- Pawl.Types.ActiveAttackRequirement used to be the only carrier of.
+  Spec.it s "a requirement naming whom to attack" $
+    Common.assertCodec
+      s
+      AttackRequirement.codec
+      ( AttackRequirement.MkAttackRequirement
+          (Affected.Matching (Filter.HasCardType CardType.Creature))
+          (Just RequiredDefender.ControllerOfAttached)
+          Nothing
+      )
+      " {\"subject\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"object\":{\"type\":\"ControllerOfAttached\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AttackRequirement.codec

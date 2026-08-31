@@ -688,6 +688,8 @@ library codec
     Pawl.Codec.RequireAttackSpec
     Pawl.Codec.RequireBlock
     Pawl.Codec.RequireBlockSpec
+    Pawl.Codec.RequiredDefender
+    Pawl.Codec.RequiredDefenderSpec
     Pawl.Codec.RestartSignal
     Pawl.Codec.RestartSignalSpec
     Pawl.Codec.Result
@@ -1634,6 +1636,7 @@ library types
     Pawl.Types.ReplacementProvenance
     Pawl.Types.RequireAttack
     Pawl.Types.RequireBlock
+    Pawl.Types.RequiredDefender
     Pawl.Types.Response
     Pawl.Types.RestartSignal
     Pawl.Types.Result
