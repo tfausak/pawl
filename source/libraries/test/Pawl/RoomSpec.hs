@@ -245,14 +245,14 @@ keyAbility index key = case drop index (Face.activatedAbilities (S.combinedFace 
   ability : _ -> ability
   [] -> ActivatedAbility.MkActivatedAbility (Cost.MkCost Nothing []) (Modal.MkModal Seq.empty (ModeSelection.ChooseExactly 1)) [] Nothing Nothing
 
--- The board the two foreign-unlock cases share: bob's Room, a Balemurk Leech
+-- The board the three Skeleton Key cases share: bob's Room, a Balemurk Leech
 -- apiece for alice and bob, and alice's Skeleton Key. The Room is PLACED rather
 -- than cast, so it arrives under bob with the designations the case wants and no
 -- entry event -- which is what keeps the Leeches' other arm ("an enchantment you
 -- control enters") out of the arithmetic entirely, leaving CR 709.5i the only
 -- thing that can move a life total.
 --
--- Returns the Room permanent, the Key and the board.
+-- Returns the Room permanent, the Key's id and printing, and the board.
 foreignRoom ::
   (Monad m) =>
   Spec.Spec m n ->
