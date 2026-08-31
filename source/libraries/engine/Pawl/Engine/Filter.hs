@@ -781,9 +781,10 @@ data Context = MkContext
     -- nothing mints an object until Pawl.Engine.OutsideTheGame.bringInto does --
     -- so IsBound is False for every candidate there whatever this map holds. The
     -- other readers cannot reach it either: SameNameAsBound reads slotNames
-    -- rather than this map and carries its own lint, IsControllerOfBound and
-    -- ControlledByBound are False wherever `matches` reaches them, and no Filter
-    -- atom carries a Quantity. Pawl.CardSpec's "CR 400.11c no card asks IsBound
+    -- rather than this map and carries its own lint, SameControllerAsBound reads
+    -- slotControllers and carries one that matters MORE, its vacuous direction
+    -- being True, IsControllerOfBound and ControlledByBound are False wherever
+    -- `matches` reaches them, and no Filter atom carries a Quantity. Pawl.CardSpec's "CR 400.11c no card asks IsBound
     -- in a wish's filter" is what keeps a card out of that position, and
     -- Pawl.OutsideTheGameSpec proves the atom answers nothing there.
     slotObjects :: Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId),
@@ -817,6 +818,11 @@ data Context = MkContext
     -- is not a controller until a board has been asked, lazy so that a filter
     -- omitting the atom never forces the projection, and read through CR 608.2h's
     -- last-known reader so a bound object that has left is still answerable.
+    --
+    -- What keeps a card out of the positions this is empty in is Pawl.CardSpec's
+    -- "CR 110.2 no card asks SameControllerAsBound outside a mode's target slot",
+    -- slotNames' sweep with more riding on it: that atom is a silent False
+    -- elsewhere and this one a silent True.
     --
     -- ABSENT versus EMPTY is the one place it differs, and the atom's vacuous
     -- direction is why: a key is here for every slot the caller bound, so a

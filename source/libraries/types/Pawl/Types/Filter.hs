@@ -384,7 +384,7 @@ data Filter keyword
     -- trigger binding, answered by rewriting at Pawl.Engine.Filter.bakeBound off a
     -- map Pawl.Engine.Binding.playerSlots builds through Recipient.playerOf, so a
     -- slot holding an OBJECT contributes nothing to it. The two would also have to
-    -- disagree about the vacuous case below, which one atom cannot do (#2722).
+    -- disagree about the vacuous case below, which one atom cannot do; see #2722.
     --
     -- VACUOUSLY TRUE where the slot names no object, which is the one atom here
     -- that does not answer False, and the departure is CR 601.2c's rather than a
