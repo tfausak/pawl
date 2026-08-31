@@ -611,11 +611,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- a card in an opponent's graveyard casts it from there. No card in data/cards/
   -- offers such a cast, which leaves the caster conjunct and the owner conjunct a
   -- regression fence rather than a proved pair: mutating either away leaves the
-  -- suite green, and the reference splits in three the day one lands. Jetsam
-  -- (Flotsam // Jetsam), which offers a cast from each opponent's graveyard, is
-  -- the printing that would refute this; Havengul Lich would reach it through the
-  -- permission road instead, which would first have to widen zoneCandidates
-  -- (#2689).
+  -- suite green, and the reference splits in three the day one lands (#2689).
+  -- Jetsam (Flotsam // Jetsam), which offers a cast from each opponent's
+  -- graveyard, is the printing that would refute this; Havengul Lich would reach
+  -- it through the permission road instead, which would first have to widen
+  -- zoneCandidates (#2795).
   --
   -- An object that reached the battlefield any OTHER way answers 0 rather than
   -- Nothing, `spells` coming up empty: a permanent put there by an effect was not

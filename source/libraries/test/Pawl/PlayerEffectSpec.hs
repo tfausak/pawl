@@ -4656,11 +4656,14 @@ yawgmothsWillSpec s registry =
         -- may reach it, which is the half that decides whether a caster and a
         -- card's owner can ever come apart on this road.
         --
-        -- The typed question is asked beside the gate to name WHICH half
-        -- refuses: the permission's filter is empty, so it says yes to bob's copy
-        -- as readily as to hers, and Cast.zoneCandidates -- which offers a player
-        -- only their own copy of a per-player zone -- is what says no.
-        -- Pawl.Engine.Quantity's WasCastFrom arm rests on this (#2689).
+        -- The typed question is asked beside the gate to name WHICH half refuses:
+        -- the permission's filter is empty, so it says yes to bob's copy as
+        -- readily as to hers. TWO independent places say no, and mutating either
+        -- alone leaves this case green -- Cast.zoneCandidates, which offers a
+        -- player only their own copy of a per-player zone, and Cost.costsFor's
+        -- graveyard arm, which asks the permission of the card's OWNER because it
+        -- holds no caster to ask (#2795). Pawl.Engine.Quantity's WasCastFrom arm
+        -- rests on the pair of them (#2689).
         Spec.it s "CR 400.1 the grant does not reach the copy in bob's graveyard" $ do
           (willId, hers, his, gs) <- board
           let after = willResolved willId gs
