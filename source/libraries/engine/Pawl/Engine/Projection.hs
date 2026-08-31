@@ -741,13 +741,36 @@ viewWithLastKnown src gs oid =
 -- between the two checks still grows the Knight" -- that it answers at all;
 -- substituting the record's controller for its owner leaves that case green, so
 -- WHICH player is a fence (see #1069).
+--
+-- The TOKEN status is written over the same way, off the record's `source`
+-- through the one classifier Game.isToken itself uses -- so CR 111.6's fixed
+-- answer survives the id CR 400.7 deleted, which is what Sunpearl Kirin's "if it
+-- was a token" asks after the bounce has already happened.
+--
+-- So is the BLOCKING status, off the record's own field: CR 506.4 takes a
+-- departed creature out of GameState.combat, so the live read viewOfCharacteristics
+-- makes is False for exactly the creature CR 603.4's intervening "if" on a
+-- dies-trigger asks about (Guildsworn Prowler).
+--
+-- Not implemented: the record carries no `attacking`, so that field and the
+-- three that hang off the same GameState.combat lookup still read live and
+-- answer for a gone creature as though it had never been in combat (#991).
+-- The neighbouring `attackedThisTurn` needs no record at all: CR 608.2i makes it
+-- a fold over GameState.events, which CR 511.3 does not clear and the death does
+-- not touch.
 viewWithLastKnownAnywhere :: GameState -> Count.ViewOf
 viewWithLastKnownAnywhere gs oid =
   if Map.member oid (GameState.objects gs)
     then fullView gs oid
     else
       fmap
-        (\lk -> (viewOfCharacteristics (fullView gs) oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs) {Filter.owner = Just (LastKnown.owner lk)})
+        ( \lk ->
+            (viewOfCharacteristics (fullView gs) oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs)
+              { Filter.owner = Just (LastKnown.owner lk),
+                Filter.token = Game.sourceIsToken (LastKnown.source lk),
+                Filter.blocking = LastKnown.blocking lk
+              }
+        )
         (Map.lookup oid (GameState.lastKnown gs))
 
 -- CR 608.2h: this object's last known information, and only when the id names
@@ -1150,8 +1173,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
               Battle.protectorOf battle gs
         _ -> Nothing,
       -- CR 509.1g: likewise. Combat.blockers is keyed by ATTACKER, so blocking is
-      -- membership in some attacker's set rather than a key lookup.
-      Filter.blocking = any (Set.member oid) (Map.elems (Combat.blockers (GameState.combat gs))),
+      -- membership in some attacker's set rather than a key lookup. CR 506.4 takes
+      -- a departed creature out of the record, so viewWithLastKnownAnywhere writes
+      -- CR 608.2h's answer over this one too.
+      Filter.blocking = Game.isBlocking oid gs,
       -- CR 509.1h: the key lookup the line above is careful not to be. Stays True
       -- once every creature blocking it has left combat.
       Filter.blocked = Map.member oid (Combat.blockers (GameState.combat gs)),
@@ -1217,7 +1242,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- builder's result rather than passed in, so a search pays for it only when
       -- its filter names the atom.
       Filter.canAttachToSubject = False,
-      -- CR 111.6: fixed for the life of the object (CR 400.7).
+      -- CR 111.6: fixed for the life of the object (CR 400.7). False for an id
+      -- naming nothing, which CR 608.2b wants of a gone TARGET;
+      -- viewWithLastKnownAnywhere writes CR 608.2h's answer over it for the
+      -- readers owed one, exactly as `owner` above has it.
       Filter.token = Game.isToken oid gs,
       Filter.tapped = Game.isTapped oid gs,
       -- CR 110.5's other status, and the only site that fills the field. Read off
@@ -3029,6 +3057,8 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.ClassLevel -> quantity
   Quantity.Type.WasKicked -> quantity
   Quantity.Type.SnowWasSpent -> quantity
+  Quantity.Type.WasToken -> quantity
+  Quantity.Type.WasBlocking -> quantity
   Quantity.Type.PlayerCounters {} -> quantity
   Quantity.Type.ObjectCounters _ -> quantity
   Quantity.Type.ObjectCountersOfAnyKind -> quantity
@@ -4491,6 +4521,8 @@ quantityReads q = case q of
   Quantity.Type.ClassLevel -> Set.empty
   Quantity.Type.WasKicked -> Set.empty
   Quantity.Type.SnowWasSpent -> Set.empty
+  Quantity.Type.WasToken -> Set.empty
+  Quantity.Type.WasBlocking -> Set.empty
   Quantity.Type.OpponentsAttacked _ -> Set.empty
   Quantity.Type.CardsDiscardedThisTurn _ -> Set.empty
   Quantity.Type.LifeGainedThisTurn _ -> Set.empty

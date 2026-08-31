@@ -875,7 +875,9 @@ lastKnownRiderSpec s registry =
                     -- nothing.
                     LastKnown.attachedTo = Nothing,
                     -- CR 201.4: nothing named a card here.
-                    LastKnown.chosenNames = Set.empty
+                    LastKnown.chosenNames = Set.empty,
+                    -- CR 509.1g: this board declares no combat at all.
+                    LastKnown.blocking = False
                   }
               humbled = S.withHumility humility equipped
               planted =

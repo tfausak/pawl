@@ -1,6 +1,9 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+
 -- Covers Pawl.Engine.Condition, Pawl.Types.Condition and Pawl.Types.Comparison,
 -- including what Condition.holds makes of Pawl.Engine.Quantity's IsMonarch,
--- EnteredThisTurn, EnteredFrom and WasCastFrom.
+-- EnteredThisTurn, EnteredFrom, WasCastFrom, WasToken and WasBlocking.
 module Pawl.ConditionSpec where
 
 import qualified Data.Map as Map
@@ -22,6 +25,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
@@ -38,6 +42,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Scope as Scope
@@ -406,6 +411,124 @@ interveningRecheckSpec s registry =
               Spec.assertEqWith s "because CR 603.4's clause was false, so nothing triggered" (length (GameState.stack raised)) 0
             entrants -> Spec.assertEqWith s "exactly one Skeleton entered" (length entrants) 1
 
+-- Aims an "up to one" target slot at `victim` by FILTERING the offered set, so a
+-- hand-built recipient cannot miss CR 608.2b's re-read. S.identityAnswer declines,
+-- which for a least-of-zero slot is a legal answer of no target at all.
+bouncing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+bouncing victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter ((== Just victim) . Recipient.objectOf) candidates) sets
+  _ -> S.identityAnswer p
+
+-- S.aggressiveAnswer with its block declaration switched off when `blocks` is
+-- False; every other prompt is answered identically, so the pair of boards below
+-- differs in CR 509.1's declaration and nothing else.
+combatAnswer :: Bool -> Prompt.Prompt r -> r
+combatAnswer blocks p = case p of
+  Prompt.DeclareBlockers {} -> if blocks then S.aggressiveAnswer p else Map.empty
+  _ -> S.aggressiveAnswer p
+
+-- CR 608.2h's second clause -- "if the effect has moved it from a public zone to
+-- a hidden zone, the effect uses the object's last known information" -- read for
+-- CR 111.6's token status.
+--
+-- Sunpearl Kirin {1}{W} 2/1 Kirin: "Flash. Flying. When this creature enters,
+-- return up to one other target nonland permanent you control to its owner's
+-- hand. If it was a token, draw a card." (data/cards/sunpearl-kirin.json; Oracle
+-- text checked against api.scryfall.com, 2026-08-31.) The bounce is the FIRST
+-- clause of the resolution and the token read is the second, so CR 400.7 has
+-- already deleted the id the target slot holds by the time the condition is asked.
+--
+-- Measured on alice's LIBRARY and not on her hand: the nontoken leg puts the
+-- bounced card into that hand, so a hand count cannot tell the draw from the
+-- bounce.
+--
+-- The two legs are one board differing in ONE thing -- the victim is a Goblin
+-- Piker token or a Goblin Piker card. Same name, same box, same controller, both
+-- Settled on the battlefield.
+lastKnownTokenSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lastKnownTokenSpec s registry =
+  let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      librarySize gs = maybe 0 length (Map.lookup S.alice (GameState.library gs))
+      run kirin swamp place k =
+        let (_, stocked) = S.addLibraryCard swamp S.alice (Setup.emptyGame S.bothPlayers)
+            (victimId, withVictim) = place stocked
+            (_, entered) = S.entersWithTrigger kirin S.alice withVictim
+            onStack = settle entered
+         in k victimId onStack (S.runPure (bouncing victimId) onStack Stack.resolveTop)
+   in Spec.describe s "LastKnownToken" $ do
+        -- THE PROVING TEST for #1102. A live read of the bounced id answers "not a
+        -- token, there is no it" and the draw never happens.
+        Spec.it s "CR 608.2h the token Sunpearl Kirin bounced was a token, so alice draws" $ do
+          kirin <- S.printingOf s registry "Sunpearl Kirin"
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.cardOf s registry "Goblin Piker"
+          run kirin swamp (S.addToken piker S.alice) $ \victimId onStack after -> do
+            Spec.assertEqWith s "alice drew her one library card" (librarySize after) 0
+            Spec.assertEqWith s "off a library that held exactly one" (librarySize onStack) 1
+            Spec.assertEqWith s "and the token really did leave the battlefield" (Set.member victimId (GameState.battlefield after)) False
+            Spec.assertEqWith s "with the Kirin's trigger on the stack before it resolved" (length (GameState.stack onStack)) 1
+
+        -- The negative, one difference from the case above: the victim is a CARD.
+        -- Bounced by the same clause into the same hidden zone, so "no draw" cannot
+        -- be the bounce failing.
+        Spec.it s "CR 111.6 a Goblin Piker card bounced the same way is no token, so she does not" $ do
+          kirin <- S.printingOf s registry "Sunpearl Kirin"
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          run kirin swamp (S.addCreature piker S.alice) $ \victimId onStack after -> do
+            Spec.assertEqWith s "alice's library is untouched" (librarySize after) 1
+            Spec.assertEqWith s "though the card really did leave the battlefield" (Set.member victimId (GameState.battlefield after)) False
+            Spec.assertEqWith s "with the Kirin's trigger on the stack before it resolved" (length (GameState.stack onStack)) 1
+
+-- CR 608.2h read for CR 509.1g's combat status, on CR 603.4's intervening "if".
+--
+-- Guildsworn Prowler {1}{B} 2/1 Tiefling Rogue Assassin: "Deathtouch. When this
+-- creature dies, if it wasn't blocking, draw a card."
+-- (data/cards/guildsworn-prowler.json; Oracle text checked against
+-- api.scryfall.com, 2026-08-31.) CR 400.7 deletes the id before rule 603.4's
+-- first check runs, and CR 506.4 takes the creature out of GameState.combat, so
+-- the live read answers "not blocking" for exactly the creature that was.
+--
+-- The two legs are one board differing in ONE thing -- whether bob declares the
+-- block. The Prowler dies to the SAME three marked damage in both (CR 704.5g on a
+-- 1-toughness creature), declared blockers or not, so the draw cannot be the
+-- kill's doing. Combat damage is never dealt: the fixture stops at the top of the
+-- combat damage step.
+lastKnownBlockingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lastKnownBlockingSpec s registry =
+  let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      run giant prowler swamp blocks k = case S.combatBoardOf [giant] [prowler] of
+        (base, _, [prowlerId]) ->
+          let (_, stocked) = S.addLibraryCard swamp S.bob base
+              declared = S.runToStep (Phase.Combat CombatStep.CombatDamage) (combatAnswer blocks) stocked
+              killed = S.settleSba (S.markDamage prowlerId 3 declared)
+              onStack = settle killed
+           in k prowlerId declared killed (S.runPure S.identityAnswer onStack Stack.resolveTop)
+        _ -> Spec.assertFailure s "combatBoardOf should place exactly one Prowler"
+   in Spec.describe s "LastKnownBlocking" $ do
+        -- THE PROVING TEST for #991. A live read of the dead id answers "it wasn't
+        -- blocking" and bob draws off a creature that spent the step blocking.
+        Spec.it s "CR 608.2h a blocking Guildsworn Prowler that dies draws nothing" $ do
+          giant <- S.printingOf s registry "Hill Giant"
+          prowler <- S.printingOf s registry "Guildsworn Prowler"
+          swamp <- S.printingOf s registry "Swamp"
+          run giant prowler swamp True $ \prowlerId declared killed after -> do
+            Spec.assertEqWith s "bob's hand is empty, so CR 603.4's clause was false" (S.handSize S.bob after) 0
+            Spec.assertEqWith s "and it really was blocking before it died" (fmap Filter.blocking (Projection.viewWithLastKnownAnywhere declared prowlerId)) (Just True)
+            Spec.assertEqWith s "and it really did die" (Set.member prowlerId (GameState.battlefield killed)) False
+            Spec.assertEqWith s "so nothing was gathered onto the stack" (length (GameState.stack (settle killed))) 0
+
+        -- The negative's twin, and the control the case above is read against: bob
+        -- declines the block and the same kill draws him a card.
+        Spec.it s "CR 509.1g the same Prowler that never blocked draws one" $ do
+          giant <- S.printingOf s registry "Hill Giant"
+          prowler <- S.printingOf s registry "Guildsworn Prowler"
+          swamp <- S.printingOf s registry "Swamp"
+          run giant prowler swamp False $ \prowlerId declared killed after -> do
+            Spec.assertEqWith s "bob drew his one library card" (S.handSize S.bob after) 1
+            Spec.assertEqWith s "off a Prowler that was never blocking" (fmap Filter.blocking (Projection.viewWithLastKnownAnywhere declared prowlerId)) (Just False)
+            Spec.assertEqWith s "and died the same way" (Set.member prowlerId (GameState.battlefield killed)) False
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   Spec.describe s "Exactly" $ do
@@ -484,3 +607,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   enteredThisTurnSpec s registry
   enteredFromSpec s registry
   interveningRecheckSpec s registry
+  lastKnownTokenSpec s registry
+  lastKnownBlockingSpec s registry

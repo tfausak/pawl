@@ -675,6 +675,8 @@ quantityCounts quantity = case quantity of
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
   Quantity.Type.SnowWasSpent -> []
+  Quantity.Type.WasToken -> []
+  Quantity.Type.WasBlocking -> []
   -- CR 122.1's per-player counter tally, another such scalar.
   Quantity.Type.PlayerCounters {} -> []
   -- CR 122.1's per-OBJECT tally, read off the object the quantity is evaluated
@@ -1757,6 +1759,8 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.ClassLevel -> False
   Quantity.Type.WasKicked -> False
   Quantity.Type.SnowWasSpent -> False
+  Quantity.Type.WasToken -> False
+  Quantity.Type.WasBlocking -> False
   Quantity.Type.OpponentsAttacked {} -> False
   Quantity.Type.CardsDiscardedThisTurn {} -> False
   Quantity.Type.LifeGainedThisTurn {} -> False
@@ -3755,6 +3759,8 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
   Quantity.Type.SnowWasSpent -> []
+  Quantity.Type.WasToken -> []
+  Quantity.Type.WasBlocking -> []
   -- CR 122.1's PER-PLAYER tally, whose kind is a Pawl.Types.PlayerCounterKind --
   -- a disjoint domain from the object kinds, carrying no Keyword and so no
   -- Filter. See Pawl.Types.PlayerCounterKind.

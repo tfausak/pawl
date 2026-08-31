@@ -72,6 +72,11 @@ codec =
       -- asked about is the constructor (Pawl.Types.Quantity), and the object is
       -- whichever one the quantity is evaluated against.
       Arm.nullary "SnowWasSpent" Quantity.SnowWasSpent,
+      -- CR 111.6's status and CR 509.1g's combat fact, both with nothing on the
+      -- wire for WasKicked's reason: the object is whichever one the quantity is
+      -- evaluated against.
+      Arm.nullary "WasToken" Quantity.WasToken,
+      Arm.nullary "WasBlocking" Quantity.WasBlocking,
       Arm.nullary "ClassLevel" Quantity.ClassLevel,
       -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted
       -- comes from the combat record rather than from anything the card names.

@@ -16,7 +16,7 @@ import qualified Pawl.Types.Source as Source
 -- as the object ceases, from the same pre-move state the GameEvent.Moved
 -- snapshot is taken against.
 --
--- Eight things rather than the characteristics alone, because the other seven
+-- Nine things rather than the characteristics alone, because the other eight
 -- questions CR 608.2h is asked have no home in that fold. Control is not a
 -- characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
 -- asks of a triggered ability whose source is gone. Neither is the object's
@@ -30,9 +30,10 @@ import qualified Pawl.Types.Source as Source
 -- names "what an Aura enchants" as an example of what is not one. Nor are the
 -- CHOSEN NAMES, the sixth, for the reason its own field gives. Nor is the
 -- OWNER, the seventh -- CR 109.3's list has no owner either -- for the reason
--- its own field gives.
+-- its own field gives. Nor is the COMBAT STATUS, the eighth, for the reason its
+-- own field gives.
 --
--- All eight fields STRICT (!): entries are keyed by an id that no longer exists
+-- All nine fields STRICT (!): entries are keyed by an id that no longer exists
 -- and are never pruned, so an unforced field would be a thunk retaining the whole
 -- pre-move GameState for the rest of the game.
 data LastKnown = MkLastKnown
@@ -114,6 +115,18 @@ data LastKnown = MkLastKnown
     -- not recoverable from `characteristics` or `copiable`, since choosing a name
     -- changes nothing the projection folds. So it sits beside them for
     -- `controller`'s reason.
-    chosenNames :: !(Set.Set CardName.CardName)
+    chosenNames :: !(Set.Set CardName.CardName),
+    -- | CR 509.1g: was it blocking as it left -- the same membership
+    -- Pawl.Engine.Filter.View's `blocking` reports, read off GameState.combat
+    -- before the object ceased.
+    --
+    -- Not a characteristic either (CR 109.3's list has no combat status), and not
+    -- recoverable from anything above: CR 506.4 takes a departed creature out of
+    -- combat, so the live read is unavailable exactly when CR 603.4's intervening
+    -- "if" on a dies-trigger still asks for it (Guildsworn Prowler).
+    --
+    -- A Bool rather than the attackers this creature was blocking, because that
+    -- is the whole of what the view reports and all any clause in the pool asks.
+    blocking :: !Bool
   }
   deriving (Eq, Ord, Show)
