@@ -1503,7 +1503,8 @@ evolvingDogAt oid p = case p of
 -- (Arachnogenesis, Galadhrim Ambush, Repel the Abominable, That's No Moonmist,
 -- Frontline Strategist) cannot spell this opcode's required ref and take
 -- Effect.Replace's DamageR instead, which is the shape data/cards/moonmist.json
--- already writes; their own text change is #2746. The static abilities (Drogskol
+-- already writes; a text change reaching THAT shape is proved by
+-- Pawl.CounterspellSpec's evolved Moonmist. The static abilities (Drogskol
 -- Reinforcements, Rescue Retriever, Marble Priest) install no shield at
 -- resolution. Pack Leader's "to Dogs you control" reaches the unbounded shield's
 -- own whatRecipient, which the group above proves, but no printing aims a text
