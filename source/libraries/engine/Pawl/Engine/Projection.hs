@@ -3751,13 +3751,14 @@ abilitiesRemovedBy keep cands gs oid =
 -- is the last word -- a newer colour- or type-changing effect lands on top of it
 -- (CR 613.7).
 --
--- Both of gather's producers of a layer-6 GainKeyword run through this: a static
--- ability's grant by way of staticParts, and a resolution's stored effect by way
--- of gatherGiven's fromStored, where CR 613.7b's creation timestamp replaces CR
--- 613.7a's.
+-- Both GRANTS run through this: a static ability's by way of staticParts, and a
+-- resolution's stored effect by way of gatherGiven's fromStored, where CR 613.7b's
+-- creation timestamp replaces CR 613.7a's.
 --
--- CR 122.1b's list names neither keyword, so a keyword COUNTER can never carry
--- one and the counter gather needs no arm.
+-- gatherGiven's other layer-6 producers do not, and none of them can carry either
+-- keyword: CR 122.1b's list names neither, so no keyword counter is one, and
+-- `designations` and `bestows` emit only menace (CR 701.60c) and rule 702.103b's
+-- type line and enchant.
 grantedDefiningParts :: Modification -> NonEmpty.NonEmpty Modification
 grantedDefiningParts m = case m of
   Modification.GainKeyword Keyword.Type.Devoid -> m NonEmpty.:| [Modification.SetColor Set.empty]

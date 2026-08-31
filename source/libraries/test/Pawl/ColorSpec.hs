@@ -1,10 +1,12 @@
 {-# LANGUAGE GADTs #-}
 
 -- Covers: Pawl.Engine.Projection (an object's CR 613 layer-5 colour, including CR
--- 702.114a devoid both PRINTED and GRANTED -- CR 604.3a routes the two
--- differently, and Slivdrazi Monstrosity is the card that separates them -- CR
--- 613.3's characteristic-defining-ability-first ordering within layer 5, and CR
--- 111.3 token colour), Pawl.Engine.Target (the "target nonblack creature" filter
+-- 702.114a devoid PRINTED, GRANTED by a static ability and GRANTED by a
+-- resolution -- CR 604.3a routes the first apart from the other two, and
+-- Slaughter Drone, Slivdrazi Monstrosity and Synthetic Colorless Blessing are the
+-- cards that separate them -- CR 613.3's characteristic-defining-ability-first
+-- ordering within layer 5, and CR 111.3 token colour),
+-- Pawl.Engine.Target (the "target nonblack creature" filter
 -- below, and Red Elemental Blast's two colour-filtered pools read straight off
 -- the card), the P3a colour gates (Doom Blade, Crimson
 -- Wisps, Aphotic Wisps, Bad Moon, Dragon Fodder) and this phase's own CR 613.3
@@ -495,10 +497,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
 
   Spec.it s "CR 604.3a a GRANTED devoid makes its own five-colour source colourless" $ do
     -- Slivdrazi Monstrosity (Mystery Booster Playtest Cards 2021, cmb2 #102) is
-    -- the pool's only card that GRANTS devoid: "Slivers you control have devoid
-    -- and annihilator 1." It is itself a Sliver Eldrazi, so its own ability
-    -- reaches it, and its mana cost is {C}{W}{U}{B}{R}{G} -- five colours for
-    -- the grant to clear.
+    -- the pool's only card whose STATIC ability grants devoid: "Slivers you
+    -- control have devoid and annihilator 1." (Synthetic Colorless Blessing below
+    -- grants it by a resolution instead.) It is itself a Sliver Eldrazi, so its
+    -- own ability reaches it, and its mana cost is {C}{W}{U}{B}{R}{G} -- five
+    -- colours for the grant to clear.
     --
     -- The granted instance is NOT a characteristic-defining ability: CR 604.3a
     -- requires all five clauses, and this ability fails (2) -- it is not printed
