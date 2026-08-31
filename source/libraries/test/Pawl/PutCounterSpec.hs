@@ -190,13 +190,12 @@ putCountersFromSpec s registry = Spec.describe s "CR 122.8 putting the counters 
 -- graveyard.
 resourcefulDefenseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 resourcefulDefenseSpec s registry = Spec.describe s "CR 122.8 putting the counters a departed bystander had" $ do
-  let -- alice: Resourceful Defense, the Goblin Piker its trigger will aim at, a
-      -- SECOND Piker so the target prompt has a real choice, and a Swamp that is
-      -- a permanent she controls too. bob holds a third Piker, which "target
-      -- permanent you control" excludes.
-      --
-      -- `victim` is whichever permanent a case makes leave, and `counters` is
-      -- what that case put on it.
+  let -- alice: Resourceful Defense, two permanents either of which a case can
+      -- make leave (a Goblin Piker and a Swamp), the Piker the trigger aims at,
+      -- and a DECOY Piker so the target prompt has a real choice and so an
+      -- implementation that put the counters on every permanent it could reach
+      -- says so. bob holds a Piker of his own, which "target permanent you
+      -- control" excludes.
       board = do
         swamp <- S.printingOf s registry "Swamp"
         defense <- S.printingOf s registry "Resourceful Defense"
@@ -264,6 +263,6 @@ resourcefulDefenseSpec s registry = Spec.describe s "CR 122.8 putting the counte
     (victimId, _, takerId, _, before) <- board
     Spec.assertEqWith s "no counters on it at all" (pairOn victimId before) Map.empty
     let (settled, after) = settleAnd takerId (S.settleSba (S.markDamage victimId 4 before))
-    Spec.assertEqWith s "the target Piker is the plain 2/1 it started as" (bodyOf takerId after) (Just 2, Just 1, False)
     Spec.assertEqWith s "nothing reached the stack" (GameState.stack settled) []
+    Spec.assertEqWith s "the target Piker is the plain 2/1 it started as" (bodyOf takerId after) (Just 2, Just 1, False)
     Spec.assertEqWith s "and the Piker is off the battlefield just the same" (Set.member victimId (GameState.battlefield after)) False

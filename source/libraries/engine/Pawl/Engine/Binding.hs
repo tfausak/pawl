@@ -373,9 +373,10 @@ tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
 -- this slot is not `became`: CR 400.7e's arriving incarnation is a different
 -- object, which CR 122.2 left with no counters and whose controller CR 108.4a
 -- would hand back as its owner -- and CR 400.7e withholds it entirely for a
--- hidden destination (CR 400.2), where this slot is bound just the same. What the card says "it" about
--- is the permanent as it last existed on the battlefield, which is CR 603.10a's
--- look-back and CR 608.2h's last known information.
+-- hidden destination (CR 400.2), where this slot is bound just the same. What
+-- the card says "it" about is the permanent as it last existed on the
+-- battlefield, which is CR 603.10a's look-back and CR 608.2h's last known
+-- information.
 --
 -- Bound for the BYSTANDER condition only. Under
 -- TriggerCondition.SelfLeavesTheBattlefield and SelfDies the departed id already
