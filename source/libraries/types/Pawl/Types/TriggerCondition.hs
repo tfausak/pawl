@@ -33,1243 +33,370 @@ import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 data TriggerCondition
   = -- | CR 603.6a: "when this ... enters". Self-scoped.
     SelfEnters
-  | -- | CR 603.6a's second written form -- "whenever a [type] enters" -- fires
-    -- whoever bears the ability, the bearer included, since CR 603.6a checks
-    -- the newcomers too. Soul Warden's "another" is `Not IsSource` inside the
-    -- Filter.
+  | -- | CR 603.6a read by a bystander: "whenever a [type] enters", the bearer
+    -- included.
     PermanentEnters (Filter.Filter Keyword.Keyword)
-  | -- | CR 603.2b: "at the beginning of [each|your] <step>", against a
-    -- GameEvent.StepBegan; the TurnScope decides whose turn qualifies. The
-    -- ACTIVE player is bound under Pawl.Engine.Binding.triggerPlayer, which is
-    -- "each player's upkeep ... that player" -- CR 109.5's "you" is the
-    -- controller instead.
+  | -- | CR 603.2b: "at the beginning of [each|your] <step>"; the TurnScope
+    -- decides whose turn qualifies.
     StepBegins StepBegins.StepBegins
-  | -- | CR 603.8: a STATE trigger -- it fires whenever its condition is true,
-    -- and not again until the ability has left the stack, which is why
-    -- Pawl.Engine.Event derives armedness from the stack rather than storing it.
+  | -- | CR 603.8: a state trigger, armed again only once the ability has left
+    -- the stack.
     StateIs Condition.Condition
-  | -- | CR 603.2 / 509-510: the bearer dealt combat damage to a player, off the
-    -- DamageDealt history. Binds CR 702.70a's "that player" under
-    -- Pawl.Engine.Binding.triggerPlayer and the amount that one event dealt
-    -- under Pawl.Engine.Binding.eventAmount. The damager needs no slot, being
-    -- the bearer.
+  | -- | CR 603.2 / 509-510: the bearer dealt combat damage to a player.
+    -- Self-scoped.
     SelfDealsCombatDamageToPlayer
-  | -- | CR 120.3: the bearer WAS DEALT damage -- the enrage trigger's event
-    -- (Ripjaw Raptor). SelfDealsCombatDamageToPlayer's mirror off the same
-    -- history, with the identity check on the recipient.
-    --
-    -- No DamageKind and no source Filter: the printed phrase qualifies the
-    -- damage in no way. Enrage is an ability word (CR 207.2c), so nothing about
-    -- it reaches Pawl.Types.Keyword. One fire per recorded event, not per batch,
-    -- so a creature blocked by two triggers twice. Binds the amount under
-    -- Pawl.Engine.Binding.eventAmount and CR 120.1's source under
-    -- Pawl.Engine.Binding.combatDamager.
+  | -- | CR 120.3: the bearer was dealt damage -- the enrage trigger's event
+    -- (Ripjaw Raptor).
     SelfIsDealtDamage
-  | -- | CR 603.2 / 509-510 read by a BYSTANDER: a permanent the Filter admits
-    -- dealt combat damage to a player (Tovolar, Dire Overlord). Reads the
-    -- damager's characteristics, so it goes through CR 608.2h for a trampler
-    -- that died to its blocker in the same event.
-    --
-    -- Binds CR 510.2's damager under Pawl.Engine.Binding.combatDamager, the
-    -- amount under Pawl.Engine.Binding.eventAmount, and the damaged player under
-    -- Pawl.Engine.Binding.triggerPlayer.
+  | -- | CR 603.2 / 509-510 read by a bystander: a permanent the Filter admits
+    -- dealt combat damage to a player (Tovolar, Dire Overlord).
     PermanentDealsCombatDamageToPlayer (Filter.Filter Keyword.Keyword)
   | -- | CR 725.2: a creature dealt combat damage to the monarch. Borne by no
     -- card; matched only via Pawl.Engine.Monarch.inherentMatch.
     CreatureDealtCombatDamageToMonarch
   | -- | CR 702.179d: "whenever one or more opponents lose life during your
-    -- turn". The inherent speed-increase ability's event, and
-    -- CreatureDealtCombatDamageToMonarch's sibling -- borne by no card, matched
-    -- via Pawl.Engine.Speed.inherentPending, so
-    -- Pawl.Engine.Event.matchesTrigger answers False for it.
-    --
-    -- The rule's other two clauses are elsewhere: "if your speed is less than 4"
-    -- is CR 603.4's intervening "if" on Pawl.Types.TriggeredAbility.intervening,
-    -- and "only once each turn" is that type's `limit`. Folding either in would
-    -- make this constructor mean one ability instead of one event.
+    -- turn". Borne by no card; matched via Pawl.Engine.Speed.inherentPending.
     OpponentLostLifeDuringYourTurn
-  | -- | CR 702.29c: "when you cycle this card". Self-scoped. The bearer is the
-    -- card in the zone it landed in, which is that rule's second sentence.
+  | -- | CR 702.29c: "when you cycle this card". Self-scoped.
     SelfCycled
   | -- | CR 702.94a: "when you reveal this card this way" -- miracle's triggered
-    -- half, linked (CR 603.11) to the static half. Self-scoped; CR 701.20b left
-    -- the card in its owner's HAND, which is the candidate source CR 113.6k
-    -- needs.
-    --
-    -- "THIS WAY" is the link: the event carries Pawl.Types.RevealCause, so a
-    -- miracle card shown by any other effect does not fire it.
-    --
-    -- No PlayerRelation: the reveal is from the player's own hand and CR 113.8
-    -- makes the owner the controller, so "you" and the revealer are one seat.
+    -- half, linked (CR 603.11) to the static half. Self-scoped.
     SelfRevealedForMiracle
-  | -- | CR 701.9a: "when you discard this card" (Bartered Cow). Self-scoped; CR
-    -- 701.9a has already moved the card to its owner's graveyard, so the CR
-    -- 400.7 incarnation is what the scan offers.
-    --
-    -- The CAUSE is deliberately not read: CR 702.29a makes cycling a discard, so
-    -- a card discarded to a cycling cost fires this too, and CR 702.29d's once is
-    -- supplied by the single GameEvent.Discarded funnel. No PlayerRelation,
-    -- SelfRevealedForMiracle's argument one rule over.
+  | -- | CR 701.9a: "when you discard this card" (Bartered Cow). Self-scoped.
     SelfDiscarded
-  | -- | CR 701.9a: "whenever [a player] discards a card" (Megrim), against
-    -- GameEvent.Discarded; the PlayerRelation reads the discarding player
-    -- against CR 109.5's "you" (CR 603.3a). Not self-scoped: the bearer is a
-    -- bystander.
-    --
-    -- The DiscardCause is deliberately not part of it, SelfDiscarded's argument.
+  | -- | CR 701.9a read by a bystander: "whenever [a player] discards a card"
+    -- (Megrim).
     PlayerDiscards PlayerRelation.PlayerRelation
-  | -- | "Whenever you cycle a card" (Prickly Marmoset). CR 702.29a makes cycling
-    -- a discard, so this is PlayerDiscards narrowed to
-    -- Pawl.Types.DiscardCause.ToPayCyclingCost; "you" is CR 603.3a's controller,
-    -- read through the PlayerRelation. Not self-scoped, unlike SelfCycled: the
-    -- card that left the hand is nothing to do with the bearer.
-    --
-    -- A separate constructor rather than a DiscardCause field on PlayerDiscards,
-    -- because a card prints one phrase or the other and never both. CR 702.29d's
-    -- "cycles or discards a card" needs neither, its event set being
-    -- PlayerDiscards' exactly.
+  | -- | "Whenever you cycle a card" (Prickly Marmoset) -- PlayerDiscards
+    -- narrowed to Pawl.Types.DiscardCause.ToPayCyclingCost by CR 702.29a.
     PlayerCycles PlayerRelation.PlayerRelation
   | -- | CR 121.1: "whenever [a player] draws their Nth card each turn" (Erudite
-    -- Wizard), against GameEvent.Drew, whose Natural is which of that player's
-    -- draws this turn it was. PlayerDiscards' shape.
-    --
-    -- "Each turn" is not a field: the ordinal the event carries is already
-    -- per-turn, GameState.drawsThisTurn being cleared at the handoff.
-    --
-    -- EQUALITY, not "at least": Erudite Wizard fires on the second draw and no
-    -- other.
+    -- Wizard), by equality on the ordinal the event carries.
     PlayerDrawsNthCard PlayerDrawsNthCard.PlayerDrawsNthCard
   | -- | CR 508.3a: "whenever [a creature] attacks" (Hanweir Garrison).
-    -- Self-scoped.
-    --
-    -- DECLARED is the whole content: CR 508.3a exempts a creature put onto the
-    -- battlefield attacking and CR 508.4 says it never attacked, so this matches
-    -- GameEvent.AttackerDeclared and never the combat record. No attack target is
-    -- compared here; CR 508.5's defending player is bound under
-    -- Pawl.Engine.Binding.triggerPlayer for CR 702.86a's annihilator.
-    --
-    -- The TriggerFrequency is Aurelia, the Warleader's "for the first time each
-    -- turn" -- a payload rather than a sibling condition, since it narrows this
-    -- same event.
+    -- Self-scoped; the TriggerFrequency is Aurelia, the Warleader's "for the
+    -- first time each turn".
     SelfAttacks TriggerFrequency.TriggerFrequency
-  | -- | CR 508.3a with a companion required -- rule 702.149a's training.
-    -- SelfAttacks' event and scoping, plus a Filter that is a predicate over
-    -- everybody ELSE the same declaration named, asked existentially: one
-    -- declaration is one event (CR 603.2), so it fires once however many
-    -- companions qualify. Nothing is bound, rule 702.149a's payload naming only
-    -- "this creature".
-    --
-    -- The companions come from the combat record and not the event log, which is
-    -- what makes a second combat phase right -- the log keeps a turn's
-    -- declarations, where Pawl.Types.Combat is cleared per combat phase. Reading
-    -- the record is exact here despite CR 508.4, CR 508.2b putting these triggers
-    -- on the stack before any player gets priority.
+  | -- | CR 508.3a with a companion required -- rule 702.149a's training, the
+    -- Filter asked existentially of everybody else the declaration named.
     SelfAttacksWithAnother (Filter.Filter Keyword.Keyword)
-  | -- | CR 506.5: "whenever a creature you control attacks alone" -- rule
-    -- 702.83a's exalted. SelfAttacks read by a BYSTANDER: an Aven Squire held
-    -- back still triggers, so the bearer only frames the match, as
-    -- PermanentEnters' does.
-    --
-    -- ALONE rides the constructor rather than the Filter, because CR 506.5 makes
-    -- it a fact about the DECLARATION rather than a characteristic, and
-    -- Pawl.Types.Filter's atoms are all characteristics. The number is read off
-    -- the count GameEvent.AttackerDeclared carries, which is what makes rule
-    -- 702.83b's "in a given combat phase" hold across an extra combat phase.
-    --
-    -- No TriggerFrequency: CR 506.1 gives a combat phase one declare attackers
-    -- step. The attacker is bound under Pawl.Engine.Binding.attackingCreature.
+  | -- | CR 506.5 read by a bystander: "whenever a creature you control attacks
+    -- alone" -- rule 702.83a's exalted.
     CreatureAttacksAlone (Filter.Filter Keyword.Keyword)
-  | -- | CR 508.3a's second sentence read by a BYSTANDER: "whenever a creature
-    -- attacks you or a planeswalker you control" (Marchesa's Decree).
-    -- SelfAttacks' event and DECLARED reading.
-    --
-    -- Per declared attacker, so three attackers fire it three times. Nullary
-    -- where CreatureAttacksAlone carries a Filter: CR 508.1a lets only a creature
-    -- be declared, so "a creature" is no predicate. "You or a planeswalker you
-    -- control" is ONE test, CR 508.5/508.5a making the defending player exactly
-    -- the field the event carries, so this reads the event and never the board.
-    -- The attacker is bound under Pawl.Engine.Binding.attackingCreature.
-    --
-    -- CR 508.3b's "[a player] is attacked" is a once-per-DECLARATION sibling,
-    -- AttachedPlayerIsAttacked below, and two creatures attacking one player tell
-    -- the two arities apart. CR 508.3d's "[a player] attacks" is the other,
-    -- PlayerAttacks, which is once per declaration outright rather than per target.
+  | -- | CR 508.3a's second sentence read by a bystander: "whenever a creature
+    -- attacks you or a planeswalker you control" (Marchesa's Decree), once per
+    -- declared attacker.
     CreatureAttacksYou
-  | -- | CR 508.3b: "whenever enchanted player is attacked" (Curse of Vitality).
-    -- CreatureAttacksYou's grouping sibling -- against
-    -- GameEvent.BecameAttacked, which Pawl.Engine.Combat.declareAttackers
-    -- records once per distinct target, so a declaration sending five creatures
-    -- at one player fires this ONCE. That arity is the whole difference between
-    -- the two arms, and it is structural rather than deduplicated: the condition
-    -- sees one event at a time.
+  | -- | CR 508.3b: "whenever enchanted player is attacked" (Curse of Vitality),
+    -- once per distinct target, the subject read off Object.attachedTo.
     --
-    -- The ATTACHED player and not CR 109.5's "you", where CreatureAttacksYou
-    -- takes the bearer's controller: the subject is whom the Aura enchants (CR
-    -- 303.4m), read off Object.attachedTo as AttachedCreatureDies reads it. That
-    -- is the only subject in print -- Scryfall o:"is attacked" o:"whenever",
-    -- 2026-08-21, matches five cards and all five are Curses enchanting a player.
-    --
-    -- Nullary: rule 508.3b's subject is named by the ability's own attachment,
-    -- so there is nothing left for a payload to say. The player is bound under
-    -- the reserved Pawl.Engine.Binding.triggerPlayer slot, which the second half
-    -- of every one of those five Curses needs ("each opponent attacking that
-    -- player").
-    --
-    -- CR 508.3e's "[a player] attacks [another player]" reads the same event,
-    -- and PlayerAttacksPlayer below is that arm: this one names the ATTACKED
-    -- player by attachment, that one names both subjects by relation.
-    --
-    -- Not implemented: rule 508.3b's planeswalker and battle subjects -- the
-    -- sweep above turned up no card writing one, and GameEvent.BecameAttacked
+    -- Not implemented: rule 508.3b's planeswalker and battle subjects --
+    -- Scryfall o:"is attacked" o:"whenever", 2026-08-21, matches five cards and
+    -- all five are Curses enchanting a player, and GameEvent.BecameAttacked
     -- already carries the permanent an arm for them would read (#2279).
     AttachedPlayerIsAttacked
-  | -- | CR 508.3d: "whenever [a player] attacks" -- once per DECLARATION,
-    -- against GameEvent.AttackersDeclared, which
-    -- Pawl.Engine.Combat.declareAttackers records once per CR 508.1 declaration
-    -- and only for a non-empty one. The payload is which player rule 508.3d
-    -- names: You for Boggart Prankster's "whenever you attack", AnyPlayer for
-    -- Avatar Roku, Firebender's "whenever a player attacks", Opponent for
-    -- "whenever an opponent attacks".
+  | -- | CR 508.3d: "whenever [a player] attacks" -- once per declaration,
+    -- against GameEvent.AttackersDeclared.
     --
-    -- The third of CR 508.3's arities, and the two arms above are the others:
-    -- SelfAttacks and CreatureAttacksYou fire per declared attacker (CR 508.3a),
-    -- AttachedPlayerIsAttacked per distinct target (CR 508.3b). Two creatures
-    -- declared together part this from the first; one declaration split across a
-    -- player and a planeswalker that player controls parts it from the second,
-    -- which is why neither of their events could carry it.
-    --
-    -- The BEARER need not attack, and need not be a creature: rule 508.3d asks
-    -- only that the named player declared one or more attackers.
-    -- CreatureAttacksAlone's bystanding posture, not SelfAttacks' self-scoping.
-    --
-    -- Nothing is bound. Rule 508.3d names a SET of creatures rather than one, so
-    -- there is no attacker to point at.
-    --
-    -- CR 508.3e's "attacks [another player]" is PlayerAttacksPlayer below, and
-    -- the ARITY is the whole difference: this one fires once for the
-    -- declaration, that one once per player attacked.
-    --
-    -- Not implemented: rule 508.3d's BOUND attacking player -- "that player" and
-    -- "the attacking player", which Norn's Decree and Mirkwood Trapper print
-    -- (#2154). CR 508.3c's "attacks with [a creature]" is the arm below.
+    -- Not implemented: rule 508.3d's bound attacking player -- "that player"
+    -- and "the attacking player", which Norn's Decree and Mirkwood Trapper
+    -- print (#2154).
     PlayerAttacks PlayerRelation.PlayerRelation
-  | -- | CR 508.3c: "whenever [a player] attacks with [a creature]" -- Hermes,
-    -- Overseer of Elpis' "whenever you attack with one or more Birds". The arm
-    -- above narrowed by a quality the declaration has to have named, and that
-    -- Filter is the whole difference.
+  | -- | CR 508.3c: "whenever [a player] attacks with [a creature]" (Hermes,
+    -- Overseer of Elpis) -- the arm above narrowed by a Filter over the
+    -- creatures declared.
     --
-    -- The same once-per-DECLARATION arity, against the same
-    -- GameEvent.AttackersDeclared, because that is the arity the printed
-    -- sentence takes: every printing of "attacks with" quantifies over a set
-    -- ("one or more Birds", "three or more creatures"), so a declaration naming
-    -- two Birds fires it once. CR 508.3a's per-attacker event is SelfAttacks'
-    -- and CreatureAttacksAlone's, and two admitted attackers tell them apart.
-    --
-    -- Nothing is bound, for rule 508.3d's reason above: the form names a SET of
-    -- creatures rather than one.
-    --
-    -- The creatures are read from Pawl.Types.Combat's declaration record rather
-    -- than from the event, which carries only the declaring player --
-    -- SelfBlocksOneOrMore's shape on the blocking side.
-    --
-    -- Not implemented: a FLOOR above one, which Aurelia, the Law Above's "with
+    -- Not implemented: a floor above one, which Aurelia, the Law Above's "with
     -- three or more creatures" needs (#2226).
     PlayerAttacksWith PlayerAttacksWith.PlayerAttacksWith
-  | -- | CR 508.3e: "whenever [a player] attacks [another player]" -- Seifer,
-    -- Balamb Rival's "whenever you attack a player", Lulu, Stern Guardian's
-    -- "whenever an opponent attacks you". The payload names BOTH of rule
-    -- 508.3e's subjects: `attacker` is the one who declared, `attacked` the one
-    -- the declaration was aimed at. A card leaving the second subject bare
-    -- writes AnyPlayer there, which is what every printing of Seifer's shape
-    -- says -- Scryfall o:"attack a player", 2026-08-24, twenty-four cards and
-    -- not one of them narrows it.
+  | -- | CR 508.3e: "whenever [a player] attacks [another player]" (Seifer,
+    -- Balamb Rival), once per pair; only AttackTarget.OfPlayer matches.
     --
-    -- Both relations are read against CR 109.5's "you" and not against each
-    -- other, so Opponent on the ATTACKED side would say "somebody other than me
-    -- was attacked" rather than restate CR 506.2a's requirement that the
-    -- defending player be an opponent of the attacker. Only You is in print
-    -- there today.
-    --
-    -- CR 508.3b's per-TARGET arity and not rule 508.3d's, so this reads
-    -- GameEvent.BecameAttacked where PlayerAttacks above reads
-    -- GameEvent.AttackersDeclared: rule 508.3e triggers "if one or more
-    -- creatures the first player controls are declared as attackers attacking
-    -- the second player", once per pair. One declaration split across two
-    -- opponents fires this twice and PlayerAttacks once, which is what parts
-    -- them.
-    --
-    -- The attacked player is BOUND under the reserved
-    -- Pawl.Engine.Binding.triggerPlayer slot, AttachedPlayerIsAttacked's slot
-    -- off the same event, because that is what the printed payloads read --
-    -- Seifer's "goad target creature that player controls", Karazikar, the Eye
-    -- Tyrant's and Gornog, the Red Reaper's the same. The ATTACKING player is
-    -- not bound.
-    --
-    -- Not implemented: the ATTACKING player as a bound slot, which Archnemesis'
+    -- Not implemented: the attacking player as a bound slot, which Archnemesis'
     -- "attach this Aura to that player" needs (#2810).
-    --
-    -- ONLY AttackTarget.OfPlayer matches, which is rule 508.3e's last sentence
-    -- in as many words -- "it won't trigger if a creature attacks a planeswalker
-    -- or a battle" -- and AttachedPlayerIsAttacked's narrowing for rule 508.3b's
-    -- version of it. That sentence's other exclusion, a creature put onto the
-    -- battlefield attacking, holds by construction: CR 508.4 says such a
-    -- creature was never declared, and Pawl.Engine.Combat.putOntoBattlefieldAttacking
-    -- records no event.
     PlayerAttacksPlayer PlayerAttacksPlayer.PlayerAttacksPlayer
-  | -- | CR 702.105a: dethrone -- SelfAttacks narrowed by whom the bearer
-    -- attacked. The attacked player comes from Combat.attackers rather than the
-    -- event, and that is the whole narrowing: the event carries CR 508.5's
-    -- DEFENDING player, who may be a planeswalker's controller or a battle's
-    -- protector, where the rule says "attacks THE PLAYER". Only
-    -- AttackTarget.OfPlayer satisfies it.
-    --
-    -- Most life is compared across every player still in the game (CR 800.4a),
-    -- the bearer's controller included. Read off the game state as the trigger is
-    -- matched, not through Pawl.Types.Condition: an intervening "if" would be
-    -- re-checked at resolution (CR 603.4, CR 608.2a), and rule 702.105a states
-    -- none.
+  | -- | CR 702.105a: dethrone -- SelfAttacks narrowed to the player with the
+    -- most life, or tied for most. Only AttackTarget.OfPlayer satisfies it.
     SelfAttacksPlayerWithMostLife
-  | -- | CR 509.3a: "whenever [a creature] blocks" (Pride Guardian). SelfAttacks'
-    -- mirror, self-scoped, and DECLARED for its reason read on the blocking side
-    -- (CR 509.4), so it matches GameEvent.BlocksDeclared -- which the declaration
-    -- alone writes -- and never Combat.blockers.
-    --
-    -- No TriggerFrequency: rule 509.3a's "only once each combat for that
-    -- creature" is the GROUPING of GameEvent.BlocksDeclared, recorded once per
-    -- blocking creature however many attackers it took. The attacker is neither
-    -- compared nor bound.
+  | -- | CR 509.3a: "whenever [a creature] blocks" (Pride Guardian).
+    -- Self-scoped, and once per blocking creature however many it blocked.
     SelfBlocks
-  | -- | CR 509.3b: "whenever [a creature] blocks a creature" (Loyal Sentry).
-    -- SelfBlocks reading the per-pair GameEvent.BecameBlocking instead, which
-    -- is the rule's "once for each attacking creature ... blocks", and binding
-    -- the attacker under Pawl.Engine.Binding.blockedCreature.
-    --
-    -- The Filter is a predicate over the ATTACKER blocked (Netcaster Spider's
-    -- "with flying"), read at the scan, which is rule 509.3f's "at the point
-    -- blockers are declared".
-    --
-    -- A creature put onto the battlefield blocking records that same event, so
-    -- the match reads BecameBlocking.putOntoBattlefield to stay off it: rule
-    -- 509.3b's last sentence, which Aetherplasm putting Loyal Sentry onto the
-    -- battlefield blocking proves at gameplay level.
+  | -- | CR 509.3b: "whenever [a creature] blocks a creature" (Loyal Sentry) --
+    -- SelfBlocks per attacker blocked, with the Filter over that attacker.
     --
     -- Not implemented: rule 509.3b's other producer, an effect that causes the
     -- bearer to block, records no event (#1146).
     SelfBlocksCreature (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3e: "whenever [a creature] blocks two or more creatures"
-    -- (Lairwatch Giant), against the grouped GameEvent.BlocksDeclared.
-    --
-    -- AT LEAST, never exactly, which is rule 509.3e's last sentence. The Natural
-    -- is the floor, carried because the rule is written about a number.
+    -- (Lairwatch Giant); the Natural is a floor, never an exact count.
     SelfBlocksAtLeast Natural.Natural
   | -- | CR 509.3e: "whenever [a creature] blocks one or more [F] creatures"
-    -- (Serra Inquisitors' first half). SelfBlocksAtLeast with the number spent
-    -- on a QUALITY instead, against the same grouped GameEvent.BlocksDeclared,
-    -- so the bearer's whole declaration fires it once. CR 509.3b's per-attacker
-    -- form is SelfBlocksCreature, and two admitted attackers tell them apart. No
-    -- Natural: a floor beyond one would be a number no printing states.
-    --
-    -- The Filter is a predicate over each attacker blocked, read from
-    -- Pawl.Types.Combat's declaration record rather than the event, which
-    -- carries only how many.
+    -- (Serra Inquisitors' first half) -- SelfBlocksAtLeast spending the number
+    -- on a quality instead.
     --
     -- Not implemented: rule 509.3e's "effects that add or remove blockers" reach
     -- neither this nor SelfBlocksAtLeast (#1146).
     SelfBlocksOneOrMore (Filter.Filter Keyword.Keyword)
-  | -- | CR 509.3c: "whenever [a creature] becomes blocked" (Sacred Prey). The
-    -- ATTACKING side of SelfBlocks, against GameEvent.AttackerBlocked -- one per
-    -- attacker that got at least one blocker, which is the rule's "only once
-    -- each combat for that creature".
+  | -- | CR 509.3c: "whenever [a creature] becomes blocked" (Sacred Prey) -- the
+    -- attacking side of SelfBlocks, once per attacker that got a blocker.
     --
-    -- Rule 509.3c's second producer reaches it too: Effect.BecomesBlocked
-    -- (Curtain of Light) records the same event, and the rule's "only if the
-    -- attacking creature was an unblocked creature at that time" is
-    -- Pawl.Engine.Combat.becomeBlocked's own guard. No blocker is bound; CR
-    -- 508.5's defending player IS, which rule 702.130a's afflict reads.
-    --
-    -- The THIRD producer reaches it too: a creature put onto the battlefield as a
-    -- blocker (CR 509.4), through
-    -- Pawl.Engine.Combat.putOntoBattlefieldBlocking, which records the same
-    -- event under the same unblocked-at-that-time guard. Flash Foliage is the
-    -- pool's producer, and Pawl.CombatEffectSpec's PutOntoBattlefieldBlocking
-    -- group is the proof.
+    -- Rule 509.3c's other two producers reach it: Effect.BecomesBlocked (Curtain
+    -- of Light) and a creature put onto the battlefield blocking (CR 509.4),
+    -- which Flash Foliage exercises -- Pawl.CombatEffectSpec's
+    -- PutOntoBattlefieldBlocking group is the proof.
     SelfBecomesBlocked
   | -- | CR 509.3d: "whenever [a creature] becomes blocked by a creature" -- rule
-    -- 702.25a's flanking. Self-scoped on the attacking side, but against
-    -- GameEvent.BecameBlocking's PAIR rather than the grouped
-    -- AttackerBlocked, the rule triggering "once for each creature that blocks".
-    -- That arity is the whole difference from SelfBecomesBlocked.
+    -- 702.25a's flanking, once for each creature that blocks.
     --
-    -- The Filter is a predicate over the BLOCKER, read at the scan -- rule
-    -- 509.3f's "at the point it becomes a blocking creature", CR 509.2a putting
-    -- the triggers on the stack before any player gets priority. The blocker is
-    -- bound under Pawl.Engine.Binding.blockingCreature.
-    --
-    -- Rule 509.3d's third sentence reaches it too, and it is the one form of CR
-    -- 509.3 that CR 509.4 does not silence: a creature put onto the battlefield
-    -- blocking records the same event, through
-    -- Pawl.Engine.Combat.putOntoBattlefieldBlocking, and this condition does not
-    -- read BecameBlocking.putOntoBattlefield where SelfBlocksCreature does.
-    -- Flash Foliage blocking Benalish Cavalry is the pooled pair that fires it,
-    -- and Pawl.CombatEffectSpec's PutOntoBattlefieldBlocking group is the proof.
-    -- Aetherplasm reaches the same function from a MoveToZone, but nothing it
-    -- can put out carries flanking, so it observes nothing here.
+    -- A creature put onto the battlefield blocking fires it too, unlike
+    -- SelfBlocksCreature: Flash Foliage blocking Benalish Cavalry is the pooled
+    -- pair, and Pawl.CombatEffectSpec's PutOntoBattlefieldBlocking group is the
+    -- proof.
     --
     -- Not implemented: rule 509.3d's remaining producer, an effect that causes a
     -- creature to block, records no event (#1146).
     SelfBecomesBlockedBy (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3e: "whenever [a creature] becomes blocked by one or more [F]
     -- creatures" (Serra Inquisitors' second half) -- SelfBlocksOneOrMore from
-    -- the ATTACKING side, against the grouped GameEvent.AttackerBlocked, so the
-    -- whole declaration fires it once. That grouping is the whole difference
-    -- from SelfBecomesBlockedBy.
+    -- the attacking side, so the whole declaration fires it once.
     --
-    -- No blocker is bound: the form names a SET, not an object.
-    --
-    -- Rule 509.3e's "effects that add or remove blockers" reaches it too,
-    -- through the pool's one producer: a creature PUT ONTO THE BATTLEFIELD
-    -- blocking an attacker that was already blocked, matched against
-    -- GameEvent.BecameBlocking rather than the grouped event -- CR 509.3c's "was
-    -- an unblocked creature at that time" keeps the grouped one off that
-    -- arrival. The arm fires only where the arrival is the FIRST admitted
-    -- blocker, which is what makes it a becoming rather than an addition.
-    -- Aetherplasm swapping itself out for a black creature card is the pooled
-    -- pair, and Pawl.KeywordTriggerSpec's SelfBlocksOneOrMore group is the
-    -- proof. Removing blockers can only shrink the admitted set.
+    -- Rule 509.3e's "effects that add or remove blockers" reaches it where the
+    -- arrival is the first admitted blocker: Aetherplasm swapping itself out for
+    -- a black creature card is the pooled pair, and Pawl.KeywordTriggerSpec's
+    -- SelfBlocksOneOrMore group is the proof.
     --
     -- Not implemented: an effect that causes a creature already on the
     -- battlefield to block records no event at all (#1146).
     SelfBecomesBlockedByOneOrMore (Filter.Filter Keyword.Keyword)
-  | -- | CR 509.3e read by a BYSTANDER on the ATTACKING side: "whenever a
+  | -- | CR 509.3e read by a bystander on the attacking side: "whenever a
     -- creature attacking one of your opponents becomes blocked by two or more
-    -- creatures" (Seifer, Balamb Rival, the one printing -- Scryfall
-    -- o:"becomes blocked by two or more", 2026-08-21). The arm above with the
-    -- number spent on the blockers' COUNT rather than on a quality, and the
-    -- subject moved off the bearer -- SelfBlocksAtLeast's floor read from the
-    -- other side of the same declaration, so it matches the grouped
-    -- GameEvent.AttackerBlocked and fires once for the attacker however many
-    -- creatures blocked it.
+    -- creatures" (Seifer, Balamb Rival); the number is a floor, and only
+    -- Pawl.Types.AttackTarget.OfPlayer satisfies the PlayerRelation.
     --
-    -- AT LEAST, never exactly, which is rule 509.3e's last sentence.
-    --
-    -- The PlayerRelation is whom the attacker was declared attacking, and only
-    -- Pawl.Types.AttackTarget.OfPlayer satisfies it: CR 508.1b lists player,
-    -- planeswalker and battle separately, so a creature sent at a planeswalker
-    -- an opponent controls is not attacking that opponent. That is why it is
-    -- read from Pawl.Types.Combat's declaration record rather than from CR
-    -- 508.5's defending player, which GameEvent.AttackerBlocked carries and
-    -- which a planeswalker resolves to -- SelfAttacksPlayerWithMostLife makes
-    -- the same distinction one rule over.
-    --
-    -- The attacker is bound under Pawl.Engine.Binding.attackingCreature, which
-    -- is Seifer's "that attacking creature". No blocker is bound: the form
-    -- names a number, not an object. Both events bind it, which
-    -- Pawl.ZoneTriggerSpec's representativeEvents pins by listing both.
-    --
-    -- Rule 509.3e's "effects that add or remove blockers" reaches it too, and
-    -- this is the only form of rule 509.3e they reach today: a creature put onto
-    -- the battlefield blocking an attacker that was ALREADY blocked pushes the
-    -- count over the floor, against GameEvent.BecameBlocking rather than the
-    -- grouped event -- CR 509.3c's "was an unblocked creature at that time"
-    -- keeps the grouped one off that arrival. Flash Foliage's Saproling joining
-    -- a declared Hill Giant is the pooled pair, and Pawl.KeywordTriggerSpec's
-    -- CreatureBecomesBlockedByAtLeast group is the proof. Removing blockers
-    -- cannot reach a floor from above.
-    --
-    -- Several such arrivals at ONE attacker are one crossing rather than one
-    -- each, and each event carrying the tally it found is what says so -- a
-    -- Doubling Season over that same Flash Foliage is the pooled pair there.
+    -- Both GameEvent.AttackerBlocked and GameEvent.BecameBlocking bind the
+    -- attacker, which Pawl.ZoneTriggerSpec's representativeEvents pins by
+    -- listing both. Rule 509.3e's added blockers reach it through a creature put
+    -- onto the battlefield blocking an already-blocked attacker: Flash Foliage's
+    -- Saproling joining a declared Hill Giant is the pooled pair, and
+    -- Pawl.KeywordTriggerSpec's CreatureBecomesBlockedByAtLeast group is the
+    -- proof.
     --
     -- Not implemented: an effect that causes a creature already on the
     -- battlefield to block, which records no event (#1146).
     CreatureBecomesBlockedByAtLeast CreatureBecomesBlockedByAtLeast.CreatureBecomesBlockedByAtLeast
-  | -- | "Whenever this creature attacks and isn't blocked" -- Eternal of Harsh
-    -- Truths', and CR 702.68a's frenzy, which Pawl.Engine.Keyword.frenzy mints.
-    -- The glossary sends the phrase to CR 509.1h, so this matches
-    -- GameEvent.AttackerUnblocked, recorded once per attacker the declaration
-    -- left with no blockers -- the only arity the phrase can have, so no
-    -- once-per-combat dedup is needed. Nothing is bound;
-    -- GameEvent.AttackerUnblocked carries no player.
-    --
-    -- NOT "the bearer attacked and is not blocked right now": rule 509.1h fixes
-    -- the status at the declaration and keeps it fixed, so a later state test
-    -- would answer wrong for an attacker whose blockers all died.
+  | -- | CR 509.1h: "whenever this creature attacks and isn't blocked" -- CR
+    -- 702.68a's frenzy, with the status fixed at the declaration.
     SelfAttacksUnblocked
-  | -- | CR 603.6, a zone-change trigger: "when this card is put into your
-    -- graveyard from your library" (Narcomoeba). Self-scoped.
-    --
-    -- The bearer is the card AS IT NOW IS IN THE GRAVEYARD -- CR 400.7's new
-    -- incarnation, which CR 400.7e lets the ability find -- because CR 113.6k
-    -- puts the ability wherever it can trigger from, and a card cannot be put
-    -- into a graveyard from a library while it is on the battlefield. No zone
-    -- pair is carried: the two zones are exactly what makes CR 113.6k apply.
-    --
-    -- The printed "your ... your" needs no controller check: a card goes to its
-    -- OWNER's graveyard from its OWNER's library, and CR 113.8 makes that owner
-    -- the ability's controller (CR 108.4).
+  | -- | CR 603.6: "when this card is put into your graveyard from your library"
+    -- (Narcomoeba). Self-scoped, and the bearer is CR 400.7's new incarnation.
     SelfPutIntoGraveyardFromLibrary
   | -- | CR 603.6: "when this card is put into a graveyard from anywhere" (Serra
-    -- Avatar). Self-scoped, and the widest of the three put-into-a-graveyard
-    -- conditions.
-    --
-    -- NOT a leaves-the-battlefield ability, which CR 603.6c's last sentence says
-    -- in as many words, and which is why it is a sibling of SelfDies rather than
-    -- its generalisation. Two consequences:
-    --
-    --   * no CR 603.10a look-back, so the bearer is the object as it exists
-    --     AFTER the event -- the CR 400.7 graveyard incarnation, where SelfDies
-    --     reads the departing one.
-    --   * CR 113.6k puts the ability in the graveyard, which is what lets a
-    --     Serra Avatar discarded out of a hand trigger at all.
-    --
-    -- A superset of SelfPutIntoGraveyardFromLibrary and still separate:
-    -- Narcomoeba's sentence names one origin zone and must stay silent for a
-    -- discard.
+    -- Avatar). Self-scoped, and not a leaves-the-battlefield ability (CR 603.6c).
     SelfPutIntoGraveyardFromAnywhere
   | -- | CR 603.6c narrowed to CR 700.4's "dies", the battlefield-to-graveyard
-    -- pair (Doomed Traveler). Self-scoped. CR 603.6c's wider first clause is
-    -- SelfLeavesTheBattlefield.
-    --
-    -- The bearer is the incarnation that was ON THE BATTLEFIELD -- the id
-    -- ZoneChange.departed carries and GameState.lastKnown files under -- which
-    -- is CR 603.10a's look-back: the ability exists because the pre-move
-    -- projection says so, and CR 603.3a's controller is whoever controlled the
-    -- permanent as it left. The ARRIVING incarnation is bound separately under
-    -- Pawl.Engine.Binding.became (CR 400.7e), so the bearer and the object the
-    -- payload acts on are deliberately two different ids.
+    -- pair (Doomed Traveler). Self-scoped, and a CR 603.10a look-back.
     SelfDies
-  | -- | The SAME written form read by a BYSTANDER (Meren of Clan Nel Toth).
-    -- Filtered rather than self-scoped, so it reads the dead permanent's
-    -- characteristics; "another" is `Not IsSource` inside the Filter.
-    --
-    -- The candidate is ZoneChange.departed and NOT ZoneChange.object, read from
-    -- CR 608.2h last known information (CR 603.10a). That is what makes "you
-    -- control" answerable correctly: by the CR 117.5 boundary the candidate is a
-    -- card in a graveyard, which CR 108.4 gives no controller and CR 108.4a
-    -- would hand back its OWNER. What the PAYLOAD acts on is a different id, as
-    -- for SelfDies: Pawl.Engine.Binding.became holds the graveyard incarnation,
-    -- which Promise of Tomorrow's "exile it" reads.
+  | -- | The same written form read by a bystander (Meren of Clan Nel Toth),
+    -- filtered over the departed permanent's last known information.
     PermanentDies (Filter.Filter Keyword.Keyword)
-  | -- | CR 603.2c's other reading of the same written form: "whenever ONE OR MORE
-    -- other creatures you control die" (Vengeful Townsfolk). PermanentDies' Filter
-    -- and PermanentDies' zone pair, scoped to the BATCH instead of to the member --
-    -- CR 704.3 and CR 608.2f make a whole sweep one event, so that event contains
-    -- one occurrence of this trigger however many permanents it buried, where
-    -- PermanentDies' event is each death and CR 603.2c's own Example fires it once
-    -- per land.
-    --
-    -- SelfBlocksOneOrMore is the same fork on the blocking side, and the two are
-    -- built differently for a rules reason rather than a stylistic one: a blocking
-    -- declaration has ONE emitter, so its arity is built into the event
-    -- (GameEvent.BlocksDeclared), while deaths reach a graveyard from four
-    -- unrelated places and what makes them one event is the Pawl.Types.EventGroup
-    -- the log stamps. So the grouping is read in Pawl.Engine.Event.eventTriggers,
-    -- which is the only reader that has it.
-    --
-    -- Binds nothing where PermanentDies binds CR 400.7e's graveyard card: a batch
-    -- may bury several, so one slot could not name them all.
-    -- Pawl.Engine.Event's eventBindingSlots arm records the query behind that.
+  | -- | CR 603.2c's batch reading of the same form: "whenever one or more other
+    -- creatures you control die" (Vengeful Townsfolk), once for the batch.
     PermanentsDie (Filter.Filter Keyword.Keyword)
   | -- | CR 603.6c's first written form taken whole -- "when [this object] leaves
-    -- the battlefield", so an exile, a bounce and a shuffle into a library all
-    -- fire it (Thragtusk). Self-scoped and a LOOK-BACK for SelfDies' reasons.
-    --
-    -- A sibling of SelfDies, never its superset in code even though it is one in
-    -- the rules: a Doomed Traveler must stay silent for exactly the bounce that
-    -- fires a Thragtusk. Where it diverges is CR 400.7e, whose rescue of the
-    -- arriving object holds only for a public destination, so
-    -- Pawl.Engine.Binding.became is bound only there.
-    --
-    -- Leaving the GAME is matched too, off GameEvent.LeftTheGame, on the two
-    -- roads that reach it: CR 603.6c's second trigger event, a phased-in
-    -- permanent leaving the game with its owner (CR 800.4a), and CR 729.4a's own
-    -- grant, a card a subgame took out of the main game -- that rule, not rule
-    -- 603.6c, is what makes the main game's ability trigger there.
-    -- It is the one form that fires without a zone change, so its bearer can
-    -- only be read from CR 608.2h last known information.
+    -- the battlefield" (Thragtusk) -- plus that rule's and CR 729.4a's
+    -- leaving-the-game forms. Self-scoped and a look-back.
     SelfLeavesTheBattlefield
-  | -- | The SAME written form read by a BYSTANDER (Super Shredder's "whenever
-    -- another permanent leaves the battlefield"). SelfLeavesTheBattlefield's
-    -- events -- any destination, plus CR 603.6c's leaving-the-game form -- with
-    -- PermanentDies' scoping: filtered rather than self-scoped, so it reads the
-    -- departing permanent's characteristics, and "another" is `Not IsSource`
-    -- inside the Filter.
-    --
-    -- The candidate is ZoneChange.departed and NOT ZoneChange.object, read from
-    -- CR 608.2h last known information (CR 603.10a) -- PermanentDies' argument,
-    -- and stronger here: this condition's destination may be a hand or a library,
-    -- where there is no public incarnation to read at all.
-    --
-    -- No card in `data/cards/` needs the arriving incarnation, so what the
-    -- payload could act on is bound exactly as SelfLeavesTheBattlefield binds it
-    -- -- only for a public destination (CR 400.7e), and never for the
-    -- leaving-the-game form, which reaches no zone. What a card here DOES name
-    -- is the departing permanent itself, and this is the one condition that
-    -- binds it (Pawl.Engine.Binding.departedPermanent): the self-scoped forms
-    -- have it as CR 113.7a's source already, so a slot would be a second name
-    -- for one object.
+  | -- | The same written form read by a bystander (Super Shredder), filtered
+    -- over the departed permanent's last known information.
     PermanentLeavesTheBattlefield (Filter.Filter Keyword.Keyword)
-  | -- | CR 603.6c's leaves-the-battlefield family narrowed to ONE destination:
-    -- "whenever another nonland permanent you control is returned to its owner's
-    -- hand" (Justice, Vance Astrovik). PermanentDies is the same shape with a
-    -- graveyard where this has a hand, and CR 110.1 is what makes the origin
-    -- implicit -- a permanent is on the battlefield, so "returned to hand" is
-    -- battlefield-to-hand and nothing else.
-    --
-    -- NOT PermanentLeavesTheBattlefield with a Filter, which names no
-    -- destination and so would fire on a permanent destroyed or exiled too. A
-    -- Filter is a predicate over the OBJECT; where the card's clause is about
-    -- where the object went, the condition has to carry it.
-    --
-    -- A look-back for PermanentDies' reasons, doubly cited here: CR 603.10a
-    -- names leaves-the-battlefield abilities and, separately, abilities that
-    -- trigger when an object all players can see is put into a hand. The
-    -- candidate is ZoneChange.departed, read through CR 608.2h last known
-    -- information, which is the only way "you control" can be answered about a
-    -- card that is in a hand by the time the scan runs.
-    --
-    -- Binds nothing, PermanentsDie's floor and for eventBindingSlots' stated
-    -- reason: no printed payload under this condition points at the returned
-    -- permanent or at the player whose hand it reached. Warped Devotion's "that
-    -- player discards a card" is what would earn a slot.
+  | -- | CR 603.6c's family narrowed to one destination: "whenever another
+    -- nonland permanent you control is returned to its owner's hand" (Justice,
+    -- Vance Astrovik). A look-back, CR 603.10a naming this form too.
     --
     -- Not implemented: CR 603.2c's batch reading of the same event -- "whenever
     -- one or more noncreature permanents are returned to hand" (Tameshi, Reality
     -- Architect), which fires once however many moved, the way PermanentsDie
     -- stands beside PermanentDies (#2682).
     PermanentReturnedToHand (Filter.Filter Keyword.Keyword)
-  | -- | CR 700.4's "dies" read off the permanent the BEARER IS ATTACHED TO
-    -- (Screams from Within's "when enchanted creature dies"). PermanentDies'
-    -- battlefield-to-graveyard pair and a look-back for its reasons; WHICH
-    -- permanent is Object.attachedTo, AttachedCreatureMentors' scoping.
-    --
-    -- Attachment-scoped rather than filtered, for the reason rule 702.134c's
-    -- condition gives: CR 303.4b's "enchanted creature" is a link the Aura
-    -- records, not a class a Filter could name.
-    --
-    -- The one condition CR 113.6m's Aura clause names, which is why
-    -- Pawl.Engine.Event.zoneFunctionedFrom cases on it: the rule exempts an
-    -- ability whose trigger condition "specifies that ... the object it enchants
-    -- leaves the battlefield" from being pinned to the zone its effect moves the
-    -- object out of.
-    --
-    -- Vacuously False while the source is attached to nothing, or to a player
-    -- (CR 303.4), AttachedCreatureMentors again.
-    --
-    -- The link is read from CR 608.2h last known information where the bearer is
-    -- already gone (Pawl.Types.LastKnown.attachedTo), which is the ordinary case
-    -- rather than the exotic one: CR 704.5m buries the Aura in the same SBA batch
-    -- that buried its host, and CR 117.5 places triggers only after that batch
-    -- settles.
-    --
-    -- The PAYLOAD finding the Aura in that graveyard is CR 400.7f rather than
-    -- this rule, and lives with the other zone-change slots:
-    -- Pawl.Engine.Event.eventBindings binds the arrival under Binding.became.
+  | -- | CR 700.4's "dies" read off the permanent the bearer is attached to
+    -- (Screams from Within); the one condition CR 113.6m's Aura clause names.
     AttachedCreatureDies
-  | -- | CR 701.26a's "became tapped" read off the permanent the BEARER IS
-    -- ATTACHED TO (Betrayal's "whenever enchanted creature becomes tapped").
-    -- WHICH permanent is Object.attachedTo, AttachedCreatureDies' scoping and
-    -- for its reason: CR 303.4b's "enchanted creature" is a link the Aura
-    -- records, not a class a Filter could name.
-    --
-    -- CR 603.2e is the whole of what "becomes" adds, and both halves of it are
-    -- discharged by the EVENT rather than here: a permanent entering the
-    -- battlefield tapped records none, and rule 701.26a's "only untapped
-    -- permanents can be tapped" means a second tap records none either.
-    --
-    -- Vacuously False while the source is attached to nothing, or to a player
-    -- (CR 303.4), AttachedCreatureDies again -- but read only LIVE, never through
-    -- CR 608.2h last known information: the host is still on the battlefield
-    -- (it just became tapped), so CR 704.5m has taken nothing off, and the Aura
-    -- is standing beside it.
-    --
-    -- Binds nothing. CR 109.5 answers Betrayal's "you" from the Aura's own
-    -- controller through Binding.triggerSource, and the tapped permanent is the
-    -- one the attachment link already names.
+  | -- | CR 701.26a's "became tapped" read off the permanent the bearer is
+    -- attached to (Betrayal), live rather than through last known information.
     AttachedCreatureBecomesTapped
-  | -- | CR 702.55b/702.55c: "when the creature this card haunts dies", borne by
-    -- the haunting CARD IN EXILE. PermanentDies' zone pair; WHICH permanent is
-    -- the one GameState.haunting files the bearer against, the link
-    -- Effect.ExileHaunting wrote.
-    --
-    -- The only condition that cannot trigger from the battlefield for a reason
-    -- about the BEARER rather than the event: a permanent on the battlefield
-    -- haunts nothing, so CR 113.6k sends this to exile. No Filter -- rule 702.55b
-    -- makes the haunted object the one the haunt ability targeted "regardless of
-    -- whether or not that object is still a creature".
+  | -- | CR 702.55b / 702.55c: "when the creature this card haunts dies", borne
+    -- by the haunting card in exile.
     HauntedCreatureDies
   | -- | CR 701.6a: "whenever a spell or ability you control counters a spell"
-    -- (Baral, Chief of Compliance), against GameEvent.SpellCountered; the
-    -- relation is on the COUNTERING side, never the countered spell's.
-    --
-    -- Only a countered SPELL fires this: CR 113.9 says an ability on the stack is
-    -- not a spell, so Pawl.Engine.Event.counter ceases it (CR 608.2n) and records
-    -- no event.
+    -- (Baral, Chief of Compliance); the relation is on the countering side.
     --
     -- Not implemented: a countered-ability event and its condition (#541).
     SpellOrAbilityCounters PlayerRelation.PlayerRelation
   | -- | CR 615.13: "whenever damage that would be dealt to you is prevented"
-    -- (Selfless Squire), against GameEvent.DamagePrevented; the relation reads
-    -- the recipient against CR 109.5's "you" (CR 603.3a). Scoped to a PLAYER
-    -- recipient, which is the printed sentence -- CR 615.13 itself says nothing
-    -- about who the damage was addressed to.
-    --
-    -- Deliberately blind to WHICH prevention effect applied, which is the
-    -- Squire's own 2016-11-08 ruling: "any effect that uses the word 'prevent'
-    -- will cause it to trigger". SelfPreventsDamage below is the reading that
-    -- does look, over the same record.
+    -- (Selfless Squire), blind to which prevention effect applied.
     DamageToPlayerPrevented PlayerRelation.PlayerRelation
-  | -- | CR 615.13 the other way round: "when damage is prevented THIS WAY"
-    -- (Phyrexian Vindicator), against GameEvent.DamagePrevented. Matches when the
-    -- applying instance's CR 614.5 identity names the bearer as its source --
-    -- the bearer's own prevention effect did the preventing, not anybody's.
-    --
-    -- The whole of the match, with no recipient scope where
-    -- DamageToPlayerPrevented above has one: rule 615.13 says nothing about whom
-    -- the damage was addressed to, and the printed sentence does not either --
-    -- the prevention effect this is paired with already fixes the recipient it
-    -- can cover.
-    --
-    -- The SOURCE and not the whole identity, because card data can name no
-    -- CandidateId: two prevention effects PRINTED on one object would be
-    -- indistinguishable here, and no printing has two (Scryfall
-    -- o:"prevented this way", 2026-08-25). CR 122.1c's shield-counter pair and CR
-    -- 702.16e's protection are preventions the RULES mint onto a permanent rather
-    -- than ones its card prints, and Pawl.Engine.Replacement.printedBy is what
-    -- tells those from a printed row -- off the mark
-    -- Pawl.Engine.Projection.replacementsOf makes, since rule 702.16e's row is a
-    -- value a card could print.
-    --
-    -- The Filter is over CR 120.1's SOURCE of the damage that was prevented --
-    -- Samite Ministration's "damage from a black or red source". The trivial
-    -- `And []` is the printed sentence that qualifies the damage in no way
-    -- (Phyrexian Vindicator). Read against
-    -- Pawl.Engine.Projection.viewWithLastKnown, CR 608.2h being live for a
-    -- source that died to the very batch this prevented.
-    --
-    -- One filter and no relation, where DamageToPlayerPrevented above has a
-    -- relation and no filter: each names the half of the event its printings ask
-    -- about, and no printing of either shape asks about both.
+  | -- | CR 615.13 the other way round: "when damage is prevented this way"
+    -- (Phyrexian Vindicator), matching where CR 614.5's applying instance names
+    -- the bearer as its source; the Filter is over CR 120.1's damage source.
     SelfPreventsDamage (Filter.Filter Keyword.Keyword)
-  | -- | CR 119.9: "whenever [a player] gains life" (Ajani's Pridemate). That
-    -- rule rewrites the sentence as "whenever a SOURCE causes [a player] to gain
-    -- life", which is why this matches GameEvent.LifeGained -- recorded only
-    -- where a source caused the gain -- rather than any upward movement.
-    --
-    -- One fire per recorded event, which is where CR 702.15e's separate lifelink
-    -- events are honoured. The amount is not part of the CONDITION -- any gain
-    -- above 0 matches -- but is bound under Pawl.Engine.Binding.eventAmount for
-    -- Sanguine Bond's "that much", and the gaining player under
-    -- Pawl.Engine.Binding.triggerPlayer for False Cure's "that player", who under
-    -- AnyPlayer is not CR 109.5's "you".
-    --
-    -- Losing life is a different event entirely (PlayerLosesLife), so a card
-    -- bearing this stays silent for a loss and for prevented damage (CR 615.6).
+  | -- | CR 119.9: "whenever [a player] gains life" (Ajani's Pridemate), once per
+    -- gain a source caused.
     PlayerGainsLife PlayerRelation.PlayerRelation
-  | -- | CR 603.2c's batch reading of the arm above: "whenever one or more players
-    -- gain life". PlayerGainsLife's relation, scoped to the whole CR 608.2f event
-    -- rather than to each gain -- "each player gains 4 life" (Centaur Peacemaker)
-    -- is one event containing a gain per seat, so this fires once for the set
-    -- where PlayerGainsLife fires once per seat.
-    --
-    -- PermanentsDie and PermanentsGetCounters are the same fork on the object
-    -- side, built the same way and for the same reason: the matcher answers per
-    -- occurrence, and what makes the group one trigger is the
-    -- Pawl.Types.EventGroup the log stamps, read in
-    -- Pawl.Engine.Event.eventTriggers.
-    --
-    -- Binds nothing where PlayerGainsLife binds the gaining player and the
-    -- amount: a batch may span several seats and several numbers, so one slot
-    -- could not name them.
+  | -- | CR 603.2c's batch reading of the arm above: "whenever one or more
+    -- players gain life", once for the whole CR 608.2f event.
     PlayersGainLife PlayerRelation.PlayerRelation
   | -- | "Whenever [a player] loses life" (Exquisite Blood), against
-    -- GameEvent.LifeLost. PlayerGainsLife's mirror in shape.
+    -- GameEvent.LifeLost -- PlayerGainsLife's mirror in shape.
     --
-    -- No CR 119.9 for this direction: the rules print no such rewriting for
-    -- loss, so what this matches is settled by what the engine RECORDS, and the
-    -- recording sites are the citation -- CR 119.3's effect
-    -- (Pawl.Engine.Resolve's LoseLife), CR 119.2 / 120.3a's damage without
-    -- infect (Pawl.Engine.Damage), and CR 119.4's paid life
-    -- (Pawl.Engine.Event.payLife).
-    --
-    -- Three life-total facts that are NOT this event: CR 120.3b's infect damage
-    -- gives poison counters instead; CR 615.6's prevented damage never leaves the
-    -- total; CR 120.3c-e take a permanent's damage somewhere no life total is.
-    -- The zero case needs no check here, every producer guarding its own zero.
-    --
-    -- The amount is bound under Pawl.Engine.Binding.eventAmount for Exquisite
-    -- Blood's "that much", and the losing player under
-    -- Pawl.Engine.Binding.triggerPlayer for Mindcrank's "that player".
-    --
-    -- Not implemented: CR 119.5's life-total SET, which would be a loss by that
+    -- Not implemented: CR 119.5's life-total set, which would be a loss by that
     -- rule's own words whenever the new total is lower, records nothing.
     PlayerLosesLife PlayerRelation.PlayerRelation
-  | -- | CR 714.2b generalized over the counter kind: "when one or more [kind]
-    -- counters are put onto this permanent, if the number ... was less than N
-    -- and became at least N". A THRESHOLD CROSSING, against a
-    -- GameEvent.CountersPut whose before/after pair straddles N. Bearer-scoped.
-    --
-    -- The WHOLE sentence, intervening "if" included, rather than half of it on
-    -- TriggeredAbility.intervening: both conjuncts describe the placement event
-    -- rather than the board, so CR 603.4's second check could not find either
-    -- changed. The consequence is that a chapter ability on the stack still
-    -- resolves after its Saga's lore counters are removed, which is what CR
-    -- 704.5s's exemption presupposes.
-    --
-    -- The Natural is N, the chapter number. CR 714.2c's "{rN1}, {rN2}" is two
-    -- abilities sharing one effect, and the rule says the shorthand MEANS that,
-    -- so a card writes two entries and nothing here represents it.
-    --
-    -- Not restricted to Sagas or to lore counters: the shape is the counter
-    -- kind's, and Pawl.Engine.Saga is where the subtype is read.
+  | -- | CR 714.2b generalized over the counter kind: a threshold crossing whose
+    -- before/after pair straddles N, intervening "if" included.
     SelfCountersReached SelfCountersReached.SelfCountersReached
-  | -- | CR 716.2a: "when this Class becomes level N" (Stormchaser's Talent),
-    -- against a GameEvent.ClassLevelSet naming the BEARER. SelfCountersReached's
-    -- shape over a class level instead of a counter tally, and bearer-scoped
-    -- alike.
-    --
-    -- The ClassLevel is N, the number printed on the level bar the ability sits
-    -- under. One field and self-scoped, so the payload rides on the constructor
-    -- rather than in a record of its own.
-    --
-    -- A CROSSING, not an equality -- `before < N && N <= after`, exactly
-    -- SelfCountersReached's reading of CR 714.2b. CR 716.2a's ladder means a bar
-    -- can only step N-1 to N, so the two readings coincide for every printing;
-    -- an effect setting a level directly should still fire "becomes level 2" when
-    -- it takes a Class from 1 to 3, and an equality would silently skip it.
-    --
-    -- CR 603.10 is what makes this reachable at all. Its exception list is
-    -- exhaustive and "becomes level N" is not on it, so the abilities checked
-    -- against this event are the ones that exist immediately AFTER it -- which is
-    -- when CR 716.2a's static half has granted the level-N section's trigger.
+  | -- | CR 716.2a: "when this Class becomes level N" (Stormchaser's Talent), a
+    -- crossing rather than an equality.
     SelfBecomesClassLevel ClassLevel.ClassLevel
-  | -- | CR 310.12b generalized over the counter kind: "when the LAST [kind]
-    -- counter is removed from this permanent". SelfCountersReached's mirror,
-    -- against a GameEvent.CountersRemoved going from one or more to none, and
-    -- bearer-scoped alike. The whole sentence lives here for that constructor's
-    -- reason: a permanent whose counters were removed and replaced before the
-    -- ability resolved still had its last counter removed.
-    --
-    -- Takes no threshold, rule 310.12b stating none. Not restricted to battles
-    -- or to defense counters; Pawl.Engine.Battle reads rule 310.
+  | -- | CR 310.12b generalized over the counter kind: "when the last [kind]
+    -- counter is removed from this permanent".
     SelfLastCounterRemoved (CounterKind.CounterKind Keyword.Keyword)
   | -- | "Whenever one or more [kind] counters are removed from this permanent"
-    -- (Chandra, Fire Artisan). SelfLastCounterRemoved's any-amount mirror: same
-    -- CounterKind payload, same bearer scope, and matched against the same
-    -- GameEvent.CountersRemoved -- but with no reading of the AFTER count, so a
-    -- removal that leaves counters behind matches and a removal that empties the
-    -- object matches too.
-    --
-    -- The two do not collapse into each other in either direction. Rule 310.12b
-    -- needs the last-counter reading, and Chandra needs the any-amount one; a
-    -- board where three of four loyalty counters come off separates them.
-    --
-    -- No "one or more" conjunct, for SelfLastCounterRemoved's reason: the record
-    -- exists only where something actually came off, an invariant stated on
-    -- GameEvent.CountersRemoved itself.
-    --
-    -- The amount removed is bound under Pawl.Engine.Binding.eventAmount, which
-    -- neither sibling stamps -- CR 603.2's "that much", read off the event's
-    -- before/after pair rather than off the board, so CR 510.2's simultaneity
-    -- carries into it: one batch of combat damage removing three counters is one
-    -- trigger for three, not three for one.
+    -- (Chandra, Fire Artisan) -- the arm above with no reading of the after
+    -- count.
     SelfCountersRemoved (CounterKind.CounterKind Keyword.Keyword)
   | -- | CR 603.2c's batch reading of a CR 122.6 placement: "whenever one or more
-    -- [kind] counters are put on one or more [permanents]". The arm above's
-    -- placement mirror scoped to the BATCH and to a FILTER rather than to the
-    -- bearer -- CR 704.3 and CR 608.2f make a whole sweep one event, so that event
-    -- contains one occurrence of this trigger however many permanents it put
-    -- counters on.
-    --
-    -- PermanentsDie's twin, built the same way and for the same reason: the
-    -- matcher answers per placement, and what makes the whole group one trigger is
-    -- the Pawl.Types.EventGroup the log stamps, read in
-    -- Pawl.Engine.Event.eventTriggers.
-    --
-    -- The batch spans OBJECTS, which is what separates this from
-    -- PermanentGetsCounters below: that one names ONE permanent and fires once
-    -- per permanent, this names a set and fires once for the set.
-    --
-    -- Binds nothing, for PermanentsDie's reason: a batch may cover several
-    -- permanents, so one slot could not name them all.
+    -- [kind] counters are put on one or more [permanents]", once for the batch.
     PermanentsGetCounters CounterPlacement.CounterPlacement
-  | -- | The printed "whenever one or more [kind] counters are put on A
-    -- [permanent]" (Wickersmith's Tools, Auntie Ool, Cursewretch) -- the arm
-    -- above's PER-PERMANENT reading, sharing its CounterPlacement payload and
-    -- its matcher and differing only in CR 603.2c's scope.
+  | -- | The arm above read per permanent: "whenever one or more [kind] counters
+    -- are put on a [permanent]" (Wickersmith's Tools).
     --
-    -- PermanentDies is to PermanentsDie exactly what this is to the arm above,
-    -- and that pair is why this is a second constructor rather than a flag on
-    -- the payload: Pawl.Engine.Event.batchScoped is a total case over THIS type
-    -- and nothing else, so the scope has to be readable off the constructor.
-    --
-    -- One creature taking several counters AT ONCE is one placement and so one
-    -- trigger, which is what "one or more" buys: Pawl.Engine.Event.settleCounters
-    -- records one GameEvent.CountersPut per settled placement, so the "one or
-    -- more" is spent inside the event rather than needing a conjunct here.
-    --
-    -- Binds nothing today, unlike PermanentDies, which binds what it names. Not
-    -- implemented: a slot for the permanent this condition names, which Auntie
-    -- Ool, Cursewretch's "if you control that creature" reads (#2342).
+    -- Not implemented: a slot for the permanent this condition names, which
+    -- Auntie Ool, Cursewretch's "if you control that creature" reads (#2342).
     PermanentGetsCounters CounterPlacement.CounterPlacement
-  | -- | CR 601.2i: "whenever you cast a [type] spell" (Young Pyromancer). That
-    -- rule's second sentence is the trigger event in as many words. Matched
-    -- against GameEvent.SpellCast.
-    --
-    -- A FILTER over the spell rather than a PlayerRelation over the caster: the
-    -- printed sentence narrows who cast it AND what it was, and only one of those
-    -- is a player. "You cast" is Filter.ControlledBy You read against CR 109.5's
-    -- "you" (CR 603.3a). Not self-scoped; "this spell" is SelfCast, for the zone
-    -- reason that constructor gives.
-    --
-    -- The spell is read AS IT IS ON THE STACK, which CR 601.2i requires: that
-    -- rule applies the effects modifying the spell's characteristics before it
-    -- becomes cast, so the card in the hand is the wrong object.
-    --
-    -- The spell is bound under Pawl.Engine.Binding.castSpell and the caster
-    -- under Pawl.Engine.Binding.triggerPlayer -- CR 112.2's controller, which
-    -- Kambal, Consul of Allocation names without going through the spell, since
-    -- CR 608.2h can have taken it away by resolution.
-    --
-    -- The TurnScope is a second axis beside the Filter, earned by Brineborn
-    -- Cutthroat's "during an opponent's turn": whose turn it is is no
-    -- characteristic of the spell, so Event.matchesTrigger reads it off the
-    -- GameState. The ORDINAL is a fourth, earned by Clarion Spirit's "your
-    -- second spell each turn" -- PlayerDrawsNthCard's question, kept a field
-    -- because it narrows the same event.
+  | -- | CR 601.2i: "whenever you cast a [type] spell" (Young Pyromancer), the
+    -- Filter read against the spell as it is on the stack.
     SpellCast SpellCast.SpellCast
-  | -- | CR 601.2i read off the spell BEING cast -- "when you cast this spell"
-    -- (Desolation Twin). Self-scoped.
-    --
-    -- The ZONE is what this constructor exists for: CR 113.6k puts a condition
-    -- that cannot trigger from the battlefield in the zones it can, and CR
-    -- 601.2a leaves the object on the stack.
-    -- Pawl.Engine.Event.zonesTriggeredFrom answers that with a total case over
-    -- this type; asking the same of a Filter would be a partial analysis of an
-    -- open language, silently answering "battlefield" for shapes it had not
-    -- anticipated.
+  | -- | CR 601.2i read off the spell being cast -- "when you cast this spell"
+    -- (Desolation Twin). Self-scoped, which is what lets
+    -- Pawl.Engine.Event.zonesTriggeredFrom answer CR 113.6k totally.
     SelfCast
   | -- | CR 601.2c: "whenever this permanent becomes the target of a spell or
-    -- ability [a player] controls" -- CR 702.21a's ward. Against
-    -- GameEvent.BecameTarget; self-scoped, plus a relation reading the targeting
-    -- object's controller.
-    --
-    -- Fires once per instance of the word "target" the bearer is chosen for,
-    -- which is rule 601.2c's arity: one object may be chosen once per instance,
-    -- and each choice is a becoming. Once more for a copy of that spell, CR
-    -- 115.1 and CR 707.10c putting the copy on the stack with targets of its
-    -- own.
+    -- ability [a player] controls" -- CR 702.21a's ward, once per instance of
+    -- the word "target".
     --
     -- Not implemented: CR 115.7's re-targeting effects, which would make a new
     -- object become a target (#1525).
     SelfBecomesTargeted PlayerRelation.PlayerRelation
-  | -- | CR 601.2c from the PLAYER's side: "whenever you become the target of a
-    -- spell or ability" (Dormant Gomazoa, Amulet of Safekeeping). Against
-    -- GameEvent.BecameTarget whose `targeted` is a Recipient.ToPlayer equal to
-    -- CR 109.5's "you" (CR 603.3a). The payload carries the narrowings the
-    -- printings differ in; its own haddock says why each is read off the EVENT.
+  | -- | CR 601.2c from the player's side: "whenever you become the target of a
+    -- spell or ability" (Dormant Gomazoa).
     ControllerBecomesTarget ControllerBecomesTarget.ControllerBecomesTarget
-  | -- | CR 709.5h: "when you unlock this door" -- fires when the bearer is given
-    -- the unlocked designation for the NAMED half, however it was given (CR
-    -- 709.5d's entry, CR 709.5e's special action, CR 709.5f's keyword action).
-    -- Self-scoped plus the half, which is what makes this the only condition
-    -- that names one: a Room whose two doors both carry an unlock trigger has
-    -- two abilities seeing the same event, and only the name separates them.
-    --
-    -- Reaching the half from the ABILITY instead would need the face an ability
-    -- was printed on to survive Pawl.Engine.Projection's flattened list, and CR
-    -- 709.4c combines the halves' abilities into one text box. Naming the door
-    -- is the card stating a fact about itself, not the engine casing on which
-    -- card it is.
-    --
-    -- CR 709.5i's "fully unlocks" is RoomFullyUnlocked.
+  | -- | CR 709.5h: "when you unlock this door", however the named half was
+    -- unlocked. Self-scoped plus the half, which is what separates a Room's two
+    -- doors.
     SelfHalfUnlocked CardName.CardName
-  | -- | CR 709.5i: the permanent has one unlocked designation and gets the
-    -- other, or has neither and gains both. Not self-scoped, which is the whole
-    -- difference from SelfHalfUnlocked: Balemurk Leech watches every Room. Names
-    -- no half, the rule being about the permanent.
+  | -- | CR 709.5i: the permanent gained the unlocked designation it lacked, or
+    -- gained both. Not self-scoped (Balemurk Leech).
     --
-    -- The PlayerRelation reads the player who UNLOCKED, which rule 709.5i's own
-    -- "a player fully unlocks" makes the subject of the printed "you". Proved by
-    -- Pawl.RoomSpec's "CR 709.5i 'you' is the player who unlocked, not the Room's
-    -- controller".
+    -- The PlayerRelation reads the player who unlocked, proved by Pawl.RoomSpec's
+    -- "CR 709.5i 'you' is the player who unlocked, not the Room's controller".
     RoomFullyUnlocked PlayerRelation.PlayerRelation
-  | -- | CR 603.1b: several conditions, ANY of which fires the ONE ability that
-    -- bears them (Balemurk Leech). One ability rather than two is observable --
-    -- CR 603.8's suppression, CR 603.3b's ordering and CR 603.1b's own "all of
-    -- those conditions" clause all count abilities.
-    --
-    -- Read as "any". CR 603.1b's "all of those conditions have happened during a
-    -- particular period" is a second thing a multi-condition ability can do, and
-    -- nothing here does it.
-    --
-    -- Pawl.CardSpec's lint forbids a StateIs or a nested AnyOf inside one: state
-    -- and event triggers are gathered by different scans
-    -- (Pawl.Engine.Event.stateTriggers against matchesTrigger), and a flat list
-    -- says everything a nested one could.
+  | -- | CR 603.1b: several conditions, any of which fires the one ability that
+    -- bears them (Balemurk Leech); Pawl.CardSpec's lint forbids a StateIs or a
+    -- nested AnyOf inside one.
     AnyOf [TriggerCondition]
   | -- | CR 708.7 through CR 603.2: "when this creature is turned face up" (Skirk
     -- Marauder). Self-scoped.
-    --
-    -- No payload: CR 702.37e's morph cost, the player who took the special
-    -- action and the characteristics regained are all things a printed ability
-    -- could say "that much" about, and none does.
     SelfTurnedFaceUp
-  | -- | CR 701.27e: "when this creature transforms into Blightsower Thallid",
-    -- against GameEvent.Transformed. Self-scoped PLUS the name, which is
-    -- TriggerCondition.SelfHalfUnlocked's shape and its reason -- every printing
-    -- of this names a face, and naming it is the card stating a fact about
-    -- itself rather than the engine casing on which card it is.
+  | -- | CR 701.27e: "when this creature transforms into [face]", matched against
+    -- the names the event carries. Self-scoped plus the name, which is what
+    -- tells the turn to a face from the turn away from it.
     --
-    -- The name is not decoration. CR 701.27e admits an ability that triggers
-    -- when an object "transforms into" an object with a SPECIFIED
-    -- CHARACTERISTIC, and both faces of a card can carry one: Brutal Cathar
-    -- fires on the turn back to the front face while Wildsong Howler fires on
-    -- the turn away from it, and only the name tells the two events apart.
-    -- Matched against the names the event carries (CR 201.1 / 707.2's projected
-    -- ones, not the printed face's), which is CR 701.27e's "has the specified
-    -- characteristic immediately after it does so".
-    --
-    -- CR 701.28a makes a convert follow CR 701.27a-f, so this condition fires on
-    -- one too: a convert writes the same GameEvent.Transformed, there being one
-    -- code path for both opcodes.
-    --
-    -- Not implemented: the BYSTANDER form CR 701.27e also admits, a card
+    -- Not implemented: the bystander form CR 701.27e also admits, a card
     -- watching another permanent transform (Corruption of Towashi, Neglected
     -- Heirloom). The event carries everything such a condition would read, so
     -- what is missing is the arm rather than the record (#2050).
     SelfTransformedInto CardName.CardName
-  | -- | CR 708.7's other written form read by a BYSTANDER (Aven Farseer).
-    -- Filtered rather than self-scoped, so it reads the permanent's
-    -- characteristics for a narrowed printing (Deathmist Raptor, Hamza);
-    -- "another" would be `Not IsSource` inside the Filter. Aven Farseer's bare
-    -- "a permanent" is Filter's trivial `And []`.
-    --
-    -- A LIVE read, unlike PermanentDies': CR 708.8 leaves the permanent on the
-    -- battlefield with its copiable values back, so CR 603.10a's look-back
-    -- exceptions do not reach this. Reading it BEFORE the turning would answer
-    -- every narrowed form wrong, a face-down permanent having only the
-    -- characteristics CR 708.2 lists.
+  | -- | CR 708.7's other written form read by a bystander (Aven Farseer),
+    -- filtered and read live after CR 708.8 restores the copiable values.
     PermanentTurnedFaceUp (Filter.Filter Keyword.Keyword)
-  | -- | A permanent the Filter admits GAINED THIS DESIGNATION -- CR 702.112b's
-    -- renown (Valeron Wardens) and CR 701.37b's monstrous (Arbor Colossus),
-    -- against GameEvent.BecameDesignated. The designation is a payload beside
-    -- the Filter and is what keeps the readings apart.
-    --
-    -- PermanentTurnedFaceUp's shape and posture, including the LIVE read:
-    -- nothing here is a zone change. The self forms (Relic Seeker) are this
-    -- condition with Filter.IsSource, so no self-scoped constructor is needed.
+  | -- | A permanent the Filter admits gained this designation -- CR 702.112b's
+    -- renown (Valeron Wardens) and CR 701.37b's monstrous (Arbor Colossus).
     PermanentBecomesDesignated PermanentBecomesDesignated.PermanentBecomesDesignated
-  | -- | CR 702.100b: the BEARER evolved (Renegade Krasis), against
-    -- GameEvent.Evolved by an id comparison. Self-scoped and not filtered
-    -- because both printings that read rule 702.100b's marker say "this
-    -- creature".
+  | -- | CR 702.100b: the bearer evolved (Renegade Krasis). Self-scoped.
     SelfEvolves
-  | -- | CR 702.134c: the creature the bearer is ATTACHED TO mentored another
-    -- (Aegis of the Legion), against GameEvent.Mentored, whose second id is
-    -- bound under Pawl.Engine.Binding.mentoredCreature.
-    --
-    -- Attachment-scoped rather than self-scoped or filtered: the one printing is
-    -- an Equipment, so its source is never the mentoring creature, and "equipped
-    -- creature" is not a class a Filter could name (CR 301.5f). The same
-    -- sentence Affected.Attached states for a static ability.
-    --
-    -- Vacuously False while the source is attached to nothing, or to a player
-    -- (CR 303.4).
+  | -- | CR 702.134c: the creature the bearer is attached to mentored another
+    -- (Aegis of the Legion). Attachment-scoped, so vacuously False while
+    -- attached to nothing or to a player (CR 303.4).
     AttachedCreatureMentors
-  | -- | CR 702.149c: the BEARER trained (Savior of Ollenbock), against
-    -- GameEvent.Trained by an id comparison. Self-scoped, rule 702.149c stating
-    -- that form in as many words. The event is recorded only when a resolving
-    -- training ability actually put a counter on, which is the rule's whole
-    -- condition.
+  | -- | CR 702.149c: the bearer trained (Savior of Ollenbock). Self-scoped, and
+    -- recorded only where a counter actually went on.
     SelfTrains
-  | -- | CR 603.10a: "whenever a player sacrifices a permanent" (Mayhem Devil).
-    -- One of the four look-back families that rule names.
-    --
-    -- NOT SelfDies or PermanentDies, even though CR 700.4 makes every sacrifice
-    -- a death: this fires on the sacrifice AS a sacrifice (CR 701.21a's game
-    -- action), which the zone change alone cannot say.
-    -- GameEvent.PermanentSacrificed is recorded beside the Moved event rather
-    -- than instead of it, so a death trigger still sees a sacrifice and this one
-    -- does not see a destruction.
-    --
-    -- No payload: Mayhem Devil says "a PLAYER" and "a permanent", so a relation
-    -- would carry PlayerRelation.AnyPlayer on every printing and a Filter would
-    -- carry nothing. Not self-scoped.
+  | -- | CR 603.10a: "whenever a player sacrifices a permanent" (Mayhem Devil) --
+    -- the CR 701.21a game action, not the zone change SelfDies reads.
     PermanentSacrificed
-  | -- | CR 603.3b's second class: a trigger condition that IS another ability
-    -- triggering. "Whenever the final chapter ability of a Saga you control
-    -- triggers" (Historian's Boon), against GameEvent.AbilityTriggered, which
-    -- Pawl.Engine.Engine appends for each gathered trigger before the batch goes
-    -- on the stack.
-    --
-    -- Being in this class is why CR 603.3b has two passes;
-    -- Pawl.Engine.Event.reactsToAbilityTriggering classifies exhaustively, so a
-    -- new condition must decide which pass it takes.
-    --
-    -- Three things are checked together and none is separable into a Filter over
-    -- the source: the ability must be a CHAPTER ability (CR 714.2b), its chapter
-    -- must be its source's FINAL chapter number (CR 714.2d), and the source must
-    -- be a Saga with chapter abilities (CR 714.1, CR 704.5s). The middle
-    -- compares the event with the source's projection, which no Filter atom can
-    -- express.
-    --
-    -- The PlayerRelation reads the TRIGGERED ability's controller against the
-    -- watching ability's. No payload for which Saga or which chapter:
-    -- Historian's Boon's effect names neither.
+  | -- | CR 603.3b's second class: "whenever the final chapter ability of a Saga
+    -- you control triggers" (Historian's Boon), against
+    -- GameEvent.AbilityTriggered.
     SagaFinalChapterTriggers PlayerRelation.PlayerRelation
   | -- | CR 725.1: "whenever [a player] becomes the monarch" (Custodi Lich),
-    -- against GameEvent.BecameMonarch. One constructor with a relation rather
-    -- than two: "you" and "an opponent" are the same event read from two seats.
-    --
-    -- No Filter, which is CR 725.3 -- only one player can be the monarch, so a
-    -- crowning names exactly one player.
-    --
-    -- Matched against the EVENT, never against how the crown was won: an entry
-    -- trigger's crown, a targeted crown, CR 725.2's stolen crown and CR 725.4's
-    -- departure reassignment all record the same event.
+    -- however the crown was won.
     PlayerBecomesMonarch PlayerRelation.PlayerRelation
-  | -- | CR 603.7: "when you lose control of the creature" (Ray of Command).
-    -- Fires when the permanent BOUND IN THE NAMED SLOT stops being controlled by
-    -- "you", against GameEvent.ControlChanged.
-    --
-    -- The only condition that names a SLOT, because it is the only one whose
-    -- subject is a particular object chosen earlier. A delayed ability's source
-    -- is the SPELL that armed it (CR 603.7d), so a Self- condition would ask
-    -- about Ray of Command on the stack; and a Filter would ask about "a
-    -- creature" rather than THE creature. CR 603.7c's captured environment is
-    -- what remembers which.
-    --
-    -- "You" is CR 603.7d's controller of the spell as it resolved, matched
-    -- against the player the event says control LEFT. Where it went is not read.
-    --
-    -- An empty slot never matches, which is CR 608.2b's fizzle rather than a
-    -- guard: a spell whose only target became illegal arms nothing.
-    --
-    -- A permanent LEAVING the battlefield is not a match,
-    -- GameEvent.ControlChanged being sampled on the battlefield only, so the
-    -- entry stays armed rather than spending CR 603.7b's one shot --
-    -- unobservable, the ability could only act on an object CR 400.7 has
-    -- replaced.
+  | -- | CR 603.7: "when you lose control of the creature" (Ray of Command) --
+    -- the only condition naming a slot, its subject being an object CR 603.7c's
+    -- captured environment chose earlier.
     LoseControlOfBound SlotName.SlotName
-  | -- | CR 309.4c: "When you move your venture marker into this room", against
-    -- GameEvent.VentureMarkerEntered naming the bearer and this room.
-    -- Self-scoped through the bearer AND the room index, SelfHalfUnlocked's
-    -- shape and reason: a dungeon has one ability per room, all borne by the
-    -- same card.
-    --
-    -- Never written by card data: Pawl.Engine.Dungeon mints one per room of
-    -- Pawl.Types.Face.rooms, which is why Pawl.Types.DungeonRoom carries a bare
-    -- Modal rather than a whole TriggeredAbility.
+  | -- | CR 309.4c: "when you move your venture marker into this room".
+    -- Self-scoped through the bearer and the room index; minted by
+    -- Pawl.Engine.Dungeon rather than written by card data.
     RoomEntered RoomIndex.RoomIndex
   | -- | CR 309.7: "whenever you complete a dungeon" (Dungeon Crawler), against
     -- GameEvent.DungeonCompleted.
     PlayerCompletesDungeon PlayerRelation.PlayerRelation
-  | -- | CR 701.22d: "whenever you scry" (Matoya, Archon Elder), against
-    -- GameEvent.Scried. Counts SCRIES rather than cards, which is why it reads
-    -- its own event: CR 701.22a's reorder records nothing, and a scry that moved
-    -- nothing still fires this. CR 701.22b's scry 0 records no event.
+  | -- | CR 701.22d: "whenever you scry" (Matoya, Archon Elder). Counts scries
+    -- rather than cards; CR 701.22b's scry 0 records no event.
     PlayerScries PlayerRelation.PlayerRelation
-  | -- | CR 701.25d, PlayerScries' twin, against GameEvent.Surveiled. A surveil
-    -- that put nothing into a graveyard fires it just the same, which is what
-    -- keeps it apart from a condition built on CR 701.25a's zone changes. CR
-    -- 701.25c's surveil 0 fires nothing.
+  | -- | CR 701.25d, PlayerScries' twin: a surveil that put nothing into a
+    -- graveyard fires it just the same, and CR 701.25c's surveil 0 fires nothing.
     PlayerSurveils PlayerRelation.PlayerRelation
-  | -- | CR 706.1: "whenever you roll one or more dice" (Feywild Trickster),
-    -- against GameEvent.DiceRolled, with the relation read against CR 109.5's
-    -- "you" -- the ability's controller at the moment it triggered (CR 603.3a),
-    -- PlayerScries' shape.
-    --
-    -- The EVENT and nothing else: the result is not here, and CR 706.7 is why
-    -- that is the right split rather than an omission -- in Planechase the
-    -- planar die fires this very condition while every effect reading a
-    -- numerical result ignores it. #934 is the planar die.
+  | -- | CR 706.1: "whenever you roll one or more dice" (Feywild Trickster). The
+    -- event and not the result, which is what lets CR 706.7's planar die fire it.
     --
     -- Not implemented: the printed "one or more", which needs CR 706.1's die
     -- count (#2085); one roll is one event, so the batch and per-occurrence
-    -- readings coincide today.
+    -- readings coincide today. See #934 for the planar die.
     PlayerRollsDice PlayerRelation.PlayerRelation
-  | -- | CR 705.2: "whenever you win a coin flip" (Tavern Scoundrel), against
-    -- GameEvent.CoinFlipped, with the relation read against CR 109.5's "you" --
-    -- the ability's controller at the moment it triggered (CR 603.3a),
-    -- PlayerRollsDice's shape.
+  | -- | CR 705.2: "whenever you win a coin flip" (Tavern Scoundrel), reading the
+    -- event's win where PlayerRollsDice ignores what the die showed.
     --
-    -- Reads the event's WIN, unlike PlayerRollsDice beside it, which deliberately
-    -- ignores what the die showed. The printed template says so: CR 705.2's
-    -- "wins the flip" is a named outcome of the flip rather than a number the
-    -- flip produced, and the losing flip is recorded too -- as is the flip rule
-    -- 705.2's first sentence leaves with no outcome at all -- so this condition
-    -- is a filter on the log rather than the presence of an entry. An
-    -- outcome-blind "whenever you flip a coin" would be a SIBLING arm over that
-    -- same event rather than a widening of this one, and so would a losing one
-    -- (gap #2306).
+    -- Not implemented: an outcome-blind "whenever you flip a coin", and a losing
+    -- one, each of which would be a sibling arm over the same event (gap #2306).
     PlayerWinsCoinFlip PlayerRelation.PlayerRelation
   | -- | CR 702.170a / 702.170c: "when this card becomes plotted" (Aloe
-    -- Alchemist), against GameEvent.Plotted naming the bearer. Self-scoped and
-    -- nullary. Watched for from EXILE, which is where both routes leave the
-    -- card -- CR 702.170b's special action exiles it, and rule 702.170c's
-    -- effect acts on a card already there.
+    -- Alchemist). Self-scoped, and watched for from exile.
     SelfBecomesPlotted
   | -- | CR 701.44b: "whenever a creature you control explores" (Wildgrowth
-    -- Walker), against GameEvent.Explored, with the Filter applied to the
-    -- EXPLORER and through last known information, PermanentDies' posture. Fires
-    -- once per completed explore, including one whose library was empty, which
-    -- keeps it apart from a condition built on CR 701.44a's steps.
+    -- Walker), once per completed explore including one whose library was empty.
     PermanentExplores (Filter.Filter Keyword.Keyword)
   | -- | CR 701.43d \/ 607.2h: "when you do" beside "you may exert this creature
-    -- as it attacks" (Glory-Bound Initiate), against GameEvent.Exerted by an id
-    -- comparison. Self-scoped and nullary, CR 701.43d stating the linked form.
-    --
-    -- CR 607.2h's linkage holds by construction rather than by a link field: the
-    -- event is recorded only by the CR 508.1g payment on THIS permanent.
+    -- as it attacks" (Glory-Bound Initiate). Self-scoped, the linkage holding by
+    -- construction.
     --
     -- Not implemented: a card bearing two exert paragraphs, whose two triggers
     -- would each see both exerts.
     SelfExerted
-  | -- | CR 701.3a read by the HOST: "whenever an Aura becomes attached to this
-    -- creature" (Bramble Elemental), against GameEvent.BecameAttached, whose
-    -- `host` is compared with the bearer while the Filter reads the ATTACHMENT.
-    -- A self-scoped bearer PLUS a Filter, the two objects playing different
-    -- parts.
+  | -- | CR 701.3a read by the host: "whenever an Aura becomes attached to this
+    -- creature" (Bramble Elemental), with the Filter over the attachment.
     --
-    -- A LIVE read of the attachment, PermanentTurnedFaceUp's posture: attaching
-    -- is no zone change, and the one route that is -- an Aura arriving already
-    -- attached -- leaves the permanent on the battlefield.
-    --
-    -- CR 702.26j is satisfied by where the event is emitted:
-    -- Pawl.Engine.Phasing writes Object.attachedTo without going through the
-    -- funnel, so phasing records nothing to match.
-    --
-    -- Not implemented: the other scope, the bearer as the ATTACHMENT (Enormous
+    -- Not implemented: the other scope, the bearer as the attachment (Enormous
     -- Energy Blade), which needs its own constructor and a binding for "that
     -- creature" (gap #1837).
     SelfBecomesAttachedBy (Filter.Filter Keyword.Keyword)
-  | -- | CR 603.12's reflexive triggered ability: "you may sacrifice a Clue. WHEN
-    -- YOU DO, target instant or sorcery card in your graveyard gains flashback"
-    -- (The Fugitive Doctor). Nullary, and it matches no GameEvent at all.
+  | -- | CR 603.12's reflexive triggered ability: "when you do" (The Fugitive
+    -- Doctor). Nullary, and it matches no GameEvent -- the arming clause runs
+    -- exactly when the action it hangs off was taken, so
+    -- Pawl.Engine.Event.delayedPending fires it once at the next gather.
     --
-    -- CR 603.12 routes a reflexive through rule 603.7, so its carrier is a
-    -- delayed entry -- but with the exception that it is "checked immediately
-    -- after being created" and triggers "based on whether the trigger event or
-    -- events occurred earlier during the resolution of the spell or ability that
-    -- created them". Both halves are discharged STRUCTURALLY rather than by
-    -- re-reading the log: an Effect.ArmDelayedTrigger naming it sits inside a
-    -- clause that runs exactly when the action it hangs off was taken -- the
-    -- branch of a CR 118.12 pay gate (The Fugitive Doctor's "you may sacrifice a
-    -- Clue"), or a clause whose own CR 603.5 "may" is the action (Ratchet, Field
-    -- Medic's "you may convert Ratchet") -- so by the time an entry with this
-    -- condition exists its trigger event has already occurred.
-    -- Pawl.Engine.Event.delayedPending therefore fires it once, on no
-    -- event, at the next gather -- which is CR 603.3's "the next time a player
-    -- would receive priority", so its targets are chosen (CR 603.3d) after the
-    -- action rather than as the creating ability went on the stack.
-    --
-    -- CR 603.12a's "paying that cost one or more times causes the reflexive
-    -- triggered ability to trigger only once" holds by construction: one clause
-    -- arms one entry, and an entry with no stated duration is spent by its one
-    -- firing (CR 603.7b).
-    --
-    -- Not implemented: CR 603.12a's FIRST sentence, "once for each of those
+    -- Not implemented: CR 603.12a's first sentence, "once for each of those
     -- times", which rule 603.12's other printed form ("when [something happens]
     -- this way") reaches -- that event is no payment and can occur several times
     -- in one resolution, where this fires once (#2121).
