@@ -612,10 +612,10 @@ defaultAnswer p = case p of
   -- CR 122.5 once more: a group destination under "any number" includes none, so
   -- ChooseMovedCounters' default is this prompt's too -- allocate to nobody and
   -- the board is left alone.
+  Prompt.ChooseDistributedMovedCounters {} -> Map.empty
   -- CR 122.5 once more: "up to one" includes none, and ChooseMovedCounters'
   -- reason for declining is this prompt's too -- a default that took a counter
   -- off the first object would rewrite a board rather than leave it alone.
-  Prompt.ChooseDistributedMovedCounters {} -> Map.empty
   Prompt.ChooseMovedCounterOrNone {} -> Nothing
   -- CR 608.2d: the prompt is only raised with two or more matching cards in the
   -- named graveyards, and every one of them is a legal choice.

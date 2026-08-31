@@ -7394,9 +7394,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- "one or more counters" and the call Pawl.Types.PutCounters already made.
     -- The two halves batch DIFFERENTLY, which the sweep below is what forces: one
     -- removal per kind PER FIRST OBJECT, since a removal is off one object and
-    -- rule 122.5 pairs it with one; one placement per kind for the WHOLE
-    -- instruction, since CR 608.2f processes an action taken on several objects
-    -- simultaneously and every pair's counters land on the one destination.
+    -- rule 122.5 pairs it with one; one placement per kind PER DESTINATION, since
+    -- CR 608.2f processes an action taken on several objects simultaneously and
+    -- every pair's counters land on the destination its own answer named. Where
+    -- `to` names ONE object -- every printing but Forgotten Ancient -- that is one
+    -- placement per kind for the whole instruction however many first objects the
+    -- sweep gathered from; where it names a group the placements are one per
+    -- recipient per kind and batch no further, an arrival being on one object.
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext controller source legal (slotGroups resolving gs)
@@ -7696,12 +7700,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- recipient open, and one question answers both (Prompt's
         -- ChooseDistributedMovedCounters).
         --
-        -- Only the two arms whose COUNT is the player's are asked. An arm the
-        -- card settles a count on would be a different question -- where does a
-        -- fixed batch go -- which this prompt cannot state, since an answer
-        -- allocating less than the batch would leave counters removed with
-        -- nowhere to land and rule 122.5 forbids the half-move. No printing
-        -- pairs the two; see Pawl.Types.MoveCounters (#2784).
+        -- Only MovedKinds.AnyNumber and MovedKinds.AnyNumberOfKind are asked, and
+        -- they are two of the THREE arms whose count is the player's rather than
+        -- all of them: MovedKinds.AtLeastOne's count is the player's too and it
+        -- is not asked here. An arm the card settles a count on would be a
+        -- different question -- where does a fixed batch go -- which this prompt
+        -- cannot state, since an answer allocating less than the batch would
+        -- leave counters removed with nowhere to land and rule 122.5 forbids the
+        -- half-move. The floor is a different question again: an answer moving
+        -- nothing is repaired below by taking one counter of the first kind
+        -- offered, and over a group that repair would have to choose the
+        -- RECIPIENT as well, which the card leaves to the player and no board
+        -- forces. Neither pairing is printed; see Pawl.Types.MoveCounters
+        -- (#2784).
         distributePair candidates fromOne =
           -- Rule 122.5's first and fourth impossibilities, per recipient: the
           -- first object is not its own destination, and both ends are on the
@@ -7725,6 +7736,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         offered = case kinds of
                           MovedKinds.AnyNumber -> onFrom
                           MovedKinds.AnyNumberOfKind wanted -> Map.restrictKeys onFrom (Set.singleton wanted)
+                          -- Not implemented: a floor over a group, whose repair
+                          -- would have to name a recipient (#2784). Written out
+                          -- rather than left to the fallthrough below, since it
+                          -- is the arm a reader of this file would expect here.
+                          MovedKinds.AtLeastOne -> Map.empty
                           _ -> Map.empty
                      in if Map.null offered
                           then pure Map.empty

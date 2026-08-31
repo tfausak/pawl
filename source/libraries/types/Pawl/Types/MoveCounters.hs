@@ -17,17 +17,28 @@ import qualified Pawl.Types.SlotName as SlotName
 -- HOW MANY land on each is the player's answer
 -- (Pawl.Types.Prompt's ChooseDistributedMovedCounters) rather than the card's.
 --
--- Not implemented: a group destination under a `kinds` arm whose count the CARD
--- settles, which would have to ask where a fixed batch goes rather than what
--- crosses; no printing writes one, the sweep on Pawl.Types.MovedKinds naming
--- Forgotten Ancient as the only group destination there is (#2784).
+-- Not implemented: a group destination under any `kinds` arm but
+-- MovedKinds.AnyNumber and MovedKinds.AnyNumberOfKind, whose count is the
+-- player's and whose whole answer the distribution prompt can therefore carry.
+-- An arm the CARD settles a count on would have to ask where a fixed batch goes
+-- rather than what crosses, and MovedKinds.AtLeastOne -- whose count IS the
+-- player's -- would have to repair an answer moving nothing by choosing a
+-- recipient as well as a kind, which under one destination it never has to do.
+-- No printing writes either pairing: the sweep on Pawl.Types.MovedKinds names
+-- Forgotten Ancient as the only group destination there is, and Goldberry,
+-- River-Daughter's floor as the only "one or more", whose destination is one
+-- targeted permanent (#2784).
 --
 -- `kinds` is WHICH counters cross and how many of each; Pawl.Types.MovedKinds is
 -- where every spelling the printed text uses for that is set out.
 --
 -- ONE batch per kind is what crosses -- one REMOVAL of it per first object, and
--- one PLACEMENT of it for the whole instruction, CR 608.2f processing an action
--- taken on several objects simultaneously. Rule 122.5 never speaks of more
+-- one PLACEMENT of it per DESTINATION, CR 608.2f processing an action taken on
+-- several objects simultaneously. Those are the same thing wherever `to` names a
+-- single object, which is every printing but Forgotten Ancient: one placement for
+-- the whole instruction however many first objects it was gathered off. Where
+-- `to` names a group they part, an arrival being on one object -- the placements
+-- cannot batch across recipients, and CR 614.16 and CR 122.7 see one apiece. Rule 122.5 never speaks of more
 -- than one counter, so it does not settle the batch on its own; what does is that
 -- each of its four impossibilities is an object-level or kind-level property (the
 -- two objects being one, the appropriate kind absent, the destination refusing
@@ -43,7 +54,8 @@ data MoveCounters = MkMoveCounters
   { from :: ObjectRef.ObjectRef,
     kinds :: MovedKinds.MovedKinds,
     -- | How many counters rule 122.5 ACTUALLY moved, summed over every kind that
-    -- crossed and over every first object the ref named, written back for a later
+    -- crossed, over every first object the `from` ref named and over every
+    -- destination the `to` ref named, written back for a later
     -- effect of the same resolution to read as Quantity.InSlot -- Black Panther,
     -- Wakandan King's "if one or more +1\/+1 counters are moved this way, you
     -- gain that much life and draw a card". Pawl.Types.Destroy's `slot` in every
