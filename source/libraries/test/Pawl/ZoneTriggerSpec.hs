@@ -2048,6 +2048,10 @@ representativeEvents cond =
         -- every one of the three, which is what these events pin.
         TriggerCondition.PermanentLeavesTheBattlefield _ ->
           moved Zone.Battlefield Zone.Graveyard NonEmpty.:| [moved Zone.Battlefield Zone.Hand, GameEvent.LeftTheGame departed]
+        -- The one destination the arm above's three events narrow to, and the
+        -- only event this condition admits at all: CR 400.2 makes a hand hidden,
+        -- so CR 400.7e withholds the arrival and the floor is empty.
+        TriggerCondition.PermanentReturnedToHand _ -> one (moved Zone.Battlefield Zone.Hand)
         -- SelfDies' event, since CR 700.4 is the same word: the haunted creature
         -- is put into a graveyard from the battlefield. Which permanent it is
         -- rides GameState.haunting rather than the event, so one event says all
@@ -2293,6 +2297,7 @@ everyTriggerCondition =
     TriggerCondition.SelfDies,
     TriggerCondition.SelfLeavesTheBattlefield,
     TriggerCondition.PermanentLeavesTheBattlefield Filter.Type.IsSource,
+    TriggerCondition.PermanentReturnedToHand Filter.Type.IsSource,
     TriggerCondition.HauntedCreatureDies,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
     TriggerCondition.DamageToPlayerPrevented PlayerRelation.You,
@@ -2496,6 +2501,123 @@ permanentLeavesTheBattlefieldSpec s registry =
               Spec.assertBool s (Event.matchesTrigger gone shredderId S.bob (TriggerCondition.PermanentLeavesTheBattlefield (Filter.Type.And [])) departure) "a Filter without the exclusion admits the Shredder's own departure"
               Spec.assertBool s (not (Event.matchesTrigger gone shredderId S.bob (TriggerCondition.PermanentLeavesTheBattlefield (Filter.Type.Not Filter.Type.IsSource)) departure)) "so the printed \"another\" is the only thing declining it"
             other -> Spec.assertFailure s ("expected exactly one zone change, got " <> show (length other))
+
+-- CR 603.6c's leaves-the-battlefield family with the DESTINATION named --
+-- Justice, Vance Astrovik {2}{U} Legendary Creature -- Mutant Hero 2/2,
+-- "Whenever another nonland permanent you control is returned to its owner's
+-- hand, put a +1/+1 counter on Justice."
+--
+-- permanentLeavesTheBattlefieldSpec above is the same bystander scoping with no
+-- destination at all, and telling the two apart is what this group exists for:
+-- a permanent DESTROYED fires that condition and must not fire this one. The
+-- pair of boards below differ in the destination and in nothing else.
+--
+-- The second thing it proves is CR 603.2c's scoping. The printed singular is one
+-- occurrence per permanent, so one spell returning two of them triggers twice --
+-- unlike PermanentsDie's "one or more", which Event.batchScoped collapses.
+permanentReturnedToHandSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+permanentReturnedToHandSpec s registry =
+  let -- alice's Justice watching, and a Goblin Piker for each entry in `owners`.
+      -- Justice is alice's because the printed condition says "you control", so a
+      -- Piker of bob's is the board that tells that clause apart from no clause.
+      justiceBoard lands owners = do
+        justice <- S.printingOf s registry "Justice, Vance Astrovik"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (justiceId, withJustice) = S.addCreature justice S.alice lands
+            step (ids, gs) owner = let (oid, gs') = S.addCreature piker owner gs in (ids <> [oid], gs')
+            (pikerIds, board) = Foldable.foldl' step ([], withJustice) owners
+        pure (justiceId, pikerIds, board)
+      -- Move one permanent to `zone` by hand, let CR 117.5's scan place whatever
+      -- triggered, then resolve it. The narrowest path that shows the behaviour:
+      -- no spell, no targeting, so the destination is the only variable.
+      moveTo oid zone gs =
+        let gone = S.runPure S.identityAnswer gs (Event.changeZone oid zone)
+            settled = S.runPure S.identityAnswer gone Engine.settleForPriority
+         in S.runPure S.identityAnswer settled Stack.resolveTop
+      -- How big Justice is, which is the whole of what the +1/+1 counter is
+      -- observable as. Read by ID, and the id is safe here: Justice never moves
+      -- in these cases, so CR 400.7's fresh id for the RETURNED permanent is
+      -- never the one being asked about.
+      sizeOf oid gs = (Projection.powerOf oid gs, Projection.toughnessOf oid gs)
+      -- CR 113.7a's source id for every triggered ability currently on the stack.
+      triggerSourcesOn gs =
+        Maybe.mapMaybe
+          ( \oid -> case fmap Object.source (Game.lookupObject oid gs) of
+              Just (Source.OfTrigger triggered) -> Just (TriggeredAbilitySource.source triggered)
+              _ -> Nothing
+          )
+          (GameState.stack gs)
+   in Spec.describe s "PermanentReturnedToHand" $ do
+        -- The whole card through a real spell: alice casts Unsummon at her own
+        -- Piker. Targeted by ID -- S.identityAnswer takes the least Recipient,
+        -- and with two creatures out that is whichever id sorts first rather
+        -- than the one this case is about.
+        Spec.it s "CR 603.6c whole card: Unsummon returns alice's Piker and Justice grows" $ do
+          island <- S.printingOf s registry "Island"
+          unsummon <- S.printingOf s registry "Unsummon"
+          (justiceId, pikerIds, board) <- justiceBoard (S.landsInPlay island 1) [S.alice]
+          case pikerIds of
+            [pikerId] -> do
+              let (withSpell, spellId) = S.handOne unsummon board
+                  answer :: Prompt.Prompt r -> r
+                  answer p = case p of
+                    Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just pikerId) . Recipient.objectOf) . snd) sets
+                    _ -> S.identityAnswer p
+                  cast = S.runPure answer withSpell (S.cast S.alice spellId)
+                  resolved = S.runPure answer cast Stack.resolveTop
+                  settled = S.runPure answer resolved Engine.settleForPriority
+                  after = S.runPure answer settled Stack.resolveTop
+              Spec.assertEqWith s "Justice grew on the Piker's return" (sizeOf justiceId after) (Just 3, Just 3)
+              Spec.assertEqWith s "one counter, from one return" (fmap (Map.lookup CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject justiceId after)) (Just (Just 1))
+              Spec.assertEqWith s "the Piker really left the battlefield" (Game.lookupObject pikerId settled) Nothing
+              Spec.assertEqWith s "Justice was a 2/2 before it went" (sizeOf justiceId board) (Just 2, Just 2)
+            other -> Spec.assertFailure s ("expected one Piker, got " <> show (length other))
+        -- The destination, and nothing else. ONE board, moved two ways: a hand
+        -- fires this condition and a graveyard does not, which is what a Filter
+        -- over the object alone could never say -- CR 400.2 makes both zones
+        -- somewhere other than the battlefield, so
+        -- PermanentLeavesTheBattlefield admits them alike.
+        Spec.it s "CR 603.6c a Piker destroyed rather than returned leaves Justice a 2/2" $ do
+          island <- S.printingOf s registry "Island"
+          (justiceId, pikerIds, board) <- justiceBoard (S.landsInPlay island 1) [S.alice]
+          case pikerIds of
+            [pikerId] -> do
+              Spec.assertEqWith s "the graveyard leaves Justice a 2/2" (sizeOf justiceId (moveTo pikerId Zone.Graveyard board)) (Just 2, Just 2)
+              Spec.assertEqWith s "the hand, on the same board, makes it a 3/3" (sizeOf justiceId (moveTo pikerId Zone.Hand board)) (Just 3, Just 3)
+            other -> Spec.assertFailure s ("expected one Piker, got " <> show (length other))
+        -- The printed "you control", read from CR 608.2h last known information:
+        -- by the time CR 117.5's scan runs the Piker is a card in a hand, which
+        -- CR 108.4 gives no controller at all. Same board shape as the case
+        -- above, the owner of the Piker the only difference.
+        Spec.it s "CR 603.10a bob's Piker returned to hand leaves alice's Justice a 2/2" $ do
+          island <- S.printingOf s registry "Island"
+          (justiceId, bobPikers, bobBoard) <- justiceBoard (S.landsInPlay island 1) [S.bob]
+          (aliceJusticeId, alicePikers, aliceBoard) <- justiceBoard (S.landsInPlay island 1) [S.alice]
+          case (bobPikers, alicePikers) of
+            ([bobPiker], [alicePiker]) -> do
+              Spec.assertEqWith s "bob's Piker is not one alice controls" (sizeOf justiceId (moveTo bobPiker Zone.Hand bobBoard)) (Just 2, Just 2)
+              Spec.assertEqWith s "alice's is, on the board that differs in nothing else" (sizeOf aliceJusticeId (moveTo alicePiker Zone.Hand aliceBoard)) (Just 3, Just 3)
+            other -> Spec.assertFailure s ("expected one Piker each, got " <> show other)
+        -- CR 603.2c: "it can trigger repeatedly if one event contains multiple
+        -- occurrences". Evacuation returns every creature in one resolution, so
+        -- two of alice's Pikers are two occurrences and Justice's ability
+        -- triggers twice -- where PermanentsDie's batch scoping would place one.
+        --
+        -- Counted on the STACK rather than in counters: Evacuation takes Justice
+        -- too, so what its own triggers resolve onto is a card in a hand. CR
+        -- 603.10a is what lets them trigger at all, and CR 113.7a's source id is
+        -- the one Justice had on the battlefield.
+        Spec.it s "CR 603.2c Evacuation returns two Pikers and Justice triggers twice" $ do
+          island <- S.printingOf s registry "Island"
+          evacuation <- S.printingOf s registry "Evacuation"
+          (justiceId, pikerIds, board) <- justiceBoard (S.landsInPlay island 5) [S.alice, S.alice]
+          let (withSpell, spellId) = S.handOne evacuation board
+              cast = S.runPure S.identityAnswer withSpell (S.cast S.alice spellId)
+              resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+              settled = S.runPure S.identityAnswer resolved Engine.settleForPriority
+          Spec.assertEqWith s "Justice's ability reached the stack once per Piker" (length (filter (== justiceId) (triggerSourcesOn settled))) 2
+          Spec.assertEqWith s "and Evacuation really emptied the battlefield of creatures" (Set.size (Set.filter (`Projection.isCreatureOf` settled) (GameState.battlefield settled))) 0
+          Spec.assertEqWith s "two Pikers were on the board to be returned" (length pikerIds) 2
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
 -- to the card that left the battlefield checks for it only in the first zone
@@ -4801,6 +4923,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   merenEndStepSpec s registry
   leavesBattlefieldSpec s registry
   permanentLeavesTheBattlefieldSpec s registry
+  permanentReturnedToHandSpec s registry
   becameSlotSpec s registry
   promiseOfTomorrowSpec s registry
   promiseOfTomorrowReturnSpec s registry
