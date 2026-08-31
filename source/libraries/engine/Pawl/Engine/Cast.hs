@@ -1633,9 +1633,18 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   -- The COUNT reads the same announcement through its own
                   -- argument two lines down (SlotCount.AnnouncedX, Rot-Curse
                   -- Rakshasa); the bound reads it through the seed.
-                  let sets = Target.legalSets (Just pid) (Binding.fromChoices Map.empty mAmount Seq.empty) sid slots bestowedGs
+                  --
+                  -- The SAME seed reaches the joint check below, which re-derives
+                  -- every jointly judged slot: a slot that both reads a sibling
+                  -- and names such a bound would otherwise be offered against the
+                  -- announced X and re-judged against no X at all, and CR 601.2e
+                  -- would reverse a casting rule 601.2c allows. Pawl.TargetSpec's
+                  -- "CR 601.2c the joint check re-derives a jointly judged slot
+                  -- against the announced X" is what proves the two agree.
+                  let seed = Binding.fromChoices Map.empty mAmount Seq.empty
+                      sets = Target.legalSets (Just pid) seed sid slots bestowedGs
                   chosen <- Target.chooseTargets decider pid sid (Maybe.fromMaybe 0 mAmount) slots sets
-                  if not (Target.selectionLegal (Just pid) sid (Maybe.fromMaybe 0 mAmount) slots sets chosen bestowedGs)
+                  if not (Target.selectionLegal (Just pid) seed sid (Maybe.fromMaybe 0 mAmount) slots sets chosen bestowedGs)
                     then reject
                     else do
                       -- CR 601.2b then 601.2f: X substituted and the Phyrexian
