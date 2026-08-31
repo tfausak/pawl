@@ -86,6 +86,7 @@ import qualified Pawl.Codec.CombatSpec
 import qualified Pawl.Codec.CombatStepSpec
 import qualified Pawl.Codec.ComparesSpec
 import qualified Pawl.Codec.ComparisonSpec
+import qualified Pawl.Codec.CompletedDungeonSpec
 import qualified Pawl.Codec.ConditionSpec
 import qualified Pawl.Codec.ConjureDestinationSpec
 import qualified Pawl.Codec.ConjureSpec
@@ -639,6 +640,7 @@ spec s registry = do
   Pawl.Codec.CombatStepSpec.spec s
   Pawl.Codec.ComparesSpec.spec s
   Pawl.Codec.ComparisonSpec.spec s
+  Pawl.Codec.CompletedDungeonSpec.spec s
   Pawl.Codec.ConditionSpec.spec s
   Pawl.Codec.ContinuousEffectSpec.spec s
   Pawl.Codec.ControlChangedSpec.spec s

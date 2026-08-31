@@ -2,9 +2,11 @@ module Pawl.Codec.PlayerSpec where
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Codec.Player as Player
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -33,9 +35,10 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.commanderDamage = Map.empty,
           Player.dungeons = Set.empty,
           Player.outsideTheGame = Map.empty,
-          Player.completedDungeons = 0
+          Player.completedDungeons = 0,
+          Player.completedDungeonNames = Set.empty
         }
-      " {\"life\":20,\"status\":{\"type\":\"Playing\"},\"counters\":[],\"ringTemptations\":0,\"speed\":null,\"commander\":null,\"commanderCasts\":0,\"commanderDamage\":{},\"dungeons\":[],\"outsideTheGame\":{},\"completedDungeons\":0} "
+      " {\"life\":20,\"status\":{\"type\":\"Playing\"},\"counters\":[],\"ringTemptations\":0,\"speed\":null,\"commander\":null,\"commanderCasts\":0,\"commanderDamage\":{},\"dungeons\":[],\"outsideTheGame\":{},\"completedDungeons\":0,\"completedDungeonNames\":[]} "
   -- Every axis away from the case above. `life` is NEGATIVE, which CR 104.3b
   -- reaches through a state-based action rather than clamping at zero, so the
   -- field is an Integer and a Natural encoder would reject this state.
@@ -61,13 +64,14 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.commanderDamage = Map.singleton (PlayerId.MkPlayerId 7) 8,
           Player.dungeons = Set.fromList [PrintingId.MkPrintingId 9, PrintingId.MkPrintingId 11],
           Player.outsideTheGame = Map.singleton (PrintingId.MkPrintingId 12) 13,
-          Player.completedDungeons = 10
+          Player.completedDungeons = 10,
+          Player.completedDungeonNames = Set.fromList [CardName.MkCardName (Text.pack "Tomb of Annihilation"), CardName.MkCardName (Text.pack "Undercity")]
         }
       ( " {\"life\":-1,\"status\":{\"type\":\"Departed\",\"value\":{\"type\":\"Conceded\"}}"
           <> ",\"counters\":[{\"key\":{\"type\":\"Energy\"},\"value\":2}"
           <> ",{\"key\":{\"type\":\"Poison\"},\"value\":0}]"
           <> ",\"ringTemptations\":3,\"speed\":4,\"commander\":5,\"commanderCasts\":6"
-          <> ",\"commanderDamage\":{\"7\":8},\"dungeons\":[9,11],\"outsideTheGame\":{\"12\":13},\"completedDungeons\":10} "
+          <> ",\"commanderDamage\":{\"7\":8},\"dungeons\":[9,11],\"outsideTheGame\":{\"12\":13},\"completedDungeons\":10,\"completedDungeonNames\":[\"Tomb of Annihilation\",\"Undercity\"]} "
       )
   Spec.it s "has a schema" $
     Common.assertHasSchema s Player.codec

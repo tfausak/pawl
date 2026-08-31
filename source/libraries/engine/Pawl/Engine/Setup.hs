@@ -108,7 +108,8 @@ emptyGame order =
               Player.outsideTheGame = Map.empty,
               -- CR 309.7: nobody has completed a dungeon in a game that has not
               -- started, there having been no venture to remove one from it.
-              Player.completedDungeons = 0
+              Player.completedDungeons = 0,
+              Player.completedDungeonNames = Set.empty
             }
         )
    in GameState.MkGameState
@@ -447,7 +448,8 @@ resetPlayers players =
               -- wish already brought IN -- and this field no longer holds those,
               -- having been spent as they were brought in. What is left in it is
               -- what stayed outside the game, which the restart does not reach.
-              Player.completedDungeons = 0
+              Player.completedDungeons = 0,
+              Player.completedDungeonNames = Set.empty
             }
         Status.Departed _ -> player
    in fmap reset players

@@ -1,6 +1,7 @@
 module Pawl.Codec.Quantity where
 
 import qualified Pawl.Codec.AgainstSlot as AgainstSlot
+import qualified Pawl.Codec.CompletedDungeon as CompletedDungeon
 import qualified Pawl.Codec.Count as Count
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
@@ -101,6 +102,10 @@ codec =
       -- threshold that turns the count into "you've completed a dungeon" is the
       -- Comparison's, not this arm's.
       Arm.payload "DungeonsCompleted" PlayerRef.codec Quantity.DungeonsCompleted (\x -> case x of Quantity.DungeonsCompleted y -> Just y; _ -> Nothing),
+      -- CR 309.7 asked of ONE dungeon, so a player and a printed name go on the
+      -- wire together -- PlayerCounters' payload shape. The threshold that turns
+      -- the 0\/1 into "you haven't completed it" is the Comparison's.
+      Arm.payload "CompletedDungeon" CompletedDungeon.codec Quantity.CompletedDungeon (\x -> case x of Quantity.CompletedDungeon y -> Just y; _ -> Nothing),
       -- CR 400.7's entry read against the object the quantity is aimed at, so
       -- there is nothing on the wire: the turn is the log's extent rather than a
       -- window a card could state, as for CardsDiscardedThisTurn above.

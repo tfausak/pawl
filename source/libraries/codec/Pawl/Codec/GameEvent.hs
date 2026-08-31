@@ -82,6 +82,9 @@ codec =
       Arm.payload "BecameAttached" BecameAttached.codec GameEvent.BecameAttached (\x -> case x of GameEvent.BecameAttached y -> Just y; _ -> Nothing),
       Arm.payload "LeftTheGame" ObjectId.codec GameEvent.LeftTheGame (\x -> case x of GameEvent.LeftTheGame y -> Just y; _ -> Nothing),
       Arm.payload "Scried" PlayerId.codec GameEvent.Scried (\x -> case x of GameEvent.Scried y -> Just y; _ -> Nothing),
+      -- CR 309.7's completion, with only the completing player on the wire: the
+      -- rule names no card, so there is nothing else to carry.
+      Arm.payload "DungeonCompleted" PlayerId.codec GameEvent.DungeonCompleted (\x -> case x of GameEvent.DungeonCompleted y -> Just y; _ -> Nothing),
       Arm.payload "Surveiled" PlayerId.codec GameEvent.Surveiled (\x -> case x of GameEvent.Surveiled y -> Just y; _ -> Nothing),
       Arm.payload "DiceRolled" PlayerId.codec GameEvent.DiceRolled (\x -> case x of GameEvent.DiceRolled y -> Just y; _ -> Nothing),
       Arm.payload "ClassLevelSet" ClassLevelChange.codec GameEvent.ClassLevelSet (\x -> case x of GameEvent.ClassLevelSet y -> Just y; _ -> Nothing),
