@@ -917,7 +917,8 @@ abilityRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Ga
 --         over it is every card the announcement could reach -- a superset of
 --         any one coherent answer, which selectionLegal then judges whole. No
 --         order between the two slots is invented, which is what a
---         one-slot-at-a-time prompt would have to do.
+--         one-slot-at-a-time prompt would have to do. The SET stays the union;
+--         it is the COUNT that slotCapacities narrows to one coherent answer.
 --       - CR 608.2b re-checks a spell whose slots are FILLED, so Resolve passes
 --         the chosen targets and the union is over the one player named.
 --
@@ -1105,23 +1106,32 @@ jointlyJudged declared slot =
 -- with (CR 601.2c)? A GraveyardScope's InSlot is the one axis that does, wherever
 -- it appears; every other pool draws from a zone no slot names.
 dependsOnSlot :: Pool.Pool -> Bool
-dependsOnSlot pool = case pool of
-  Pool.Creatures -> False
-  Pool.Players -> False
-  Pool.AnyTarget -> False
-  Pool.Permanents -> False
-  Pool.Spells -> False
-  Pool.Abilities -> False
-  Pool.SpellsAndPermanents -> False
-  Pool.PlayersAndPlaneswalkers -> False
-  Pool.CardsInGraveyard scope -> case scope of
-    GraveyardScope.Scoped _ -> False
-    GraveyardScope.InSlot _ -> True
-  Pool.CardsInExile -> False
+dependsOnSlot = Maybe.isJust . scopeSlot
+
+-- WHICH slot that is, and the whole of dependsOnSlot above: a pool whose
+-- candidates are scoped to another slot's answer names it here, and every other
+-- pool answers Nothing. Two readers, and they want the two halves -- the gates
+-- want the Bool, slotCapacities below wants the name.
+scopeSlot :: Pool.Pool -> Maybe SlotName
+scopeSlot pool = case pool of
+  Pool.Creatures -> Nothing
+  Pool.Players -> Nothing
+  Pool.AnyTarget -> Nothing
+  Pool.Permanents -> Nothing
+  Pool.Spells -> Nothing
+  Pool.Abilities -> Nothing
+  Pool.SpellsAndPermanents -> Nothing
+  Pool.PlayersAndPlaneswalkers -> Nothing
+  Pool.CardsInGraveyard scope -> graveyardScopeSlot scope
+  Pool.CardsInExile -> Nothing
   -- Its graveyard half carries the same axis, so the answer is that half's.
-  Pool.CreaturesAndCardsInGraveyard scope -> case scope of
-    GraveyardScope.Scoped _ -> False
-    GraveyardScope.InSlot _ -> True
+  Pool.CreaturesAndCardsInGraveyard scope -> graveyardScopeSlot scope
+
+-- The slot a GraveyardScope names, if it names one.
+graveyardScopeSlot :: GraveyardScope.GraveyardScope -> Maybe SlotName
+graveyardScopeSlot scope = case scope of
+  GraveyardScope.Scoped _ -> Nothing
+  GraveyardScope.InSlot slot -> Just slot
 
 -- CR 601.2c: the range of numbers this slot may be answered with on this board
 -- -- the printed count, narrowed by how many legal recipients there actually
@@ -1139,11 +1149,65 @@ dependsOnSlot pool = case pool of
 -- as a number rather than being read off the board here because CR 601.2b's
 -- announcement is not recorded anywhere yet -- the object is put on the stack
 -- carrying it only after CR 601.2c is done.
-announcedRange :: Natural -> TargetSlot -> Set Recipient -> (Natural, Natural)
-announcedRange x slot legal =
+--
+-- `capacity` is how many of the slot's legal recipients ONE announcement could
+-- name, which is the slot's own candidate count for every slot but a
+-- graveyard-scoped one -- see slotCapacities.
+announcedRange :: Natural -> TargetSlot -> Natural -> (Natural, Natural)
+announcedRange x slot capacity =
   let count = SlotCount.at x (TargetSlot.count slot)
-      ceiling_ = TargetCount.ceilingOn (Natural.length legal) count
+      ceiling_ = TargetCount.ceilingOn capacity count
    in (min (TargetCount.least count) ceiling_, ceiling_)
+
+-- CR 601.2c: how many of each slot's legal recipients a single COHERENT
+-- announcement could name -- the number the count is measured against, both when
+-- the offer is built (chooseTargets, selectionLegal) and when a mode's
+-- fillability is judged (fillableModesGiven).
+--
+-- For every slot whose pool names no other slot this is just how many candidates
+-- it has: the whole legal set is one coherent answer, and nothing narrows it.
+--
+-- A GraveyardScope.InSlot pool is the exception, and the reason this function
+-- exists. legalSetsGiven offers it the UNION over the graveyards of every player
+-- the named slot could still take, which is a superset of any one coherent
+-- answer -- CR 400.1 gives each player their own graveyard, so a card in one
+-- player's is unreachable beside another player. The most such a slot can be
+-- answered with is therefore the largest total over the player selections the
+-- named slot itself admits: the graveyards are pairwise disjoint, so that is the
+-- sum of the `k` largest per-player counts, where `k` is the most targets the
+-- named slot may be answered with. (Every printing in the pool names exactly one
+-- player, so `k` is 1 and this is a maximum; the general form costs a sort.)
+--
+-- Anything in the legal set that is in NO candidate player's graveyard is added
+-- back whole: Pool.CreaturesAndCardsInGraveyard's battlefield half is scoped by
+-- nothing, so a coherent answer may take every creature it offers beside the
+-- cards from one graveyard.
+--
+-- The named slot's own capacity is its plain candidate count rather than another
+-- pass through here, which is what makes this terminate: legalSetsGiven's second
+-- pass already answers a slot naming a dependent slot with nothing.
+slotCapacities :: Natural -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Map SlotName Natural
+slotCapacities x slots sets gs = Map.mapWithKey capacity slots
+  where
+    legalOf name = Map.findWithDefault Set.empty name sets
+    capacity name slot =
+      let legal = legalOf name
+       in case scopeSlot (TargetSlot.pool slot) of
+            Nothing -> Natural.length legal
+            -- The scope names a slot this announcement does not declare -- CR
+            -- 603.2's trigger bindings reach a pool as `seed` and never as a
+            -- slot. Nothing here can bound such a slot's answers, so the
+            -- candidate count stands, which is what it was before this function
+            -- existed.
+            Just named -> case Map.lookup named slots of
+              Nothing -> Natural.length legal
+              Just namedSlot ->
+                let candidates = legalOf named
+                    pids = Maybe.mapMaybe playerOf (Set.toList candidates)
+                    k = snd (announcedRange x namedSlot (Natural.length candidates))
+                    per = List.sortBy (flip compare) (fmap (\pid -> Natural.length (Set.intersection legal (graveyardsOf [pid] gs))) pids)
+                    elsewhere = Natural.length (Set.difference legal (graveyardsOf pids gs))
+                 in elsewhere + sum (take (Natural.toIntSaturating k) per)
 
 -- CR 601.2c's two announcements over one slot map, in the rule's own order: how
 -- many targets each variable slot gets, then the targets themselves.
@@ -1159,7 +1223,7 @@ chooseTargets :: Decider -> PlayerId -> ObjectId -> Natural -> Map SlotName Targ
 chooseTargets decider pid oid x slots sets = do
   gs <- State.get
   let offered = fmap (piledOffer (Just pid) gs) sets
-      ranges = Map.intersectionWith (announcedRange x) slots offered
+      ranges = Map.intersectionWith (announcedRange x) slots (slotCapacities x slots offered gs)
       variable = Map.keysSet (Map.filter (uncurry (/=)) ranges)
       offers = Map.restrictKeys (Map.intersectionWith (\targetSlot legal -> (SlotCount.at x (TargetSlot.count targetSlot), legal)) slots offered) variable
   announced <-
@@ -1290,11 +1354,10 @@ pileMembers perspective pile legal gs =
 -- with neither slot resolved before the other. jointlyJudged is which slots those
 -- are, in both readings.
 --
--- An announced COUNT is still measured against the union: a caster who announces
--- four targets and then cannot name four coherent ones fails here and CR 601.2
--- returns the game to before the spell was proposed, the same posture CR 601.2b's
--- unaffordable X announcement already takes. Narrowing the offered count
--- to what a coherent answer could reach is not implemented (#1296).
+-- An announced COUNT is measured against slotCapacities rather than against the
+-- union, so a caster is never offered more targets for a graveyard-scoped slot
+-- than one graveyard can supply. What the joint check below still catches is
+-- WHICH recipients were named, not how many.
 --
 -- `seed` is the announcement's OWN bindings, the same map the offer was computed
 -- against (legalSets) -- CR 601.2b's X for a cast, and nothing at all for an
@@ -1316,10 +1379,11 @@ selectionLegal perspective seed source x slots sets chosen gs =
     && and (Map.elems (Map.mapWithKey coherent (Map.filter (jointlyJudged (Map.keysSet slots)) slots)))
   where
     pcs = Projection.projectAll gs
+    caps = slotCapacities x slots sets gs
     slotLegal slot targetSlot =
       let legal = Map.findWithDefault Set.empty slot sets
           picked = Map.findWithDefault Set.empty slot chosen
-          (_, hi) = announcedRange x targetSlot legal
+          (_, hi) = announcedRange x targetSlot (Map.findWithDefault 0 slot caps)
           -- The count the slot DEMANDS, unnarrowed by the board -- unlike the
           -- ceiling beside it, which the board is entitled to lower (a caster
           -- cannot choose more targets than there are). CR 601.2c gives no such
@@ -1349,11 +1413,12 @@ selectionLegal perspective seed source x slots sets chosen gs =
 -- lives in the slot's own Filter. Shared by spells (Cast) and abilities
 -- (Activate/Engine).
 --
--- Each slot is asked INDEPENDENTLY. Not implemented: narrowing a mode's
--- fillability to what a COHERENT announcement could reach, so a mode whose slots
--- exclude each other (Fall of the Hammer's, through selectionLegal's joint
--- check) is judged fillable off a board holding one creature and the cast is
--- then reversed at CR 601.2e (#1296).
+-- Each slot is asked against slotCapacities, which is what a single coherent
+-- announcement could reach through the slot's own POOL. Not implemented:
+-- narrowing a mode's fillability across slots that exclude each other through a
+-- FILTER (Fall of the Hammer's, through selectionLegal's joint check), so that
+-- mode is judged fillable off a board holding one creature and the cast is then
+-- reversed at CR 601.2e (#2803).
 --
 -- `extra` is the slots EVERY mode carries in addition to its own -- CR 303.4a's
 -- enchant slot, declared by the card rather than by a mode, which castability
@@ -1406,13 +1471,18 @@ fillableModesGiven pcs grants pools perspective seed source extra modal gs =
          in -- CR 115.6 / 601.2c: a slot is unfillable when the board cannot supply
             -- the MINIMUM its count demands. An "up to one" slot with no legal
             -- recipient demands none, and is answered with zero targets.
-            if or (Map.elems (Map.intersectionWith short slots sets))
+            if or (Map.elems (Map.intersectionWith short slots (slotCapacities 0 slots sets gs)))
               then Nothing
               else Just (ModeIndex.MkModeIndex i)
       -- CR 601.2b's X=0 FLOOR, the value every castability and activation gate
       -- is asked at: a slot counting the announced X demands no target until
       -- that announcement exists, and announcing zero is a legal answer.
-      short slot legal = Natural.length legal < TargetCount.least (SlotCount.at 0 (TargetSlot.count slot))
+      --
+      -- Measured against slotCapacities rather than the candidate count, for that
+      -- function's reason: a graveyard-scoped slot is offered the union over the
+      -- named slot's players, and a minimum no ONE of those graveyards can supply
+      -- is a mode with no legal announcement rather than a fillable one.
+      short slot capacity = capacity < TargetCount.least (SlotCount.at 0 (TargetSlot.count slot))
    in Set.fromList (Maybe.mapMaybe (uncurry fillable) (zip [0 :: Natural ..] ms))
 
 -- CR 603.2: every target slot with its "that player" atoms baked against this
