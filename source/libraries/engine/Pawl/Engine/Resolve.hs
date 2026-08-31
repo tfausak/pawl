@@ -3444,10 +3444,12 @@ chooseDamageSource controller resolving context gs filter_ = case filter_ of
 -- Pawl.Engine.Replacement.matchesDamageSource rechecks with under CR 609.7b, so
 -- the choice and the recheck cannot read one source two ways.
 --
--- That fallback is a REGRESSION FENCE rather than a proven behaviour: every card
--- in data/cards/ naming a chosen source writes a trivial filter, which admits a
--- blank view as readily as a filled one, so replacing the pair with the bare
--- viewOfObject leaves the whole suite green (#2480).
+-- That fallback is a REGRESSION FENCE rather than a proven behaviour: no card in
+-- data/cards/ naming a chosen source needs it -- most write a trivial filter,
+-- which admits a blank view as readily as a filled one, and Synthetic Turn the
+-- Blade's creature-type filter is answered off an ordinary battlefield view -- so
+-- replacing the pair with the bare viewOfObject leaves the whole suite green
+-- (#2480).
 --
 -- DEDUPED, the classes overlapping wherever a spell's living target is also a
 -- permanent, and ASCENDING out of the same Set, so both the single-candidate
