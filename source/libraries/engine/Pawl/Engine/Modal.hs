@@ -177,10 +177,12 @@ modesTargetSlots chosen m = Map.unions (fmap (\mi -> instanceTargetSlots mi m) (
 -- instance's effects, which still read the printed names.
 --
 -- The KEYS are not the whole rename: a slot's pool may itself name a sibling slot
--- (Pawl.Types.GraveyardScope's InSlot, Dwell on the Past's "their graveyard"),
--- and that payload is the printed name too. Renaming the keys alone would leave
--- occurrence 1's pool pointing at occurrence 0's slot, so CR 700.2d's "different
--- targets may be chosen" would silently read the first occurrence's player.
+-- (Pawl.Types.GraveyardScope's InSlot, Dwell on the Past's "their graveyard") and
+-- so may its FILTER (Pawl.Types.Filter's IsBound, Fall of the Hammer's "another
+-- target creature"), and both are the printed name too. Renaming the keys alone
+-- would leave occurrence 1 pointing at occurrence 0's slot, so CR 700.2d's
+-- "different targets may be chosen" would silently read the first occurrence's
+-- answer. instanceScope below is that half.
 instanceTargetSlots :: ModeInstance.ModeInstance -> Modal.Modal card ability -> Map SlotName TargetSlot
 instanceTargetSlots mi m = maybe Map.empty (modeInstanceTargetSlots mi) (modeAtIndex (ModeInstance.index mi) m)
 

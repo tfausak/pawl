@@ -2144,9 +2144,9 @@ resolveModesWith runSubgame stackId srcId modes = do
     Just obj ->
       -- CR 700.2d: instance-named, not printed-named -- two instances of one
       -- repeated mode fill two slots this union would otherwise collapse.
-      -- Modal.modeInstanceTargetSlots and not a mapKeys of its own: the slot
-      -- NAMES a slot's pool and filter carry are renamed with the key, which is
-      -- what makes this map the one CR 601.2c offered. CR
+      -- Modal.modeInstanceTargetSlots rather than a rename of its own: the slot
+      -- names a pool and a filter carry are rewritten along with the key, which
+      -- is what makes this the same map CR 601.2c was answered against. CR
       -- 608.2b re-judges each against the SAME declaration CR 603.3d offered, so
       -- the "that player controls" atoms are baked here too; an ability whose
       -- environment binds no player leaves them standing, admitting nothing.
