@@ -709,8 +709,10 @@ data Effect card ability
     MoveCounters MoveCounters.MoveCounters
   | -- | CR 122.8: put the counters the slot's object HAD onto the permanents the
     -- ObjectRef names -- Iron Apprentice's "put those counters on target creature
-    -- you control". The whole per-kind tally crosses, which is why the payload
-    -- names no kind and no Quantity; see Pawl.Types.PutCountersFrom.
+    -- you control". A per-kind tally crosses, which is why the payload names no
+    -- Quantity, and rule 122.8's second sentence is why its kind is optional --
+    -- Selfless Police Captain's "put its +1/+1 counters"; see
+    -- Pawl.Types.PutCountersFrom.
     --
     -- A PUT and not a MoveCounters: rule 122.8 says the player "doesn't move
     -- counters from one object to the other", CR 122.2 having already made the

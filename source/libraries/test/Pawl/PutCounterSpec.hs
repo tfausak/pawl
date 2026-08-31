@@ -61,6 +61,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   putCountersFromSpec s registry
   resourcefulDefenseSpec s registry
+  selflessPoliceCaptainSpec s registry
 
 -- CR 603.3d's target, chosen as the trigger goes on the stack. FILTERS the
 -- offered set rather than building a recipient, so CR 608.2b's re-read at
@@ -266,3 +267,90 @@ resourcefulDefenseSpec s registry = Spec.describe s "CR 122.8 putting the counte
     Spec.assertEqWith s "nothing reached the stack" (GameState.stack settled) []
     Spec.assertEqWith s "the target Piker is the plain 2/1 it started as" (bodyOf takerId after) (Just 2, Just 1, False)
     Spec.assertEqWith s "and the Piker is off the battlefield just the same" (Set.member victimId (GameState.battlefield after)) False
+
+-- Selfless Police Captain {1}{W} Creature -- Human Detective 1/1 (Marvel Super
+-- Heroes Commander; name, cost, type line, power, toughness and oracle text
+-- checked against Scryfall 2026-08-31), data/cards/selfless-police-captain.json:
+--
+--   This creature enters with a +1/+1 counter on it.
+--   When this creature leaves the battlefield, put its +1/+1 counters on target
+--   creature you control.
+--
+-- The second line is CR 122.8's SECOND sentence, this group's subject: "if the
+-- ability specifies what kind(s) of counters to place, the player puts the same
+-- number of each of those kinds of counter the first object had onto the second
+-- object". "its +1/+1 counters" names the kind, so what crosses is one kind's
+-- tally rather than the whole one the two groups above prove.
+--
+-- Scryfall @oracle:/put (its|those) [^ ]+ counters/@ with
+-- @unique=cards&include_extras=true@, 2026-08-31, is where the card came from:
+-- two printings name a kind, this one and Joraga Peach, whose sacrifice cost
+-- makes it CR 122.9's twin rather than rule 122.8's. The gap was filed on a
+-- narrower query that asked only for "those counters" and so found neither; see
+-- #2698.
+--
+-- The trigger is TriggerCondition.SelfLeavesTheBattlefield and not SelfDies: CR
+-- 603.6c's condition admits every destination. The board below reaches it
+-- through a death all the same, which is the narrowest road -- one trigger, one
+-- prompt, one resolution.
+selflessPoliceCaptainSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+selflessPoliceCaptainSpec s registry = Spec.describe s "CR 122.8 putting only the kind the ability names" $ do
+  let -- alice: the Captain, the Goblin Piker its trigger aims at, and a SECOND
+      -- Piker so the target prompt has a real choice. bob holds a third, which
+      -- "target creature you control" excludes.
+      board counters = do
+        swamp <- S.printingOf s registry "Swamp"
+        captain <- S.printingOf s registry "Selfless Police Captain"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (captainId, g1) = S.addCreature captain S.alice (S.landsInPlay swamp 1)
+            (_, g2) = S.addCreature piker S.alice g1
+            (takerId, g3) = S.addCreature piker S.alice g2
+            (_, g4) = S.addCreature piker S.bob g3
+            -- CR 104.3c: nothing here draws or advances a turn, and a stocked
+            -- library keeps it that way if a later fixture change does.
+            stocked = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) g4 [1 .. 5 :: Int]
+        pure (captainId, takerId, counters captainId stocked)
+      diesFrom damage (captainId, takerId, before) =
+        let dead = S.settleSba (if damage > 0 then S.markDamage captainId damage before else before)
+            settled = S.runPure (aiming takerId) dead Engine.settleForPriority
+         in (settled, S.runPure (aiming takerId) settled Stack.resolveTop)
+  -- THE CASE THIS GROUP EXISTS FOR, and it needs BOTH kinds on the Captain: on a
+  -- single-kind board a payload that ignored the named kind altogether would
+  -- pass. The flying counters are the ones rule 122.8's second sentence leaves
+  -- behind.
+  Spec.it s "CR 122.8 only the +1/+1 counters cross, not the flying ones beside them" $ do
+    built@(captainId, takerId, before) <-
+      board (\oid -> S.addCounter (CounterKind.Keyword Keyword.Flying) 2 oid . S.addCounter CounterKind.PlusOnePlusOne 3 oid)
+    Spec.assertEqWith s "the Captain bears three +1/+1 counters and two flying counters" (pairOn captainId before) (Map.fromList [(CounterKind.PlusOnePlusOne, 3), (CounterKind.Keyword Keyword.Flying, 2)])
+    Spec.assertEqWith s "which CR 122.1a and CR 122.1b make a 4/4 with flying -- DIFFERENT facts from the tally" (bodyOf captainId before) (Just 4, Just 4, True)
+    Spec.assertEqWith s "alice's Piker is a plain 2/1 with no flying" (bodyOf takerId before) (Just 2, Just 1, False)
+    -- CR 704.5g: four damage on a 4/4 is lethal.
+    let (settled, after) = diesFrom 4 built
+    -- THE GAMEPLAY-LEVEL ASSERTION, and first: the +1/+1 counters made the Piker
+    -- a 5/4 and the flying counters did NOT come along, so it still cannot fly.
+    -- An implementation putting the whole tally is a 5/4 that flies here, which
+    -- is what the two groups above assert and what this one denies.
+    Spec.assertEqWith s "the Piker is a 5/4 that does NOT fly" (bodyOf takerId after) (Just 5, Just 4, False)
+    Spec.assertEqWith s "and holds the +1/+1 counters alone, the flying ones left behind" (pairOn takerId after) (Map.singleton CounterKind.PlusOnePlusOne 3)
+    Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack settled)) 1
+    Spec.assertEqWith s "and the Captain is off the battlefield" (Set.member captainId (GameState.battlefield after)) False
+  -- The same board differing in exactly ONE thing: the Captain bore the named
+  -- kind and nothing else, so the narrowing has nothing to drop. Without this leg
+  -- the case above would pass on an implementation that dropped every kind.
+  Spec.it s "CR 122.8 a Captain bearing only the named kind hands over all of it" $ do
+    built@(captainId, takerId, before) <- board (S.addCounter CounterKind.PlusOnePlusOne 3)
+    Spec.assertEqWith s "the Captain bears the +1/+1 counters alone" (pairOn captainId before) (Map.singleton CounterKind.PlusOnePlusOne 3)
+    let (_, after) = diesFrom 4 built
+    Spec.assertEqWith s "the Piker is a 5/4 that does not fly" (bodyOf takerId after) (Just 5, Just 4, False)
+    Spec.assertEqWith s "and holds all three of them" (pairOn takerId after) (Map.singleton CounterKind.PlusOnePlusOne 3)
+  -- A Captain bearing ONLY the kind the ability does not name: the tally narrows
+  -- to nothing and no counter crosses. The ability still triggers and still
+  -- targets -- the card writes no intervening "if" -- so this is a different
+  -- board from the counterless Apprentice above.
+  Spec.it s "CR 122.8 a Captain bearing only flying counters hands over none" $ do
+    built@(captainId, takerId, before) <- board (S.addCounter (CounterKind.Keyword Keyword.Flying) 2)
+    Spec.assertEqWith s "the Captain bears the flying counters alone" (pairOn captainId before) (Map.singleton (CounterKind.Keyword Keyword.Flying) 2)
+    let (settled, after) = diesFrom 1 built
+    Spec.assertEqWith s "the Piker is the plain 2/1 it started as, with no flying" (bodyOf takerId after) (Just 2, Just 1, False)
+    Spec.assertEqWith s "and bears no counters at all" (pairOn takerId after) Map.empty
+    Spec.assertEqWith s "the trigger reached the stack all the same -- the card writes no intervening if" (length (GameState.stack settled)) 1
