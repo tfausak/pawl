@@ -1073,8 +1073,27 @@ targetSlotSlots slot =
       -- itself. What it fences is the pairing -- a card whose bound names an
       -- amount its CONDITION does not supply (Pawl.Engine.Event.eventBindingSlots)
       -- is caught only because the read is reported here.
-      maybe Map.empty quantitySlots (TargetSlot.amount slot)
+      maybe Map.empty amountSlots (TargetSlot.amount slot)
     ]
+  where
+    -- The bound's own reads: quantitySlots' -- a Quantity.InSlot naming the
+    -- slot's amount -- plus the ones only Quantity.nestedRefs reports, a slot
+    -- named through a PlayerRef buried inside the number ("mana value X or less,
+    -- where X is the amount of life THAT PLAYER gained this turn") or through CR
+    -- 400.7j's Scope.OverBound. Without them a bound naming a slot its carrier
+    -- never binds is invisible to the equality above, which is the one defect the
+    -- fold exists to catch; Pawl.CardSpec's "the lint itself catches a computed
+    -- bound naming a slot through a player" is what proves it.
+    --
+    -- The arities are playerRefSlots' rather than One across the board, because
+    -- the count lint reads these values: PlayerRef.EachInSlot takes every player
+    -- a slot names and CR 400.7j's fold every object, so neither is damaged by a
+    -- plural slot.
+    amountSlots quantity =
+      joinSlots
+        ( quantitySlots quantity
+            : fmap (either playerRefSlots (`Map.singleton` SlotArity.Many)) (Set.toList (Quantity.nestedRefs quantity))
+        )
 
 -- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless
 -- [a player] pays" names, and every slot a target slot's own pool, filter or
