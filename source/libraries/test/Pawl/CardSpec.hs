@@ -2335,14 +2335,20 @@ shieldNamingNothingOffends :: Effect.Effect Card.Type.Card (GrantedAbility.Grant
 shieldNamingNothingOffends effect = case effect of
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref whatRecipient whoRecipient _ _ _) ->
     Maybe.isNothing ref && Maybe.isNothing whatRecipient && Maybe.isNothing whoRecipient
-  -- `direction` is not read here: on the by-direction shield `ref` names CR
-  -- 120.1's SOURCE rather than a recipient, but either way it is the field the
-  -- row is built from, so a shield leaving both empty has nothing to install
-  -- whichever side it is pinned to. Its `whatSource` is not a substitute -- that
-  -- one narrows a row rather than creating one, and `And []` is its ordinary
-  -- value.
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref whatRecipient _ _ _ _) ->
-    Maybe.isNothing ref && Maybe.isNothing whatRecipient
+  -- `direction` IS read here, because it decides whether `whatRecipient` can
+  -- stand in for `ref`. Beside DealtTo the two are alternative spellings of the
+  -- covered side, and Pawl.Engine.Resolve builds one row per named recipient or
+  -- one row for a description, so either alone installs something. Beside DealtBy
+  -- `ref` names CR 120.1's SOURCE and the description is the far END of the
+  -- event: that branch folds over the ids the ref named and conjoins the
+  -- description onto each row, never making a row of its own, so a by-direction
+  -- shield with no ref installs nothing however it describes its recipients.
+  -- `whatSource` is not a substitute on either side -- that one narrows a row
+  -- rather than creating one, and `And []` is its ordinary value.
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref whatRecipient direction _ _ _) ->
+    Maybe.isNothing ref && case direction of
+      DamageDirection.DealtBy -> True
+      DamageDirection.DealtTo -> Maybe.isNothing whatRecipient
   _ -> False
 
 -- The non-vacuity half of that lint, isPhaseR's shape.
@@ -8585,6 +8591,23 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any isByDirectionShield (shieldsOf dovin)) "setup: Dovin prints a by-direction shield"
     Spec.assertBool s (not (any shieldNamingNothingOffends (shieldsOf dovin))) "and naming only the source it watches is accepted"
     Spec.assertEqWith s "while stripping that name rejects both of Dovin's shields" (length (filter (shieldNamingNothingOffends . strip) (shieldsOf dovin))) (2 :: Int)
+    -- The cell the lint reads `direction` for: beside DealtBy the description is
+    -- the OTHER end of the damage event rather than a second spelling of the
+    -- covered side, and Pawl.Engine.Resolve's by-direction branch folds over the
+    -- ids the ref named, so describing recipients does not save a shield naming
+    -- no source. Dovin's other shield is DealtTo, where the same rewrite IS a
+    -- covered side, so `any` is what distinguishes the two.
+    let describeOnly effect = case effect of
+          Effect.PreventAllDamage shield ->
+            Effect.PreventAllDamage shield {PreventAllDamage.ref = Nothing, PreventAllDamage.whatRecipient = Just (Filter.Type.And [])}
+          other -> other
+    Spec.assertBool s (any (shieldNamingNothingOffends . describeOnly) (shieldsOf dovin)) "and a by-direction shield describing recipients but naming no source is rejected"
+    -- The legal neighbour that same arm must still accept: a by-direction shield
+    -- writing BOTH ends, which is the shape Resolve installs one narrowed row per
+    -- named source for.
+    muzzle <- S.printingOf s registry "Synthetic Selective Muzzle"
+    Spec.assertBool s (any isByDirectionShield (shieldsOf muzzle)) "setup: the Muzzle prints a by-direction shield describing its recipients"
+    Spec.assertBool s (not (any shieldNamingNothingOffends (shieldsOf muzzle))) "and naming a source beside that description is accepted"
   -- The same shape one axis over, and the thing that makes
   -- Pawl.Engine.PlayerEffect.unpreventable's board fold EXACT rather than
   -- approximate. See unpreventableScopeOffends.
