@@ -4255,11 +4255,10 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.Not f -> filterSlotsReadSingly f
 
 -- Every SlotName a Quantity reads as ONE OBJECT -- today exactly the
--- Quantity.AgainstSlot arms in it. CR 608.2b's read of a target aims the inner
--- number at the object the slot names, through Pawl.Engine.Filter.slotOneObject,
--- which declines a slot naming several rather than picking one of them
--- (Pawl.Engine.Binding.onlyOne's doctrine), so the whole number is unanswered in
--- silence.
+-- Quantity.AgainstSlot arms in it, which aim an inner number at the object a
+-- slot names, through Pawl.Engine.Filter.slotOneObject. That declines a slot
+-- naming several rather than picking one of them (Pawl.Engine.Binding.onlyOne's
+-- doctrine), so the whole number is unanswered in silence.
 --
 -- NOT Pawl.Engine.Quantity.slots, which reports the OTHER slot-naming arm too.
 -- Quantity.InSlot reads an AMOUNT -- Pawl.Engine.Binding.amountOf off
