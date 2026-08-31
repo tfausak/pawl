@@ -2347,14 +2347,15 @@ isPreventionShield effect = case effect of
   _ -> False
 
 -- The same question one axis over: a shield pinned to the SOURCE side of the
--- damage event covers every recipient, and Pawl.Engine.Resolve's DealtBy branch
--- writes no printed recipient onto the row at all, so a described recipient
--- beside that direction is text nothing performs -- the shield installed would be
--- BROADER than the card printed. No printing pairs the two: the by-direction
--- template is Scryfall `o:"would be dealt by" o:prevent`, 2026-08-30, and the one
--- shape that mentions both sides ("prevent all combat damage that would be dealt
--- to and dealt by target creature", Fog Bank) is two shields, which is how Dovin,
--- Hand of Control is written in data/cards/.
+-- damage event covers every recipient.
+--
+-- Not implemented: restricting whom such a shield protects.
+-- Pawl.Engine.Resolve's DealtBy branch passes no printed recipient to
+-- installDamageRow at all, so a described recipient beside that direction is text
+-- nothing performs and the shield installed would be BROADER than the card
+-- printed (#2765). Until that side carries the description, this lint is what
+-- stops one being written. A card mentioning both sides is written as two
+-- shields, which is how Dovin, Hand of Control is written in data/cards/.
 byDirectionRecipientOffends :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 byDirectionRecipientOffends effect = case effect of
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ whatRecipient direction _ _ _) ->
