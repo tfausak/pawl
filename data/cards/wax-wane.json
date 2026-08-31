@@ -89,7 +89,7 @@
                     "value": {
                       "ref": {
                         "type": "InSlot",
-                        "value": "target"
+                        "value": "enchantment"
                       },
                       "regenerability": {
                         "type": "Regenerable"
@@ -100,7 +100,7 @@
               }
             ],
             "targetSlots": {
-              "target": {
+              "enchantment": {
                 "filter": {
                   "type": "HasCardType",
                   "value": {

@@ -924,6 +924,9 @@ castable pid oid name facing gs =
 -- static ability that functions in any zone from which you could play the
 -- card"), and off the face being proposed, so a multi-face card offers the
 -- morph cast only for the half that prints one. No printing has one.
+--
+-- AND ONE MORE FOR A HAND'S FUSE CARD, rule 702.102a's own permission, offered
+-- the same way for the same reason -- see `fusedProposals` below.
 castableSpells :: PlayerId -> GameState -> [(ObjectId, CardName.CardName, Facing.Facing)]
 castableSpells pid gs =
   let facings face =
@@ -965,8 +968,9 @@ castableSpells pid gs =
       -- reads it without knowing fuse exists.
       --
       -- FACE UP alone: rule 702.102a is a permission to cast both halves, and a
-      -- face-down cast has no halves to combine (CR 708.2 leaves the object no
-      -- name and no text at all).
+      -- face-down cast has no halves to combine -- CR 708.2 leaves such a spell
+      -- "no characteristics other than those listed by the ability or rules that
+      -- allowed" it, which is one set of listed values rather than two halves.
       --
       -- HAND alone, which is rule 702.102a's own zone -- the ability "applies
       -- while the card with fuse is in a player's hand" -- so a fuse card in a

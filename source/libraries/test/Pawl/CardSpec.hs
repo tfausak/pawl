@@ -6344,7 +6344,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- modal or whose halves name a target slot alike, and either would be a card
   -- quietly offering two halves where the printing offers three casts. Slot names
   -- are card DATA and never printed, so the second is always the card file's to
-  -- fix; the first is a capability nothing in the pool needs yet (gap #2794).
+  -- fix; the first is a capability nothing in the pool needs yet (gap #2787).
   Spec.it s "CR 702.102 every card with fuse has a fused face" $ do
     root <- Registry.defaultRoot
     loaded <- Registry.loadRoot root

@@ -3262,23 +3262,29 @@ wearTearSpec s registry = Spec.describe s "WearTear" $ do
         (unfused, _) = S.handOne waxWane (targets (S.landsFor plains S.alice 1 (S.landsInPlay forest 1)))
     Spec.assertEqWith s "both halves payable, and still two offers" (namesOffered unfused) [waxName, waneName]
     Spec.assertEqWith s "and no fused face to offer" (fmap Face.name (Card.fusedFace (Printing.card waxWane))) Nothing
-  -- CR 702.102a's ZONE: "fuse is a static ability found on some split cards that
-  -- applies while the card with fuse is in a player's hand", and rule 702.102a's
-  -- permission is for a cast "from their hand".
+  -- CR 601.2c, asked of a spell with TWO halves' target slots: "the player
+  -- announces their choice of an appropriate . . . object for each target the
+  -- spell requires", and CR 601.2e rewinds the cast where they cannot. So a board
+  -- with an artifact and no enchantment offers Wear and refuses the fused spell,
+  -- which needs a target for Tear as well.
   --
-  -- Read through Pawl.Engine.Cast.castableSpells with the same card in a
-  -- graveyard, where CR 601.3 permits no cast at all -- so the assertion is that
-  -- the fused offer is not among the offers, which is what a fused proposal
-  -- exempt from the ordinary gates would be.
-  Spec.it s "CR 702.102a a fuse card in a graveyard offers no cast at all" $ do
+  -- The pair to the mana case above, and the same shape: two boards differing in
+  -- exactly one permanent, so the refusal is about the missing target rather than
+  -- about the mana, which both boards pay in full. It is also what holds the
+  -- fused proposal to the ORDINARY gates -- a proposal exempt from `castable`
+  -- would be offered on both boards.
+  Spec.it s "CR 601.2c the fused cast is refused where one half has no legal target" $ do
     mountain <- S.printingOf s registry "Mountain"
     plains <- S.printingOf s registry "Plains"
     sphere <- S.printingOf s registry "Chromatic Sphere"
+    ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
     wearTear <- S.printingOf s registry "Wear"
-    let board = S.landsFor mountain S.alice 2 (S.landsInPlay plains 1)
-        (_, withSphere) = S.addCreature sphere S.alice board
-        (_, gs) = S.addGraveyardCard wearTear S.alice withSphere
-    Spec.assertEqWith s "nothing castable from a graveyard" (Cast.castableSpells S.alice gs) []
+    let mana = S.landsFor plains S.alice 1 (S.landsInPlay mountain 2)
+        namesOffered board = [n | A.Cast _ n _ <- Action.legalActions S.alice board]
+        (artifactOnly, _) = S.handOne wearTear (snd (S.addCreature sphere S.alice mana))
+        (bothTargets, _) = S.handOne wearTear (snd (S.addCreature ghostlyPrison S.alice (snd (S.addCreature sphere S.alice mana))))
+    Spec.assertEqWith s "no enchantment: Wear alone, and no fused cast" (namesOffered artifactOnly) [wearName]
+    Spec.assertEqWith s "an enchantment as well: the fused cast returns" (namesOffered bothTargets) [wearName, tearName, fusedName]
 
 -- Victor Mancha, Runaway {5} Legendary Artifact Creature -- Human Hero 4/4:
 -- "When Victor Mancha enters, exile target card from your graveyard. You may

@@ -368,11 +368,14 @@ merge2 l r =
       -- a per-half ability, so the combined view taking the left half's is a
       -- placeholder no split card exercises.
       --
-      -- Face.spell is deliberately NOT merged either: it stays the left half's, and
-      -- nothing ever casts it. CR 709.3b means the thing on the stack is always
-      -- ONE half, so the combined view is never the payload that resolves --
-      -- Task 4's castableFaces is what a cast reads. Merging the modes here
-      -- would invent a spell that has no printing.
+      -- Face.spell is deliberately NOT merged either: it stays the left half's,
+      -- and nothing casts it. CR 709.3b means the thing on the stack is ONE half
+      -- for every cast this view is asked about -- castableFaces below is what
+      -- such a cast reads -- so the combined view is never the payload that
+      -- resolves. The one printing that puts BOTH halves on the stack is CR
+      -- 702.102's fuse, and it does not merge them here: `fusedFace` below builds
+      -- that payload over this view, so a fused spell reads rule 702.102d's
+      -- ordering and every other reader of `combined` is untouched.
     }
 
 -- CR 202.1b: "Some objects have no mana cost. This normally includes all land
@@ -511,7 +514,7 @@ castableFaces card = case Card.layout card of
 -- has the zone, is what offers it. Every other road to a cast (an effect's offer,
 -- Pawl.Engine.Resolve.offerCast) therefore reaches the halves alone. Not
 -- implemented: fusing under a permission an effect grants for a cast from the
--- hand (gap #2794).
+-- hand (gap #2787).
 --
 -- Built on `combined`, which is CR 702.102b read rather than restated: "a fused
 -- split spell has the combined characteristics of its two halves. (See rule
@@ -526,6 +529,12 @@ castableFaces card = case Card.layout card of
 -- the order -- "the controller of the spell follows the instructions of the left
 -- half and then follows the instructions of the right half" -- which is the
 -- clauses of the halves concatenated in printed order, one mode.
+--
+-- Read off the card's PRINTED keywords, through `combined` (CR 709.4c), which is
+-- rule 702.102a's own scope: a static ability of the card, functioning in the
+-- hand. Not implemented: a fuse ability GRANTED to a card lying in a hand, the
+-- posture Pawl.Engine.Cast.castableSpells takes for rule 702.37a's morph (gap
+-- #2787).
 --
 -- SPLIT alone. A Room is a split card too (CR 709.5) and no printing gives one
 -- fuse; the layouts with two faces that are not split cards (Adventure,
@@ -545,7 +554,7 @@ fusedFace card = case Card.layout card of
 -- NOTHING for a half that is modal, which is what keeps that union honest: CR
 -- 601.2c fills the CHOSEN mode's slots, and two halves offering two mode lists
 -- each would be a cross product this does not build. Every printed fuse card is a
--- pair of non-modal halves. Not implemented: fusing a modal half (gap #2794).
+-- pair of non-modal halves. Not implemented: fusing a modal half (gap #2787).
 --
 -- NOTHING as well for two halves whose slot names collide, since Map.union would
 -- silently drop one half's slot and leave that half's effects pointing at the
