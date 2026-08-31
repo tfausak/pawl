@@ -1,7 +1,8 @@
 -- Mode-scoped structural reads over a Modal payload (CR 700.2), shared by the
--- spell (Face.spell) and both ability types. Parametric in `card` and importing
--- only Type modules and Pawl.Extra, so there is no cycle -- Pawl.Engine.Card
--- imports THIS.
+-- spell (Face.spell) and both ability types. Parametric in `card`, and its only
+-- engine import is Pawl.Engine.Filter, which reaches no further than
+-- Pawl.Engine.Keyword and Pawl.Engine.Binding -- so there is no cycle, and
+-- Pawl.Engine.Card imports THIS.
 module Pawl.Engine.Modal where
 
 import qualified Data.Foldable as Foldable
@@ -14,6 +15,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ChooseBetween as ChooseBetween
 import Pawl.Types.Effect (Effect)
@@ -180,17 +182,30 @@ modesTargetSlots chosen m = Map.unions (fmap (\mi -> instanceTargetSlots mi m) (
 -- occurrence 1's pool pointing at occurrence 0's slot, so CR 700.2d's "different
 -- targets may be chosen" would silently read the first occurrence's player.
 instanceTargetSlots :: ModeInstance.ModeInstance -> Modal.Modal card ability -> Map SlotName TargetSlot
-instanceTargetSlots mi m =
-  Map.mapKeys (instanceSlot mi) (fmap (instanceScope mi) (maybe Map.empty Mode.targetSlots (modeAtIndex (ModeInstance.index mi) m)))
+instanceTargetSlots mi m = maybe Map.empty (modeInstanceTargetSlots mi) (modeAtIndex (ModeInstance.index mi) m)
 
--- CR 700.2d applied to the slot NAME a target slot's pool carries, so the pool
--- follows its mode's occurrence exactly as the key does.
+-- instanceTargetSlots with the mode already in hand rather than looked up by
+-- index, which is what CR 608.2b's re-check holds: Pawl.Engine.Resolve walks the
+-- chosen modes themselves. ONE builder, because the announcement's map and the
+-- re-check's map disagreeing about which slot belongs to which occurrence is
+-- exactly the defect (#2806).
+modeInstanceTargetSlots :: ModeInstance.ModeInstance -> Mode.Mode card ability -> Map SlotName TargetSlot
+modeInstanceTargetSlots mi mode = Map.mapKeys (instanceSlot mi) (fmap (instanceScope mi) (Mode.targetSlots mode))
+
+-- CR 700.2d applied to the slot NAMES a target slot carries, so everything the
+-- slot points at follows its mode's occurrence exactly as the key does: the
+-- pool's GraveyardScope.InSlot, and the sibling slots the FILTER reads
+-- (Filter.IsBound and the atoms beside it, which Pawl.Engine.Filter.renameBound
+-- and boundSlots share one walk over).
 --
--- Only the pool: a Filter that reads a sibling slot (Filter.ControlledByBound and
--- the atoms beside it) carries the same hazard and is not renamed here (gap
--- #2802). No printed card writes one inside a repeatable mode.
+-- Not implemented: the CR 202.3 bound a slot's `amount` carries may itself name a
+-- slot (Quantity.InSlot) and is not renamed here (gap #2825).
 instanceScope :: ModeInstance.ModeInstance -> TargetSlot -> TargetSlot
-instanceScope mi slot = slot {TargetSlot.pool = instancePool mi (TargetSlot.pool slot)}
+instanceScope mi slot =
+  slot
+    { TargetSlot.pool = instancePool mi (TargetSlot.pool slot),
+      TargetSlot.filter = fmap (Filter.renameBound (instanceSlot mi)) (TargetSlot.filter slot)
+    }
 
 -- instanceScope's rename over the pool itself: the two arms carrying a
 -- GraveyardScope, and every other pool unchanged.

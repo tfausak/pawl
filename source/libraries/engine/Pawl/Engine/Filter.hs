@@ -1,5 +1,7 @@
 module Pawl.Engine.Filter where
 
+import qualified Data.Functor.Const as Const
+import qualified Data.Functor.Identity as Identity
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -2139,69 +2141,85 @@ statesAQuality predicate = case predicate of
   -- shortfall applies rather than CR 701.23d's "must find".
   Filter.IsInZone _ -> True
 
--- The slots a Filter READS -- today exactly the ControlledByBound atoms in it.
--- Pawl.Engine.Resolve.modeSlots folds this over a mode's target slots, which is
--- what makes the card dataflow lint see a slot named in a FILTER rather than in
--- an effect: a card reading "that player" under a condition that never binds one
--- is then a failing test rather than a slot that silently admits nothing.
---
--- The SECOND consumer is behavioural rather than a lint, and the catch-all below
--- is behavioural with it: Pawl.Engine.Resolve.replacementRowReads walks a waiting
--- replacement's Filters through here to decide which of the installing
--- resolution's bindings that row CAPTURES, so an atom this function does not
--- report is a slot the row does not carry and the atom then answers vacuously
--- False at the event. No -Werror reaches it, and the lint cannot either, both
--- sides being this one function.
+-- Every slot NAME a Filter carries, as one traversal: `boundSlots` below READS
+-- them and `renameBound` REWRITES them. One walk rather than two, because the two
+-- consumers disagreeing about which atoms name a slot is a live defect shape --
+-- CR 700.2d's per-occurrence rename skipped every atom here while the lint below
+-- reported them (#2802).
 --
 -- The same descent `bakeBound` makes, and deliberately so: a position that
 -- function does not bake is a position this one must not report as read, or the
 -- lint would bless an atom the engine can never answer.
-boundSlots :: Filter.Filter Keyword.Type.Keyword -> Set.Set SlotName.SlotName
-boundSlots predicate = case predicate of
-  Filter.ControlledByBound slot -> Set.singleton slot
-  -- Reported although `bakeBound` above leaves it standing, which the pairing
+--
+-- The catch-all is BEHAVIOURAL, not a convenience:
+-- Pawl.Engine.Resolve.replacementRowReads walks a waiting replacement's Filters
+-- through here to decide which of the installing resolution's bindings that row
+-- CAPTURES, so an atom this function does not report is a slot the row does not
+-- carry and the atom then answers vacuously False at the event. No -Werror
+-- reaches it, and the lint cannot either, both sides being this one function.
+overBoundSlots :: (Applicative f) => (SlotName.SlotName -> f SlotName.SlotName) -> Filter.Filter Keyword.Type.Keyword -> f (Filter.Filter Keyword.Type.Keyword)
+overBoundSlots f predicate = case predicate of
+  Filter.ControlledByBound slot -> fmap Filter.ControlledByBound (f slot)
+  -- Named although `bakeBound` above leaves it standing, which the pairing
   -- this function's comment states would otherwise forbid. What the pairing is
   -- for is that a reported slot be ANSWERABLE, and this one is -- one module
   -- over, at Pawl.Engine.Count.bakePerspective, which holds the board a
   -- controller has to be projected off.
-  Filter.IsControllerOfBound slot -> Set.singleton slot
-  -- Reported although `bakeBound` leaves it standing too, and answerable in the
+  Filter.IsControllerOfBound slot -> fmap Filter.IsControllerOfBound (f slot)
+  -- Named although `bakeBound` leaves it standing too, and answerable in the
   -- same sense the atom above is -- here rather than one module over, off the
   -- Context `matches` is already handed.
-  Filter.IsBound slot -> Set.singleton slot
-  -- Reported for the atom above's reason, and answerable in the same place: it
+  Filter.IsBound slot -> fmap Filter.IsBound (f slot)
+  -- Named for the atom above's reason, and answerable in the same place: it
   -- reads the Context too, one field over.
-  Filter.SameNameAsBound slot -> Set.singleton slot
-  -- Reported for the atom above's reason and answerable one field along, and here
-  -- the report is BEHAVIOURAL as well as a lint: Pawl.Engine.Target.jointlyJudged
-  -- fires on this set, and CR 601.2c's joint check is the whole of what enforces
-  -- this atom (the offer widens for it).
-  Filter.SameControllerAsBound slot -> Set.singleton slot
-  -- Reported for IsBound's reason and answerable in the same place: the number
-  -- rides the Context `matches` is already handed, one field along again
+  Filter.SameNameAsBound slot -> fmap Filter.SameNameAsBound (f slot)
+  -- Named for the atom above's reason, and here the report is BEHAVIOURAL as
+  -- well as a lint: Pawl.Engine.Target.jointlyJudged fires on boundSlots, and CR
+  -- 601.2c's joint check is the whole of what enforces this atom (the offer
+  -- widens for it).
+  Filter.SameControllerAsBound slot -> fmap Filter.SameControllerAsBound (f slot)
+  -- Named for IsBound's reason and answerable one field along again
   -- (boundAmounts). The dataflow lint is what this report is for -- a card whose
   -- filter reads an amount no clause of the mode ever bound is then a failing
   -- test rather than a sweep that silently admits nothing.
-  Filter.PowerIsAmountInSlot slot -> Set.singleton slot
-  Filter.And fs -> foldMap boundSlots fs
-  Filter.Or fs -> foldMap boundSlots fs
-  Filter.Not f -> boundSlots f
+  Filter.PowerIsAmountInSlot slot -> fmap Filter.PowerIsAmountInSlot (f slot)
+  Filter.And fs -> fmap Filter.And (traverse (overBoundSlots f) fs)
+  Filter.Or fs -> fmap Filter.Or (traverse (overBoundSlots f) fs)
+  Filter.Not g -> fmap Filter.Not (overBoundSlots f g)
   -- Descended into because `bakeBound` descends into it, which is the pairing this
   -- function's comment above insists on. The catch-all below would have absorbed
   -- it silently, this being the first atom to carry a Filter DIRECTLY -- a
   -- keyword's own filter (CR 702.29e) is out of both functions' reach alike, so
   -- the pairing holds there by both sides declining.
-  Filter.ControlsMoreThanYou f -> boundSlots f
+  Filter.ControlsMoreThanYou g -> fmap Filter.ControlsMoreThanYou (overBoundSlots f g)
   -- Descended into for the atom above's reason and named explicitly for the same
   -- one: `bakeBound` descends into the host's description, so the catch-all below
   -- would silently bake a slot this function never reported.
-  Filter.AttachedTo f -> boundSlots f
+  Filter.AttachedTo g -> fmap Filter.AttachedTo (overBoundSlots f g)
   -- Descended into for the atom above's reason and named explicitly for the same
   -- one: `bakeBound` descends into the represented card's description, so the
   -- catch-all below would silently bake a slot this function never reported.
-  Filter.RepresentedByCard f -> boundSlots f
+  Filter.RepresentedByCard g -> fmap Filter.RepresentedByCard (overBoundSlots f g)
   -- Descended into for the atom above's reason, and named explicitly for the same
   -- one: `bakeBound` descends into the attacher's description, so the catch-all
   -- below would silently bake a slot this function never reported.
-  Filter.HasAttached f -> boundSlots f
-  _ -> Set.empty
+  Filter.HasAttached g -> fmap Filter.HasAttached (overBoundSlots f g)
+  _ -> pure predicate
+
+-- The slots a Filter READS. Pawl.Engine.Resolve.modeSlots folds this over a
+-- mode's target slots, which is what makes the card dataflow lint see a slot
+-- named in a FILTER rather than in an effect: a card reading "that player" under
+-- a condition that never binds one is then a failing test rather than a slot that
+-- silently admits nothing. Pawl.Engine.Resolve.replacementRowReads is the second,
+-- behavioural consumer -- see overBoundSlots above.
+boundSlots :: Filter.Filter Keyword.Type.Keyword -> Set.Set SlotName.SlotName
+boundSlots = Const.getConst . overBoundSlots (Const.Const . Set.singleton)
+
+-- Every slot NAME a Filter carries, rewritten. CR 700.2d's per-occurrence rename
+-- is the caller (Pawl.Engine.Modal.instanceScope): a mode chosen twice renames
+-- its slots per occurrence, so a filter naming a SIBLING slot -- Fall of the
+-- Hammer's "another target creature" is Not (IsBound "dealer") -- would otherwise
+-- name occurrence 0's slot from occurrence 1 and read a binding that is not its
+-- own.
+renameBound :: (SlotName.SlotName -> SlotName.SlotName) -> Filter.Filter Keyword.Type.Keyword -> Filter.Filter Keyword.Type.Keyword
+renameBound rename = Identity.runIdentity . overBoundSlots (Identity.Identity . rename)

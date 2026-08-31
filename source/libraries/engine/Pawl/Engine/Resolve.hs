@@ -2143,11 +2143,14 @@ resolveModesWith runSubgame stackId srcId modes = do
     Nothing -> pure ()
     Just obj ->
       -- CR 700.2d: instance-named, not printed-named -- two instances of one
-      -- repeated mode fill two slots this union would otherwise collapse. CR
+      -- repeated mode fill two slots this union would otherwise collapse.
+      -- Modal.modeInstanceTargetSlots and not a mapKeys of its own: the slot
+      -- NAMES a slot's pool and filter carry are renamed with the key, which is
+      -- what makes this map the one CR 601.2c offered. CR
       -- 608.2b re-judges each against the SAME declaration CR 603.3d offered, so
       -- the "that player controls" atoms are baked here too; an ability whose
       -- environment binds no player leaves them standing, admitting nothing.
-      let slots = Target.bakeSlots (Binding.playerSlots (Object.bindings obj)) (Map.unions (fmap (\(mi, mode) -> Map.mapKeys (Modal.instanceSlot mi) (Mode.targetSlots mode)) modes))
+      let slots = Target.bakeSlots (Binding.playerSlots (Object.bindings obj)) (Map.unions (fmap (uncurry Modal.modeInstanceTargetSlots) modes))
           chosen = Binding.targetsOf (Object.bindings obj)
           legalSlot slot recipients = case Map.lookup slot slots of
             -- CR 608.2b is about TARGETS. A slot declaring none is a RESERVED
