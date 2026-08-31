@@ -7417,8 +7417,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Spike Cannibal's "from all creatures" sweeps a group, and every
         -- member is its own pair against the one destination, with the rule's
         -- four impossibilities asked afresh for each.
-        movePair to fromOne = case fromOne of
-          from
+        movePair to from = case from of
+          _
             -- "This may occur if the first and second objects are the same object".
             | from /= to,
               -- "... or if either object is no longer in the correct zone". CR 122.1
@@ -7431,13 +7431,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- creature that entered; Explorer's Cache binds the artifact and a
               -- targeted creature; Black Panther, Wakandan King binds a targeted land
               -- and a targeted creature; Fate Transfer binds two targeted creatures;
-              -- Goldberry, River-Daughter binds a targeted permanent and herself, and
-              -- her second ability the two the other way about; Scrounging Bandar
-              -- binds itself and a targeted creature, where Bioshift binds two
-              -- targeted ones; Spike Cannibal
-              -- sweeps every creature on the battlefield onto itself; Takesies sweeps
-              -- every permanent onto a targeted one; Forgotten Ancient sweeps itself
-              -- onto every other creature). A slot bound as the ability triggered may
+              -- Goldberry, River-Daughter binds a targeted permanent and herself,
+              -- and her second ability the two the other way about; Scrounging
+              -- Bandar binds itself and a targeted creature, where Bioshift binds
+              -- two targeted ones; Spike Cannibal sweeps every creature on the
+              -- battlefield onto itself; Takesies sweeps every permanent onto a
+              -- targeted one; Forgotten Ancient sweeps itself onto every other
+              -- creature). A slot bound as the ability triggered may
               -- name an object CR 400.7 has since moved, and a targeted one may have
               -- become illegal, which is CR 608.2b's re-read in the legalMany inside
               -- objectRefObjects.
