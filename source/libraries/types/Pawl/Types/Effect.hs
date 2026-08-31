@@ -648,6 +648,11 @@ data Effect card ability
     -- duration does, hence a DamageRewrite.PreventAll rather than a PreventNext
     -- of some large number. With no running count, CR 615.5's "the damage
     -- prevented this way" is per APPLICATION here (Brace for Impact).
+    --
+    -- Its own DESCRIBED recipient side beside that ref (whatRecipient), which is
+    -- PreventNextDamage's pair one opcode over: Pack Leader's "to Dogs you
+    -- control" is read live at each damage event under CR 611.2c rather than
+    -- swept here. The ref is then absent, the two spellings being alternatives.
     PreventAllDamage (PreventAllDamage.PreventAllDamage (Effect card ability))
   | -- | CR 614.9: install a floating REDIRECTION effect (Turn the Tables).
     -- RedirectDamage.from is the damage's original recipient,

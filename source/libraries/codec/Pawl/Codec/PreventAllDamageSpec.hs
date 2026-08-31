@@ -14,6 +14,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
 
 -- | The @effect@ parameter is instantiated at 'Text.Text' rather than at
 -- 'Pawl.Types.Effect.Effect', for the reason Pawl.Codec.PreventNextDamageSpec
@@ -24,7 +25,7 @@ codec = PreventAllDamage.codec Common.text
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
   -- CR 615.1's shield naming no kind and carrying no CR 615.5 clause -- Selfless
-  -- Squire's. All five optional keys are elided, so this is byte for byte what
+  -- Squire's. Every optional key is elided, so this is byte for byte what
   -- Pawl.Codec.DurationRef used to write for this arm.
   Spec.it s "MkPreventAllDamage, kind, direction and riders elided" $
     Common.assertCodec
@@ -33,7 +34,8 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
       ( PreventAllDamage.MkPreventAllDamage
           { PreventAllDamage.duration = Duration.UntilEndOfTurn,
             PreventAllDamage.kind = Nothing,
-            PreventAllDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you")),
+            PreventAllDamage.ref = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))),
+            PreventAllDamage.whatRecipient = Nothing,
             PreventAllDamage.direction = DamageDirection.DealtTo,
             PreventAllDamage.chosenSource = Nothing,
             PreventAllDamage.whatSource = Filter.And [],
@@ -51,7 +53,8 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
       ( PreventAllDamage.MkPreventAllDamage
           { PreventAllDamage.duration = Duration.UntilEndOfTurn,
             PreventAllDamage.kind = Just DamageKind.Combat,
-            PreventAllDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+            PreventAllDamage.ref = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
+            PreventAllDamage.whatRecipient = Nothing,
             PreventAllDamage.direction = DamageDirection.DealtBy,
             PreventAllDamage.chosenSource = Nothing,
             PreventAllDamage.whatSource = Filter.And [],
@@ -71,7 +74,8 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
       ( PreventAllDamage.MkPreventAllDamage
           { PreventAllDamage.duration = Duration.UntilEndOfTurn,
             PreventAllDamage.kind = Nothing,
-            PreventAllDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you")),
+            PreventAllDamage.ref = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))),
+            PreventAllDamage.whatRecipient = Nothing,
             PreventAllDamage.direction = DamageDirection.DealtTo,
             PreventAllDamage.chosenSource = Just (Filter.And []),
             PreventAllDamage.whatSource = Filter.And [],
@@ -91,7 +95,8 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
       ( PreventAllDamage.MkPreventAllDamage
           { PreventAllDamage.duration = Duration.UntilEndOfTurn,
             PreventAllDamage.kind = Nothing,
-            PreventAllDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you")),
+            PreventAllDamage.ref = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))),
+            PreventAllDamage.whatRecipient = Nothing,
             PreventAllDamage.direction = DamageDirection.DealtTo,
             PreventAllDamage.chosenSource = Nothing,
             PreventAllDamage.whatSource = Filter.HasKeyword Keyword.Flying,
@@ -99,4 +104,23 @@ spec s = Spec.describe s "Pawl.Codec.PreventAllDamage" $ do
           }
       )
       " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"you\"},\"whatSource\":{\"type\":\"HasKeyword\",\"value\":{\"type\":\"Flying\"}}} "
+  -- CR 611.2c's DESCRIBED recipient side, which is Pack Leader's "to Dogs you
+  -- control": the ref key is absent and the predicate carries the whole recipient
+  -- question, the alternative spelling to every case above.
+  Spec.it s "MkPreventAllDamage, a described recipient side and no ref" $
+    Common.assertCodec
+      s
+      codec
+      ( PreventAllDamage.MkPreventAllDamage
+          { PreventAllDamage.duration = Duration.UntilEndOfTurn,
+            PreventAllDamage.kind = Just DamageKind.Combat,
+            PreventAllDamage.ref = Nothing,
+            PreventAllDamage.whatRecipient = Just (Filter.HasSubtype Subtype.Dog),
+            PreventAllDamage.direction = DamageDirection.DealtTo,
+            PreventAllDamage.chosenSource = Nothing,
+            PreventAllDamage.whatSource = Filter.And [],
+            PreventAllDamage.riders = Seq.empty
+          }
+      )
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"kind\":{\"type\":\"Combat\"},\"whatRecipient\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Dog\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
