@@ -11,8 +11,9 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- has to attack: Alluring Siren's "target creature an opponent controls attacks
 -- you this turn if able".
 --
--- Pawl.Types.AttackRequirement, the PRINTED carrier, states only CR 508.1d's
--- subject, and says there why the object axis lives here instead (#2014).
+-- Pawl.Types.AttackRequirement, the PRINTED carrier, states the same two axes,
+-- its object as a Pawl.Types.RequiredDefender rather than a bare PlayerId for
+-- the reason given below.
 --
 -- Both axes are bare, one ObjectId and one PlayerId, for
 -- ActiveBlockRequirement's reason: rule 508.1d's producer here names its

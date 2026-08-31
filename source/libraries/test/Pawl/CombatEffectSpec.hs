@@ -5176,7 +5176,8 @@ exertAnswer decision p = case p of
 -- CR 508.1d's OBJECT axis -- what a required creature has to attack, rather than
 -- merely that it must attack -- proved by Alluring Siren ("{T}: Target creature
 -- an opponent controls attacks you this turn if able"). The subject-only shape is
--- Curse of the Nightly Hunt's, in attackCostSpec above and in Pawl.CombatSpec.
+-- Curse of the Nightly Hunt's, in attackCostSpec above and in Pawl.CombatSpec;
+-- publicEnemySpec below is this axis on the PRINTED carrier.
 --
 -- bob controls a Jace Beleren, so CR 508.1b offers alice's attacker TWO
 -- announcements and the narrowing has something to narrow. That is the Siren's
@@ -5297,6 +5298,101 @@ sirenBoard siren jace piker centaur =
               activated = snd (Engine.runGamePure (aimingAt lured) ready (Activate.activateAbility S.bob sirenId ability))
            in Just (control, lured, free, jaceId, snd (Engine.runGamePure (aimingAt lured) activated Stack.resolveTop))
         _ -> Nothing
+
+-- CR 508.1d's OBJECT axis on the PRINTED carrier, proved by Public Enemy
+-- ("{2}{U} Aura, Enchant creature / All creatures attack enchanted creature's
+-- controller each combat if able / When enchanted creature dies, draw a card").
+-- Alluring Siren above is the same axis on the resolution-created carrier;
+-- Curse of the Nightly Hunt, in attackCostSpec, is the printed carrier with the
+-- axis absent, and is the control every case here is written against.
+--
+-- The Aura's object is a RELATION -- Pawl.Types.RequiredDefender's
+-- ControllerOfAttached -- rather than a player it names, which is why the two
+-- legs of the first case attach the same Aura to two different opponents'
+-- creatures and change nothing else.
+publicEnemySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+publicEnemySpec s registry = Spec.describe s "PublicEnemy" $ do
+  Spec.it s "CR 508.1d no attack is required when the enchanted creature's controller is not being attacked" $ do
+    -- THREE seats, because two collapse the object axis onto the one player
+    -- alice could attack. bob is the defending player and carol is not, so the
+    -- SAME Aura mints a requirement on one leg and none on the other.
+    --
+    -- Both legs put a creature on both opponents' sides and the Aura on exactly
+    -- one of them, so the boards differ in the host alone.
+    enemy <- S.printingOf s registry "Public Enemy"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (base, mine, theirs, hers) = S.threePlayerCombat [piker] [piker] [piker]
+        defending = base {GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.bob}}
+        enchanting host =
+          let (aura, withAura) = S.addCreature enemy S.alice defending
+           in S.attach aura host withAura
+    case (mine, theirs, hers) of
+      ([attacker], [bobs], [carols]) -> do
+        let onCarol = enchanting carols
+            onBob = enchanting bobs
+        -- Gameplay first: whether alice may decline to attack at all.
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] onCarol) "carol cannot be attacked this combat, so nothing is required"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] onBob)) "bob can, so the same Aura forbids declining"
+        -- Neither leg refused the attacker outright, which is the other way a
+        -- board answers "declining is legal" (CR 508.1a).
+        Spec.assertEqWith s "the attacker is offered on the carol leg" (Combat.legalAttackers S.alice onCarol) [attacker]
+        Spec.assertEqWith s "and on the bob leg" (Combat.legalAttackers S.alice onBob) [attacker]
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [attacker] onCarol) "attacking anyway stays legal where nothing is required"
+      _ -> Spec.assertFailure s "fixture should have one creature per seat"
+  Spec.it s "CR 508.1d the requirement is obeyed by attacking that player and not by attacking their planeswalker" $ do
+    -- CR 508.1b offers alice's attacker two announcements, so the object axis
+    -- has something to narrow -- Alluring Siren's board, reached from the
+    -- printed carrier instead. Curse of the Nightly Hunt enchanting ALICE is the
+    -- control: it requires the same creature to attack and states no object, so
+    -- its requirement is obeyed by EITHER announcement, and the illegality below
+    -- is the object axis rather than anything else on the board.
+    enemy <- S.printingOf s registry "Public Enemy"
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    jace <- S.printingOf s registry "Jace Beleren"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (base, mine, theirs) = S.combatBoardOf [piker] [jace, piker]
+    case (mine, theirs) of
+      ([attacker], [jaceId, host]) -> do
+        let loyal = S.addCounter CounterKind.Loyalty 3 jaceId base
+            (aura, withAura) = S.addCreature enemy S.alice loyal
+            narrowed = S.attach aura host withAura
+            control = cursingBoard curse S.alice loyal
+        Spec.assertBool
+          s
+          (not (Combat.legalAttackDeclarationAs S.alice [(attacker, AttackTarget.OfPlaneswalker jaceId)] narrowed))
+          "CR 508.1d: announcing Jace does not obey 'attack enchanted creature's controller'"
+        Spec.assertBool
+          s
+          (Combat.legalAttackDeclarationAs S.alice [(attacker, AttackTarget.OfPlayer S.bob)] narrowed)
+          "announcing bob does"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] narrowed)) "and declining obeys nothing"
+        -- The control, one printing different and the same two seats: the
+        -- subject-only Curse requires the attack and admits either announcement.
+        Spec.assertBool
+          s
+          (Combat.legalAttackDeclarationAs S.alice [(attacker, AttackTarget.OfPlaneswalker jaceId)] control)
+          "under a requirement that names no object, Jace is a legal announcement"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] control)) "while declining is illegal there too"
+      _ -> Spec.assertFailure s "fixture should have one attacker and bob's two permanents"
+  Spec.it s "CR 508.1d whole cards: a real declare attackers step sends the creature at the enchanted creature's controller" $ do
+    -- Through Combat.declareAttackers rather than the legality predicate, with
+    -- an interpreter that announces JACE for every attacker: CR 508.1d refuses
+    -- that declaration, and what the combat record then says is the assertion.
+    enemy <- S.printingOf s registry "Public Enemy"
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    jace <- S.printingOf s registry "Jace Beleren"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (base, mine, theirs) = S.combatBoardOf [piker] [jace, piker]
+    case (mine, theirs) of
+      ([attacker], [jaceId, host]) -> do
+        let loyal = S.addCounter CounterKind.Loyalty 3 jaceId base
+            (aura, withAura) = S.addCreature enemy S.alice loyal
+            narrowed = S.attach aura host withAura
+            control = cursingBoard curse S.alice loyal
+            announced gs = Map.lookup attacker (Combat.Type.attackers (GameState.combat (S.runPure (announcing jaceId) gs (Combat.declareAttackers S.alice))))
+        Spec.assertEqWith s "the attacker is redirected to bob" (announced narrowed) (Just (AttackTarget.OfPlayer S.bob))
+        Spec.assertEqWith s "where a requirement naming no object leaves the announcement alone" (announced control) (Just (AttackTarget.OfPlaneswalker jaceId))
+      _ -> Spec.assertFailure s "fixture should have one attacker and bob's two permanents"
 
 -- CR 508.1d's second shape -- "or that it attacks if some condition is met" --
 -- proved by Otarian Juggernaut, whose whole threshold line is one CR 604.2 "as
@@ -5522,6 +5618,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   soulSnareSpec s registry
   attackCostSpec s registry
   alluringSirenSpec s registry
+  publicEnemySpec s registry
   conditionalAttackRequirementSpec s registry
   randomOpponentSpec s registry
   declarationRetrySpec s registry

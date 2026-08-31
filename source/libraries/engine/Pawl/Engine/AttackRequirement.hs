@@ -27,6 +27,7 @@ import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.RequiredDefender as RequiredDefender
 
 -- CR 508.1d: every requirement in force right now, INSTANTIATED as the
 -- (creature, target) pairs the active player is required to declare, each
@@ -133,16 +134,34 @@ instances candidates targets gs =
           gs
       -- CR 612.1: a hacked "Swamps attack each combat if able" requires Islands.
       --
-      -- The printed carrier states no object (Pawl.Types.AttackRequirement says
-      -- why), so every target is admissible and the requirement mints a pair per
-      -- one.
       fromRequirement source changes requirement =
         let subject = AttackRequirement.subject requirement
          in [ (creature, target)
             | inForce source changes requirement,
               creature <- filter (named source (if null changes then subject else Projection.rewriteAffected changes subject)) candidates,
-              target <- targets
+              target <- admissible source requirement
             ]
+      -- CR 508.1d's OBJECT axis. An unnarrowed requirement mints a pair per
+      -- announcement CR 508.1b admits, so any announcement obeys it; a narrowed
+      -- one mints only the announcements against the player it names, and
+      -- NOTHING at all when that player is not among `targets`. Alluring Siren's
+      -- ruling is the same reading fromStored gets from membership: a
+      -- requirement to attack a player who cannot be attacked this combat is
+      -- obeyed by no declaration and so raises CR 508.1d's maximum by nothing.
+      --
+      -- No CR 612.1 rewrite, unlike the subject and the gate: RequiredDefender
+      -- names its player structurally rather than by any word the source prints,
+      -- so Projection.rewriteAffected has nothing to act on.
+      admissible source requirement = case AttackRequirement.object requirement of
+        Nothing -> targets
+        Just RequiredDefender.ControllerOfAttached ->
+          -- Read LIVE off the source's attachment and the host's controller (CR
+          -- 613.1b's layer 2), for the reason every other field here is: the
+          -- Aura can be moved and the host's controller can change, and CR
+          -- 613.11 puts this effect after every layer.
+          case Projection.hostOf source gs >>= \host -> Projection.controllerOf host gs of
+            Nothing -> []
+            Just pid -> filter (== AttackTarget.OfPlayer pid) targets
       -- CR 508.1d's second shape -- "or that it attacks if some condition is
       -- met" -- read as CR 604.2's "as long as" clause and asked exactly as
       -- BlockPermission.instances asks its own `while`: a gate that does not

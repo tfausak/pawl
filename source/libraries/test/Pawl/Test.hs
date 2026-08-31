@@ -312,6 +312,7 @@ import qualified Pawl.Codec.ReplacementOriginSpec
 import qualified Pawl.Codec.ReplacementProvenanceSpec
 import qualified Pawl.Codec.RequireAttackSpec
 import qualified Pawl.Codec.RequireBlockSpec
+import qualified Pawl.Codec.RequiredDefenderSpec
 import qualified Pawl.Codec.RestartSignalSpec
 import qualified Pawl.Codec.ResultSpec
 import qualified Pawl.Codec.ReturnPermanentsSpec
@@ -866,6 +867,7 @@ spec s registry = do
   Pawl.Codec.ReplacementProvenanceSpec.spec s
   Pawl.Codec.RequireAttackSpec.spec s
   Pawl.Codec.RequireBlockSpec.spec s
+  Pawl.Codec.RequiredDefenderSpec.spec s
   Pawl.Codec.RestartSignalSpec.spec s
   Pawl.Codec.ResultSpec.spec s
   Pawl.Codec.ReturnWatchSpec.spec s

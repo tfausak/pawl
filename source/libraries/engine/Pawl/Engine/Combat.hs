@@ -371,9 +371,16 @@ attackCeilingGiven limit alone candidates gs =
       -- the creature has no free announcement at all, which is a creature the cost
       -- clause keeps out of every declaration.
       --
-      -- Untested, not unimplemented: every board in the suite has one declarable
-      -- target, so both reversing this fold and replacing it with "the first
-      -- announceable target" leave the whole suite green (#2369).
+      -- The RESULT is observed -- Pawl.CombatEffectSpec's PublicEnemy Jace board
+      -- turns on `best` being the defending player rather than their
+      -- planeswalker -- but the maximization inside is a fence no board can
+      -- reach. Every instance AttackRequirement.instances mints either weights
+      -- every target alike (a requirement naming no object, goad's first) or
+      -- weights only the defending player (the stored carrier, a printed
+      -- RequiredDefender, goad's second), and Combat.attackTargets puts that
+      -- target first -- so the first freely announceable target is always an
+      -- argmax. Not implemented, therefore untested: any weighting under which
+      -- this fold and "take the first announceable target" differ (#2369).
       bestFor oid = case fmap (\target -> (target, Map.findWithDefault 0 (oid, target) required)) (announceable oid) of
         [] -> Nothing
         first : rest -> Just (List.foldl' (\best pair -> if snd pair > snd best then pair else best) first rest)

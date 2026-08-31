@@ -4,14 +4,16 @@ module Pawl.Codec.AttackRequirement where
 
 import qualified Pawl.Codec.Affected as Affected
 import qualified Pawl.Codec.Condition as Condition
+import qualified Pawl.Codec.RequiredDefender as RequiredDefender
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 
--- | "while" is the ordinary optional field, omitted when the card states no
--- gate, spelled exactly as Pawl.Codec.BlockPermission spells the same CR 604.2
--- clause and as Pawl.Codec.CombatRestriction spells its opposite, "unless".
+-- | "object" and "while" are both ordinary optional fields, omitted when the
+-- card narrows neither axis. "while" is spelled exactly as
+-- Pawl.Codec.BlockPermission spells the same CR 604.2 clause and as
+-- Pawl.Codec.CombatRestriction spells its opposite, "unless".
 --
 -- The key is "subject" and not "attacker": CR 508.1d's requirement names the
 -- creatures REQUIRED to attack, where CR 509.1c's names the attacker to be
@@ -22,9 +24,11 @@ import qualified Pawl.Types.AttackRequirement as AttackRequirement
 codec :: Codec.Codec AttackRequirement.AttackRequirement
 codec = Fields.object $ do
   subject <- Fields.required "subject" Affected.codec AttackRequirement.subject
+  object <- Fields.defaulted "object" Nothing (Common.maybe RequiredDefender.codec) AttackRequirement.object
   while <- Fields.defaulted "while" Nothing (Common.maybe Condition.codec) AttackRequirement.while
   pure
     AttackRequirement.MkAttackRequirement
       { AttackRequirement.subject = subject,
+        AttackRequirement.object = object,
         AttackRequirement.while = while
       }

@@ -2,6 +2,7 @@ module Pawl.Types.AttackRequirement where
 
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.RequiredDefender as RequiredDefender
 
 -- | CR 508.1d: one printed ATTACKING REQUIREMENT. Curse of the Nightly Hunt's
 -- "creatures enchanted player controls attack each combat if able".
@@ -10,21 +11,8 @@ import qualified Pawl.Types.Condition as Condition
 -- Pawl.Types.BlockRequirement, which argues why neither
 -- Pawl.Types.StaticAbility nor Pawl.Types.PlayerStaticAbility can hold a
 -- requirement. BlockRequirement carries BOTH of CR 509.1c's axes, because the
--- printings use both; this one carries the subject and CR 508.1d's condition.
---
--- CR 508.1d's OBJECT axis -- "attacks a player other than you if able" -- lives
--- on Pawl.Types.ActiveAttackRequirement instead, the resolution-created sibling.
--- Nothing in data/cards/ states that axis as a static ability: the one card
--- there that reaches it CREATES the requirement on resolution (Alluring Siren),
--- as does Kardur, Doomscourge, untranscribed. Printings that state it STATICALLY
--- do exist and are untranscribed too, so the gap is a transcription away from
--- being observable: Public Enemy is an Aura reading "all creatures attack
--- enchanted creature's controller each combat if able", and Galactus, Devourer
--- of Worlds prints it on a creature, gated (Scryfall o:"if able" o:"other than
--- you" and the o:"if able" sweep, 2026-08-21). Pawl.Engine.AttackRequirement
--- instantiates this carrier as (creature, target) pairs, one per announcement
--- CR 508.1b admits, so a requirement written here is unrestricted on that axis.
--- Not implemented: a PRINTED requirement that narrows it (#2014).
+-- printings use both; this one carries all three of subject, object and CR
+-- 508.1d's condition.
 --
 -- Gathered LIVE from the battlefield on every read and never captured, so a
 -- Curse leaving the battlefield lifts its requirement with nothing to unwind.
@@ -35,6 +23,20 @@ data AttackRequirement = MkAttackRequirement
     -- for: a rule-modifying continuous effect can affect objects that were not
     -- affected when it began.
     subject :: Affected.Affected,
+    -- | CR 508.1d's OBJECT axis -- WHOM the creature has to attack. Nothing is
+    -- the unnarrowed requirement (Curse of the Nightly Hunt's "attack each
+    -- combat if able"), which Pawl.Engine.AttackRequirement instantiates as one
+    -- pair per announcement CR 508.1b admits, so any announcement obeys it.
+    --
+    -- A Pawl.Types.RequiredDefender and not the PlayerId
+    -- Pawl.Types.ActiveAttackRequirement carries: that carrier's producer names
+    -- its player by TARGETING it, and a static ability has no target to read.
+    -- The type says why neither PlayerRef nor PlayerScope reaches the phrase.
+    --
+    -- Not implemented: any other way of naming the player -- Galactus, Devourer
+    -- of Worlds' "an opponent with the most life among your opponents", Trove of
+    -- Temptation's "you or a planeswalker you control" (#2820).
+    object :: Maybe RequiredDefender.RequiredDefender,
     -- | CR 508.1d's second shape -- "or that it attacks if some condition is
     -- met" -- read as CR 604.2's "as long as" clause. Otarian Juggernaut's
     -- threshold: "as long as there are seven or more cards in your graveyard,
