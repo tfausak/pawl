@@ -8020,8 +8020,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- assertions above.
     Spec.assertBool s (clashes [destruction, counting (Quantity.Type.Negate (against destroyedSlot))]) "a singular read nested inside a number is caught"
     -- And the guard that keeps the leg from being silently inert: the pool reads
-    -- a slot inside a number -- Soul's Majesty aims a count at its target, and
-    -- every card with an {X} in a number reads the announced amount.
+    -- a slot inside a number -- Rabid Bite's damage is its dealer's power, aimed
+    -- at the dealer's own slot.
     Spec.assertBool s (any (anyFace (any readsSlotInNumber . cardResolutionEffects) . Printing.card) ps) "the pool has a card reading a slot inside a number"
     -- The PlayerRef carrier one step out: CR 118.12a's payer and CR 603.5's asker
     -- sit on a CLAUSE, so this pair goes through faceClashes rather than through
@@ -8033,12 +8033,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (faceClashes (payerFace (PlayerRef.EachInSlot destroyedSlot)))) "a group-tolerant payer is left alone"
     Spec.assertBool s (not (faceClashes (payerFace (PlayerRef.ControllerOfBound elsewhereSlot)))) "a payer naming another slot is left alone"
     -- The same arm at the OTHER clause position, which the payer's boards cannot
-    -- prove: an askerSlot answering nothing would pass all three above.
+    -- prove: a clausePlayerRefs answering [] for Optionality.Optional would pass
+    -- all three above.
     Spec.assertBool s (faceClashes (askerFace (PlayerRef.ControllerOfBound destroyedSlot))) "a may's asker naming a plurally bound slot is caught"
     Spec.assertBool s (not (faceClashes (askerFace (PlayerRef.ControllerOfBound elsewhereSlot)))) "an asker naming another slot is left alone"
     -- And the guard that keeps this leg from fencing a shape no card writes: Mana
     -- Leak, Clash of Wills, Mystic Confluence and Don't Make a Sound all offer
-    -- their cost to the countered spell's controller.
+    -- their cost to the targeted spell's controller, and Amulet of Safekeeping to
+    -- the controller of the object that did the targeting.
     Spec.assertBool s (any (anyFace (any namesControllerOfBound . faceClausePlayerRefs) . Printing.card) ps) "the pool has a card naming a clause's player by the controller of a bound object"
     Spec.assertEqWith s "a group binding is invisible to a singular reader" (fmap (S.nameOf . Printing.card) offenders) []
   -- OwnerChooses asks a player which END of a library a card arrives at (CR
