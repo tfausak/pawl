@@ -3351,48 +3351,49 @@ installDamageRow players slots controller source duration kind rewrite rider pri
   Nothing -> g
   Just expiry ->
     let (ts, g1) = Game.freshTimestamp g
+        re =
+          ReplacementEffect.DamageR
+            ( DamageR.MkDamageR
+                DamagePattern.MkDamagePattern
+                  { -- PRINTED, not assumed: Nothing takes combat and
+                    -- noncombat alike, Just Combat only the former.
+                    DamagePattern.whichKind = kind,
+                    -- A caller that names no source gets the trivial
+                    -- predicate, which is CR 615.7's own "the number of
+                    -- events or sources dealing it doesn't matter"; one
+                    -- that named a CHOSEN source (CR 609.7a) gets that
+                    -- source's printed properties, for CR 615.9's recheck
+                    -- at the damage event. A caller naming CR 609.7b's
+                    -- PRINTED properties instead contributes them here
+                    -- too, and the trivial predicate drops out of the
+                    -- conjunction rather than nesting inside it.
+                    DamagePattern.whatSource = case filter (/= Filter.Type.And []) (printed : Maybe.maybeToList (fmap fst sourceChoice)) of
+                      [only] -> only
+                      named -> Filter.Type.And named,
+                    -- CR 611.2c's DESCRIBED recipient side, disjoined on the
+                    -- pattern: a shield covering "you and/or permanents you
+                    -- control" is read live at each damage event, since a
+                    -- prevention effect changes no characteristic and no
+                    -- controller and so reaches objects it did not reach
+                    -- when it began. Both halves are Nothing for a row
+                    -- whose recipient the resolution BAKED below instead.
+                    DamagePattern.whatRecipient = fst describedRecipient,
+                    DamagePattern.whoRecipient = snd describedRecipient,
+                    DamagePattern.whichRecipient = recipient,
+                    -- CR 609.7a's chosen source or CR 601.2c's targeted
+                    -- one, baked for the recipient's reason -- both were
+                    -- fixed when this effect was created and card data can
+                    -- name neither.
+                    DamagePattern.whichSource = fmap snd sourceChoice
+                  }
+                rewrite
+                -- CR 615.5's rider on this carrier is the snapshotted one
+                -- on the row below; the authored field here stays empty.
+                Seq.empty
+            )
         active =
           ActiveReplacement.MkActiveReplacement
-            { ActiveReplacement.effect =
-                ReplacementEffect.DamageR
-                  ( DamageR.MkDamageR
-                      DamagePattern.MkDamagePattern
-                        { -- PRINTED, not assumed: Nothing takes combat and
-                          -- noncombat alike, Just Combat only the former.
-                          DamagePattern.whichKind = kind,
-                          -- A caller that names no source gets the trivial
-                          -- predicate, which is CR 615.7's own "the number of
-                          -- events or sources dealing it doesn't matter"; one
-                          -- that named a CHOSEN source (CR 609.7a) gets that
-                          -- source's printed properties, for CR 615.9's recheck
-                          -- at the damage event. A caller naming CR 609.7b's
-                          -- PRINTED properties instead contributes them here
-                          -- too, and the trivial predicate drops out of the
-                          -- conjunction rather than nesting inside it.
-                          DamagePattern.whatSource = case filter (/= Filter.Type.And []) (printed : Maybe.maybeToList (fmap fst sourceChoice)) of
-                            [only] -> only
-                            named -> Filter.Type.And named,
-                          -- CR 611.2c's DESCRIBED recipient side, disjoined on the
-                          -- pattern: a shield covering "you and/or permanents you
-                          -- control" is read live at each damage event, since a
-                          -- prevention effect changes no characteristic and no
-                          -- controller and so reaches objects it did not reach
-                          -- when it began. Both halves are Nothing for a row
-                          -- whose recipient the resolution BAKED below instead.
-                          DamagePattern.whatRecipient = fst describedRecipient,
-                          DamagePattern.whoRecipient = snd describedRecipient,
-                          DamagePattern.whichRecipient = recipient,
-                          -- CR 609.7a's chosen source or CR 601.2c's targeted
-                          -- one, baked for the recipient's reason -- both were
-                          -- fixed when this effect was created and card data can
-                          -- name neither.
-                          DamagePattern.whichSource = fmap snd sourceChoice
-                        }
-                      rewrite
-                      -- CR 615.5's rider on this carrier is the snapshotted one
-                      -- on the row below; the authored field here stays empty.
-                      Seq.empty
-                  ),
+            { ActiveReplacement.effect = re,
               ActiveReplacement.source = source,
               -- CR 109.5, baked as Replace's is.
               ActiveReplacement.controller = controller,
@@ -3409,15 +3410,33 @@ installDamageRow players slots controller source duration kind rewrite rider pri
               -- Pawl.Types.ActiveReplacement).
               ActiveReplacement.condition = Nothing,
               ActiveReplacement.rider = rider,
-              -- The installing resolution's own slot bindings, captured here for
-              -- the reason Effect.Replace's row captures them (CR 603.7c): this
+              -- The installing resolution's slot bindings, captured here for the
+              -- reason Effect.Replace's row captures them (CR 603.7c): this
               -- resolution is about to end, and DamagePattern.whatSource and
               -- DamagePattern.whatRecipient are re-asked at every damage event
               -- (Pawl.Engine.Replacement.candidateContext), so a Filter.IsBound in
               -- either would have nothing live to read. The two carriers of a
               -- DamageR row therefore answer a bound slot the same way.
-              ActiveReplacement.slots = slots
+              --
+              -- NARROWED to the slots THIS ROW names, not the whole resolution's
+              -- map, because the map is also read as CR 609.7a's third class:
+              -- referredToSources offers "any object referred to by ... a
+              -- replacement or prevention effect that's waiting to apply", and a
+              -- slot an unrelated earlier effect of the same resolution bound is
+              -- not something this row refers to. The redirection is the extreme
+              -- case -- it is installed with the trivial printed predicate, no
+              -- described recipient, no rider and no clause, so nothing it holds
+              -- can read a slot at all.
+              ActiveReplacement.slots = Map.restrictKeys slots namedSlots
             }
+        -- Every slot name the row above can name: the PATTERN's own Filters,
+        -- which is the whole of what Replacement.candidateContext re-asks them
+        -- against, plus CR 615.5's rider, whose objects the effect still refers
+        -- to even though Resolve.runPreventionRider reads them off
+        -- Pawl.Types.PreventionRider rather than off the row. `condition` is
+        -- Nothing on every one of these carriers, so it contributes no third
+        -- half.
+        namedSlots = Map.keysSet (replacementPatternSlots re) <> foldMap (Map.keysSet . PreventionRider.targets) rider
      in g1 {GameState.replacements = active : GameState.replacements g1}
 
 -- CR 609.7a: choose the SOURCE a prevention or redirection effect names, and
@@ -3511,12 +3530,19 @@ damageSourceCandidates context gs filter_ =
 -- reads it through CR 608.2h's last known information rather than through the
 -- blank view a live-only projection gives.
 --
--- Only the STACK half has a card behind it -- Pawl.ReplacementSpec's "a source
--- only a waiting ability still refers to is offered", Ghitu Fire-Eater under
--- Auriok Replica. The replacement-row and delayed-trigger halves are REGRESSION
--- FENCES: neutralizing either leaves the whole suite green, no board in
--- data/cards/ putting such an object in front of a chooser. They are written
--- because rule 609.7a's one sentence names all three carriers (#2479).
+-- What a waiting ROW refers to is narrower than the map it carries: a floating
+-- damage row holds only the slots its own fields name, since installDamageRow
+-- restricts what it captures. So the fold below is over referents rather than
+-- over a whole resolution's bindings, and that narrowing is what
+-- Pawl.ReplacementSpec's Synthetic Parting Ward case reads.
+--
+-- Only the STACK half is proven in the OFFERING direction -- Pawl.ReplacementSpec's
+-- "a source only a waiting ability still refers to is offered", Ghitu Fire-Eater
+-- under Auriok Replica. That the replacement-row and delayed-trigger halves
+-- OFFER anything is a REGRESSION FENCE: neutralizing either leaves the whole
+-- suite green, no board in data/cards/ needing such an object in front of a
+-- chooser to make its play. They are written because rule 609.7a's one sentence
+-- names all three carriers (#2479).
 referredToSources :: GameState -> [ObjectId]
 referredToSources gs =
   foldMap (\oid -> foldMap referentsOfObject (Game.lookupObject oid gs)) (GameState.stack gs)

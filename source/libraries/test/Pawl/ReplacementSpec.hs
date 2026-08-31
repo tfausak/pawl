@@ -1695,6 +1695,99 @@ targetingOnly oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
   _ -> S.identityAnswer p
 
+-- CR 609.7a's third class read the OTHER way -- what a waiting row does NOT refer
+-- to -- whose producer is Synthetic Parting Ward ({1}{W} Instant: "Destroy target
+-- creature. Prevent the next 2 combat damage that would be dealt to you this
+-- turn."), with Auriok Replica supplying the later chooser and Ghitu Fire-Eater
+-- the damage.
+--
+-- The rule admits "any object referred to by ... a replacement or prevention
+-- effect that's waiting to apply". A floating shield carries a snapshot of the
+-- installing resolution's bindings so its own Filters can still be answered at
+-- the damage event (Pawl.Types.ActiveReplacement, and Synthetic Communal Bulwark
+-- above is what needs it), and this card's shield names NONE of them: it
+-- describes its recipient as a player relation, prints no source properties, asks
+-- for no chosen source and carries no rider. So the creature its FIRST clause
+-- destroyed is referred to by the spell and not by the row the spell left behind,
+-- and it must not turn up in the Replica's pool.
+--
+-- WHY THE CREATURE HAS TO DIE: every one of CR 609.7a's other three classes would
+-- otherwise offer it anyway. Destroyed, it is on no battlefield, is no spell, and
+-- sits in no command zone, so the row's captured map is the only thing that could
+-- put it in front of a chooser -- exactly the parenthesis's "even if that object
+-- is no longer in the zone it used to be in", read as an exclusion.
+--
+-- SYNTHETIC because no printing binds a slot in one clause and installs a damage
+-- row that ignores it in the next. Scryfall o:"prevent the next" (o:"destroy
+-- target" or o:"exile target" or o:"return target" or o:"target creature card" or
+-- o:"tap target") and o:"prevent all damage" with the same disjunction,
+-- 2026-08-31: the hits either put the two clauses in different modes (Ivory
+-- Charm, Rith's Charm, Dromoka's Command), in different halves of a split card
+-- (Stand // Deliver), or aim both at ONE object (Enshrouding Mist, Inquisitor's
+-- Snare), which the row then genuinely refers to. What would refute this is a
+-- printing whose single resolution targets one object and shields another.
+--
+-- THE FALLBACK IS THE OBSERVABLE, chooseDamageSourceOf's filtered-not-trusted
+-- posture: alice names the destroyed creature every time, so an engine that
+-- offers it shields a corpse and takes the Fire-Eater's 2, and an engine that
+-- declines it falls back to the head of the ascending pool. The Fire-Eater is
+-- placed FIRST so that head is the one source whose damage this shield can
+-- prevent.
+--
+-- Two seats is enough: the card says "you" and names no opponent. bob owns the
+-- destroyed creature, so the offered id belongs to the other seat as well as to
+-- another zone.
+partingWardSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+partingWardSpec s registry = Spec.describe s "Synthetic Parting Ward (CR 609.7a)" $ do
+  Spec.it s "CR 609.7a an object bound by an unrelated clause of the row's own resolution is not offered" $ do
+    plains <- S.printingOf s registry "Plains"
+    ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
+    replica <- S.printingOf s registry "Auriok Replica"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ward <- S.printingOf s registry "Synthetic Parting Ward"
+    let (fireEater, g1) = S.addCreature ghitu S.alice (Setup.emptyGame S.bothPlayers)
+        (destroyed, g2) = S.addCreature piker S.bob g1
+        (replicaId, g3) = S.addCreature replica S.alice g2
+        -- Three Plains: two pay the Ward's {1}{W}, the third the Replica's {W}.
+        g4 = S.landsFor plains S.alice 3 g3
+        (wardId, g5) = S.addHandCard ward S.alice g4
+        ready =
+          g5
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        -- The Ward resolved: bob's creature is destroyed and the shield is
+        -- waiting, holding whatever its installation captured.
+        armed = S.runPure (targetingOnly destroyed) ready (S.cast S.alice wardId Monad.>> Stack.resolveTop)
+        -- The Fire-Eater's ability goes on the stack FIRST and the Replica's on
+        -- top of it, so the choice is made while the shield is still waiting and
+        -- the Fire-Eater's damage is dealt afterwards.
+        rest =
+          Activate.activateAbility S.alice fireEater (theAbility ghitu)
+            Monad.>> Activate.activateAbility S.alice replicaId (theAbility replica)
+            Monad.>> Stack.resolveTop
+            Monad.>> Stack.resolveTop
+        after src = S.runPure (choosePlayerAndSource S.alice src) armed rest
+        -- The lands were placed last, so the battlefield's highest id is a Plains.
+        plainsId = Set.findMax (GameState.battlefield armed)
+    -- THE gameplay assertion: naming the destroyed creature gets alice the
+    -- FALLBACK, and the fallback shields the Fire-Eater whose 2 is the only damage
+    -- on this board. An engine offering it shields an object that deals nothing
+    -- and leaves alice on 18.
+    Spec.assertEqWith s "the destroyed creature was not offered, so the fallback shielded the Fire-Eater" (S.lifeOf S.alice (after destroyed)) (Just 20)
+    -- Its twin on the same board, differing in the ANSWER alone and naming
+    -- something the rule DOES admit: a Plains is a permanent, is offered, and
+    -- shields nothing that happens here -- so the 20 above is neither "everything
+    -- was prevented" nor the Ward's own shield catching this damage.
+    Spec.assertEqWith s "naming a Plains instead, which IS a legal choice, leaves the same 2 landing" (S.lifeOf S.alice (after plainsId)) (Just 18)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "the answer recorded is the fallback, not the destroyed creature alice named" (chosenSourcesIn (answersFor (choosePlayerAndSource S.alice destroyed) armed rest)) [fireEater]
+    Spec.assertBool s (Maybe.isNothing (Game.lookupObject destroyed armed)) "setup: the Ward really did destroy bob's creature, so the id names nothing"
+    Spec.assertEqWith s "setup: the Ward installed exactly one floating row" (length (GameState.replacements armed)) 1
+    Spec.assertEqWith s "setup: that row names no slot, so it captured none" (foldMap ActiveReplacement.slots (GameState.replacements armed)) Map.empty
+    Spec.assertBool s (plainsId /= destroyed && plainsId /= fireEater) "setup: the id the twin names is a Plains and neither of the two creatures"
+
 -- CR 612.1 through a REDIRECTION's own chosen-source predicate (CR 609.7a),
 -- whose producer is Synthetic Turn the Blade ({1}{W} Instant: "The next time a
 -- Human of your choice would deal damage to you this turn, that damage is dealt
@@ -6564,6 +6657,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   packLeaderSpec s registry
   wardingChantSpec s registry
   communalBulwarkSpec s registry
+  partingWardSpec s registry
   turnTheBladeSpec s registry
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
