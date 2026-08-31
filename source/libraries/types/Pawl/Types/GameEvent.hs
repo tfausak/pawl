@@ -840,9 +840,11 @@ data GameEvent
     -- Pawl.Engine.Dungeon.remove.
     --
     -- No dungeon on the payload, Scried's shape: CR 309.7 states the fact of
-    -- completion and names no card, and nothing triggers on completing a NAMED
-    -- dungeon. Acererak the Archlich reads that off
-    -- Pawl.Types.Player.completedDungeonNames instead, which outlives the log.
+    -- completion and names no card. Scryfall o:"completed" (2026-08-31) returns
+    -- one printing naming a dungeon, Acererak the Archlich, and it reads the fact
+    -- rather than the moment -- off Pawl.Types.Player.completedDungeonNames, which
+    -- outlives the log this entry is cleared from. A "whenever you complete
+    -- [dungeon]" would be what puts a name here.
     DungeonCompleted PlayerId.PlayerId
   | -- | CR 601.2c: an object or player BECAME A TARGET of a spell or ability --
     -- CR 115.1 makes a player a target in its own right, so the payload's

@@ -603,9 +603,10 @@ data Quantity
     -- differ and Player.completedDungeons argues which is which.
     --
     -- Read straight off Player.completedDungeons rather than folded from
-    -- GameState.events, for the reason LifeTotal is read off the player: nothing
-    -- logs the removal, and the log is cleared at every turn handoff while
-    -- completion outlives the game's turns.
+    -- GameState.events, for the reason LifeTotal is read off the player: the log
+    -- is cleared at every turn handoff while a completion outlives the game's
+    -- turns, so GameEvent.DungeonCompleted answers "did one just happen?" and
+    -- never "how many".
     --
     -- An ABSENT player answers 0 rather than Nothing, as SpellsCastLastTurn's
     -- absent entry does: nobody having completed a dungeon is an answered
