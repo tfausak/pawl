@@ -268,6 +268,7 @@ import qualified Pawl.Codec.PhaseSpec
 import qualified Pawl.Codec.PhasedOutSpec
 import qualified Pawl.Codec.PileSpec
 import qualified Pawl.Codec.PlayPermissionOriginSpec
+import qualified Pawl.Codec.PlayerAttacksPlayerSpec
 import qualified Pawl.Codec.PlayerAttacksWithSpec
 import qualified Pawl.Codec.PlayerCounterKindSpec
 import qualified Pawl.Codec.PlayerCounterTallySpec
@@ -819,6 +820,7 @@ spec s registry = do
   Pawl.Codec.PileSpec.spec s
   Pawl.Codec.PlayPermissionOriginSpec.spec s
   Pawl.Codec.PlayerCounterKindSpec.spec s
+  Pawl.Codec.PlayerAttacksPlayerSpec.spec s
   Pawl.Codec.PlayerAttacksWithSpec.spec s
   Pawl.Codec.PlayerCounterTallySpec.spec s
   Pawl.Codec.PlayerCountersSpec.spec s

@@ -4150,8 +4150,78 @@ seiferSpec s registry =
 -- Rule 508.3e's condition, read off the log entry CR 603.2 writes for a trigger.
 isPlayerAttacksPlayer :: TriggerCondition.TriggerCondition -> Bool
 isPlayerAttacksPlayer condition = case condition of
-  TriggerCondition.PlayerAttacksPlayer _ -> True
+  TriggerCondition.PlayerAttacksPlayer {} -> True
   _ -> False
+
+-- CR 508.3e's SECOND subject named, with Lulu, Stern Guardian {2}{U} Legendary
+-- Creature -- Human Wizard 2/3: "Whenever an opponent attacks you, choose
+-- target creature attacking you. Put a stun counter on that creature." Seifer
+-- above leaves that subject bare (AnyPlayer); this one pins it to You, and the
+-- pair is what makes the field observable.
+--
+-- THREE SEATS, because two collapse it: CR 506.2a has the attacking player
+-- choose one opponent as a turn-based action, so the two boards below differ in
+-- exactly that answer -- alice attacks bob on one and carol on the other, with
+-- bob's Lulu, alice's two Pikers and everything else identical.
+--
+-- Opponent on the ATTACKING side is not observable here and is not claimed to
+-- be: the attacked side is already pinned to Lulu's controller, and a player
+-- cannot attack themselves, so AnyPlayer would pick the same declarations. It
+-- is Seifer's board that exercises that half of the payload.
+luluSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+luluSpec s registry =
+  let -- Answers CR 506.2a's turn-based choice with `defender`, sends every
+      -- Piker at that player, and points the stun's one target slot at
+      -- `victim`. Every choice is FILTERED out of what the engine offered
+      -- rather than built, seiferSpec's reason above.
+      answering :: PlayerId.PlayerId -> [ObjectId.ObjectId] -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      answering defender attackers victim p = case p of
+        Prompt.ChooseDefender _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== defender) (NonEmpty.toList options))
+        Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
+        Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer defender) (NonEmpty.toList options))
+        Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just victim) . Recipient.objectOf) . snd) sets
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      sentAt gs = Combat.Type.attackers (GameState.combat gs)
+      stunOn oid gs = fmap (Map.findWithDefault 0 CounterKind.Stun . Object.counters) (Game.lookupObject oid gs)
+      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacksPlayer (AbilityTriggered.condition record)]
+   in Spec.describe s "Lulu, Stern Guardian" $ do
+        -- The proving test: alice picks bob, so rule 508.3e's two subjects are
+        -- alice and bob and the trigger fires. TWO Pikers so the target slot is
+        -- a real choice -- one candidate would let the prompt short-circuit and
+        -- the answer would prove nothing.
+        Spec.it s "CR 508.3e an opponent attacking you stuns a creature attacking you" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          lulu <- S.printingOf s registry "Lulu, Stern Guardian"
+          let (gs, mine, theirs, _) = S.threePlayerCombat [piker, piker] [lulu] []
+          case (mine, theirs) of
+            ([first, second], [_]) -> do
+              let after = atBlockers (answering S.bob [first, second] second) gs
+              Spec.assertEqWith s "CR 122.1d the Piker the trigger named has a stun counter" (stunOn second after) (Just 1)
+              Spec.assertEqWith s "and the Piker it did not name has none" (stunOn first after) (Just 0)
+              Spec.assertEqWith s "CR 508.3e one trigger, from the one attacked player" (fired after) 1
+              Spec.assertEqWith s "CR 508.1b and both Pikers really were declared at bob" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.bob), (second, AttackTarget.OfPlayer S.bob)])
+            _ -> Spec.assertFailure s "fixture should give alice two Pikers and bob a Lulu"
+        -- The same board with CR 506.2a's answer moved to carol, and nothing
+        -- else changed. This is the leg the attacked relation buys: a payload
+        -- leaving that subject bare fires here too.
+        --
+        -- Led by the TRIGGER COUNT rather than by the counters, because the
+        -- counters cannot tell the two readings apart -- Lulu's own target
+        -- filter is "attacking you", so a spurious firing finds no legal target
+        -- and CR 603.3d removes it before anything is placed. The count is the
+        -- closest observable there is, seiferSpec's silent boards' reason.
+        Spec.it s "CR 508.3e an opponent attacking somebody else leaves it silent" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          lulu <- S.printingOf s registry "Lulu, Stern Guardian"
+          let (gs, mine, theirs, _) = S.threePlayerCombat [piker, piker] [lulu] []
+          case (mine, theirs) of
+            ([first, second], [_]) -> do
+              let after = atBlockers (answering S.carol [first, second] second) gs
+              Spec.assertEqWith s "CR 508.3e no trigger at all" (fired after) 0
+              Spec.assertEqWith s "CR 122.1d and neither Piker is stunned" (stunOn second after, stunOn first after) (Just 0, Just 0)
+              Spec.assertEqWith s "CR 508.1b and both Pikers really were declared at carol" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.carol), (second, AttackTarget.OfPlayer S.carol)])
+            _ -> Spec.assertFailure s "fixture should give alice two Pikers and bob a Lulu"
 
 -- CR 122.1's experience counters READ, with Ezuri, Claw of Progress {2}{G}{U}
 -- Legendary Creature -- Phyrexian Elf Warrior 3/3: "Whenever a creature you
@@ -5847,6 +5917,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   everWatchingThresholdSpec s registry
   hermesSpec s registry
   seiferSpec s registry
+  luluSpec s registry
   ezuriExperienceSpec s registry
   savantiRomeroSpec s registry
   youngPyromancerSpec s registry
