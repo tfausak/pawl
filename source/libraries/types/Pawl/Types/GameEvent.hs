@@ -896,7 +896,9 @@ data GameEvent
     -- Emitted for a PHASED-IN BATTLEFIELD permanent and for nothing else, by
     -- both roads. For CR 800.4a's that is exactly right: it is the set CR 603.6c's
     -- second trigger event ranges over, and rule 702.26k says a phased-out
-    -- permanent leaving that way causes no zone-change ability to trigger.
+    -- permanent leaving that way causes no zone-change ability to trigger. For
+    -- CR 729.4a's it is CR 702.26b, to which rule 729.4a states no exception --
+    -- see Pawl.Engine.Setup.applyCrossings.
     --
     -- Not implemented: CR 729.4a asks for more -- "abilities in the main game
     -- that trigger on objects leaving a main-game ZONE" -- so a card a subgame
