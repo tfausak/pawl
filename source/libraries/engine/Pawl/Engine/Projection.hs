@@ -2239,11 +2239,24 @@ rewriteEffect pairs effect = case effect of
   Effect.CopySpell (CopySpell.MkCopySpell ref newTargets) -> Effect.CopySpell (CopySpell.MkCopySpell (rewriteObjectRef pairs ref) newTargets)
   Effect.Replace {} -> effect
   Effect.SkipNextPhase {} -> effect
-  -- CR 612.1: a rider's text is as changeable as any other.
+  -- CR 612.1 through every half of the shield that holds printed words: the
+  -- objects it covers, the predicates describing its recipients and its source,
+  -- the amount, the duration and the CR 615.5 rider. `kind`, `whoRecipient` and
+  -- `direction` are not words a subtype swap can find -- a damage kind, CR
+  -- 109.5's player relation and which side of the event the ref sits on.
+  --
+  -- Only the two Filters Synthetic Warding Chant writes are PROVEN, by
+  -- Pawl.ReplacementSpec's "Synthetic Warding Chant (CR 612.1)" group:
+  -- PreventAllDamage's whatSource and PreventNextDamage's whatRecipient. The
+  -- refs and the two chosenSource fields are REGRESSION FENCES, TurnFaceDown's
+  -- shape above: every ref data/cards writes at these positions is an InSlot, on
+  -- which rewriteObjectRef is the identity, and every chosenSource it writes
+  -- (Auriok Replica, Healing Grace, Samite Ministration) is the trivial
+  -- `And []`, so mutating either line reddens nothing.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration kind ref whatRecipient whoRecipient chosenSource quantity rider) ->
-    Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage (rewriteDuration pairs duration) kind ref whatRecipient whoRecipient chosenSource (rewriteQuantity pairs quantity) (fmap (rewriteEffect pairs) rider))
+    Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage (rewriteDuration pairs duration) kind (fmap (rewriteObjectRef pairs) ref) (fmap (Filter.rewrite pairs) whatRecipient) whoRecipient (fmap (Filter.rewrite pairs) chosenSource) (rewriteQuantity pairs quantity) (fmap (rewriteEffect pairs) rider))
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration kind ref direction chosenSource whatSource rider) ->
-    Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage (rewriteDuration pairs duration) kind ref direction chosenSource whatSource (fmap (rewriteEffect pairs) rider))
+    Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage (rewriteDuration pairs duration) kind (rewriteObjectRef pairs ref) direction (fmap (Filter.rewrite pairs) chosenSource) (Filter.rewrite pairs whatSource) (fmap (rewriteEffect pairs) rider))
   Effect.RedirectDamage {} -> effect
   Effect.Counter (Counter.MkCounter ref mSlot) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot)
   -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
