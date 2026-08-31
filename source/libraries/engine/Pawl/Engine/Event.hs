@@ -10811,13 +10811,27 @@ eventBindings bearerBecame cond event = case (cond, event) of
   (TriggerCondition.SelfLeavesTheBattlefield, GameEvent.Moved m)
     | not (Game.isHiddenZone (ZoneChange.to (Moved.change m))) ->
         setBecameArrivals m Map.empty
-  -- The bystander reading of that same arm, guarded the same way and for the same
-  -- rule. Its OTHER event binds nothing and has no arm: CR 603.6c's
-  -- leaving-the-game form reaches no zone at all, so there is no arriving
-  -- incarnation for CR 400.7e to rescue.
-  (TriggerCondition.PermanentLeavesTheBattlefield _, GameEvent.Moved m)
-    | not (Game.isHiddenZone (ZoneChange.to (Moved.change m))) ->
-        setBecameArrivals m Map.empty
+  -- The bystander reading of that same arm. CR 400.7e's arrival is guarded the
+  -- same way and for the same rule -- and unlike the self-scoped arm this one
+  -- binds a second slot the guard does not reach.
+  (TriggerCondition.PermanentLeavesTheBattlefield _, GameEvent.Moved m) ->
+    -- CR 603.10a's look-back, bound UNCONDITIONALLY where CR 400.7e's arrival is
+    -- bound only for a public destination: Resourceful Defense's "if IT had
+    -- counters on it" is about the permanent as it last existed on the
+    -- battlefield, which ZoneChange.departed names whatever zone the card
+    -- reached. Both slots, since one printed "it" is two objects for the reader
+    -- that wants the arrival instead.
+    Binding.setDepartedPermanent (ZoneChange.departed (Moved.change m)) $
+      if Game.isHiddenZone (ZoneChange.to (Moved.change m))
+        then Map.empty
+        else setBecameArrivals m Map.empty
+  -- CR 603.6c's other trigger event reaches no zone, so it offers CR 400.7e
+  -- nothing to bind -- but the departed id is the whole of what it carries, and
+  -- CR 608.2h is the only way to read a permanent that left the GAME. Which is
+  -- what keeps eventBindingSlots' promise for this condition honest across all
+  -- three of its events.
+  (TriggerCondition.PermanentLeavesTheBattlefield _, GameEvent.LeftTheGame oid) ->
+    Binding.setDepartedPermanent oid Map.empty
   -- CR 400.7e again, read in the ENTRY direction: the object that moved is the
   -- entrant, and what it became is the permanent now on the battlefield --
   -- ZoneChange.object, the field the SelfDies arm reads for the same reason.
@@ -11508,10 +11522,13 @@ eventBindingSlots cond = case cond of
   -- empty. A card whose leaves-the-battlefield payload names `became` is therefore
   -- rejected by the lint (#505).
   TriggerCondition.SelfLeavesTheBattlefield -> Set.empty
-  -- Empty for the arm above's reason, and for a second one: this condition's
-  -- other event (CR 603.6c's leaving-the-game form) reaches no zone, so even a
-  -- public destination is not guaranteed by a match.
-  TriggerCondition.PermanentLeavesTheBattlefield _ -> Set.empty
+  -- CR 400.7e's `became` is withheld for the arm above's reason and for a second
+  -- one: this condition's other event (CR 603.6c's leaving-the-game form)
+  -- reaches no zone, so even a public destination is not guaranteed by a match.
+  -- CR 603.10a's departed permanent IS guaranteed, and by both events -- a zone
+  -- change carries ZoneChange.departed and a departure from the game carries the
+  -- id itself -- which is what lets Resourceful Defense read "it".
+  TriggerCondition.PermanentLeavesTheBattlefield _ -> Set.singleton Binding.departedPermanent
   -- Nothing, where PermanentDies binds CR 400.7e's graveyard card: rule 702.55b's
   -- ability speaks about the creature it HAUNTS and never about the card that
   -- creature became, so no printing of haunt names the arrival. eventBindings has

@@ -735,13 +735,10 @@ everyKindSpec s registry = Spec.describe s "CR 122.5 moving every kind of counte
 -- include_extras parameter without which it misses two printings, and its date.
 -- The per-arm lists are not restated here: two copies is how one goes stale.
 --
--- pawl's Resourceful Defense omits the triggered ability entirely. CR 122.8's
--- placement itself is writable -- Effect.PutCountersFrom, which Iron Apprentice
--- proves in Pawl.PutCounterSpec -- but that opcode reads its tally off a SLOT,
--- and no reserved slot names the departing BYSTANDER this card's condition
--- watches (#2694). The omission is stricter than printed -- a departing
--- permanent's counters simply cease -- and never weaker in its controller's
--- favour.
+-- The card's FIRST line is CR 122.8 rather than rule 122.5 -- "the player
+-- doesn't move counters from one object to the other" -- so it is
+-- Effect.PutCountersFrom over Binding.departedPermanent, and Pawl.PutCounterSpec
+-- is where it is proved.
 --
 -- Both target pools are Pool.Permanents and both slots accept every permanent
 -- alice controls, so one predicate over both could not tell them apart and the
