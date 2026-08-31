@@ -2160,6 +2160,65 @@ isDamageR replacement = case replacement of
   ReplacementEffect.DamageR {} -> True
   _ -> False
 
+-- CR 615.1: a prevention effect acts like a "shield" around whatever it's
+-- affecting, so one affecting nothing is not a prevention effect at all. Each
+-- field that says what a shield covers is independently optional -- a card NAMES
+-- its recipients (Mending Hands' "any target"), DESCRIBES them (Divine
+-- Deflection's "you and/or permanents you control"), or names a SOURCE instead
+-- (Dovin, Hand of Control's "dealt by target permanent") -- so no schema can say
+-- that at least one has to be there, and Pawl.Engine.Resolve's two arms build one
+-- row per named object and one row for a description, leaving a shield that names
+-- nothing with no row to install and the card silently doing less than it
+-- printed.
+--
+-- Not implemented: a shield covering EVERY recipient, which is what a card naming
+-- only its source needs (Burrenton Forge-Tender's "prevent all damage a red
+-- source of your choice would deal this turn"). @whatRecipient@ describes
+-- permanents and the unbounded shield has no player half, so "everything" has no
+-- spelling and such a card would install nothing at all (#2101). Until it does,
+-- this lint is what stops one being written.
+shieldNamingNothingOffends :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+shieldNamingNothingOffends effect = case effect of
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref whatRecipient whoRecipient _ _ _) ->
+    Maybe.isNothing ref && Maybe.isNothing whatRecipient && Maybe.isNothing whoRecipient
+  -- `direction` is not read here: on the by-direction shield `ref` names CR
+  -- 120.1's SOURCE rather than a recipient, but either way it is the field the
+  -- row is built from, so a shield leaving both empty has nothing to install
+  -- whichever side it is pinned to. Its `whatSource` is not a substitute -- that
+  -- one narrows a row rather than creating one, and `And []` is its ordinary
+  -- value.
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref whatRecipient _ _ _ _) ->
+    Maybe.isNothing ref && Maybe.isNothing whatRecipient
+  _ -> False
+
+-- The non-vacuity half of that lint, isPhaseR's shape.
+isPreventionShield :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+isPreventionShield effect = case effect of
+  Effect.PreventNextDamage {} -> True
+  Effect.PreventAllDamage {} -> True
+  _ -> False
+
+-- The same question one axis over: a shield pinned to the SOURCE side of the
+-- damage event covers every recipient, and Pawl.Engine.Resolve's DealtBy branch
+-- writes no printed recipient onto the row at all, so a described recipient
+-- beside that direction is text nothing performs -- the shield installed would be
+-- BROADER than the card printed. No printing pairs the two: the by-direction
+-- template is Scryfall `o:"would be dealt by" o:prevent`, 2026-08-30, and the one
+-- shape that mentions both sides ("prevent all combat damage that would be dealt
+-- to and dealt by target creature", Fog Bank) is two shields, which is how Dovin,
+-- Hand of Control is written in data/cards/.
+byDirectionRecipientOffends :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+byDirectionRecipientOffends effect = case effect of
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ whatRecipient direction _ _ _) ->
+    direction == DamageDirection.DealtBy && Maybe.isJust whatRecipient
+  _ -> False
+
+-- The non-vacuity half of THAT lint, one field narrower than isPreventionShield.
+isByDirectionShield :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+isByDirectionShield effect = case effect of
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ direction _ _ _) -> direction == DamageDirection.DealtBy
+  _ -> False
+
 -- Every modal one face carries, in the four scopes cardSlotNamesCollide sweeps
 -- plus its rooms -- the list that lint spells out inline, hoisted because the
 -- either-or lint below needs the same one and a second copy would drift.
@@ -8124,6 +8183,68 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any hasZoneChangeRider printed) "setup: the Nexus prints both riders to move"
     Spec.assertBool s (not (any shufflingOutsideLibraryOffends printed)) "the real Nexus shuffles into a library"
     Spec.assertBool s (any (shufflingOutsideLibraryOffends . toExile) printed) "and the same rider on a redirect to exile is rejected"
+  -- CR 615.1: a prevention shield surrounds "whatever it's affecting", and every
+  -- field saying what that is is separately optional, so the schema cannot ask for
+  -- one of them and only this rejects a shield saying nothing at all. See
+  -- shieldNamingNothingOffends.
+  Spec.it s "no card authors a prevention shield that names nothing to shield" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace (any shieldNamingNothingOffends . cardResolutionEffects) . Printing.card) ps
+    -- Guards against a vacuous sweep: with no prevention shield in the pool at
+    -- all this would pass whatever a card said. Mending Hands prints the counted
+    -- shield and Inkshield the unbounded one.
+    Spec.assertBool s (any (anyFace (any isPreventionShield . cardResolutionEffects) . Printing.card) ps) "the pool has a card printing a prevention shield"
+    Spec.assertEqWith s "every shield says what it covers (CR 615.1)" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The rejecting direction, proven against real cards rather than a card file,
+  -- exactly as the cases above are -- one per spelling of the covered side, since
+  -- a lint reading only the ref would accept a stripped Divine Deflection and one
+  -- reading only the description would accept a stripped Mending Hands.
+  Spec.it s "the lint itself catches a prevention shield with its covered side stripped" $ do
+    hands <- S.printingOf s registry "Mending Hands"
+    deflection <- S.printingOf s registry "Divine Deflection"
+    packLeader <- S.printingOf s registry "Pack Leader"
+    dovin <- S.printingOf s registry "Dovin, Hand of Control"
+    let strip effect = case effect of
+          Effect.PreventNextDamage shield ->
+            Effect.PreventNextDamage shield {PreventNextDamage.ref = Nothing, PreventNextDamage.whatRecipient = Nothing, PreventNextDamage.whoRecipient = Nothing}
+          Effect.PreventAllDamage shield ->
+            Effect.PreventAllDamage shield {PreventAllDamage.ref = Nothing, PreventAllDamage.whatRecipient = Nothing}
+          other -> other
+        shieldsOf = filter isPreventionShield . cardResolutionEffects . S.combinedFace
+    Spec.assertBool s (not (any shieldNamingNothingOffends (shieldsOf hands))) "the real Mending Hands names its recipient"
+    Spec.assertBool s (any (shieldNamingNothingOffends . strip) (shieldsOf hands)) "and the same shield with that name removed is rejected"
+    Spec.assertBool s (not (any shieldNamingNothingOffends (shieldsOf deflection))) "the real Divine Deflection describes its recipients instead"
+    Spec.assertBool s (any (shieldNamingNothingOffends . strip) (shieldsOf deflection)) "and the same shield with that description removed is rejected"
+    Spec.assertBool s (not (any shieldNamingNothingOffends (shieldsOf packLeader))) "the real Pack Leader describes the recipients of an unbounded shield"
+    Spec.assertBool s (any (shieldNamingNothingOffends . strip) (shieldsOf packLeader)) "and the same shield with that description removed is rejected"
+    -- The by-direction shield names a SOURCE rather than a recipient, which the
+    -- lint accepts: a shield covering everyone still says what it covers.
+    Spec.assertBool s (any isByDirectionShield (shieldsOf dovin)) "setup: Dovin prints a by-direction shield"
+    Spec.assertBool s (not (any shieldNamingNothingOffends (shieldsOf dovin))) "and naming only the source it watches is accepted"
+    Spec.assertEqWith s "while stripping that name rejects both of Dovin's shields" (length (filter (shieldNamingNothingOffends . strip) (shieldsOf dovin))) (2 :: Int)
+  -- CR 615.1 one axis over: WHICH SIDE of the damage event the shield is pinned
+  -- to. See byDirectionRecipientOffends.
+  Spec.it s "no card restricts a by-direction prevention shield to described recipients" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace (any byDirectionRecipientOffends . cardResolutionEffects) . Printing.card) ps
+    -- Guards against a vacuous sweep: with no by-direction shield in the pool at
+    -- all this would pass whatever a card said. Dovin, Hand of Control and Old
+    -- Fat Spider Can't See Me print one.
+    Spec.assertBool s (any (anyFace (any isByDirectionShield . cardResolutionEffects) . Printing.card) ps) "the pool has a card printing a by-direction shield"
+    Spec.assertEqWith s "a shield pinned to the source side describes no recipient (CR 615.1)" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The rejecting direction, proven against Dovin, whose one ability prints both
+  -- directions -- so the count is the lint: it rejects the by-direction shield and
+  -- accepts the same description on the DealtTo shield beside it, where a
+  -- predicate answering on `whatRecipient` alone would reject both.
+  Spec.it s "the lint itself catches a by-direction shield restricted to recipients" $ do
+    dovin <- S.printingOf s registry "Dovin, Hand of Control"
+    let describe effect = case effect of
+          Effect.PreventAllDamage shield -> Effect.PreventAllDamage shield {PreventAllDamage.whatRecipient = Just (Filter.Type.And [])}
+          other -> other
+        shields = filter isPreventionShield (cardResolutionEffects (S.combinedFace dovin))
+    Spec.assertBool s (any isByDirectionShield shields) "setup: Dovin prints a by-direction shield to describe"
+    Spec.assertBool s (not (any byDirectionRecipientOffends shields)) "the real Dovin describes no recipient beside that direction"
+    Spec.assertEqWith s "and describing one rejects the by-direction shield alone" (length (filter (byDirectionRecipientOffends . describe) shields)) (1 :: Int)
   -- The same shape one axis over, and the thing that makes
   -- Pawl.Engine.PlayerEffect.unpreventable's board fold EXACT rather than
   -- approximate. See unpreventableScopeOffends.
