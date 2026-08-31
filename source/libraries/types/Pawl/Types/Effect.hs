@@ -91,1443 +91,482 @@ import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 -- (Draw's `Relative You` beside Ancestral Recall's `InSlot`).
 data Effect card ability
   = -- | CR 120.1: deal damage to what the payload's clauses name, each clause
-    -- carrying its own amount and all of them one CR 608.2f action. CR 120.1a /
-    -- 115.4 let damage reach a PLAYER, which no ObjectRef can name, so the
-    -- InSlot arm reads a Recipient rather than an ObjectId. WHO deals it is the
-    -- payload's `dealer` (CR 120.2b), absent where CR 113.7's resolving source is
-    -- it and present for Rabid Bite.
+    -- carrying its own amount and all of them one CR 608.2f action.
     DealDamage DealDamage.DealDamage
-  | -- | CR 701.14: the two slots' creatures fight -- "each of those creatures
-    -- deals damage equal to its power to the other creature" (CR 701.14a), and
-    -- that damage is not combat damage (CR 701.14d).
-    --
-    -- A separate opcode rather than a pair of DealDamage instructions because CR
-    -- 701.14b is a condition on the PAIR: if either creature is gone or is no
-    -- longer a creature, NEITHER deals damage. Two DealDamage instructions would
-    -- each answer for themselves and let the survivor hit alone.
-    --
-    -- No Quantity field: CR 701.14a fixes the amount at each creature's own
-    -- power, so nothing about it is the card's to say.
+  | -- | CR 701.14: the two slots' creatures fight, which CR 701.14b makes a
+    -- condition on the pair rather than two independent damage instructions.
     Fight Fight.Fight
   | -- | CR 611: create a continuous effect on the objects the ObjectRef names,
-    -- for a duration. Resolve stores the Modification without ever casing on it
-    -- -- or, when a quantity inside it has no answer at resolution (CR 608.2h),
-    -- stores nothing rather than a value to re-read later.
-    --
-    -- CR 611.2c fixes the affected set when the effect begins, so Resolve sweeps
-    -- ONCE and freezes the result as Affected.TheseObjects -- never the Filter,
-    -- which re-evaluated per projection would pump a creature that became
-    -- attacking later.
+    -- for a duration, over the set CR 611.2c freezes as the effect begins.
     ModifyTarget (ModifyTarget.ModifyTarget ability)
-  | -- | CR 612: rewrite subtype words in the target spell or permanent. The
-    -- SubtypeFamily is which words the card's own text names, and so which words
-    -- the player is asked for; the Set is what the NEW word may not be. Resolve
-    -- announces the pair as the effect applies (CR 608.2d) and bakes it into a
-    -- stored ChangeSubtypeWord.
-    --
-    -- The family is not stored alongside the pair: CR 612.2's gate reads the
-    -- family of the word being REPLACED, which Pawl.Engine.Subtype answers from
-    -- the word itself.
+  | -- | CR 612: rewrite subtype words in the target spell or permanent, the
+    -- pair announced as the effect applies (CR 608.2d).
     ChangeText ChangeText.ChangeText
-  | -- | CR 605: one player adds ONE unit of mana, of the type the payload's
+  | -- | CR 605: one player adds one unit of mana, of the type the payload's
     -- ManaProduction names -- one fixed type, or one colour its controller
-    -- chooses (CR 105.4). A mode adding more holds the opcode more than once,
-    -- and Mana.manaRoutesOfGiven reads a mode's whole list as one activation's
-    -- yield. WHICH player is written rather than assumed because CR 106.4 puts
-    -- the mana in "a player's mana pool" without saying whose.
+    -- chooses (CR 105.4).
     --
-    -- Two routes reach a pool. A MANA ABILITY's is Cost.tapForMana at payment
-    -- (CR 605.3b), which reads the production and both of CR 106.6's clauses --
-    -- the spending restriction and the rider -- and ignores the rest of the
-    -- payload: the recipient (#1673) and the retention (#1808). Everything else
-    -- resolves through Resolve.applyEffect, which reads the whole record.
+    -- Not implemented: a mana ability's payment route (Cost.tapForMana, CR
+    -- 605.3b) reads the production and both of CR 106.6's clauses and ignores
+    -- the recipient (#1673) and the retention (#1808); everything else resolves
+    -- through Resolve.applyEffect, which reads the whole record.
     AddMana ManaAddition.ManaAddition
-  | -- | CR 701.23: the players Search.searcher names each search the Search.zones
-    -- of each player Search.owner names -- or whichever of them they choose,
-    -- where the card printed "and/or" -- for Search.quantity cards matching
-    -- Search.filter, or for any number of them where Search.quantity is Nothing
-    -- (Mana Severance); put them where Search.destination says, then that
-    -- library's owner shuffles, where a library was among the zones searched. The
-    -- Filter is evaluated over each card's own CR 613 projection
-    -- (Projection.viewOfObject).
-    --
-    -- TWO refs, because CR 701.23a's looking and CR 400.1's ownership are
-    -- independent (Extract's `You`/`InSlot`). The SEARCHER looks, answers CR
-    -- 101.2's prohibition, is offered CR 601.3's cast over their own library and
-    -- performs the CR 701.23e-silent placement; the OWNER's library is read and
-    -- shuffled.
-    --
-    -- Whether the Quantity is a CEILING or a QUOTA is read off the Filter rather
-    -- than stored, CR 701.23b letting a search STATING A QUALITY find fewer where
-    -- CR 701.23d makes a bare quantity find that many. Filter.statesAQuality
-    -- classifies; Search.upTo and an absent count are the two cases it cannot
-    -- reach, both of which land in CR 701.23b's branch. CR 701.23b is scoped to a
-    -- HIDDEN zone (CR 400.2), so its classification is applied per zone LOOKED
-    -- THROUGH -- which is the searcher's own choice where the card prints
-    -- "and/or" -- while the two the card prints itself hold in every such zone.
+  | -- | CR 701.23: the players Search.searcher names each search the
+    -- Search.zones of each player Search.owner names for cards matching
+    -- Search.filter, put them where Search.destination says, then shuffle any
+    -- library searched.
     Search Search.Search
   | -- | CR 701.13 / Rest in Peace: exile every card in every graveyard.
     -- Targetless and bulk; a general exile-from-zone is future.
     ExileAllGraveyards
-  | -- | CR 727.1/727.1a: restart the game. The starting player of the new game
-    -- is the resolving controller, so no slot is needed.
-    --
-    -- The ObjectRef is CR 727.5's exemption and names the cards that skip the
-    -- rebuild, staying in exile; optional, since a card saying nothing about it
-    -- exempts nothing. A ref rather than a Filter because Karn Liberated picks by
-    -- CR 607.2a linkage as well as by characteristics.
+  | -- | CR 727.1 / 727.1a: restart the game, with the resolving controller as
+    -- the new game's starting player; the ObjectRef is CR 727.5's exemption.
     RestartGame (Maybe ObjectRef.ObjectRef)
-  | -- | CR 723.1: you control target player during that player's next turn.
-    -- Installs pending control keyed to the slot's chosen player, with the
-    -- ability's controller as the decider. Mindslaver's shape.
+  | -- | CR 723.1: you control target player during that player's next turn
+    -- (Mindslaver).
     ControlPlayerNextTurn SlotName.SlotName
-  | -- | CR 701.8 / 702.12b: destroy the permanents the ObjectRef names -- move
-    -- each to its owner's graveyard via the changeZone funnel UNLESS it is
-    -- indestructible. NOT MoveToZone Graveyard: the destruction is itself
-    -- interceptable, Pawl.Engine.Event.destroy offering a WouldBeDestroyed event
-    -- to the CR 616.1 loop first, which is how a regeneration shield (CR 701.19a)
-    -- catches it. The Regenerability is CR 701.19c's rider, carried by the
-    -- destruction rather than the victim -- Terror has it and CR 704.5g's
-    -- state-based action does not, for the same creature.
-    --
-    -- Three optional slots BIND what this destruction leaves a later effect of
-    -- the same resolution to look back at: how many permanents it ACTUALLY
-    -- destroyed (Bane of Progress, read as Quantity.InSlot), the cards it put
-    -- into a graveyard (Come Back Wrong) and the PERMANENTS it destroyed
-    -- (Rampage of the Clans' "for each permanent destroyed this way, its
-    -- controller ...", walked by ForEach below). None of them is "matched by the
-    -- ObjectRef": all three come out of Event.destroyReturning. Definitions,
-    -- never targets. Pawl.Types.Destroy is where each is spelled out.
+  | -- | CR 701.8 / 702.12b: destroy the permanents the ObjectRef names, through
+    -- the CR 616.1 loop so a regeneration shield (CR 701.19a) can catch it; the
+    -- Regenerability is CR 701.19c's rider.
     Destroy Destroy.Destroy
-  | -- | CR 701.21/701.21a: the slot's target permanent is sacrificed -- its
-    -- CONTROLLER moves it to its OWNER's graveyard. NOT a destruction, which CR
-    -- 701.21a says outright, so this consults neither indestructible nor a
-    -- regeneration shield. "This creature" needs no separate opcode:
-    -- Engine.placeOne binds the trigger's SOURCE into the reserved
-    -- Pawl.Engine.Binding.triggerSource slot.
+  | -- | CR 701.21 / 701.21a: the slot's target permanent is sacrificed -- its
+    -- controller moves it to its owner's graveyard, consulting neither
+    -- indestructible nor a regeneration shield.
     Sacrifice SlotName.SlotName
-  | -- | CR 701.3 / 702.6a: attach THIS permanent (the effect's source) to the
-    -- slot's target, so the Equipment is the source and the only slot is what it
-    -- attaches TO. CR 701.3a moves an already-attached source and CR 701.3c
-    -- restamps it; CR 701.3b leaves it put if it cannot legally be attached.
+  | -- | CR 701.3 / 702.6a: attach this permanent (the effect's source) to the
+    -- slot's target.
     Attach SlotName.SlotName
-  | -- | CR 701.3 / 303.4j: attach the SLOT'S TARGET -- an Aura, Equipment or
-    -- Fortification already on the battlefield -- to an object chosen as this
-    -- resolves (Crown of the Ages). Attach's mirror, differing in WHAT MOVES:
-    -- this targets the thing that moves and not the destination, so the
-    -- destination is a resolution-time choice outside CR 608.2b and a bare
-    -- Filter.
-    --
-    -- The Filter is the destination's card text; Aura Graft's "another permanent
-    -- IT CAN ENCHANT" is `Filter.CanHostSubject`. The "another" is NOT in it, CR
-    -- 701.3b making attachment to the current host a no-op whatever the card
-    -- says. An illegal destination leaves the subject where it was, unrestamped.
+  | -- | CR 701.3 / 303.4j: attach the slot's target -- an attachment already on
+    -- the battlefield -- to an object the Filter admits, chosen as this resolves
+    -- (Crown of the Ages).
     AttachTarget AttachTarget.AttachTarget
-  | -- | CR 303.4d / CR 301.5c: attach the SLOT'S TARGET to EACH permanent the
-    -- Filter matches, rather than to one of them. Both rules end the same
-    -- sentence -- an Aura can't enchant more than one object or player, an
-    -- Equipment can't equip more than one creature, and in each case the
-    -- ATTACHMENT's controller chooses which one it ends up on -- so this opcode
-    -- names the whole set and Pawl.Engine.Attach.arbitrate reduces it.
-    --
-    -- AttachTarget's sibling, and the payload is the same record read a second
-    -- way: there the Filter's matches are the menu the resolving controller
-    -- picks from (CR 608.2d), here they are all named at once and the choice
-    -- moves to the subject's controller. That reassignment is the only thing
-    -- observable about this opcode, and it needs two seats to see.
+  | -- | CR 303.4d / 301.5c: attach the slot's target to each permanent the
+    -- Filter matches, which Pawl.Engine.Attach.arbitrate reduces to the one the
+    -- attachment's controller picks.
     AttachTargetToEach AttachTarget.AttachTarget
-  | -- | CR 701.3a, the third arrangement: a BOUND object moves, to a TARGETED
-    -- destination -- Sigarda's Aid's "whenever an Equipment you control enters,
-    -- you may attach it to target creature you control". Attach's mover is the
-    -- source and cannot be the entrant; AttachTarget's mover is the target and
-    -- its destination is picked as the effect resolves, which CR 115.10a says is
-    -- not a target at all. Only this opcode puts the destination's choice at CR
-    -- 603.3d, so only here do shroud, CR 115.7's retargeting and CR 608.2b
-    -- reach it. Pawl.Types.AttachBound names the two slots.
+  | -- | CR 701.3a, the third arrangement: a bound object moves, to a targeted
+    -- destination (Sigarda's Aid) -- the only attach opcode whose destination is
+    -- chosen at CR 603.3d.
     AttachBound AttachBound.AttachBound
   | -- | CR 400.7: move the objects the ObjectRef names to a zone through the
-    -- changeZone funnel. The destination is data, so this is one opcode for every
-    -- zone move; Hand is owner-relative, changeZone carrying Object.owner.
-    -- Distinct from Destroy, which checks indestructible.
-    --
-    -- The EntryRiders are what the effect says about the object AS IT ENTERS the
-    -- battlefield, beyond its own text (Meandering Towershell's "tapped and
-    -- attacking"), shared with Create -- CR 109.3 makes neither a
-    -- characteristic. Inert for any other destination.
-    --
-    -- The Maybe SlotName BINDS the incarnations CR 400.7 mints at the
-    -- DESTINATION (CR 400.7j), so the rest of this effect and any delayed ability
-    -- it arms can name the object, the old id being gone. A definition, never a
-    -- target.
-    --
-    -- The trailing Maybe Zone is the zone the effect's own words say the object
-    -- is moved OUT of (Reassembling Skeleton's "from your graveyard"). It exists
-    -- for CR 113.6m, a CLASSIFICATION (Pawl.Engine.EffectZone) that can only
-    -- report a zone the data states; the resolver ignores it, and EffectZone
-    -- answers Nothing for EachMatching, that rule asking about one object.
-    --
-    -- The LibraryPlacement is the END a LIBRARY destination arrives at (CR
-    -- 401.2), either stated (Griptide) or left to each moved object's OWNER
-    -- (Aetherspouts); it also says whether CR 401.4's arrangement of two or more
-    -- simultaneous arrivals is the owner's or a random one (Endurance). Inert
-    -- elsewhere; a CardSpec lint forbids OwnerChooses there, that one asking a
-    -- question with no board behind it.
+    -- changeZone funnel; the destination, the entry riders, the binding for CR
+    -- 400.7j's new incarnations, CR 113.6m's stated origin zone and CR 401.2's
+    -- library placement are all payload fields.
     MoveToZone MoveToZone.MoveToZone
   | -- | CR 121.1: the players the PlayerRef names each draw this many cards, one
-    -- at a time (CR 121.2). Empty-library draw is a loss (CR 104.3c), unlike
-    -- Mill -- the asymmetry that keeps the two separate.
-    --
-    -- The slot is "and remember which cards", for a later clause of the same
-    -- resolution to name them (#1899) -- Shahrazad and Sindbad's "draw a card
-    -- and reveal IT". Nothing for a draw nothing looks back at.
+    -- at a time (CR 121.2), an empty library being a loss (CR 104.3c). The slot
+    -- remembers which cards, for a later clause of the same resolution (#1899).
     Draw Draw.Draw
-  | -- | CR 701.17: the players the PlayerRef names each mill this many. A short
-    -- or empty library mills fewer, no penalty (CR 701.17b) -- unlike Draw, which
-    -- loses.
-    --
-    -- The MillTally is "and remember how many of them counted", for a later
-    -- effect to read as Quantity.InSlot (CR 728.1's "for each nonland card milled
-    -- this way"). Nothing for a mill nothing looks back at.
+  | -- | CR 701.17: the players the PlayerRef names each mill this many, a short
+    -- library milling fewer with no penalty (CR 701.17b). The MillTally
+    -- remembers how many counted, read back as Quantity.InSlot.
     Mill Mill.Mill
-  | -- | CR 701.20a: the cards the ObjectRef names are REVEALED -- shown to ALL
-    -- players -- and nothing else happens. The public counterpart of LookAt, and
-    -- the pair is CR 701.20e's own distinction. Nothing moves either way (CR
-    -- 701.20b).
-    --
-    -- AN OPTIONAL SLOT, where LookAt's is required: the public
-    -- GameEvent.Revealed this appends is already the whole record, where LookAt's
-    -- binding is all it leaves.
+  | -- | CR 701.20a: the cards the ObjectRef names are revealed -- shown to all
+    -- players -- and nothing moves (CR 701.20b).
     --
     -- Not implemented: rule 701.20a keeps a revealed card revealed "for as long
     -- as necessary", which pawl has nowhere to store (#1408).
     Reveal Reveal.Reveal
-  | -- | CR 400.11c: the resolving controller puts a card they own from OUTSIDE
-    -- THE GAME into their hand, showing it first where the card prints CR
-    -- 701.20a\'s reveal -- Burning Wish\'s whole sentence, and Death Wish\'s
-    -- without the reveal.
-    --
-    -- An opcode rather than an ObjectRef, and CR 400.11c is why: cards outside
-    -- the game "can\'t be affected by spells or abilities, EXCEPT ... spells and
-    -- abilities that allow those cards to be brought into the game", so nothing
-    -- that names objects can reach them.
-    --
-    -- The Filter is evaluated against the PRINTED FACE
-    -- (Pawl.Engine.Projection.viewOfCard): CR 400.11 makes outside the game not a
-    -- zone, so no object exists to project, and CR 604.3 makes a
-    -- characteristic-defining ability the only thing that functions out there.
-    --
-    -- No optionality field: Burning Wish\'s "You may" is the CLAUSE\'s printed may
-    -- (CR 608.2d), which Pawl.Engine.Resolve.exercises already asks ahead of the
-    -- instruction.
-    --
-    -- No chooser ref either, and CR 108.3b is why this is exact rather than an
-    -- approximation: every rule that reaches out there asks for the acting
-    -- player\'s OWN cards (CR 309.2a, CR 701.23j, CR 701.48a, CR 702.139a).
+  | -- | CR 400.11c: the resolving controller puts a card they own from outside
+    -- the game into their hand, showing it first where the card prints CR
+    -- 701.20a's reveal (Burning Wish). The Filter is evaluated against the
+    -- printed face, no object existing out there to project.
     --
     -- Not implemented: a destination other than the hand, and a count other than
     -- one -- the two axes Pawl.Types.FromOutsideTheGame does not carry
     -- (gap #2449).
     --
-    -- Not implemented: where the reveal is printed it happens as the card ARRIVES
-    -- IN THE HAND rather than before the move, GameEvent.Revealed being keyed on
-    -- an ObjectId and outside the game having none to key it on (#2450).
+    -- Not implemented: where the reveal is printed it happens as the card
+    -- arrives in the hand rather than before the move, GameEvent.Revealed being
+    -- keyed on an ObjectId and outside the game having none to key it on
+    -- (#2450).
     FromOutsideTheGame FromOutsideTheGame.FromOutsideTheGame
-  | -- | CR 608.2n: THIS SPELL goes to exile as this instruction runs, rather than
-    -- to its owner\'s graveyard as the final part of its resolution -- Burning
-    -- Wish\'s "Exile Burning Wish".
-    --
-    -- Not a MoveToZone: that opcode names what it moves with an ObjectRef, and no
-    -- ObjectRef names the resolving spell -- CR 115.10a keeps it from being a
-    -- target, and the reserved CR 113.7 source slot is bound for a triggered
-    -- ability and a hand action but not for a spell.
-    --
-    -- Rule 608.2n needs no help afterwards: Pawl.Engine.Resolve.finishSpell\'s move
-    -- to the graveyard finds the id gone, CR 400.7 having minted a fresh
-    -- incarnation in exile, and Pawl.Engine.Event.changeZoneAttaching answers a
-    -- lookup miss by moving nothing.
-    --
-    -- A SPELL only. An ability\'s resolving object is not a card (CR 113.7a) and
-    -- exiling it would take the ability off the stack mid-resolution, so the arm
-    -- moves nothing for one; a card file stating this on an ability states
-    -- something inert, the shape Pawl.Engine.EffectZone describes for a misplaced
-    -- move origin.
+  | -- | CR 608.2n: this spell goes to exile as this instruction runs, rather
+    -- than to its owner's graveyard at the end of its resolution (Burning Wish).
+    -- A spell only, an ability's resolving object being no card (CR 113.7a).
     ExileThisSpell
-  | -- | CR 701.20e: the cards the ObjectRef names are LOOKED AT -- shown to one
-    -- player rather than all -- and bound into the slot, so a later clause of the
-    -- same resolution can act on what was seen (Into the Wilds).
-    --
-    -- NOTHING MOVES and nothing is recorded: rule 701.20e reaches CR 701.20b
-    -- through "the same rules as revealing a card", and GameEvent.Revealed would
-    -- be the wrong event, that one being public.
-    --
-    -- The ObjectRef is what makes this reusable where Scry's look is not:
-    -- ObjectRef.TopOfLibrary names a card in a library by POSITION, the one thing
-    -- no Filter can say about a hidden zone (CR 400.2).
-    --
-    -- A look naming SEVERAL cards binds them as a GROUP, which CR 701.20e's "from
-    -- among them" reads back through Filter.IsBound.
+  | -- | CR 701.20e: the cards the ObjectRef names are looked at -- shown to one
+    -- player rather than all -- and bound into the slot, so a later clause of
+    -- the same resolution can act on what was seen (Into the Wilds).
     --
     -- Not implemented: no seat is shown anything, there being no per-player view
-    -- of the state (#1412), so the binding is the whole of the look and WHO looks
-    -- is not carried.
+    -- of the state (#1412), so the binding is the whole of the look and WHO
+    -- looks is not carried.
     LookAt LookAt.LookAt
-  | -- | CR 701.22a: the players the PlayerRef names each scry this many -- look
-    -- at the top N of their own library, then put any number on the bottom in any
-    -- order and the rest back on top in any order.
-    --
-    -- The ORDERED PARTITION is the player's: Prompt.ChooseScry asks for both ends
-    -- and both orders. Not asked for CR 701.22b's scry 0, an empty library, or
-    -- the one card that IS the whole library.
-    --
-    -- No zone change and so no CR 400.7 incarnation: rule 701.22a reorders WITHIN
-    -- one library (CR 701.20b via CR 701.20e), so Resolve rewrites
-    -- GameState.library directly.
-    --
-    -- The LOOK is the prompt, so no GameEvent is recorded. Not the LookAt arm
-    -- either: scry's look and its ordered partition are one instruction, so the
-    -- cards looked at are the candidate list of the prompt that decides where
-    -- they go. CR 701.22d's trigger reads GameEvent.Scried, which
-    -- Pawl.Engine.Resolve.scryOne records outside the prompt guard.
+  | -- | CR 701.22a: the players the PlayerRef names each scry this many, the
+    -- ordered partition being theirs (Prompt.ChooseScry). One library rewrite
+    -- and no zone change.
     Scry PlayerQuantity.PlayerQuantity
   | -- | CR 701.25a: the players the PlayerRef names each surveil this many, the
-    -- unwanted cards going to their GRAVEYARD rather than the bottom of the
-    -- library.
-    --
-    -- CROSSES A ZONE BOUNDARY, where Scry does not: the graveyard half is
-    -- funnelled through Event.changeZone, so each card put there mints a CR 400.7
-    -- incarnation, and only the kept half is a library rewrite. The elision is
-    -- Scry's minus one case -- a lone card that is the whole library IS a real
-    -- question here. CR 701.25c's surveil 0 and an empty library ask nothing.
+    -- unwanted cards crossing into their graveyard where Scry's go to the bottom
+    -- of the library.
     --
     -- Not implemented: CR 701.25b's "additional cards" rider (#1343).
     Surveil PlayerQuantity.PlayerQuantity
   | -- | CR 701.29a: the players the PlayerRef names each fateseal this many --
-    -- Scry's library rewrite over AN OPPONENT'S library. The asymmetry is the
-    -- whole rule: the fatesealer is shown the cards and answers
-    -- Prompt.ChooseFateseal, while the library's owner is shown nothing. The
-    -- PlayerRef names the FATESEALER; WHICH opponent is a second choice, asked as
-    -- Prompt.ChooseOpponent as the effect applies.
-    --
-    -- Rule 701.29 is one sentence, so there is no zero case, no "even if
-    -- impossible" clause and no additional-cards rider, unlike CR 701.22 and CR
-    -- 701.25.
+    -- Scry's library rewrite over an opponent's library, that opponent chosen as
+    -- the effect applies.
     Fateseal PlayerQuantity.PlayerQuantity
-  | -- | CR 701.44a: the permanents the ObjectRef names each explore. Each one's
-    -- controller reveals the top card of their library; a land card goes to their
-    -- hand, and otherwise a +1/+1 counter goes on the exploring permanent and
-    -- they MAY put the revealed card into their graveyard.
-    --
-    -- ONE opcode rather than Reveal plus a condition and a branch. Rule 701.44 is
-    -- part of the rulebook, so reading "is a land card" here is the same kind of
-    -- act as Pawl.Engine.Keyword casing on CR 702's keywords; LookAt's branch
-    -- does live in the card, rule 701.20e's look not being a keyword action.
-    --
-    -- The REVEAL is public (CR 701.20a); the CHOICE is Prompt.ChooseExplore's. CR
-    -- 701.44b makes the permanent explore even where the actions were impossible,
-    -- which is why an empty library still reaches the counter, and CR 701.44c
-    -- reads the controller from last known information.
-    --
-    -- CR 701.44d orders several simultaneous explores: APNAP across the seats
-    -- that control them, then that seat's OWN choice within its group, asked as
-    -- Prompt.OrderForEach by Pawl.Engine.Resolve.forEachOrder. The chooser is the
-    -- permanents' controller and NOT the resolving controller CR 608.2f names one
-    -- rule up.
+  | -- | CR 701.44a: the permanents the ObjectRef names each explore, ordered
+    -- across seats by CR 701.44d.
     Explore ObjectRef.ObjectRef
-  | -- | CR 701.9: the slot's target player discards this many. The DISCARDING
-    -- player chooses which (CR 701.9b) via Prompt.ChooseDiscard. A hand smaller
-    -- than the count discards all of it (CR 609.3), forced, so it is not
-    -- prompted.
+  | -- | CR 701.9: the slot's target player discards this many, choosing which
+    -- (CR 701.9b); a hand smaller than the count discards all of it (CR 609.3).
     Discard Discard.Discard
-  | -- | CR 119.3: the players the PlayerRef names each lose this much life. CR
-    -- 704.5a's state-based action may follow, from Pawl.Engine.Sba.
-    --
-    -- NOT a DealDamage aimed at a player. CR 119.2 runs one way only, so the
-    -- damage funnel would wrongly subject life loss to CR 614/615's replacement
-    -- and prevention, to infect's CR 120.3b diversion and to toxic's CR 120.3g
-    -- rider, and would append a GameEvent.DamageDealt. GainLife is a separate
-    -- opcode rather than a signed amount, the two being distinct trigger events.
+  | -- | CR 119.3: the players the PlayerRef names each lose this much life --
+    -- not damage aimed at a player, CR 119.2 running one way only.
     LoseLife PlayerQuantity.PlayerQuantity
-  | -- | CR 119.3: the players the PlayerRef names each gain this much life.
-    -- LoseLife's mirror but for the sign, and separate from it for that arm's
-    -- reason. No state-based action follows a gain (CR 704.5a is about a total of
-    -- 0 or less).
+  | -- | CR 119.3: the players the PlayerRef names each gain this much life,
+    -- LoseLife's mirror but for the sign.
     GainLife PlayerQuantity.PlayerQuantity
-  | -- | CR 701.12c: the two players the ExchangeSides names exchange life totals
-    -- -- Mirror Universe's controller and its target (WithController), or Soul
-    -- Conduit's "two target players" (BetweenTargets). Each gains or loses
-    -- whatever it takes to reach the other's PREVIOUS total, which is why a card
-    -- cannot spell this with a GainLife and a LoseLife: the second would read a
-    -- total the first had already overwritten. Not a PlayerRef, an exchange
-    -- having exactly two sides.
+  | -- | CR 701.12c: the two players the ExchangeSides names exchange life
+    -- totals, each reaching the other's previous total.
     ExchangeLifeTotals ExchangeSides.ExchangeSides
-  | -- | CR 119.5: the players the PlayerRef names each end up with this life
-    -- total -- Magister Sphinx' `InSlot` over a Literal, Arbiter of Knollridge's
-    -- `EachPlayer` over a fold.
-    --
-    -- Not expressible as a GainLife or a LoseLife: the amount is the DIFFERENCE
-    -- between a total nobody wrote down and the new one, and its sign varies per
-    -- player. Not a raw write either -- CR 119.5 says the player "gains or loses
-    -- the necessary amount of life", so this resolves into the same CR 608.2i
-    -- events a life-gain trigger reads.
+  | -- | CR 119.5: the players the PlayerRef names each gain or lose the
+    -- necessary amount to end up with this life total (Magister Sphinx).
     SetLifeTotal PlayerQuantity.PlayerQuantity
-  | -- | Reverse the Sands' "redistribute any number of players' life totals": the
-    -- resolving controller chooses any number of the players in the game and
-    -- hands each of them one of THOSE players' previous totals, using each total
-    -- exactly once. CR 119.7 and CR 119.8 name the action; every seat's new total
-    -- is a gain or a loss of the necessary amount, as SetLifeTotal's CR 119.5
-    -- makes it.
-    --
-    -- CHOOSE, not target, and so no SlotName: the whole assignment is picked on
-    -- RESOLUTION via Prompt.ChooseRedistribution. Nullary, the printed words
-    -- leaving nothing for an author to vary.
-    --
-    -- NOT a composition of SetLifeTotals: each would read a total an earlier one
-    -- had overwritten, and no card data could name the permutation a player picks
-    -- while the spell resolves.
+  | -- | Reverse the Sands' "redistribute any number of players' life totals":
+    -- CR 119.7 / 119.8's assignment, each new total a CR 119.5 gain or loss.
+    -- Choose, not target, so the permutation is picked on resolution.
     RedistributeLifeTotals
   | -- | CR 702.179c: the players the PlayerRef names each have their speed
-    -- increased by this much -- "if a player has no speed and they are instructed
-    -- to increase their speed by a certain value, their speed becomes that
-    -- value", which is why the rule needs an opcode rather than a plain addition
-    -- against a stored zero. NOT a "set speed to" opcode: CR 702.179b's set is
-    -- the rules core's own (Pawl.Engine.Speed's startEngines, CR 704.5aa).
+    -- increased by this much, which for a player with no speed sets it to that
+    -- value.
     IncreaseSpeed PlayerQuantity.PlayerQuantity
   | -- | The other direction: the named players each have their speed reduced by
-    -- this much, never below the floor beside it (Spikeshell Harrier).
+    -- this much, never below the card's printed floor (Spikeshell Harrier).
     --
-    -- NOT IncreaseSpeed with a negated Quantity: CR 702.179c makes an increase
-    -- CREATE a speed for a player who has none, and no rule says the same of a
-    -- decrease. The floor is the card's own sentence, and IncreaseSpeed has
-    -- nowhere to put it; rule 702.179 bounds speed in neither direction, so no
-    -- other bound applies. Whether an effect may push speed past 4 is unsettled
-    -- (#809) and is IncreaseSpeed's question.
+    -- Whether an effect may push speed past 4 is unsettled (#809) and is
+    -- IncreaseSpeed's question.
     DecreaseSpeed SpeedDecrease.SpeedDecrease
   | -- | CR 111: create this many tokens with the given effect-defined
-    -- characteristics (CR 111.3). The `card` is the token's text, embedded
-    -- literally; Create (Literal 2) mints two distinct objects. Targetless and
-    -- unprompted. NOT a copy-token (CR 707) and NOT a predefined token (CR
-    -- 111.10): given, not derived.
-    --
-    -- Create.riders is what the effect says about the tokens beyond their text
-    -- (Hanweir Garrison's "tapped and attacking"), outside the embedded card
-    -- because CR 109.3 makes it no characteristic.
-    --
-    -- Create.slot BINDS what this Create minted into the resolving object's LIVE
-    -- bindings, so a delayed ability armed by this resolution can name it. A
-    -- definition, never a target. WHAT it binds is decided by the PRINTED
-    -- Create.quantity, the only thing that can tell CR 603.7c's singular "it"
-    -- from a card's plural "those tokens": Literal 1 binds the one token, and if
-    -- CR 614.16 multiplied the count asks which of them "it" names, while any
-    -- other quantity binds every token. See Resolve.namesEveryToken.
+    -- characteristics (CR 111.3), the `card` being the token's text embedded
+    -- literally. Create.slot binds what was minted; see Resolve.namesEveryToken
+    -- for which tokens CR 603.7c's "it" names.
     Create (Create.Create card)
-  | -- | Alchemy's conjure keyword action: create a card that was in nobody's deck
-    -- and put it into a zone -- Emporium Thopterist's "conjure a card named
-    -- Ornithopter into your hand".
-    --
-    -- DIGITAL-ONLY, so there is no rule to cite: docs/rules.txt does not contain
-    -- the word. What the CR settles is what the result is not -- CR 111.1's
-    -- token is created by an effect and is not a card, where a conjured card is
-    -- one, so it is castable, shufflable and drawable, and Pawl.Types.Source's
-    -- OfCard is what backs it.
-    --
-    -- Create's neighbour and not a case of it: that opcode mints CR 111's tokens
-    -- onto the battlefield, and the two agree on nothing after that. See
-    -- Pawl.Types.Conjure for why the card is carried inline rather than named.
+  | -- | Alchemy's conjure keyword action: create a card that was in nobody's
+    -- deck and put it into a zone (Emporium Thopterist). Digital-only, so there
+    -- is no rule to cite; unlike CR 111.1's token, the result is a card.
     Conjure (Conjure.Conjure card)
-  | -- | CR 707.1 / 111.3: create this many tokens that are copies of each object
-    -- the ObjectRef names (Cackling Counterpart, Rite of Replication). Create's
-    -- sibling and not a case of it: the token's text is DERIVED from a permanent's
-    -- copiable values (CR 707.2) rather than given as a literal card.
+  | -- | CR 707.1 / 111.3: create this many tokens per named object that are
+    -- copies of it (Cackling Counterpart), entering simultaneously.
     --
-    -- The Quantity counts tokens PER named object, and they enter SIMULTANEOUSLY
-    -- (Event.createTokens takes the count), which is what CR 614.12's entry loop
-    -- and CR 616.1g's containment are asked about.
-    --
-    -- The EntryRiders are Create's own record, and CR 122.6's counters is the
-    -- one field read -- Littjara Mirrorlake's "except it enters with an
-    -- additional +1/+1 counter on it", which is no more copied from the original
-    -- than any other counter is (CR 707.2).
-    --
-    -- Not implemented: the rest of that record, and a bound slot for CR 603.7c's
-    -- "it" -- Kiki-Jiki's hasty token and the delayed sacrifice that names it
-    -- (#2302).
+    -- Not implemented: the rest of the EntryRiders record beyond CR 122.6's
+    -- counters, and a bound slot for CR 603.7c's "it" -- Kiki-Jiki's hasty token
+    -- and the delayed sacrifice that names it (#2302).
     CreateCopy CreateCopy.CreateCopy
-  | -- | CR 707.4 / 613.1a: make a permanent ALREADY ON THE BATTLEFIELD a copy of
-    -- another object (Unstable Shapeshifter). CreateCopy mints a new object off
-    -- an existing one's copiable values; this rewrites an existing object's.
-    --
-    -- Writes the copiable values THEMSELVES (CR 707.2), stamping the subject's
-    -- copy snapshot -- the same place the CR 707.5 entry replacement and
-    -- CreateCopy write, so all three converge on
-    -- Projection.copiableCharacteristics and CR 707.3 holds for free. CR 707.4's
-    -- two riders fall out of that: nothing moves zones, and layers 2-7 re-apply
-    -- over the new layer-1 base.
+  | -- | CR 707.4 / 613.1a: make a permanent already on the battlefield a copy of
+    -- another object (Unstable Shapeshifter), by writing CR 707.2's copiable
+    -- values themselves.
     --
     -- Not implemented: the CR 707.9a exception every printed producer carries
-    -- ("except it has this ability"), so pawl's Shapeshifter loses its own trigger
-    -- as it copies and cannot copy again (#1292); and a stated duration (#1753).
+    -- ("except it has this ability"), so pawl's Shapeshifter loses its own
+    -- trigger as it copies and cannot copy again (#1292); and a stated duration
+    -- (#1753).
     BecomeCopy BecomeCopy.BecomeCopy
-  | -- | CR 707.10: put a copy of a SPELL ON THE STACK onto the stack (Twincast).
-    -- The third of the copy opcodes and the only one whose product is not a
-    -- permanent: CreateCopy mints a token on the battlefield, BecomeCopy rewrites
-    -- one already there, and this mints a spell with no card behind it (CR
-    -- 112.1a) -- Pawl.Types.Source's OfSpellCopy, which is what CR 704.5e is then
-    -- able to ask about.
-    --
-    -- CR 707.10's "all decisions made for it" is why the mint CLONES the original
-    -- stack object rather than building one: the modes, the targets, the announced
-    -- X and every announced cost live on that object, and enumerating them here
-    -- would be a list to keep in step with Pawl.Types.Object.
+  | -- | CR 707.10: put a copy of a spell on the stack onto the stack (Twincast),
+    -- cloning the original stack object so CR 707.10's "all decisions made for
+    -- it" carries over.
     --
     -- Not implemented: copying an activated or triggered ability, CR 707.10's
-    -- other two nouns (#2208); and CR 707.10f's token permanent, which a copy of a
-    -- PERMANENT spell becomes as it resolves (#2207).
+    -- other two nouns (#2208); and CR 707.10f's token permanent, which a copy of
+    -- a permanent spell becomes as it resolves (#2207).
     CopySpell CopySpell.CopySpell
   | -- | CR 614.3 / 615.3: install a floating replacement effect for a duration,
-    -- with a use count, an origin and an optional condition. Fog and Drudge
-    -- Skeletons' regeneration are both this opcode, differing only in the
-    -- payload's event class. Targetless -- a floating replacement watches a class
-    -- of events, and where the printed sentence is about ONE object it says so
-    -- with a Filter.IsBound over a slot an earlier effect of the same resolution
-    -- defined (CR 400.7j / 400.7h; Dire Fleet Daredevil's "that spell"), which
-    -- ActiveReplacement.slots is what answers. Resolve stores the row into
-    -- GameState.replacements with this effect's SOURCE (CR 113.7).
-    --
-    -- The ReplacementOrigin is CR 614.15's self-replacement bit. The Condition
-    -- rides the installed row and is asked as the event would happen (CR 614.1),
-    -- never latched on resolution -- see Pawl.Types.Replace.
-    --
-    -- A field rather than a general conditional Effect arm: this rides ONE
-    -- opcode's ONE object, so the effect list stays a straight-line sequence,
-    -- where an `If` arm would put a BRANCH between two effect lists. NOT
-    -- Pawl.Types.Clause.condition, which gates whether a clause runs at all.
+    -- with a use count, an origin and an optional condition asked as the event
+    -- would happen (CR 614.1). Targetless.
     Replace (Replace.Replace (Effect card ability))
-  | -- | CR 614.10a: each player the PlayerRef names skips their NEXT occurrence
-    -- of this step or phase. Fatigue names a step; Stonehorn Dignitary names a
-    -- whole phase (CR 500.1).
-    --
-    -- NOT a Replace carrying a PhaseR, though CR 614.1b makes this a replacement
-    -- effect: the pattern would have to name a player known only at resolution,
-    -- which a ReplacementEffect written on a card cannot. No Duration and no
-    -- Uses, CR 614.10a's "next" being the use count, so Resolve installs one
-    -- floating replacement per named player with Uses.Once and Expiry.Never.
+  | -- | CR 614.10a: each player the PlayerRef names skips their next occurrence
+    -- of this step or phase (Fatigue, Stonehorn Dignitary).
     SkipNextPhase SkipNextPhase.SkipNextPhase
-  | -- | CR 615.7: install a prevention SHIELD over the recipients an ObjectRef
-    -- names, for a duration (Mending Hands). The quantity is the shield's printed
-    -- size, which then counts DAMAGE down (Pawl.Types.DamageRewrite.PreventNext).
-    -- A damage clause's ObjectRef, because CR 115.4's "any target" reaches a
-    -- PLAYER.
-    -- One shield per recipient the ref NAMES, CR 615.11's shape for free.
-    --
-    -- Its own DESCRIBED recipient side beside that ref (whatRecipient and
-    -- whoRecipient), which is the other half of the same question and one shield
-    -- rather than one each: Divine Deflection's "you and/or permanents you
-    -- control" is CR 615.7's counted pool over both, read live at each damage
-    -- event under CR 611.2c. The ref is then absent, the two spellings being
-    -- alternatives.
-    --
-    -- NOT a Replace carrying a DamageR: a shield the resolution NAMES must name
-    -- the shielded permanent or player by id, known only at resolution, so
-    -- Resolve bakes the Recipient into DamagePattern.whichRecipient. A
-    -- Filter.IsBound over a slot would reach the permanent half (that is how
-    -- Replace's own ZoneChangeR names one object) and no Filter names a player,
-    -- so the two halves would need two spellings where the baked Recipient is
-    -- one. A Duration, CR 615.3 giving a prevention effect two terminators; no
-    -- Uses field, the shield being spent in damage rather than applications.
-    --
-    -- PreventNextDamage.riders is CR 615.5's ADDITIONAL EFFECT (Test of Faith).
-    -- It rides the shield rather than being a sibling effect because it fires
-    -- when the shield does, possibly turns later, and reads what that application
-    -- prevented (Pawl.Engine.Binding.eventAmount).
+  | -- | CR 615.7: install a prevention shield of the printed size over the
+    -- recipients an ObjectRef or a described recipient side names, for a
+    -- duration (Mending Hands). PreventNextDamage.riders is CR 615.5's
+    -- additional effect.
     PreventNextDamage (PreventNextDamage.PreventNextDamage (Effect card ability))
-  | -- | CR 615.1 / 615.3: install an UNBOUNDED prevention shield over the
-    -- recipients an ObjectRef names, for a duration (Selfless Squire).
-    --
-    -- PreventNextDamage with the Quantity removed, and the missing field is the
-    -- whole difference: this has no amount to spend and ends only when its
-    -- duration does, hence a DamageRewrite.PreventAll rather than a PreventNext
-    -- of some large number. With no running count, CR 615.5's "the damage
-    -- prevented this way" is per APPLICATION here (Brace for Impact).
-    --
-    -- Its own DESCRIBED recipient side beside that ref (whatRecipient), which is
-    -- PreventNextDamage's pair one opcode over: Pack Leader's "to Dogs you
-    -- control" is read live at each damage event under CR 611.2c rather than
-    -- swept here. The ref is then absent, the two spellings being alternatives.
+  | -- | CR 615.1 / 615.3: install an unbounded prevention shield over the same
+    -- recipients (Selfless Squire) -- PreventNextDamage with the Quantity
+    -- removed, so it ends only when its duration does.
     PreventAllDamage (PreventAllDamage.PreventAllDamage (Effect card ability))
-  | -- | CR 614.9: install a floating REDIRECTION effect (Turn the Tables).
-    -- RedirectDamage.from is the damage's original recipient,
-    -- RedirectDamage.to where it goes instead. NOT a Replace carrying a DamageR,
-    -- for PreventNextDamage's reason doubled: BOTH sides are known only at
-    -- resolution.
-    --
-    -- The Maybe DamageKind is PRINTED, not assumed: Turn the Tables says "all
-    -- COMBAT damage", and an opcode without the field would redirect its
-    -- controller's noncombat damage away too, weaker than printed. Nothing means
-    -- any kind.
+  | -- | CR 614.9: install a floating redirection effect (Turn the Tables); the
+    -- Maybe DamageKind is printed rather than assumed.
     RedirectDamage RedirectDamage.RedirectDamage
-  | -- | CR 701.6/701.6a: counter the objects the ObjectRef names via the
-    -- Event.counter funnel. ONE opcode for both of that rule's subjects: which
-    -- ending the countering has (the owner's graveyard for a spell, CR 608.2n's
-    -- cease for an ability) is the funnel's own classification of what it is
-    -- handed.
-    --
-    -- Distinct from MoveToZone Graveyard the way Destroy is: it carries the
-    -- funnel's can't-be-countered gates (CR 113.6g, CR 613.11) and records for a
-    -- SPELL a distinct "was countered" event. The optional slot is how many the
-    -- funnel actually countered, for Swift Silence's "for each spell countered
-    -- this way" to read as Quantity.InSlot.
+  | -- | CR 701.6 / 701.6a: counter the objects the ObjectRef names via the
+    -- Event.counter funnel, which carries the can't-be-countered gates and
+    -- decides each subject's ending. The optional slot is how many it countered.
     Counter Counter.Counter
   | -- | CR 122.6: put this many counters of this kind on the permanents the
-    -- ObjectRef names. A counter is persistent object state, NOT a zone change --
-    -- Resolve.applyEffect edits Object.counters in place. The counter's P/T
-    -- effect is the projection's (CR 122.1a / 613.4c), not this opcode's. Each
-    -- named permanent gets its OWN call to Event.putCounters, because CR 614.16
+    -- ObjectRef names, one call to Event.putCounters apiece since CR 614.16
     -- replaces one placement at a time.
     PutCounters PutCounters.PutCounters
   | -- | CR 122: remove this many counters of this kind from the slot's target
-    -- permanent. PutCounters' mirror, and separate rather than one signed amount:
-    -- CR 122.7's "when the Nth counter is put on" reads only the putting
-    -- direction.
-    --
-    -- Asking for more than are present removes the ones that are there and no
-    -- more; CR 122 states no rule making the instruction fail. Passes through no
-    -- CR 614.16 gate -- that rule replaces a PLACEMENT.
+    -- permanent; asking for more than are present removes what is there.
     RemoveCounters RemoveCounters.RemoveCounters
   | -- | CR 122.5: move counters from the permanents an ObjectRef names onto the
-    -- one a slot does. WHICH kinds cross and HOW MANY of each is
-    -- Pawl.Types.MovedKinds, every printed spelling over one batch per kind; see
-    -- Pawl.Types.MoveCounters' `kinds`.
-    --
-    -- NOT a RemoveCounters beside a PutCounters, which is the whole reason this
-    -- arm exists: rule 122.5 makes the pair ATOMIC -- "if either of these actions
-    -- isn't possible, it's not possible to move a counter, and no counter is
-    -- removed from or put onto anything" -- so the two-step spelling would take a
-    -- counter off in a case the printed card leaves the board untouched.
-    --
-    -- The rule's four impossibilities are checked BEFORE either half runs; see
-    -- Pawl.Engine.Resolve's arm for which of them pawl can reach.
+    -- one a slot does, atomically -- the rule's four impossibilities are checked
+    -- before either half runs.
     MoveCounters MoveCounters.MoveCounters
-  | -- | CR 122.8: put the counters the slot's object HAD onto the permanents the
-    -- ObjectRef names -- Iron Apprentice's "put those counters on target creature
-    -- you control". A per-kind tally crosses, which is why the payload names no
-    -- Quantity, and rule 122.8's second sentence is why its kind is optional --
-    -- Selfless Police Captain's "put its +1/+1 counters"; see
-    -- Pawl.Types.PutCountersFrom.
-    --
-    -- A PUT and not a MoveCounters: rule 122.8 says the player "doesn't move
-    -- counters from one object to the other", CR 122.2 having already made the
-    -- first object's counters cease.
+  | -- | CR 122.8: put the counters the slot's object had onto the permanents the
+    -- ObjectRef names (Iron Apprentice). A put and not a move, CR 122.2 having
+    -- already made the first object's counters cease.
     PutCountersFrom PutCountersFrom.PutCountersFrom
-  | -- | CR 122 / 107.14: the players the PlayerRef names each get N counters of a
-    -- player-counter kind. Subsumes any self-scoped player counter (energy,
-    -- experience, rad) as `Relative You`.
-    --
-    -- PlayerRef and not PlayerScope, since only PlayerRef can name a binding
-    -- slot: CR 702.70a's poison counters go to `InSlot Binding.triggerPlayer`.
-    -- Targetless in itself, though a slot this reads may have been filled by
-    -- TARGETING (CR 601.2c).
+  | -- | CR 122 / 107.14: the players the PlayerRef names each get N counters of
+    -- a player-counter kind (energy, experience, poison, rad).
     GainPlayerCounters PlayerCounters.PlayerCounters
-  | -- | CR 122: the players the PlayerRef names each LOSE N counters of a
-    -- player-counter kind -- CR 728.1's "removes one rad counter from
-    -- themselves". GainPlayerCounters' mirror, separate for LoseLife's reason.
-    --
-    -- Removing more than the player has removes what they have and no more, the
-    -- count being a Natural and CR 122 knowing no negative counter, rather than
-    -- being an error or a no-op.
+  | -- | CR 122: the players the PlayerRef names each lose N counters of a
+    -- player-counter kind (CR 728.1); removing more than they have removes what
+    -- they have.
     RemovePlayerCounters PlayerCounters.PlayerCounters
   | -- | CR 107.14: "you may pay any amount of {E}" -- the resolving controller
-    -- names an amount as the spell or ability resolves, removes that many energy
-    -- counters from themselves, and the amount is bound to this SlotName for a
-    -- later effect of the same resolution to read as Quantity.InSlot. Harnessed
-    -- Lightning's "then you may pay any amount of {E}. Harnessed Lightning deals
-    -- that much damage to that creature" is the printing.
+    -- names an amount, removes that many energy counters, and the amount is
+    -- bound to this SlotName for a later effect to read (Harnessed Lightning).
+    -- Not a cost, nothing on the card being gated on the payment.
     --
-    -- NOT a Pawl.Types.CostComponent, and that is the whole reason it is an
-    -- effect: CR 118.1 makes a cost "an action or payment necessary to take
-    -- another action", and nothing on this card is gated on the payment -- pay
-    -- nothing and the damage clause still runs, dealing 0. CR 118.12's gate is
-    -- the other shape and prints an "If you do" (Aether Refinery), which
-    -- Pawl.Types.PayGate already carries. So this opcode neither reaches
-    -- Pawl.Engine.Cost.canPay nor takes CR 118.12's branch.
-    --
-    -- NOT RemovePlayerCounters above with some "chosen" Quantity: a Quantity is
-    -- EVALUATED against the game, and this amount is ASKED FOR (CR 107.14 read
-    -- through CR 118.3, which caps it at what the payer has). Folding a prompt
-    -- into Quantity would put a choice inside the vocabulary every quantity read
-    -- shares.
-    --
-    -- The payer is the resolving controller (CR 109.5's "you") rather than a
-    -- PlayerRef, and no printing separates the two: Scryfall
-    -- o:"pay any amount of {E}" and o:"pay one or more {E}", 2026-08-19, name
-    -- "you" on every hit (Die Young, Harnessed Lightning, Galvanic Discharge,
-    -- Aether Spike, Wheel of Potential, Wrath of the Skies, Suppression Ray,
-    -- Vault 112: Sadistic Simulation, Aether Refinery, Localized Destruction,
-    -- Pia Nalaar, Chief Mechanic). A card offering the payment to somebody else
-    -- would be a PlayerRef field here, and Aether Spike is the card to check
-    -- first, its OTHER payment ("unless its controller pays {1} for each {E}
-    -- paid this way") being a CR 118.12 gate on a different player.
-    --
-    -- The "MAY" is subsumed rather than carried as a second decision: the
-    -- printed amount is "ANY amount", zero included, so declining and paying
-    -- nothing are the same answer.
-    --
-    -- "You may pay ONE OR MORE {E}" is this opcode too (Localized Destruction),
-    -- and its floor of 1 is not a second capability. Every printing of that
-    -- clause hangs a branch off it keyed on "one or more paid" -- CR 118.12's
-    -- "if you do" on four of the five, CR 603.12's "when you do" on Territorial
-    -- Aetherkite -- so decline-or-1..N and 0..N offer the same answers and take
-    -- the branch on the same ones. Vault 112: Sadistic Simulation prints the two
-    -- spellings side by side, "Pay any amount of {E}. If you paid one or more
-    -- {E} this way". Scryfall o:"one or more {E}", 2026-08-31, eleven cards, of
-    -- which five print the clause and none reads the payment any other way.
-    --
-    -- That branch is a CLAUSE rider rather than anything here: the condition
-    -- Quantity.InSlot >= 1 over the slot below, which is how the corpus already
-    -- writes "if you did" over a bound amount (Goldberry, River-Daughter).
     -- Pawl.VariableEffectSpec's "CR 118.12 paying nothing declines the offer" is
-    -- what proves paying zero does not take it.
-    --
-    -- The slot is not optional. Every printing reads the amount back ("that
-    -- much", "for each {E} paid this way", "the amount of {E} paid this way"),
-    -- which is what makes the payment worth stating at all.
+    -- what proves paying zero does not take a gate hung off this opcode.
     PayAnyEnergy SlotName.SlotName
-  | -- | CR 701.26a: tap the permanents the ObjectRef names. A permanent that is
-    -- ALREADY tapped is left alone, which is that rule's second sentence and
-    -- falls out of the resolution being an assignment to TapState.Tapped.
+  | -- | CR 701.26a: tap the permanents the ObjectRef names, leaving an already
+    -- tapped one alone.
     Tap ObjectRef.ObjectRef
   | -- | CR 701.26b: untap the permanents the ObjectRef names.
     Untap ObjectRef.ObjectRef
-  | -- | CR 701.35a: detain the permanents the ObjectRef names.
-    --
-    -- NO DURATION beside it, rule 701.35a fixing it, so a Duration here would let
-    -- a card file contradict the rulebook. ONE opcode for a sentence with three
-    -- limbs (can't attack, can't block, activated abilities can't be activated),
-    -- which Pawl.Engine.Detain reads apart.
+  | -- | CR 701.35a: detain the permanents the ObjectRef names, that rule fixing
+    -- the duration and all three limbs.
     Detain ObjectRef.ObjectRef
   | -- | CR 701.15a: goad the permanents the ObjectRef names, until the next turn
-    -- of this resolution's controller.
-    --
-    -- NO DURATION and no goader beside it, Detain's reasons unchanged: rule
-    -- 701.15a fixes the duration, and the goader is CR 109.5's "you". ONE opcode
-    -- for CR 701.15b's two requirements (attacks each combat if able, attacks a
-    -- player other than the goader if able), which
-    -- Pawl.Engine.AttackRequirement reads apart -- so no card file states either
-    -- half and no card file can state one without the other.
+    -- of this resolution's controller; CR 701.15b's two requirements are one
+    -- opcode.
     Goad ObjectRef.ObjectRef
   | -- | CR 502.3 / 611.2: the permanents the ObjectRef names don't untap during
-    -- their controller's NEXT untap step (Elvish Hunter). CR 701.43a's exert is
-    -- NOT this opcode: it names the exerting player's own next untap step rather
-    -- than the victim's controller's, so it rides Object.exertedBy.
-    --
-    -- NOT Tap and not a rider on it. The two clauses come apart on both sides:
-    -- Elvish Hunter prohibits without tapping, and Wall of Frost prohibits a
-    -- creature that tapped itself by attacking. Stores NO duration -- it writes
-    -- Object.doesNotUntapNext, which CR 701.43b ends at the untap step it applies
-    -- in. The PRINTED static twin is Pawl.Types.UntapRestriction.
+    -- their controller's next untap step (Elvish Hunter). CR 701.43a's exert is
+    -- a different clause, riding Object.exertedBy.
     DoesNotUntapNext ObjectRef.ObjectRef
   | -- | CR 701.27a: turn the permanents the ObjectRef names over, so each shows
-    -- its other face.
-    --
-    -- A one-shot under CR 608.2c: it writes Object.face, which every
-    -- characteristic read goes through (Pawl.Engine.Game.faceOf). The gates on
-    -- whether anything happens (CR 701.27c, CR 701.27d) are read off the card's
-    -- LAYOUT by Pawl.Engine.Card.turnedOver, never off which card it is.
-    --
-    -- The transform WORDING only. CR 701.28's convert is Convert below, which
-    -- shares this opcode's whole implementation because CR 701.28a says to.
+    -- its other face. The transform wording only; CR 701.28's convert is Convert
+    -- below.
     Transform ObjectRef.ObjectRef
-  | -- | CR 701.28a: turn the permanents the ObjectRef names over, so each shows
-    -- its other face -- the Transformers cards' word for Transform above.
-    --
-    -- A SECOND opcode and not an alias, though CR 701.28a routes a convert
-    -- through rules 701.27a-f, 712.9-10 and 712.18 unchanged. What the CR does
-    -- NOT do is collapse the two: CR 701.28c and CR 701.28d restate 701.27c and
-    -- 701.27d in convert's own words rather than deferring to them, and CR
-    -- 701.28f has to state that "can't transform" also forbids converting --
-    -- which a synonym would not need. So a card file says which word its card
-    -- prints, and no reader has to guess.
-    --
-    -- Where the two must NOT come apart, they share one implementation rather
-    -- than agreeing by inspection: Pawl.Engine.Resolve applies both arms through
-    -- the same turnPermanentsOver, so CR 701.27f's already-turned gate (which CR
-    -- 701.28e counts a transform and a convert alike for), CR 701.27e's
-    -- "transforms into" trigger, CR 702.145b's daybound restriction and CR
-    -- 701.28f's prohibition are one code path with one event.
+  | -- | CR 701.28a: the Transformers cards' word for Transform above, kept a
+    -- second opcode because CR 701.28c-f restate the gates in convert's own
+    -- words, and sharing one implementation so the two cannot drift.
     Convert ObjectRef.ObjectRef
-  | -- | CR 701.42a: meld the cards the payload's ObjectRef names -- put them onto
-    -- the battlefield with their back faces up and combined, as one permanent
-    -- represented by all of them.
-    --
-    -- Transform's neighbour and not a wider version of it: rule 701.27a turns ONE
-    -- object over in place, where this puts SEVERAL cards onto the battlefield as
-    -- ONE new object (CR 712.14c). CR 712.4c is the rule that keeps the two from
-    -- ever meeting on the same permanent.
-    --
-    -- The EXILE is not part of this opcode; see 'Pawl.Types.Meld.Meld', which
-    -- carries the whole of what this arm means.
+  | -- | CR 701.42a: meld the cards the payload's ObjectRef names -- put them
+    -- onto the battlefield with their back faces up and combined, as one
+    -- permanent (CR 712.14c).
     Meld (Meld.Meld card)
-  | -- | CR 702.26b: the permanents the ObjectRef names phase out.
-    --
-    -- NOT a zone change, which is CR 702.26d in as many words, so this does not
-    -- go through the zone-change funnel and no zone-change ability triggers. It
-    -- writes GameState.phasedOut via Pawl.Engine.Phasing.phaseOutSet, shared with
-    -- CR 502.1's turn-based action, so the two ways of phasing out cannot
-    -- disagree about CR 702.26g's closure or CR 702.26h's tie-break.
-    --
-    -- Stores NO duration, CR 702.26a fixing when it ends. No PhaseIn twin, that
-    -- same rule being the only thing that phases anything in.
+  | -- | CR 702.26b: the permanents the ObjectRef names phase out. Not a zone
+    -- change (CR 702.26d), and CR 702.26a fixes when it ends.
     PhaseOut ObjectRef.ObjectRef
-  | -- | CR 708.2: turn the named permanents face down with the characteristics the
-    -- effect LISTS for them. Backslide lists none, so CR 708.2a's 2/2 supplies
-    -- them; Cyber Conversion lists a set and carries it.
-    --
-    -- A SET and not one permanent, the payload's ObjectRef says which: Weaver of
-    -- Lies' "any number of target creatures with morph abilities" fills one slot
-    -- with several, and Ixidron's "all other nontoken creatures" names no slot at
-    -- all. CR 608.2f's simultaneity is the fold in Pawl.Engine.Resolve, which
-    -- enumerates the victims once.
-    --
-    -- NOT the same act as Transform, which CR 701.27b keeps separate in as many
-    -- words. The listed values are "the COPIABLE values of that object's
-    -- characteristics" (CR 708.2), which is why the whole of it is one status
-    -- field that Pawl.Engine.Game.faceOf substitutes for.
+  | -- | CR 708.2: turn the named permanents face down with the copiable values
+    -- the effect lists for them, CR 708.2a's 2/2 supplying them where it lists
+    -- none.
     TurnFaceDown TurnFaceDown.TurnFaceDown
-  | -- | CR 708: turn the slot's target permanent face up. The mirror of
-    -- TurnFaceDown and NOT of CR 116.2b's special action: no procedure is taken
-    -- and no cost is paid, so Showstopping Surprise's "turn it face up if it's
-    -- face down" needs neither a morph ability nor a mana cost on the card
-    -- underneath.
-    --
-    -- A bare SlotName because the turning-over takes no arguments: CR 708.8 has
-    -- the permanent simply regain its own copiable values, so there is nothing
-    -- for the effect to list the way TurnFaceDown lists CR 708.2's.
-    --
-    -- The "if it's face down" of the card's own text is not a condition to
-    -- author: turning a face-up permanent face up is a no-op, so the opcode's own
-    -- guard is the clause.
+  | -- | CR 708: turn the slot's target permanent face up, which CR 708.8 makes
+    -- argumentless -- not CR 116.2b's special action, so no cost is paid.
     TurnFaceUp SlotName.SlotName
-  | -- | CR 506.4: an effect that specifically removes a permanent from combat --
-    -- the rule's one clause a card ASKS for rather than a condition the engine
-    -- has to notice, which is why it is an opcode and not a sampler like
-    -- Combat.removeChanged (Labyrinth of Skophos).
-    --
-    -- Removal ONLY: CR 506.4's second sentence is the whole effect, so there is
-    -- no inverse opcode and no duration. CR 506.4a and CR 506.4b bound what
-    -- removal is NOT and neither reaches this opcode.
-    --
-    -- An ObjectRef rather than a slot, for Counter's reason: CR 109.2's "each
-    -- creature" is a sweep of the battlefield with nothing targeted (Save Point),
-    -- and ObjectRef.InSlot is still the single named permanent (Labyrinth of
-    -- Skophos).
+  | -- | CR 506.4: an effect that specifically removes the named permanents from
+    -- combat (Labyrinth of Skophos). Removal only, that rule's second sentence
+    -- being the whole effect.
     RemoveFromCombat ObjectRef.ObjectRef
-  | -- | CR 509.1h's escape clause: an effect SAYS an attacking creature becomes
-    -- blocked (Curtain of Light). CR 508.4d names the same clause for a creature
-    -- that entered the battlefield attacking after the declaration.
-    --
-    -- Blocked BY NOTHING, which is the rule: the status and the set of creatures
-    -- blocking are separate (CR 509.1h against CR 510.1c), so a creature this
-    -- blocks assigns no combat damage and takes none.
-    --
-    -- The BLOCKING side is not this opcode and never was: a creature put onto the
-    -- battlefield already blocking a named attacker is EntryRiders.blocking (CR
-    -- 509.4), and a creature already on the battlefield being made to block is CR
-    -- 509.1c's requirements -- Pawl.Types.BlockRequirement and
-    -- Pawl.Types.ActiveBlockRequirement, with Lure and provoke in the pool.
+  | -- | CR 509.1h's escape clause: an effect says an attacking creature becomes
+    -- blocked (Curtain of Light), blocked by nothing.
     --
     -- Not implemented: CR 509.1h's other direction, an effect saying a creature
-    -- becomes UNBLOCKED (Scryfall `oracle:"becomes unblocked"`, 2026-08-14, no
+    -- becomes unblocked (Scryfall `oracle:"becomes unblocked"`, 2026-08-14, no
     -- hit).
     BecomesBlocked SlotName.SlotName
   | -- | CR 500.8: add phases to a turn, directly after the specified phase, in
-    -- written order -- Aggravated Assault is `[ExtraCombat, ExtraMain]`. A
-    -- payload rather than a sibling opcode per shape, because CR 500.8 does not
-    -- fix which phases are added. Targetless. Executed via Turn.splicePhases,
-    -- where the CR 505.1a/506.1 detail of WHAT is inserted and the CR 511.3
-    -- question of WHERE both live.
+    -- written order (Aggravated Assault). Targetless.
     AddPhases [ExtraPhase.ExtraPhase]
-  | -- | CR 724.1: end the turn (Time Stop). Nullary -- rule 724.1's six steps
-    -- fix the whole procedure, and no printing parameterises any of them.
-    --
-    -- Not a schedule rewrite that a caller composes: CR 724.1a-f differ from CR
-    -- 608's resolution process, so the opcode owns the pending-trigger watermark
-    -- (724.1a), the exile of the whole stack including the resolving object
-    -- (724.1b), the state-based check that grants no priority (724.1c), and the
-    -- jump to the cleanup step (724.1d). CR 724.1f's "no player gets priority
-    -- during this process" is what GameState.endTurnSignal carries out to
-    -- Engine.priorityLoop; it cannot be expressed in `remaining` alone.
-    --
-    -- CR 724.2's sibling is EndCombatPhase below, and the two share the signal
-    -- rather than the arm: the six steps differ in what CR 724.1d and CR 724.2d
-    -- leave at the head of the schedule.
+  | -- | CR 724.1: end the turn (Time Stop). Nullary, that rule's six steps
+    -- fixing the whole procedure, including CR 724.1f's suppression of priority.
     EndTurn
   | -- | CR 724.2: end the combat phase (Mandate of Peace, which rule 724.2 says
-    -- is the only card that does). Nullary for EndTurn's reason -- rule 724.2's
-    -- seven steps fix the whole procedure.
-    --
-    -- The same shape as EndTurn and deliberately not a reuse of it: CR 724.2d
-    -- ends the current COMBAT PHASE and jumps to whatever the schedule holds
-    -- next, expiring the "until end of combat" effects CR 500.5a scopes to that
-    -- phase, where CR 724.1d ends the turn outright and jumps to the cleanup
-    -- step. CR 724.2g is the other difference: attempted outside a combat phase,
-    -- nothing happens at all, where ending the turn is always something.
+    -- is the only card that does). EndTurn's shape, differing in what CR 724.2d
+    -- leaves at the head of the schedule.
     EndCombatPhase
   | -- | CR 613.1b / 611.2c: install a layer-2 control effect on the objects the
-    -- ObjectRef names, for a duration. The new controller is this effect's
-    -- source's controller, baked into a stored SetController effect -- derived,
-    -- never chosen -- and each object whose controller changed is re-Sicked (CR
-    -- 302.6). NOT a reuse of ModifyTarget, whose Modification is static card data
-    -- and cannot carry a resolution-time PlayerId. Permanent control (CR 613),
-    -- distinct from Mindslaver's (CR 723); the swept set is FROZEN (CR 611.2c).
+    -- ObjectRef names, for a duration; the new controller is derived from this
+    -- effect's source, and each object whose controller changed is re-Sicked (CR
+    -- 302.6).
     GainControl DurationRef.DurationRef
   | -- | CR 603.7: create the delayed triggered ability this card declares under
-    -- this name (Face.delayedAbilities). First-order: the payload is card data
-    -- joined by a name, so this opcode carries no nested ability. The resolving
-    -- object's binding environment is captured as the ability is armed, which is
-    -- how CR 603.7c's "it" survives the end of this resolution.
-    --
-    -- The Duration is CR 603.7b's stated duration; Nothing is that rule's
-    -- default, once only at the next trigger event. The Onset is the envelope's
-    -- other end -- when the ability becomes armed. See Pawl.Types.Onset for why a
-    -- total field rather than a second Maybe, and why the gate cannot live in the
-    -- ability's own trigger condition.
-    --
-    -- A resolution is not the only arming -- CR 603.7a's third clause, "a static
-    -- ability that allows a player to take an action". Chancellor of the Forge
-    -- arms this from a CR 103.6 opening-hand action, before the game's first
-    -- turn, where Pawl.Engine.Resolve.performHandAction passes the acting CARD as
-    -- the resolving object; CR 603.7g fixes that card as the source.
+    -- this name (Face.delayedAbilities), capturing the resolving object's
+    -- bindings so CR 603.7c's "it" survives this resolution.
     ArmDelayedTrigger ArmDelayedTrigger.ArmDelayedTrigger
-  | -- | CR 611.1 / 613.11: install a stored PLAYER or RULES-modifying continuous
-    -- effect on some players for a duration (Silence, Cease-Fire).
-    --
-    -- Targets only through its AffectedPlayers: a Scoped effect watches a CLASS
-    -- and prompts for nothing, while the Named arm names a slot the ability
-    -- targeted and Resolve bakes it to a seat. Its controller is BAKED IN (CR
-    -- 109.5) -- the source may be in a graveyard by the time anyone asks.
+  | -- | CR 611.1 / 613.11: install a stored player- or rules-modifying
+    -- continuous effect on some players for a duration (Silence, Cease-Fire),
+    -- with its controller baked in (CR 109.5).
     AffectPlayers AffectPlayers.AffectPlayers
-  | -- | CR 509.1c / 613.11: install a stored BLOCKING REQUIREMENT for a duration.
-    -- Provoke (CR 702.39a) is `RequireBlock UntilEndOfCombat (InSlot
-    -- provokeTarget) (EachMatching IsSource)`.
-    --
-    -- Rule 509.1c's two axes are both OBJECTS -- which creature must block, and
-    -- what it must block -- so this takes ObjectRefs rather than AffectPlayers'
-    -- scope, one requirement instance per (blocker, attacker) pair.
+  | -- | CR 509.1c / 613.11: install a stored blocking requirement for a
+    -- duration, one instance per (blocker, attacker) pair -- provoke (CR
+    -- 702.39a) is this opcode.
     RequireBlock RequireBlock.RequireBlock
-  | -- | CR 701.19c / 611.1: install a stored REGENERATION PROHIBITION over the
-    -- permanents the ref names, for a duration. Hurr Jackal's is
-    -- `CantBeRegenerated UntilEndOfTurn (InSlot target)`.
-    --
-    -- RequireBlock's shape one axis narrower, and stored for the same reason: the
-    -- prohibition outlives the resolution that made it, where
-    -- Pawl.Types.Regenerability is a property of one destruction and is set by
-    -- the effect doing the destroying (Terror's "It can't be regenerated").
+  | -- | CR 701.19c / 611.1: install a stored regeneration prohibition over the
+    -- permanents the ref names, for a duration (Hurr Jackal); the printed
+    -- one-destruction form is Pawl.Types.Regenerability instead.
     CantBeRegenerated CantBeRegenerated.CantBeRegenerated
-  | -- | CR 508.1d / 613.11: install a stored ATTACKING REQUIREMENT for a
-    -- duration. Alluring Siren's is `RequireAttack UntilEndOfTurn (InSlot
-    -- target) (Relative You)`.
-    --
-    -- RequireBlock's twin, and not its mirror image: rule 508.1d's two axes are
-    -- an OBJECT and a PLAYER -- which creature must attack, and whom it must
-    -- attack (CR 508.1b) -- so this pairs an ObjectRef with a PlayerRef, one
-    -- requirement instance per (attacker, defender) pair.
+  | -- | CR 508.1d / 613.11: install a stored attacking requirement for a
+    -- duration (Alluring Siren), one instance per (attacker, defender) pair --
+    -- rule 508.1d's two axes being an object and a player.
     RequireAttack RequireAttack.RequireAttack
-  | -- | CR 509.1b / 613.11: install a stored BLOCKING RESTRICTION for a duration.
-    -- Zirda, the Dawnwaker's is `ForbidBlock UntilEndOfTurn (InSlot target)`.
-    --
-    -- RequireBlock's opposite polarity and CantBeRegenerated's shape: rule
-    -- 509.1b's subject is one OBJECT, so a single ObjectRef and no second axis --
-    -- "can't block" names nothing to be blocked, where CR 509.1c's requirement
-    -- names what must be blocked.
-    --
-    -- Not a Pawl.Types.Modification, and CR 613.11 is the reason: a restriction on
-    -- a declaration modifies the RULES rather than any object's characteristics,
-    -- so it is applied after the layers and Pawl.Engine.Projection never sees it.
-    -- Pawl.Types.CombatRestriction is the printed carrier of the same sentence and
-    -- could not have been reused either -- it is gathered live off a source on the
-    -- battlefield, where this outlives its source (CR 611.2a).
+  | -- | CR 509.1b / 613.11: install a stored blocking restriction for a duration
+    -- (Zirda, the Dawnwaker). A rules modification (CR 613.11) rather than a
+    -- Modification, so Pawl.Engine.Projection never sees it.
     ForbidBlock ForbidBlock.ForbidBlock
-  | -- | CR 508.1c / 613.11: install a stored ATTACKING RESTRICTION for a duration.
-    -- Netter en-Dal's is `ForbidAttack UntilEndOfTurn (InSlot target)`.
-    --
-    -- ForbidBlock's twin one rule over, and RequireAttack's opposite polarity:
-    -- rule 508.1c's subject is one OBJECT, so a single ObjectRef and no second
-    -- axis -- "can't attack" names nothing to be attacked, where CR 508.1d's
-    -- requirement names whom the creature must attack.
-    --
-    -- Not a Pawl.Types.Modification, and CR 613.11 is the reason: a restriction on
-    -- a declaration modifies the RULES rather than any object's characteristics,
-    -- so it is applied after the layers and Pawl.Engine.Projection never sees it.
-    -- Pawl.Types.CombatRestriction is the printed carrier of the same sentence and
-    -- could not have been reused either -- it is gathered live off a source on the
-    -- battlefield, where this outlives its source (CR 611.2a).
+  | -- | CR 508.1c / 613.11: install a stored attacking restriction for a
+    -- duration (Netter en-Dal), ForbidBlock's twin one rule over.
     ForbidAttack ForbidAttack.ForbidAttack
   | -- | CR 114.2: the resolving controller gets an emblem with the given
-    -- abilities, put into the command zone. Targetless; the abilities ride a Card
-    -- so the emblem reuses the whole ability pipeline.
+    -- abilities, put into the command zone. Targetless; the abilities ride a
+    -- Card so the emblem reuses the whole ability pipeline.
     CreateEmblem card
-  | -- | CR 725: a player becomes the monarch. The beneficiary is named by the
-    -- MonarchTarget: the resolving controller, the controller of the ability's
-    -- bound source, or a target slot, which is the one arm that makes this opcode
-    -- target. Emits GameEvent.BecameMonarch.
+  | -- | CR 725: a player the MonarchTarget names becomes the monarch.
     BecomeMonarch MonarchTarget.MonarchTarget
-  | -- | The permanent in the slot GAINS THIS DESIGNATION -- CR 702.112a's
+  | -- | The permanent in the slot gains this designation -- CR 702.112a's
     -- renown, CR 701.37a's monstrous, CR 701.60a's suspect and CR 719.3a's
-    -- solved.
-    --
-    -- ONE opcode over Pawl.Types.Designation and not one per mark, because every
-    -- rule that mints one words the write identically. Casing on the designation
-    -- is not casing on an effect's identity: it is one payload of one opcode, the
-    -- way ItBecomes carries a Daytime.
-    --
-    -- A SlotName and not an ObjectRef, so that it names the same permanent the
-    -- PutCounters beside it in the clause does. The slot need not be a reserved
-    -- binding: Person of Interest's names Binding.triggerSource, while
-    -- Rune-Brand Juggler's is a CR 115.6 target slot.
-    --
-    -- Writes Object.designations, which holds DESIGNATIONS rather than
-    -- characteristics, so nothing in CR 613 could carry it. What CR 701.60c hangs
-    -- off `Suspected` is read off the designation wherever it is asked, not
-    -- written here. Idempotent by construction, which CR 702.112c and CR 701.60d
-    -- lean on; emits GameEvent.BecameDesignated only on a change.
+    -- solved. Writes Object.designations, which CR 613 could not carry, and is
+    -- idempotent (CR 702.112c, CR 701.60d).
     Designate Designate.Designate
-  | -- | CR 716.2a's first half: "[Cost]: This Class's level becomes N." The
-    -- slot's permanent gets that level.
-    --
-    -- Designate's shape above, and for its reason: CR 716.2b makes a level a
-    -- designation, so this writes Object.classLevel rather than creating a CR 613
-    -- modification, and nothing in CR 613 could carry it. BECOMES rather than
-    -- increments -- rule 716.2a states an absolute -- and the "only if this Class
-    -- is level N-1" half of the same sentence rides
-    -- Pawl.Types.ActivatedAbility.condition on the level bar's own ability rather
-    -- than being re-checked here, which is CR 113.7a: once activated, an ability
-    -- exists on the stack independently of its source.
+  | -- | CR 716.2a's first half: "[Cost]: This Class's level becomes N." Writes
+    -- Object.classLevel, CR 716.2b making a level a designation; the "only if
+    -- this Class is level N-1" half rides the ability's own condition.
     SetClassLevel SetClassLevel.SetClassLevel
-  | -- | CR 701.60a's other ending: the named permanents are NO LONGER SUSPECTED.
-    -- Rule 701.60a's "until it leaves the battlefield" needs no opcode,
-    -- Object.newIncarnation already dropping the designation.
-    --
-    -- Not a designation-parameterised inverse of Designate: CR 701.60a's ending
-    -- belongs to `Suspected` alone, no rule taking renowned or monstrous away.
+  | -- | CR 701.60a's other ending: the named permanents are no longer suspected.
+    -- Not a designation-parameterised inverse of Designate, that ending
+    -- belonging to `Suspected` alone.
     Unsuspect ObjectRef.ObjectRef
-  | -- | CR 709.5f and CR 709.5g: "lock" or "unlock" halves of the slot's
-    -- permanent. Keys to the House's "lock or unlock a door of target Room you
-    -- control" is the printed producer in data/cards, and it prints both settings
-    -- as one either-or clause pair (Pawl.Types.Clause.orElse). Marina Vendrell
-    -- prints the same clause on a five-colour legend and is not transcribed.
-    -- Synthetic Skeleton Key is the producer of the plural setting.
-    --
-    -- ONE opcode over a payload and not one arm apiece, Designate's argument
-    -- above: rules 709.5f and 709.5g are the same sentence with two words
-    -- swapped -- choose a half that is locked \/ unlocked, and give \/ take the
-    -- appropriate unlocked designation -- so the choice, its filter and the write
-    -- are one code path with a setting rather than two that can drift. Unsuspect
-    -- is the opposite precedent and does not apply here: it is an ending with no
-    -- general inverse, while this pair IS the inverse of itself.
-    --
-    -- GENERAL, never Room-shaped: rule 709.5f\/g say "half of a permanent", and
-    -- CR 709.5j's "door" is only what a card calls one. Nothing here, in
-    -- Prompt.ChooseHalf, or in Pawl.Engine.Event.lockHalf names a Room; CR
-    -- 709.5's shared type line is what leaves a Room the only permanent with
-    -- halves to address, which is a fact about the rules rather than about this
-    -- type.
-    --
-    -- WHICH half is not a payload: both rules make it a choice taken while the
-    -- effect is applied (CR 608.2d), so it is asked at resolution and filtered to
-    -- the halves the setting admits. HOW MANY is a payload, since that is the
-    -- instruction's own wording rather than a choice -- "each locked door" leaves
-    -- nothing to ask and is the only route to CR 709.5i's second branch.
-    --
-    -- Writes Object.unlockedHalves, which holds DESIGNATIONS (CR 709.5c) rather
-    -- than characteristics, so nothing in CR 613 could carry it -- Designate's
-    -- reason one rule over. The locked side is derived from it
-    -- (Pawl.Engine.Room.lockedHalves), so a lock is a deletion and needs no
-    -- second field on the object.
+  | -- | CR 709.5f and CR 709.5g: lock or unlock halves of the slot's permanent
+    -- (Keys to the House). One opcode over a setting, the two rules being one
+    -- sentence with two words swapped; which half is asked at resolution (CR
+    -- 608.2d) and how many is the payload. General, never Room-shaped.
     SetHalfLocked SetHalfLocked.SetHalfLocked
   | -- | CR 702.100a and CR 702.100b together: put a +1/+1 counter on the slot's
-    -- permanent, and if one or more actually land, that permanent EVOLVES.
-    --
-    -- ONE opcode and not a PutCounters beside a marker, unlike renown's pair:
-    -- rule 702.100b makes the marker CONDITIONAL on counters having been put, and
-    -- two effects in a clause cannot state that dependency. The counter's kind
-    -- and count are the rule's, so neither is a payload.
+    -- permanent, and if one or more actually land, that permanent evolves. One
+    -- opcode because rule 702.100b makes the marker conditional on the placement.
     Evolve SlotName.SlotName
   | -- | CR 702.134a and CR 702.134c together: put a +1/+1 counter on the slot's
-    -- creature, and record that the source MENTORED it.
-    --
-    -- Evolve's shape one rule over. The slot names rule 702.134a's chosen TARGET,
-    -- the mentor being the resolving ability's own source.
+    -- creature, and record that the source mentored it. Evolve's shape one rule
+    -- over.
     Mentor SlotName.SlotName
   | -- | CR 702.149a and CR 702.149c together: put a +1/+1 counter on the slot's
-    -- creature, and record that it TRAINED. Evolve's shape and Evolve's reason
-    -- for being one opcode -- rule 702.149c makes the marker conditional on
-    -- counters having been put. The slot is Binding.triggerSource, unlike
-    -- Mentor's chosen target.
+    -- creature, and record that it trained. Evolve's shape, over
+    -- Binding.triggerSource rather than a chosen target.
     Train SlotName.SlotName
-  | -- | CR 731.1: "it becomes day" / "it becomes night" -- the GAME gains that
-    -- designation. Targetless and player-free, unlike BecomeMonarch: rule 731.1
-    -- puts the designation on the game itself.
-    --
-    -- NOT just a write: CR 702.145c and CR 702.145f make daybound and nightbound
-    -- permanents transform as the designation arrives, so Pawl.Engine.Resolve
-    -- hands this to Pawl.Engine.Daytime rather than assigning GameState.daytime.
+  | -- | CR 731.1: "it becomes day" / "it becomes night" -- the game gains that
+    -- designation, which CR 702.145c and CR 702.145f make daybound and
+    -- nightbound permanents transform for.
     ItBecomes Daytime.Daytime
-  | -- | CR 725 (Palace Jailer): exile the slot's target UNTIL an opponent of the
-    -- effect's controller becomes the monarch. The DURATION is the novelty -- the
-    -- exiled incarnation is registered in GameState.exiledUntilMonarch and
-    -- returned by Pawl.Engine.Monarch's settle-loop sweep. NOT MoveToZone, which
-    -- has no duration and schedules no return.
+  | -- | CR 725 (Palace Jailer): exile the slot's target until an opponent of the
+    -- effect's controller becomes the monarch. Not MoveToZone, which schedules
+    -- no return.
     ExileUntilMonarch SlotName.SlotName
-  | -- | CR 702.55a: exile the object the ObjectRef names, HAUNTING the creature
-    -- the SlotName's target names. The LINK is the novelty: the exiled
-    -- incarnation is filed in GameState.haunting against the object targeted,
-    -- which CR 702.55b's "creature it haunts" reads and
-    -- TriggerCondition.HauntedCreatureDies matches on.
-    --
-    -- THREE incarnations are in play (CR 400.7): the ObjectRef is
-    -- Pawl.Engine.Binding.became, the graveyard card the death minted, since rule
-    -- 702.55a's "it" is the card and the ability's source is the permanent that
-    -- died; the link is keyed on the id the exile move mints. Only the second
-    -- slot is a target (CR 115.10a).
+  | -- | CR 702.55a: exile the object the ObjectRef names, haunting the creature
+    -- the SlotName's target names; the link is filed in GameState.haunting,
+    -- which CR 702.55b reads.
     ExileHaunting ExileHaunting.ExileHaunting
-  | -- | CR 729.1/729.1b: play a Magic subgame, then bind its outcome -- the
-    -- WINNER -- into this slot for a later effect to read. Nothing is bound when
-    -- the subgame is a draw, which is what lets Shahrazad's
-    -- PlayerRef.EachPlayerExcept read "each player who doesn't win" as the whole
-    -- table. A definition, not a cast-time target -- the winner is known only when
-    -- the subgame ends.
+  | -- | CR 729.1 / 729.1b: play a Magic subgame, then bind its winner into this
+    -- slot; nothing is bound for a draw. A definition, never a target.
     PlaySubgame SlotName.SlotName
   | -- | CR 608.2d: the resolving controller chooses one of their opponents, and
-    -- the player chosen is bound into this slot for a LATER EFFECT of the same
-    -- resolution to name (Skullwinder, Infernal Offering), read through
-    -- Pawl.Types.Chooser's BoundInSlot.
-    --
-    -- CHOOSE, not target (CR 115.10a), so the pick happens while applying the
-    -- effect (CR 608.2d) rather than at CR 601.2c and CR 608.2b has nothing to
-    -- re-validate. The slot is a definition, which Pawl.CardSpec's dataflow lint
-    -- sees through Pawl.Engine.Resolve.definedSlots. Elided at one candidate.
+    -- the player chosen is bound into this slot for a later effect of the same
+    -- resolution to name (Skullwinder). Choose, not target; elided at one
+    -- candidate.
     --
     -- Not implemented: "choose a player", which would offer the controller too
     -- and so needs a scope beside the slot (#1444).
     ChooseOpponent SlotName.SlotName
-  | -- | ChooseOpponent's twin with the decision replaced by randomness: one of
-    -- the resolving controller's opponents is picked AT RANDOM and bound into
-    -- this slot for a later effect of the same resolution to name (Ruhan of the
-    -- Fomori's "choose an opponent at random. Ruhan attacks that player").
-    --
-    -- Its own arm rather than a flag on ChooseOpponent, for the reason
-    -- Pawl.Types.ObjectRef's RandomCardInHand gives beside ChosenCardInHand: the
-    -- two differ in who answers -- a seat weighing options against nobody
-    -- weighing anything -- so Pawl.Types.Prompt's RandomOpponent carries no
-    -- Pawl.Types.Decider where Prompt.ChooseOpponent does. CR 701.9b is the
-    -- rulebook's own acknowledgment that "at random" and "the player chooses"
-    -- are different instructions over the same domain.
-    --
-    -- CHOOSE, not target (CR 115.10a). The slot is a definition, which
-    -- Pawl.CardSpec's dataflow lint sees through
-    -- Pawl.Engine.Resolve.definedSlots. Elided at one candidate, CR 102.2
-    -- leaving a two-player game exactly one opponent.
+  | -- | ChooseOpponent's twin with the decision replaced by randomness (Ruhan of
+    -- the Fomori), so Prompt's RandomOpponent carries no Decider. Elided at one
+    -- candidate, CR 102.2 leaving a two-player game exactly one opponent.
     ChooseOpponentAtRandom SlotName.SlotName
   | -- | CR 706.1: roll a die of the stated kind, and bind the result as an
-    -- AMOUNT at the payload's slot for a later effect of the same resolution to
-    -- read through Pawl.Types.Quantity's InSlot (Ancient Copper Dragon's "roll a
-    -- d20. You create a number of Treasure tokens equal to the result").
+    -- amount at the payload's slot for a later effect to read as
+    -- Quantity.InSlot (Ancient Copper Dragon).
     --
-    -- CR 706.4's half of CR 706 needs nothing more: no results table, so the
-    -- number itself is the whole outcome and the card's own later text says what
-    -- to do with it. CR 706.3's table needs nothing more EITHER, and gets no arm
-    -- here: a striation is one Pawl.Types.Clause of the same mode, gated by its
-    -- `condition` on a Condition.Compares over this slot, which CR 706.3b's "all
-    -- part of one ability" is exactly. Djinni Windseer in Pawl.DiceSpec is what
-    -- proves it. Not implemented: CR 706.3c's "Roll again" (#2124).
-    --
-    -- ChooseOpponentAtRandom's posture, one type over: Pawl.Types.Prompt's
-    -- RollDie carries no Pawl.Types.Decider and no PlayerId, because a die
-    -- result is nobody's choice -- there is no seat weighing options, so there
-    -- is nothing for CR 723 to usurp. The engine still only OFFERS and FILTERS:
-    -- it names the die and admits the interpreter's answer only inside CR
-    -- 706.1a's 1..N, never computing the outcome itself.
-    --
-    -- The slot is a definition, which Pawl.CardSpec's dataflow lint sees through
-    -- Pawl.Engine.Resolve.definedSlots.
+    -- CR 706.3's results table needs no arm here: a striation is one Clause of
+    -- the same mode gated on a Condition.Compares over this slot, which CR
+    -- 706.3b's "all part of one ability" is exactly, and Djinni Windseer in
+    -- Pawl.DiceSpec is what proves it. Not implemented: CR 706.3c's "Roll again"
+    -- (#2124).
     RollDie RollDie.RollDie
   | -- | CR 705.1: flip a coin, and bind CR 705.2's outcome at the payload's slot
-    -- for a later clause of the same resolution to gate on (Winter Sky's "Flip a
-    -- coin. If you win the flip, ... If you lose the flip, ...").
-    --
-    -- RollDie's posture, one rule over, with CR 705.2's extra half: the flipping
-    -- player CALLS heads or tails first, which is a real choice and so a prompt
-    -- carrying a Pawl.Types.Decider, and then the coin comes up, which is nobody's
-    -- choice and so a prompt carrying neither a Decider nor a PlayerId. The engine
-    -- never flips; it asks, and CR 705.2 compares the two answers.
-    --
-    -- Nobody but the flipping player is involved -- CR 705.2's last sentence -- so
-    -- the payload names no seat, and the flipper is the resolving object's
-    -- controller (CR 109.5's "you"). A card telling ANOTHER player to flip would
-    -- put the seat on Pawl.Types.FlipCoin.
-    --
-    -- The slot is a definition, which Pawl.CardSpec's dataflow lint sees through
-    -- Pawl.Engine.Resolve.definedSlots.
+    -- for a later clause of the same resolution to gate on (Winter Sky). The
+    -- call is a choice and the outcome is not, so the two prompts differ in
+    -- whether they carry a Decider.
     FlipCoin FlipCoin.FlipCoin
   | -- | CR 103.5b (Serum Powder): exile every card in the resolving controller's
-    -- hand, then draw that many. Targetless and controller-scoped.
-    --
-    -- ONE opcode rather than an exile composed with a Draw: "that many" is the
-    -- hand size BEFORE the exile. The card granting the action is itself exiled
-    -- with the rest, CR 103.5b's action not being a cost.
+    -- hand, then draw that many -- "that many" being the hand size before the
+    -- exile, which is why it is one opcode.
     ExileHandThenDraw
   | -- | CR 701.34a: choose any number of permanents and/or players that have a
-    -- counter, then give each one additional counter of each kind it already has.
-    --
-    -- CHOOSE, not target (the rule's own word), so no SlotName: the set is picked
-    -- on RESOLUTION via Prompt.ChooseProliferate. Nullary, rule 701.34a fixing
-    -- the count at one per kind. Object counters ride Event.putCounters and
-    -- player counters Event.putPlayerCounters, so CR 614's counter replacements
-    -- get their opportunity against either recipient.
+    -- counter, then give each one additional counter of each kind it already
+    -- has. Choose, not target, so the set is picked on resolution.
     Proliferate
-  | -- | CR 201.4 via CR 608.2c: the resolving controller chooses a card name, and
-    -- the name is written to Pawl.Types.Object.chosenNames on the resolving
-    -- object -- Ancient Vendetta's "Choose a card name."
-    --
-    -- The RESOLUTION-time twin of Pawl.Types.EntryRewrite.ChooseCardNames, which
-    -- is CR 614.1c's as-enters choice. Same prompt (Prompt.ChooseCardName), same
-    -- store, different moment: a spell that is never a permanent cannot use the
-    -- entry replacement at all.
-    --
-    -- CHOOSE, not target, and no SlotName: a name is not an object, so nothing
-    -- binds. What READS the name is Pawl.Types.Filter's HasChosenName, off the
-    -- source, which is why the two clauses of Ancient Vendetta's sentence are one
-    -- resolution rather than a binding handed along.
-    --
-    -- The Filter is CR 201.4a's restriction on which names may be chosen, read off
-    -- the card for ChooseCardNames' reason -- Necromentia's "nonland card name" --
-    -- and passed to the prompt unchecked (#663).
+  | -- | CR 201.4 via CR 608.2c: the resolving controller chooses a card name,
+    -- written to Object.chosenNames on the resolving object (Ancient Vendetta).
+    -- The Filter is CR 201.4a's restriction, passed to the prompt unchecked
+    -- (#663).
     --
     -- Not implemented: a chooser other than CR 109.5's "you" -- Petra Sphinx's
     -- "target player chooses a card name" (#2233).
     ChooseCardName (Filter.Filter Keyword.Keyword)
   | -- | CR 701.39a: "bolster N" -- choose a creature the resolving controller
     -- controls with the least toughness, or tied for least, then put that many
-    -- +1\/+1 counters on it. CHOOSE, not target, so no SlotName;
-    -- Prompt.ChooseBolster asks on resolution.
-    --
-    -- ONE payload, rule 701.39a fixing everything else. N is a Quantity rather
-    -- than a Natural because the pool prints it as an expression (Dragonscale
-    -- General's "where X is the number of tapped creatures you control"). Not a
-    -- PutCounters over a cleverer ObjectRef: a ref DESCRIBES a set and the whole
-    -- set is counted (CR 115.10a), where this rule has a player pick ONE out of
-    -- it.
+    -- +1\/+1 counters on it. Choose, not target.
     Bolster Quantity.Quantity
-  | -- | CR 701.47a: "amass [subtype] N" -- if the resolving controller controls no
-    -- Army creature, create a 0\/0 black [subtype] Army creature token; then
-    -- choose an Army creature they control, put N +1\/+1 counters on it, and give
-    -- it the subtype in addition to its other types (CR 205.1b). CHOOSE, not
-    -- target; Prompt.ChooseAmass asks on resolution.
-    --
-    -- ONE opcode rather than four composed effects: rule 701.47a fixes the ORDER,
-    -- the second instruction reads state the first writes, and the third and
-    -- fourth act on the object the second chose, which no card-data slot names.
-    -- Amass.subtype carries the card's word, the Army type being the rulebook's.
-    -- Performed by Pawl.Engine.Amass.amass, one procedure that cannot stop early
-    -- (CR 701.47b).
+  | -- | CR 701.47a: "amass [subtype] N", performed by Pawl.Engine.Amass.amass as
+    -- one procedure that cannot stop early (CR 701.47b). Choose, not target.
     Amass Amass.Amass
   | -- | CR 701.68a: "blight N" -- the players the PlayerRef names each put N
-    -- -1\/-1 counters on a creature THEY control. CHOOSE, not target;
-    -- Prompt.ChooseBlight asks on resolution.
-    --
-    -- The candidate set is "a creature you control" UNCONSTRAINED -- Bolster's
-    -- pool narrowed by least toughness is the contrast. The "you" is whoever the
-    -- instruction ADDRESSES, which need not be the resolving controller (High
-    -- Perfect Morcant's "each opponent blights 1"), and each named player picks
-    -- from THEIR OWN creatures and is asked separately.
-    --
-    -- The Quantity has no NON-LITERAL producer in `data/cards/`, and both
-    -- printings that would be one state their amount as a COST rather than as an
-    -- instruction -- Soul Immolation's additional cost and Blighted Nightmare's
-    -- activation cost, which are Pawl.Types.CostComponent.BlightX. Scryfall
-    -- `o:/[Bb]light X/`, 2026-08-20, returns those two and nothing else; a
-    -- printing reading "blight X" after a colon or a period would refute it.
+    -- -1\/-1 counters on a creature they control, each asked separately. Choose,
+    -- not target.
     Blight PlayerQuantity.PlayerQuantity
-  | -- | CR 701.54a: the Ring tempts the resolving controller -- they get an emblem
-    -- named The Ring if they have none (CR 701.54c), then choose a creature they
-    -- control to become their Ring-bearer. CHOOSE, not target;
-    -- Prompt.ChooseRingBearer asks on resolution.
-    --
-    -- Nullary, rule 701.54a fixing the chooser, the count and the qualification.
-    -- ONE opcode rather than an emblem-maker composed with a choice, because CR
-    -- 701.54c fixes their ORDER and makes the first conditional on state the
-    -- second writes. Performed by Pawl.Engine.Ring.tempt, one procedure that
-    -- cannot stop early (CR 701.54d).
+  | -- | CR 701.54a: the Ring tempts the resolving controller, performed by
+    -- Pawl.Engine.Ring.tempt as one procedure that cannot stop early (CR
+    -- 701.54d). Nullary, rule 701.54a fixing everything.
     TemptWithTheRing
-  | -- | CR 701.49: the resolving controller ventures into the dungeon -- they
-    -- enter a dungeon they own if they are in none (CR 701.49a), and otherwise
-    -- move their venture marker along one arrow (CR 701.49b). CHOOSE, not target;
-    -- Prompt.ChooseRoom asks on resolution. Performed by
-    -- Pawl.Engine.Dungeon.venture. The venturer is "you" either way.
-    --
-    -- The payload is CR 701.49d's "[quality]": Nothing for a plain "venture into
-    -- the dungeon", and Just for the variant "venture into [quality]", which
-    -- narrows CR 701.49a's choice to the dungeon cards that player owns carrying
-    -- the indicated quality. A Subtype rather than a Filter because CR 205.3p is
-    -- what a quality IS -- a dungeon type, which is that rule's name for the
-    -- subtype a dungeon card carries -- and a Filter would be a second way to ask
-    -- a question CR 205.3p has already answered.
-    --
-    -- CR 701.49d's second sentence needs no payload of its own: a player who
-    -- already owns a dungeon card in the command zone follows CR 701.49b-c, and
-    -- only CR 701.49c's tail enters a dungeon at all, where the same quality
-    -- narrows the same choice.
+  | -- | CR 701.49: the resolving controller ventures into the dungeon,
+    -- performed by Pawl.Engine.Dungeon.venture. The payload is CR 701.49d's
+    -- "[quality]", a CR 205.3p dungeon type rather than a Filter.
     Venture (Maybe Subtype.Subtype)
-  | -- | CR 701.21a: the PLAYERS the slot names each sacrifice this many
+  | -- | CR 701.21a: the players the slot names each sacrifice this many
     -- permanents matching the Filter, each chosen by that player (Diabolic
-    -- Edict names one; Rishadan Cutpurse's gate binds several).
-    --
-    -- Distinct from Sacrifice, which names a PERMANENT: there the effect picks
-    -- the victim, here the sacrificing player does, which is why this one
-    -- prompts.
-    --
-    -- CR 101.4: with several, every seat's pick is made first -- in APNAP order,
-    -- each seat knowing the ones before it (CR 101.4b) -- and only then does
-    -- anything leave the battlefield.
-    --
-    -- CR 609.3: a player with fewer matching permanents sacrifices all of them
-    -- and one with none sacrifices nothing -- forced, so neither is prompted.
+    -- Edict) in APNAP order (CR 101.4b) before anything leaves the battlefield.
     PlayerSacrifices PlayerSacrifices.PlayerSacrifices
   | -- | CR 500.7: the players the PlayerRef names each get one extra turn, added
-    -- directly after the turn this resolves in.
-    --
-    -- No count and no "which turn": CR 500.7's clause about multiple extra turns
-    -- is about several such effects rather than one adding several. WHERE they go
-    -- is Engine.handoffTurn's question, reading GameState.extraTurns as the stack
-    -- CR 500.7 describes.
-    --
-    -- CR 500.11 / 614.1b: the PhaseSelectors are the steps and phases the created
-    -- turn SKIPS (Savor the Moment's `Step (Beginning Untap)`). They ride this
-    -- opcode because "that turn" has to name the turn this same resolution just
-    -- created, and CR 500.7's most-recently-created-first ordering means
-    -- SkipNextPhase's "next" names a DIFFERENT turn as soon as another
-    -- extra-turn effect resolves afterwards.
+    -- directly after the turn this resolves in. CR 500.11 / 614.1b: the
+    -- PhaseSelectors are the steps and phases that turn skips (Savor the
+    -- Moment).
     TakeExtraTurn TakeExtraTurn.TakeExtraTurn
-  | -- | CR 701.24: the referenced objects are shuffled into their OWNERS'
-    -- libraries (Riftsweeper). The move goes through the changeZone funnel,
-    -- landing in the OWNER's library by CR 400.3, and that library is then
-    -- shuffled (CR 701.24a).
-    --
-    -- NOT MoveToZone Library: CR 701.24c shuffles the library even if the named
-    -- objects are not where they were expected, so a CR 616.1 replacement
-    -- cancelling the move must not cancel the shuffle. And a shuffle is its own
-    -- observable event, CR 701.24e and CR 701.24f triggering on it.
-    --
-    -- ShuffleIntoLibrary.library NAMES the library, which is what CR 701.24c's
-    -- first half needs: an owner read off the objects disappears with them, so a
-    -- card whose shuffle-in resolves with every named object gone (Dwell on the
-    -- Past) would have no library left to shuffle. Absent when the card's own
-    -- words derive it instead (Riftsweeper); the libraries shuffled are the UNION
-    -- of the two readings, and one named twice is still shuffled once.
+  | -- | CR 701.24: the referenced objects are shuffled into their owners'
+    -- libraries (Riftsweeper), and CR 701.24c shuffles even where they are gone;
+    -- ShuffleIntoLibrary.library names the library where the card's words do not
+    -- derive it.
     ShuffleIntoLibrary ShuffleIntoLibrary.ShuffleIntoLibrary
   | -- | CR 701.24a on its own: the libraries the PlayerRef names are randomized,
-    -- and nothing moves. Undercity's "Throne of the Dead Three" ends "then
-    -- shuffle", a sentence about the library the room's own reveal left alone.
-    --
-    -- NOT ShuffleIntoLibrary with an empty or library-pointing ref, which is why
-    -- this is a second arm rather than a Maybe on that one's `ref`. Pointing that
-    -- opcode at cards already in the library would send each through the CR 400.7
-    -- funnel -- a fresh object id, a Moved event and a CR 616.1 replacement
-    -- opportunity apiece -- and a shuffle moves nothing (CR 701.24a). Making the
-    -- field optional would also make `MkShuffleIntoLibrary Nothing Nothing`
-    -- sayable, an instruction naming neither a library nor an object.
-    --
-    -- A PlayerRef and not an ObjectRef, so the library is named the way CR
-    -- 701.24c's first half needs and the way ShuffleIntoLibrary.library already
-    -- does. Mandatory here, that arm's fallback -- deriving the owner off moved
-    -- objects -- having nothing to derive from.
-    --
-    -- Each named library is shuffled ONCE (CR 608.2f) and CR 701.24a makes WHO
-    -- shuffles unobservable, exactly as the arm above.
+    -- and nothing moves. A second arm rather than an empty ref on the one above,
+    -- which would send cards through the CR 400.7 funnel.
     Shuffle PlayerRef.PlayerRef
-  | -- | CR 608.2g: offer a player the cast of the object the slot names. CR
-    -- 310.12b's "then you may cast it transformed without paying its mana cost"
-    -- is the producer, and the CastOffer is that sentence's two riders --
-    -- "instructs or allows" is the payload's Optionality and WHICH player its
-    -- PlayerRef.
-    --
-    -- The slot is a READ, not a definition, and may be filled either way: CR
-    -- 310.12b binds it with a MoveToZone earlier in the same instruction list,
-    -- while Harness the Storm fills it at CR 601.2c. Resolve reads it off the
-    -- resolving object's LIVE bindings either way.
-    --
-    -- CR 601.3's permission comes from the offer ITSELF, which is what lets the
-    -- second of those reach a graveyard with no standing permission in sight:
-    -- Cast.castableWhenOffered asks the prohibitions and the cost, never the
-    -- zone. An OFFER and not a cast, even at Mandatory: CR 601.2b's announcements
-    -- still belong to the caster, and one they cannot complete is reversed by CR
-    -- 601.2.
+  | -- | CR 608.2g: offer a player the cast of the object the slot names (CR
+    -- 310.12b). The slot is a read, not a definition; CR 601.3's permission
+    -- comes from the offer itself, and an offer is never a cast.
     OfferCast OfferCast.OfferCast
   | -- | CR 601.3: grant the permission to play the objects the ObjectRef names,
-    -- for a duration (Victor Mancha, Runaway).
-    --
-    -- The OPPOSITE of OfferCast: an offer is one cast taken during this
-    -- resolution, while this is a standing permission the player exercises later,
-    -- at their own timing.
-    --
-    -- PLAY and not cast, after CR 601.1a: Pawl.Engine.Cast reads the permission
-    -- for the spell, and Pawl.Engine.Action.playableLands for CR 305.1's special
-    -- action. CR 611.2b: if the stated duration never starts,
-    -- Pawl.Engine.Expiry.arm answers Nothing and Resolve stores nothing.
-    --
-    -- CR 118.14's "and mana of any type can be spent to cast that spell" is the
-    -- payload's `spending` rider, riding the GRANT because rule 118.14's last
-    -- sentence scopes it to the permission.
+    -- for a duration (Victor Mancha, Runaway) -- a standing permission where
+    -- OfferCast is one cast now. The `spending` rider is CR 118.14's.
     --
     -- Not implemented: a beneficiary other than CR 109.5's "you". The owner-side
     -- grants (Release to the Wind, Soul Partition) each carry a second clause
     -- pawl cannot yet spell.
     GrantPlayFromExile GrantPlayFromExile.GrantPlayFromExile
-  | -- | CR 702.170c: "in addition to the plot special action, some spells and
-    -- abilities cause a card in exile to become plotted" -- so the objects the
-    -- ObjectRef names each become plotted (Kellan Joins Up).
-    --
-    -- NOT named Plot: CR 702.170e reserves that verb for CR 116.2k's special
-    -- action, which this route is not -- it pays no plot cost, wants no plot
-    -- keyword, and takes no special action. The rule's own words are "become
-    -- plotted".
-    --
-    -- NO DURATION and no beneficiary beside it: CR 702.170d fixes both, naming
-    -- the card's OWNER and putting no end on the permission.
-    --
-    -- The SIBLING of GrantPlayFromExile and never a use of it. That opcode
-    -- writes Object.playableFromExile, CR 715.3d's permission for a named
-    -- PLAYER with no cost stated; rule 702.170d names the owner, makes the cast
-    -- free, and fixes the timing to a later turn's main phase. Object.plotted's
-    -- own comment argues one field cannot answer both, and one opcode cannot
-    -- either.
+  | -- | CR 702.170c: the objects the ObjectRef names each become plotted
+    -- (Kellan Joins Up). Not named Plot, CR 702.170e reserving that verb for CR
+    -- 116.2k's special action; CR 702.170d fixes the beneficiary and the timing.
     MakePlotted ObjectRef.ObjectRef
-  | -- | CR 608.2f: an action taken on several objects and/or players that cannot
-    -- be processed simultaneously "is instead processed considering each affected
-    -- player or object individually" -- so take the swept set one member at a
-    -- time and run the BODY for each, with that member bound under the payload's
-    -- slot for that iteration.
-    --
-    -- The ONE arm that runs a sequence per member. Two things need it: a
-    -- per-object step acting on what that same step produced (Soulfire Eruption,
-    -- rule 608.2f's own second example), and a body whose payload is keyed to
-    -- the MEMBER rather than applied to it -- Rampage of the Clans' "its
-    -- controller creates a 3/3 green Centaur creature token", which no opcode
-    -- can spread across a set because the token is not aimed at the member at
-    -- all. Every other set-naming opcode applies ITSELF across the swept set and
-    -- needs no binding -- reach for those first.
-    --
-    -- NOT the control flow design.md section 1 keeps out of the ISA: the bound is
-    -- the SWEPT SET, read once before the first iteration and fixed (CR 608.2c),
-    -- so there is no condition to evaluate and no branch to take. The slot is a
-    -- definition and never a target (CR 115.10a), though the REF may name a slot
-    -- CR 601.2c filled by targeting.
-    --
-    -- Scoped to the iteration, both halves: the member binding is passed down
-    -- rather than written onto the resolving object, and a name the BODY defines
-    -- is reset to its pre-loop value before each pass.
-    --
-    -- ORDER: APNAP (CR 608.2f's primary determination) and then, within one
-    -- controller, that rule's secondary sentence -- the RESOLVING controller's
-    -- choice, asked as Prompt.OrderForEach.
+  | -- | CR 608.2f: take the swept set one member at a time and run the body for
+    -- each, with that member bound under the payload's slot for that iteration.
+    -- The one arm that runs a sequence per member; every other set-naming opcode
+    -- applies itself across the set, so reach for those first. Ordered APNAP,
+    -- then by the resolving controller's choice.
     ForEach (ForEach.ForEach (Effect card ability))
   deriving (Eq, Ord, Show)
