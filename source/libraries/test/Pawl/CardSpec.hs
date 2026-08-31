@@ -7585,8 +7585,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         removal slot = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) slot)
         destruction = Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing Nothing (Just destroyedSlot))
         -- An opcode whose ObjectRef carries a Filter, so effectFilters reports it
-        -- (its Tap arm is frame SourceHostFramed (objectRefFilters ref)). Nothing about the
-        -- opcode matters here: what is on trial is the atom inside the predicate.
+        -- (its Tap arm is `frame SourceHostFramed (objectRefFilters ref)`).
+        -- Nothing about the opcode matters here: what is on trial is the atom
+        -- inside the predicate.
         tapping f = Effect.Tap (ObjectRef.EachMatching f)
         -- An opcode holding a PlayerRef in a field of its own, Marchesa's Decree
         -- shape. Nothing about the opcode matters here either: what is on trial
