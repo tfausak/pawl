@@ -31,7 +31,9 @@ data PreventAllDamage effect = MkPreventAllDamage
     -- shield that DESCRIBES its recipients in @whatRecipient@ below instead; the
     -- two spellings are alternatives, and a card writing both is read as the
     -- description alone (Pawl.Engine.Resolve's arm), exactly as
-    -- Pawl.Types.PreventNextDamage reads its pair.
+    -- Pawl.Types.PreventNextDamage reads its pair. A shield writing NEITHER
+    -- surrounds nothing (CR 615.1) and installs no row at all, which
+    -- Pawl.CardSpec's shieldNamingNothingOffends rejects.
     ref :: Maybe ObjectRef.ObjectRef,
     -- | CR 611.2c's LIVE description of the objects one shared shield covers --
     -- Pack Leader's "to Dogs you control", which is not a set swept when the
@@ -42,7 +44,9 @@ data PreventAllDamage effect = MkPreventAllDamage
     --
     -- Read on the DealtTo side only: a shield pinned to the other side of the
     -- event names no recipient at all, and describes its source in @whatSource@
-    -- below instead.
+    -- below instead. A card writing one beside DealtBy would install a shield
+    -- broader than it printed, which Pawl.CardSpec's byDirectionRecipientOffends
+    -- rejects.
     --
     -- No PLAYER half beside it, where Pawl.Types.PreventNextDamage carries
     -- @whoRecipient@. Printings that want both halves exist -- Safe Passage's

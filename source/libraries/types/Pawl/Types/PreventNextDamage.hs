@@ -27,7 +27,9 @@ data PreventNextDamage effect = MkPreventNextDamage
     -- one CR 615.7 shield each. Nothing for a shield that describes its
     -- recipients instead, in the two fields below; the two spellings are
     -- alternatives, and a card writing both is read as the description alone
-    -- (Pawl.Engine.Resolve's arm).
+    -- (Pawl.Engine.Resolve's arm). A shield writing NEITHER surrounds nothing
+    -- (CR 615.1) and installs no row at all, which Pawl.CardSpec's
+    -- shieldNamingNothingOffends rejects.
     ref :: Maybe ObjectRef.ObjectRef,
     -- | CR 611.2c's LIVE description of the OBJECTS one shared shield covers --
     -- Divine Deflection's "permanents you control", which is not a set swept when
