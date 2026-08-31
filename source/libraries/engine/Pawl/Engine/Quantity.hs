@@ -17,6 +17,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
@@ -503,6 +504,16 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.DungeonsCompleted ref -> case playersOf ref of
     Just [pid] -> Just (toInteger (maybe 0 Player.completedDungeons (Map.lookup pid (GameState.players gs))))
     _ -> Nothing
+  -- CR 309.7 asked of ONE dungeon, the arm above's shape in arity, source and
+  -- liveness: 1 if that player's completed names hold this one and 0 if not.
+  --
+  -- A 0\/1 rather than a Bool because Quantity is a number; the threshold that
+  -- turns it into Acererak the Archlich's "if you haven't" is the Comparison's.
+  Quantity.CompletedDungeon (CompletedDungeon.MkCompletedDungeon ref name) -> case playersOf ref of
+    Just [pid] ->
+      let completed = maybe Set.empty Player.completedDungeonNames (Map.lookup pid (GameState.players gs))
+       in Just (if Set.member name completed then 1 else 0)
+    _ -> Nothing
   -- CR 400.7 / 608.2i read as a 0/1: did the object this evaluation is aimed at
   -- enter the battlefield this turn?
   --
@@ -806,6 +817,7 @@ substituteStar star quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn _ -> quantity
   Quantity.SpellsCastLastTurn _ -> quantity
   Quantity.DungeonsCompleted _ -> quantity
+  Quantity.CompletedDungeon {} -> quantity
   Quantity.EnteredThisTurn -> quantity
   Quantity.EnteredFrom _ -> quantity
   Quantity.WasCastFrom _ -> quantity
@@ -942,8 +954,10 @@ slots quantity = case quantity of
   -- beside its PlayerRef either.
   Quantity.SpellsCastLastTurn _ -> Set.empty
   -- And another again, CR 309.7's completion tally having nothing beside its
-  -- PlayerRef either.
+  -- PlayerRef either -- nor the named read beside it, whose CardName is a printed
+  -- name rather than anything a slot could bind.
   Quantity.DungeonsCompleted _ -> Set.empty
+  Quantity.CompletedDungeon {} -> Set.empty
   -- And a nullary arm, which names nothing at all: CR 400.7's entry is read
   -- against the object the evaluation is aimed at, as ObjectCounters is.
   Quantity.EnteredThisTurn -> Set.empty
@@ -1016,6 +1030,7 @@ objectSlots quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn _ -> Set.empty
   Quantity.SpellsCastLastTurn _ -> Set.empty
   Quantity.DungeonsCompleted _ -> Set.empty
+  Quantity.CompletedDungeon {} -> Set.empty
   Quantity.EnteredThisTurn -> Set.empty
   Quantity.EnteredFrom _ -> Set.empty
   Quantity.WasCastFrom _ -> Set.empty
@@ -1076,6 +1091,7 @@ nestedRefs quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn ref -> Set.singleton (Left ref)
   Quantity.SpellsCastLastTurn ref -> Set.singleton (Left ref)
   Quantity.DungeonsCompleted ref -> Set.singleton (Left ref)
+  Quantity.CompletedDungeon (CompletedDungeon.MkCompletedDungeon ref _) -> Set.singleton (Left ref)
   Quantity.EnteredThisTurn -> Set.empty
   Quantity.EnteredFrom inZone -> Set.singleton (Left (InZone.player inZone))
   Quantity.WasCastFrom inZone -> Set.singleton (Left (InZone.player inZone))
@@ -1224,6 +1240,7 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn ref -> Quantity.PlayersDealtDamageThisTurn (f ref)
   Quantity.SpellsCastLastTurn ref -> Quantity.SpellsCastLastTurn (f ref)
   Quantity.DungeonsCompleted ref -> Quantity.DungeonsCompleted (f ref)
+  Quantity.CompletedDungeon (CompletedDungeon.MkCompletedDungeon ref name) -> Quantity.CompletedDungeon (CompletedDungeon.MkCompletedDungeon (f ref) name)
   Quantity.EnteredFrom z -> Quantity.EnteredFrom z {InZone.player = f (InZone.player z)}
   Quantity.WasCastFrom z -> Quantity.WasCastFrom z {InZone.player = f (InZone.player z)}
   Quantity.ManaCount c -> Quantity.ManaCount c {ManaCount.Type.player = f (ManaCount.Type.player c)}
@@ -1361,6 +1378,7 @@ readsX quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn _ -> False
   Quantity.SpellsCastLastTurn _ -> False
   Quantity.DungeonsCompleted _ -> False
+  Quantity.CompletedDungeon {} -> False
   Quantity.EnteredThisTurn -> False
   Quantity.EnteredFrom _ -> False
   Quantity.WasCastFrom _ -> False

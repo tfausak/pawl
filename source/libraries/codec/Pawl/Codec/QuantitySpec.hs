@@ -6,6 +6,8 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
@@ -362,6 +364,13 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.DungeonsCompleted (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"DungeonsCompleted\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  -- CR 309.7 asked of one dungeon by name, the tally's named sibling.
+  Spec.it s "CompletedDungeon, a player and a printed name" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.CompletedDungeon (CompletedDungeon.MkCompletedDungeon (PlayerRef.Relative PlayerRelation.You) (CardName.MkCardName (Text.pack "Tomb of Annihilation"))))
+      " {\"type\":\"CompletedDungeon\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"dungeon\":\"Tomb of Annihilation\"}} "
   -- CR 400.7 with NOTHING on the wire either: the object is the one the quantity
   -- is evaluated against, and "this turn" is the event log's own extent.
   Spec.it s "EnteredThisTurn is nullary" $

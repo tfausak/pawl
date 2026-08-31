@@ -2939,6 +2939,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.LoseControlOfBound _ -> condition
   TriggerCondition.RoomEntered _ -> condition
   TriggerCondition.PlayerScries _ -> condition
+  TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerRollsDice _ -> condition
   TriggerCondition.PlayerWinsCoinFlip _ -> condition
@@ -3037,6 +3038,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.PlayersDealtDamageThisTurn _ -> quantity
   Quantity.Type.SpellsCastLastTurn _ -> quantity
   Quantity.Type.DungeonsCompleted _ -> quantity
+  Quantity.Type.CompletedDungeon {} -> quantity
   Quantity.Type.EnteredThisTurn -> quantity
   Quantity.Type.EnteredFrom _ -> quantity
   Quantity.Type.WasCastFrom _ -> quantity
@@ -4495,6 +4497,7 @@ quantityReads q = case q of
   Quantity.Type.PlayersDealtDamageThisTurn _ -> Set.empty
   Quantity.Type.SpellsCastLastTurn _ -> Set.empty
   Quantity.Type.DungeonsCompleted _ -> Set.empty
+  Quantity.Type.CompletedDungeon {} -> Set.empty
   Quantity.Type.EnteredThisTurn -> Set.empty
   Quantity.Type.EnteredFrom _ -> Set.empty
   Quantity.Type.WasCastFrom _ -> Set.empty

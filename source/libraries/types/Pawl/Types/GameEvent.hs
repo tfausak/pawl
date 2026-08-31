@@ -834,6 +834,15 @@ data GameEvent
     -- alone names nothing: two players may be in room 1 of two different dungeons,
     -- and CR 309.4c makes each room ability the dungeon card's own.
     VentureMarkerEntered VentureMarkerEntered.VentureMarkerEntered
+  | -- | CR 309.7: a player completed a dungeon, as the dungeon card they own
+    -- was removed from the game -- CR 309.6's owner, recorded by
+    -- Pawl.Engine.Dungeon.remove.
+    --
+    -- No dungeon on the payload, Scried's shape: CR 309.7 states the fact of
+    -- completion and names no card, and nothing triggers on completing a NAMED
+    -- dungeon. Acererak the Archlich reads that off
+    -- Pawl.Types.Player.completedDungeonNames instead, which outlives the log.
+    DungeonCompleted PlayerId.PlayerId
   | -- | CR 601.2c: an object or player BECAME A TARGET of a spell or ability --
     -- CR 115.1 makes a player a target in its own right, so the payload's
     -- `targeted` is a Recipient. Emitted by Pawl.Engine.Event.becameTarget, once

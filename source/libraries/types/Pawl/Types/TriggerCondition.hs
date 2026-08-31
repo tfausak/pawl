@@ -1164,6 +1164,9 @@ data TriggerCondition
     -- Pawl.Types.Face.rooms, which is why Pawl.Types.DungeonRoom carries a bare
     -- Modal rather than a whole TriggeredAbility.
     RoomEntered RoomIndex.RoomIndex
+  | -- | CR 309.7: "whenever you complete a dungeon" (Dungeon Crawler), against
+    -- GameEvent.DungeonCompleted.
+    PlayerCompletesDungeon PlayerRelation.PlayerRelation
   | -- | CR 701.22d: "whenever you scry" (Matoya, Archon Elder), against
     -- GameEvent.Scried. Counts SCRIES rather than cards, which is why it reads
     -- its own event: CR 701.22a's reorder records nothing, and a scry that moved

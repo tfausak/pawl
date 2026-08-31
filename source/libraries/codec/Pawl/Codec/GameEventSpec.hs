@@ -387,6 +387,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Scried (PlayerId.MkPlayerId 1))
       " {\"type\":\"Scried\",\"value\":1} "
+  -- CR 309.7. One player id, Scried's payload: the rule names the completion
+  -- and not the dungeon.
+  Spec.it s "DungeonCompleted" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.DungeonCompleted (PlayerId.MkPlayerId 5))
+      " {\"type\":\"DungeonCompleted\",\"value\":5} "
   -- CR 701.25d, Scried's twin. A DISTINCT tag, since CR 701.25a's graveyard half
   -- is what a card telling the two apart reads about.
   Spec.it s "Surveiled" $

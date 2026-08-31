@@ -640,6 +640,7 @@ snapshotView gs shape event = case event of
   GameEvent.Milled {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Scried _ -> Nothing
+  GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing

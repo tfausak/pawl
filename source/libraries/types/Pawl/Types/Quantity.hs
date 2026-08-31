@@ -1,6 +1,7 @@
 module Pawl.Types.Quantity where
 
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
+import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
@@ -597,9 +598,9 @@ data Quantity
     -- card ever wants one, is Aggregation.Greatest over Scope.OverPlayers reading
     -- each candidate through PlayerRef.Candidate, as SpellsCastLastTurn above does.
     --
-    -- A COUNT and not a set of dungeon names: CR 309.7 states only the fact of
-    -- completion, and Player.completedDungeons argues why the names wait for
-    -- Acererak the Archlich. Not implemented: the named read (#2259).
+    -- A COUNT and not a set of dungeon names, which the CompletedDungeon arm
+    -- below is: CR 309.5b lets a dungeon be completed twice, so the two answers
+    -- differ and Player.completedDungeons argues which is which.
     --
     -- Read straight off Player.completedDungeons rather than folded from
     -- GameState.events, for the reason LifeTotal is read off the player: nothing
@@ -612,6 +613,9 @@ data Quantity
     --
     -- A LEAF, like LifeTotal and SpellsCastLastTurn: it holds no Quantity.
     DungeonsCompleted PlayerRef.PlayerRef
+  | -- | CR 309.7 as a 0\/1: has that player completed a dungeon with this name --
+    -- Acererak the Archlich's "if you haven't completed Tomb of Annihilation".
+    CompletedDungeon CompletedDungeon.CompletedDungeon
   | -- | CR 400.7 / 608.2i: did the object this quantity is evaluated against ENTER
     -- THE BATTLEFIELD this turn? 1 if so and 0 if not -- Thrasta, Tempest's Roar's
     -- "Thrasta has hexproof as long as it entered this turn", a CR 604.1 static

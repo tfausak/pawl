@@ -2212,6 +2212,9 @@ representativeEvents cond =
         -- player would still agree with eventBindingSlots here if the two
         -- coincided.
         TriggerCondition.PlayerScries _ -> one (GameEvent.Scried S.bob)
+        -- CR 309.7's own event, and the only one this condition admits. bob
+        -- rather than the perspective player, on the PlayerScries arm's reasoning.
+        TriggerCondition.PlayerCompletesDungeon _ -> one (GameEvent.DungeonCompleted S.bob)
         -- CR 701.25d's own event, the arm above's twin. A DISTINCT event, which
         -- is what keeps this pin honest: an arm matching a scry here would claim
         -- the floor for the wrong keyword action.
@@ -2372,6 +2375,8 @@ everyTriggerCondition =
     -- BOTH relations for each of the two, on the PlayerBecomesMonarch pair's
     -- reasoning: an eventBindings arm that had cased on the relation and stamped
     -- nothing under one of them would go unseen if only one were listed.
+    TriggerCondition.PlayerCompletesDungeon PlayerRelation.You,
+    TriggerCondition.PlayerCompletesDungeon PlayerRelation.Opponent,
     TriggerCondition.PlayerScries PlayerRelation.You,
     TriggerCondition.PlayerScries PlayerRelation.Opponent,
     TriggerCondition.PlayerSurveils PlayerRelation.You,

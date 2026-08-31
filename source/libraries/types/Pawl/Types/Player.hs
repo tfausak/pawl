@@ -3,6 +3,7 @@ module Pawl.Types.Player where
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -169,18 +170,26 @@ data Player = MkPlayer
     -- owner and the resolving controller coincide; in the state-based action the
     -- owner is the only player available.
     --
-    -- A COUNT and not the set of dungeons completed, though the printing is in
-    -- hand at the removal site. CR 309.7 states no more than the fact of
-    -- completion, and no card in data/cards/ asks which dungeon: Gloom Stalker's
-    -- "as long as you've completed a dungeon" is this compared to 1. Acererak the
-    -- Archlich's "if you haven't completed Tomb of Annihilation" is the card that
-    -- would need the names. Not implemented: the named read (#2259).
+    -- A COUNT, beside the names below rather than folded from them: CR 309.5b
+    -- lets the same dungeon be brought back in and completed again, so a player
+    -- who completed Undercity twice has completed two dungeons and one name.
+    -- Gloom Stalker's "as long as you've completed a dungeon" is this compared
+    -- to 1.
     --
     -- NOT a PlayerCounterKind, for Player.ringTemptations' reason: CR 122.1 makes
     -- a counter a MARKER an effect can add or remove, and rule 309 never calls
     -- this one -- proliferate (CR 701.34a) would find it if it were.
     --
     -- Read by Pawl.Engine.Quantity's Quantity.DungeonsCompleted arm.
-    completedDungeons :: Natural.Natural
+    completedDungeons :: Natural.Natural,
+    -- | CR 309.7: WHICH dungeons this player has completed, by name -- Acererak
+    -- the Archlich's "if you haven't completed Tomb of Annihilation". Written by
+    -- Pawl.Engine.Dungeon.remove beside the tally above, and read by
+    -- Pawl.Engine.Quantity's Quantity.CompletedDungeon arm.
+    --
+    -- NAMES and not PrintingIds, because a name is what Acererak's text names and
+    -- CR 201.2a makes sameness of name the question: two printings of one dungeon
+    -- are the same dungeon to it, and a printing id would tell them apart.
+    completedDungeonNames :: Set.Set CardName.CardName
   }
   deriving (Eq, Ord, Show)

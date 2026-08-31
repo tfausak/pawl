@@ -314,23 +314,40 @@ enter pid quality = do
 -- word; the two coincide on the venture road, and on the SBA road the owner is
 -- the only player there is.
 --
--- Nothing is recorded on the Nothing branch, which is right: a lookup miss
--- removed no dungeon and so completed none.
+-- CR 309.7 again: the dungeon's NAME is kept beside the tally, on
+-- Player.completedDungeonNames -- read by Quantity.CompletedDungeon for Acererak
+-- the Archlich's "if you haven't completed Tomb of Annihilation". Read off the
+-- face while the object still exists, which is the last moment it can be read at
+-- all: removal is from the GAME, so nothing afterwards can say which card left.
 --
--- The tally and not a GameEvent, so no ability can trigger on completing a
--- dungeon. Not implemented: the event form, Dungeon Crawler's "whenever you
--- complete a dungeon" (#2260).
+-- GameEvent.DungeonCompleted is recorded here too, which is what lets Dungeon
+-- Crawler's "whenever you complete a dungeon" trigger (CR 309.7). Recorded on the
+-- stripped state, so a trigger gathered from it cannot see the dungeon card.
+--
+-- Nothing is recorded on the Nothing branch, which is right: a lookup miss
+-- removed no dungeon and so completed none -- no tally, no name and no event.
 remove :: ObjectId -> GameState.GameState -> GameState.GameState
 remove oid gs = case Game.lookupObject oid gs of
   Nothing -> gs
   Just obj ->
     let owner = Object.owner obj
-        completed p = p {Player.completedDungeons = Player.completedDungeons p + 1}
+        -- Nothing for an object with no readable face: `enter` is the only writer
+        -- of a dungeon into the command zone and always mints one, so this is
+        -- unreachable -- and the tally still climbs, since CR 309.7 makes the
+        -- completion the removal rather than the name.
+        name = fmap Face.name (Game.faceOf oid gs)
+        completed p =
+          p
+            { Player.completedDungeons = Player.completedDungeons p + 1,
+              Player.completedDungeonNames = maybe id Set.insert name (Player.completedDungeonNames p)
+            }
         stripped = Game.removeFromZones owner oid gs
-     in stripped
-          { GameState.objects = Map.delete oid (GameState.objects stripped),
-            GameState.players = Map.adjust completed owner (GameState.players stripped)
-          }
+     in Event.recordEvent
+          (GameEvent.DungeonCompleted owner)
+          stripped
+            { GameState.objects = Map.delete oid (GameState.objects stripped),
+              GameState.players = Map.adjust completed owner (GameState.players stripped)
+            }
 
 -- CR 701.49b: move the marker along one arrow out of the room it is on.
 --
