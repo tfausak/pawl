@@ -931,14 +931,14 @@ createEmblem pid card = do
 -- alongside it because it acts on the card in the zone it is leaving, and
 -- `apply` already holds that id -- see the arm there for why that is a
 -- convenience rather than a constraint.
-resolveZoneChange :: Maybe GameState -> ZoneChange -> Game (Maybe ZoneChange, Maybe ObjectId, Bool)
+resolveZoneChange :: Maybe GameState -> ZoneChange -> Game (Maybe ZoneChange, Maybe ObjectId, Bool, Maybe PrintingId.PrintingId)
 resolveZoneChange asOf zc = do
   (outcome, _, exiledBy, shuffling) <- applyReplacementsFully asOf Set.empty (ProposedEvent.WouldChangeZone zc)
   case outcome >>= Replacement.asZoneChange of
-    Nothing -> pure (Nothing, exiledBy, shuffling)
+    Nothing -> pure (Nothing, exiledBy, shuffling, Nothing)
     Just settled -> do
-      redirected <- offerCommandZone settled
-      pure (Just redirected, exiledBy, shuffling)
+      (redirected, splitOff) <- offerCommandZone settled
+      pure (Just redirected, exiledBy, shuffling, splitOff)
 
 -- CR 903.9b: "if a commander would be put into its owner's hand or library from
 -- anywhere, its owner may put it into the command zone instead". The question;
@@ -972,20 +972,34 @@ resolveZoneChange asOf zc = do
 --
 -- No case on effect identity: the question is a proposed event's destination ZONE
 -- and whether its subject is a commander.
-offerCommandZone :: ZoneChange -> Game ZoneChange
+offerCommandZone :: ZoneChange -> Game (ZoneChange, Maybe PrintingId.PrintingId)
 offerCommandZone zc = do
   gs <- State.get
   case Commander.commandZoneOffer zc gs of
-    Nothing -> pure zc
+    Nothing -> pure (zc, Nothing)
     Just owner -> do
       decision <- Game.choose (Prompt.ReturnCommander (Decide.deciderFor owner gs) owner (ZoneChange.departed zc))
       pure $ case decision of
-        -- CR 614.6: the modified event is what happens, so the destination is
-        -- rewritten rather than the card being moved twice. changeZoneAttaching
-        -- places it under Object.owner, which is rule 903.9b's "its owner" for a
-        -- stolen commander too.
-        CommandZoneDecision.Returns -> zc {ZoneChange.to = Zone.Command}
-        CommandZoneDecision.Leaves -> zc
+        CommandZoneDecision.Leaves -> (zc, Nothing)
+        CommandZoneDecision.Returns -> case Commander.commandZoneComponent (ZoneChange.departed zc) gs of
+          -- CR 614.6: the modified event is what happens, so the destination is
+          -- rewritten rather than the card being moved twice. changeZoneAttaching
+          -- places it under Object.owner, which is rule 903.9b's "its owner" for a
+          -- stolen commander too.
+          Nothing -> (zc {ZoneChange.to = Zone.Command}, Nothing)
+          -- CR 903.9c: a melded or merged commander does NOT go to the command
+          -- zone whole. "That permanent and each component representing it that
+          -- isn't a commander are put into the appropriate zone, and the card
+          -- that represents it and is a commander is put into the command zone"
+          -- -- so the event's destination is left as it was and only the named
+          -- component splits off, which changeZoneAttaching performs where CR
+          -- 712.21's own split already places one object per component.
+          --
+          -- Reported rather than performed here for that reason: no component
+          -- exists yet at this point in the funnel, so the card the rule names
+          -- can only be identified by its PRINTING, and the id it will get is
+          -- minted several steps later.
+          Just component -> (zc, Just component)
 
 -- CR 616.1's loop. `Nothing` means the event DOES NOT HAPPEN (CR 615.6, CR
 -- 701.19a). A rewrite that cancels an event has already performed its own
@@ -3656,7 +3670,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
       -- loop.
       --
       -- Both ids are `oid` in the PROPOSED event: nothing has moved yet.
-      (resolved, exiledBy, shuffling) <- resolveZoneChange asOf (ZoneChange.MkZoneChange oid oid fromZone requestedDest)
+      (resolved, exiledBy, shuffling, splitOff) <- resolveZoneChange asOf (ZoneChange.MkZoneChange oid oid fromZone requestedDest)
       case resolved of
         -- CR 614.6: nothing survived the loop, so no zone change happens. No
         -- producer today -- no ReplacementEffect in data/cards cancels a zone
@@ -4107,18 +4121,48 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- cards are stamped in the order arrangeComponents leaves them,
               -- which on that path is the order they melded in (#2508).
               let components = if fromZone /= Zone.Battlefield || dest == Zone.Battlefield then Seq.empty else Game.componentsOf (Object.source obj)
-                  asComponent mComponent ts = case mComponent of
-                    Nothing -> mkObj entrySeed ts
-                    Just component -> (mkObj entrySeed ts) {Object.source = Source.OfCard component}
+                  -- CR 903.9c, the split offerCommandZone above settled: "that
+                  -- permanent and each component representing it that isn't a
+                  -- commander are put into the appropriate zone, and the card
+                  -- that represents it and is a commander is put into the command
+                  -- zone". `splitOff` is Nothing on every other move, and the
+                  -- partition then leaves every component headed for `dest`
+                  -- exactly as CR 712.21 alone does.
+                  --
+                  -- The event's own `to` still names the zone the move was
+                  -- headed for, and the card split off announces no arrival of
+                  -- its own -- the same missing per-arrival announcement CR
+                  -- 712.21's Example asks for (#2509), reached here by a second
+                  -- road: under CR 903.9c the two arrivals are in different
+                  -- zones as well as being two.
+                  (commandComponents, destComponents) = Seq.partition (\component -> Just component == splitOff) components
+                  asComponent zone mComponent ts =
+                    ( case mComponent of
+                        Nothing -> mkObj entrySeed ts
+                        Just component -> (mkObj entrySeed ts) {Object.source = Source.OfCard component}
+                    )
+                      { Object.zone = zone
+                      }
               -- CR 712.21a, asked BEFORE the first placeObject: the arrangement is
               -- the order the cards are put down in, so nothing can be placed
               -- until it is settled.
-              arranged <- arrangeComponents pid dest components
+              --
+              -- Over the components that actually reach `dest`, which is the
+              -- rule's own "the two cards": a melded commander whose owner took
+              -- CR 903.9b's offer puts ONE card into the library, and one card
+              -- has one arrangement.
+              arranged <- arrangeComponents pid dest destComponents
               let (leading, trailing) = case Seq.viewl arranged of
                     Seq.EmptyL -> (Nothing, Seq.empty)
                     c Seq.:< cs -> (Just c, cs)
-              newId <- placeObject pid (asComponent leading) dest position
-              trailingIds <- Monad.forM trailing (\component -> placeObject pid (asComponent (Just component)) dest position)
+              newId <- placeObject pid (asComponent dest leading) dest position
+              trailingIds0 <- Monad.forM trailing (\component -> placeObject pid (asComponent dest (Just component)) dest position)
+              -- CR 408.1's command zone is one shared area rather than one per
+              -- player, so placeObject's `pid` decides nothing about where the
+              -- card lands here; it is Object.owner all the same, which is rule
+              -- 903.9b's "its owner" for a stolen commander.
+              commandIds <- Monad.forM commandComponents (\component -> placeObject pid (asComponent Zone.Command (Just component)) Zone.Command position)
+              let trailingIds = trailingIds0 <> commandIds
               -- `newId` heads the answer, so a caller that can only act on one
               -- object acts on the first card the arrangement named -- the first
               -- the meld recorded, where nobody was asked for one.

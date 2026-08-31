@@ -747,8 +747,8 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith s "setup: the pair melded into one permanent named Hanweir, the Writhing Township" (fmap (\(oid, after) -> fmap S.nameOf (Game.cardOf oid after)) (melds board)) (Just (Just townshipName))
       [] -> Spec.assertFailure s "Pearl Collector should declare one activated ability"
   -- CR 903.9a over CR 712.21's split, and NOT CR 903.9c -- that rule governs only
-  -- the CR 903.9b replacement (the hand and library redirect), which pawl does not
-  -- make for a melded permanent (#2265). What runs here is rule 903.9a's
+  -- the CR 903.9b replacement, the hand and library redirect the two cases below
+  -- cover. What runs here is rule 903.9a's
   -- state-based action: "if a commander is in a graveyard or in exile and that
   -- object was put into that zone since the last time state-based actions were
   -- checked, its owner may put it into the command zone." The split has already
@@ -772,7 +772,6 @@ spec s registry = Spec.describe s "Meld" $ do
           let designating pid gs = gs {GameState.players = Map.adjust (\p -> p {Player.commander = Just pid}) S.alice (GameState.players gs)}
               run pid = S.runPure reclaiming (designating pid board) (Event.destroy Regenerability.Regenerable [meldedId] >> Engine.settleForPriority)
               nameOf pid = fmap (S.nameOf . Printing.card) (Game.printingOf pid board)
-              commandNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Set.toList (GameState.command gs))
           Spec.assertEqWith s "CR 903.9a naming the first component puts THAT card into the command zone" (commandNames (run firstPid)) (Maybe.maybeToList (nameOf firstPid))
           Spec.assertEqWith s "and its partner is left in the graveyard" (graveyardNames (run firstPid)) (Maybe.maybeToList (nameOf secondPid))
           Spec.assertEqWith s "CR 903.9a naming the second component puts THAT card into the command zone instead" (commandNames (run secondPid)) (Maybe.maybeToList (nameOf secondPid))
@@ -780,6 +779,113 @@ spec s registry = Spec.describe s "Meld" $ do
           -- What makes the pair discriminating: the two components really are two
           -- different cards, and the meld recorded them in this order.
           Spec.assertEqWith s "setup: the components are the Garrison then the Battlements" [nameOf firstPid, nameOf secondPid] [Just (S.nameOf (Printing.card garrison)), Just (S.nameOf (Printing.card battlements))]
+        other -> Spec.assertFailure s ("expected two components, got " <> show (length other))
+  -- CR 903.9c: "if a commander is a melded permanent or a merged permanent and
+  -- its owner chooses to put it into the command zone using the replacement
+  -- effect described in rule 903.9b, that permanent and each component
+  -- representing it that isn't a commander are put into the appropriate zone,
+  -- and the card that represents it and is a commander is put into the command
+  -- zone." CR 712.21d points here for the melded case.
+  --
+  -- The road CR 903.9a's case above is not: that rule is a state-based action
+  -- asked of cards ALREADY in a graveyard, where CR 712.21's split has run and
+  -- each component is an object of its own. Here the CR 903.9b replacement
+  -- settles the destination before anything has become a card, so the two zones
+  -- have to be decided for one object.
+  --
+  -- Griptide -- "put target creature on top of its owner's library" -- is the
+  -- library half, and the melded permanent is a creature it can target.
+  --
+  -- BOTH DESIGNATIONS, the case above's reason: the two runs differ in nothing
+  -- but which half of the pair alice's deck named, so an engine that split off
+  -- the component the meld recorded FIRST answers them differently. Hanweir
+  -- Garrison is that first component.
+  Spec.it s "CR 903.9c a melded commander sent to the command zone from a library leaves its other half in the library" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    griptide <- S.printingOf s registry "Griptide"
+    let (mMelded, base) = meldedThrough (Setup.emptyGame S.bothPlayers) battlements garrison mountain
+        (griptideId, withSpell) = S.addHandCard griptide S.alice base
+        board = S.landsFor island S.alice 4 withSpell
+    case mMelded >>= \meldedId -> fmap ((,) meldedId . Game.componentsOf . Object.source) (Game.lookupObject meldedId board) of
+      Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
+      Just (meldedId, components) -> case Foldable.toList components of
+        [firstPid, secondPid] -> do
+          let designating pid gs = gs {GameState.players = Map.adjust (\p -> p {Player.commander = Just pid}) S.alice (GameState.players gs)}
+              run pid = S.runPure (returningComponent meldedId) (designating pid board) (do S.cast S.alice griptideId; Stack.resolveTop)
+              declined pid = S.runPure (arranging meldedId [0, 1]) (designating pid board) (do S.cast S.alice griptideId; Stack.resolveTop)
+              nameOf pid = Maybe.maybeToList (fmap (S.nameOf . Printing.card) (Game.printingOf pid board))
+          Spec.assertEqWith s "CR 903.9c naming the first component puts THAT card into the command zone" (commandNames (run firstPid)) (nameOf firstPid)
+          Spec.assertEqWith s "and its partner is put on top of the library, where the Griptide sent it" (libraryNames (run firstPid)) (nameOf secondPid)
+          Spec.assertEqWith s "CR 903.9c naming the second component splits off THAT card instead" (commandNames (run secondPid)) (nameOf secondPid)
+          Spec.assertEqWith s "and its partner is the one left in the library" (libraryNames (run secondPid)) (nameOf firstPid)
+          -- CR 903.9b is a "may", so the pair of boards differing in the ANSWER
+          -- alone: declining leaves CR 712.21 alone to put both cards in the
+          -- library, which is what keeps the four assertions above from passing
+          -- on an engine that split without asking.
+          Spec.assertEqWith s "CR 903.9b declining leaves both cards in the library" (List.sort (libraryNames (declined firstPid))) (List.sort (nameOf firstPid <> nameOf secondPid))
+          Spec.assertEqWith s "and nothing in the command zone" (commandNames (declined firstPid)) []
+          -- The proxies, kept after them: the components really are two different
+          -- cards in this order, and nothing was in either zone to begin with.
+          Spec.assertEqWith s "setup: the components are the Garrison then the Battlements" (nameOf firstPid <> nameOf secondPid) [S.printingName garrison, S.printingName battlements]
+          Spec.assertEqWith s "setup: alice's library and the command zone were both empty" (libraryNames board <> commandNames board) []
+        other -> Spec.assertFailure s ("expected two components, got " <> show (length other))
+  -- CR 903.9c's other destination, which CR 903.9b names alongside the library:
+  -- Unsummon's "return target creature to its owner's hand". The board differs
+  -- from the case above in the bounce spell alone, so an engine that had special
+  -- cased the library would be caught here.
+  Spec.it s "CR 903.9c a melded commander sent to the command zone from a hand leaves its other half in the hand" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    unsummon <- S.printingOf s registry "Unsummon"
+    let (mMelded, base) = meldedThrough (Setup.emptyGame S.bothPlayers) battlements garrison mountain
+        (unsummonId, withSpell) = S.addHandCard unsummon S.alice base
+        board = S.landsFor island S.alice 1 withSpell
+    case mMelded >>= \meldedId -> fmap ((,) meldedId . Game.componentsOf . Object.source) (Game.lookupObject meldedId board) of
+      Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
+      Just (meldedId, components) -> case Foldable.toList components of
+        [firstPid, _] -> do
+          let designated = board {GameState.players = Map.adjust (\p -> p {Player.commander = Just firstPid}) S.alice (GameState.players board)}
+              after = S.runPure (returningComponent meldedId) designated (do S.cast S.alice unsummonId; Stack.resolveTop)
+              handNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Hand S.alice gs)
+          Spec.assertEqWith s "CR 903.9c the Garrison is alice's commander, so it goes to the command zone" (commandNames after) [S.printingName garrison]
+          Spec.assertEqWith s "and the Battlements goes to her hand, where the Unsummon sent it" (handNames after) [S.printingName battlements]
+          Spec.assertEqWith s "setup: her hand held the Unsummon and nothing else" (handNames board) [S.printingName unsummon]
+          Spec.assertEqWith s "setup: and the melded permanent left the battlefield" (Game.lookupObject meldedId after) Nothing
+        other -> Spec.assertFailure s ("expected two components, got " <> show (length other))
+  -- CR 903.10a: "a player who's been dealt 21 or more combat damage by the same
+  -- commander over the course of the game loses the game". CR 903.9c is what
+  -- makes a melded permanent one of those commanders -- "if a commander is a
+  -- melded permanent" -- so its combat damage is tallied against its owner's
+  -- designation even though no card in that zone carries it.
+  --
+  -- TWO BOARDS DIFFERING IN THE DESIGNATION ALONE, which is the whole case: the
+  -- same permanent deals the same 2 to bob either way, so an engine that tallied
+  -- every creature's damage and one that tallied none would each answer the pair
+  -- the same way.
+  --
+  -- The damage is built through Pawl.Engine.Damage.damageEvent, the narrowest
+  -- path: an attack would add the Township's own two 3/2 tokens to the tally
+  -- arithmetic.
+  Spec.it s "CR 903.10a a melded permanent's combat damage is tallied against its owner's commander" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    let (mMelded, board) = meldedThrough (Setup.emptyGame S.bothPlayers) battlements garrison mountain
+    case mMelded >>= \meldedId -> fmap ((,) meldedId . Game.componentsOf . Object.source) (Game.lookupObject meldedId board) of
+      Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
+      Just (meldedId, components) -> case Foldable.toList components of
+        firstPid : _ -> do
+          let designated = board {GameState.players = Map.adjust (\p -> p {Player.commander = Just firstPid}) S.alice (GameState.players board)}
+              pings gs = S.runPure S.identityAnswer gs (Damage.applyDamage [Damage.damageEvent gs DamageKind.Combat meldedId (Recipient.ToPlayer S.bob) 2])
+              tally gs = maybe 0 (Map.findWithDefault 0 S.alice . Player.commanderDamage) (Map.lookup S.bob (GameState.players gs))
+          Spec.assertEqWith s "CR 903.10a the Garrison is alice's commander, so the melded permanent's 2 is tallied" (tally (pings designated)) 2
+          Spec.assertEqWith s "and nothing is tallied when she designated neither half" (tally (pings board)) 0
+          Spec.assertEqWith s "setup: bob took the 2 either way" (fmap (S.lifeOf S.bob) [pings designated, pings board]) [Just 18, Just 18]
         other -> Spec.assertFailure s ("expected two components, got " <> show (length other))
   -- CR 712.21a: "if a melded permanent is put into its owner's graveyard or
   -- library, that player may arrange the two cards in any order. If it's put
@@ -967,6 +1073,19 @@ arranging victim order p = case p of
 -- answers it -- which is the order CR 712.21a's arrangement decides.
 libraryNames :: GameState.GameState -> [CardName.CardName]
 libraryNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Library S.alice gs)
+
+-- libraryNames' command-zone twin: what CR 903.9c's split puts there, by name.
+commandNames :: GameState.GameState -> [CardName.CardName]
+commandNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Set.toList (GameState.command gs))
+
+-- CR 903.9b's offer accepted, over a board whose bounce spell aims at the melded
+-- permanent by identity. CR 712.21a's arrangement is answered too, so a run that
+-- WRONGLY asked for one -- which it would if both cards still went to the library
+-- -- is answered rather than crashing, and the split is then read off the zones.
+returningComponent :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+returningComponent victim p = case p of
+  Prompt.ReturnCommander {} -> CommandZoneDecision.Returns
+  _ -> arranging victim [0, 1] p
 
 -- Accepts CR 903.9a's offer; everything else is the identity answerer. The
 -- default LEAVES the commander where it is, so the CR 903.9a case has to say so.
