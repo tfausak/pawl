@@ -2365,8 +2365,13 @@ rewriteEffect pairs effect = case effect of
   -- A REGRESSION FENCE rather than a proven behaviour: every ArmDelayedTrigger in
   -- data/cards/ writes either no duration or UntilEndOfTurn, on both of which
   -- rewriteDuration is the identity, so mutating this line reddens nothing.
-  Effect.ArmDelayedTrigger a ->
-    Effect.ArmDelayedTrigger a {ArmDelayedTrigger.duration = fmap (rewriteDuration pairs) (ArmDelayedTrigger.duration a)}
+  --
+  -- Destructured POSITIONALLY, the shape Effect.Replace and Effect.RedirectDamage
+  -- above take: a new word-bearing field on the record is then a compile error
+  -- here, where the record update this arm used to be would have carried it
+  -- through unrewritten and said nothing.
+  Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name onset duration) ->
+    Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name onset (fmap (rewriteDuration pairs) duration))
   -- CR 612.1 through BOTH halves that hold printed text, the same descent every
   -- neighbouring arm here makes. The duration's "for as long as" clause is
   -- printed text, so a Magical Hack on the spell while it is on the stack changes
