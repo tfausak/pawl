@@ -150,6 +150,28 @@ data Filter keyword
     -- (Pawl.Engine.CombatRestriction.cantBeBlockedBy), where the source is the
     -- attacker being blocked.
     PowerGreaterThanSource
+  | -- | CR 208.1 compared against a number an earlier clause of the same
+    -- resolution BOUND, rather than against a literal or the source -- Localized
+    -- Destruction's "each creature you control with power equal to the amount of
+    -- {E} paid this way", whose bound is what
+    -- Pawl.Types.Effect.PayAnyEnergy stamped on the slot this atom names.
+    --
+    -- Carries the SlotName where ManaValueAtMostAmount carries nothing, and the
+    -- position is the whole difference: that atom lives in a target slot, which
+    -- states its own bound in Pawl.Types.TargetSlot's `amount` field, while this
+    -- one lives in an effect's sweep, where nothing but the atom can say which
+    -- slot holds the number. A SlotName is what the other reading atoms
+    -- (ControlledByBound, IsBound) carry for that reason.
+    --
+    -- EXACT equality, not a bound: the printed clause names a power rather than a
+    -- ceiling. Widening to an inequality is what a card asking for one would
+    -- earn, ManaValueAtMostAmount's own reason turned around.
+    --
+    -- Pawl.Engine.Filter.Context's boundAmounts is where the number arrives,
+    -- filled for an effect's sweep by Pawl.Engine.Resolve.effectContext.
+    -- Vacuously False where either number is absent -- a candidate with no power,
+    -- or a slot naming no amount -- the posture PowerLessThanSource takes.
+    PowerIsAmountInSlot SlotName.SlotName
   | -- | CR 202.3: the object's mana value is <= this literal -- Ojutai's
     -- Command's "creature card with mana value 2 or less".
     --
@@ -158,8 +180,8 @@ data Filter keyword
     -- may reach. Nothing in the pool asks for a mana value floor, and an unused
     -- arm is the speculative construction the project forbids.
     --
-    -- Answerable OFF the battlefield, as the two power atoms above are and for
-    -- the same reason: rule 202.3 reads the printed mana cost, which exists in
+    -- Answerable OFF the battlefield, as the two literal power atoms above are
+    -- and for the same reason: rule 202.3 reads the printed mana cost, which exists in
     -- every zone, and the graveyard is where the card asking is looking (CR 115.2's
     -- other zone half, via Pool.CardsInGraveyard). No Modification writes a mana
     -- cost, so there is nothing projected to read instead.

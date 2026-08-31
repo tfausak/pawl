@@ -4075,6 +4075,9 @@ filterReads f = case f of
   -- aspect of one object's projection, with no way to say "the source's".
   Filter.Type.PowerLessThanSource -> Set.singleton PowerA
   Filter.Type.PowerGreaterThanSource -> Set.singleton PowerA
+  -- The candidate's power alone: the number at the other end is a binding rather
+  -- than a projection.
+  Filter.Type.PowerIsAmountInSlot _ -> Set.singleton PowerA
   Filter.Type.ControlledBy _ -> Set.singleton Controller
   -- The candidate's controller; who defends is a combat-record fact.
   Filter.Type.ControlledByDefendingPlayer -> Set.singleton Controller
@@ -4281,6 +4284,9 @@ filterReadsPeers f = case f of
   -- Filter.contextFor -- no projection of a second object is read.
   Filter.Type.PowerLessThanSource -> False
   Filter.Type.PowerGreaterThanSource -> False
+  -- The bound arrives on the Context as a number, so no second projection is
+  -- read.
+  Filter.Type.PowerIsAmountInSlot _ -> False
   Filter.Type.ControlledBy _ -> False
   Filter.Type.ControlledByDefendingPlayer -> False
   Filter.Type.ControlledByBound _ -> False

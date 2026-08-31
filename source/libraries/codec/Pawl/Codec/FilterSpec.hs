@@ -101,6 +101,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.PowerGreaterThanSource
       " {\"type\":\"PowerGreaterThanSource\"} "
+  Spec.it s "PowerIsAmountInSlot" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.PowerIsAmountInSlot (SlotName.MkSlotName (Text.pack "paid")))
+      " {\"type\":\"PowerIsAmountInSlot\",\"value\":\"paid\"} "
   Spec.it s "ControlledByDefendingPlayer" $
     Common.assertCodec
       s

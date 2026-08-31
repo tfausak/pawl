@@ -3191,6 +3191,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.PowerAtMost _ -> 0
   Filter.Type.PowerLessThanSource -> 0
   Filter.Type.PowerGreaterThanSource -> 0
+  Filter.Type.PowerIsAmountInSlot _ -> 0
   Filter.Type.ControlledByDefendingPlayer -> 0
   -- Zero for ControlledBy's reason: one carries a slot name and the other a
   -- PlayerId, and neither holds a Filter for a card author to reach.
@@ -4212,6 +4213,10 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.PowerAtMost _ -> []
   Filter.Type.PowerLessThanSource -> []
   Filter.Type.PowerGreaterThanSource -> []
+  -- Not one either, though it names a slot: the slot holds an AMOUNT
+  -- (Pawl.Engine.Filter.Context's boundAmounts), a namespace disjoint from the
+  -- object slots a binder mints, which is ControlledByBound's position above.
+  Filter.Type.PowerIsAmountInSlot _ -> []
   Filter.Type.ManaValueAtMost _ -> []
   Filter.Type.ManaValueIsEven -> []
   Filter.Type.ManaValueAtMostAmount -> []
