@@ -37,6 +37,11 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- 109.5's relation rides that Filter too (Filter.ControlledBy), so EntryR needs no
 -- ControllerRelation field beside it.
 --
+-- Not implemented: EntryR installed as a FLOATING row by a resolving ability and
+-- aimed at another permanent's entry -- Boreal Outrider's "that creature enters
+-- with an additional +1/+1 counter on it" (#2886). Every EntryR in the pool is a
+-- permanent's own static ability, read off the entrant.
+--
 -- ZoneChangePattern spells its subject the same way (see that module) and yet
 -- KEEPS its relation field, which is not an inconsistency: a zone change is
 -- scoped by the moving object's OWNER (CR 400.3), and Filter.ControlledBy asks
