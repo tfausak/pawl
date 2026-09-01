@@ -1246,6 +1246,7 @@ library test
     Pawl.ModalSpec
     Pawl.MoveCounterSpec
     Pawl.MulliganSpec
+    Pawl.OmenSpec
     Pawl.OutsideTheGameSpec
     Pawl.PhasingSpec
     Pawl.PlaneswalkerSpec

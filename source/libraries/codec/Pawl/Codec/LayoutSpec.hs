@@ -37,6 +37,13 @@ spec s = Spec.describe s "Pawl.Codec.Layout" $ do
       Layout.codec
       Layout.Adventure
       " {\"type\":\"Adventure\"} "
+  -- CR 720.1.
+  Spec.it s "Omen" $
+    Common.assertCodec
+      s
+      Layout.codec
+      Layout.Omen
+      " {\"type\":\"Omen\"} "
   -- CR 712.2.
   Spec.it s "Transforming" $
     Common.assertCodec
