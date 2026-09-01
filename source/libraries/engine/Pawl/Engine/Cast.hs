@@ -538,7 +538,9 @@ proposedFor oid castFor gs = if castBestowed castFor then stampBestowed oid gs e
 -- value it cannot enumerate -- CR 601.2b's X. A candidate cost is not such a
 -- choice: it is one of a finite offered list, so rule 702.103d can be answered
 -- for each of them exactly, and castSpellWith withholds the ones it answers no
--- for rather than offering a cast CR 601.2 would then have to return from.
+-- for. CR 601.2e is why that is not merely tidier: the legality check comes
+-- AFTER rule 601.2b's announcements, so a player who announced the prohibited
+-- candidate under 601.3a's lenience would lose the whole casting there.
 candidateAllowed :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> CandidateCost.CandidateCost -> Bool
 candidateAllowed pid oid name proposed candidate =
   not (PlayerEffect.prohibitsCasting pid oid name (proposedFor oid (CandidateCost.keyword candidate) proposed))
