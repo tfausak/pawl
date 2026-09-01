@@ -137,13 +137,18 @@ data Keyword
     Fading Natural.Natural
   | -- | 702.33a: "You may pay an additional [cost] as you cast this spell", plus
     -- CR 702.33d's "kicked" designation. The payoff is printed text reading
-    -- Quantity.WasKicked, not a field here.
+    -- Quantity.TimesKickedWith, not a field here. CR 702.33b's "kicker [cost 1]
+    -- and/or [cost 2]" is two of these on one face, which the keyword Set already
+    -- keeps apart by cost (Sunscape Battlemage).
     --
-    -- Not implemented: CR 702.33c's multikicker, whose "any number of times"
-    -- makes the announcement a count (#1234); and CR 702.33b's second kicker
-    -- cost, CR 702.33f's "kicked with its [A] kicker" and CR 702.33h's sticker
-    -- kicker, since one designation cannot say which cost was paid (#1235).
+    -- Not implemented: CR 702.33h's sticker kicker, which needs stickers (#872).
     Kicker (Cost.Cost Keyword)
+  | -- | 702.33c: "You may pay an additional [cost] any number of times as you cast
+    -- this spell". Kicker above's question asked as a COUNT rather than as a
+    -- yes-or-no, which is why it is a constructor of its own and not a flag on
+    -- that one: rule 702.33c's own sentence says a multikicker cost IS a kicker
+    -- cost, so everything downstream of the announcement treats the two alike.
+    Multikicker (Cost.Cost Keyword)
   | -- | 702.34a: this card may be cast from its owner's graveyard for the given
     -- cost, and is exiled instead of going anywhere else as it leaves the stack.
     -- Not a Face.alternativeCosts entry, which would also be payable from hand.

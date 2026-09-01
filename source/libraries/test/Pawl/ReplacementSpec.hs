@@ -3087,7 +3087,7 @@ deflectionCombat blocker attacker wanted p = case p of
 -- do not depend on the order the instruction's own sweep gathered the batch in.
 castDisaster :: Natural.Natural -> [Recipient.Recipient] -> Prompt.Prompt r -> r
 castDisaster x wanted p = case p of
-  Prompt.ChooseKicker {} -> KickerDecision.Declines
+  Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision 0
   Prompt.ChooseX {} -> x
   Prompt.OrderDamage _ _ events ->
     let rank e = Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)
@@ -7256,7 +7256,7 @@ warLeechSpec s registry = Spec.describe s "Monstrous War-Leech" $ do
     giant <- S.printingOf s registry "Lairwatch Giant"
     bolt <- S.printingOf s registry "Lightning Bolt"
     let (board, leechId) = warLeechBoard swamp island leech giant [bolt]
-        settled = castLeech KickerDecision.Kicks board leechId
+        settled = castLeech (KickerDecision.MkKickerDecision 1) board leechId
     Spec.assertEqWith s "four cards were milled: six in the library became two, and the graveyard's one Bolt became five cards" (zoneSizes settled) (2, 5)
     case leechOut settled of
       [permId] -> Spec.assertEqWith s "the greatest mana value among them is Lairwatch Giant's 6" (S.powerToughnessOf permId settled) (Just (6, 6))
@@ -7271,7 +7271,7 @@ warLeechSpec s registry = Spec.describe s "Monstrous War-Leech" $ do
     giant <- S.printingOf s registry "Lairwatch Giant"
     bolt <- S.printingOf s registry "Lightning Bolt"
     let (board, leechId) = warLeechBoard swamp island leech giant [bolt]
-        settled = castLeech KickerDecision.Declines board leechId
+        settled = castLeech (KickerDecision.MkKickerDecision 0) board leechId
     Spec.assertEqWith s "the library is untouched and the graveyard still holds only the Bolt" (zoneSizes settled) (6, 1)
     case leechOut settled of
       [permId] -> Spec.assertEqWith s "so the greatest mana value is Lightning Bolt's 1" (S.powerToughnessOf permId settled) (Just (1, 1))
@@ -7291,7 +7291,7 @@ warLeechSpec s registry = Spec.describe s "Monstrous War-Leech" $ do
     leech <- S.printingOf s registry "Monstrous War-Leech"
     giant <- S.printingOf s registry "Lairwatch Giant"
     let (board, leechId) = warLeechBoard swamp island leech giant []
-        settled = castLeech KickerDecision.Kicks board leechId
+        settled = castLeech (KickerDecision.MkKickerDecision 1) board leechId
     Spec.assertEqWith s "four cards were milled into an empty graveyard" (zoneSizes settled) (2, 4)
     case leechOut settled of
       [permId] -> Spec.assertEqWith s "and the Leech is a 6/6 rather than a buried 0/0" (S.powerToughnessOf permId settled) (Just (6, 6))
@@ -8257,7 +8257,7 @@ woodElementalBoard island forest bayou mountain woodElemental rite =
 -- `sacrificeAnswer`.
 riteOn :: ObjectId.ObjectId -> (forall r. Prompt.Prompt r -> r) -> Prompt.Prompt a -> a
 riteOn victim sacrificeAnswer p = case p of
-  Prompt.ChooseKicker {} -> KickerDecision.Kicks
+  Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision 1
   Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Set.singleton (Recipient.ToCreature victim))) sets
   _ -> sacrificeAnswer p
 

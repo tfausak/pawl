@@ -253,6 +253,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Menace -> []
   Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
+  Keyword.Multikicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
@@ -342,6 +343,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Menace -> []
   Keyword.Renown _ -> []
   Keyword.Kicker _ -> []
+  Keyword.Multikicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
@@ -552,6 +554,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Menace -> []
   Keyword.Renown _ -> []
   Keyword.Kicker _ -> []
+  Keyword.Multikicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
@@ -898,9 +901,11 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Menace -> []
   Keyword.Renown _ -> []
   -- CR 702.33a's "as you cast this spell" is not a zone or a timing permission --
-  -- it is when the additional cost is announced (CR 601.2b). CR 702.42a's entwine
-  -- is the same shape one clause over.
+  -- it is when the additional cost is announced (CR 601.2b), and CR 702.33c's
+  -- multikicker says it again with a count. CR 702.42a's entwine is the same
+  -- shape one clause below.
   Keyword.Kicker _ -> []
+  Keyword.Multikicker _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
@@ -1147,18 +1152,26 @@ disguiseCost keywords =
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
--- CR 702.33a: the ADDITIONAL cost this card's controller may pay as they cast it,
--- or Nothing when it has no kicker. Offered at CR 601.2b and added to whichever
--- candidate cost was announced (CR 601.2f). A wildcard, morphCost's shape.
+-- CR 702.33a: every ADDITIONAL cost this card's controller may pay as they cast
+-- it, in ascending Set order and each paired with how many times CR 702.33 lets
+-- it be paid -- Just 1 for kicker, and Nothing for CR 702.33c's multikicker,
+-- which the rule makes payable "any number of times". Offered at CR 601.2b and
+-- added to whichever candidate cost was announced (CR 601.2f).
 --
--- Nothing beyond the FIRST kicker cost is reachable, so CR 702.33b's "kicker
--- [cost 1] and/or [cost 2]" is unrepresented (gap #1235).
-kickerCost :: Set Keyword -> Maybe (Cost Keyword)
-kickerCost keywords =
+-- A LIST, entwineCosts' shape and for its reason: CR 702.33b's "kicker [cost 1]
+-- and/or [cost 2]" is two kicker abilities on one object (Sunscape Battlemage),
+-- and CR 118.8a makes two additional costs a SUM rather than a choice. The
+-- summing is Pawl.Engine.Cast.castProposed's, entwineCosts' arrangement exactly.
+--
+-- A wildcard rather than an exhaustive case, entwineCosts' reason: this asks
+-- about two named constructors rather than classifying every keyword.
+kickerCosts :: Set Keyword -> [(Cost Keyword, Maybe Natural)]
+kickerCosts keywords =
   let costOf keyword = case keyword of
-        Keyword.Kicker cost -> Just cost
+        Keyword.Kicker cost -> Just (cost, Just 1)
+        Keyword.Multikicker cost -> Just (cost, Nothing)
         _ -> Nothing
-   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
 -- CR 702.42a: every ADDITIONAL cost this card's controller may pay to choose all
 -- of its modes, in ascending Set order, and empty when it has no entwine. Offered
@@ -1445,6 +1458,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Renown _ -> []
   Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
+  Keyword.Multikicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
@@ -1630,6 +1644,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Renown _ -> []
   Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
+  Keyword.Multikicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
@@ -1785,6 +1800,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Renown _ -> []
   Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
+  Keyword.Multikicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
@@ -1896,6 +1912,9 @@ familyOf keyword = case keyword of
   Keyword.Landwalk _ -> Just KeywordFamily.Landwalk
   Keyword.Cycling {} -> Just KeywordFamily.Cycling
   Keyword.Kicker _ -> Just KeywordFamily.Kicker
+  -- CR 702.33c's last sentence, "a multikicker cost is a kicker cost", is why
+  -- this answers the SAME family rather than owing one of its own.
+  Keyword.Multikicker _ -> Just KeywordFamily.Kicker
   Keyword.Flashback _ -> Just KeywordFamily.Flashback
   Keyword.Bestow _ -> Just KeywordFamily.Bestow
   Keyword.Morph {} -> Just KeywordFamily.Morph

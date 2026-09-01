@@ -406,14 +406,25 @@ entwineOffer spending pid oid candidates gs = case Game.faceOf oid gs of
     Monad.guard (any (\candidate -> payableCost spending pid oid gs (Cost.plus candidate cost)) candidates)
     pure cost
 
--- CR 702.33a: the ADDITIONAL cost this player may pay as they cast this spell, or
--- Nothing when kicking is not on offer at all.
+-- CR 601.2f: one candidate cost with every kicker payment announced so far added
+-- to it -- CR 118.8a's "any number of additional costs may be applied", so a cost
+-- declared N times is added N times (CR 702.33c).
+withKickerPayments :: Map.Map (Cost Keyword) Natural -> Cost Keyword -> Cost Keyword
+withKickerPayments paid candidate =
+  Map.foldrWithKey
+    (\cost times acc -> List.foldl' Cost.plus acc (List.genericReplicate times cost))
+    candidate
+    paid
+
+-- CR 702.33a / 702.33b / 702.33c: the announcement of this spell's kicker costs,
+-- one question per cost and each answered as a count -- the record CR 702.33d's
+-- designation is made of, and empty for a player who declared none.
 --
--- Two conditions where entwineOffer above has three, and each is entwineOffer's:
+-- Two conditions per cost, and each is entwineOffer's above:
 --
---   1. The card HAS kicker, read off the printed keywords of the half being cast
---      for that function's reason -- rule 702.33a is a static ability of the spell
---      itself (CR 702.33a: "functions while the spell with kicker is on the
+--   1. The card HAS that kicker, read off the printed keywords of the half being
+--      cast for that function's reason -- rule 702.33a is a static ability of the
+--      spell itself (CR 702.33a: "functions while the spell with kicker is on the
 --      stack").
 --   2. Some candidate cost plus this one is payable -- CR 601.2f's "plus all
 --      additional costs", at CR 601.2b's X=0 floor and with the same payableCost
@@ -427,27 +438,41 @@ entwineOffer spending pid oid candidates gs = case Game.faceOf oid gs of
 -- Neither condition is a choice being made for the player: an option the card does
 -- not have, or that CR 118.3 says cannot be paid, is not an option. WHICH candidate
 -- will carry the cost is not decided here -- castProposed narrows the candidates
--- once the answer is in -- and `candidates` is handed in for entwineOffer's reason.
-kickerOffer :: ManaSpending -> PlayerId -> ObjectId -> [Cost Keyword] -> GameState -> Maybe (Cost Keyword)
-kickerOffer spending pid oid candidates gs = case Game.faceOf oid gs of
-  Nothing -> Nothing
-  Just face -> do
-    cost <- Keyword.kickerCost (Face.keywords face)
-    Monad.guard (any (\candidate -> payableCost spending pid oid gs (Cost.plus candidate cost)) candidates)
-    pure cost
+-- once the answers are in -- and `candidates` is handed in for entwineOffer's
+-- reason.
+--
+-- Payability is asked against the answers already given, which is what makes CR
+-- 702.33b's two kicker costs one CR 601.2f total rather than two independent
+-- offers: a player who has kicked once is asked about the second cost only if both
+-- together are payable. How high a multikicker count may go is not gated here at
+-- all -- the answer is honoured and then measured, which is Prompt.ChooseX's
+-- posture, and castProposed rejects a cast whose announced total nothing can pay.
+announceKickers :: ManaSpending -> PlayerId -> ObjectId -> [Cost Keyword] -> GameState -> Game (Map.Map (Cost Keyword) Natural)
+announceKickers spending pid sid candidates gs = case Game.faceOf sid gs of
+  Nothing -> pure Map.empty
+  Just face ->
+    let ask paid (cost, limit) =
+          if any (\candidate -> payableCost spending pid sid gs (Cost.plus (withKickerPayments paid candidate) cost)) candidates
+            then do
+              decision <- Game.choose (Prompt.ChooseKicker (Decide.deciderFor pid gs) pid sid cost limit)
+              let times = KickerDecision.unwrap decision
+              pure (if times == 0 then paid else Map.insert cost times paid)
+            else pure paid
+     in Monad.foldM ask Map.empty (Keyword.kickerCosts (Face.keywords face))
 
 -- CR 702.33d's designation, written onto the spell's own stack incarnation: "that
--- spell has been kicked". Read back by Quantity.WasKicked through the CR 613
--- projection, which is how the card's own CR 702.33e ability sees it.
+-- spell has been kicked". Read back by Quantity.WasKicked and
+-- Quantity.TimesKickedWith through the CR 613 projection, which is how the card's
+-- own CR 702.33e ability sees it.
 --
--- An idempotent write of a field no layer computes, and one direction only: rule
--- 702.33d gives no way to unkick a spell, and CR 400.7 ends the designation with
--- the incarnation (Object.newIncarnation), so nothing has to clear it.
-stampKicked :: ObjectId -> GameState -> GameState
-stampKicked sid gs =
+-- A write of a field no layer computes, and one direction only: rule 702.33d gives
+-- no way to unkick a spell, and CR 400.7 ends the designation with the incarnation
+-- (Object.newIncarnation), so nothing has to clear it.
+stampKicked :: Map.Map (Cost Keyword) Natural -> ObjectId -> GameState -> GameState
+stampKicked paid sid gs =
   gs
     { GameState.objects =
-        Map.adjust (\o -> o {Object.kicked = True}) sid (GameState.objects gs)
+        Map.adjust (\o -> o {Object.kicked = paid}) sid (GameState.objects gs)
     }
 
 -- CR 702.103b: "as a spell cast bestowed is put onto the stack, it becomes an
@@ -1446,31 +1471,33 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
       -- announcement of an additional cost, and rule 702.33a bundles nothing else
       -- into the question the way rule 702.42a bundles a mode choice.
       --
-      -- The choice is never made for them: kickerOffer answers Nothing only where
-      -- there is no option to offer -- no kicker, or no payable route -- and where
-      -- there IS one, both answers go to the player.
+      -- The choice is never made for them: announceKickers asks about every kicker
+      -- cost the card prints and skips one only where there is no payable route,
+      -- and where there IS one, every answer goes to the player.
       --
       -- Offered against the ENTWINED candidates, so a player who has already
       -- announced one additional cost is asked about this one only if the two
       -- together are payable (CR 601.2f's one total). No card carries both, and the
       -- composition is the rule rather than a guess about the pool.
       --
-      -- Carried as the additional Cost itself rather than as a flag, for entwine's
+      -- Carried as the counts per cost rather than as a flag, for entwine's
       -- reason: the candidate costs below and the CR 702.33d stamp read one value.
-      kicked <- case kickerOffer spending pid sid entwinedCandidates gs of
-        Nothing -> pure Nothing
-        Just extra -> do
-          decision <- Game.choose (Prompt.ChooseKicker decider pid sid extra)
-          pure $ case decision of
-            KickerDecision.Kicks -> Just extra
-            KickerDecision.Declines -> Nothing
+      kicked <- announceKickers spending pid sid entwinedCandidates gs
       -- CR 702.33d: "if a spell's controller declares the intention to pay any of
       -- that spell's kicker costs, that spell has been kicked" -- the DECLARATION
       -- is what designates it, so the stamp lands here and not at CR 601.2h's
       -- payment. A cast that fails after this point rewinds to `before`, which
       -- takes the stamp with it along with the spell.
-      Monad.when (Maybe.isJust kicked) (State.modify' (stampKicked sid))
-      let withKicker candidate = maybe candidate (Cost.plus candidate) kicked
+      Monad.unless (Map.null kicked) (State.modify' (stampKicked kicked sid))
+      -- CR 702.33a's additional cost is payable ONCE, where rule 702.33c's
+      -- multikicker states no limit. An answer past a stated limit is text the card
+      -- does not have, so it rejects the cast below rather than being clamped --
+      -- Prompt.ChooseX's reject-not-repair posture, and for its reason.
+      let overKickerLimit =
+            any
+              (\(cost, limit) -> maybe False (Map.findWithDefault 0 cost kicked >) limit)
+              (Keyword.kickerCosts (Face.keywords face))
+          withKicker = withKickerPayments kicked
           -- The announced additional costs are folded into each candidate's
           -- COST and never into its keyword: CR 702.33a's kicker and CR
           -- 702.42a's entwine are paid ON TOP of whichever candidate was
@@ -1482,7 +1509,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
               (payableCost spending pid sid gs . CandidateCost.cost)
               (fmap (\candidate -> candidate {CandidateCost.cost = withKicker (withEntwine (CandidateCost.cost candidate))}) candidateCosts)
           payable = fmap CandidateCost.cost payableCandidates
-      if null payable
+      if null payable || overKickerLimit
         then reject
         else do
           chosenCost <- case payable of
