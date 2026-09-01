@@ -7,6 +7,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostScale as CostScale
@@ -26,6 +27,7 @@ import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
+import qualified Pawl.Types.StatedFlip as StatedFlip
 import qualified Pawl.Types.Subtype as Subtype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -403,4 +405,18 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.CantGetCounters (Just PlayerCounterKind.Poison))
       " {\"type\":\"CantGetCounters\",\"value\":{\"type\":\"Poison\"}} "
+  -- CR 705.3 as Edgar, King of Figaro prints it, and the wire form
+  -- data/cards/edgar-king-of-figaro.json writes.
+  Spec.it s "StateCoinFlip, both halves of CR 705.3" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      ( PlayerEffect.StateCoinFlip
+          StatedFlip.MkStatedFlip
+            { StatedFlip.face = Just CoinFace.Heads,
+              StatedFlip.wins = True,
+              StatedFlip.firstEachTurn = True
+            }
+      )
+      " {\"type\":\"StateCoinFlip\",\"value\":{\"face\":{\"type\":\"Heads\"},\"wins\":true,\"firstEachTurn\":true}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s PlayerEffect.codec

@@ -14,6 +14,7 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
+import qualified Pawl.Types.StatedFlip as StatedFlip
 
 -- | CR 611.1's third clause: a continuous effect affecting players or the rules
 -- of the game rather than the characteristics of an object. The player analogue
@@ -706,4 +707,13 @@ data PlayerEffect
     -- placement to zero describes an event that was possible and had something
     -- put instead, where "can't" is CR 101.2's word.
     CantGetCounters (Maybe PlayerCounterKind.PlayerCounterKind)
+  | -- | CR 705.3: an effect stating that a coin flip this player flips has a
+    -- certain result and\/or that this player wins it (Edgar, King of Figaro).
+    --
+    -- The rule's "ignore the actual results of that flip" is what makes this a
+    -- PlayerEffect rather than a CR 614 replacement: nothing about the flip
+    -- EVENT changes, and the result the rule states is read where the outcome is
+    -- settled -- Pawl.Engine.Coin, the one road both writers of CR 705.1's flip
+    -- take.
+    StateCoinFlip StatedFlip.StatedFlip
   deriving (Eq, Ord, Show)

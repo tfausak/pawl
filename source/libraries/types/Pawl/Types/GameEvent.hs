@@ -1038,7 +1038,8 @@ data GameEvent
     -- it -- or left it winnerless. Recorded by both roads that flip:
     -- Pawl.Engine.Resolve's Effect.FlipCoin arm, AFTER the outcome is settled and
     -- bound (DiceRolled's posture beside it), and Pawl.Engine.Event's
-    -- EntryRewrite.ChoiceByCoinFlip arm, which has no outcome to settle.
+    -- EntryRewrite.ChoiceByCoinFlip arm, whose only outcome is the one CR 705.3
+    -- states.
     --
     -- What TriggerCondition.PlayerWinsCoinFlip watches (Tavern Scoundrel). The
     -- outcome is a FIELD rather than a second constructor, and an OPTIONAL one;

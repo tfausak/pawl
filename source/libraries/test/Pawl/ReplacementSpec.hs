@@ -6856,8 +6856,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- and records the flip as WON when the call matches. The answerer below pins
   -- both questions to the same face, so that road wins its flip and the
   -- Scoundrel mints two Treasures; the correct road asks no call, records no
-  -- outcome, and mints none. 0 against 2, asserted FIRST so no proxy absorbs
-  -- it.
+  -- outcome -- nothing on this board states one under CR 705.3, which
+  -- Pawl.CoinSpec's Edgar case is the other side of -- and mints none. 0 against
+  -- 2, asserted FIRST so no proxy absorbs it.
   --
   -- CR 603.3 IS THE SEQUENCING, as in Pawl.EventTriggerSpec's Scoundrel case:
   -- the flip happens inside the entry replacement, so a trigger off it would

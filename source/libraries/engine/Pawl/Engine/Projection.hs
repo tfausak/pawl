@@ -2154,6 +2154,8 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.PlayLandsFromGraveyard -> effect
   -- A counter KIND is not a word CR 612.2's subtype pairs could reach either.
   PlayerEffect.CantGetCounters _ -> effect
+  -- Nor is a coin's face, or the two flags beside it.
+  PlayerEffect.StateCoinFlip _ -> effect
 
 -- CR 612's subtype word swap over an effect's AST. Cases on an effect's
 -- STRUCTURE -- does this arm carry a word a swap could reach -- never on which

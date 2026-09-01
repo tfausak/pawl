@@ -4420,6 +4420,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- Pawl.Types.CounterRestriction, whose affected filter this lint reaches
   -- through Face.counterRestrictions instead.
   PlayerEffect.CantGetCounters _ -> []
+  -- CR 705.3's statement narrows by nothing at all: it names a face, a win and
+  -- a once-per-turn flag, and no Filter over objects.
+  PlayerEffect.StateCoinFlip _ -> []
 
 -- Does this carrier pair CR 615.12's "damage can't be prevented" with a
 -- scope narrower than the whole table?
@@ -4487,6 +4490,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.PlayLandsFromGraveyard -> False
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
   PlayerEffect.CantGetCounters _ -> False
+  PlayerEffect.StateCoinFlip _ -> False
 
 -- The OTHER half of the same carrier -- and of CR 614.9's twin beside it, whose
 -- narrowing rides in the same type -- now that the narrowing is a DamagePattern:
@@ -4542,6 +4546,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.PlayLandsFromGraveyard -> False
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
   PlayerEffect.CantGetCounters _ -> False
+  PlayerEffect.StateCoinFlip _ -> False
 
 -- The non-vacuity half of both lints above: is this a damage-event prohibition
 -- at all -- CR 615.12's or CR 614.9's? A wildcard is right here, where it is not

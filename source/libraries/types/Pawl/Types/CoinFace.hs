@@ -18,4 +18,4 @@ module Pawl.Types.CoinFace where
 data CoinFace
   = Heads
   | Tails
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

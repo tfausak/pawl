@@ -13,6 +13,7 @@ import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Codec.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Codec.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Codec.SpendManaAsThough as SpendManaAsThough
+import qualified Pawl.Codec.StatedFlip as StatedFlip
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -53,7 +54,8 @@ codec =
       Arm.payload "CastFromGraveyard" filterCodec PlayerEffect.CastFromGraveyard (\x -> case x of PlayerEffect.CastFromGraveyard y -> Just y; _ -> Nothing),
       Arm.nullary "PlayLandsFromGraveyard" PlayerEffect.PlayLandsFromGraveyard,
       Arm.payload "CastFromHandWithoutPayingManaCost" filterCodec PlayerEffect.CastFromHandWithoutPayingManaCost (\x -> case x of PlayerEffect.CastFromHandWithoutPayingManaCost y -> Just y; _ -> Nothing),
-      Arm.payload "CantGetCounters" (Common.maybe PlayerCounterKind.codec) PlayerEffect.CantGetCounters (\x -> case x of PlayerEffect.CantGetCounters y -> Just y; _ -> Nothing)
+      Arm.payload "CantGetCounters" (Common.maybe PlayerCounterKind.codec) PlayerEffect.CantGetCounters (\x -> case x of PlayerEffect.CantGetCounters y -> Just y; _ -> Nothing),
+      Arm.payload "StateCoinFlip" StatedFlip.codec PlayerEffect.StateCoinFlip (\x -> case x of PlayerEffect.StateCoinFlip y -> Just y; _ -> Nothing)
     ]
   where
     filterCodec = Filter.codec Keyword.codec
