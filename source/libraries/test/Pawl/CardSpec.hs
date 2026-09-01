@@ -674,6 +674,10 @@ quantityCounts quantity = case quantity of
   Quantity.Type.HasDesignation _ -> []
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
+  -- Not implemented: a check that the Cost here is one this face's kicker or
+  -- multikicker keyword prints. A mismatched spelling reads 0 for the life of
+  -- the game, and none of this module's three Quantity traversals reaches the
+  -- arm (gap #2836).
   Quantity.Type.TimesKickedWith {} -> []
   Quantity.Type.SnowWasSpent -> []
   Quantity.Type.WasToken -> []

@@ -2150,6 +2150,15 @@ resolveModesWith runSubgame stackId srcId modes = do
       -- 608.2b re-judges each against the SAME declaration CR 603.3d offered, so
       -- the "that player controls" atoms are baked here too; an ability whose
       -- environment binds no player leaves them standing, admitting nothing.
+      --
+      -- Not implemented: baking BEFORE the CR 700.2d rename on this path.
+      -- Engine.placeBorne bakes the whole modal and then renames; this renames
+      -- and then bakes, so a repeated mode's occurrence 1 carries
+      -- Filter.ControlledByBound "them#1", which no environment binding is keyed
+      -- by -- the atom stands and admits nothing, while announcement judged the
+      -- same slot against a baked ControlledByPlayer, and the target is dropped.
+      -- Occurrence 0 keeps the printed name, so only a repeat is exposed
+      -- (#2835).
       let slots = Target.bakeSlots (Binding.playerSlots (Object.bindings obj)) (Map.unions (fmap (uncurry Modal.modeInstanceTargetSlots) modes))
           chosen = Binding.targetsOf (Object.bindings obj)
           legalSlot slot recipients = case Map.lookup slot slots of

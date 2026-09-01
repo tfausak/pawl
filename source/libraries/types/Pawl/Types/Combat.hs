@@ -213,11 +213,12 @@ data Combat = MkCombat
     -- derivation each already makes: the record is what makes the answer stick
     -- between samples, the derivation is what answers within one.
     attackingNothing :: Set.Set ObjectId.ObjectId,
-    -- | CR 506.2/506.2a: the one player being attacked this combat phase. Chosen
-    -- as a turn-based action immediately after the beginning of combat step
-    -- begins (CR 703.4h, CR 507.1).
+    -- | CR 507.1's answer: the opponent the active player chose as a turn-based
+    -- action immediately after the beginning of combat step began (CR 703.4h),
+    -- who thereby became the defending player (CR 506.2a). Nothing where no such
+    -- action was taken.
     --
-    -- Nothing before that action has run, and again once combat is cleared. The
+    -- Cleared with the rest of the record, which is exact rather than lucky. The
     -- RULES scope the designation to the combat phase (CR 506.2), and CR 703.4h
     -- makes the choice per beginning-of-combat step, so a turn with a second
     -- combat phase (CR 500.8) chooses again rather than inheriting. CR 511.3
@@ -233,11 +234,20 @@ data Combat = MkCombat
     -- attacking player the active player and after CR 800.4a a departed player
     -- controls no creature.
     --
-    -- Maybe PlayerId, not a set. CR 802 (attack multiple players) is the option
-    -- that makes several players defenders at once, and CR 802.4 then has each of
-    -- them declare blockers in APNAP order; neither is available here, because
-    -- pawl has no options concept to read one from (#175). This field becomes a
-    -- set when that arrives.
+    -- Maybe PlayerId, and it stays one. CR 802.2 is the case where the action is
+    -- NOT taken and all the attacking player's opponents are defending players
+    -- instead, so what widens is the question "who is defending", not this
+    -- record of a choice -- and CR 802.2a denies there is ever a group answer:
+    -- "a defending player" means one specific defending player, resolved per
+    -- attacking creature from what that creature is attacking. CR 803's attack
+    -- left and right and CR 809.3c's Emperor adjacency keep the action, seating
+    -- narrowing or dictating the choice.
+    --
+    -- Read through Pawl.Engine.Defender.defendingPlayers rather than directly:
+    -- that is where CR 802.2's several defenders will arrive, and where CR
+    -- 802.2a's narrowing to one is made explicit at each site that needs one.
+    -- The only readers of the field itself are Pawl.Codec.Combat and
+    -- Pawl.Engine.Combat.chooseDefender, its writer.
     defender :: Maybe PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)

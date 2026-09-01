@@ -178,10 +178,9 @@ attackableBattles defender gs =
 -- and no trigger condition asks; Pawl.Types.TriggerCondition's
 -- AttachedPlayerIsAttacked records the sweep behind that (#2279).
 stillAttacked :: ObjectId -> GameState -> Bool
-stillAttacked oid gs = case Combat.defender (GameState.combat gs) of
-  -- No defending player is no attack (see Pawl.Types.Combat's defender field).
-  Nothing -> False
-  Just defender -> List.elem oid (attackablePlaneswalkers defender gs)
+stillAttacked oid gs =
+  -- No defending player is no attack (see Pawl.Engine.Defender.defendingPlayers).
+  List.any (\defender -> List.elem oid (attackablePlaneswalkers defender gs)) (Defender.defendingPlayers gs)
 
 -- CR 506.4 for a battle: is this one still being attacked, or has it left the
 -- battlefield since the declaration? stillAttacked's twin, built out of the same
@@ -192,9 +191,8 @@ stillAttacked oid gs = case Combat.defender (GameState.combat gs) of
 -- player mid-combat (CR 310.9f) reads here as removed from combat, which is what
 -- rule 506.4 says. Not implemented: any effect that moves a designation (#853).
 stillAttackedBattle :: ObjectId -> GameState -> Bool
-stillAttackedBattle oid gs = case Combat.defender (GameState.combat gs) of
-  Nothing -> False
-  Just defender -> List.elem oid (attackableBattles defender gs)
+stillAttackedBattle oid gs =
+  List.any (\defender -> List.elem oid (attackableBattles defender gs)) (Defender.defendingPlayers gs)
 
 isCreatureObject :: ObjectId -> GameState -> Bool
 isCreatureObject = isCreatureObjectGiven Map.empty
@@ -456,9 +454,8 @@ attackCeilingGiven limit alone candidates gs =
 -- defending player has been chosen -- which is a combat no creature may attack
 -- in, so no requirement can be instantiated and none can be disobeyed.
 declarableTargets :: GameState -> [AttackTarget.AttackTarget]
-declarableTargets gs = case Combat.defender (GameState.combat gs) of
-  Nothing -> []
-  Just defender -> NonEmpty.toList (attackTargets defender gs)
+declarableTargets gs =
+  concatMap (\defender -> NonEmpty.toList (attackTargets defender gs)) (Defender.defendingPlayers gs)
 
 -- How many of `required` this declaration obeys (CR 508.1d): a requirement
 -- instance is obeyed exactly when the declaration attacks with its creature AND
@@ -982,7 +979,7 @@ becomeBlocked oid gs =
            in -- The status is conferred either way: with no defending player
               -- there is nobody for a CR 509.3c trigger to bind, and CR 509.1h
               -- still says the creature is blocked.
-              case Defender.playerOfAttacker oid gs Applicative.<|> Combat.defender c of
+              case Defender.playerOfAttacker oid gs Applicative.<|> Maybe.listToMaybe (Defender.defendingPlayers gs) of
                 Nothing -> blocked
                 -- Blocked by ZERO creatures, which is this road's whole point:
                 -- CR 509.3e's count triggers ask how many creatures block it,
@@ -1069,8 +1066,9 @@ noteAttackingNothing gs =
 --
 -- Not prompted with one candidate: CR 507.1's condition is a multiplayer
 -- game, and a two-player game's defending player is CR 506.2's nonactive player.
--- No candidates leaves Combat.defender Nothing, which declareAttackers reads as no
--- attack being possible; unreachable in a running game (CR 104.2a).
+-- No candidates leaves the field Nothing, which declareAttackers reads through
+-- Defender.defendingPlayers as no attack being possible; unreachable in a
+-- running game (CR 104.2a).
 --
 -- An answer outside the candidate list is a broken interpreter, not a game state,
 -- and degrades to the first candidate -- the same value Replay.defaultAnswer gives
@@ -1138,12 +1136,16 @@ announceAttackTarget pid oid options = case options of
 declareAttackers :: PlayerId -> Game ()
 declareAttackers pid = do
   gs <- State.get
-  case Combat.defender (GameState.combat gs) of
-    -- Nothing means no attack is possible: either the beginning of combat step's
-    -- turn-based action has not run, or it ran on a turn with no active player
-    -- (CR 800.4j), or it found no opponents. Never a place to recompute one.
-    Nothing -> pure ()
-    Just defender -> attemptAttackDeclaration pid defender Set.empty
+  -- No defending player means no attack is possible: either the beginning of
+  -- combat step's turn-based action has not run, or it ran on a turn with no
+  -- active player (CR 800.4j), or it found no opponents. Never a place to
+  -- recompute one.
+  --
+  -- CR 802.2a's one specific defending player, and today the only one: CR 802.3
+  -- is what would have the declaration draw its targets from every defender at
+  -- once, which is declarableTargets above.
+  Monad.forM_ (Maybe.listToMaybe (Defender.defendingPlayers gs)) $ \defender ->
+    attemptAttackDeclaration pid defender Set.empty
 
 -- One attempt at CR 508.1's declaration, plus the preamble's retry. Two steps can
 -- make the attempt fail: CR 508.1c/508.1d judge the declaration illegal, and CR
@@ -1426,8 +1428,8 @@ attemptAttackDeclaration pid defender rejected = do
 -- and none of canAttack's questions, per CR 508.4c.
 --
 -- The guards are the ways the rules say the creature enters WITHOUT being an
--- attacking creature -- CR 506.3a, CR 506.3b, CR 506.3c / CR 508.4a, and a Nothing
--- Combat.defender -- each a silent no-op, which is what those rules say. CR
+-- attacking creature -- CR 506.3a, CR 506.3b, CR 506.3c / CR 508.4a, and an empty
+-- Defender.defendingPlayers -- each a silent no-op, which is what those rules say. CR
 -- 508.4a's remaining clauses need no check, attackTargets deriving the offer from
 -- the board AT THIS MOMENT, and CR 508.4d holds by construction: the creature gets
 -- no key in Combat.blockers.
@@ -1439,7 +1441,7 @@ putOntoBattlefieldAttacking :: ObjectId -> Game ()
 putOntoBattlefieldAttacking oid = do
   gs <- State.get
   let c = GameState.combat gs
-  case (Combat.defender c, Projection.controllerOf oid gs) of
+  case (Maybe.listToMaybe (Defender.defendingPlayers gs), Projection.controllerOf oid gs) of
     (Just defender, Just controller)
       | Set.member oid (GameState.battlefield gs),
         -- CR 506.3a
@@ -1625,7 +1627,7 @@ declareBlockers = do
   start <- State.get
   let attacking = Map.keys (Combat.attackers (GameState.combat start))
   Monad.unless (null attacking) $ do
-    Monad.forM_ (Maybe.maybeToList (Combat.defender (GameState.combat start))) $ \pid ->
+    Monad.forM_ (Defender.defendingPlayers start) $ \pid ->
       attemptBlockDeclaration pid attacking Set.empty
     -- CR 509.1h's other half, performed once CR 509.1g has assigned the blockers:
     -- every attacking creature the declaration named no blockers for became an
