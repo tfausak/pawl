@@ -3694,7 +3694,7 @@ objectRefFilters ref = case ref of
   -- Commune with the Gods' "a creature or enchantment card from among them"; its
   -- slot names the group and holds no characteristic, so the Filter is the whole
   -- of what there is to lint -- the two chosen arms above's answer.
-  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ f) -> unframed [f]
+  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ f _ _) -> unframed [f]
   -- The arm above's plural: the same Filter position, saying which members are
   -- taken rather than which may be picked, and linted the same way.
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ f) -> unframed [f]
@@ -7791,10 +7791,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- player" would be one each. The same per-seat count TopOfLibrary
           -- takes of its own PlayerRef, which is why they share namesOneSeat.
           ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> namesOneSeat player
-          -- One card, full stop: the resolving controller chooses once out of the
-          -- group however many members it holds, there being no chooser to
-          -- multiply the question by (#1957) and no count above one (#1956).
-          ObjectRef.ChosenCardFromAmong {} -> True
+          -- One card per ONE seat, so the ref's own count is the whole of it: a
+          -- chooser names a single seat or nobody, where ChosenCardInHand's
+          -- PlayerRef above may name several hands. A COMPUTED count is plural
+          -- here whatever the board would make it, TopOfLibrary's reading above
+          -- and for its reason.
+          ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ count _) -> case count of
+            Quantity.Type.Literal n -> n <= 1
+            _ -> False
           -- FALSE where the arm above is True, which is the whole difference
           -- between them: "all" takes every member that matches, and nothing
           -- about the ref bounds how many a group holds.
@@ -8332,7 +8336,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         group = SlotName.MkSlotName (Text.pack "revealed")
         inGraveyard = ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.You anyCard)
         inHand = ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard)
-        fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard)
+        fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard (Quantity.Type.Literal 1) (PlayerRef.Relative PlayerRelation.You))
         atRandom = ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.You)
         anyNumber = ObjectRef.AnyNumberMatching anyCard
         onePermanent = ObjectRef.ChosenPermanent anyCard

@@ -1103,6 +1103,224 @@ communeWithTheGodsSpec s registry =
           Spec.assertEqWith s "and only the spell is in her graveyard" (namesIn Zone.Graveyard S.alice after) [named "Commune with the Gods"]
           Spec.assertEqWith s "her library is empty" (namesIn Zone.Library S.alice after) []
 
+-- ObjectRef.ChosenCardFromAmong's COUNT: "from among them" taking more than one
+-- card out of one bound group, where communeWithTheGodsSpec above takes one.
+--
+-- Ancestral Memories {2}{U}{U}{U} Sorcery, "Look at the top seven cards of your
+-- library. Put two of them into your hand and the rest into your graveyard."
+-- (name, cost, type line and Oracle text checked against api.scryfall.com,
+-- 2026-09-01). The whole card is transcribed.
+--
+-- Three clauses: CR 701.20e's look binds the seven as a group and leaves them in
+-- the library (rule 701.20b), the choice takes two of them, and "the rest" is the
+-- SAME slot read by ObjectRef.InSlot -- which finds both chosen cards gone, CR
+-- 400.7 having minted new objects for them on the way to the hand.
+--
+-- The two asks are pinned by INDEX through a State-threaded answerer, since a
+-- pure one cannot tell the second ask from the first. Both legs below index 5 and
+-- 0 of the offers, in the two orders, and the second leg is what proves the
+-- EXCLUSION: index 5 of the untouched seven is the Bad Moon, and index 5 of the
+-- six the first ask left is the Bird Maiden, so an implementation that re-offered
+-- the taken card would name a different pair. An eighth card sits below the seven
+-- so the look's own depth stays observable.
+ancestralMemoriesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ancestralMemoriesSpec s registry =
+  let -- alice: five Islands for the {2}{U}{U}{U}, `stock` into her library BOTTOM
+      -- FIRST (S.addLibraryCard puts each new card on top), Ancestral Memories in
+      -- hand. Returns the spell's id.
+      board island memories stock =
+        let mana = S.landsFor island S.alice 5 S.threePlayerGame
+            withStock = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) mana stock
+            (withSpell, spellId) = S.handOne memories withStock
+         in (spellId, withSpell {GameState.priority = Just S.alice})
+      named = Just . CardName.MkCardName . Text.pack
+      nth n offered = Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop n (NonEmpty.toList offered)))
+      -- One index per ask, taken in order, and the SIZE of each offer recorded
+      -- beside it -- so a second ask that never happened and a second ask over the
+      -- wrong candidates are both visible.
+      taking :: Prompt.Prompt r -> State.State ([Int], [Int]) r
+      taking p = case p of
+        Prompt.ChooseCardFromAmong _ _ _ offered -> do
+          (indices, sizes) <- State.get
+          State.put (drop 1 indices, sizes <> [length (NonEmpty.toList offered)])
+          pure (nth (Maybe.fromMaybe 0 (Maybe.listToMaybe indices)) offered)
+        _ -> pure (S.identityAnswer p)
+      cast :: [Int] -> (ObjectId.ObjectId, GameState.GameState) -> (GameState.GameState, [Int])
+      cast script (spellId, gs) =
+        let ((_, announced), afterCast) = State.runState (Engine.runGame taking gs (S.cast S.alice spellId)) (script, [])
+            ((_, after), afterResolve) = State.runState (Engine.runGame taking announced Stack.resolveTop) afterCast
+         in (after, snd afterResolve)
+      setup = do
+        island <- S.printingOf s registry "Island"
+        memories <- S.printingOf s registry "Ancestral Memories"
+        swamp <- S.printingOf s registry "Swamp"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        moon <- S.printingOf s registry "Bad Moon"
+        murder <- S.printingOf s registry "Murder"
+        piker <- S.printingOf s registry "Goblin Piker"
+        giant <- S.printingOf s registry "Hill Giant"
+        forest <- S.printingOf s registry "Forest"
+        mountain <- S.printingOf s registry "Mountain"
+        -- Bottom to top: the Swamp is never looked at, and the seven above it are
+        -- Mountain, Forest, Hill Giant, Goblin Piker, Murder, Bad Moon, Bird
+        -- Maiden read top down, which is the order the offer takes.
+        pure (board island memories [swamp, maiden, moon, murder, piker, giant, forest, mountain])
+      -- The graveyard when nothing is taken: the seven looked-at cards and the
+      -- spell itself (CR 608.2n).
+      allBuried =
+        List.sort
+          [ named "Ancestral Memories",
+            named "Bad Moon",
+            named "Bird Maiden",
+            named "Forest",
+            named "Goblin Piker",
+            named "Hill Giant",
+            named "Mountain",
+            named "Murder"
+          ]
+      burying takens = List.sort (List.foldl' (flip List.delete) allBuried takens)
+   in Spec.describe s "AncestralMemories" $ do
+        -- The headline: TWO cards come out of the one group, and both are the ones
+        -- the answers named.
+        Spec.it s "CR 608.2d two cards are taken from among the seven, both of them chosen" $ do
+          gs <- setup
+          let (after, sizes) = cast [5, 0] gs
+          Spec.assertEqWith
+            s
+            "both chosen cards are in alice's hand"
+            (List.sort (namesIn Zone.Hand S.alice after))
+            (List.sort [named "Bad Moon", named "Mountain"])
+          Spec.assertEqWith
+            s
+            "and the other five are in the graveyard"
+            (List.sort (namesIn Zone.Graveyard S.alice after))
+            (burying [named "Bad Moon", named "Mountain"])
+          Spec.assertEqWith s "the eighth card was never looked at" (namesIn Zone.Library S.alice after) [named "Swamp"]
+          Spec.assertEqWith s "two asks, the second over one fewer candidate" sizes [7, 6]
+        -- The paired control, and the proof that the second ask cannot re-offer the
+        -- first ask's card: the SAME two indices in the other order. Index 5 of the
+        -- untouched seven is the Bad Moon; index 5 of what the Mountain's removal
+        -- leaves is the Bird Maiden.
+        Spec.it s "CR 608.2d the second choice is made among the cards the first left" $ do
+          gs <- setup
+          let (after, _) = cast [0, 5] gs
+          Spec.assertEqWith
+            s
+            "the Mountain and the Bird Maiden are in alice's hand"
+            (List.sort (namesIn Zone.Hand S.alice after))
+            (List.sort [named "Bird Maiden", named "Mountain"])
+          Spec.assertEqWith
+            s
+            "and the Bad Moon is among the rest"
+            (List.sort (namesIn Zone.Graveyard S.alice after))
+            (burying [named "Bird Maiden", named "Mountain"])
+        -- CR 609.3: a group holding fewer cards than the count gives what it has,
+        -- and the rest of the instruction is performed on that (CR 101.3). One
+        -- candidate elides the ask entirely, so no index is consumed.
+        Spec.it s "CR 609.3 a one-card library gives its one card to a count of two" $ do
+          island <- S.printingOf s registry "Island"
+          memories <- S.printingOf s registry "Ancestral Memories"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          let (after, sizes) = cast [] (board island memories [maiden])
+          Spec.assertEqWith s "the one looked-at card came to alice's hand" (namesIn Zone.Hand S.alice after) [named "Bird Maiden"]
+          Spec.assertEqWith s "and only the spell is in her graveyard" (namesIn Zone.Graveyard S.alice after) [named "Ancestral Memories"]
+          Spec.assertEqWith s "her library is empty" (namesIn Zone.Library S.alice after) []
+          Spec.assertEqWith s "nobody was asked" sizes []
+
+-- ObjectRef.ChosenCardFromAmong's CHOOSER: "from among them" answered by a seat
+-- other than the resolving controller, where communeWithTheGodsSpec above is CR
+-- 608.2c's default.
+--
+-- Animal Magnetism {4}{G} Sorcery, "Reveal the top five cards of your library. An
+-- opponent chooses a creature card from among them. Put that card onto the
+-- battlefield and the rest into your graveyard." (name, cost, type line and
+-- Oracle text checked against api.scryfall.com, 2026-09-01). The whole card is
+-- transcribed.
+--
+-- WHICH opponent is itself a CR 608.2d choice the controller announces, so the
+-- card writes Effect.ChooseOpponent into a slot and the ref's chooser reads that
+-- slot -- Skullwinder's shape, one ObjectRef over.
+--
+-- THREE seats, and the two legs below differ in exactly one thing: which opponent
+-- alice names. The answerer replies by the seat the PROMPT names -- alice would
+-- take index 0, bob takes index 1, carol takes index 2 -- so a reading that asked
+-- the controller hands back the same card in both legs, and one that asked the
+-- other opponent swaps them.
+animalMagnetismSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+animalMagnetismSpec s registry =
+  let -- alice: five Forests for the {4}{G}, `stock` into her library BOTTOM FIRST,
+      -- Animal Magnetism in hand.
+      board forest magnetism stock =
+        let mana = S.landsFor forest S.alice 5 S.threePlayerGame
+            withStock = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) mana stock
+            (withSpell, spellId) = S.handOne magnetism withStock
+         in (spellId, withSpell {GameState.priority = Just S.alice})
+      named = Just . CardName.MkCardName . Text.pack
+      nth n offered = Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop n (NonEmpty.toList offered)))
+      -- The index each seat would take, so the card that moves names the seat that
+      -- was asked. `opponent` is alice's answer to the ChooseOpponent prompt.
+      answering :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      answering opponent p = case p of
+        Prompt.ChooseOpponent {} -> opponent
+        Prompt.ChooseCardFromAmong _ asked _ offered
+          | asked == S.alice -> nth 0 offered
+          | asked == S.bob -> nth 1 offered
+          | otherwise -> nth 2 offered
+        _ -> S.identityAnswer p
+      cast opponent (spellId, gs) =
+        let announced = S.runPure (answering opponent) gs (S.cast S.alice spellId)
+         in S.runPure (answering opponent) announced Stack.resolveTop
+      setup = do
+        forest <- S.printingOf s registry "Forest"
+        magnetism <- S.printingOf s registry "Animal Magnetism"
+        swamp <- S.printingOf s registry "Swamp"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        island <- S.printingOf s registry "Island"
+        giant <- S.printingOf s registry "Hill Giant"
+        murder <- S.printingOf s registry "Murder"
+        piker <- S.printingOf s registry "Goblin Piker"
+        -- Bottom to top: the Swamp is never revealed, and the five above it are
+        -- Goblin Piker, Murder, Hill Giant, Island, Bird Maiden read top down. The
+        -- Murder and the Island match no creature filter, so the offer is Goblin
+        -- Piker, Hill Giant, Bird Maiden -- three candidates for three seats.
+        pure (board forest magnetism [swamp, maiden, island, giant, murder, piker])
+      -- Alice's battlefield without the five Forests she cast the spell off.
+      arrived after = filter (/= named "Forest") (namesIn Zone.Battlefield S.alice after)
+      allBuried =
+        List.sort
+          [ named "Animal Magnetism",
+            named "Bird Maiden",
+            named "Goblin Piker",
+            named "Hill Giant",
+            named "Island",
+            named "Murder"
+          ]
+   in Spec.describe s "AnimalMagnetism" $ do
+        -- The headline: BOB's answer, not alice's, decides which creature card
+        -- reaches the battlefield.
+        Spec.it s "CR 608.2d the opponent alice named picks the creature card" $ do
+          gs <- setup
+          let after = cast S.bob gs
+          Spec.assertEqWith s "bob's index-1 pick is the creature on the battlefield" (arrived after) [named "Hill Giant"]
+          Spec.assertEqWith
+            s
+            "and the other four revealed cards are in alice's graveyard"
+            (List.sort (namesIn Zone.Graveyard S.alice after))
+            (List.delete (named "Hill Giant") allBuried)
+          Spec.assertEqWith s "the sixth card was never revealed" (namesIn Zone.Library S.alice after) [named "Swamp"]
+        -- The paired control: the same board with the OTHER opponent named. If the
+        -- controller were answering, both legs would put the same card onto the
+        -- battlefield.
+        Spec.it s "CR 608.2d naming the other opponent takes the other card" $ do
+          gs <- setup
+          let after = cast S.carol gs
+          Spec.assertEqWith s "carol's index-2 pick is the creature on the battlefield" (arrived after) [named "Bird Maiden"]
+          Spec.assertEqWith
+            s
+            "and the Hill Giant is among the rest"
+            (List.sort (namesIn Zone.Graveyard S.alice after))
+            (List.delete (named "Bird Maiden") allBuried)
+
 -- ObjectRef.TopOfLibraryUntil: a prefix of a library whose LENGTH is what a
 -- Filter decides, where ObjectRef.TopOfLibrary's is what a Quantity counts.
 --
@@ -1193,7 +1411,7 @@ treasureHuntSpec s registry =
           Spec.assertEqWith s "and the library is empty" (namesIn Zone.Library S.alice after) []
 
 -- ObjectRef.EachCardFromAmong: the members of a bound group that a Filter
--- matches, where ObjectRef.ChosenCardFromAmong above takes ONE that a player
+-- matches, where ObjectRef.ChosenCardFromAmong above takes the number a player
 -- picks -- so one sentence can send the matching half of a group one way and the
 -- remainder another.
 --
@@ -4341,6 +4559,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   portOfKarfellSpec s registry
   midnightTillingSpec s registry
   communeWithTheGodsSpec s registry
+  ancestralMemoriesSpec s registry
+  animalMagnetismSpec s registry
   treasureHuntSpec s registry
   mulchSpec s registry
   openTheWaySpec s registry

@@ -422,7 +422,11 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- later one reads is exactly the dataflow that lint checks. Many, not One,
   -- which is the arity InSlot reports of the same binding: the ref reads every
   -- member of the group to offer them.
-  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot _) -> Map.singleton slot SlotArity.Many
+  --
+  -- Joined with the COUNT's own slots, TopOfLibrary's arm above and for its
+  -- reason; the CHOOSER's are the generic playerRefSlots fold this case is joined
+  -- into, which is what makes Animal Magnetism's ChooseOpponent slot a read.
+  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot _ count _) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots count)
   -- The arm above's read, for its reasons: the candidates come from a slot, and
   -- the ref reads every member of the group to match them.
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong slot _) -> Map.singleton slot SlotArity.Many
@@ -463,7 +467,9 @@ objectRefQuantities ref = case ref of
   ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil _ _ count) -> [count]
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ _) -> []
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand _ _) -> []
-  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _) -> []
+  -- How many cards are picked out of the group -- Ancestral Memories' printed
+  -- two, the library walks' counts above being the only other ObjectRef numbers.
+  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ count _) -> [count]
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
   ObjectRef.RandomCardInHand _ -> []
   ObjectRef.AnyNumberMatching _ -> []
@@ -492,7 +498,9 @@ objectRefPlayerRefs ref = case ref of
   ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil player _ _) -> [player]
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ _) -> []
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> [player]
-  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _) -> []
+  -- The seat that picks out of the group -- Animal Magnetism's opponent, and by
+  -- default CR 608.2c's resolving controller.
+  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ _ chooser) -> [chooser]
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
   ObjectRef.RandomCardInHand player -> [player]
   ObjectRef.AnyNumberMatching _ -> []
@@ -4002,10 +4010,27 @@ matchingFromAmong legal resolving controller source gs filter_ members =
 -- 109.5's "you" is the resolving controller), against the CR 613 projection -- so
 -- a card a continuous effect made a creature is a creature card here.
 --
--- WHO is asked is the resolving controller and only ever them (CR 608.2d, #1957).
--- Elided at one candidate and skipped at none (CR 101.3, CR 609.3). Filtered, not
--- trusted: an answer naming a card never offered falls back to the first
--- candidate. At most one object comes back, which is #1956's count read as one.
+-- WHO is asked is the ref's own chooser, ONE seat: CR 608.2c's resolving
+-- controller by default, or the seat a PlayerRef names -- Animal Magnetism's "an
+-- opponent chooses a creature card from among them", read out of the slot a
+-- ChooseOpponent filled earlier in this resolution. Read through playerRefPlayers
+-- so the slot is read as every other is (CR 608.2b): a reference naming nobody,
+-- or naming several where no printing writes one, asks nobody and so names no
+-- card (CR 101.3).
+--
+-- HOW MANY is the ref's Quantity, evaluated HERE (CR 608.2c) off the announcement
+-- CR 601.2b left on the resolving object -- TopOfLibrary's reading, and its clamp:
+-- a count that will not evaluate, or evaluates negative, is zero cards (CR
+-- 107.1b). A group holding fewer matches than the count gives what it has (CR
+-- 609.3) and the rest of the instruction is performed on that (CR 101.3).
+--
+-- ONE ask per card, each over the candidates the earlier asks have not taken --
+-- CR 608.2d cannot choose the same card twice, "put two of them into your hand"
+-- naming two cards. One seat answering several asks in sequence is the same
+-- decision as one simultaneous choice of that many, CR 101.4c leaving the order
+-- of a player's own simultaneous choices to that player. Elided at one candidate
+-- and skipped at none (CR 101.3, CR 609.3). Filtered, not trusted: an answer
+-- naming a card never offered falls back to the first candidate.
 chooseCardFromAmong ::
   ObjectId ->
   ObjectId ->
@@ -4014,16 +4039,27 @@ chooseCardFromAmong ::
   Map.Map SlotName (Set Recipient) ->
   ChosenCardFromAmong.ChosenCardFromAmong ->
   Game [ObjectId]
-chooseCardFromAmong resolving source controller legal chosen (ChosenCardFromAmong.MkChosenCardFromAmong slot filter_) = do
+chooseCardFromAmong resolving source controller legal chosen (ChosenCardFromAmong.MkChosenCardFromAmong slot filter_ count chooser) = do
   members <- fromAmongMembers legal resolving chosen slot
   gs <- State.get
-  case matchingFromAmong legal resolving controller source gs filter_ members of
-    [] -> pure []
-    [only] -> pure [only]
-    first : second : more -> do
-      let offered = first NonEmpty.:| (second : more)
-      answer <- Game.choose (Prompt.ChooseCardFromAmong (Decide.deciderFor controller gs) controller source offered)
-      pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+  let viewOf = effectViewOf source legal gs
+      context = effectContext (Game.teams gs) controller source legal (slotBindings resolving gs)
+      wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
+      candidates = matchingFromAmong legal resolving controller source gs filter_ members
+      pick asked n available
+        | n <= (0 :: Natural) = pure []
+        | otherwise = case available of
+            [] -> pure []
+            [only] -> pure [only]
+            first : second : more -> do
+              let offered = first NonEmpty.:| (second : more)
+              answer <- Game.choose (Prompt.ChooseCardFromAmong (Decide.deciderFor asked gs) asked source offered)
+              let taken = if List.elem answer (NonEmpty.toList offered) then answer else first
+              rest <- pick asked (n - 1) (List.delete taken available)
+              pure (taken : rest)
+  case playerRefPlayers legal controller gs chooser of
+    [asked] -> pick asked wanted candidates
+    _ -> pure []
 
 -- One effect, applied, wrapped in the window CR 607.2a's link is filed from:
 -- what was in exile before, and what is in it after.
@@ -5376,11 +5412,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- slotBoundObjects the InSlot gather reads, so the choice and "the
               -- rest" cannot see different groups.
               --
-              -- ONE card: what the group has left over is not named here at all.
-              -- "The rest" is the same slot read by ObjectRef.InSlot in a LATER
-              -- clause, which finds the chosen card gone -- CR 400.7 minted a new
-              -- object for it on the way to its new zone, and the id the group still
-              -- holds resolves to nothing, so moveOne passes over it.
+              -- What the group has left over is not named here at all. "The rest"
+              -- is the same slot read by ObjectRef.InSlot in a LATER clause, which
+              -- finds every chosen card gone -- CR 400.7 minted a new object for
+              -- each on the way to its new zone, and the ids the group still holds
+              -- resolve to nothing, so moveOne passes over them.
               ObjectRef.ChosenCardFromAmong from -> chooseCardFromAmong resolving source controller legal chosen from
               -- Mulch's "all land cards revealed this way", the arm above's plural.
               -- NOT routed through objectRefObjects, for the InSlot arm's reason:
