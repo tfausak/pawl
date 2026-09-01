@@ -51,6 +51,25 @@ data Layout
     -- carries is what says which is which -- the same positional reading CR
     -- 712.8a's front face takes below.
     Adventure
+  | -- | CR 720.1: a card with "a two-part card frame, with a smaller frame inset
+    -- within their text box", whose inset text is a set of ALTERNATIVE
+    -- characteristics the object may have while it is a spell (CR 720.2). The
+    -- same shape as Adventure above, and CR 720.4 states the same claim CR 715.4
+    -- does: everywhere but the stack, and on the stack when not cast as an Omen,
+    -- an omen card has only its normal characteristics.
+    --
+    -- Its own constructor rather than a second reading of Adventure, because of
+    -- one sentence. CR 720.3d: "As an Omen spell resolves, its controller
+    -- shuffles it into its owner's library instead of putting it into its
+    -- owner's graveyard as it resolves", where CR 715.3d exiles the adventurer
+    -- card instead -- two different destinations that the layout, not the card's
+    -- printed text, decides.
+    --
+    -- FIRST face normal, the rest alternative -- the positional reading Adventure
+    -- above takes. CR 720.2 puts the inset frame on the LEFT where CR 715.2 puts
+    -- an Adventure's on the left too; either way position is a printing fact and
+    -- Pawl.Types.Card.faces' order is what says which is which.
+    Omen
   | -- | CR 712.2: a NONMODAL double-faced card -- one Magic card face on each
     -- side, with an ability on one or both faces that turns the card over. The
     -- constructor keeps the name CR 712.1 records as the older one for the same

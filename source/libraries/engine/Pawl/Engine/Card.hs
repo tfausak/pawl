@@ -205,6 +205,11 @@ combinedFaces card = case Card.layout card of
   -- characteristics shows one of them, rather than that a card with one shows
   -- it.
   Layout.Adventure -> pure (NonEmpty.head (Card.faces card))
+  -- CR 720.4, which is CR 715.4's sentence over the other inset-frame layout:
+  -- "In every zone except the stack, and while on the stack not as an Omen, an
+  -- omen card has only its normal characteristics." So the same expression the
+  -- Adventure arm above takes, for the same reason.
+  Layout.Omen -> pure (NonEmpty.head (Card.faces card))
   -- CR 712.8a: "While a double-faced card is outside the game or in a zone other
   -- than the battlefield or stack, it has only the characteristics of its front
   -- face", and CR 712.8d says the same of a permanent showing that face. The
@@ -470,7 +475,19 @@ castableFaces card = case Card.layout card of
   -- this function's question -- CR 715.3d's exile permission excludes the
   -- Adventure half, and Pawl.Engine.Cast is where that is read.
   Layout.Adventure -> NonEmpty.toList (Card.faces card)
-  -- CR 712.11: "A double-faced spell is cast with its front face up by default."
+  -- CR 720.3: "As a player casts an omen card, the player chooses whether they
+  -- cast the card normally or as an Omen." Both, for Split's and Adventure's
+  -- reason: the choice is the player's, and offering each as its own legal action
+  -- is how the engine avoids making it. CR 720.3a is what makes each offer stand
+  -- on its own -- "only the alternative characteristics are evaluated to see if it
+  -- can be cast" -- which is how Pawl.Engine.Cast prices and gates a proposal.
+  --
+  -- Unlike CR 715.3d's Adventure, nothing narrows the list by zone: CR 720.3d
+  -- shuffles a resolved Omen back into its owner's library rather than exiling it
+  -- with a permission attached, so there is no exiled incarnation for a later cast
+  -- to be excluded from (Pawl.Engine.Resolve.finishSpell).
+  Layout.Omen -> NonEmpty.toList (Card.faces card)
+  -- CR 712.11: "A double-faced spell is cast with its front face up by default.
   -- The front face always, and the BACK face as a second option exactly when the
   -- front prints CR 702.162a's more than meets the eye -- "you may cast this card
   -- converted by paying [cost]". CR 712.11d is the rule that puts it in this list
@@ -562,7 +579,7 @@ castableFaces card = case Card.layout card of
 -- #2787).
 --
 -- SPLIT alone. A Room is a split card too (CR 709.5) and no printing gives one
--- fuse; the layouts with two faces that are not split cards (Adventure,
+-- fuse; the other layouts that are not split cards (Adventure, Omen,
 -- ModalDoubleFaced, Transforming, Meld) are not what rule 702.102a's "found on
 -- some split cards" reaches.
 fusedFace :: Card.Card -> Maybe (Face.Face Card.Card)
@@ -686,6 +703,12 @@ landFaces card =
         -- a land in its type line would want the arm castableFaces has.
         Layout.Room -> byDefault
         Layout.Adventure -> byDefault
+        -- CR 720.4 leaves an omen card in a hand showing only its normal
+        -- characteristics, exactly as CR 715.4 does an adventurer card, so the
+        -- default view is what a player would play as a land. No omen card prints
+        -- a land face -- CR 720.2's inset frame holds a spell -- so the filter
+        -- below drops the pair either way.
+        Layout.Omen -> byDefault
         -- CR 712.8a again, and CR 712.12 names the MODAL kind alone: a nonmodal
         -- double-faced card in a hand is only its front face, so a back face that
         -- is a land is not something its controller may elect to play. Westvale
@@ -724,6 +747,7 @@ staysWhenPutOntoBattlefield card = case Card.layout card of
   Layout.Split -> False
   Layout.Room -> False
   Layout.Adventure -> False
+  Layout.Omen -> False
   Layout.Transforming -> False
   Layout.ModalDoubleFaced -> not (isPermanent (NonEmpty.head (Card.faces card)))
   -- CR 712.14b is written about a modal double-faced card and reaches no other
@@ -776,6 +800,7 @@ backFace card =
         -- is the answer, and Nothing is how this function says it.
         Layout.Room -> Nothing
         Layout.Adventure -> Nothing
+        Layout.Omen -> Nothing
         Layout.Transforming -> successor
         -- The SAME answer, because CR 712.11a says "a double-faced card" and CR
         -- 712.1 counts the modal kind among them: a card cast "transformed" is
@@ -860,6 +885,7 @@ turnedOver mName card = case Card.layout card of
   -- halves are both on the front, which is what a shared type line means.
   Layout.Room -> Nothing
   Layout.Adventure -> Nothing
+  Layout.Omen -> Nothing
   Layout.Transforming -> nextFace mName card
   Layout.ModalDoubleFaced -> nextFace mName card
   -- CR 712.4c: "Unlike other double-faced cards, meld cards cannot be transformed
@@ -924,6 +950,10 @@ enteringFace card shown = case Card.layout card of
   -- hasSharedTypeLine below -- see the `face` note in its mkObj.
   Layout.Room -> shown
   Layout.Adventure -> Nothing
+  -- CR 720.4's "in every zone except the stack" is CR 715.4's claim again, and an
+  -- Omen never becomes a permanent at all -- CR 720.3d shuffles it into its
+  -- owner's library as it resolves -- so no chosen face survives the move.
+  Layout.Omen -> Nothing
   -- CR 712.11 casts one with its front face up, so for an ordinary cast `shown`
   -- IS the front face and CR 712.8a would resolve Nothing to that same face. The
   -- two answers part where CR 712.11a's cast does put a back face on the stack.
@@ -979,6 +1009,7 @@ manaCostFace card live = case Card.layout card of
   -- reaches nothing here.
   Layout.Room -> live
   Layout.Adventure -> live
+  Layout.Omen -> live
   Layout.Transforming -> NonEmpty.head (Card.faces card)
   -- The live face, and NOT the front one: CR 712.8e's mana-value exception is
   -- written about a nonmodal double-faced permanent alone, and CR 712.8f states
@@ -1029,6 +1060,7 @@ showsBackFace card mName = case Card.layout card of
   Layout.Split -> False
   Layout.Room -> False
   Layout.Adventure -> False
+  Layout.Omen -> False
   Layout.Transforming ->
     case mName >>= \name -> List.findIndex ((== name) . Face.name) (NonEmpty.toList (Card.faces card)) of
       Nothing -> False
@@ -1056,6 +1088,7 @@ hasSharedTypeLine card = case Card.layout card of
   Layout.Split -> False
   Layout.Room -> True
   Layout.Adventure -> False
+  Layout.Omen -> False
   Layout.Transforming -> False
   Layout.ModalDoubleFaced -> False
   -- CR 709.5's shared type line belongs to a split card, and CR 712.1 counts a
@@ -1326,6 +1359,15 @@ isAura f = Set.member Subtype.Aura (TypeLine.subtypes (Face.typeLine f))
 -- second of a face that has already been chosen.
 isAdventure :: Face.Face Card.Card -> Bool
 isAdventure f = Set.member Subtype.Adventure (TypeLine.subtypes (Face.typeLine f))
+
+-- CR 205.3k: is this face the OMEN half of an omen card? isAdventure's reading
+-- one rule section over, and for the same reason -- CR 720.3b puts one named face
+-- on the stack, and CR 720.3d asks of the face already chosen whether the spell
+-- resolving is an Omen. Pawl.Engine.Resolve.finishSpell is the one reader, and
+-- Pawl.OmenSpec's "CR 720.3d Signaling Roar is shuffled into its owner's library"
+-- is what proves it.
+isOmen :: Face.Face Card.Card -> Bool
+isOmen f = Set.member Subtype.Omen (TypeLine.subtypes (Face.typeLine f))
 
 -- CR 303.4a: the slot an Aura spell's required target is bound under. A genuine
 -- target, so it lives in the ordinary target namespace rather than among
