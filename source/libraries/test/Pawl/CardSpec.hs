@@ -85,6 +85,7 @@ import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
+import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
@@ -1413,6 +1414,8 @@ combatRestrictionCounts restriction = case restriction of
   CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless _ condition) -> foldMap conditionCounts condition
   -- The blocker Filter beside the gate holds no Count either.
   CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ condition) -> foldMap conditionCounts condition
+  -- The PlayerScope beside the gate holds no Count either.
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ condition) -> foldMap conditionCounts condition
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ condition) -> foldMap conditionCounts condition
   CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionCounts condition
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionCounts condition
@@ -4806,6 +4809,11 @@ combatRestrictionFilters restriction = case restriction of
   -- Three positions on the PAIRWISE arm: the attackers restricted, the blockers
   -- barred from them, and the gate.
   CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy affected blockers condition) -> unframed (affectedFilters affected <> [blockers]) <> foldMap conditionFilters condition
+  -- Two on the attacking one: the creatures restricted and the gate. The
+  -- players they may not attack are a PlayerScope, which is card data with no
+  -- Filter in it -- so nothing stands in for it here, the size-bounding arms'
+  -- posture.
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer affected _ condition) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless affected condition) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
   CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionFilters condition
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionFilters condition

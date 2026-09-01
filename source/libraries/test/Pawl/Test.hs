@@ -59,6 +59,7 @@ import qualified Pawl.Codec.BlockPermissionSpec
 import qualified Pawl.Codec.BlockRequirementSpec
 import qualified Pawl.Codec.BlocksDeclaredSpec
 import qualified Pawl.Codec.CandidateIdSpec
+import qualified Pawl.Codec.CantAttackPlayerSpec
 import qualified Pawl.Codec.CantBeBlockedBySpec
 import qualified Pawl.Codec.CantBeRegeneratedSpec
 import qualified Pawl.Codec.CardNameSpec
@@ -624,6 +625,7 @@ spec s registry = do
   Pawl.Codec.BecameBlockingSpec.spec s
   Pawl.Codec.BlocksDeclaredSpec.spec s
   Pawl.Codec.CandidateIdSpec.spec s
+  Pawl.Codec.CantAttackPlayerSpec.spec s
   Pawl.Codec.CantBeBlockedBySpec.spec s
   Pawl.Codec.CantBeRegeneratedSpec.spec s
   Pawl.Codec.CardNameSpec.spec s

@@ -174,6 +174,24 @@ attackTargets defender gs =
     NonEmpty.:| fmap AttackTarget.OfPlaneswalker (attackablePlaneswalkers defender gs)
       <> fmap AttackTarget.OfBattle (attackableBattles defender gs)
 
+-- CR 508.1c through CR 802.3a: may this creature be announced as attacking this
+-- target? The pairwise attacking restriction read against ONE announcement, the
+-- pairs having been gathered once per declaration pass
+-- (CombatRestriction.cantAttackPlayer).
+--
+-- Exhaustive over CR 506.3's three things that can be attacked rather than a
+-- wildcard, so a fourth of them fails to compile here instead of silently
+-- answering True. Only the player arm consults the set today, and that is the
+-- rule and not an omission: Blazing Archon's "creatures can't attack you" leaves
+-- a planeswalker its controller controls attackable, which is a different
+-- announcement. Not implemented: a restriction naming a planeswalker or a battle
+-- (#2891), which would give the other two arms a set of their own.
+attackTargetAllowed :: Set (ObjectId, PlayerId) -> ObjectId -> AttackTarget.AttackTarget -> Bool
+attackTargetAllowed barred oid target = case target of
+  AttackTarget.OfPlayer pid -> not (Set.member (oid, pid) barred)
+  AttackTarget.OfPlaneswalker _ -> True
+  AttackTarget.OfBattle _ -> True
+
 -- CR 306.6 / CR 508.1b: the planeswalkers a defending player controls, in
 -- ascending id order. PROJECTED rather than printed: CR 613.1d puts card types in
 -- layer 4.
@@ -288,9 +306,15 @@ isCreatureObjectGiven = Projection.isCreatureGiven
 -- it off the list would forbid the declaration CR 508.1c's own Example calls
 -- legal.
 --
--- Not implemented: the PAIRWISE shape, a restriction naming what the attack is
--- aimed at (Blazing Archon), which has no carrier (#1686); and CR 508.1a's "they
--- can't also be battles", which the creature test below already covers (#898).
+-- NOT the PAIRWISE shape, a restriction naming what the attack is aimed at
+-- (Blazing Archon): CR 508.1b's announcement has not been made when this list is
+-- built, so that one is asked of the (creature, target) pair instead
+-- (attackTargetAllowed). A creature every announcement of which is forbidden is
+-- dropped in attemptAttackDeclaration rather than here, which is the same
+-- posture and one step later.
+--
+-- Not implemented: CR 508.1a's "they can't also be battles", which the creature
+-- test below already covers (#898).
 --
 -- canAttackGiven is the half a LOOP wants: `grants`, `pcs` and `restricted` are
 -- each one battlefield-wide walk, taken once per declaration pass. An
@@ -357,10 +381,15 @@ aloneAllows alone declaration = case Set.toList declaration of
 -- A FENCE, because nothing else is one: attackCeilingGiven's greedy search is
 -- exact only while this answer is a cardinality cap plus the size-one exception,
 -- reading the declaration's KEY SET and never its announcements. A third conjunct
--- naming WHICH creatures may attack together (#1686) -- or widening the third
--- argument from Set ObjectId to the declaration -- would make that search answer
--- CR 508.1d with a number no player can attain, and -Werror would say nothing.
+-- naming WHICH creatures may attack together -- or widening the third argument
+-- from Set ObjectId to the declaration -- would make that search answer CR
+-- 508.1d with a number no player can attain, and -Werror would say nothing.
 -- Re-derive the argument there before adding one.
+--
+-- CR 508.1c's aimed-at restriction is NOT such a conjunct, which is why it is not
+-- here: it forbids (creature, target) pairs independently of every other creature,
+-- so the search stays exact by narrowing each creature's announcements instead
+-- (attackCeilingGiven's `announceable`).
 attackDeclarationAllowed :: Maybe Natural -> Set ObjectId -> Set ObjectId -> Bool
 attackDeclarationAllowed limit alone declaration =
   aloneAllows alone declaration
@@ -403,8 +432,10 @@ withinLimit limit size = case limit of
 --   2. attackRequirementsMet is a sum of non-negative weights over independent
 --      (creature, target) PAIRS: AttackRequirement.instances is keyed by the
 --      pair, so no requirement spans two creatures.
---   3. Nothing restricts which target a creature may be announced against, so
---      each creature's best announcement is chosen alone (bestFor).
+--   3. What restricts which target a creature may be announced against is a fact
+--      about that creature and that target alone -- an attack cost (CR 508.1d) or
+--      CR 508.1c's aimed-at restriction -- so each creature's best announcement
+--      is chosen alone (bestFor).
 --
 -- Given those, a declaration's score is at most the sum over its creatures of
 -- their per-creature best, and any set of creatures attains that sum -- so CR
@@ -413,10 +444,10 @@ withinLimit limit size = case limit of
 -- weights. What used to be the CLOSED FORM is the same computation where the cap
 -- binds on nothing.
 --
--- Any of the three failing silently invalidates this: a restriction naming what
--- the attack is aimed at (#1686), one reading the announcements rather than the
--- key set, a requirement keyed by something other than a pair, or an attack cost
--- read off the whole declaration. attackDeclarationAllowed and
+-- Any of the three failing silently invalidates this: a restriction reading the
+-- announcements rather than the key set, one naming a (creature, target) pair
+-- together with another creature's, a requirement keyed by something other than a
+-- pair, or an attack cost read off the whole declaration. attackDeclarationAllowed and
 -- AttackRequirement.instances both carry a comment saying so, because -Werror
 -- cannot.
 --
@@ -429,19 +460,31 @@ withinLimit limit size = case limit of
 -- stands.
 attackCeiling :: [ObjectId] -> GameState -> (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget)
 attackCeiling candidates gs =
-  attackCeilingGiven (CombatRestriction.attackLimit gs) (CombatRestriction.cantAttackAlone candidates gs) candidates gs
+  attackCeilingGiven (CombatRestriction.attackLimit gs) (CombatRestriction.cantAttackAlone candidates gs) (barredAttacks candidates gs) candidates gs
+
+-- CR 508.1c's aimed-at restriction over the whole declaration pass: every
+-- (creature, defending player) pair it forbids. Hoisted beside the bound and the
+-- attacks-alone set, and gathered from the same list the announcements will be
+-- drawn from (Defender.defendingPlayers, which declarableTargets also walks).
+barredAttacks :: [ObjectId] -> GameState -> Set (ObjectId, PlayerId)
+barredAttacks candidates gs = CombatRestriction.cantAttackPlayer candidates (Defender.defendingPlayers gs) gs
 
 -- attackCeiling against the restrictions the caller already gathered: each caller
 -- also asks attackDeclarationAllowed of the player's own declaration, and the two
 -- must be judging the same board.
-attackCeilingGiven :: Maybe Natural -> Set ObjectId -> [ObjectId] -> GameState -> (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget)
-attackCeilingGiven limit alone candidates gs =
+attackCeilingGiven :: Maybe Natural -> Set ObjectId -> Set (ObjectId, PlayerId) -> [ObjectId] -> GameState -> (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget)
+attackCeilingGiven limit alone barred candidates gs =
   let targets = declarableTargets gs
       required = AttackRequirement.instances candidates targets gs
       -- CR 508.1d's cost clause. AttackCost.costsOn is asked of the ANNOUNCEMENT,
       -- which is the question that rule's cards ask.
       freely oid target = null (AttackCost.costsOn oid target gs)
-      announceable oid = filter (freely oid) targets
+      -- CR 508.1c beside CR 508.1d's cost clause: an announcement a restriction
+      -- forbids is in no legal declaration, so it is off this list for the same
+      -- reason a taxed one is -- and a creature left with no announcement at all
+      -- drops out of `eligible` below, which is how "can't attack you" reaches a
+      -- board where that player is the only thing to attack.
+      announceable oid = filter (\target -> freely oid target && attackTargetAllowed barred oid target) targets
       -- The best announcement for ONE creature and how many instances it obeys:
       -- the EARLIEST freely announceable target obeying the most, so a tie goes to
       -- the defending player (Combat.attackTargets puts them first). Nothing when
@@ -585,13 +628,19 @@ legalAttackDeclarationGiven candidates chosen gs =
   -- maximization have to be judging one board.
   let alone = CombatRestriction.cantAttackAlone candidates gs
       limit = CombatRestriction.attackLimit gs
+      barred = barredAttacks candidates gs
    in all (\oid -> List.elem oid candidates) (Map.keys chosen)
         -- CR 508.1b: an announcement outside the list is not a declaration at all.
         -- Vacuous on the empty declaration, which is what keeps declining legal in
         -- a combat with no defending player.
         && all (\target -> List.elem target (declarableTargets gs)) (Map.elems chosen)
+        -- CR 508.1c's aimed-at restriction, asked of the ANNOUNCEMENTS rather
+        -- than of the candidate list: this is the conjunct that makes a creature
+        -- with no legal announcement undeclarable, since every target it could
+        -- have been given fails here.
+        && all (uncurry (attackTargetAllowed barred)) (Map.toList chosen)
         && attackDeclarationAllowed limit alone (Map.keysSet chosen)
-        && obeysAttackRequirements (attackCeilingGiven limit alone candidates gs) chosen
+        && obeysAttackRequirements (attackCeilingGiven limit alone barred candidates gs) chosen
 
 -- A declaration that is always legal: one attaining CR 508.1d's maximum, which
 -- with no requirement in force is the empty one (declining to attack). CR 508.1's
@@ -1272,7 +1321,19 @@ declareAttackers pid = do
 attemptAttackDeclaration :: PlayerId -> Set (Map ObjectId AttackTarget.AttackTarget) -> Game ()
 attemptAttackDeclaration pid rejected = do
   gs <- State.get
-  let candidates = legalAttackers pid gs
+  let legal = legalAttackers pid gs
+      -- CR 508.1c's aimed-at restriction, gathered ONCE for the whole pass and
+      -- over the WIDER list, so the narrowing below and the ceiling read one set.
+      barred = barredAttacks legal gs
+      -- CR 508.1b's announcements this creature may actually make. Every one
+      -- being forbidden is a creature in no legal declaration at all, so it is
+      -- off the candidate list -- legalAttackers' posture for the per-creature
+      -- restrictions, one step later because the pair needs an announcement to
+      -- be about. legalAttackDeclarationGiven refuses the same declaration
+      -- through its announcement conjunct rather than through its candidate
+      -- test, so the two agree without sharing this filter.
+      announceableFor oid = filter (attackTargetAllowed barred oid) (declarableTargets gs)
+      candidates = filter (not . null . announceableFor) legal
   -- CR 508.1b / CR 802.3's candidates -- every defending player's own seat,
   -- planeswalkers and battles -- taken ONCE and from the state the declaration
   -- is judged against. Empty is a combat with no defending player, which
@@ -1295,13 +1356,19 @@ attemptAttackDeclaration pid rejected = do
     -- The price is that a creature the CR 508.1d degradation below then drops
     -- was asked about; only an interpreter that repeats a rewound declaration
     -- reaches that path.
-    announced <- Monad.mapM (\oid -> fmap ((,) oid) (announceAttackTarget pid oid targets)) offered
+    --
+    -- The options are this creature's own, not the whole list: CR 508.1c's
+    -- aimed-at restriction is asked BEFORE the announcement, so a forbidden
+    -- player is never offered. `targets` is the fallback the list cannot need --
+    -- `offered` is filtered to `candidates`, each of which has at least one
+    -- announcement -- and is what keeps this total.
+    announced <- Monad.mapM (\oid -> fmap ((,) oid) (announceAttackTarget pid oid (Maybe.fromMaybe targets (NonEmpty.nonEmpty (announceableFor oid))))) offered
     let -- CR 508.1c's set-shaped restrictions and CR 508.1d's maximization,
         -- taken ONCE for all three questions below, so the ceiling and the
         -- check beside it cannot judge different boards.
         alone = CombatRestriction.cantAttackAlone candidates gs
         limit = CombatRestriction.attackLimit gs
-        bound = attackCeilingGiven limit alone candidates gs
+        bound = attackCeilingGiven limit alone barred candidates gs
         -- CR 508.1a-d's declaration, announcements included, as a map -- the
         -- key `rejected` is taken on, since it is the declaration the preamble
         -- rewinds rather than the interpreter's raw answer.

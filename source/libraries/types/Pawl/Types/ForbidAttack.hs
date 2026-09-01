@@ -17,7 +17,9 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- names the permanents it covers once, at resolution.
 --
 -- Not implemented: the PAIRWISE shape, a restriction naming what the attack is
--- aimed at, "can't attack you or planeswalkers you control" (#1686).
+-- aimed at, "creatures can't attack you this turn". The printed carrier has it
+-- (Pawl.Types.CantAttackPlayer); a stored one would have to reach
+-- Pawl.Engine.Combat.attackTargetAllowed's pair set (#2892).
 data ForbidAttack = MkForbidAttack
   { duration :: Duration.Duration,
     ref :: ObjectRef.ObjectRef

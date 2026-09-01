@@ -179,6 +179,8 @@ library codec
     Pawl.Codec.BlocksDeclaredSpec
     Pawl.Codec.CandidateId
     Pawl.Codec.CandidateIdSpec
+    Pawl.Codec.CantAttackPlayer
+    Pawl.Codec.CantAttackPlayerSpec
     Pawl.Codec.CantBeBlockedBy
     Pawl.Codec.CantBeBlockedBySpec
     Pawl.Codec.CantBeRegenerated
@@ -1360,6 +1362,7 @@ library types
     Pawl.Types.BlocksDeclared
     Pawl.Types.CandidateCost
     Pawl.Types.CandidateId
+    Pawl.Types.CantAttackPlayer
     Pawl.Types.CantBeBlockedBy
     Pawl.Types.CantBeRegenerated
     Pawl.Types.Card

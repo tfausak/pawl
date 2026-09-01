@@ -1,6 +1,7 @@
 module Pawl.Types.CombatRestriction where
 
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
+import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.LimitUnless as LimitUnless
 
@@ -23,9 +24,10 @@ import qualified Pawl.Types.LimitUnless as LimitUnless
 -- object, and the two requirement carriers collapse opposite ones -- a blocking
 -- requirement carries the attacker to be blocked and no subject, an attacking
 -- requirement carries the subject and no object. A restriction names its SUBJECT
--- on every arm that names anything, and only CantBeBlockedBy also names an
--- object: Pacifism's two halves are the same Affected twice, so the only thing
--- distinguishing THOSE TWO is which declaration they forbid. Splitting them
+-- on every arm that names anything, and the two PAIRWISE arms -- CantBeBlockedBy
+-- and CantAttackPlayer -- also name an object: Pacifism's two halves are the same
+-- Affected twice, so the only thing distinguishing THOSE TWO is which declaration
+-- they forbid. Splitting them
 -- would copy the requirements' shape without the reason for it. What tells the
 -- later arms from the first is not the declaration -- CantAttackAlone and
 -- CantAttackMoreThan both forbid an attack -- but the shape, which is the next
@@ -53,12 +55,22 @@ import qualified Pawl.Types.LimitUnless as LimitUnless
 -- subtracts nothing from CR 508.1a's or CR 509.1a's candidate list: every
 -- creature stays a legal candidate and it is the DECLARATION that is refused.
 --
--- The FOURTH shape is answered about a PAIR, which is CantBeBlockedBy: it names
--- attackers and describes the blockers that may not block them, so no set of
--- creatures on either side is the answer, and CR 509.1b's own Example is a
--- pairwise board. It is the shape that rule's second paragraph is about, though
--- not always its evasion ABILITY: that paragraph's definition wants the ability
--- on the attacking creature, and CR 701.54c's is on an emblem.
+-- The FOURTH shape is answered about a PAIR, and TWO arms take it -- one per
+-- declaration. CantBeBlockedBy is CR 509.1b's: it names attackers and describes
+-- the blockers that may not block them, so no set of creatures on either side is
+-- the answer, and CR 509.1b's own Example is a pairwise board. It is the shape
+-- that rule's second paragraph is about, though not always its evasion ABILITY:
+-- that paragraph's definition wants the ability on the attacking creature, and
+-- CR 701.54c's is on an emblem.
+--
+-- CantAttackPlayer is the attacking one, Blazing Archon's "creatures can't
+-- attack you": the pair is a creature and the PLAYER it may not be announced
+-- against (CR 508.1b), so the second half is a Pawl.Types.PlayerScope rather
+-- than a Filter over creatures. CR 802.3a is the rule that says such a
+-- restriction applies only to the creatures attacking that player, and it is not
+-- a multiplayer rule in disguise: at two seats a planeswalker its controller
+-- controls is a second announcement, so "can't attack you" and "can't attack"
+-- already come apart.
 --
 -- A restriction a player may PAY THROUGH is one of CR 508.1c's all the same
 -- (Ghostly Prison), but it rides Pawl.Types.AttackCost, the SIXTH carrier. The
@@ -76,11 +88,11 @@ import qualified Pawl.Types.LimitUnless as LimitUnless
 -- through Pawl.Types.Filter.ControlledByDefendingPlayer, and
 -- Pawl.Engine.CombatRestriction.inForce is what supplies CR 508.5's answer.
 --
--- NOT IMPLEMENTED: an attacking restriction naming WHAT the attack is aimed at
--- (Blazing Archon, "creatures can't attack you"), which is CR 508.1b's
--- per-creature announcement rather than a condition (#1686). The blocking side's
--- object is CantBeBlockedBy, whose own comment says why a keyword on the
--- attacker could not have carried CR 701.54c's clause.
+-- The aimed-at axis is CantAttackPlayer's and not the condition's: CR 508.1b's
+-- per-creature announcement is what a "can't attack you" names, where the
+-- condition below is a predicate over game state that cannot see an announcement
+-- at all. Not implemented: naming a planeswalker or a battle rather than a
+-- player (#2891).
 --
 -- Open-half card data, classified rather than identified:
 -- Pawl.Engine.CombatRestriction is the only module that may case on it. Casing
@@ -105,8 +117,8 @@ import qualified Pawl.Types.LimitUnless as LimitUnless
 --
 -- The LAST field of each arm is that gate: the condition the creature can't
 -- attack (or block) UNLESS -- Blind-Spot Giant's "unless you control another
--- Giant". On CantBeBlockedBy and on CantAttackMoreThan it gates the whole
--- sentence rather than a creature, which is the same clause CR 508.1c describes
+-- Giant". On CantBeBlockedBy, on CantAttackPlayer and on CantAttackMoreThan it
+-- gates the whole sentence rather than a creature, which is the same clause CR 508.1c describes
 -- and the same posture CantAttackAlone's gate is in. Relic Runner prints the
 -- first ("can't be blocked if you've cast a historic spell this turn", carried
 -- here as the unless of that condition's negation); the bound's gate and
@@ -167,6 +179,23 @@ data CombatRestriction
     -- against is the blocked creature's, not the emblem's -- CR 114.3 leaves an
     -- emblem no power at all. See Pawl.Engine.CombatRestriction.cantBeBlockedBy.
     CantBeBlockedBy CantBeBlockedBy.CantBeBlockedBy
+  | -- | CR 508.1c through CR 802.3a: these creatures can't attack the players the
+    -- scope names, unless the gate holds. Blazing Archon's "creatures can't
+    -- attack you" is the pool's printing.
+    --
+    -- The attacking side's PAIRWISE arm: what it forbids is an ANNOUNCEMENT (CR
+    -- 508.1b), so neither a set of creatures nor a set of players is an answer
+    -- and the two sides cannot be split into two restrictions. A creature every
+    -- announcement of which is forbidden can't attack at all, which is that pair
+    -- set read over CR 508.1b's whole candidate list rather than a second arm.
+    --
+    -- Not CantAttack with a Condition, for CantAttackAlone's reason: a Condition
+    -- is a predicate over game STATE, and which player a creature is being
+    -- announced against is not game state at CR 508.1c time. The condition axis
+    -- that DOES exist -- Filter.ControlledByDefendingPlayer, Armored Galleon --
+    -- narrows which CREATURES a restriction reaches and says nothing about what
+    -- they may be announced against.
+    CantAttackPlayer CantAttackPlayer.CantAttackPlayer
   | -- | CR 508.1c together with CR 506.5: these creatures can't be the ONLY
     -- creature declared as an attacker, unless the gate holds. Bonded Construct
     -- ("This creature can't attack alone") is the pool's printing, and CR
