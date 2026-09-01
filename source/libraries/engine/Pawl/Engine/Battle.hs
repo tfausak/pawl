@@ -67,6 +67,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -110,6 +111,18 @@ isBattle = Set.member CardType.Battle . PC.cardTypes
 -- while an attack stands moves the defending player with it (CR 310.9d).
 protectorOf :: ObjectId.ObjectId -> GameState -> Maybe PlayerId.PlayerId
 protectorOf oid gs = Object.protector =<< Game.lookupObject oid gs
+
+-- CR 608.2h for the same designation: who protected a battle that no longer
+-- exists. CR 508.5's second sentence is the one caller -- a creature goes on
+-- attacking a battle CR 506.4 removed from combat, and "the protector of the
+-- battle that creature was attacking" then has no live object to read
+-- (Pawl.Engine.Defender.playerOf's battle arm).
+--
+-- Reads GameState.lastKnown alone, so it answers only where protectorOf cannot:
+-- Pawl.Engine.Projection.lastKnownOf's guard is the same membership test read the
+-- other way round, and this module sits below that one.
+lastKnownProtectorOf :: ObjectId.ObjectId -> GameState -> Maybe PlayerId.PlayerId
+lastKnownProtectorOf oid gs = LastKnown.protector =<< Map.lookup oid (GameState.lastKnown gs)
 
 -- CR 310.5 / CR 704.5x: is any attacking creature currently attacking this battle?
 --

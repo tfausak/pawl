@@ -250,6 +250,9 @@ objectsLeaveWith pid gs =
                 (Object.attachedTo obj)
                 (Object.chosenNames obj)
                 (Game.isBlocking oid gs)
+                -- CR 310.9a, read straight off the object like the owner above:
+                -- Nothing for everything that is not a battle.
+                (Object.protector obj)
             )
       -- CR 603.6c's second trigger event: "when a phased-in permanent leaves the
       -- game because its owner leaves the game". Only those, which is CR 702.26k

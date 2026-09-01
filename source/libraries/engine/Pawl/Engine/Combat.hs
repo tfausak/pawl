@@ -241,8 +241,10 @@ attackTargetKind target = case target of
 -- An attacker whose target names NO defending player is offered to every one of
 -- them rather than to none, which keeps CR 506.4c's creature -- still attacking,
 -- attacking nothing -- blockable exactly as it was before this list narrowed.
--- Not implemented: narrowing that creature to the one player CR 802.2a says it
--- is still attacking, which needs the per-attacker record #2841 describes.
+-- Not implemented: whom such a creature may be blocked by at all. CR 509.1a and
+-- CR 802.4a both name only a creature attacking that player, a planeswalker they
+-- control or a battle they protect, and a creature attacking nothing is none of
+-- the three -- against CR 506.4c's own "It may be blocked" (#2899).
 attackersOn :: PlayerId -> GameState -> [ObjectId]
 attackersOn pid gs =
   let recorded = Combat.attackers (GameState.combat gs)

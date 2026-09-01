@@ -280,13 +280,17 @@ damageEvent gs kind source target amount =
 -- attacking that player" -- so Combat.attackers still names the planeswalker and
 -- CR 506.4c's record is untouched.
 --
--- The defending player is read off the combat's designation
--- (Defender.defendingPlayers) and not re-derived from the planeswalker, which is
--- gone -- CR 508.5's second sentence. Not implemented: CR 802.2a's answer where
--- several players defend, this taking the first of them rather than the seat
--- that controlled the planeswalker (#2841). Exact while one player defends, an
--- attack on a planeswalker being declared against that player's own
--- planeswalkers (CR 508.1b).
+-- The defending player is Defender.playerOf's answer for the very target the
+-- attacker is still recorded against, and never the head of
+-- Defender.defendingPlayers: CR 802.2a resolves "a defending player" per
+-- attacking creature from what that creature is attacking, which at three or more
+-- seats is a different player from the group's first. CR 508.5's second sentence
+-- is why it is still answerable once the planeswalker is gone -- the controller
+-- lookup is Projection.controllerWithLastKnown, CR 608.2h's last known
+-- information, the same reader attackerAssignment's `defending` passes so the CR
+-- 702.19c threshold map and this recipient cannot name different seats.
+-- Pawl.CombatEffectSpec's "CR 802.2a the removed planeswalker's trampler drains
+-- ITS controller" is the three-seat board that proves it.
 --
 -- Read at ASSIGNMENT and at every place assignment can name a recipient (the
 -- unblocked/trample-through event and the CR 702.19b threshold map the prompt
@@ -314,7 +318,7 @@ combatRecipient gs attacker target =
             Combat.stillAttacked oid gs ->
               Just (Recipient.ToPlaneswalker oid)
           | Projection.hasKeyword Keyword.TrampleOverPlaneswalkers attacker gs ->
-              stillPlaying =<< Maybe.listToMaybe (Defender.defendingPlayers gs)
+              stillPlaying =<< Defender.playerOf Projection.controllerWithLastKnown target gs
           | otherwise -> Nothing
         -- CR 310.5 / 506.4, the planeswalker arm's twin: a battle that has left the
         -- battlefield is removed from combat and stops being attacked, so CR 510.1b

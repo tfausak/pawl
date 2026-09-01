@@ -16,7 +16,7 @@ import qualified Pawl.Types.Source as Source
 -- as the object ceases, from the same pre-move state the GameEvent.Moved
 -- snapshot is taken against.
 --
--- Nine things rather than the characteristics alone, because the other eight
+-- Ten things rather than the characteristics alone, because the other nine
 -- questions CR 608.2h is asked have no home in that fold. Control is not a
 -- characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
 -- asks of a triggered ability whose source is gone. Neither is the object's
@@ -31,9 +31,10 @@ import qualified Pawl.Types.Source as Source
 -- CHOSEN NAMES, the sixth, for the reason its own field gives. Nor is the
 -- OWNER, the seventh -- CR 109.3's list has no owner either -- for the reason
 -- its own field gives. Nor is the COMBAT STATUS, the eighth, for the reason its
--- own field gives.
+-- own field gives. Nor is the PROTECTOR, the ninth, for the reason its own field
+-- gives.
 --
--- All nine fields STRICT (!): entries are keyed by an id that no longer exists
+-- All ten fields STRICT (!): entries are keyed by an id that no longer exists
 -- and are never pruned, so an unforced field would be a thunk retaining the whole
 -- pre-move GameState for the rest of the game.
 data LastKnown = MkLastKnown
@@ -127,6 +128,18 @@ data LastKnown = MkLastKnown
     --
     -- A Bool rather than the attackers this creature was blocking, because that
     -- is the whole of what the view reports and all any clause in the pool asks.
-    blocking :: !Bool
+    blocking :: !Bool,
+    -- | CR 310.9a: which player protected it as it left -- the same
+    -- Object.protector the live object carried, and Nothing for everything that
+    -- is not a battle.
+    --
+    -- Not a characteristic either (CR 109.3's list has no protector), and not
+    -- recoverable from anything above: CR 506.4 removes a departed battle from
+    -- combat while CR 506.4c keeps its attacker attacking it, and CR 508.5's
+    -- second sentence then asks for "the protector of the battle that creature
+    -- was attacking before it was removed from combat" -- a question with no live
+    -- object left to read. Pawl.Engine.Battle.lastKnownProtectorOf is the reader,
+    -- through Pawl.Engine.Defender.playerOf's battle arm.
+    protector :: !(Maybe PlayerId.PlayerId)
   }
   deriving (Eq, Ord, Show)
