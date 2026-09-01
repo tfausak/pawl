@@ -5188,8 +5188,8 @@ abilitiesFromCharacteristics peers pc oid gs =
 --
 -- The ZONE is the one the object is in, and CR 113.6b is what it answers: a
 -- printed row naming some other zone is not gathered here. The two callers pass
--- the two zones CR 113.6 gives a DEFAULT to -- the battlefield and, for an
--- emblem, the command zone -- which is why the gate is functionsFromZoneOfRow
+-- the two zones CR 113.6 gives a DEFAULT to -- the battlefield and, for the
+-- objects CR 113.6p names, the command zone -- which is why the gate is functionsFromZoneOfRow
 -- rather than the bare stated set replacementsAffecting's other walks take. The
 -- MINTED rows below take no such gate: each is minted by a rule for the object
 -- it is on rather than printed on a face, so none of them can state a zone.
@@ -5341,8 +5341,9 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 --
 -- The rule's FROM-ZONE is not in the pattern -- Pawl.Types.ZoneChangePattern has
 -- no such field -- and does not need to be: replacementsAffecting projects
--- battlefield permanents and the command zone's emblems, and CR 122.1h mints
--- this row from counters on a PERMANENT, which CR 114.5 says an emblem is not --
+-- battlefield permanents and the command zone's CR 113.6p objects, and CR 122.1h
+-- mints this row from counters on a PERMANENT, which CR 114.5 says an emblem is
+-- not and CR 313.2 says a vanguard card is not --
 -- so a row minted here can only ever be a candidate while its source is on the
 -- battlefield, which is exactly "from the battlefield". The four walks that
 -- reach the other zones cannot carry it: CR 113.6b gathers PRINTED rows and this
@@ -5469,7 +5470,7 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
     <> Saga.entryReplacementsOf pc
 
 -- CR 614.1: every replacement effect active on the battlefield -- plus the
--- emblems CR 113.6p keeps working in the command zone, see the walk -- PAIRED
+-- emblems and vanguard cards CR 113.6p keeps working in the command zone, see the walk -- PAIRED
 -- WITH ITS SOURCE, since a ControllerRelation pattern (CR 109.5's "you") is
 -- unanswerable without it. Short-circuits when nothing in either place has one.
 --
@@ -5640,8 +5641,9 @@ storedWrites p gs = any (p . ContinuousEffect.modification) (GameState.continuou
 -- Does any static ability functioning from a zone OTHER than the battlefield
 -- write a modification satisfying `p`? storedWrites' sibling disjunct in both
 -- gates, and the other half of what a walk of the permanents cannot reach: an
--- emblem's abilities function in the command zone and an emblem is neither a
--- card nor a permanent (CR 114.4 / 114.5, the arm CR 113.6p names), and CR
+-- emblem's or a vanguard card's abilities function in the command zone, where an
+-- emblem is neither a card nor a permanent and a vanguard card is not a permanent
+-- either (CR 114.4 / 114.5 / 902.7 / 313.2, the arm CR 113.6p names), and CR
 -- 113.6b / 113.6f put a card's abilities to work from the stack, a graveyard, a
 -- hand or a library.
 --

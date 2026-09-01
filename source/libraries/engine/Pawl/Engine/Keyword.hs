@@ -1551,7 +1551,7 @@ mintedReplacementsFor keyword count = case keyword of
 -- The SHORT-CIRCUIT's voice: Projection.replacementsAffecting skips the whole
 -- board when nothing it walks -- the permanents' COPIABLE rules text, the stored
 -- continuous effects, the static abilities functioning from the other zones, and
--- the command zone's emblems' own printed rows -- could hold a replacement
+-- the command zone's emblems' and vanguard cards' own printed rows -- could hold a replacement
 -- effect, and a minted row is not printed in a face's list, so the gate has to
 -- be told which keywords mint one. Membership rather than a count, the gate asking whether
 -- there is any.
