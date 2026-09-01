@@ -19,6 +19,7 @@ import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
+import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.BeginningStep as BeginningStep
@@ -42,6 +43,7 @@ import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
@@ -64,6 +66,7 @@ import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.InZone as InZone
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
@@ -104,6 +107,7 @@ import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
@@ -208,6 +212,9 @@ abilitiesFor keyword count = case keyword of
   Keyword.Fabricate n -> List.genericReplicate count (fabricate n)
   Keyword.Provoke -> List.genericReplicate count provoke
   Keyword.Rampage n -> List.genericReplicate count (rampage n)
+  -- CR 702.24b: each instance triggers separately, and each counts the one
+  -- pile of age counters.
+  Keyword.CumulativeUpkeep cost -> List.genericReplicate count (cumulativeUpkeep cost)
   Keyword.Compleated -> []
   Keyword.ReadAhead -> []
   Keyword.Training -> List.genericReplicate count training
@@ -373,6 +380,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Skulk -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
+  Keyword.CumulativeUpkeep _ -> []
   Keyword.Riot -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
@@ -585,6 +593,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Skulk -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
+  Keyword.CumulativeUpkeep _ -> []
   Keyword.Riot -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
@@ -934,6 +943,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Skulk -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
+  Keyword.CumulativeUpkeep _ -> []
   Keyword.Riot -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
@@ -1493,6 +1503,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Skulk -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
+  Keyword.CumulativeUpkeep _ -> []
   -- CR 702.145b's FIRST static ability: "if it is night and this permanent is
   -- represented by a double-faced card, it enters transformed". Filter.IsSource
   -- for riot's reason, CR 614.1d's "[this permanent] enters" being the entering
@@ -1673,6 +1684,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Skulk -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
+  Keyword.CumulativeUpkeep _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   -- CR 702.147a's static half: "This creature can't block." Unleash's row with the
@@ -1829,6 +1841,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Skulk -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
+  Keyword.CumulativeUpkeep _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
@@ -1932,6 +1945,7 @@ familyOf keyword = case keyword of
   Keyword.Crew _ -> Just KeywordFamily.Crew
   Keyword.Fabricate _ -> Just KeywordFamily.Fabricate
   Keyword.Rampage _ -> Just KeywordFamily.Rampage
+  Keyword.CumulativeUpkeep _ -> Just KeywordFamily.CumulativeUpkeep
   Keyword.Afflict _ -> Just KeywordFamily.Afflict
   Keyword.Toxic _ -> Just KeywordFamily.Toxic
   Keyword.Disguise _ -> Just KeywordFamily.Disguise
@@ -2547,6 +2561,7 @@ ward cost =
           PayGate.cost = cost,
           PayGate.branch = PayBranch.IfNotPaid,
           PayGate.obligation = PayObligation.Optional,
+          PayGate.perCounter = Nothing,
           PayGate.offeredAt = Nothing
         }
     effect = Effect.Counter (Counter.MkCounter (ObjectRef.InSlot Binding.targetingObject) Nothing)
@@ -2925,6 +2940,7 @@ fabricate n =
           -- Optional because rule 702.123a prints the "may" itself; no offeredAt,
           -- one clause making its own offer.
           PayGate.obligation = PayObligation.Optional,
+          PayGate.perCounter = Nothing,
           PayGate.offeredAt = Nothing
         }
     spawn =
@@ -3258,6 +3274,77 @@ fading =
         Optionality.Mandatory
         Nothing
         (Seq.singleton (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Fade (Quantity.Literal 1) Binding.triggerSource)))
+
+-- CR 702.24a's whole ability: "At the beginning of your upkeep, if this
+-- permanent is on the battlefield, put an age counter on this permanent. Then
+-- you may pay [cost] for each age counter on it. If you don't, sacrifice it."
+--
+-- TurnScope.ControllersTurn is rule 702.24a's "YOUR upkeep" (CR 603.3a),
+-- vanishingUpkeep's scope.
+--
+-- THE INTERVENING "IF" is rule 702.24a's own, and vanishingUpkeep's shape one
+-- question over: the rule prints "if", so CR 603.4 keeps the ability off the
+-- stack when the permanent has already gone and re-checks at resolution, which
+-- is what stops a permanent removed in response from being offered the cost.
+-- Written as a count of the battlefield keeping Filter.IsSource, there being no
+-- Pawl.Types.Condition atom that asks a zone of the source directly.
+--
+-- TWO CLAUSES in printed order, and the order is load-bearing the way fading's
+-- inversion is: a clause's riders are read as the clause is REACHED (CR 608.2c),
+-- so the payment below already counts the counter this resolution just added.
+--
+-- CR 118.12a's rewriting puts the sacrifice on the IfNotPaid branch of an
+-- Optional offer -- ward's shape -- with rule 702.24a's "for each age counter on
+-- it" riding PayGate.perCounter, which multiplies the offered cost by the pile.
+-- Rule 702.24a's "either the entire set of costs is paid, or none of them is
+-- paid" is that one multiplied cost rather than a run of offers.
+--
+-- Effect.Sacrifice, never Destroy: CR 701.21a says a sacrifice is not a
+-- destruction, so an indestructible permanent still goes.
+cumulativeUpkeep :: Cost Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+cumulativeUpkeep cost =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn),
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.fromList [ageClause, upkeepClause]) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Just onBattlefield,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
+    }
+  where
+    onBattlefield =
+      Condition.Compares
+        ( Compares.MkCompares
+            (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) Filter.IsSource Aggregation.Members))
+            Comparison.AtLeast
+            (Quantity.Literal 1)
+        )
+    ageClause =
+      Clause.MkClause
+        Nothing
+        Nothing
+        Nothing
+        Optionality.Mandatory
+        Nothing
+        (Seq.singleton (Effect.PutCounters (PutCounters.MkPutCounters CounterKind.Age (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))))
+    upkeepClause =
+      Clause.MkClause
+        Nothing
+        Nothing
+        Nothing
+        Optionality.Mandatory
+        (Just gate)
+        (Seq.singleton (Effect.Sacrifice Binding.triggerSource))
+    gate =
+      PayGate.MkPayGate
+        { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
+          PayGate.cost = cost,
+          PayGate.branch = PayBranch.IfNotPaid,
+          PayGate.obligation = PayObligation.Optional,
+          PayGate.perCounter = Just CounterKind.Age,
+          PayGate.offeredAt = Nothing
+        }
 
 -- CR 702.43a's SECOND ability: "when this permanent is put into a graveyard from
 -- the battlefield, you may put a +1/+1 counter on target artifact creature for

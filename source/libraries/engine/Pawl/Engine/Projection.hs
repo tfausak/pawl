@@ -2854,6 +2854,7 @@ rewritePayGate pairs gate =
       PayGate.cost = Filter.rewriteCost pairs (PayGate.cost gate),
       PayGate.branch = PayGate.branch gate,
       PayGate.obligation = PayGate.obligation gate,
+      PayGate.perCounter = fmap (Filter.rewriteCounterKind pairs) (PayGate.perCounter gate),
       PayGate.offeredAt = PayGate.offeredAt gate
     }
 
@@ -3930,6 +3931,7 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               CounterKind.Defense -> []
               -- Nor a time counter (CR 702.63a).
               CounterKind.Time -> []
+              CounterKind.Age -> []
               -- Nor a fade counter (CR 702.32a).
               CounterKind.Fade -> []
               -- CR 122.1j: emitted by `honed` above rather than here, because

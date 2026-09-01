@@ -3186,6 +3186,7 @@ canHostSubjects predicate = case predicate of
     CounterKind.Defense -> 0
     CounterKind.Time -> 0
     CounterKind.Fade -> 0
+    CounterKind.Age -> 0
     CounterKind.Shield -> 0
     CounterKind.Finality -> 0
     CounterKind.Stun -> 0
@@ -3328,6 +3329,7 @@ counterKindFilters kind = case kind of
   CounterKind.Defense -> []
   CounterKind.Time -> []
   CounterKind.Fade -> []
+  CounterKind.Age -> []
   CounterKind.Shield -> []
   CounterKind.Finality -> []
   CounterKind.Stun -> []
@@ -3404,6 +3406,8 @@ keywordFilters keyword = keywordFramed $ case keyword of
   -- CR 702.67a's payload is equip's, and so is this: the "target land you
   -- control" filter its minted ability carries is the ENGINE's, never a card's.
   Keyword.Fortify cost -> costFilters cost
+  -- CR 702.24a carries a whole Cost, so a Filter inside it is the card's.
+  Keyword.CumulativeUpkeep cost -> costFilters cost
   Keyword.FirstStrike -> []
   -- CR 702.8a: flash is a static ability with no payload -- it changes WHEN the
   -- card may be cast, and names nothing to filter.
@@ -8140,7 +8144,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                   )
                   (ModeSelection.ChooseExactly 1)
             }
-        payerFace ref = clauseFace (Just (PayGate.MkPayGate ref (Cost.Type.MkCost Nothing []) PayBranch.IfNotPaid PayObligation.Optional Nothing)) Optionality.Mandatory
+        payerFace ref = clauseFace (Just (PayGate.MkPayGate ref (Cost.Type.MkCost Nothing []) PayBranch.IfNotPaid PayObligation.Optional Nothing Nothing)) Optionality.Mandatory
         askerFace ref = clauseFace Nothing (Optionality.Optional ref)
         -- CR 111.1's token, whose OWN printed text carries that same predicate:
         -- Face.enchant is a Filter position cardFilters walks, so effectFilters

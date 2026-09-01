@@ -41,9 +41,11 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryR as EntryR
@@ -54,6 +56,8 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Modification as Modification
@@ -61,6 +65,7 @@ import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -3932,6 +3937,116 @@ fadingSpec s registry =
             (Keyword.mintedReplacementsFor (Keyword.Type.Fading 2) 2)
             (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.Fade (Quantity.Type.Literal 2))))))
 
+-- Rule 702.24a's "you MAY pay" answered yes for one seat -- ZoneTriggerSpec's
+-- helper of the same name, duplicated rather than hoisted. S.identityAnswer
+-- declines every CR 118.12 offer, and everything else falls through to it,
+-- including the mana window the payment opens.
+paysFor :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+paysFor who p = case p of
+  Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
+    | d == who && player == who ->
+        PaymentDecision.Pays
+  _ -> S.identityAnswer p
+
+-- CR 702.24 cumulative upkeep, the first keyword whose CR 118.12 payment is not
+-- the cost the card prints: rule 702.24a's "you may pay [cost] for each age
+-- counter on it" multiplies the printed cost by a pile that grows an upkeep at a
+-- time, which is what Pawl.Types.PayGate.perCounter carries.
+--
+-- Revered Unicorn {1}{W} Creature -- Unicorn 2/3, "Cumulative upkeep {1}" and
+-- "When this creature leaves the battlefield, you gain life equal to the number
+-- of age counters on it". The second ability is why this printing and not a
+-- keyword-only one: it reads the pile from OUTSIDE the keyword, so a life total
+-- witnesses the count without asking Object.counters, and CR 608.2h answers it --
+-- the Unicorn is in a graveyard by the time that trigger resolves.
+--
+-- SEEDED with two age counters against a board that has had none, modularSpec's
+-- device: with an unseeded pile every number below would equal the number of
+-- upkeeps run, and an engine reading the wrong one would still be green.
+cumulativeUpkeepSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cumulativeUpkeepSpec s registry =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      -- vanishingSpec's, and the same reasons: one upkeep for `pid`, run to the
+      -- end of the priority loop so the trigger is gathered (CR 603.3) and
+      -- resolved. NO UNTAP STEP, deliberately: rule 702.24a's costs are meant to
+      -- outrun the board, and a fixture that untapped between upkeeps would give
+      -- alice the same five lands twice.
+      steppedTo pid gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep pid)) (gs {GameState.phase = upkeep, GameState.activePlayer = pid})
+      upkeepOf pid gs =
+        let settled = snd (Engine.runGamePure (paysFor S.alice) (steppedTo pid gs) Engine.settleForPriority)
+         in (settled, snd (Engine.runGamePure (paysFor S.alice) settled Engine.priorityLoop))
+      after pid gs = snd (upkeepOf pid gs)
+      -- The same upkeep with rule 702.24a's "may" answered no, S.identityAnswer
+      -- declining every CR 118.12 offer. Two helpers rather than one taking the
+      -- answerer, since Pawl.Engine.Engine.runGamePure wants a polymorphic one.
+      afterDeclining pid gs =
+        let settled = snd (Engine.runGamePure S.identityAnswer (steppedTo pid gs) Engine.settleForPriority)
+         in snd (Engine.runGamePure S.identityAnswer settled Engine.priorityLoop)
+      ages = S.counterOf CounterKind.Age
+      -- Five Forests and a two-counter head start, which is the smallest board
+      -- that tells rule 702.24a's multiplied cost from the printed {1}: the first
+      -- upkeep asks {3} and the second {4}, and five lands cannot cover both.
+      -- An engine offering {1} each time would pay every upkeep out of one land.
+      boardOf = do
+        forest <- S.printingOf s registry "Forest"
+        unicorn <- S.printingOf s registry "Revered Unicorn"
+        let (oid, placed) = S.addCreature unicorn S.alice (S.landsFor forest S.alice 5 (Setup.emptyGame S.bothPlayers))
+        pure (oid, S.addCounter CounterKind.Age 2 oid placed)
+   in Spec.describe s "Cumulative upkeep" $ do
+        -- The proving test. Every assertion is board state a player could see --
+        -- lands spent, the permanent's zone, a life total -- and none of them
+        -- reads the keyword back.
+        Spec.it s "CR 702.24a the cost grows with the pile until the board can't cover it" $ do
+          (oid, gs) <- boardOf
+          Spec.assertEqWith s "the head start is really on it" (ages oid gs) 2
+          Spec.assertEqWith s "and nothing is tapped yet" (S.tappedCount S.alice gs) 0
+          let first = after S.alice gs
+          -- The behaviour, ahead of every proxy: three Forests went for one
+          -- upkeep of a permanent whose printed cost is {1}.
+          Spec.assertEqWith s "CR 702.24a the first upkeep cost THREE mana, not one" (S.tappedCount S.alice first) 3
+          Spec.assertBool s (S.onBattlefield oid first) "so the Unicorn survived it"
+          Spec.assertEqWith s "on a third age counter" (ages oid first) 3
+          Spec.assertEqWith s "and alice has gained nothing" (S.lifeOf S.alice first) (Just 20)
+          let second = after S.alice first
+          -- CR 118.3: two untapped Forests cannot pay {4}, so the offer is never
+          -- made and rule 702.24a's "if you don't" runs.
+          Spec.assertBool s (not (S.onBattlefield oid second)) "CR 702.24a the second upkeep asked {4} of two lands, so it was sacrificed"
+          -- CR 701.21a: a sacrifice is a move to the OWNER's graveyard.
+          Spec.assertEqWith s "into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice second)) 1
+          -- The pile read from outside the keyword, through CR 608.2h.
+          Spec.assertEqWith s "and its leaves-play trigger gained FOUR life, the pile it died on" (S.lifeOf S.alice second) (Just 24)
+        -- The same board and the same upkeep, differing in NOTHING but the answer
+        -- to rule 702.24a's "may". The five Forests can cover {3}, so this leg
+        -- separates declining from being unable to pay.
+        Spec.it s "CR 702.24a declining the payment sacrifices it with the mana still up" $ do
+          (oid, gs) <- boardOf
+          let first = afterDeclining S.alice gs
+          Spec.assertEqWith s "CR 702.24a no Forest was spent" (S.tappedCount S.alice first) 0
+          Spec.assertBool s (not (S.onBattlefield oid first)) "and the Unicorn went anyway"
+          Spec.assertEqWith s "gaining three life, the pile after this upkeep's counter" (S.lifeOf S.alice first) (Just 23)
+        -- Rule 702.24a says "YOUR upkeep", which is TurnScope.ControllersTurn: an
+        -- arm reading EachTurn would age the Unicorn on bob's upkeep too.
+        Spec.it s "CR 702.24a bob's upkeep ages nothing" $ do
+          (oid, gs) <- boardOf
+          let (settled, resolved) = upkeepOf S.bob gs
+          Spec.assertEqWith s "nothing was even put on the stack" (GameState.stack settled) []
+          Spec.assertEqWith s "so the pile is untouched" (ages oid resolved) 2
+          Spec.assertEqWith s "no mana was spent" (S.tappedCount S.alice resolved) 0
+          Spec.assertBool s (S.onBattlefield oid resolved) "and the Unicorn is untouched"
+        -- The mint, spelled out for vanishingSpec's reason. Rule 702.24b states
+        -- the multiplicity clause explicitly -- "if a permanent has multiple
+        -- instances of cumulative upkeep, each triggers separately" -- and rule
+        -- 702.24b's second sentence is why both instances still read one pile:
+        -- the counters belong to the permanent, not to an ability.
+        Spec.it s "CR 702.24b each instance is its own ability over one pile" $ do
+          let cost n = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []
+          Spec.assertEqWith
+            s
+            "cumulative upkeep {1} held twice mints two upkeep triggers"
+            (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.CumulativeUpkeep (cost 1)) 2))
+            [Keyword.cumulativeUpkeep (cost 1), Keyword.cumulativeUpkeep (cost 1)]
+          Spec.assertBool s (Keyword.cumulativeUpkeep (cost 1) /= Keyword.cumulativeUpkeep (cost 2)) "and the cost reaches the minted ability"
+
 -- CR 702.43 modular, whose rule text also spans BOTH of
 -- Pawl.Engine.Keyword's mints -- one CR 614.1c entry replacement and one death
 -- trigger. What is new is the trigger's PAYLOAD: rule 702.43a
@@ -5021,6 +5136,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   vanishingSpec s registry
   numberlessVanishingSpec s registry
   fadingSpec s registry
+  cumulativeUpkeepSpec s registry
   modularSpec s registry
   tovolarSpec s registry
   aragornSpec s registry
