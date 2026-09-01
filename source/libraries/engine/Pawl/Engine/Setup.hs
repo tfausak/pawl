@@ -920,10 +920,9 @@ applyCrossings finalSub parent =
       --
       -- So a PHASED-OUT permanent crosses without an event and hands nothing
       -- over, and that is CR 702.26b rather than an omission: excepting rules
-      -- that specifically
-      -- mention phased-out permanents, such a permanent "is treated as though it
-      -- does not exist" and "can't affect or be affected by anything else in the
-      -- game". CR 729.4a mentions none, so the main-game abilities it speaks of
+      -- that specifically mention phased-out permanents, such a permanent "is
+      -- treated as though it does not exist" and "can't affect or be affected by
+      -- anything else in the game". CR 729.4a mentions none, so the main-game abilities it speaks of
       -- cannot see one leave -- the answer CR 702.26k spells out for the other
       -- road out of the game. The crossing itself still happens: CR 729.4 puts
       -- every main-game object outside the subgame, and the wish reaching for it

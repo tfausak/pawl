@@ -19,10 +19,9 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- StaticAbility.lingers, Titania's Song's "if this enchantment leaves the
 -- battlefield, this effect continues until end of turn", which
 -- Pawl.Engine.Event.lingeringHandover hands over as the permanent goes -- by a
--- zone change, with its owner under CR 800.4a, or into a subgame's wish under CR
--- 729.4a. Such an effect keeps the
--- timestamp CR 613.7a gave it rather than taking a fresh one, since the card
--- says it is the same effect continuing.
+-- zone change, with its owner under CR 800.4a, or into a subgame's wish under
+-- CR 729.4a. Such an effect keeps the timestamp CR 613.7a gave it rather than
+-- taking a fresh one, since the card says it is the same effect continuing.
 --
 -- Parametric in `card` for Pawl.Types.StaticAbility's reason, and instantiated at
 -- the SAME width: the lingers clause hands a static ability's own modification

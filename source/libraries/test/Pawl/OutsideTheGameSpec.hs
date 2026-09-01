@@ -490,24 +490,23 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
     -- follow-on LoseLife excludes. 20 halves to 10.
     Spec.assertEqWith s "CR 729.1b: only bob paid, which is how the subgame ended" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 20, Just 10)
     Spec.assertEqWith s "CR 729.1a: the subgame did not decide the main game" (GameState.result after) Nothing
-  -- CR 604.2's exception on the crossing road, and the case #2459 is about.
+  -- CR 604.2's exception on the crossing road, and the case #2459 named.
   -- Titania's Song ({3}{G} enchantment, "Each noncreature artifact loses all
   -- abilities and becomes an artifact creature with power and toughness each
   -- equal to its mana value. If this enchantment leaves the battlefield, this
   -- effect continues until end of turn."): CR 604.2 ends a static ability's
-  -- effect when its permanent leaves
-  -- the battlefield, and this card's own text overrides that. CR 729.4a takes the
-  -- enchantment out of the main game, which IS leaving the battlefield, so the
-  -- effect has to go on applying in the main game the subgame was played inside
-  -- -- exactly as it does on CR 800.4a's road out of the game
-  -- (Pawl.DepartureSpec).
+  -- effect when its permanent leaves the battlefield, and this card's own text
+  -- overrides that. CR 729.4a takes the enchantment out of the main game, which
+  -- IS leaving the battlefield, so the effect has to go on applying in the main
+  -- game the subgame was played inside -- exactly as it does on CR 800.4a's road
+  -- out of the game (Pawl.DepartureSpec).
   --
   -- Death Wish ({1}{B}{B} sorcery, "You may put a card you own from outside the
   -- game into your hand. You lose half your life, rounded up. Exile Death Wish.")
   -- is the producer, and its unrestricted filter is why: #2459 was filed reading
   -- the pool's wishes as naming a card type apiece, but Death Wish names none, so
-  -- CR 729.4 offers it a main-game ENCHANTMENT. The case above proves the same
-  -- filter admits an ordinary sorcery.
+  -- CR 729.4 offers it a main-game ENCHANTMENT. The Death Wish case further up
+  -- proves the same filter admits an ordinary sorcery out of the POOL.
   --
   -- Jade Statue ({4} artifact) is the probe: a noncreature artifact of mana value
   -- 4, so an animated one is a 4/4 and an un-animated one is no creature at all.
