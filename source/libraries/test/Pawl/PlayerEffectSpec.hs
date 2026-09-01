@@ -92,7 +92,9 @@ import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
@@ -121,6 +123,8 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -4098,6 +4102,42 @@ runedHaloBoard plains halo curse =
           }
       )
 
+-- runedHaloBoard carried through one combat: the Halo enters naming `name`, bob's
+-- Goblin Piker attacks `defender` alone, and the pair (before, after) comes back
+-- so a case can read the life it cost. Nothing blocks -- neither alice nor carol
+-- has a creature -- so CR 510.1c assigns the Piker's 2 to the defending player.
+--
+-- COMBAT damage and not a burn spell, which is the whole reason this helper
+-- exists: rule 702.16b already stops a spell with the chosen name from TARGETING
+-- the protected player, so a Lightning Bolt aimed at alice never reaches rule
+-- 702.16e -- and a case built on one stays green with the prevention deleted,
+-- which is how this one was found. Combat damage targets nothing (CR 508.1),
+-- so rule 702.16e is the only thing that can stop it.
+--
+-- The attacker is bob's, so it is bob's combat: the board is re-pointed at him
+-- after the Halo resolves on alice's own main phase, which is the only order
+-- CR 614.1c's as-enters choice can happen in.
+runedHaloCombat ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  CardName.CardName ->
+  PlayerId.PlayerId ->
+  (GameState.GameState, GameState.GameState)
+runedHaloCombat plains halo curse piker name defender =
+  let (haloId, _, base) = runedHaloBoard plains halo curse
+      (_, withPiker) = S.addCreature piker S.bob (castHalo name base haloId)
+      before =
+        withPiker
+          { GameState.activePlayer = S.bob,
+            GameState.priority = Just S.bob,
+            GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [defender]}
+          }
+      fight = Combat.declareAttackers S.bob >> Combat.declareBlockers >> Damage.dealCombatDamage
+   in (before, S.settleSba (S.runPure (S.attackTo defender) before fight))
+
 -- Cast the Halo and let it resolve, naming `name`.
 --
 -- CAST rather than S.addCreature, castChamber's reason: the choice happens only
@@ -4187,6 +4227,31 @@ runedHaloSpec s registry =
       Spec.assertBool s (not (Set.member aura (GameState.battlefield named))) "the Halo names it, and it is off the battlefield after one pass"
       Spec.assertEqWith s "in its OWNER's graveyard, and bob owns it" (length (Game.zoneMembers Zone.Graveyard S.bob named)) 1
       Spec.assertBool s (Set.member aura (GameState.battlefield other)) "with another card named it stays where it is"
+    -- CR 702.16e's PLAYER half: "any damage that would be dealt by sources that
+    -- have the stated quality to a permanent or player with protection is
+    -- prevented." The clause that had no mint at all until
+    -- Pawl.Engine.Replacement.collect grew a segment reading this axis: the
+    -- targeting and Aura bars above are gates a caller asks, where a prevention
+    -- has to be a CR 615.1 row before the damage event is proposed.
+    --
+    -- THREE combats, each differing from the first in exactly one thing. alice
+    -- takes none of the Piker's 2 (the shield exists); carol takes all of it off
+    -- the same named board (the shield is scoped to the Halo's controller, and is
+    -- not a Fog); and alice takes all of it when the Halo named the Curse instead
+    -- (the shield reads CR 201.4's chosen name rather than firing on every
+    -- source). The second is also what says combat damage really flowed.
+    Spec.it s "CR 702.16e combat damage from a source with the chosen name is prevented, and the same attacker otherwise connects" $ do
+      plains <- S.printingOf s registry "Plains"
+      halo <- S.printingOf s registry "Runed Halo"
+      curse <- S.printingOf s registry "Curse of Vitality"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let combat = runedHaloCombat plains halo curse piker
+          (beforeNamed, named) = combat (S.printingName piker) S.alice
+          (beforeCarol, atCarol) = combat (S.printingName piker) S.carol
+          (beforeOther, other) = combat (S.printingName curse) S.alice
+      Spec.assertEqWith s "with the Piker named, alice takes none of its 2" (S.lifeOf S.alice named) (S.lifeOf S.alice beforeNamed)
+      Spec.assertEqWith s "carol takes the whole 2 with the same name chosen -- the Halo protects its controller alone" (S.lifeOf S.carol atCarol) (fmap (subtract 2) (S.lifeOf S.carol beforeCarol))
+      Spec.assertEqWith s "and with the Curse named instead, so does alice" (S.lifeOf S.alice other) (fmap (subtract 2) (S.lifeOf S.alice beforeOther))
 
 -- Conjurer's Ban {W}{B} Sorcery: "Choose a card name. Until your next turn,
 -- spells with the chosen name can't be cast and lands with the chosen name can't

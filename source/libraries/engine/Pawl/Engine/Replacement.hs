@@ -159,14 +159,22 @@ asZoneChange event = case event of
 --      installer prepends as it creates the row. Always the LIVE store, never a
 --      frozen one: CR 614.3 spends a one-shot as it is applied, and `consume`
 --      writes that back here.
+--   3. The CR 613.11 PLAYER axis (PlayerEffect.protectionCarriers), by seat: rule
+--      702.16e's "or player", which no permanent's ability list holds because a
+--      player has no keywords and no characteristics. Re-derived from the board
+--      like segment 1 and spent like it -- nothing to consume.
 --
--- Both segments drop a row whose printed clause is false right now, which is CR
--- 614.1's "they aren't locked in ahead of time": the permanent segment's CR 604.2
--- clause in Projection.replacementsOf, the floating one's in `lives` below.
+-- Segments 1 and 2 drop a row whose printed clause is false right now, which is
+-- CR 614.1's "they aren't locked in ahead of time": the permanent segment's CR
+-- 604.2 clause in Projection.replacementsOf, the floating one's in `lives` below.
+-- Segment 3's twin of that is PlayerEffect.applying, whose own CR 604.2 gate
+-- drops a carrier that has stopped applying.
 --
--- The two segments take separate arguments -- rather than one GameState apiece,
--- which would be two interchangeable parameters of the same type -- so the split
--- cannot be got backwards.
+-- The first two segments take separate arguments -- rather than one GameState
+-- apiece, which would be two interchangeable parameters of the same type -- so
+-- the split cannot be got backwards. The third reads `sources` for segment 1's
+-- reason: it is derived from the board, so it must be derived from the board a CR
+-- 608.2f batch began in.
 collect :: GameState -> [ActiveReplacement.ActiveReplacement] -> [ReplacementCandidate]
 collect sources floating =
   let fromPermanent (instance_, (src, provenance, re)) =
@@ -240,6 +248,92 @@ collect sources floating =
             -- own pattern can name one object (see Pawl.Types.ActiveReplacement).
             ReplacementCandidate.slots = ActiveReplacement.slots active
           }
+      -- CR 702.16e's PLAYER half: "any damage that would be dealt by sources that
+      -- have the stated quality to a permanent or player with protection is
+      -- prevented." The permanent half is a row rule 702.16 mints onto the
+      -- permanent (Pawl.Engine.Keyword.mintedReplacementsOf); a player has no
+      -- keywords, so its half rides the CR 613.11 axis and is minted here, where
+      -- the pairs PlayerEffect.protectionCarriers gathers can be read.
+      --
+      -- CandidateId.OfPermanent with a MINTED provenance rather than a third arm
+      -- of that type, and the fit is exact rather than a reuse: CR 614.5's
+      -- identity for this row is (carrier, effect value, ordinal), the carrier is
+      -- the object whose static ability grants the protection, and CR 615.13's
+      -- "prevented this way" must not see it -- which is precisely what Minted
+      -- says (see Pawl.Types.ReplacementProvenance). The effect value names the
+      -- protected player, so one carrier protecting two seats is two instances,
+      -- and the ordinal is 0 because equal rows here are the same (player,
+      -- carrier) pair, which CR 702.16m makes redundant anyway.
+      --
+      -- No collision with segment 1's rows off the same carrier: `whichRecipient`
+      -- is engine-baked and no card may write it (Pawl.CardSpec's
+      -- engineOnlyOffends), and rule 702.16's keyword row writes `whatRecipient`
+      -- instead.
+      --
+      -- CR 109.5's "you" is the CARRIER's controller, not the protected player --
+      -- the two differ the moment a scope wider than PlayerScope.You appears --
+      -- and nothing in the row reads it: the pattern's source side is a literal
+      -- name set and its recipient side is a baked id, so no atom here is
+      -- perspective-relative.
+      --
+      -- Nothing to consume and no rider: this segment is re-derived from the board
+      -- every iteration, exactly as segment 1 is, and CR 615.10 leaves a static
+      -- shield unreduced.
+      fromProtectedPlayer (pid, src) =
+        ReplacementCandidate.MkReplacementCandidate
+          { ReplacementCandidate.identity =
+              CandidateId.OfPermanent
+                PermanentCandidate.MkPermanentCandidate
+                  { PermanentCandidate.source = src,
+                    PermanentCandidate.provenance = ReplacementProvenance.Minted,
+                    PermanentCandidate.effect = protectionShield pid src,
+                    PermanentCandidate.ordinal = InstanceOrdinal.MkInstanceOrdinal 0
+                  },
+            ReplacementCandidate.effect = protectionShield pid src,
+            ReplacementCandidate.source = src,
+            ReplacementCandidate.controller = Projection.controllerOf src sources,
+            ReplacementCandidate.lifetime = Nothing,
+            ReplacementCandidate.origin = ReplacementOrigin.Other,
+            ReplacementCandidate.rider = Nothing,
+            ReplacementCandidate.slots = Map.empty
+          }
+      -- Rule 702.16e's row for one (protected player, carrier) pair.
+      --
+      -- The quality is CR 201.4's chosen names, spelled as the disjunction of the
+      -- literal names the carrier holds RIGHT NOW -- the same set intersection
+      -- PlayerEffect.protectedFromGiven asks for the targeting and Aura bars, so
+      -- the three consequences of rule 702.16 cannot disagree about which sources
+      -- carry the quality. A carrier that has chosen nothing yields `Or []`, which
+      -- matches no source, rather than a shield against everything.
+      --
+      -- Filter.HasChosenName would say the same thing and is not usable here: it
+      -- reads Filter.sourceChosenNames, which candidateContext leaves empty (see
+      -- Pawl.Engine.Filter.contextFor), so it is vacuously False in every
+      -- replacement position.
+      --
+      -- `whichRecipient` and not `whoRecipient`, though both name a player: the
+      -- protected seat is an id this segment knows, where a PlayerRelation would
+      -- have to be read against a perspective, and CR 109.5's "you" on this row is
+      -- the carrier's controller rather than the protected player.
+      --
+      -- No kind, rule 702.16e saying "any damage", and no printed recipient half
+      -- at all -- `whatRecipient` is the permanent half's spelling and this row is
+      -- the other one.
+      protectionShield pid src =
+        ReplacementEffect.DamageR
+          DamageR.MkDamageR
+            { DamageR.matching =
+                DamagePattern.MkDamagePattern
+                  { DamagePattern.whichKind = Nothing,
+                    DamagePattern.whatSource = Filter.Type.Or (fmap Filter.Type.HasName (Set.toList (PlayerEffect.chosenNamesOf (Just src) sources))),
+                    DamagePattern.whatRecipient = Nothing,
+                    DamagePattern.whoRecipient = Nothing,
+                    DamagePattern.whichRecipient = Just (Recipient.ToPlayer pid),
+                    DamagePattern.whichSource = Nothing
+                  },
+              DamageR.rewrite = DamageRewrite.PreventAll,
+              DamageR.riders = Seq.empty
+            }
       -- CR 614.1: a replacement effect is not locked in ahead of time, so the
       -- printed "if" the installing clause carried is asked HERE rather than at
       -- installation -- the row stays in GameState.replacements and is asked
@@ -289,6 +383,7 @@ collect sources floating =
             condition
    in fmap fromPermanent (numberInstances (Projection.replacementsAffecting sources))
         <> fmap fromFloating (filter lives floating)
+        <> fmap fromProtectedPlayer (PlayerEffect.protectionCarriers sources)
 
 -- CR 615.5: the additional effect a PERMANENT's static prevention ability
 -- prints, packaged with the environment it will run in.
@@ -2140,8 +2235,10 @@ preventionBy inert candidate before after = case (ReplacementCandidate.effect ca
 -- READ OFF THE CANDIDATE rather than inferred from its effect, because rule
 -- 702.16e's row is a plain PreventAll naming the permanent itself -- the same
 -- value Phyrexian Vindicator and Stormwild Capridor print, so no reading of the
--- effect can separate them. Pawl.Engine.Projection.replacementsOf makes the mark
--- where the segments are still apart; see Pawl.Types.ReplacementProvenance.
+-- effect can separate them. The mark is made where the row is built and the
+-- segments are still apart -- Pawl.Engine.Projection.replacementsOf for the
+-- keyword's permanent half, `collect`'s player segment for rule 702.16e's other
+-- one; see Pawl.Types.ReplacementProvenance.
 printedBy :: CandidateId.CandidateId -> Maybe ObjectId
 printedBy candidate = case candidate of
   CandidateId.OfFloating floating -> Just (FloatingCandidate.source floating)
