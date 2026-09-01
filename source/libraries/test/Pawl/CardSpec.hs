@@ -3261,6 +3261,7 @@ canHostSubjects predicate = case predicate of
   -- codec (canAttachToSubjectCounts) rather than through this recursion.
   Filter.Type.CanAttachToSubject -> 0
   Filter.Type.IsToken -> 0
+  Filter.Type.IsActivatedAbility -> 0
   Filter.Type.IsTapped -> 0
   Filter.Type.IsFaceDown -> 0
   -- A DESCENT for AttachedTo's reason, the nest describing the CARD representing
@@ -4311,6 +4312,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.CanHostSubject -> []
   Filter.Type.CanAttachToSubject -> []
   Filter.Type.IsToken -> []
+  Filter.Type.IsActivatedAbility -> []
   Filter.Type.IsTapped -> []
   Filter.Type.IsFaceDown -> []
   -- DESCENT, for the atom above's reason.

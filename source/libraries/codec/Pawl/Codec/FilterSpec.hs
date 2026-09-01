@@ -354,6 +354,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.IsToken
       " {\"type\":\"IsToken\"} "
+  Spec.it s "IsActivatedAbility" $
+    Common.assertCodec
+      s
+      codec
+      Filter.IsActivatedAbility
+      " {\"type\":\"IsActivatedAbility\"} "
   Spec.it s "IsTapped" $
     Common.assertCodec
       s

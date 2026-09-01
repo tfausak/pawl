@@ -22,7 +22,8 @@ data Pool
   | Spells -- CR 112.1: spells on the stack (ToObject).
   | -- | CR 113.9: activated and triggered abilities on the stack (ToObject) --
     -- Stifle's "target activated or triggered ability". CR 115.2 clause (b) is
-    -- what lets a slot name one at all.
+    -- what lets a slot name one at all. Squelch's "target activated ability" is
+    -- this pool under a Filter.IsActivatedAbility rather than a pool of its own.
     --
     -- A SIBLING of Spells rather than a widening of it, and rule 113.9 is why:
     -- an ability on the stack is not a spell, so a Cancel must not reach an

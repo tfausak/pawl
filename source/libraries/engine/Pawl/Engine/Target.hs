@@ -887,7 +887,9 @@ spellRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Game
 -- CR 113.9: only activated and triggered abilities (Source.OfAbility /
 -- OfTrigger / OfInherentTrigger) on the stack, tagged ToObject; spells and
 -- permanents are excluded by Game.isAbility. Stifle's "target activated or
--- triggered ability".
+-- triggered ability"; Squelch's "target activated ability" is this same walk
+-- narrowed by Filter.IsActivatedAbility, which is the card's own restriction and
+-- not the pool's.
 --
 -- The same walk spellRecipients makes over the same list, and DISJOINT from it by
 -- construction, which is CR 113.9's first two sentences.
