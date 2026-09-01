@@ -761,6 +761,34 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     Spec.assertEqWith s "CR 729.4a: it left the main game just the same" (Game.lookupObject tusk after) Nothing
     Spec.assertEqWith s "and is no longer recorded as phased out either" (Map.member tusk (GameState.phasedOut after)) False
     Spec.assertEqWith s "CR 608.2h: its last known information is still filed" (Map.member tusk (GameState.lastKnown after)) True
+  -- CR 702.26b again, this time against CR 604.2's handover rather than the
+  -- event: a phased-out permanent "is treated as though it does not exist", so
+  -- its static ability was generating no effect there is anything to continue.
+  -- One gate serves both, GameState.battlefield membership, which is the reading
+  -- Departure.objectsLeaveWith records for the other road out of the game.
+  --
+  -- A PAIR differing in the phase-out alone -- same Song, same Statue, same
+  -- crossing -- since a phased-out Song animates nothing while it is out there
+  -- either, and a negative assembled on its own board could not tell the two
+  -- readings apart. Pawl.OutsideTheGameSpec's Death Wish case proves the
+  -- phased-in leg at gameplay level; this one is here for the gate.
+  Spec.it s "CR 702.26b a phased-out Titania's Song a subgame takes hands nothing over" $ do
+    titaniasSong <- S.printingOf s registry "Titania's Song"
+    jadeStatue <- S.printingOf s registry "Jade Statue"
+    let (songId, g1) = S.addCreature titaniasSong S.alice (Setup.emptyGame S.bothPlayers)
+        (statueId, phasedIn) = S.addCreature jadeStatue S.alice g1
+        phasedOut = Phasing.phaseOut (PhasedOut.Directly S.alice) songId phasedIn
+        crossFrom parent = Setup.applyCrossings (snd (OutsideTheGame.bringInFrom S.alice songId (Setup.subgameStateFrom S.alice parent))) parent
+        afterIn = crossFrom phasedIn
+        afterOut = crossFrom phasedOut
+    -- The pair's one difference, on the boards going in.
+    Spec.assertEqWith s "CR 613.4b the phased-in Song animates the Statue as a 4/4" (S.powerToughnessOf statueId phasedIn) (Just (4, 4))
+    Spec.assertEqWith s "CR 702.26b the phased-out one animates nothing" (S.powerToughnessOf statueId phasedOut) Nothing
+    -- The gate, ahead of the proxies.
+    Spec.assertEqWith s "CR 702.26b: the phased-out Song hands nothing over as it leaves the game" (S.powerToughnessOf statueId afterOut) Nothing
+    Spec.assertEqWith s "CR 604.2: where the phased-in one's effect goes on applying" (S.powerToughnessOf statueId afterIn) (Just (4, 4))
+    Spec.assertEqWith s "and it is a stored effect on each leg, none and CR 613.6's four parts" (length (GameState.continuousEffects afterOut), length (GameState.continuousEffects afterIn)) (0, 4)
+    Spec.assertEqWith s "CR 729.4a: both legs took the Song out of the main game" (Map.member songId (GameState.objects afterOut), Map.member songId (GameState.objects afterIn)) (False, False)
 
   -- Why applyCrossings does NOT wrap its batch in Event.simultaneouslyPure, the
   -- one place it parts company with Departure.objectsLeaveWith: CR 800.4a's
