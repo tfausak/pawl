@@ -12,6 +12,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Decider as Decider
@@ -33,8 +34,20 @@ import qualified Pawl.Types.Zone as Zone
 -- CR 103.5: the starting hand size. Deliberately NOT shared with CR 402.2's
 -- maximum hand size (PlayerEffect.defaultMaximumHandSize), a different seven
 -- the rules keep apart.
-openingHand :: Int
+openingHand :: Numeric.Natural.Natural
 openingHand = 7
+
+-- CR 103.5 / CR 902.5: how many cards THIS player draws for an opening hand --
+-- rule 103.5's seven, as modified by CR 313.6's hand modifier where they brought
+-- a vanguard card. Both of this module's draws go through it, which is CR
+-- 902.5a: a mulligan "draws a new hand equal to their starting hand size", the
+-- same number as the first one.
+--
+-- Read per player and per draw rather than settled once, because it is read off
+-- a card in the command zone; CR 313.2 keeps that card there, so the two readings
+-- cannot disagree today, and reading live is what stays right if one ever could.
+startingHandSize :: PlayerId -> GameState.GameState -> Numeric.Natural.Natural
+startingHandSize = Vanguard.handSize openingHand
 
 -- CR 103.5: draw opening hands, then run the declaration/mulligan/bottom round
 -- loop to completion. Assumes each player's library is already built and
@@ -45,7 +58,12 @@ openingHands perform owners = do
   -- CR 103.5 sentence 1: every player draws a full opening hand. A short
   -- library sets drewFromEmpty here, and the flag survives the loop -- CR 727.3
   -- / 729.3.
-  Monad.forM_ owners (Monad.replicateM_ openingHand . Event.drawCard)
+  Monad.forM_
+    owners
+    ( \pid -> do
+        n <- State.gets (startingHandSize pid)
+        Monad.replicateM_ (Natural.toIntSaturating n) (Event.drawCard pid)
+    )
   mulliganRounds perform Map.empty owners
   -- CR 103.6: the opening-hand window, after the WHOLE CR 103.5 process.
   openingHandActions perform owners
@@ -278,7 +296,8 @@ takeMulligan counts pid = do
   handIds <- State.gets (Game.zoneMembers Zone.Hand pid)
   Monad.forM_ handIds (\oid -> Event.changeZone oid Zone.Library)
   Event.shuffleLibrary pid
-  Monad.replicateM_ openingHand (Event.drawCard pid)
+  handSize <- State.gets (startingHandSize pid)
+  Monad.replicateM_ (Natural.toIntSaturating handSize) (Event.drawCard pid)
   -- The SAME offer the declaration prompt reported -- offerFor is a pure
   -- function of `counts`, `pid` and the seat roster, none of which the redraw
   -- touches -- so this bottoms exactly what the player was promised.

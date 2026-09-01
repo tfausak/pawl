@@ -24,6 +24,7 @@ import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
+import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
@@ -3359,16 +3360,23 @@ gatherGiven stripped functioning seed gs =
          in fmap one (NonEmpty.toList (grantedDefiningParts (ContinuousEffect.modification eff)))
       stored = concatMap fromStored (GameState.continuousEffects gs)
       static = concatMap (fmap snd . permanentParts stripped functioning setEffs setStripped gs) (abilitySources gs)
-      fromEmblem emblemId = case Game.lookupObject emblemId gs of
+      fromCommandZone commandId = case Game.lookupObject commandId gs of
         Nothing -> []
-        Just emblemObj -> case Game.faceOfObject gs emblemObj of
+        Just commandObj -> case Game.faceOfObject gs commandObj of
           Nothing -> []
           Just face ->
             -- CR 114.4 / 113.6: an emblem's abilities function in the command
             -- zone, sharing the emblem's timestamp (CR 613.7a). Never stripped:
             -- the pool's CR 613.1f removers reach creatures (CR 114.5).
-            concat [gatherStatic (functioning emblemId) emblemId (Object.timestamp emblemObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), functionsFromZone Zone.Command sa]
-      emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
+            --
+            -- CR 313.4 / CR 902.7 puts a vanguard card's static abilities here on
+            -- the same terms, and by RULE rather than by the card saying so: a
+            -- vanguard prints no "as long as this is in the command zone" clause,
+            -- so the zone gate is answered from its card type and not from
+            -- Face.staticAbilities' own functionsFrom (Anger, whose graveyard
+            -- clause IS printed, is the contrast).
+            concat [gatherStatic (functioning commandId) commandId (Object.timestamp commandObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), functionsFromZone Zone.Command sa || Vanguard.isVanguard commandId gs]
+      emblems = concatMap fromCommandZone (Set.toList (GameState.command gs))
       fromSpell spellId = case Game.lookupObject spellId gs of
         Nothing -> []
         Just spellObj -> case Game.faceOfObject gs spellObj of

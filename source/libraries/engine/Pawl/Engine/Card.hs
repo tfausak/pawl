@@ -103,6 +103,7 @@ faceDownFace listed =
       Face.toughness = FaceDownCharacteristics.toughness listed,
       Face.loyalty = Nothing,
       Face.defense = Nothing,
+      Face.vanguard = Nothing,
       Face.keywords = FaceDownCharacteristics.keywords listed,
       Face.colorIndicator = Set.empty,
       Face.characteristicPT = Nothing,
@@ -356,6 +357,10 @@ merge2 l r =
       Face.toughness = firstJust (Face.toughness l) (Face.toughness r),
       Face.loyalty = firstJust (Face.loyalty l) (Face.loyalty r),
       Face.defense = firstJust (Face.defense l) (Face.defense r),
+      -- The same left bias, and vacuous today: CR 313.2 keeps a vanguard card in
+      -- the command zone, so no vanguard has ever been printed with two faces
+      -- for this to combine.
+      Face.vanguard = firstJust (Face.vanguard l) (Face.vanguard r),
       -- CR 709.4c reaches this one where it does not reach the four above: a
       -- characteristic-defining ability IS "an ability in the text box" (CR
       -- 604.3), so the combined view has BOTH halves'. One slot holds one of

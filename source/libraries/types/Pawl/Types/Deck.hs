@@ -32,6 +32,19 @@ data Deck = MkDeck
     -- | CR 903.3: the card designated as this deck's commander, which CR 903.6
     -- starts in the command zone.
     commander :: Maybe Printing.Printing,
+    -- | CR 902.3: the vanguard card this player brings, which CR 313.2 keeps in
+    -- the command zone for the whole game.
+    --
+    -- Here for the commander's reason, and NOT one of the `cards` for the
+    -- commander's reason either: rule 902.3 calls it a game material each player
+    -- needs "in addition to the normal game materials", placed beside the library
+    -- before the game begins, so counting it among the library's printings would
+    -- deal it into a hand. Nothing but a Vanguard game sets it, so `Nothing` is
+    -- every other format.
+    --
+    -- ONE, like the commander and unlike the dungeons: CR 902.1 gives each player
+    -- "one face-up vanguard card".
+    vanguard :: Maybe Printing.Printing,
     -- | CR 309.2: the dungeon cards this player owns from OUTSIDE the game, which
     -- CR 701.49a draws on the first time they venture.
     --
@@ -75,7 +88,8 @@ data Deck = MkDeck
   }
   deriving (Eq, Ord, Show)
 
--- | A deck with no commander, no dungeons and no sideboard -- every format but
--- Commander, every game nobody ventures in, and every game nobody wishes in.
+-- | A deck with no commander, no vanguard, no dungeons and no sideboard -- every
+-- format but Commander and Vanguard, every game nobody ventures in, and every
+-- game nobody wishes in.
 fromCards :: Map.Map Printing.Printing Natural.Natural -> Deck
-fromCards m = MkDeck {cards = m, commander = Nothing, dungeons = Set.empty, sideboard = Map.empty}
+fromCards m = MkDeck {cards = m, commander = Nothing, vanguard = Nothing, dungeons = Set.empty, sideboard = Map.empty}

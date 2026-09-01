@@ -314,6 +314,7 @@ vanillaFace name typeLine =
       Face.toughness = Nothing,
       Face.loyalty = Nothing,
       Face.defense = Nothing,
+      Face.vanguard = Nothing,
       Face.keywords = Set.empty,
       Face.colorIndicator = Set.empty,
       Face.staticAbilities = [],
@@ -5715,9 +5716,9 @@ activatedAbilityFilters ability =
 --     pregame actions, which `cardResolutionEffects` above does not reach.
 --
 -- The remaining fields hold none: `name`, `manaCost`, `typeLine`, `loyalty`,
--- `defense`, `colorIndicator`, `counterability`, `castingPermissions` and
--- `castingRestrictions`. That is checkable rather than asserted: none of the
--- types those nine fields reach imports Pawl.Types.Filter, which
+-- `defense`, `vanguard`, `colorIndicator`, `counterability`, `castingPermissions`
+-- and `castingRestrictions`. That is checkable rather than asserted: none of the
+-- types those ten fields reach imports Pawl.Types.Filter, which
 -- `grep -rl 'import qualified Pawl.Types.Filter' source/libraries/types/` over
 -- each one's closure answers.
 --
@@ -8954,6 +8955,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         offends c = isPlaneswalker c /= Maybe.isJust (Face.loyalty c)
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "planeswalker iff loyalty" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 313.6 / 313.7: the same biconditional again, and the tightest of the
+  -- family, since rule 313.6 and rule 313.7 each say "each vanguard card has" one
+  -- of these. A vanguard without them has no number for CR 902.4 and CR 902.5 to
+  -- read; a non-vanguard with them carries two numbers no rule reads, since only
+  -- rule 902 consults them and only of a card in the command zone (CR 313.2).
+  Spec.it s "a card is a vanguard iff it has printed modifiers" $ do
+    ps <- S.allPrintings s
+    let isVanguard c = Set.member CardType.Vanguard (TypeLine.types (Face.typeLine c))
+        offends c = isVanguard c /= Maybe.isJust (Face.vanguard c)
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "vanguard iff modifiers" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 310.4 / 210.1: the same biconditional one rule number over. "Defense is a
   -- characteristic that battles have", so a battle without one has nothing for CR
   -- 310.4b's intrinsic replacement to place and would enter with no defense

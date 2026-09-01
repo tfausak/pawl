@@ -57,6 +57,7 @@ import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UntapRestriction as UntapRestriction
+import qualified Pawl.Types.Vanguard as Vanguard
 
 data Face card = MkFace
   { name :: CardName.CardName,
@@ -86,6 +87,19 @@ data Face card = MkFace
     -- replacement, which needs the defense of the permanent as it WOULD exist on
     -- the battlefield (CR 614.12).
     defense :: Maybe Defense.Defense,
+    -- | CR 313.6 \/ 313.7: the two numbers in a vanguard card's lower corners.
+    -- Nothing for every card that is not a vanguard; the CardSpec lint family
+    -- holds that biconditional in both directions, as it does for loyalty and
+    -- defense above.
+    --
+    -- Read straight off the FACE and never through the projection, which is
+    -- where this parts from those two. CR 707.2's copiable values are what a
+    -- copy effect acquires, and no such effect can reach a vanguard card: CR
+    -- 313.2 keeps it in the command zone, where it is not a permanent and not a
+    -- spell, so nothing in the pool copies it. Its readers are pregame or
+    -- per-cleanup and take the printed card the way Face.castingPermissions'
+    -- readers do (Pawl.Engine.Vanguard).
+    vanguard :: Maybe Vanguard.Vanguard,
     -- | CR 702. A Set because this is PRINTED text: a card names each keyword
     -- ability it has once, so there is no printed multiplicity to lose. Where
     -- multiplicity does arise -- the same ability printed and granted, which CR

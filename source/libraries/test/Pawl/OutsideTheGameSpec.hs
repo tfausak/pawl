@@ -293,6 +293,7 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
           Deck.MkDeck
             { Deck.cards = Map.empty,
               Deck.commander = Nothing,
+              Deck.vanguard = Nothing,
               Deck.dungeons = Set.empty,
               Deck.sideboard = Map.fromList [(signInBlood, 2), (dragon, 1)]
             }
