@@ -2205,11 +2205,12 @@ pinnedAssignments base answers p = case p of
 -- power, loyalty, and the 4 that spills past it -- are all distinct and no two
 -- readings of CR 702.19c land on the same board.
 --
--- "That planeswalker's controller" and "the defending player" are one seat here.
--- That is not the two-player collapse that hides a bug: CR 702.19c names the
--- planeswalker's controller precisely because the attack was declared against
--- that player's planeswalker (CR 508.1b), so the two are the same player on every
--- board pawl can build.
+-- "That planeswalker's controller" and "the defending player" are one seat here,
+-- because these boards have one defending player. CR 508.1b is why they cannot
+-- disagree while the planeswalker is still attacked -- the attack was declared
+-- against that player's own planeswalker -- but Damage.combatRecipient's CR
+-- 702.19e arm reads the group's head once the planeswalker is gone, which is the
+-- wrong seat at three or more (#2841). No board here has two defenders.
 --
 -- Thrasta's cost reduction is implemented and dormant here: nothing is cast on
 -- these boards, so CR 601.2f is never reached. Pawl.CostSpec is where it is
