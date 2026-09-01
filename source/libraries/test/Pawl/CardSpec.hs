@@ -156,6 +156,7 @@ import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
@@ -1174,7 +1175,8 @@ ownCounts effect = case effect of
   Effect.ChooseOpponentAtRandom _ -> []
   -- CR 706.2's modifier is a Quantity, so its Counts are reachable here.
   Effect.RollDie rollDie -> foldMap quantityCounts (RollDie.modifier rollDie)
-  Effect.FlipCoin {} -> []
+  -- CR 705.1's number of coins is a Quantity, so its Counts are reachable here.
+  Effect.FlipCoin flipCoin -> quantityCounts (FlipCoin.count flipCoin)
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Shuffle {} -> []
@@ -1319,7 +1321,7 @@ ownQuantities effect = case effect of
   Effect.ChooseOpponent _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
   Effect.RollDie rollDie -> Maybe.maybeToList (RollDie.modifier rollDie)
-  Effect.FlipCoin {} -> []
+  Effect.FlipCoin flipCoin -> [FlipCoin.count flipCoin]
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Shuffle {} -> []
@@ -3123,7 +3125,8 @@ reservedBindings = Set.intersection reservedSlots . boundSlots
 -- CR 111.4: "A spell or ability that creates a token sets both its name and its
 -- subtype(s). If the spell or ability doesn't specify the name of the token, its
 -- name is the same as its subtype(s) plus the word 'Token.'" True of every token
--- this pool creates, because no card in it specifies a token name.
+-- this pool creates whose instruction does not name it, which is all but the two
+-- exemptions below.
 --
 -- Compared against every PERMUTATION of the subtypes rather than one rendering,
 -- and that is forced rather than chosen: TypeLine.subtypes is a Set, so a
@@ -3141,14 +3144,20 @@ reservedBindings = Set.intersection reservedSlots . boundSlots
 -- card says. Keyed on the Legendary supertype, which is the only mark the card
 -- data carries of having been written in rule 111.9's form.
 --
--- Narrow this further the first time a NONLEGENDARY card names its token: CR
--- 111.10's predefined tokens (111.10d's Walker, 111.10j-r's Roles) and the copy
--- tokens of CR 111.4's own Spitting Image example (named Doomed Dissenter, "not
--- Human Token or Doomed Dissenter Token") are each correctly named something this
--- lint would reject, and none is legendary.
+-- EXEMPT TOO: a NONLEGENDARY token the instruction names -- Flock of Rabid
+-- Sheep's "create a 2\/2 green Sheep creature token named Rabid Sheep". The same
+-- half of rule 111.4 as the legendary case, but nothing in the card data marks
+-- it, so this is a hand-kept list rather than a predicate. CR 111.10's predefined
+-- tokens (111.10d's Walker, 111.10j-r's Roles) and the copy tokens of CR 111.4's
+-- own Spitting Image example (named Doomed Dissenter, "not Human Token or Doomed
+-- Dissenter Token") will each want a line here too.
+namedTokens :: Set.Set CardName.CardName
+namedTokens = Set.singleton (CardName.MkCardName (Text.pack "Rabid Sheep"))
+
 tokenNameOffends :: Face.Face Card.Type.Card -> Bool
 tokenNameOffends token
   | Set.member Supertype.Legendary (TypeLine.supertypes (Face.typeLine token)) = False
+  | Set.member (Face.name token) namedTokens = False
   | otherwise =
       case traverse (fmap (Text.pack . fst) . Common.asTagged . Codec.encode Subtype.codec) (Set.toList (TypeLine.subtypes (Face.typeLine token))) of
         Left _ -> True
@@ -5325,7 +5334,8 @@ effectFilters effect = case effect of
   Effect.ChooseOpponentAtRandom _ -> []
   -- CR 706.2's modifier is a Quantity, so its filters are reachable here.
   Effect.RollDie rollDie -> frame Unframed (foldMap quantityFilters (RollDie.modifier rollDie))
-  Effect.FlipCoin {} -> []
+  -- CR 705.1's number of coins is a Quantity, so its filters are reachable here.
+  Effect.FlipCoin flipCoin -> frame Unframed (quantityFilters (FlipCoin.count flipCoin))
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> frame SourceHostFramed (objectRefFilters ref)
   -- A PlayerRef carries no Filter, exactly as GainPlayerCounters' does not.
