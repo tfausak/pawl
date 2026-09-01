@@ -1086,6 +1086,17 @@ chooseDamageSourceOf src p = case p of
     Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== src) (NonEmpty.toList candidates))
   _ -> S.identityAnswer p
 
+-- CR 118.12's gate PAID, with its sacrifice pinned to one permanent: the delayed
+-- trigger case below runs on a board where alice controls four creatures, so the
+-- offered set is a real choice and a default answer would eat the Fire-Eater the
+-- case is about. FILTERED rather than hand-built, the posture every
+-- choose-don't-target answerer in this file takes.
+payingGate :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+payingGate fodder p = case p of
+  Prompt.ChooseToPay {} -> PaymentDecision.Pays
+  Prompt.ChooseSacrifices _ _ _ offered _ -> Set.fromList (filter (== fodder) offered)
+  _ -> S.identityAnswer p
+
 -- chooseDamageSourceOf with every target slot aimed at one PLAYER: aimAndChoose's
 -- player-side twin, for the group's third-class case, whose Fire-Eater ability
 -- has to be aimed at the player Auriok Replica's "to you" shields.
@@ -1319,6 +1330,83 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
     Spec.assertEqWith s "setup: exactly one object is on the stack, and it is not the Fire-Eater's own id" (GameState.stack armed) [abilityId]
     Spec.assertBool s (abilityId /= fireEater) "setup: CR 602.2a's ability object is not the permanent whose ability it is"
     Spec.assertBool s (plainsId /= replicaId) "setup: the id the twin names is the Plains and not the Replica"
+    Spec.assertEqWith s "the answer recorded is the fallback, not the ability alice named" (chosenSourcesIn (answersFor (choosePlayerAndSource S.alice abilityId) armed rest)) [fireEater]
+
+  -- The SAME rule and the same exclusion, reached by CR 609.7a's OTHER
+  -- binding-reading carrier: "any object referred to by ... a delayed triggered
+  -- ability that's waiting to trigger". Effect.ArmDelayedTrigger captures the
+  -- resolving object's whole binding environment (CR 603.7c), so an activated
+  -- ability that arms one leaves its OWN id (Binding.thisAbility) in the entry --
+  -- and the ability has ceased by then, which is exactly the parenthetical case
+  -- "even if that object is no longer in the zone it used to be in" and so is not
+  -- filtered out anywhere downstream.
+  --
+  -- Grist, the Hunger Tide's -2 is the pool's only activated ability that arms a
+  -- delayed trigger ("You may sacrifice a creature. When you do, destroy target
+  -- creature or planeswalker"), and the entry is still armed once the -2 has
+  -- resolved -- the reflexive ability is placed at the next gather, which this
+  -- case deliberately does not run.
+  --
+  -- The board and the reading are the case above's: alice names the ceased
+  -- ability, the answerer falls back to the head of the ascending pool when that
+  -- id is not offered, and the Fire-Eater is placed FIRST so the head is the one
+  -- source whose damage this shield can prevent. Offering the ability installs a
+  -- shield over an object no damage event carries and alice takes the 2.
+  Spec.it s "CR 609.7a an activated ability a waiting delayed trigger still names is not offered as a source" $ do
+    plains <- S.printingOf s registry "Plains"
+    replica <- S.printingOf s registry "Auriok Replica"
+    ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
+    grist <- S.printingOf s registry "Grist, the Hunger Tide"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    -- The Fire-Eater FIRST, so its id is the ascending pool's head and the
+    -- fallback lands on it; the Piker LAST among the creatures, so Grist's CR
+    -- 118.12 gate has exactly one candidate to eat.
+    let (fireEater, g1) = S.addCreature ghitu S.alice (Setup.emptyGame S.bothPlayers)
+        (replicaId, g2) = S.addCreature replica S.alice g1
+        (gristId, g3) = S.addCreature grist S.alice g2
+        g4 = S.addCounter CounterKind.Loyalty 3 gristId g3
+        (fodder, g5) = S.addCreature pikerPrinting S.alice g4
+        (decoy, g6) = S.addCreature pikerPrinting S.bob g5
+        board = S.landsFor plains S.alice 1 g6
+        minusTwo = case Face.activatedAbilities (S.combinedFace grist) of
+          ab : _ -> ab
+          [] -> theAbility grist
+        -- Grist's -2 alone, paid, so the delayed trigger is armed and its
+        -- captured environment holds the ability's own id. Its reflexive trigger
+        -- is left unplaced, which is what keeps the entry WAITING.
+        armed = S.runPure (payingGate fodder) board (Activate.activateAbility S.alice gristId minusTwo Monad.>> Stack.resolveTop)
+        -- The id the entry still names, read off the stack while the -2 is on it
+        -- rather than guessed.
+        onStack = S.runPure (payingGate fodder) board (Activate.activateAbility S.alice gristId minusTwo)
+        abilityId = case GameState.stack onStack of
+          oid : _ -> oid
+          [] -> gristId
+        rest =
+          Activate.activateAbility S.alice fireEater (theAbility ghitu)
+            Monad.>> Activate.activateAbility S.alice replicaId (theAbility replica)
+            Monad.>> Stack.resolveTop
+            Monad.>> Stack.resolveTop
+        after src = S.runPure (choosePlayerAndSource S.alice src) armed rest
+    -- THE gameplay assertion: naming the ceased ability gets alice the FALLBACK,
+    -- and the fallback prevents the Fire-Eater's 2. An engine that let the
+    -- delayed trigger's captured environment offer the ability would shield an
+    -- object that deals no damage and leave alice on 18.
+    Spec.assertEqWith s "the ability the delayed trigger names was not offered, so the fallback shielded the Fire-Eater" (S.lifeOf S.alice (after abilityId)) (Just 20)
+    -- Its twin, differing in the ANSWER alone and naming something the rule DOES
+    -- admit through this very carrier: the departed Fire-Eater, which the waiting
+    -- ability on the stack refers to. So the 20 above is not "nothing was
+    -- offered at all".
+    Spec.assertEqWith s "naming the departed Fire-Eater, which IS offered, prevents the same 2" (S.lifeOf S.alice (after fireEater)) (Just 20)
+    -- And the reading that separates them: aim the shield at bob's Piker -- an
+    -- ordinary permanent, offered by CR 609.7a's first class, that deals no damage
+    -- here -- and the 2 lands, so neither 20 above is "everything was prevented".
+    Spec.assertEqWith s "aiming it at bob's Piker, which shields nothing that happens here, leaves the 2 landing" (S.lifeOf S.alice (after decoy)) (Just 18)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "setup: the -2 armed a delayed trigger and it is still waiting" (length (GameState.delayedTriggers armed)) 1
+    Spec.assertBool s (Maybe.isNothing (Game.lookupObject abilityId armed)) "setup: CR 608.2m the -2's ability object has ceased, so only the entry still names it"
+    Spec.assertBool s (abilityId /= gristId && abilityId /= fireEater) "setup: the id named is the ability object, not Grist and not the Fire-Eater"
+    Spec.assertBool s (decoy /= replicaId && decoy /= fireEater) "setup: the id the twin names is bob's Piker"
+    Spec.assertBool s (Maybe.isNothing (Game.lookupObject fodder armed) && Set.member fireEater (GameState.battlefield armed)) "setup: the gate ate the spare Piker and left the Fire-Eater standing"
     Spec.assertEqWith s "the answer recorded is the fallback, not the ability alice named" (chosenSourcesIn (answersFor (choosePlayerAndSource S.alice abilityId) armed rest)) [fireEater]
 
 -- CR 609.7b's PROPERTY-named source on a shield covering a PLAYER, whose

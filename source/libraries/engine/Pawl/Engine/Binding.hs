@@ -462,6 +462,12 @@ castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 --
 -- Bound for an ACTIVATED ability only. A triggered ability has no activation to
 -- ask about, and CR 605.3b's mana ability never reaches the stack.
+--
+-- NOT a CR 609.7a referent, and Pawl.Engine.Resolve.referentsOfBindings drops it
+-- by name for every carrier that reads a binding environment: this slot exists so
+-- a card can read the activation's payment record, not because printed text names
+-- the ability as some other object, and counting it would undo rule 609.7a's stop
+-- at "a spell on the stack".
 thisAbility :: SlotName
 thisAbility = SlotName.MkSlotName (Text.pack "thisAbility")
 
