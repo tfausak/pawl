@@ -1216,7 +1216,7 @@ enteredBattlefieldChange event = case event of
 -- PlayersDealtDamageThisTurn arm and Pawl.Engine.Projection's fold for
 -- Filter.DealtDamageThisTurn.
 --
--- The `amount > 0` test is CR 120.8 -- "if a source would deal 0 damage, it does
+-- The `amount > 0` test below is CR 120.8 -- "if a source would deal 0 damage, it does
 -- not deal damage at all" -- and a FENCE rather than a reachable filter on the
 -- pool as it stands: Resolve's DealDamage gates on `n > 0`, combat events are
 -- built with amount > 0 (CR 510.1a), and a fully prevented event is dropped
@@ -1229,10 +1229,16 @@ enteredBattlefieldChange event = case event of
 -- reading it would count an effect's bare "loses 2 life" as damage; and CR 120.3b's
 -- infect damage causes no life loss at all, yet it is damage dealt to that player.
 damageRecipient :: GameEvent -> Maybe Recipient.Recipient
-damageRecipient event = case event of
+damageRecipient = fmap fst . damageDealt
+
+-- The same answer with the AMOUNT alongside it, which is what a total rather
+-- than a tally wants -- lifeGainOf's shape below, and the one exhaustive
+-- GameEvent case both readings share.
+damageDealt :: GameEvent -> Maybe (Recipient.Recipient, Natural)
+damageDealt event = case event of
   GameEvent.DamageDealt ev ->
     if DamageEvent.amount ev > 0
-      then Just (DamageEvent.target ev)
+      then Just (DamageEvent.target ev, DamageEvent.amount ev)
       else Nothing
   -- CR 615.13's record of damage that did NOT happen, which is the opposite fact.
   GameEvent.DamagePrevented {} -> Nothing
@@ -1313,6 +1319,28 @@ damagedObject event = damageRecipient event >>= Recipient.objectOf
 -- clears the log at the handoff, so "this turn" is what the log holds.
 wasDealtDamageThisTurn :: GameState -> PlayerId -> Bool
 wasDealtDamageThisTurn gs pid = any ((== Just pid) . damagedPlayer . LoggedEvent.event) (GameState.events gs)
+
+-- CR 120.1 / 608.2i: how much damage was dealt to this OBJECT this turn --
+-- wasDealtDamageThisTurn's twin over CR 120.1's other three recipients, summing
+-- amounts where that one asks a yes or no. Burning-Eye Zubera's "if 4 or more
+-- damage was dealt to it this turn" is the reader, through
+-- Pawl.Engine.Quantity's DamageDealtToThisTurn arm.
+--
+-- The LOG and not Object.damage, which is the marks CR 120.3e leaves rather than
+-- the damage that was dealt: CR 120.6 removes every mark on a regeneration and
+-- CR 120.3d marks none at all for wither and infect, and in all three cases the
+-- creature was still dealt the damage this counts. The log also outlives the id
+-- CR 400.7 deletes as the creature dies, which is the whole case the Zubera asks
+-- from. Its extent already IS the turn: Pawl.Engine.Engine.beginTurnOf clears it
+-- at the handoff and nothing else does.
+damageDealtToThisTurn :: GameState -> ObjectId -> Natural
+damageDealtToThisTurn gs oid =
+  sum
+    [ amount
+    | logged <- Foldable.toList (GameState.events gs),
+      Just (recipient, amount) <- [damageDealt (LoggedEvent.event logged)],
+      Recipient.objectOf recipient == Just oid
+    ]
 
 -- The player an event describes GAINING LIFE, and how much (CR 119.3).
 --

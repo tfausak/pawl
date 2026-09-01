@@ -396,6 +396,16 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- including the reader, since a creature that has died is out of
   -- GameState.combat as well as out of GameState.objects (#991).
   Quantity.WasBlocking -> fmap (\view -> if Filter.blocking view then 1 else 0) mView
+  -- CR 120.1's damage as a total, read off the event log for the object the
+  -- quantity is aimed at (Game.damageDealtToThisTurn) rather than off its view:
+  -- CR 608.2i is what makes the question answerable at all for a creature CR
+  -- 400.7 has deleted, and the log survives the death where the object does not.
+  --
+  -- "This turn" and not "as it died", which is the design call this arm settles:
+  -- the printed clause says this turn, and CR 120.6's regeneration and CR 120.3d's
+  -- wither and infect are three boards where the damage that was dealt is no
+  -- longer marked on the creature that took it.
+  Quantity.DamageDealtToThisTurn -> fmap (toInteger . Game.damageDealtToThisTurn gs) mOid
   -- CR 508.3b: how many of that player's opponents were declared attacked this
   -- combat phase. LifeTotal's arm in shape -- live, one player only, resolved
   -- through the same playersOf, and Nothing for a reference naming
@@ -833,6 +843,7 @@ substituteStar star quantity = case quantity of
   Quantity.SnowWasSpent -> quantity
   Quantity.WasToken -> quantity
   Quantity.WasBlocking -> quantity
+  Quantity.DamageDealtToThisTurn -> quantity
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.CardsDiscardedThisTurn _ -> quantity
   Quantity.LifeGainedThisTurn _ -> quantity
@@ -969,6 +980,9 @@ slots quantity = case quantity of
   Quantity.SnowWasSpent -> Set.empty
   Quantity.WasToken -> Set.empty
   Quantity.WasBlocking -> Set.empty
+  -- CR 120.1's damage total, naming no slot either: it carries no reference at
+  -- all, the object being the one the evaluation is aimed at.
+  Quantity.DamageDealtToThisTurn -> Set.empty
   -- And a ninth PlayerRef in that same position, CR 508.3b's record having
   -- nothing else on it.
   Quantity.OpponentsAttacked _ -> Set.empty
@@ -1058,6 +1072,7 @@ objectSlots quantity = case quantity of
   Quantity.SnowWasSpent -> Set.empty
   Quantity.WasToken -> Set.empty
   Quantity.WasBlocking -> Set.empty
+  Quantity.DamageDealtToThisTurn -> Set.empty
   Quantity.OpponentsAttacked _ -> Set.empty
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
   Quantity.LifeGainedThisTurn _ -> Set.empty
@@ -1125,6 +1140,7 @@ nestedRefs quantity = case quantity of
   Quantity.SnowWasSpent -> Set.empty
   Quantity.WasToken -> Set.empty
   Quantity.WasBlocking -> Set.empty
+  Quantity.DamageDealtToThisTurn -> Set.empty
   Quantity.OpponentsAttacked ref -> Set.singleton (Left ref)
   Quantity.CardsDiscardedThisTurn ref -> Set.singleton (Left ref)
   Quantity.LifeGainedThisTurn ref -> Set.singleton (Left ref)
@@ -1310,6 +1326,7 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.SnowWasSpent -> quantity
   Quantity.WasToken -> quantity
   Quantity.WasBlocking -> quantity
+  Quantity.DamageDealtToThisTurn -> quantity
   Quantity.EnteredThisTurn -> quantity
   Quantity.BlockersBeyondFirst -> quantity
   where
@@ -1424,6 +1441,7 @@ readsX quantity = case quantity of
   Quantity.SnowWasSpent -> False
   Quantity.WasToken -> False
   Quantity.WasBlocking -> False
+  Quantity.DamageDealtToThisTurn -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False
   Quantity.LifeGainedThisTurn _ -> False
