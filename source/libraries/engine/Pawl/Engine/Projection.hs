@@ -24,6 +24,7 @@ import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
+import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
@@ -172,7 +173,6 @@ import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
-import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -3361,25 +3361,32 @@ gatherGiven stripped functioning seed gs =
          in fmap one (NonEmpty.toList (grantedDefiningParts (ContinuousEffect.modification eff)))
       stored = concatMap fromStored (GameState.continuousEffects gs)
       static = concatMap (fmap snd . permanentParts stripped functioning setEffs setStripped gs) (abilitySources gs)
-      fromCommandZone commandId = case Game.lookupObject commandId gs of
-        Nothing -> []
-        Just commandObj -> case Game.faceOfObject gs commandObj of
-          Nothing -> []
-          Just face ->
-            -- CR 114.4 / 113.6: an emblem's abilities function in the command
-            -- zone, sharing the emblem's timestamp (CR 613.7a). Never stripped:
-            -- the pool's CR 613.1f removers reach creatures (CR 114.5).
-            --
-            -- CR 313.4 / CR 902.7 puts a vanguard card's static abilities here on
-            -- the same terms, and this walk already reaches them with no test of
-            -- its own: a vanguard prints no zone clause -- rule 313.4 is the
-            -- rulebook's statement and not the card's -- so functionsFromZone's
-            -- empty-set default admits it, exactly as it admits an emblem's.
-            -- Pawl.VanguardSpec's "CR 902.7 a vanguard's static ability functions
-            -- from the command zone" is what proves that, against a control board
-            -- differing only in the card.
-            concat [gatherStatic (functioning commandId) commandId (Object.timestamp commandObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), functionsFromZone Zone.Command sa]
-      emblems = concatMap fromCommandZone (Set.toList (GameState.command gs))
+      fromCommandZone commandId
+        | not (Vanguard.functionsFromCommandZone commandId gs) = []
+        | otherwise = case Game.lookupObject commandId gs of
+            Nothing -> []
+            Just commandObj -> case Game.faceOfObject gs commandObj of
+              Nothing -> []
+              Just face ->
+                -- CR 114.4 / 113.6p: an emblem's abilities function in the command
+                -- zone, sharing the emblem's timestamp (CR 613.7a). Never stripped:
+                -- the pool's CR 613.1f removers reach creatures (CR 114.5).
+                --
+                -- CR 313.4 / CR 902.7 puts a vanguard card's static abilities here on
+                -- the same terms. Both arrive through Vanguard.functionsFromCommandZone
+                -- above, which is rule 113.6p's list, and the gate is not optional:
+                -- neither an emblem nor a vanguard prints a zone clause -- rule 313.4
+                -- is the rulebook's statement and not the card's -- so
+                -- functionsFromZone's empty-set default would otherwise admit the
+                -- printed statics of a COMMANDER sitting in the same zone, which CR
+                -- 113.6's default leaves functioning on the battlefield alone.
+                -- Pawl.VanguardSpec's "CR 902.7 a vanguard's static ability functions
+                -- from the command zone" and Pawl.CommanderSpec's "CR 113.6 a
+                -- commander's static ability does not function from the command zone"
+                -- are the two halves that prove it, each against a control board
+                -- differing in one thing.
+                concat [gatherStatic (functioning commandId) commandId (Object.timestamp commandObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), functionsFromZone Zone.Command sa]
+      inCommand = concatMap fromCommandZone (Set.toList (GameState.command gs))
       fromSpell spellId = case Game.lookupObject spellId gs of
         Nothing -> []
         Just spellObj -> case Game.faceOfObject gs spellObj of
@@ -3468,7 +3475,7 @@ gatherGiven stripped functioning seed gs =
       counters = counterGathered gs
       designations = designationGathered gs
       bestows = bestowGathered gs
-   in stored <> static <> emblems <> spells <> graveyards <> hands <> libraries <> counters <> designations <> bestows
+   in stored <> static <> inCommand <> spells <> graveyards <> hands <> libraries <> counters <> designations <> bestows
 
 -- CR 113.6b: does this static ability function from `zone`? THE zone
 -- classification -- one question, asked by each of gatherGiven's static-ability
@@ -5181,8 +5188,8 @@ abilitiesFromCharacteristics peers pc oid gs =
 --
 -- The ZONE is the one the object is in, and CR 113.6b is what it answers: a
 -- printed row naming some other zone is not gathered here. The two callers pass
--- the two zones CR 113.6 gives a DEFAULT to -- the battlefield and, for an
--- emblem, the command zone -- which is why the gate is functionsFromZoneOfRow
+-- the two zones CR 113.6 gives a DEFAULT to -- the battlefield and, for the
+-- objects CR 113.6p names, the command zone -- which is why the gate is functionsFromZoneOfRow
 -- rather than the bare stated set replacementsAffecting's other walks take. The
 -- MINTED rows below take no such gate: each is minted by a rule for the object
 -- it is on rather than printed on a face, so none of them can state a zone.
@@ -5334,8 +5341,9 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 --
 -- The rule's FROM-ZONE is not in the pattern -- Pawl.Types.ZoneChangePattern has
 -- no such field -- and does not need to be: replacementsAffecting projects
--- battlefield permanents and the command zone's emblems, and CR 122.1h mints
--- this row from counters on a PERMANENT, which CR 114.5 says an emblem is not --
+-- battlefield permanents and the command zone's CR 113.6p objects, and CR 122.1h
+-- mints this row from counters on a PERMANENT, which CR 114.5 says an emblem is
+-- not and CR 313.2 says a vanguard card is not --
 -- so a row minted here can only ever be a candidate while its source is on the
 -- battlefield, which is exactly "from the battlefield". The four walks that
 -- reach the other zones cannot carry it: CR 113.6b gathers PRINTED rows and this
@@ -5462,7 +5470,7 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
     <> Saga.entryReplacementsOf pc
 
 -- CR 614.1: every replacement effect active on the battlefield -- plus the
--- emblems CR 113.6p keeps working in the command zone, see the walk -- PAIRED
+-- emblems and vanguard cards CR 113.6p keeps working in the command zone, see the walk -- PAIRED
 -- WITH ITS SOURCE, since a ControllerRelation pattern (CR 109.5's "you") is
 -- unanswerable without it. Short-circuits when nothing in either place has one.
 --
@@ -5535,35 +5543,35 @@ replacementsAffecting gs =
       -- CR 604.2's second limb: a static ability's replacement effect stays
       -- active while the object with the ability remains "in the appropriate
       -- zone, as described in rule 113.6", and CR 113.6p is the arm of that list
-      -- which names emblems -- CR 114.4 again, from the emblem's own rule. So an
+      -- which names emblems and vanguard cards -- CR 114.4 and CR 902.7 again,
+      -- from each object's own rule. So an
       -- emblem's own printed rows are gathered here, where the two grantor
       -- disjuncts above find nothing: an emblem that grants nobody anything
       -- writes no Modification for either of them to read, and CR 114.5 keeps it
       -- off the battlefield `baseHas` walks.
       --
-      -- EMBLEMS alone, where the gather takes the whole zone -- the narrowing
-      -- Pawl.Engine.CombatRestriction.inForce and Pawl.Engine.Event's `inCommand`
-      -- make for the same reason: the command zone also holds a commander and a
-      -- dungeon card, whose printed abilities CR 113.6's default leaves
-      -- functioning on the battlefield. Asking Source.OfEmblem is reading the
-      -- rulebook's own list (CR 113.6p), not an effect's identity. Nothing
-      -- OBSERVES that narrowing yet -- no card in data/cards/ puts a commander
-      -- carrying a printed replacement row into the command zone, and dropping
-      -- the filter leaves the suite green -- so it is a regression fence resting
-      -- on CR 113.6's default rather than a proved behaviour.
+      -- CR 902.7 puts a face-up VANGUARD card's printed rows here on the same
+      -- terms, which is why the test is Vanguard.functionsFromCommandZone -- rule
+      -- 113.6p's own list -- and not Source.OfEmblem. It is a narrowing all the
+      -- same, and the same one Pawl.Engine.CombatRestriction.inForce and
+      -- Pawl.Engine.Event's `inCommand` make: the command zone also holds a
+      -- commander and a dungeon card, whose printed abilities CR 113.6's default
+      -- leaves functioning on the battlefield. Reading rule 113.6p's list is
+      -- reading the rulebook, not an effect's identity. Pawl.VanguardSpec's "CR
+      -- 902.7 a vanguard's replacement effect functions from the command zone" is
+      -- what proves the admitting half; the excluding half is a regression fence,
+      -- no card in data/cards/ putting a commander that prints a replacement row
+      -- into the command zone.
       --
       -- The gate disjunct is deliberately NOT folded into elsewhereGrants beside
       -- it: that function asks what a Modification WRITES, and it is shared
       -- verbatim with CombatRestriction.inForce's `anyMinted`, which does not ask
       -- this question at all. Copiability is not asked either, unlike `baseHas`:
-      -- CR 114.3 makes the emblem's abilities the whole of it, and no copy effect
-      -- has an emblem to copy.
+      -- CR 114.3 makes the emblem's abilities the whole of it, CR 313.2 keeps a
+      -- vanguard card in this zone all game, and no copy effect reaches either.
       --
-      isEmblem oid = case fmap Object.source (Game.lookupObject oid gs) of
-        Just (Source.OfEmblem _) -> True
-        _ -> False
-      emblems = filter isEmblem (Set.toList (GameState.command gs))
-      emblemHas oid = case Game.faceOf oid gs of
+      inCommand = filter (\oid -> Vanguard.functionsFromCommandZone oid gs) (Set.toList (GameState.command gs))
+      commandZoneHas oid = case Game.faceOf oid gs of
         Nothing -> False
         Just face -> not (null (Face.replacementEffects face))
       -- CR 113.6b's stated set, in the four zones CR 113.6 gives no default that
@@ -5608,9 +5616,9 @@ replacementsAffecting gs =
       -- gatherGiven's hidden walks cost and answers [] on a board with no such row
       -- without any of the reads baseHas makes.
       onBoard =
-        if not (any baseHas onBattlefield || elsewhereHas || any emblemHas emblems)
+        if not (any baseHas onBattlefield || elsewhereHas || any commandZoneHas inCommand)
           then []
-          else concatMap (forOne Zone.Battlefield) onBattlefield <> concatMap (forOne Zone.Command) emblems
+          else concatMap (forOne Zone.Battlefield) onBattlefield <> concatMap (forOne Zone.Command) inCommand
    in onBoard <> stated
 
 -- CR 611.2a: does any STORED continuous effect write a modification satisfying
@@ -5633,8 +5641,9 @@ storedWrites p gs = any (p . ContinuousEffect.modification) (GameState.continuou
 -- Does any static ability functioning from a zone OTHER than the battlefield
 -- write a modification satisfying `p`? storedWrites' sibling disjunct in both
 -- gates, and the other half of what a walk of the permanents cannot reach: an
--- emblem's abilities function in the command zone and an emblem is neither a
--- card nor a permanent (CR 114.4 / 114.5, the arm CR 113.6p names), and CR
+-- emblem's or a vanguard card's abilities function in the command zone, where an
+-- emblem is neither a card nor a permanent and a vanguard card is not a permanent
+-- either (CR 114.4 / 114.5 / 902.7 / 313.2, the arm CR 113.6p names), and CR
 -- 113.6b / 113.6f put a card's abilities to work from the stack, a graveyard, a
 -- hand or a library.
 --

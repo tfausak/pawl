@@ -119,7 +119,8 @@ roomAbility room dungeonRoom =
 -- Gathered here rather than by Event.gatherTriggers for the reason
 -- Monarch.inherentMonarchPending is: that scan asks each BATTLEFIELD permanent
 -- what it triggers, plus the graveyards, the just-cast spell and -- under CR
--- 114.4 -- the EMBLEMS in the command zone, which a dungeon card is not.
+-- 113.6p -- the EMBLEMS and VANGUARD CARDS in the command zone, which a dungeon
+-- card is neither.
 -- A room ability is minted rather than printed besides, so there is nothing on
 -- the card's face for that scan to read: widening it to offer dungeon cards
 -- would find nothing, and unifying the two means teaching it to mint the

@@ -4,15 +4,19 @@
 -- Covers Pawl.Engine.Vanguard and the CR 902 readings its callers make:
 -- Pawl.Engine.Setup's starting life, command zone and rebuild paths,
 -- Pawl.Engine.Mulligan's starting hand size, and Pawl.Engine.PlayerEffect's
--- maximum hand size. Also the two walks that let a vanguard's abilities function
--- from the command zone -- Pawl.Engine.Event's triggered one, which calls this
--- module, and Pawl.Engine.Projection's static one, which needed nothing.
+-- maximum hand size. Also the four walks that let a vanguard's abilities function
+-- from the command zone, all of which ask Vanguard.functionsFromCommandZone:
+-- Pawl.Engine.Event's triggered one, Pawl.Engine.Projection's static and
+-- replacement ones, and Pawl.Engine.CombatRestriction.inForce.
 module Pawl.VanguardSpec where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
@@ -24,6 +28,10 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
@@ -31,9 +39,12 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Zone as Zone
 
 -- A deck of thirty Mountains, plus whichever vanguard card the leg brings. Every
@@ -79,6 +90,28 @@ handSize gs = length (Game.zoneMembers Zone.Hand S.alice gs)
 
 commandNames :: GameState.GameState -> [CardName.CardName]
 commandNames gs = fmap (\oid -> maybe (CardName.MkCardName (Text.pack "?")) S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Command S.alice gs)
+
+-- One noncombat hit, the shape Pawl.Engine.Damage.applyDamage takes.
+hit :: ObjectId.ObjectId -> Recipient.Recipient -> Natural -> DamageEvent.DamageEvent
+hit src recipient n = DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+
+-- How much life `pid` lost between the two boards. A difference rather than a
+-- total, because the vanguard's own CR 902.4 modifier moves the starting number
+-- and the pair here differs in exactly the vanguard.
+lifeLost :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState -> Maybe Integer
+lifeLost pid before after = (-) <$> S.lifeOf pid before <*> S.lifeOf pid after
+
+-- `built`'s board moved into a declare-attackers step with alice active and bob
+-- defending, which is Support.combatBoardOf's shape -- rebuilt here rather than
+-- called, because that fixture starts from an empty game and this one has to keep
+-- the command zone Setup.createDeck filled.
+declaringAttackers :: GameState.GameState -> GameState.GameState
+declaringAttackers gs =
+  gs
+    { GameState.activePlayer = S.alice,
+      GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]}
+    }
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Vanguard" $ do
@@ -183,6 +216,50 @@ spec s registry = Spec.describe s "Vanguard" $ do
     Spec.assertBool s (Projection.hasKeyword Keyword.Vigilance aliceCreature board) "alice's creature has vigilance"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Vigilance bobCreature board)) "bob's, on the same board, does not"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Vigilance aliceControl control)) "and neither does alice's on the board without the vanguard"
+
+  -- CR 902.7 / CR 313.4, third kind of printed ability: a replacement effect.
+  -- Mishra (Vanguard, hand +0 / life -3, "If a creature you control would deal
+  -- damage, it deals double that damage instead" -- checked against Scryfall,
+  -- 2026-09-01) against a batch holding one hit from alice's creature and one
+  -- from bob's, so the rewrite's own "you control" half is read on the same
+  -- board and cannot be what makes the pair differ.
+  Spec.it s "CR 902.7 a vanguard's replacement effect functions from the command zone" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mishra <- S.printingOf s registry "Mishra"
+    let place vanguard =
+          let (mine, g1) = S.addCreature piker S.alice (built mountain vanguard)
+              (theirs, board) = S.addCreature piker S.bob g1
+              after = S.runPure S.identityAnswer board (Damage.applyDamage [hit mine (Recipient.ToPlayer S.bob) 3, hit theirs (Recipient.ToPlayer S.alice) 5])
+           in (lifeLost S.bob board after, lifeLost S.alice board after)
+        (bobLost, aliceLost) = place (Just mishra)
+        (bobControl, aliceControl) = place Nothing
+    Spec.assertEqWith s "with Mishra, her creature's 3 reaches bob as 6" bobLost (Just 6)
+    Spec.assertEqWith s "and bob's 5, on the same board, is not doubled" aliceLost (Just 5)
+    Spec.assertEqWith s "without him the 3 stays a 3" bobControl (Just 3)
+    Spec.assertEqWith s "and the 5 stays a 5" aliceControl (Just 5)
+
+  -- CR 902.7 / CR 313.4, fourth kind: a combat restriction. No printed vanguard
+  -- states one -- every vanguard whose text names attacking or blocking either
+  -- grants a keyword (Lyna's shadow, Two-Headed Giant of Foriys Avatar's menace),
+  -- pumps (Goblin Warchief Avatar), or states a CR 509.1c REQUIREMENT rather than
+  -- a restriction (Sisters of Stone Death Avatar's "must be blocked if able"),
+  -- checked over Scryfall's whole `t:vanguard` list on 2026-09-01 -- so the
+  -- producer is synthetic, which CR 313.4's "any number of static ... abilities"
+  -- is what permits.
+  Spec.it s "CR 902.7 a vanguard's combat restriction functions from the command zone" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    avatar <- S.printingOf s registry "Synthetic Pacifist Avatar"
+    let place vanguard =
+          let (mine, placed) = S.addCreature piker S.alice (built mountain vanguard)
+           in (mine, declaringAttackers placed)
+        (barred, board) = place (Just avatar)
+        (free, control) = place Nothing
+    Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [barred] board)) "CR 508.1c: her Piker may not be declared attacking"
+    Spec.assertBool s (Combat.legalAttackDeclaration S.alice [free] control) "and may on the board that differs only in the vanguard"
+    Spec.assertBool s (not (Combat.canAttack S.alice barred board)) "so it is not a CR 508.1a candidate either"
+    Spec.assertEqWith s "where without the vanguard it is the one offered" (Combat.legalAttackers S.alice control) [free]
 
   -- CR 313.2 against CR 727.2: a restart puts every card into its owner's new
   -- library, and the vanguard card is the exception -- it stays where it is, and

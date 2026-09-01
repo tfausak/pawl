@@ -513,8 +513,8 @@ placePendingTriggers = do
       -- and only for the active player.
       irradiated = Rad.inherentPending evs gs
       -- CR 309.4c's room abilities, gathered separately because
-      -- Event.gatherTriggers reads the command zone for CR 114.4's emblems alone
-      -- and a dungeon card is not one. Unlike the four above these DO have a
+      -- Event.gatherTriggers reads the command zone for CR 113.6p's list -- an
+      -- emblem and a vanguard card -- and a dungeon card is on neither. Unlike the four above these DO have a
       -- source, so they carry TriggerSource.OfObject and go through placeBorne.
       entered = Dungeon.roomPending evs gs
   -- The GROUPED view of the same snapshot, which the CR 603.10a look-back in
