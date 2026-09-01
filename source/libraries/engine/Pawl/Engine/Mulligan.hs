@@ -89,7 +89,7 @@ actionsFor field pid gs =
 allows :: PlayerId -> ObjectId -> HandAction.HandAction Card.Card -> GameState.GameState -> Bool
 allows pid oid action gs = case HandAction.condition action of
   Nothing -> True
-  Just condition -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Just pid) (Just oid)) gs oid condition
+  Just condition -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just pid) (Just oid)) gs oid condition
 
 -- The shared CR 103.5b / CR 103.6 loop: offer this player every action their
 -- hand grants through `field`, on the `question` channel, until they decline or

@@ -261,7 +261,7 @@ layer m = case m of
 -- fold's running value.
 applyModification :: Count.ViewOf -> ObjectId -> GameState -> ObjectId -> Set CardType.CardType -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyModification viewOf src gs oid unitTypes m pc =
-  let context = Filter.contextFor (controllerOf src gs) (Just src)
+  let context = Filter.contextFor (Game.teams gs) (controllerOf src gs) (Just src)
    in case m of
         -- CR 613.1f layer 6: a grant adds an ability, so two grants of the same
         -- keyword count twice.
@@ -660,16 +660,16 @@ affectsGiven peers source oid a partial gs = case a of
         -- consults no liveness gate and so cannot re-enter this function.
         perspective = controllerOf source gs
      in Set.member oid (GameState.battlefield gs)
-          && Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
+          && Filter.matches (Filter.contextFor (Game.teams gs) perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
   -- Matching's body without the battlefield conjunct.
   Affected.MatchingAnywhere f ->
     let perspective = controllerOf source gs
-     in Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
+     in Filter.matches (Filter.contextFor (Game.teams gs) perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
   -- Matching's body with that conjunct NEGATED rather than dropped.
   Affected.MatchingOffBattlefield f ->
     let perspective = controllerOf source gs
      in not (Set.member oid (GameState.battlefield gs))
-          && Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
+          && Filter.matches (Filter.contextFor (Game.teams gs) perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
   -- CR 303.4b / 303.4m: the source's attachment again, read for the PLAYER it
   -- names. The Filter's perspective stays the source's controller (CR 109.5), not
   -- the enchanted player's. The candidate's controller is bound once and used
@@ -679,7 +679,7 @@ affectsGiven peers source oid a partial gs = case a of
       let controller = controllerOf oid gs
        in Set.member oid (GameState.battlefield gs)
             && controller == Just pid
-            && Filter.matches (Filter.contextFor (controllerOf source gs) (Just source)) (viewOfCharacteristics peers oid partial controller (countersOf oid gs) gs) f
+            && Filter.matches (Filter.contextFor (Game.teams gs) (controllerOf source gs) (Just source)) (viewOfCharacteristics peers oid partial controller (countersOf oid gs) gs) f
     _ -> False
 
 -- The characteristics view of an object: its CR 613 projection and its projected
@@ -1484,7 +1484,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
     -- this seed from a token is CR 208.2's star. Pawl.CountSpec's Miming Slime
     -- group is what proves that.
     let seedViewOf = const Nothing
-        seedContext = Filter.contextFor (controllerOf oid gs) (Just oid)
+        seedContext = Filter.contextFor (Game.teams gs) (controllerOf oid gs) (Just oid)
      in PC.MkProjectedCharacteristics
           { -- CR 709.4a: the names the object shows, which `face` cannot carry --
             -- Game.namesOf decides which halves show.
@@ -3222,7 +3222,7 @@ anyConditional gs =
 -- new host on the next pass.
 conditionHolds :: [Gathered] -> GameState -> ObjectId -> Layer -> Condition.Type.Condition -> Bool
 conditionHolds cands gs src lowest =
-  Condition.holds (viewUpTo lowest cands gs) ((Filter.contextFor (controllerOf src gs) (Just src)) {Filter.sourceAttachedTo = hostOf src gs}) gs src
+  Condition.holds (viewUpTo lowest cands gs) ((Filter.contextFor (Game.teams gs) (controllerOf src gs) (Just src)) {Filter.sourceAttachedTo = hostOf src gs}) gs src
 
 -- CR 113.6 / 614.12: the battlefield permanents whose static abilities FUNCTION
 -- right now. Everything on the battlefield, minus the permanents entering beside
@@ -4640,7 +4640,7 @@ applyCharacteristicPT :: Count.ViewOf -> GameState -> ObjectId -> ProjectedChara
 applyCharacteristicPT viewOf gs oid pc = case PC.characteristicPT pc of
   Nothing -> pc
   Just cda ->
-    let context = Filter.contextFor (controllerOf oid gs) (Just oid)
+    let context = Filter.contextFor (Game.teams gs) (controllerOf oid gs) (Just oid)
      in pc
           { PC.power = Just (Quantity.determine viewOf context gs oid (CharacteristicPT.power cda)),
             PC.toughness = Just (Quantity.determine viewOf context gs oid (CharacteristicPT.toughness cda))
@@ -5123,7 +5123,7 @@ abilitiesFromCharacteristics :: Count.ViewOf -> ProjectedCharacteristics -> Obje
 abilitiesFromCharacteristics peers pc oid gs =
   let granted ability = case ActivatedAbility.condition ability of
         Nothing -> True
-        Just cond -> Condition.holds peers (Filter.contextFor (controllerOf oid gs) (Just oid)) gs oid cond
+        Just cond -> Condition.holds peers (Filter.contextFor (Game.teams gs) (controllerOf oid gs) (Just oid)) gs oid cond
    in -- Rule 702's own activated abilities are appended here, minted from the
       -- POST-LAYER keyword map, so Humility takes crew away with the rest.
       --
@@ -5194,7 +5194,7 @@ replacementsOf zone oid gs =
 printedRowLives :: ObjectId -> GameState -> PrintedReplacement.PrintedReplacement effect -> Bool
 printedRowLives oid gs pr = case PrintedReplacement.condition pr of
   Nothing -> True
-  Just cond -> Condition.holds (fullView gs) (Filter.contextFor (controllerOf oid gs) (Just oid)) (boardAsEntering gs) oid cond
+  Just cond -> Condition.holds (fullView gs) (Filter.contextFor (Game.teams gs) (controllerOf oid gs) (Just oid)) (boardAsEntering gs) oid cond
 
 -- CR 113.6b: does this printed replacement row function from `zone`?
 -- functionsFromZone's twin for rows, with the same empty-set reading -- a row
@@ -6023,7 +6023,7 @@ controlNames grants visited gs source a = case a of
 matchesLeanly :: [ControlGrant] -> Set ObjectId -> GameState -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesLeanly grants visited gs source f oid =
   Filter.matches
-    (Filter.contextFor (controllerOfGiven grants visited source gs) (Just source))
+    (Filter.contextFor (Game.teams gs) (controllerOfGiven grants visited source gs) (Just source))
     (leanViewOf grants visited gs oid)
     f
 

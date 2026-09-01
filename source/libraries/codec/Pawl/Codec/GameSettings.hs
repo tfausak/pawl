@@ -3,6 +3,7 @@
 module Pawl.Codec.GameSettings where
 
 import qualified Pawl.Codec.AttackOption as AttackOption
+import qualified Pawl.Codec.Teams as Teams
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -20,8 +21,10 @@ codec :: Codec.Codec GameSettings.GameSettings
 codec = Fields.object $ do
   brawl <- Fields.required "brawl" Common.boolean GameSettings.brawl
   attackOption <- Fields.required "attackOption" (Common.maybe AttackOption.codec) GameSettings.attackOption
+  teams <- Fields.required "teams" Teams.codec GameSettings.teams
   pure
     GameSettings.MkGameSettings
       { GameSettings.brawl = brawl,
-        GameSettings.attackOption = attackOption
+        GameSettings.attackOption = attackOption,
+        GameSettings.teams = teams
       }

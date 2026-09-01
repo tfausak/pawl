@@ -1,6 +1,7 @@
 module Pawl.Types.GameSettings where
 
 import qualified Pawl.Types.AttackOption as AttackOption
+import qualified Pawl.Types.Teams as Teams
 
 -- | CR 800.2: the options a game was started with -- "a series of options that
 -- can be added to a multiplayer game and a number of variant styles of
@@ -11,7 +12,7 @@ import qualified Pawl.Types.AttackOption as AttackOption
 -- CR factors itself: a named format is a preset over these fields, and CR
 -- 903.12a says so outright for the Brawl field ("Brawl is an option for a
 -- different style of Commander game"). Each further option -- CR 804's deploy
--- creatures, CR 801.2a's range of influence, CR 810's teams -- is one more field
+-- creatures (#2850), CR 801.2a's range of influence -- is one more field
 -- rather than one more name (#175). CR 802's and CR 803's three attack options
 -- share ONE field, because CR 806.2b makes them alternatives rather than
 -- independent switches (Pawl.Types.AttackOption).
@@ -41,6 +42,22 @@ data GameSettings = MkGameSettings
     -- more seats. At two seats it and 'AttackOption.MultiplePlayers' coincide --
     -- the one opponent is the defending player either way -- so the default
     -- changes nothing there.
-    attackOption :: Maybe AttackOption.AttackOption
+    attackOption :: Maybe AttackOption.AttackOption,
+    -- | CR 808.1: which team each player is on, so that CR 102.3 can take a
+    -- player's teammates out of their opponents.
+    --
+    -- Teams.none by default (Pawl.Engine.Setup.newGame), which is CR 102.4's
+    -- game that is not played between teams -- every game pawl started before
+    -- this field existed, and the one CR 806.1's free-for-all reading of
+    -- "opponent" is exact for.
+    --
+    -- Not implemented: CR 808.2's seating and CR 808.4's starting player, which
+    -- are the rest of the Team vs. Team variant -- pawl's turn order is the
+    -- caller's list and no random team is chosen from it (#2847). CR 808.3a's
+    -- attack multiple players option is the field above, which is on by default,
+    -- so a game with teams gets it without asking. CR 808.5 needs nothing: pawl
+    -- shares no resource between players, and one player has never been able to
+    -- touch another's cards.
+    teams :: Teams.Teams
   }
   deriving (Eq, Ord, Show)

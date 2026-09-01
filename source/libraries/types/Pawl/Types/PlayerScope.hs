@@ -37,13 +37,10 @@ data PlayerScope
     -- carrier, the protected player the scope is anchored to. "The one player
     -- the perspective names", whichever carrier supplied it.
     You
-  | -- | Every other player. Not a two-player shortcut: CR 806.1 has a
-    -- free-for-all's players compete as individuals, so every other player is an
-    -- opponent by construction, and CR 102.2 says the same for two players --
-    -- Pawl.Engine.PlayerEffect.inScope's `pid /= controller` is the one predicate
-    -- that serves both. CR 102.3 is the
-    -- ONE reading this is wrong for -- a teammate is not an opponent -- and pawl
-    -- has no teams to express (#175).
+  | -- | CR 102.3's opponents: every player not on the controller's team, which
+    -- in a free-for-all (CR 806.1) and at two seats (CR 102.2) is every other
+    -- player. Pawl.Engine.PlayerEffect.inScope answers it through
+    -- Pawl.Engine.Game.areOpponents, the one predicate every reader shares.
     Opponents
   | -- | Every player, the controller included ("including your own", Thalia's own
     -- ruling).

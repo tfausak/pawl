@@ -362,6 +362,8 @@ import qualified Pawl.Codec.TapPermanentsSpec
 import qualified Pawl.Codec.TapStateSpec
 import qualified Pawl.Codec.TargetCountSpec
 import qualified Pawl.Codec.TargetSlotSpec
+import qualified Pawl.Codec.TeamIdSpec
+import qualified Pawl.Codec.TeamsSpec
 import qualified Pawl.Codec.TimestampSpec
 import qualified Pawl.Codec.TokenPatternSpec
 import qualified Pawl.Codec.TokenRSpec
@@ -488,6 +490,7 @@ import qualified Pawl.SpecialActionSpec
 import qualified Pawl.SpeedSpec
 import qualified Pawl.SplitSecondSpec
 import qualified Pawl.TargetSpec
+import qualified Pawl.TeamSpec
 import qualified Pawl.TransformSpec
 import qualified Pawl.TriggerSpec
 import qualified Pawl.TurnSpec
@@ -920,6 +923,8 @@ spec s registry = do
   Pawl.Codec.TapStateSpec.spec s
   Pawl.Codec.TargetCountSpec.spec s
   Pawl.Codec.TargetSlotSpec.spec s
+  Pawl.Codec.TeamIdSpec.spec s
+  Pawl.Codec.TeamsSpec.spec s
   Pawl.Codec.TimestampSpec.spec s
   Pawl.Codec.TokenPatternSpec.spec s
   Pawl.Codec.TokenRSpec.spec s
@@ -1049,6 +1054,7 @@ spec s registry = do
   Pawl.SpeedSpec.spec s registry
   Pawl.SplitSecondSpec.spec s registry
   Pawl.TargetSpec.spec s registry
+  Pawl.TeamSpec.spec s registry
   Pawl.TransformSpec.spec s registry
   Pawl.TriggerSpec.spec s registry
   Pawl.TurnSpec.spec s registry

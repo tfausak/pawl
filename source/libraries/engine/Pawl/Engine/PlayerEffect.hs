@@ -89,20 +89,16 @@ import Pawl.Types.Timestamp (Timestamp)
 -- the opponents of whoever has hexproof rather than of the effect's controller.
 -- The parameter is named for the common case.
 --
--- The board comes in because one arm's membership is a fact about it rather than
--- about the two players: see PlayerScope.ControllingMostPermanents. Every other
--- arm ignores `gs`, and the leader is computed inside the one arm that asks, so a
--- scope that never names it pays nothing.
+-- The board comes in because two arms' membership is a fact about it rather than
+-- about the two players: PlayerScope.ControllingMostPermanents reads who leads,
+-- and PlayerScope.Opponents reads CR 808.1's teams. Each is computed inside the
+-- arm that asks, so a scope that names neither pays nothing.
 inScope :: PlayerId -> PlayerId -> GameState -> PlayerScope -> Bool
 inScope pid controller gs scope = case scope of
   PlayerScope.You -> pid == controller
-  -- Every other player. Not a two-player shortcut: CR 806.1 has a free-for-all's
-  -- players compete as individuals against each other, so every other player is
-  -- an opponent by construction, and CR 102.2 says the same for two players.
-  --
-  -- CR 102.3 is the ONE reading this is wrong for -- in a game between teams a
-  -- teammate is not an opponent -- and pawl has no teams to express (#175).
-  PlayerScope.Opponents -> pid /= controller
+  -- CR 102.3's every player not on the controller's team, which in a
+  -- free-for-all (CR 806.1) and at two seats (CR 102.2) is every other player.
+  PlayerScope.Opponents -> Game.areOpponents gs controller pid
   -- Thalia's ruling: "including your own".
   PlayerScope.EachPlayer -> True
   PlayerScope.ControllingMostPermanents -> permanentLeader gs == Just pid
@@ -283,7 +279,7 @@ printedRows gs =
                       Just c ->
                         Condition.holds
                           (Projection.fullView gs)
-                          (Filter.contextFor (Just controller) (Just oid))
+                          (Filter.contextFor (Game.teams gs) (Just controller) (Just oid))
                           gs
                           oid
                           (if null changes then c else Projection.rewriteCondition changes c)
@@ -923,7 +919,7 @@ matchesObjectFrom src filter_ oid gs =
 -- the AFFECTED object's own controller, and the source is the row's.
 contextFrom :: Maybe ObjectId -> ObjectId -> GameState -> Filter.Context
 contextFrom src oid gs =
-  (Filter.contextFor (Projection.controllerOf oid gs) src)
+  (Filter.contextFor (Game.teams gs) (Projection.controllerOf oid gs) src)
     { Filter.sourceAttachedTo = src >>= \s -> Projection.hostOf s gs
     }
 

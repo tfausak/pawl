@@ -622,8 +622,8 @@ data GameState = MkGameState
     -- moment the count exists.
     --
     -- ONE number and not a map, because rule 731.2 names exactly one player, "the
-    -- previous turn's active player". CR 731.2a's shared-team-turns variant asks
-    -- about a whole team and would need more, and pawl has no teams (#175). The
+    -- previous turn's active player". Not implemented: CR 731.2a's reading for the
+    -- shared team turns option, which asks about a whole team (#2848). The
     -- per-player question a CARD asks is castsLastTurn below, and Engine.beginTurnOf
     -- reads THIS field out of that map so the two cannot disagree.
     spellsCastLastTurn :: Natural.Natural,

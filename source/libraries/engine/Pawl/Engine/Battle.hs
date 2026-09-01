@@ -85,6 +85,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
@@ -157,13 +158,14 @@ battleTypes = Set.intersection (Set.singleton Subtype.Siege) . PC.subtypes
 -- 310.11, CR 704.5x and CR 704.5y all answer by putting the battle into its
 -- owner's graveyard.
 protectorCandidates ::
+  Teams.Teams ->
   PC.ProjectedCharacteristics ->
   PlayerId.PlayerId ->
   [PlayerId.PlayerId] ->
   [PlayerId.PlayerId]
-protectorCandidates pc controller playing
+protectorCandidates teams pc controller playing
   | Set.null (battleTypes pc) = filter (== controller) playing
-  | otherwise = filter (/= controller) playing
+  | otherwise = filter (Teams.areOpponents teams controller) playing
 
 -- CR 704.5x / CR 704.5y: does this battle's protector designation need repairing?
 --
@@ -194,13 +196,14 @@ protectorCandidates pc controller playing
 -- own protector to any protector who can't be one, which is exactly what
 -- protectorCandidates answers.
 needsProtector ::
+  Teams.Teams ->
   PC.ProjectedCharacteristics ->
   PlayerId.PlayerId ->
   [PlayerId.PlayerId] ->
   Bool ->
   Maybe PlayerId.PlayerId ->
   Bool
-needsProtector pc controller playing attacked designated = case designated of
+needsProtector teams pc controller playing attacked designated = case designated of
   -- CR 704.5x, both conjuncts.
   Nothing -> not attacked
   Just pid
@@ -208,7 +211,7 @@ needsProtector pc controller playing attacked designated = case designated of
     -- designated as its protector, so the rider covers this too.
     | notElem pid playing -> not attacked
     -- CR 704.5y, and CR 310.11's second clause. No rider.
-    | otherwise -> notElem pid (protectorCandidates pc controller playing)
+    | otherwise -> notElem pid (protectorCandidates teams pc controller playing)
 
 -- CR 310.9a: ask the battle's controller who protects it, and answer with their
 -- pick. Nothing means the rules offer no legal protector, which both callers
@@ -234,7 +237,7 @@ designateProtector ::
   Game (Maybe PlayerId.PlayerId)
 designateProtector pc controller oid = do
   gs <- State.get
-  case NonEmpty.nonEmpty (protectorCandidates pc controller (Game.stillPlaying gs)) of
+  case NonEmpty.nonEmpty (protectorCandidates (Game.teams gs) pc controller (Game.stillPlaying gs)) of
     Nothing -> pure Nothing
     Just candidates
       | null (NonEmpty.tail candidates) -> pure (Just (NonEmpty.head candidates))

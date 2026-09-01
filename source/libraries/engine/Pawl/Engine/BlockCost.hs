@@ -92,7 +92,7 @@ costsOn blocker gs =
       shareOf source bc = case BlockCost.perBlocker bc of
         PerCreature.Fixed cost -> [cost]
         PerCreature.Counted quantity ->
-          let context = Filter.contextFor (Projection.controllerOf source gs) (Just source)
+          let context = Filter.contextFor (Game.teams gs) (Projection.controllerOf source gs) (Just source)
               generic n = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)])) []
            in Maybe.maybeToList (fmap generic (Quantity.evaluate (Projection.fullView gs) context gs source quantity))
       fromCost source bc =

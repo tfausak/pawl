@@ -42,6 +42,7 @@ import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.Scope as Scope
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -422,7 +423,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- answered question, and outside a combat phase the cleared record (CR 511.3)
   -- says the same thing. What is unanswered is only the reference.
   Quantity.OpponentsAttacked ref -> case playersOf ref of
-    Just [pid] -> Just (toInteger (length (filter (attackedOpponent pid) (Set.toList (Combat.declaredAttacked (GameState.combat gs))))))
+    Just [pid] -> Just (toInteger (length (filter (attackedOpponent (Game.teams gs) pid) (Set.toList (Combat.declaredAttacked (GameState.combat gs))))))
     _ -> Nothing
   -- CR 701.9a / 608.2i: how many cards that player has discarded this turn.
   -- OpponentsAttacked's arm in shape -- live, one player only, resolved through the
@@ -738,12 +739,12 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
 -- first: attacking an opponent's planeswalker or a battle they protect is not
 -- attacking that opponent, which melee's own ruling states outright.
 --
--- Every other player is an opponent (CR 102.2, CR 806.1), the reading
--- Pawl.Types.PlayerScope.Opponents and Count.playersFor already share; CR 102.3's
--- teammates are the one case it is wrong for, and pawl has no teams (#175).
-attackedOpponent :: PlayerId.PlayerId -> AttackTarget.AttackTarget -> Bool
-attackedOpponent pid target = case target of
-  AttackTarget.OfPlayer other -> other /= pid
+-- CR 102.3's opponents, the reading Pawl.Types.PlayerScope.Opponents and
+-- Count.playersFor already share: every player not on that player's team, which
+-- at two seats (CR 102.2) and in a free-for-all (CR 806.1) is every other player.
+attackedOpponent :: Teams.Teams -> PlayerId.PlayerId -> AttackTarget.AttackTarget -> Bool
+attackedOpponent teams pid target = case target of
+  AttackTarget.OfPlayer other -> Teams.areOpponents teams pid other
   AttackTarget.OfPlaneswalker _ -> False
   AttackTarget.OfBattle _ -> False
 

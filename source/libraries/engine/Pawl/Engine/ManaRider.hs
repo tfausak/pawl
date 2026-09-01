@@ -45,7 +45,7 @@ uncounterable :: ObjectId.ObjectId -> GameState.GameState -> Bool
 uncounterable oid gs = case Game.lookupObject oid gs of
   Nothing -> False
   Just object ->
-    let context = Filter.contextFor (Projection.controllerOf oid gs) Nothing
+    let context = Filter.contextFor (Game.teams gs) (Projection.controllerOf oid gs) Nothing
         view = Projection.viewOfObject oid gs
         stops rider = case ManaRider.effect rider of
           ManaRiderEffect.CantBeCountered -> Filter.matches context view (ManaRider.condition rider)

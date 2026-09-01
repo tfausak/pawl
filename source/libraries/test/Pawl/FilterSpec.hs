@@ -25,6 +25,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Zone as Zone
 
 -- A projected black creature controlled by player 0.
@@ -196,13 +197,13 @@ onHost :: Filter.View -> Filter.View
 onHost host = blackCreature {Filter.attachedToView = Just host}
 
 self :: Filter.Context
-self = Filter.contextFor (Just (PlayerId.MkPlayerId 0)) Nothing
+self = Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) Nothing
 
 other :: Filter.Context
-other = Filter.contextFor (Just (PlayerId.MkPlayerId 1)) Nothing
+other = Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 1)) Nothing
 
 noPerspective :: Filter.Context
-noPerspective = Filter.contextFor Nothing Nothing
+noPerspective = Filter.contextFor Teams.none Nothing Nothing
 
 -- The player candidate every "vacuously false" case below is asked about.
 aPlayer :: Filter.View
@@ -548,25 +549,25 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "matches the context's source" $ do
       Spec.assertBool
         s
-        (Filter.matches (Filter.contextFor (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))) blackCreature Filter.Type.IsSource)
+        (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))) blackCreature Filter.Type.IsSource)
         "is the source"
 
     Spec.it s "does not match a different object" $ do
       Spec.assertBool
         s
-        (not (Filter.matches (Filter.contextFor (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 8))) blackCreature Filter.Type.IsSource))
+        (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 8))) blackCreature Filter.Type.IsSource))
         "not the source"
 
     Spec.it s "no source in context is vacuously false" $ do
       Spec.assertBool
         s
-        (not (Filter.matches (Filter.contextFor (Just (PlayerId.MkPlayerId 0)) Nothing) blackCreature Filter.Type.IsSource))
+        (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) Nothing) blackCreature Filter.Type.IsSource))
         "no source"
 
     Spec.it s "no identity in view is vacuously false" $ do
       Spec.assertBool
         s
-        (not (Filter.matches (Filter.contextFor (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))) devoidBigCreature Filter.Type.IsSource))
+        (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))) devoidBigCreature Filter.Type.IsSource))
         "no identity"
 
   -- CR 115.10a: what the RESOLUTION named, in either shape. blackCreature is
@@ -574,7 +575,7 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
   -- slot naming 6 and 8 is the negative built off the same board.
   Spec.describe s "IsBound" $ do
     let slot = SlotName.MkSlotName (Text.pack "milled")
-        bound oids = Filter.contextWithSlots (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7)) (Map.singleton slot (Set.fromList (fmap ObjectId.MkObjectId oids)))
+        bound oids = Filter.contextWithSlots Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7)) (Map.singleton slot (Set.fromList (fmap ObjectId.MkObjectId oids)))
     Spec.it s "matches the one object the slot names" $ do
       Spec.assertBool s (Filter.matches (bound [7]) blackCreature (Filter.Type.IsBound slot)) "the bound object"
 
@@ -1297,7 +1298,7 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- CR 701.3a / 301.5a: the candidate's HOST against the match's source. Object
     -- 7 is the source throughout, so the three cases below differ only in what the
     -- candidate is attached to.
-    let framed = Filter.contextFor (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))
+    let framed = Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))
     Spec.it s "matches a candidate attached to the source" $ do
       Spec.assertBool s (Filter.matches framed (blackCreature {Filter.attachedTo = Just (ObjectId.MkObjectId 7)}) Filter.Type.IsAttachedToSource) "on the source"
 
@@ -1327,7 +1328,7 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- atoms above cannot say. `blackCreature` is object 7 and `aHost` is object 8,
     -- so the cases below differ only in which id the context reports the source as
     -- attached to.
-    let enchanting oid = (Filter.contextFor (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) {Filter.sourceAttachedTo = Just (ObjectId.MkObjectId oid)}
+    let enchanting oid = (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) {Filter.sourceAttachedTo = Just (ObjectId.MkObjectId oid)}
     Spec.it s "matches the object the source is attached to" $ do
       Spec.assertBool s (Filter.matches (enchanting 7) blackCreature Filter.Type.IsHostOfSource) "the host itself"
 
@@ -1346,7 +1347,7 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- Vacuously False wherever the position does not supply the field, which is
     -- every context but the four -- contextFor's own posture.
     Spec.it s "an unsupplied host is vacuously false" $ do
-      Spec.assertBool s (not (Filter.matches (Filter.contextFor (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) blackCreature Filter.Type.IsHostOfSource)) "no host supplied"
+      Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) blackCreature Filter.Type.IsHostOfSource)) "no host supplied"
 
     -- CR 303.4's other destination: a source attached to a PLAYER names no object,
     -- and a player candidate has no id to be named, so both ends answer False.

@@ -117,6 +117,7 @@ import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TurnUpR as TurnUpR
@@ -282,7 +283,7 @@ collect sources floating =
         Just condition ->
           Condition.holds
             (Projection.fullView sources)
-            (Filter.contextWithSlots (Just (ActiveReplacement.controller active)) (Just (ActiveReplacement.source active)) (ActiveReplacement.slots active))
+            (Filter.contextWithSlots (Game.teams sources) (Just (ActiveReplacement.controller active)) (Just (ActiveReplacement.source active)) (ActiveReplacement.slots active))
             (Projection.boardAsEntering sources)
             (ActiveReplacement.source active)
             condition
@@ -606,7 +607,7 @@ applies gs event candidate =
         -- resolved and survives the source leaving the battlefield or changing
         -- hands. See matchesCandidatePlayer (#2662).
         (ReplacementEffect.DrawR pat, ProposedEvent.WouldDraw pid) ->
-          matchesCandidatePlayer (ReplacementCandidate.controller candidate) (DrawR.whose pat) pid
+          matchesCandidatePlayer (Game.teams gs) (ReplacementCandidate.controller candidate) (DrawR.whose pat) pid
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
         -- MISMATCHED class, where False is the correct answer rather than a
@@ -744,7 +745,7 @@ admitsEntry gs oid rewrite = case rewrite of
   -- The window is the event log's, which Engine.beginTurnOf clears at the turn
   -- handoff -- so "this turn" costs nothing here.
   EntryRewrite.Bloodthirst _ ->
-    let context = Filter.contextFor (Projection.controllerOf oid gs) (Just oid)
+    let context = Filter.contextFor (Game.teams gs) (Projection.controllerOf oid gs) (Just oid)
      in maybe False (> 0) (Quantity.evaluate (Projection.fullView gs) context gs oid (Quantity.Type.PlayersDealtDamageThisTurn (PlayerRef.Relative PlayerRelation.Opponent)))
   -- CR 702.150a's own first condition, the ability's rather than the pattern's:
   -- "If this permanent WOULD ENTER WITH ONE OR MORE LOYALTY COUNTERS ON IT". The
@@ -838,7 +839,7 @@ matchesPlayer gs src rel pid = case rel of
   ControllerRelation.Anyones -> True
   ControllerRelation.Yours -> Projection.controllerOf src gs == Just pid
   ControllerRelation.Opponents -> case Projection.controllerOf src gs of
-    Just you -> pid /= you
+    Just you -> Game.areOpponents gs you pid
     Nothing -> False
 
 -- matchesPlayer's twin for a row whose "you" is the CANDIDATE's rather than a
@@ -857,12 +858,12 @@ matchesPlayer gs src rel pid = case rel of
 -- permanent's static ability, whose source is on the battlefield whenever the row
 -- is consulted. DrawR is the first ControllerRelation pattern whose producer
 -- installs a floating row, which is where the two readings come apart (#2662).
-matchesCandidatePlayer :: Maybe PlayerId -> ControllerRelation -> PlayerId -> Bool
-matchesCandidatePlayer you rel pid = case rel of
+matchesCandidatePlayer :: Teams.Teams -> Maybe PlayerId -> ControllerRelation -> PlayerId -> Bool
+matchesCandidatePlayer teams you rel pid = case rel of
   ControllerRelation.Anyones -> True
   ControllerRelation.Yours -> you == Just pid
   ControllerRelation.Opponents -> case you of
-    Just mine -> pid /= mine
+    Just mine -> Teams.areOpponents teams mine pid
     Nothing -> False
 
 -- CR 109.5 / 614.1: does `oid` satisfy this pattern's controller relation, read
@@ -874,7 +875,7 @@ matchesController gs src rel oid = case rel of
   -- CR 102.2: no producer today -- a counter or token pattern scoped to an
   -- opponent's permanents. Controller-based, unlike matchesZoneOwner below.
   ControllerRelation.Opponents -> case (Projection.controllerOf oid gs, Projection.controllerOf src gs) of
-    (Just theirs, Just yours) -> theirs /= yours
+    (Just theirs, Just yours) -> Game.areOpponents gs yours theirs
     _ -> False
 
 -- CR 614.1 / 615.1: is this DAMAGE coming from a source the pattern admits?
@@ -986,7 +987,7 @@ matchesPrintedRecipient gs context de pat = case (DamagePattern.whatRecipient pa
 matchesRecipientPlayer :: Filter.Context -> DamageEvent.DamageEvent -> PlayerRelation.PlayerRelation -> Bool
 matchesRecipientPlayer context de relation = case Recipient.playerOf (DamageEvent.target de) of
   Nothing -> False
-  Just pid -> maybe False (\you -> PlayerRelation.holds relation you pid) (Filter.perspective context)
+  Just pid -> maybe False (\you -> PlayerRelation.holds (Filter.teams context) relation you pid) (Filter.perspective context)
 
 -- CR 615.1: does the damage's RECIPIENT have the qualities the pattern's PRINTED
 -- clause names -- Stormwild Capridor's "if noncombat damage would be dealt to
@@ -1067,7 +1068,7 @@ matchesZoneOwner gs you rel oid =
 -- step (#111).
 matchesPermanent :: GameState -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesPermanent gs source filter_ oid =
-  Filter.matches (Filter.contextFor Nothing source) (Projection.viewOfObject oid gs) filter_
+  Filter.matches (Filter.contextFor (Game.teams gs) Nothing source) (Projection.viewOfObject oid gs) filter_
 
 -- CR 701.21a: the permanents this player may sacrifice for a Filter, ascending --
 -- the order Prompt.ChooseSacrifices and Prompt.ChooseAnyNumberToSacrifice offer
@@ -1155,6 +1156,7 @@ matchesFiltered gs candidate filter_ oid =
 candidateContext :: GameState -> ReplacementCandidate -> Filter.Context
 candidateContext gs candidate =
   ( Filter.contextWithSlots
+      (Game.teams gs)
       (ReplacementCandidate.controller candidate)
       (Just (ReplacementCandidate.source candidate))
       (ReplacementCandidate.slots candidate)
@@ -1716,7 +1718,7 @@ applyCopyException snapshot exception = case exception of
 -- supplying Nothing would silently answer False if one did.
 legalCopyTargets :: Set ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> GameState -> [ObjectId]
 legalCopyTargets batch filter_ self gs =
-  let context = Filter.contextFor (Projection.controllerOf self gs) (Just self)
+  let context = Filter.contextFor (Game.teams gs) (Projection.controllerOf self gs) (Just self)
       eligible oid =
         oid /= self
           && not (Set.member oid batch)
@@ -1740,7 +1742,7 @@ legalCopyTargets batch filter_ self gs =
 -- lookup instead, which is the whole of the "from your hand" in the sentence.
 revealableFromHand :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 revealableFromHand pid filter_ gs =
-  let matching oid = Filter.matches (Filter.contextFor Nothing Nothing) (Projection.viewOfObject oid gs) filter_
+  let matching oid = Filter.matches (Filter.contextFor (Game.teams gs) Nothing Nothing) (Projection.viewOfObject oid gs) filter_
    in filter matching (Game.zoneMembers Zone.Hand pid gs)
 
 -- CR 614.3: a floating replacement whose `uses` is Once is spent by being
@@ -1971,7 +1973,7 @@ preventable gs de = not (any (\(src, pat) -> matchesDamagePattern gs (patternCon
 -- carried. Shared by the two questions of that shape so they cannot disagree
 -- about what "you" and IsSource mean.
 patternContext :: GameState -> Maybe ObjectId -> Filter.Context
-patternContext gs src = Filter.contextFor (src >>= \oid -> Projection.controllerOf oid gs) src
+patternContext gs src = Filter.contextFor (Game.teams gs) (src >>= \oid -> Projection.controllerOf oid gs) src
 
 -- CR 614.9: is this rewrite a REDIRECTION -- "dealt instead to another permanent
 -- or player"? The classification `redirectable` below is gated on, in the genre

@@ -17,6 +17,7 @@
 module Pawl.Engine.ActivationRestriction where
 
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.DuringPhase as DuringPhase
@@ -82,13 +83,13 @@ restrictionMet pid gs restriction = case restriction of
   -- mana ability -- so a stolen permanent's rider follows the thief.
   ActivationRestriction.DuringPhase (DuringPhase.MkDuringPhase window scope) ->
     Turn.inWindow window (GameState.phase gs)
-      && Event.turnScopeAdmits scope (GameState.activePlayer gs) pid
+      && Event.turnScopeAdmits (Game.teams gs) scope (GameState.activePlayer gs) pid
   -- CR 102.1 alone, with no window beside it: the rider names a turn and every
   -- phase and step of that turn is inside it. The same second conjunct
   -- DuringPhase reads above, standing on its own -- so this is not DuringPhase
   -- with a wildcard window but the absence of that axis.
   ActivationRestriction.DuringTurn scope ->
-    Event.turnScopeAdmits scope (GameState.activePlayer gs) pid
+    Event.turnScopeAdmits (Game.teams gs) scope (GameState.activePlayer gs) pid
   -- CR 508.3b's question, asked of the ACTIVATING player, and the same reader the
   -- casting side's clause of this name uses -- see Turn.attackedThisStep for
   -- why it is the declaration record and not Combat.attacked.

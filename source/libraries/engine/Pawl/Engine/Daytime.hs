@@ -286,8 +286,8 @@ settle record = do
 -- A TURN-BASED ACTION that does not use the stack, so it is performed inline by
 -- Pawl.Engine.Engine's untap arm and nothing is put anywhere.
 --
--- CR 502.2a's shared-team-turns variant is not implemented, because pawl has no
--- teams (#175).
+-- Not implemented: CR 502.2a's reading for the shared team turns option, which
+-- asks about a whole team's turn (#2848).
 untapCheck :: ([ObjectId] -> GameState -> GameState) -> Game Bool
 untapCheck record = do
   gs <- State.get

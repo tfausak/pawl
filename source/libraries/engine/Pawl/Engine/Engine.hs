@@ -367,7 +367,7 @@ discardToHandSize pid = do
 -- two survivors still does not skip.
 --
 -- Not implemented: CR 103.8b's same skip for a TEAM in Two-Headed Giant, pawl
--- having no teams or variants to read from (#175).
+-- having no variant that shares a turn between teammates (#2849).
 skipsDraw :: GameState -> Bool
 skipsDraw gs =
   GameState.turnNumber gs == 1
@@ -1257,9 +1257,9 @@ turnAnchorOf gs = Maybe.fromMaybe (GameState.activePlayer gs) (GameState.turnAnc
 -- an ordinary turn: it does not begin, the entry is still SPENT, and both "would
 -- have begun" rules still fire.
 --
--- Not implemented: CR 805.8's shared team turns and CR 807.4i/j's Grand Melee
--- turn markers, each of which rewrites this rule for a variant pawl has no
--- format to read one from (#175).
+-- Not implemented: CR 805.8's shared team turns (#2848) and CR 807.4i/j's Grand
+-- Melee turn markers (#175), each of which rewrites this rule for an option pawl
+-- does not carry.
 takeNextTurn :: GameState -> GameState
 takeNextTurn gs = case GameState.extraTurns gs of
   [] -> walkToNextTurn (length (GameState.turnOrder gs)) (turnAnchorOf gs) gs

@@ -199,7 +199,7 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
               Just cond ->
                 Condition.holds
                   (Projection.fullView gs)
-                  (Filter.contextFor (Just (Object.owner obj)) (Just oid))
+                  (Filter.contextFor (Game.teams gs) (Just (Object.owner obj)) (Just oid))
                   gs
                   oid
                   cond
@@ -384,7 +384,7 @@ selfReductions pid oid gs =
   let -- CR 109.5: the perspective is the would-be controller, `pid` -- not
       -- Projection.controllerOf, which answers Nothing for a card in a hand.
       -- The source is the spell itself, the reduction being printed on it.
-      context = Filter.contextFor (Just pid) (Just oid)
+      context = Filter.contextFor (Game.teams gs) (Just pid) (Just oid)
       scaled reduction =
         let copies = Quantity.evaluate (Projection.fullView gs) context gs oid (CostReduction.perEach reduction)
             -- Saturating rather than partial: an Int cannot hold every Integer.
@@ -726,7 +726,7 @@ componentDemandGrowsWithX component = case component of
 -- refuses rather than permits.
 maximumX :: PlayerId -> ObjectId -> Face.Face card -> GameState -> Maybe Natural
 maximumX pid oid face gs =
-  let context = Filter.contextFor (Just pid) (Just oid)
+  let context = Filter.contextFor (Game.teams gs) (Just pid) (Just oid)
       ceilingOf quantity = Integer.toNaturalSaturating (Maybe.fromMaybe 0 (Quantity.evaluate (Projection.fullView gs) context gs oid quantity))
    in fmap ceilingOf (Face.maximumX face)
 
@@ -1129,7 +1129,7 @@ countersOn kind oid gs =
 -- something else under Maskwood Nexus (Pawl.CostSpec's Putrid Raptor pair).
 discardCandidates :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 discardCandidates pid oid criterion gs =
-  let context = Filter.contextFor (Just pid) Nothing
+  let context = Filter.contextFor (Game.teams gs) (Just pid) Nothing
       matches candidate = Filter.matches context (Projection.viewOfObject candidate gs) criterion
    in filter (\candidate -> candidate /= oid && matches candidate) (Game.zoneMembers Zone.Hand pid gs)
 
@@ -1161,7 +1161,7 @@ putOntoBattlefieldCandidates = discardCandidates
 -- 601.2a has put the spell being cast on the STACK.
 exileCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 exileCandidates pid criterion gs =
-  let context = Filter.contextFor (Just pid) Nothing
+  let context = Filter.contextFor (Game.teams gs) (Just pid) Nothing
       matches candidate = Filter.matches context (Projection.viewOfObject candidate gs) criterion
    in filter matches (Game.zoneMembers Zone.Graveyard pid gs)
 
@@ -1187,7 +1187,7 @@ topExileCandidate pid criterion gs =
 -- itself.
 tapCandidates :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 tapCandidates pid oid criterion gs =
-  let context = Filter.contextFor (Just pid) (Just oid)
+  let context = Filter.contextFor (Game.teams gs) (Just pid) (Just oid)
       matches candidate =
         Filter.matches context (Projection.viewOfObject candidate gs) criterion
    in List.sort (filter matches (Set.toList (GameState.battlefield gs)))

@@ -122,6 +122,7 @@ import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
@@ -2124,7 +2125,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith
       s
       "Alice's five"
-      (S.countOf (\oid -> Just (Projection.viewOfObject oid gs)) (Filter.contextFor (Just S.alice) Nothing) gs yourHand)
+      (S.countOf (\oid -> Just (Projection.viewOfObject oid gs)) (Filter.contextFor Teams.none (Just S.alice) Nothing) gs yourHand)
       (Just 5)
   -- CR 205.4g, end to end: "any permanent with the supertype 'snow' is a
   -- snow permanent." Skred deals damage equal to the number of snow

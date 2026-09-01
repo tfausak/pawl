@@ -45,6 +45,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 
@@ -104,7 +105,10 @@ emptyGame order =
       -- CR 802.1 is the option in use by default: at two seats it coincides
       -- exactly with CR 506.2, and at three or more CR 806.2b requires one of
       -- the three and this is the one that needs no seating to be agreed.
-      settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers}
+      --
+      -- CR 102.4 / CR 808.1: and a game not played between teams, which every
+      -- variant but CR 808's, CR 809's, CR 810's and CR 811's is.
+      settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none}
       newPlayer pid =
         ( pid,
           Player.MkPlayer
