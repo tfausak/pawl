@@ -3,8 +3,8 @@
 module Pawl.Codec.EachCardInHand where
 
 import qualified Pawl.Codec.Filter as Filter
-import qualified Pawl.Codec.GraveyardScope as GraveyardScope
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.ZoneScope as ZoneScope
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -18,7 +18,7 @@ import qualified Pawl.Types.EachCardInHand as EachCardInHand
 -- reveal takes it -- so the shorter spelling is the unfiltered one.
 codec :: Codec.Codec EachCardInHand.EachCardInHand
 codec = Fields.object $ do
-  hands <- Fields.required "hands" GraveyardScope.codec EachCardInHand.hands
+  hands <- Fields.required "hands" ZoneScope.codec EachCardInHand.hands
   filter_ <- Fields.defaulted "filter" Nothing (Common.maybe (Filter.codec Keyword.codec)) EachCardInHand.filter
   pure
     EachCardInHand.MkEachCardInHand

@@ -72,7 +72,10 @@
                                 "value": []
                               },
                               "players": {
-                                "type": "EachPlayer"
+                                "type": "Scoped",
+                                "value": {
+                                  "type": "EachPlayer"
+                                }
                               }
                             }
                           },

@@ -53,7 +53,10 @@
                             }
                           },
                           "players": {
-                            "type": "You"
+                            "type": "Scoped",
+                            "value": {
+                              "type": "You"
+                            }
                           }
                         }
                       },
@@ -78,7 +81,10 @@
                             }
                           },
                           "players": {
-                            "type": "You"
+                            "type": "Scoped",
+                            "value": {
+                              "type": "You"
+                            }
                           }
                         }
                       },

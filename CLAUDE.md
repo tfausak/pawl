@@ -79,7 +79,10 @@ to agents as written. What it doesn't say:
   worktrees. Match your own worktree path, or wait --- but waiting is not a
   strategy for THIS: cabal prints that line and then HANGS instead of exiting,
   so a run stuck with no output for many minutes is the same fault, and the
-  flags are the only way out.
+  flags are the only way out. Piping `cabal` into `head` --- or anything else
+  that closes the pipe early --- deadlocks it on SIGPIPE while it still HOLDS
+  the semaphore, which stalls every other worktree until that PID is killed.
+  Redirect to a file and read the file.
 
 - Derive against `origin/main`, not the working checkout, which drifts:
   `git fetch`, then `git show origin/main:<path>` or a worktree cut from it.

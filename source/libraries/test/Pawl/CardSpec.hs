@@ -293,6 +293,7 @@ import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
+import qualified Pawl.Types.ZoneScope as ZoneScope
 import qualified System.Directory as Directory
 
 -- Not red-specific despite its first callers: just the Maybe wrapper every
@@ -3642,7 +3643,7 @@ objectRefFilters ref = case ref of
   -- Day of Judgment's "all creatures", Boil's "all Islands".
   ObjectRef.EachMatching f -> unframed [f]
   -- Rise of the Dark Realms' "all creature cards from all graveyards"; its
-  -- GraveyardScope names players rather than characteristics, so the Filter is
+  -- ZoneScope names players rather than characteristics, so the Filter is
   -- the whole of what there is to lint.
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard _ f) -> unframed [f]
   -- Ignorant Bliss' "all cards from your hand" holds none: the printing takes
@@ -3684,7 +3685,7 @@ objectRefFilters ref = case ref of
   -- match-defining Filter here, and whatever a Count or a CR 122.1b counter kind
   -- under the count would hold via the arm above's route.
   ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil _ f _) -> unframed [f] <> refFilters ref
-  -- Port of Karfell's "a creature card from your graveyard"; its PlayerScope and
+  -- Port of Karfell's "a creature card from your graveyard"; its ZoneScope and
   -- its Chooser name players, so the Filter is the whole of what there is to
   -- lint, exactly as for the graveyard sweep above.
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ f) -> unframed [f]
@@ -7498,6 +7499,23 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- minted slots on the bound side; nothing here mints, so the bound side
         -- is CR 113.7's source alone.
         delayed modes = modalSlotsOffend (Set.singleton Binding.triggerSource) (TriggeredAbility.modal (modalTrigger TriggerCondition.SelfDies modes))
+        -- The chosen graveyard card's SCOPE as the SOLE reader of a declared
+        -- slot, which is Grasping Tentacles' second clause with its mill set
+        -- aside. The pair differs in the scope alone, so it proves
+        -- Resolve.objectRefSlots reports that read rather than the chooser's.
+        takeFrom scope =
+          Effect.MoveToZone
+            ( MoveToZone.MkMoveToZone
+                (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController scope (Filter.Type.HasCardType CardType.Artifact)))
+                Zone.Battlefield
+                EntryRiders.defaultValue
+                Nothing
+                Nothing
+                LibraryPlacement.defaultValue
+                Nothing
+            )
+        scoped = [lintMode [takeFrom (ZoneScope.Scoped PlayerScope.You)] [victim]]
+        inSlot = [lintMode [takeFrom (ZoneScope.InSlot victim)] [victim]]
     Spec.assertBool s (activatedAbilityOffends (modalActivated unread)) "an activated ability declaring an unread slot is rejected"
     Spec.assertBool s (not (activatedAbilityOffends (modalActivated read_))) "and reading everything it declares is accepted"
     Spec.assertBool s (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfDies unread)) "a triggered ability declaring an unread slot is rejected"
@@ -7511,6 +7529,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (any activatedAbilityOffends (Face.activatedAbilities (S.combinedFace denethor))))
       "Denethor, Stone Seer's two-slot ability is accepted"
+    Spec.assertBool s (not (activatedAbilityOffends (modalActivated inSlot))) "a slot read only by a chosen graveyard card's scope is accepted"
+    Spec.assertBool s (activatedAbilityOffends (modalActivated scoped)) "and the same effect over a scope naming no slot leaves that slot unread"
   -- CR 400.1: every InZone Count over a shared zone (battlefield, stack,
   -- exile, command) must pair with PlayerRef.EachPlayer -- the type
   -- permits any PlayerRef there, but only EachPlayer is meaningful for a
@@ -8337,7 +8357,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     exhume <- S.printingOf s registry "Exhume"
     let anyCard = Filter.Type.HasCardType CardType.Creature
         group = SlotName.MkSlotName (Text.pack "revealed")
-        inGraveyard = ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.You anyCard)
+        inGraveyard = ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController (ZoneScope.Scoped PlayerScope.You) anyCard)
         inHand = ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard)
         fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard (Quantity.Type.Literal 1) (PlayerRef.Relative PlayerRelation.You))
         atRandom = ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.You)

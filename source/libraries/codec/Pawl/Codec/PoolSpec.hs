@@ -3,9 +3,9 @@ module Pawl.Codec.PoolSpec where
 import qualified Pawl.Codec.Pool as Pool
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
-import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Pool as Pool
+import qualified Pawl.Types.ZoneScope as ZoneScope
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Pool" $ do
@@ -65,7 +65,7 @@ spec s = Spec.describe s "Pawl.Codec.Pool" $ do
     Common.assertCodec
       s
       Pool.codec
-      (Pool.CardsInGraveyard (GraveyardScope.Scoped PlayerScope.You))
+      (Pool.CardsInGraveyard (ZoneScope.Scoped PlayerScope.You))
       " {\"type\":\"CardsInGraveyard\",\"value\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}}} "
   -- CR 406.1: the cards in the exile zone. Nullary, since exile has no
   -- per-player copy.
@@ -81,6 +81,6 @@ spec s = Spec.describe s "Pawl.Codec.Pool" $ do
     Common.assertCodec
       s
       Pool.codec
-      (Pool.CreaturesAndCardsInGraveyard (GraveyardScope.Scoped PlayerScope.EachPlayer))
+      (Pool.CreaturesAndCardsInGraveyard (ZoneScope.Scoped PlayerScope.EachPlayer))
       " {\"type\":\"CreaturesAndCardsInGraveyard\",\"value\":{\"type\":\"Scoped\",\"value\":{\"type\":\"EachPlayer\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Pool.codec

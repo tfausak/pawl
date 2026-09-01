@@ -64,7 +64,6 @@ import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
-import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
@@ -131,6 +130,7 @@ import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
+import qualified Pawl.Types.ZoneScope as ZoneScope
 
 -- Rule 702 in its OTHER voice. Most keywords are read where they matter, the rule
 -- stating them as static abilities some rules-core reader already asks about. The
@@ -3017,7 +3017,7 @@ servoToken =
 -- not say "another".
 --
 -- A CardsInGraveyard pool scoped to You is rule 702.46a's "your graveyard", read
--- as CR 115.2's clause (a) -- and the reason the pool carries a GraveyardScope
+-- as CR 115.2's clause (a) -- and the reason the pool carries a ZoneScope
 -- rather than a Filter is that CR 108.4 gives a card in a graveyard no controller.
 -- The move states no origin zone for that same reason.
 soulshift :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
@@ -3034,7 +3034,7 @@ soulshift n =
   where
     slot =
       TargetSlot.required
-        (Pool.CardsInGraveyard (GraveyardScope.Scoped PlayerScope.You))
+        (Pool.CardsInGraveyard (ZoneScope.Scoped PlayerScope.You))
         (Just (Filter.And [Filter.HasSubtype Subtype.Spirit, Filter.ManaValueAtMost (toInteger n)]))
     back =
       Effect.MoveToZone

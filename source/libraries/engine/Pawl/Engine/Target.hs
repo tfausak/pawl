@@ -30,7 +30,6 @@ import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
-import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -52,6 +51,7 @@ import Pawl.Types.TargetSlot (TargetSlot)
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneScope as ZoneScope
 
 -- CR 115: a target slot's legal recipients -- the set the slot itself admits
 -- (admittedRecipients below), less every candidate rule 702 forbids TARGETING
@@ -115,7 +115,7 @@ import qualified Pawl.Types.Zone as Zone
 -- vacuously False.
 --
 -- NO SLOT BINDINGS, which is what makes this the wrapper rather than the
--- primitive: a GraveyardScope.InSlot pool asks what another slot holds, and this
+-- primitive: a ZoneScope.InSlot pool asks what another slot holds, and this
 -- entry point answers that it holds nothing. Empty is the honest answer for a
 -- slot map that was never supplied, and it is the vacuous posture every
 -- player-referencing question here takes. legalSets below is where the bindings
@@ -147,7 +147,7 @@ legalRecipients perspective source slot gs =
 -- Pools.
 --
 -- `bindings` is the ANNOUNCEMENT's whole binding environment -- what its other
--- slots hold, which a GraveyardScope.InSlot pool is resolved against (see
+-- slots hold, which a ZoneScope.InSlot pool is resolved against (see
 -- graveyardRecipients), plus the NUMBERS the announcement holds -- CR 603.2's
 -- event amount and CR 601.2b's X alike -- which a CR 202.3 computed bound reads
 -- (see slotContext). A whole Binding rather than the recipients alone because the
@@ -209,7 +209,7 @@ legalRecipientsGiven pcs grants pools perspective unannounced bindings source sl
 --
 -- No slot bindings, and neither caller can want any: both ask what an ENCHANT
 -- slot admits, and the slot CR 303.4a declares draws from the battlefield,
--- which no GraveyardScope reaches.
+-- which no ZoneScope reaches.
 admittedRecipients :: Maybe PlayerId -> ObjectId -> TargetSlot -> GameState -> Set Recipient
 admittedRecipients perspective source slot gs =
   let pcs = Projection.projectAll gs
@@ -727,7 +727,7 @@ poolsGiven pcs gs =
 -- The Context is the SAME one the Filter is matched against, and the arms that
 -- name a GRAVEYARD or EXILE read it -- `bindings` only the graveyard ones: CR
 -- 400.1's per-player zones make a pool that names one have to say whose, and a
--- GraveyardScope answers with either the Context's perspective (CR 109.5's
+-- ZoneScope answers with either the Context's perspective (CR 109.5's
 -- would-be controller, the player CR 601.2c has choosing targets) or another
 -- slot's own answer. Every battlefield and stack arm ignores both, because those
 -- zones are shared by all players (CR 400.1 again) -- which is what lets those
@@ -899,7 +899,7 @@ abilityRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Ga
 -- the scope answerable at all -- CR 108.4 gives a card in a graveyard no
 -- controller to ask about.
 --
--- Whose graveyard is the GraveyardScope's answer, read by graveyardScopePlayers
+-- Whose graveyard is the ZoneScope's answer, read by zoneScopePlayers
 -- below, in two readings:
 --
 --   * Scoped is PlayerEffect.playersInScope's, rather than a second reading of
@@ -929,11 +929,11 @@ abilityRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Ga
 --     is itself InSlot-scoped is answerable but not usefully so: legalSets fills
 --     `bindings` from a pass that gave it no bindings of its own, so it holds
 --     nothing and this is empty -- which terminates rather than recurring.
-graveyardRecipients :: Filter.Context -> Map SlotName (Set Recipient) -> GraveyardScope.GraveyardScope -> GameState -> Set Recipient
+graveyardRecipients :: Filter.Context -> Map SlotName (Set Recipient) -> ZoneScope.ZoneScope -> GameState -> Set Recipient
 graveyardRecipients context bindings scope gs =
-  graveyardsOf (graveyardScopePlayers (Filter.perspective context) bindings scope gs) gs
+  graveyardsOf (zoneScopePlayers (Filter.perspective context) bindings scope gs) gs
 
--- The players a GraveyardScope names, and the WHOLE of what either reading of
+-- The players a ZoneScope names, and the WHOLE of what either reading of
 -- that type means: the two arms are exactly the two paragraphs above, and this is
 -- the one place they are read.
 --
@@ -944,10 +944,10 @@ graveyardRecipients context bindings scope gs =
 -- rather than at the recipients keeps one reading of the scope for both.
 --
 -- Unordered: the caller imposes whatever order its own rule asks for.
-graveyardScopePlayers :: Maybe PlayerId -> Map SlotName (Set Recipient) -> GraveyardScope.GraveyardScope -> GameState -> [PlayerId]
-graveyardScopePlayers perspective bindings scope gs = case scope of
-  GraveyardScope.Scoped playerScope -> Maybe.fromMaybe [] (PlayerEffect.playersInScope perspective gs playerScope)
-  GraveyardScope.InSlot slot ->
+zoneScopePlayers :: Maybe PlayerId -> Map SlotName (Set Recipient) -> ZoneScope.ZoneScope -> GameState -> [PlayerId]
+zoneScopePlayers perspective bindings scope gs = case scope of
+  ZoneScope.Scoped playerScope -> Maybe.fromMaybe [] (PlayerEffect.playersInScope perspective gs playerScope)
+  ZoneScope.InSlot slot ->
     Maybe.mapMaybe playerOf (Set.toList (Map.findWithDefault Set.empty slot bindings))
 
 -- CR 404.1 over a list of players, deduplicated by the Set the caller gets back.
@@ -1006,7 +1006,7 @@ exileRecipients gs = Set.fromList (fmap Recipient.ToObject (Set.toList (GameStat
 --
 -- `bindings` is the resolving object's OWN chosen targets, which is what makes
 -- CR 608.2b exact where CR 601.2c could only be a superset: a
--- GraveyardScope.InSlot pool re-derived here reads the one player the spell
+-- ZoneScope.InSlot pool re-derived here reads the one player the spell
 -- actually named, so a card that has since moved to somebody else's graveyard is
 -- no longer a legal target for it.
 stillLegal :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Recipient -> TargetSlot -> GameState -> Bool
@@ -1045,7 +1045,7 @@ legalSets perspective seed source slots gs =
 -- The same map on a board the caller already walked -- see legalRecipientsGiven.
 --
 -- TWO PASSES, because CR 601.2c makes one slot's legal set depend on another's:
--- a GraveyardScope.InSlot pool names a slot, so the first pass answers every
+-- a ZoneScope.InSlot pool names a slot, so the first pass answers every
 -- slot with no bindings at all and the second re-answers only the slots that
 -- name one, against the first pass. The rule chooses every target AT ONCE, so
 -- there is no order to consult -- what a dependent slot is offered is the UNION
@@ -1105,7 +1105,7 @@ jointlyJudged declared slot =
     || not (Set.disjoint declared (foldMap Filter.boundSlots (TargetSlot.filter slot)))
 
 -- Does this pool's candidate set depend on what another target slot is answered
--- with (CR 601.2c)? A GraveyardScope's InSlot is the one axis that does, wherever
+-- with (CR 601.2c)? A ZoneScope's InSlot is the one axis that does, wherever
 -- it appears; every other pool draws from a zone no slot names.
 dependsOnSlot :: Pool.Pool -> Bool
 dependsOnSlot = Maybe.isJust . scopeSlot
@@ -1124,16 +1124,16 @@ scopeSlot pool = case pool of
   Pool.Abilities -> Nothing
   Pool.SpellsAndPermanents -> Nothing
   Pool.PlayersAndPlaneswalkers -> Nothing
-  Pool.CardsInGraveyard scope -> graveyardScopeSlot scope
+  Pool.CardsInGraveyard scope -> zoneScopeSlot scope
   Pool.CardsInExile -> Nothing
   -- Its graveyard half carries the same axis, so the answer is that half's.
-  Pool.CreaturesAndCardsInGraveyard scope -> graveyardScopeSlot scope
+  Pool.CreaturesAndCardsInGraveyard scope -> zoneScopeSlot scope
 
--- The slot a GraveyardScope names, if it names one.
-graveyardScopeSlot :: GraveyardScope.GraveyardScope -> Maybe SlotName
-graveyardScopeSlot scope = case scope of
-  GraveyardScope.Scoped _ -> Nothing
-  GraveyardScope.InSlot slot -> Just slot
+-- The slot a ZoneScope names, if it names one.
+zoneScopeSlot :: ZoneScope.ZoneScope -> Maybe SlotName
+zoneScopeSlot scope = case scope of
+  ZoneScope.Scoped _ -> Nothing
+  ZoneScope.InSlot slot -> Just slot
 
 -- CR 601.2c: the range of numbers this slot may be answered with on this board
 -- -- the printed count, narrowed by how many legal recipients there actually
@@ -1169,7 +1169,7 @@ announcedRange x slot capacity =
 -- For every slot whose pool names no other slot this is just how many candidates
 -- it has: the whole legal set is one coherent answer, and nothing narrows it.
 --
--- A GraveyardScope.InSlot pool is the exception, and the reason this function
+-- A ZoneScope.InSlot pool is the exception, and the reason this function
 -- exists. legalSetsGiven offers it the UNION over the graveyards of every player
 -- the named slot could still take, which is a superset of any one coherent
 -- answer -- CR 400.1 gives each player their own graveyard, so a card in one
@@ -1500,7 +1500,7 @@ fillableModesGiven pcs grants pools perspective seed source extra modal gs =
 -- has to reach Pawl.Engine.Quantity, which takes a Context and no bindings. The
 -- order is not CR 601.2c's
 -- simultaneity problem that a slot depending on ANOTHER SLOT is
--- (Pawl.Types.GraveyardScope's InSlot, two passes in legalSetsGiven): a trigger's
+-- (Pawl.Types.ZoneScope's InSlot, two passes in legalSetsGiven): a trigger's
 -- event bindings are fixed before the ability is put on the stack, so nothing
 -- being chosen now can change them.
 bakeSlots :: Map SlotName PlayerId -> Map SlotName TargetSlot -> Map SlotName TargetSlot
