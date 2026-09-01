@@ -4954,21 +4954,29 @@ screamsFromWithinSpec s registry =
 -- Binding.sacrificedPermanent that Resolve.effectViewOf answers off CR 608.2h
 -- last known information.
 --
--- THE HOST IS BOB'S AND THE AURA IS ALICE'S, which is what separates CR 108.4's
+-- THE HOST IS BOB'S AND THE AURA IS ALICE'S, which is what separates CR 110.2's
 -- "that creature's controller" from CR 109.5's "you": an arm reading the Aura's
 -- own controller instead lands the loss on alice, and the pair of legs below
 -- differ in exactly that one thing.
 --
 -- Giant Spider (2/4) is the host because power and toughness differ: an arm
--- reading Quantity.Power off the same slot would take four life on a 3/3 and is
--- caught only here.
+-- reading Quantity.Power off the same slot answers the same number as the
+-- toughness on a 3/3, and nothing else on the board would catch it.
+--
+-- AND IT CARRIES A +1/+1 COUNTER, which is what tells the DEPARTED permanent from
+-- CR 400.7's graveyard incarnation the same move minted. CR 122.2 leaves the new
+-- object with no counters, so the graveyard card reads the printed 4 while CR
+-- 608.2h's last known information reads 5; without the counter both readings
+-- answer 4 and the board cannot tell ZoneChange.departed from ZoneChange.object.
+-- Three distinct numbers on the board -- power 3, printed toughness 4, last known
+-- toughness 5 -- and only the last is right.
 banewaspAfflictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 banewaspAfflictionSpec s registry =
   let board host = do
         affliction <- S.printingOf s registry "Banewasp Affliction"
         spider <- S.printingOf s registry "Giant Spider"
         let (enchanted, g1) = S.addCreature spider host (Setup.emptyGame S.bothPlayers)
-            (aura, g2) = S.addCreature affliction S.alice g1
+            (aura, g2) = S.addCreature affliction S.alice (S.addCounter CounterKind.PlusOnePlusOne 1 enchanted g1)
         pure (enchanted, S.attach aura enchanted g2)
       -- Kill the host, settle CR 117.5 so the SBA pass buries it and the
       -- now-unattached Aura and the trigger is placed, then resolve it.
@@ -4982,7 +4990,7 @@ banewaspAfflictionSpec s registry =
         Spec.it s "CR 608.2h the host's controller loses life equal to the dead host's toughness" $ do
           (enchanted, gs) <- board S.bob
           let after = run enchanted gs
-          Spec.assertEqWith s "CR 108.4 bob paid the Spider's 4 toughness and alice paid nothing" (lives after) (Just 20, Just 16)
+          Spec.assertEqWith s "CR 110.2 bob controlled the Spider, so bob paid its last known 5 toughness and alice paid nothing" (lives after) (Just 20, Just 15)
           -- The preconditions the assertion rests on, AFTER it so neither can
           -- absorb a mutation aimed at the binding.
           Spec.assertEqWith s "the enchanted Giant Spider really died" (Game.lookupObject enchanted after) Nothing
@@ -4990,9 +4998,9 @@ banewaspAfflictionSpec s registry =
         -- The same board with the host moved one seat, which is the only
         -- difference: CR 109.5's "you" is alice in both legs, so a reading that
         -- had substituted her would answer the same pair twice.
-        Spec.it s "CR 108.4 the loss follows the host's controller rather than the Aura's" $ do
+        Spec.it s "CR 110.2 the loss follows the host's controller rather than the Aura's" $ do
           (enchanted, gs) <- board S.alice
-          Spec.assertEqWith s "alice controlled the Spider, so alice pays" (lives (run enchanted gs)) (Just 16, Just 20)
+          Spec.assertEqWith s "alice controlled the Spider, so alice pays" (lives (run enchanted gs)) (Just 15, Just 20)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
