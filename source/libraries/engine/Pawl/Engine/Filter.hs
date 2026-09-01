@@ -473,18 +473,20 @@ data View = MkView
     -- off the battlefield, a player, an event snapshot -- the vacuous posture
     -- `ringBearerFor` above takes.
     classLevel :: Maybe ClassLevel.ClassLevel,
-    -- CR 702.33d: has this candidate been kicked? Read off Object.kicked, and
-    -- False where there is no object to read it off, both for the reasons
-    -- `designations` above gives. Its one reader is Pawl.Engine.Quantity's WasKicked
-    -- arm, answering Burst Lightning's clause conditions and Monstrous War-Leech's
-    -- CR 604.2 clause on its entry replacement.
+    -- CR 702.33d: how many times was each of this candidate's kicker costs
+    -- declared? Read off Object.kicked, and empty where there is no object to read
+    -- it off, both for the reasons `designations` above gives. Its readers are
+    -- Pawl.Engine.Quantity's WasKicked arm, answering Burst Lightning's clause
+    -- conditions and Monstrous War-Leech's CR 604.2 clause on its entry
+    -- replacement, and its TimesKickedWith arm, answering Gnarlid Pack's count and
+    -- Sunscape Battlemage's "kicked with its {1}{G} kicker".
     --
     -- Not a designation of a PERMANENT as that field holds -- rule 702.33d
     -- designates the SPELL -- but it comes through the view for the same reason
-    -- those do: the reader holds a view and not a board. It is nonetheless True
+    -- those do: the reader holds a view and not a board. It is nonetheless filled
     -- for a permanent a kicked spell became, which is CR 400.7d's exception to
     -- the forgetting (see Pawl.Types.Object).
-    kicked :: Bool,
+    kicked :: Map.Map (Cost.Cost Keyword.Type.Keyword) Natural.Natural,
     -- CR 400.7d / CR 107.4h: the production tags of the mana that was spent to
     -- cast the spell this candidate is, or was -- read off Object.manaSpent, and
     -- empty where there is no object to read it off, both for the reasons
@@ -656,7 +658,7 @@ playerView pid =
       -- CR 716.2b: a level is a designation A PERMANENT can have, and a player is
       -- not one -- `designations` above, same sentence.
       classLevel = Nothing,
-      kicked = False,
+      kicked = Map.empty,
       -- CR 202.1a's mana cost is spent to cast a CARD, and CR 109.1's list of
       -- what an object is has no player in it -- `manaValue` above, same rule.
       manaSpentTags = Set.empty,
@@ -1615,9 +1617,10 @@ rewriteKeyword pairs keyword = case keyword of
   -- the same way -- a ward cost naming a basic land type is the unprinted case
   -- the arms below are also a fence for.
   Keyword.Type.Ward cost -> Keyword.Type.Ward (rewriteCost pairs cost)
-  -- CR 702.33a, CR 702.34a, CR 702.37a and CR 702.42a: each states a cost as part
-  -- of the keyword, so rewriteCost carries CR 612.1 into it.
+  -- CR 702.33a, CR 702.33c, CR 702.34a, CR 702.37a and CR 702.42a: each states a
+  -- cost as part of the keyword, so rewriteCost carries CR 612.1 into it.
   Keyword.Type.Kicker cost -> Keyword.Type.Kicker (rewriteCost pairs cost)
+  Keyword.Type.Multikicker cost -> Keyword.Type.Multikicker (rewriteCost pairs cost)
   Keyword.Type.Flashback cost -> Keyword.Type.Flashback (rewriteCost pairs cost)
   -- CR 702.162a states its cost as part of the keyword too.
   Keyword.Type.MoreThanMeetsTheEye cost -> Keyword.Type.MoreThanMeetsTheEye (rewriteCost pairs cost)

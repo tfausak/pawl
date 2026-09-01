@@ -7,6 +7,7 @@ import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
@@ -604,15 +605,26 @@ data Object = MkObject
     -- ability causes it to no longer be suspected", is Effect.Unsuspect, and it
     -- deletes that one member.
     designations :: Set.Set Designation.Designation,
-    -- | CR 702.33d: has this SPELL been kicked? "If a spell's controller declares
-    -- the intention to pay any of that spell's kicker costs, that spell has been
-    -- 'kicked'", and this is that declaration, stamped by Pawl.Engine.Cast at CR
-    -- 601.2b onto the stack incarnation CR 601.2a made.
+    -- | CR 702.33d: how many times did this SPELL's controller declare each of its
+    -- kicker costs? "If a spell's controller declares the intention to pay any of
+    -- that spell's kicker costs, that spell has been 'kicked'", and this is that
+    -- declaration, stamped by Pawl.Engine.Cast at CR 601.2b onto the stack
+    -- incarnation CR 601.2a made. Empty for a spell whose controller declared
+    -- none, which is rule 702.33d's "has not been kicked".
     --
     -- Stored for the designations' reason above: nothing a CR 613 layer computes
-    -- may move it, since it records a choice rather than a characteristic. A Bool
-    -- and not a member of Pawl.Types.Designation because it is a fact about a
-    -- SPELL, where every member of that type is a mark "only permanents can have".
+    -- may move it, since it records a choice rather than a characteristic. Not a
+    -- member of Pawl.Types.Designation because it is a fact about a SPELL, where
+    -- every member of that type is a mark "only permanents can have".
+    --
+    -- KEYED BY THE COST, and a COUNT per key. Two kicker costs on one face is CR
+    -- 702.33b's "kicker [cost 1] and/or [cost 2]", whose payoffs each name one of
+    -- them (CR 702.33f, Sunscape Battlemage), and the cost is their identity
+    -- because Face.keywords is a Set: two Kicker keywords spelling one cost are
+    -- already one member. The count is CR 702.33c's multikicker, payable "any
+    -- number of times" and read back by the card that counts them (Gnarlid Pack).
+    -- Quantity.TimesKickedWith is the one reader of a key; Quantity.WasKicked asks
+    -- rule 702.33d's yes-or-no across the whole map.
     --
     -- Per-incarnation, which CR 400.7 makes the whole of rule 702.33d's duration:
     -- the designation belongs to the spell, and the card in a graveyard or in
@@ -624,11 +636,8 @@ data Object = MkObject
     -- War-Leech's rule 702.33e payoff is a CR 614.1c entry replacement asked of
     -- the PERMANENT, so the flag is carried across that one move by
     -- Pawl.Engine.Event.changeZoneAttaching, `announcedX` below's route exactly.
-    -- It stays False for every permanent no kicked spell became.
-    --
-    -- A Bool and not a count: CR 702.33c's multikicker is payable "any number of
-    -- times", and no card in the pool has two kicker costs either (#1234, #1235).
-    kicked :: Bool,
+    -- It stays empty for every permanent no kicked spell became.
+    kicked :: Map.Map (Cost.Cost Keyword.Keyword) Natural.Natural,
     -- | CR 702.103b: is this object BESTOWED, and since when? "As a spell cast
     -- bestowed is put onto the stack, it becomes an Aura enchantment and gains
     -- enchant creature... These effects last until the spell or the permanent it
@@ -682,9 +691,9 @@ data Object = MkObject
     -- Pawl.Engine.Event.changeZoneAttaching carries the number across that one
     -- move and newIncarnation forgets it everywhere else.
     --
-    -- A COUNT and not a Bool, where `kicked` is one: rule 702.150a subtracts "two
-    -- for EACH of those mana symbols", and a cost may print more than one
-    -- (CR 107.4f's own {W/P}{W/P} example).
+    -- ONE count for the whole cost, where `kicked` above keys its counts by which
+    -- cost was announced: rule 702.150a subtracts "two for EACH of those mana
+    -- symbols" of the one cost being paid (CR 107.4f's own {W/P}{W/P} example).
     --
     -- Zero for every object that was not cast for life this way: a token, a
     -- permanent an effect put onto the battlefield, and every spell whose cost
@@ -926,7 +935,7 @@ newIncarnation object =
       classLevel = Nothing,
       unlockedHalves = Set.empty,
       designations = Set.empty,
-      kicked = False,
+      kicked = Map.empty,
       -- CR 400.7 forgets the designation, `kicked` above's route; rule 702.103b's
       -- record is written back by Pawl.Engine.Event.changeZoneAttaching's mkObj
       -- for the one move that keeps it.

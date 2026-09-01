@@ -369,10 +369,16 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- as level 1 for every rule and effect that asks, so the default belongs at the
   -- one read rather than in the field Filter.classLevel reports.
   Quantity.ClassLevel -> fmap (toInteger . ClassLevel.defaulted . Filter.classLevel) mView
-  -- CR 702.33d's designation as a 0/1, HasDesignation's arm in every respect. The
-  -- object it reads is the RESOLVING SPELL, which is still on the stack while its
-  -- own clause conditions are gated (Pawl.Engine.Resolve.gateHolds).
-  Quantity.WasKicked -> fmap (\view -> if Filter.kicked view then 1 else 0) mView
+  -- CR 702.33d's designation as a 0/1, HasDesignation's arm in every respect --
+  -- rule 702.33d designating the spell for ANY of its kicker costs, so this asks
+  -- the whole map. The object it reads is the RESOLVING SPELL, which is still on
+  -- the stack while its own clause conditions are gated
+  -- (Pawl.Engine.Resolve.gateHolds).
+  Quantity.WasKicked -> fmap (\view -> if any (> 0) (Filter.kicked view) then 1 else 0) mView
+  -- CR 702.33f's "kicked with its [A] kicker" and CR 702.33c's count, which are
+  -- one read: how many times THIS cost was declared, zero for a cost the spell's
+  -- controller declined and for one the card does not print.
+  Quantity.TimesKickedWith cost -> fmap (toInteger . Map.findWithDefault 0 cost . Filter.kicked) mView
   -- CR 107.4h's third sentence as a 0/1, WasKicked's arm in every respect --
   -- including the object it reads, which for Berg Strider is the PERMANENT the
   -- spell became (CR 400.7d).
@@ -819,6 +825,10 @@ substituteStar star quantity = case quantity of
   Quantity.HasDesignation _ -> quantity
   Quantity.ClassLevel -> quantity
   Quantity.WasKicked -> quantity
+  -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
+  -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
+  -- own record by equality, never an instruction this traversal descends into.
+  Quantity.TimesKickedWith _ -> quantity
   Quantity.SnowWasSpent -> quantity
   Quantity.WasToken -> quantity
   Quantity.WasBlocking -> quantity
@@ -951,6 +961,10 @@ slots quantity = case quantity of
   Quantity.HasDesignation _ -> Set.empty
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
+  -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
+  -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
+  -- own record by equality, never an instruction this traversal descends into.
+  Quantity.TimesKickedWith _ -> Set.empty
   Quantity.SnowWasSpent -> Set.empty
   Quantity.WasToken -> Set.empty
   Quantity.WasBlocking -> Set.empty
@@ -1036,6 +1050,10 @@ objectSlots quantity = case quantity of
   Quantity.HasDesignation _ -> Set.empty
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
+  -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
+  -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
+  -- own record by equality, never an instruction this traversal descends into.
+  Quantity.TimesKickedWith _ -> Set.empty
   Quantity.SnowWasSpent -> Set.empty
   Quantity.WasToken -> Set.empty
   Quantity.WasBlocking -> Set.empty
@@ -1099,6 +1117,10 @@ nestedRefs quantity = case quantity of
   Quantity.HasDesignation _ -> Set.empty
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
+  -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
+  -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
+  -- own record by equality, never an instruction this traversal descends into.
+  Quantity.TimesKickedWith _ -> Set.empty
   Quantity.SnowWasSpent -> Set.empty
   Quantity.WasToken -> Set.empty
   Quantity.WasBlocking -> Set.empty
@@ -1280,6 +1302,10 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.HasDesignation _ -> quantity
   Quantity.ClassLevel -> quantity
   Quantity.WasKicked -> quantity
+  -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
+  -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
+  -- own record by equality, never an instruction this traversal descends into.
+  Quantity.TimesKickedWith _ -> quantity
   Quantity.SnowWasSpent -> quantity
   Quantity.WasToken -> quantity
   Quantity.WasBlocking -> quantity
@@ -1390,6 +1416,10 @@ readsX quantity = case quantity of
   Quantity.HasDesignation _ -> False
   Quantity.ClassLevel -> False
   Quantity.WasKicked -> False
+  -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
+  -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
+  -- own record by equality, never an instruction this traversal descends into.
+  Quantity.TimesKickedWith _ -> False
   Quantity.SnowWasSpent -> False
   Quantity.WasToken -> False
   Quantity.WasBlocking -> False

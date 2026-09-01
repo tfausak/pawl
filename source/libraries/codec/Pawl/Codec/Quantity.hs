@@ -2,6 +2,7 @@ module Pawl.Codec.Quantity where
 
 import qualified Pawl.Codec.AgainstSlot as AgainstSlot
 import qualified Pawl.Codec.CompletedDungeon as CompletedDungeon
+import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Count as Count
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
@@ -68,6 +69,10 @@ codec =
       -- at, so only the designation is on the wire.
       Arm.payload "HasDesignation" Designation.codec Quantity.HasDesignation (\x -> case x of Quantity.HasDesignation y -> Just y; _ -> Nothing),
       Arm.nullary "WasKicked" Quantity.WasKicked,
+      -- CR 702.33f's "kicked with its [A] kicker", with the COST on the wire and
+      -- the object still implicit: which kicker cost is asked about is the whole
+      -- of what the card names (Pawl.Types.Quantity).
+      Arm.payload "TimesKickedWith" (Cost.codec Keyword.codec) Quantity.TimesKickedWith (\x -> case x of Quantity.TimesKickedWith y -> Just y; _ -> Nothing),
       -- CR 107.4h's third sentence, with nothing on the wire either: which tag is
       -- asked about is the constructor (Pawl.Types.Quantity), and the object is
       -- whichever one the quantity is evaluated against.

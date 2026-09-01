@@ -2,10 +2,12 @@
 
 module Pawl.Codec.Object where
 
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Codec.Binding as Binding
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.ClassLevel as ClassLevel
 import qualified Pawl.Codec.Color as Color
+import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
 import qualified Pawl.Codec.ExilePlayPermission as ExilePlayPermission
@@ -24,10 +26,22 @@ import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind.Type
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Timestamp as Timestamp.Type
+
+-- | CR 702.33d: one of a spell's kicker costs and how many times its controller
+-- declared it (CR 702.33c). A pair per cost through 'Common.keyedList' for
+-- 'counterTimestamp' below's reason -- the value is a count the wire states
+-- rather than a repeat it could spell -- and possibly EMPTY, since that is every
+-- object no kicker was announced for.
+kickerPayment :: Codec.Codec (Cost.Type.Cost Keyword.Type.Keyword, Natural.Natural)
+kickerPayment = Fields.object $ do
+  cost <- Fields.required "cost" (Cost.codec Keyword.codec) fst
+  times <- Fields.required "times" Common.natural snd
+  pure (cost, times)
 
 -- | One counter kind and CR 613.7c's timestamp for it. A pair per kind through
 -- 'Common.keyedList' rather than 'Common.multiset', which pairs a key with a
@@ -86,7 +100,7 @@ codec = Fields.object $ do
   classLevel <- Fields.required "classLevel" (Common.maybe ClassLevel.codec) Object.classLevel
   unlockedHalves <- Fields.required "unlockedHalves" (Common.set CardName.codec) Object.unlockedHalves
   designations <- Fields.required "designations" (Common.set Designation.codec) Object.designations
-  kicked <- Fields.required "kicked" Common.boolean Object.kicked
+  kicked <- Fields.required "kicked" (Common.keyedList kickerPayment) Object.kicked
   bestowed <- Fields.required "bestowed" Common.boolean Object.bestowed
   phyrexianLifePaid <- Fields.required "phyrexianLifePaid" Common.natural Object.phyrexianLifePaid
   manaSpent <- Fields.required "manaSpent" Mana.codec Object.manaSpent

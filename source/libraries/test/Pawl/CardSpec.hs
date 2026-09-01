@@ -674,6 +674,7 @@ quantityCounts quantity = case quantity of
   Quantity.Type.HasDesignation _ -> []
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
+  Quantity.Type.TimesKickedWith {} -> []
   Quantity.Type.SnowWasSpent -> []
   Quantity.Type.WasToken -> []
   Quantity.Type.WasBlocking -> []
@@ -1758,6 +1759,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.HasDesignation {} -> False
   Quantity.Type.ClassLevel -> False
   Quantity.Type.WasKicked -> False
+  Quantity.Type.TimesKickedWith {} -> False
   Quantity.Type.SnowWasSpent -> False
   Quantity.Type.WasToken -> False
   Quantity.Type.WasBlocking -> False
@@ -3337,6 +3339,7 @@ keywordFilters keyword = keywordFramed $ case keyword of
   -- Filter exactly as flashback's and bestow's may.
   Keyword.MoreThanMeetsTheEye cost -> costFilters cost
   Keyword.Kicker cost -> costFilters cost
+  Keyword.Multikicker cost -> costFilters cost
   Keyword.Entwine cost -> costFilters cost
   -- CR 702.170a: the plot cost, whose components may hold a Filter exactly as
   -- flashback's and entwine's may.
@@ -3758,6 +3761,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.HasDesignation _ -> []
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
+  Quantity.Type.TimesKickedWith {} -> []
   Quantity.Type.SnowWasSpent -> []
   Quantity.Type.WasToken -> []
   Quantity.Type.WasBlocking -> []

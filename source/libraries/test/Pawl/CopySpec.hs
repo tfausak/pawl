@@ -740,7 +740,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     rite <- S.printingOf s registry "Rite of Replication"
     let (pikerId, board) = S.addCreature piker S.alice (S.landsInPlay island 9)
-        resolved = castAndResolve (rites KickerDecision.Declines pikerId) rite board
+        resolved = castAndResolve (rites (KickerDecision.MkKickerDecision 0) pikerId) rite board
     Spec.assertEqWith s "one token, and it is the Piker" (mintedTokens resolved) [(Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")), Just (2, 1))]
 
   Spec.it s "kicked Rite of Replication mints five instead (CR 702.33d, CR 707.1)" $ do
@@ -748,7 +748,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     rite <- S.printingOf s registry "Rite of Replication"
     let (pikerId, board) = S.addCreature piker S.alice (S.landsInPlay island 9)
-        resolved = castAndResolve (rites KickerDecision.Kicks pikerId) rite board
+        resolved = castAndResolve (rites (KickerDecision.MkKickerDecision 1) pikerId) rite board
     Spec.assertEqWith s "five tokens, and every one of them is the Piker" (mintedTokens resolved) (replicate 5 (Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")), Just (2, 1)))
 
   -- THE PROVING TEST for CR 614.12's batch exclusion and for CR 616.1g's
@@ -776,7 +776,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         -- battlefield and copyNewest names it -- unless a sibling token, minted
         -- later still, is wrongly offered.
         (_, board) = S.addCreature giant S.bob board1
-        resolved = castAndResolve (rites KickerDecision.Kicks cloneId) rite board
+        resolved = castAndResolve (rites (KickerDecision.MkKickerDecision 1) cloneId) rite board
     Spec.assertEqWith s "five tokens entered, and every one copied the Giant rather than an entering sibling" (mintedTokens resolved) (replicate 5 (Set.singleton (CardName.MkCardName (Text.pack "Hill Giant")), Just (3, 3)))
     Spec.assertEqWith s "the copied Clone itself still copied nothing" (S.powerToughnessOf cloneId resolved) (Just (1, 1))
 
@@ -1084,7 +1084,7 @@ handAppend printing pid gs =
             Object.classLevel = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
-            Object.kicked = False,
+            Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.Type.MkMana [],
