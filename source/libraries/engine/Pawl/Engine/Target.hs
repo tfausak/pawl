@@ -1468,9 +1468,11 @@ jointlyCoherentGiven pcs grants pools perspective seed source slots chosen gs =
 -- Not implemented: an announcement ABOVE a slot's minimum, which a sibling
 -- reading a slot POSITIVELY (Filter.IsBound and its neighbours) could need --
 -- taking two where one is demanded widens the reader rather than narrowing it,
--- so a mode fillable only at the larger announcement is refused here (#2902).
--- Every sibling-reading filter in `data/cards/` is a Filter.Not over a slot
--- counted exactly one, where the minimum is the whole range.
+-- so a mode fillable only at the larger announcement is refused here (#2905).
+-- Every slot a sibling filter names in `data/cards/` is counted exactly one --
+-- Bioshift's and Fate Transfer's `from`, Fall of the Hammer's `dealer`,
+-- Resourceful Defense's `from` -- where the minimum IS the whole range and the
+-- enumeration is therefore complete.
 jointlyFillableGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
 jointlyFillableGiven pcs grants pools perspective seed source slots sets gs =
   Map.null readers || any coherent assignments
