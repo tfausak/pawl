@@ -865,6 +865,151 @@ portOfKarfellSpec s registry =
               Spec.assertEqWith s "only the land that paid for the ability is in the graveyard" (namesIn Zone.Graveyard S.alice after) [named "Port of Karfell"]
             Nothing -> Spec.assertBool s False "expected exactly one returning ability"
 
+-- CR 400.1's WHOSE said by a SLOT for a resolution-time CHOICE: the graveyard
+-- the candidates come from is the one this spell's own target names, where
+-- portOfKarfellSpec above says "your graveyard" and exhumeSpec below says "each
+-- player's".
+--
+-- Grasping Tentacles {1}{U}{B} Sorcery, "Target opponent mills eight cards. You
+-- may put an artifact card from that player's graveyard onto the battlefield
+-- under your control." (name, cost, type line and Oracle text checked against
+-- api.scryfall.com, 2026-09-01). The whole card is transcribed: "under your
+-- control" is CR 110.2a's default for a card the effect's controller puts onto
+-- the battlefield, so it states no rider, and the "may" is a CR 608.2d choice
+-- scoped to the second clause.
+--
+-- THE CHOOSER IS NOT THE SCOPE, which is the pair no arm could state before:
+-- alice chooses (CR 608.2d) out of a graveyard that is not hers, and the seat
+-- whose graveyard it is comes from the slot the FIRST clause targeted.
+--
+-- NOT A TARGET, portOfKarfellSpec's distinction: the card says "target" of the
+-- opponent alone, so CR 115.1a leaves the artifact card unannounced and CR
+-- 608.2b has nothing to re-check about it.
+--
+-- THREE SEATS, with an artifact card in every graveyard a wider reading would
+-- reach: alice's own (which "your graveyard" would take), carol's (which "each
+-- opponent's" or "each player's" would take) and bob's two. The two legs below
+-- pin their answer to the LAST and the FIRST candidate offered, and
+-- Resolve.zoneScopePlayers offers them in APNAP order (CR 101.4), so a scope
+-- wider than the slot hands back carol's card on one leg and alice's on the
+-- other rather than bob's on both.
+--
+-- Bob's eight milled Swamps are the filter's other half -- cards in the very
+-- graveyard the choice reads that "artifact card" must leave standing -- and the
+-- witness that both clauses read the SAME slot.
+graspingTentaclesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+graspingTentaclesSpec s registry =
+  let -- alice holds the spell and has six lands for its {1}{U}{B}, a payment
+      -- that taps one source at a time having no slack of its own; `buried` goes
+      -- into the named graveyards in the order given, and bob's library is
+      -- stocked with `stock`. Returns the spell's id.
+      board tentacles island swamp buried stock =
+        let mana = S.landsFor island S.alice 3 (S.landsFor swamp S.alice 3 S.threePlayerGame)
+            withGraves = List.foldl' (\g (printing, pid) -> snd (S.addGraveyardCard printing pid g)) mana buried
+            withStock = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.bob g)) withGraves stock
+            (withSpell, spell) = S.handOne tentacles withStock
+         in (spell, withSpell {GameState.priority = Just S.alice})
+      -- Cast and resolve, keeping the RESPONSES beside the board so the same call
+      -- answers both "what came back" and "was anybody asked".
+      run :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [Response.Response])
+      run answer spell gs =
+        let ((_, after), responses) = Replay.record answer gs (S.cast S.alice spell >> Stack.resolveTop)
+         in (after, responses)
+      -- The offered set is FILTERED rather than rebuilt, so the target is a
+      -- recipient the engine itself minted (CR 608.2b).
+      answering :: (NonEmpty.NonEmpty ObjectId.ObjectId -> ObjectId.ObjectId) -> Prompt.Prompt r -> r
+      answering pick p = case p of
+        Prompt.ChooseTargets _ _ _ slots -> fmap (Set.filter (== Recipient.ToPlayer S.bob) . snd) slots
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        Prompt.ChooseCardInGraveyard _ _ _ offered -> pick offered
+        _ -> S.identityAnswer p
+      named = Just . CardName.MkCardName . Text.pack
+      -- The whole battlefield minus alice's six lands, by NAME and CONTROLLER:
+      -- CR 400.7 mints a fresh id at the destination, and CR 110.2a is what
+      -- decides whose the arrival is.
+      arrivals gs =
+        List.sort
+          [ (fmap S.nameOf (Game.cardOf oid gs), Projection.controllerOf oid gs)
+          | oid <- Set.toList (GameState.battlefield gs),
+            notElem (fmap S.nameOf (Game.cardOf oid gs)) [named "Island", named "Swamp"]
+          ]
+      wasAsked responses =
+        let isChoice r = case r of
+              Response.ChoseCardInGraveyard _ -> True
+              _ -> False
+         in any isChoice responses
+   in Spec.describe s "GraspingTentacles" $ do
+        -- The headline: the LAST candidate is bob's second artifact card, not
+        -- carol's, so the scope is the slot rather than the table.
+        Spec.it s "CR 608.2d the candidates come from the graveyard the target slot names" $ do
+          tentacles <- S.printingOf s registry "Grasping Tentacles"
+          island <- S.printingOf s registry "Island"
+          swamp <- S.printingOf s registry "Swamp"
+          medallion <- S.printingOf s registry "Sapphire Medallion"
+          meekstone <- S.printingOf s registry "Meekstone"
+          heartstone <- S.printingOf s registry "Heartstone"
+          crucible <- S.printingOf s registry "Crucible of Worlds"
+          let buried = [(medallion, S.alice), (meekstone, S.bob), (heartstone, S.bob), (crucible, S.carol)]
+              (spell, gs) = board tentacles island swamp buried (replicate 8 swamp)
+              (after, responses) = run (answering NonEmpty.last) spell gs
+          Spec.assertEqWith
+            s
+            "bob's last artifact card is on alice's battlefield: carol's, which a wider scope would have offered last, is not"
+            (arrivals after)
+            [(named "Heartstone", Just S.alice)]
+          Spec.assertEqWith
+            s
+            "alice's and carol's own artifact cards were never candidates and are still buried"
+            (List.sort (namesIn Zone.Graveyard S.alice after), namesIn Zone.Graveyard S.carol after)
+            (List.sort [named "Grasping Tentacles", named "Sapphire Medallion"], [named "Crucible of Worlds"])
+          Spec.assertEqWith
+            s
+            "bob's unchosen artifact and his eight milled Swamps stay in his graveyard, and his library is empty"
+            (List.sort (namesIn Zone.Graveyard S.bob after), namesIn Zone.Library S.bob after)
+            (List.sort (named "Meekstone" : replicate 8 (named "Swamp")), [])
+          Spec.assertBool s (wasAsked responses) "alice was asked which card to take"
+        -- The paired control, and the whole reason bob buries TWO artifact cards:
+        -- the same cast on the same board answered with the FIRST candidate takes
+        -- the other one. A wider scope would offer alice's own Medallion first,
+        -- so this leg fails on the same reading the one above does -- and if the
+        -- engine were picking, both legs would name one card.
+        Spec.it s "CR 608.2d the engine does not pick: another answer takes bob's other artifact card" $ do
+          tentacles <- S.printingOf s registry "Grasping Tentacles"
+          island <- S.printingOf s registry "Island"
+          swamp <- S.printingOf s registry "Swamp"
+          medallion <- S.printingOf s registry "Sapphire Medallion"
+          meekstone <- S.printingOf s registry "Meekstone"
+          heartstone <- S.printingOf s registry "Heartstone"
+          crucible <- S.printingOf s registry "Crucible of Worlds"
+          let buried = [(medallion, S.alice), (meekstone, S.bob), (heartstone, S.bob), (crucible, S.carol)]
+              (spell, gs) = board tentacles island swamp buried (replicate 8 swamp)
+              (after, _) = run (answering NonEmpty.head) spell gs
+          Spec.assertEqWith
+            s
+            "bob's first artifact card comes instead, where alice's own Medallion is what a wider scope would have offered first"
+            (arrivals after)
+            [(named "Meekstone", Just S.alice)]
+        -- The "may", declined: the mill is a clause of its own and stands.
+        Spec.it s "CR 608.2d a declined may leaves the mill done and nothing taken" $ do
+          tentacles <- S.printingOf s registry "Grasping Tentacles"
+          island <- S.printingOf s registry "Island"
+          swamp <- S.printingOf s registry "Swamp"
+          meekstone <- S.printingOf s registry "Meekstone"
+          heartstone <- S.printingOf s registry "Heartstone"
+          let buried = [(meekstone, S.bob), (heartstone, S.bob)]
+              (spell, gs) = board tentacles island swamp buried (replicate 8 swamp)
+              declining p = case p of
+                Prompt.ChooseTargets _ _ _ slots -> fmap (Set.filter (== Recipient.ToPlayer S.bob) . snd) slots
+                _ -> S.identityAnswer p
+              (after, responses) = run declining spell gs
+          Spec.assertEqWith s "nothing arrived on any battlefield" (arrivals after) []
+          Spec.assertEqWith
+            s
+            "and bob's eight milled Swamps joined the two artifact cards he had buried"
+            (List.sort (namesIn Zone.Graveyard S.bob after))
+            (List.sort ([named "Heartstone", named "Meekstone"] <> replicate 8 (named "Swamp")))
+          Spec.assertBool s (not (wasAsked responses)) "the declined may asked nothing about which card"
+
 -- CR 701.17c's "from among them", which is the group read Filter.IsBound could
 -- not do: a slot bound to the WHOLE batch a mill put in the graveyard, named by a
 -- later clause's filter over candidates that batch does not exhaust.
@@ -4557,6 +4702,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   amnesiaSpec s registry
   enduranceSpec s registry
   portOfKarfellSpec s registry
+  graspingTentaclesSpec s registry
   midnightTillingSpec s registry
   communeWithTheGodsSpec s registry
   ancestralMemoriesSpec s registry

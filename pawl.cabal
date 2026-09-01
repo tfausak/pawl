@@ -436,8 +436,6 @@ library codec
     Pawl.Codec.GrantedAbilitySpec
     Pawl.Codec.GrantPlayFromExile
     Pawl.Codec.GrantPlayFromExileSpec
-    Pawl.Codec.GraveyardScope
-    Pawl.Codec.GraveyardScopeSpec
     Pawl.Codec.HalfUnlocked
     Pawl.Codec.HalfUnlockedSpec
     Pawl.Codec.Halved
@@ -849,6 +847,8 @@ library codec
     Pawl.Codec.ZoneChangeR
     Pawl.Codec.ZoneChangeRSpec
     Pawl.Codec.ZoneChangeSpec
+    Pawl.Codec.ZoneScope
+    Pawl.Codec.ZoneScopeSpec
     Pawl.Codec.ZoneSpec
 
 -- An arbitrary precision decimal number, in the spirit of the Decimal and
@@ -1495,7 +1495,6 @@ library types
     Pawl.Types.GameState
     Pawl.Types.GrantedAbility
     Pawl.Types.GrantPlayFromExile
-    Pawl.Types.GraveyardScope
     Pawl.Types.HalfUnlocked
     Pawl.Types.Halved
     Pawl.Types.HandAction
@@ -1731,6 +1730,7 @@ library types
     Pawl.Types.ZoneChange
     Pawl.Types.ZoneChangePattern
     Pawl.Types.ZoneChangeR
+    Pawl.Types.ZoneScope
 
 -- URI components, and the encoding each of them takes.
 library uri

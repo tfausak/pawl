@@ -6,7 +6,7 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 -- (CR 611.1 / 613.11) -- the payload of Effect.AffectPlayers and of the
 -- Pawl.Types.ActivePlayerEffect it stores.
 --
--- Two readings, which is exactly Pawl.Types.GraveyardScope's split one axis over:
+-- Two readings, which is exactly Pawl.Types.ZoneScope's split one axis over:
 -- a card either names a CLASS of players relative to the effect's controller
 -- ("your opponents"), or names the seat it TARGETED ("target player"). The
 -- printed carrier (Pawl.Types.PlayerStaticAbility) keeps the bare PlayerScope,

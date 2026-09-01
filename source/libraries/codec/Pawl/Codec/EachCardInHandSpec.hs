@@ -7,9 +7,9 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.ZoneScope as ZoneScope
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.EachCardInHand" $ do
@@ -20,7 +20,7 @@ spec s = Spec.describe s "Pawl.Codec.EachCardInHand" $ do
       s
       EachCardInHand.codec
       ( EachCardInHand.MkEachCardInHand
-          { EachCardInHand.hands = GraveyardScope.InSlot (SlotName.MkSlotName (Text.pack "target")),
+          { EachCardInHand.hands = ZoneScope.InSlot (SlotName.MkSlotName (Text.pack "target")),
             EachCardInHand.filter = Just (Filter.Not (Filter.HasCardType CardType.Land))
           }
       )
@@ -32,7 +32,7 @@ spec s = Spec.describe s "Pawl.Codec.EachCardInHand" $ do
       s
       EachCardInHand.codec
       ( EachCardInHand.MkEachCardInHand
-          { EachCardInHand.hands = GraveyardScope.Scoped PlayerScope.You,
+          { EachCardInHand.hands = ZoneScope.Scoped PlayerScope.You,
             EachCardInHand.filter = Nothing
           }
       )

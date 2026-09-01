@@ -19,7 +19,6 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ChooseBetween as ChooseBetween
 import Pawl.Types.Effect (Effect)
-import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
@@ -30,6 +29,7 @@ import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotName as SlotName
 import Pawl.Types.TargetSlot (TargetSlot)
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.ZoneScope as ZoneScope
 
 -- Each mode's effects, in printed (mode, then written) order (CR 608.2c) -- one
 -- inner list per mode, kept apart. The shape a caller wants when the MODE is
@@ -177,7 +177,7 @@ modesTargetSlots chosen m = Map.unions (fmap (\mi -> instanceTargetSlots mi m) (
 -- instance's effects, which still read the printed names.
 --
 -- The KEYS are not the whole rename: a slot's pool may itself name a sibling slot
--- (Pawl.Types.GraveyardScope's InSlot, Dwell on the Past's "their graveyard") and
+-- (Pawl.Types.ZoneScope's InSlot, Dwell on the Past's "their graveyard") and
 -- so may its FILTER (Pawl.Types.Filter's IsBound, Fall of the Hammer's "another
 -- target creature"), and both are the printed name too. Renaming the keys alone
 -- would leave occurrence 1 pointing at occurrence 0's slot, so CR 700.2d's
@@ -196,7 +196,7 @@ modeInstanceTargetSlots mi mode = Map.mapKeys (instanceSlot mi) (fmap (instanceS
 
 -- CR 700.2d applied to the slot NAMES a target slot carries, so everything the
 -- slot points at follows its mode's occurrence exactly as the key does: the
--- pool's GraveyardScope.InSlot, and the sibling slots the FILTER reads
+-- pool's ZoneScope.InSlot, and the sibling slots the FILTER reads
 -- (Filter.IsBound and the atoms beside it, which Pawl.Engine.Filter.renameBound
 -- and boundSlots share one walk over).
 --
@@ -210,11 +210,11 @@ instanceScope mi slot =
     }
 
 -- instanceScope's rename over the pool itself: the two arms carrying a
--- GraveyardScope, and every other pool unchanged.
+-- ZoneScope, and every other pool unchanged.
 instancePool :: ModeInstance.ModeInstance -> Pool.Pool -> Pool.Pool
 instancePool mi pool = case pool of
-  Pool.CardsInGraveyard scope -> Pool.CardsInGraveyard (instanceGraveyardScope mi scope)
-  Pool.CreaturesAndCardsInGraveyard scope -> Pool.CreaturesAndCardsInGraveyard (instanceGraveyardScope mi scope)
+  Pool.CardsInGraveyard scope -> Pool.CardsInGraveyard (instanceZoneScope mi scope)
+  Pool.CreaturesAndCardsInGraveyard scope -> Pool.CreaturesAndCardsInGraveyard (instanceZoneScope mi scope)
   Pool.Creatures -> pool
   Pool.Players -> pool
   Pool.AnyTarget -> pool
@@ -227,10 +227,10 @@ instancePool mi pool = case pool of
 
 -- CR 109.5's Scoped arm names no slot and is untouched; InSlot's is the printed
 -- name instanceSlot rewrites.
-instanceGraveyardScope :: ModeInstance.ModeInstance -> GraveyardScope.GraveyardScope -> GraveyardScope.GraveyardScope
-instanceGraveyardScope mi scope = case scope of
-  GraveyardScope.Scoped _ -> scope
-  GraveyardScope.InSlot slot -> GraveyardScope.InSlot (instanceSlot mi slot)
+instanceZoneScope :: ModeInstance.ModeInstance -> ZoneScope.ZoneScope -> ZoneScope.ZoneScope
+instanceZoneScope mi scope = case scope of
+  ZoneScope.Scoped _ -> scope
+  ZoneScope.InSlot slot -> ZoneScope.InSlot (instanceSlot mi slot)
 
 -- CR 700.2d: the binding-shaped environment ONE chosen instance's effects read.
 -- Three parts, and each is a rule rather than a convenience:

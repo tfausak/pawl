@@ -1,15 +1,15 @@
 module Pawl.Types.EachCardInHand where
 
 import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ZoneScope as ZoneScope
 
 -- | CR 400.1: every card in the named players' hands that matches -- Amnesia's
 -- "target player reveals their hand and discards all nonland cards".
 --
 -- Pawl.Types.EachCardInGraveyard's shape over the other per-player zone, and
 -- resolved the same way: the same scope, read by the same
--- Pawl.Engine.Target.graveyardScopePlayers, and the same fold in
+-- Pawl.Engine.Target.zoneScopePlayers, and the same fold in
 -- Pawl.Engine.Resolve.objectRefObjects. The zone is BAKED IN rather than carried
 -- as a Pawl.Types.Zone, for the reason that arm's header gives.
 --
@@ -26,16 +26,11 @@ import qualified Pawl.Types.Keyword as Keyword
 -- reason: Pawl.Types.Filter has no tautological arm, so "reveals their hand" --
 -- the whole of it, which is Amnesia's first instruction -- has no other spelling.
 --
--- The scope is a Pawl.Types.GraveyardScope, whose name reads of the wrong zone
--- (#2074): the type is CR 400.1's "whose", stated once for every per-player zone
--- and for a target pool as much as for a sweep, and its two arms carry no
--- graveyard in them.
---
 -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to fizzle,
 -- and swept when the effect executes (CR 608.2c) -- the two properties every
 -- sweeping arm has.
 data EachCardInHand = MkEachCardInHand
-  { hands :: GraveyardScope.GraveyardScope,
+  { hands :: ZoneScope.ZoneScope,
     filter :: Maybe (Filter.Filter Keyword.Keyword)
   }
   deriving (Eq, Ord, Show)

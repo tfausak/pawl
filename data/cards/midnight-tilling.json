@@ -103,7 +103,10 @@
                             ]
                           },
                           "players": {
-                            "type": "You"
+                            "type": "Scoped",
+                            "value": {
+                              "type": "You"
+                            }
                           }
                         }
                       },

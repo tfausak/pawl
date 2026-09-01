@@ -187,7 +187,6 @@ import qualified Pawl.Codec.GameEventSpec
 import qualified Pawl.Codec.GameSettingsSpec
 import qualified Pawl.Codec.GrantPlayFromExileSpec
 import qualified Pawl.Codec.GrantedAbilitySpec
-import qualified Pawl.Codec.GraveyardScopeSpec
 import qualified Pawl.Codec.HalfUnlockedSpec
 import qualified Pawl.Codec.HalvedSpec
 import qualified Pawl.Codec.HandActionSpec
@@ -392,6 +391,7 @@ import qualified Pawl.Codec.WithCountersSpec
 import qualified Pawl.Codec.ZoneChangePatternSpec
 import qualified Pawl.Codec.ZoneChangeRSpec
 import qualified Pawl.Codec.ZoneChangeSpec
+import qualified Pawl.Codec.ZoneScopeSpec
 import qualified Pawl.Codec.ZoneSpec
 import qualified Pawl.CodecIntegrationSpec
 import qualified Pawl.CoinSpec
@@ -747,7 +747,6 @@ spec s registry = do
   Pawl.Codec.GameSettingsSpec.spec s
   Pawl.Codec.GrantPlayFromExileSpec.spec s
   Pawl.Codec.GrantedAbilitySpec.spec s
-  Pawl.Codec.GraveyardScopeSpec.spec s
   Pawl.Codec.HalfUnlockedSpec.spec s
   Pawl.Codec.HalvedSpec.spec s
   Pawl.Codec.HandActionSpec.spec s
@@ -953,6 +952,7 @@ spec s registry = do
   Pawl.Codec.ZoneChangePatternSpec.spec s
   Pawl.Codec.ZoneChangeRSpec.spec s
   Pawl.Codec.ZoneChangeSpec.spec s
+  Pawl.Codec.ZoneScopeSpec.spec s
   Pawl.Codec.ZoneSpec.spec s
   Pawl.CodecIntegrationSpec.spec s registry
   Pawl.ColorSpec.spec s registry

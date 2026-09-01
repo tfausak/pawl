@@ -1204,7 +1204,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- mistake and any of them alone would pass against a pool that stayed empty:
   --
   --   * CR 400.1's per-player zone -- "each player has their own library, hand,
-  --     and graveyard" -- is why the pool carries a GraveyardScope at all, and
+  --     and graveyard" -- is why the pool carries a ZoneScope at all, and
   --     bob's copy of the very same card is what proves the axis is real rather
   --     than decorative. It cannot be a Filter: CR 108.4 says "a card doesn't
   --     have a controller unless that card represents a permanent or spell", so

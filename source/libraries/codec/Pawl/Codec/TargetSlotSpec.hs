@@ -7,11 +7,11 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.ZoneScope as ZoneScope
 
 -- Filter's own coverage lives in Pawl.Codec.FilterSpec, so these cases exercise
 -- it only in its embedded position: a bare pool (Nothing filter, omitted key),
@@ -43,7 +43,7 @@ spec s = Spec.describe s "Pawl.Codec.TargetSlot" $ do
     Common.assertCodec
       s
       TargetSlot.codec
-      (TargetSlot.required (Pool.CardsInGraveyard (GraveyardScope.Scoped PlayerScope.You)) (Just (Filter.HasCardType CardType.Creature)))
+      (TargetSlot.required (Pool.CardsInGraveyard (ZoneScope.Scoped PlayerScope.You)) (Just (Filter.HasCardType CardType.Creature)))
       " {\"pool\":{\"type\":\"CardsInGraveyard\",\"value\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- CR 115.2 clause (a)'s other zone: no PlayerScope (CR 400.1's shared zone)
   -- and no Filter.

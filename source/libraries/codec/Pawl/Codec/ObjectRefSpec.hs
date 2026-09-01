@@ -16,7 +16,6 @@ import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -26,6 +25,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
+import qualified Pawl.Types.ZoneScope as ZoneScope
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
@@ -47,7 +47,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard (GraveyardScope.Scoped PlayerScope.EachPlayer) (Filter.HasCardType CardType.Creature)))
+      (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard (ZoneScope.Scoped PlayerScope.EachPlayer) (Filter.HasCardType CardType.Creature)))
       " {\"type\":\"EachCardInGraveyard\",\"value\":{\"graveyards\":{\"type\":\"Scoped\",\"value\":{\"type\":\"EachPlayer\"}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- The record codec rejects an ARRAY of any length, which is what keeps the
   -- old positional wire format from decoding silently. Both lengths are asserted
@@ -120,7 +120,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (GraveyardScope.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Just (Filter.Not (Filter.HasCardType CardType.Land)))))
+      (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (ZoneScope.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Just (Filter.Not (Filter.HasCardType CardType.Land)))))
       " {\"type\":\"EachCardInHand\",\"value\":{\"hands\":{\"type\":\"InSlot\",\"value\":\"target\"},\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}} "
   -- An absent filter is the whole hand, which is Amnesia's reveal: the key is
   -- omitted rather than written null, so the shorter spelling is the unfiltered
@@ -129,7 +129,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (GraveyardScope.Scoped PlayerScope.You) Nothing))
+      (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (ZoneScope.Scoped PlayerScope.You) Nothing))
       " {\"type\":\"EachCardInHand\",\"value\":{\"hands\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}}}} "
   -- Nullary like EachCardInYourHand above, and for its rule: CR 400.2 makes a
   -- library hidden too, so this arm names only the resolving controller's own
@@ -199,29 +199,27 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       (Either.isLeft (Common.parse (Text.pack " {\"type\":\"TopOfLibrary\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"count\":3}} ") >>= Codec.decode ObjectRef.codec))
       "expected a decode failure"
   -- The graveyard's OTHER arm: a card somebody chooses rather than the whole
-  -- matching set. Its filter is EachCardInGraveyard's exactly and its scope is
-  -- the PlayerScope that arm used to carry, so the tag, the leading chooser and
-  -- the scope's own shape tell them apart -- which is what the distinctness case
-  -- below is for; see #1952 for what this arm still cannot say that the sweep
-  -- now can.
+  -- matching set. Its filter and its scope are EachCardInGraveyard's exactly, so
+  -- the tag and the leading chooser are what tell them apart -- which is what the
+  -- distinctness case below is for.
   Spec.it s "ChosenCardInGraveyard" $
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.You (Filter.HasCardType CardType.Creature)))
-      " {\"type\":\"ChosenCardInGraveyard\",\"value\":{\"chooser\":{\"type\":\"TheController\"},\"players\":{\"type\":\"You\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+      (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController (ZoneScope.Scoped PlayerScope.You) (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"ChosenCardInGraveyard\",\"value\":{\"chooser\":{\"type\":\"TheController\"},\"players\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   Spec.it s "ChosenCardInGraveyard carries the chooser Exhume needs" $
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.EachInScope PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature)))
-      " {\"type\":\"ChosenCardInGraveyard\",\"value\":{\"chooser\":{\"type\":\"EachInScope\"},\"players\":{\"type\":\"EachPlayer\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+      (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.EachInScope (ZoneScope.Scoped PlayerScope.EachPlayer) (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"ChosenCardInGraveyard\",\"value\":{\"chooser\":{\"type\":\"EachInScope\"},\"players\":{\"type\":\"Scoped\",\"value\":{\"type\":\"EachPlayer\"}},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   Spec.it s "ChosenCardInGraveyard carries the slot-named chooser Skullwinder needs" $
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard (Chooser.BoundInSlot (SlotName.MkSlotName (Text.pack "opponent"))) PlayerScope.EachPlayer (Filter.And [])))
-      " {\"type\":\"ChosenCardInGraveyard\",\"value\":{\"chooser\":{\"type\":\"BoundInSlot\",\"value\":\"opponent\"},\"players\":{\"type\":\"EachPlayer\"},\"filter\":{\"type\":\"And\",\"value\":[]}}} "
+      (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard (Chooser.BoundInSlot (SlotName.MkSlotName (Text.pack "opponent"))) (ZoneScope.Scoped PlayerScope.EachPlayer) (Filter.And [])))
+      " {\"type\":\"ChosenCardInGraveyard\",\"value\":{\"chooser\":{\"type\":\"BoundInSlot\",\"value\":\"opponent\"},\"players\":{\"type\":\"Scoped\",\"value\":{\"type\":\"EachPlayer\"}},\"filter\":{\"type\":\"And\",\"value\":[]}}} "
   Spec.it s "ChosenCardInGraveyard rejects a bare filter with no chooser or scope" $
     Spec.assertBool
       s
@@ -331,9 +329,9 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
           ( List.nub
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
                 Codec.encode ObjectRef.codec (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)),
-                Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard (GraveyardScope.Scoped PlayerScope.EachPlayer) (Filter.HasCardType CardType.Creature))),
+                Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard (ZoneScope.Scoped PlayerScope.EachPlayer) (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec ObjectRef.EachCardInYourHand,
-                Codec.encode ObjectRef.codec (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (GraveyardScope.Scoped PlayerScope.You) Nothing)),
+                Codec.encode ObjectRef.codec (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (ZoneScope.Scoped PlayerScope.You) Nothing)),
                 Codec.encode ObjectRef.codec ObjectRef.EachCardInYourLibrary,
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardExiledWithSource Nothing),
                 Codec.encode ObjectRef.codec (ObjectRef.EachSpell (Filter.Not Filter.IsSource)),
@@ -343,7 +341,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec ObjectRef.ChosenPlayer,
                 Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 3))),
                 Codec.encode ObjectRef.codec (ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (PlayerRef.Relative PlayerRelation.You) (Filter.Not (Filter.HasCardType CardType.Land)) (Quantity.Literal 1))),
-                Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))),
+                Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController (ZoneScope.Scoped PlayerScope.EachPlayer) (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Creature) (Quantity.Literal 1) (PlayerRef.Relative PlayerRelation.You))),
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Land))),
