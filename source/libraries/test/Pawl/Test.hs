@@ -388,6 +388,7 @@ import qualified Pawl.Codec.TypeLineSpec
 import qualified Pawl.Codec.UntapRestrictionSpec
 import qualified Pawl.Codec.UntapRewriteSpec
 import qualified Pawl.Codec.UsesSpec
+import qualified Pawl.Codec.VanguardSpec
 import qualified Pawl.Codec.VentureMarkerEnteredSpec
 import qualified Pawl.Codec.WhileSpec
 import qualified Pawl.Codec.WithCountersSpec
@@ -499,6 +500,7 @@ import qualified Pawl.TriggerSpec
 import qualified Pawl.TurnSpec
 import qualified Pawl.UntapRestrictionSpec
 import qualified Pawl.Uri.FragmentSpec
+import qualified Pawl.VanguardSpec
 import qualified Pawl.VariableEffectSpec
 import qualified Pawl.ZoneChangeSpec
 import qualified Pawl.ZoneReplacementSpec
@@ -952,6 +954,7 @@ spec s registry = do
   Pawl.Codec.TypeLineSpec.spec s
   Pawl.Codec.UntapRestrictionSpec.spec s
   Pawl.Codec.UsesSpec.spec s
+  Pawl.Codec.VanguardSpec.spec s
   Pawl.Codec.VentureMarkerEnteredSpec.spec s
   Pawl.Codec.WhileSpec.spec s
   Pawl.Codec.WithCountersSpec.spec s
@@ -1066,6 +1069,7 @@ spec s registry = do
   Pawl.TurnSpec.spec s registry
   Pawl.UntapRestrictionSpec.spec s registry
   Pawl.Uri.FragmentSpec.spec s
+  Pawl.VanguardSpec.spec s registry
   Pawl.VariableEffectSpec.spec s registry
   Pawl.ZoneChangeSpec.spec s registry
   Pawl.ZoneReplacementSpec.spec s registry

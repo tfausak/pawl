@@ -17,6 +17,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AttackOption as AttackOption
 import qualified Pawl.Types.Combat as Combat.Type
@@ -74,11 +75,21 @@ import qualified Pawl.Types.Zone as Zone
 -- Deck's Printing when a game is built, and as the Player's PrintingId when one
 -- is restarted (CR 727) -- and rule 903.7 turns on WHETHER a commander was
 -- designated, never on which card it is.
-startingLife :: GameSettings.GameSettings -> Int -> Maybe a -> Integer
-startingLife settings seats commander
-  | GameSettings.brawl settings = if seats > 2 then 30 else 25
-  | Maybe.isJust commander = 40
-  | otherwise = 20
+--
+-- CR 902.4's life modifier is the `modifier` addend rather than a fourth branch:
+-- rule 902.4 modifies rule 103.4's twenty rather than replacing it, and the
+-- Vanguard variant combines with none of the three above -- no Brawl or Commander
+-- deck brings a vanguard card, so a nonzero modifier only ever meets the
+-- `otherwise` branch. Written as an addend anyway, because that is what rule
+-- 902.4 says of whatever the starting total is.
+startingLife :: GameSettings.GameSettings -> Int -> Maybe a -> Integer -> Integer
+startingLife settings seats commander modifier = modifier + base
+  where
+    base :: Integer
+    base
+      | GameSettings.brawl settings = if seats > 2 then 30 else 25
+      | Maybe.isJust commander = 40
+      | otherwise = 20
 
 -- How many cards this deck holds, CR 903.5a's commander included: rule 903.5a
 -- counts the deck at exactly 100 cards "including its commander", so the card
@@ -114,7 +125,9 @@ emptyGame order =
           Player.MkPlayer
             { -- CR 903.7 sets the total once the decks are known, which is
               -- createDeck below; no deck has been read yet here.
-              Player.life = startingLife settings (length order_) Nothing,
+              -- CR 902.4's modifier is zero for the same reason: no vanguard card
+              -- is in a command zone this function leaves empty.
+              Player.life = startingLife settings (length order_) Nothing 0,
               Player.status = Status.Playing,
               Player.counters = Map.empty,
               -- CR 701.54c: the Ring has tempted nobody in a game that has not
@@ -295,9 +308,20 @@ createDeck pid deck = do
   -- CR 103.2a: the sideboard is set aside before the game, so these are interned
   -- alongside the deck's own printings but no card is created for them.
   sideboardIds <- Monad.mapM (\(printing, n) -> fmap (\i -> (i, n)) (State.state (Game.intern printing))) (Map.toAscList (Deck.sideboard deck))
-  -- CR 903.7 / CR 103.4 / CR 103.4d: the starting life total, which is the
-  -- deck's business -- and the settings' and the seat count's -- and so cannot
-  -- be settled by emptyGame above.
+  -- CR 902.3: "each vanguard card is placed face up next to its owner's library
+  -- before the game begins", which is the command zone (CR 313.2). Placed BEFORE
+  -- the life total below, and that ordering is load-bearing: rule 902.4's modifier
+  -- is read off the card where it sits, so the card has to be sitting there.
+  --
+  -- No designation on the player beside Commander.designate's: the card type says
+  -- which object this is (Pawl.Engine.Vanguard.isVanguard) and rule 313.2 keeps it
+  -- from ever changing zones, so nothing has to survive CR 400.7's fresh id.
+  Monad.forM_ (Deck.vanguard deck) $ \printing -> do
+    printingId <- State.state (Game.intern printing)
+    Monad.void (createInCommandZone pid printingId)
+  -- CR 903.7 / CR 103.4 / CR 103.4d / CR 902.4: the starting life total, which is
+  -- the deck's business -- and the settings' and the seat count's and the
+  -- vanguard's -- and so cannot be settled by emptyGame above.
   State.modify' $ \gs ->
     gs
       { GameState.players =
@@ -308,7 +332,7 @@ createDeck pid deck = do
           -- CR 400.11a: the sideboard is recorded on the player for the same
           -- reason and no object is minted for it either. CR 400.11c is what
           -- keeps anything else from reaching these until a card brings one in.
-          Map.adjust (\p -> p {Player.life = startingLife (GameState.settings gs) (length (GameState.turnOrder gs)) (Deck.commander deck), Player.dungeons = Set.fromList dungeonIds, Player.outsideTheGame = Map.fromList sideboardIds}) pid (GameState.players gs)
+          Map.adjust (\p -> p {Player.life = startingLife (GameState.settings gs) (length (GameState.turnOrder gs)) (Deck.commander deck) (Vanguard.lifeModifierOf pid gs), Player.dungeons = Set.fromList dungeonIds, Player.outsideTheGame = Map.fromList sideboardIds}) pid (GameState.players gs)
       }
   Monad.forM_ (Map.toList (Deck.cards deck)) $ \(printing, n) -> do
     printingId <- State.state (Game.intern printing)
@@ -320,20 +344,28 @@ createDeck pid deck = do
   -- pawl does not enforce it) down to one entry.
   Monad.forM_ (Deck.commander deck) $ \printing -> do
     printingId <- State.state (Game.intern printing)
-    oid <- createCard pid printingId
-    State.modify' $ \gs ->
-      let moved =
-            Game.insertIntoZone Zone.Command LibraryPosition.defaultValue pid oid (Game.removeFromZones pid oid gs)
-          -- Object.zone tracks the zone sets, so it moves with them. A hand-written
-          -- move outside Event.changeZone for createCard's own reason: this is the
-          -- game being built, so there is no CR 400.7 event to emit and nothing to
-          -- trigger.
-          rezoned =
-            moved
-              { GameState.objects =
-                  Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved)
-              }
-       in Commander.designate pid printingId rezoned
+    Monad.void (createInCommandZone pid printingId)
+    State.modify' (Commander.designate pid printingId)
+
+-- CR 903.6 / CR 902.3: mint one of this player's cards straight into the command
+-- zone, which is where both of the cards a deck starts outside its library begin.
+--
+-- Shared by the two rather than written twice, because what it does is CR 400.1's
+-- zone bookkeeping and neither rule's own business: Object.zone tracks the zone
+-- sets, so it moves with them, and this is a hand-written move outside
+-- Event.changeZone for createCard's own reason -- the game is being built, so
+-- there is no CR 400.7 event to emit and nothing to trigger.
+createInCommandZone :: PlayerId -> PrintingId.PrintingId -> Game ObjectId
+createInCommandZone pid printingId = do
+  oid <- createCard pid printingId
+  State.modify' $ \gs ->
+    let moved =
+          Game.insertIntoZone Zone.Command LibraryPosition.defaultValue pid oid (Game.removeFromZones pid oid gs)
+     in moved
+          { GameState.objects =
+              Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved)
+          }
+  pure oid
 
 newGame :: HandActionPerformer -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
 newGame perform matchup = do
@@ -410,19 +442,31 @@ startGameFromCards perform exemptions = do
       commanderOf pid =
         Maybe.listToMaybe (Map.keys (Map.filterWithKey (\oid obj -> Object.owner obj == pid && Commander.isCommander oid gs) rebuilt))
       commanderIds = Set.fromList (Maybe.mapMaybe commanderOf owners)
-      commanders = fmap toCommandCard (Map.restrictKeys rebuilt commanderIds)
-      cards = fmap toLibraryCard (Map.withoutKeys rebuilt commanderIds)
+      -- CR 313.2: "if a vanguard card would leave the command zone, it remains in
+      -- the command zone", which is the exception CR 727.2's "all cards" and CR
+      -- 729.2's own funnel would otherwise sweep into a library. So a vanguard is
+      -- held back exactly as a commander is, and for a rule of its own rather than
+      -- for rule 903.6's. CR 729.2b is the same holding read forwards.
+      --
+      -- Every one of them, where `commanderOf` takes one per player: CR 902.1's
+      -- one card per player is a deck-construction rule pawl does not enforce
+      -- (#940), and rule 313.2 is stated of each vanguard card rather than of the
+      -- one the player designated, so there is nothing here to choose between.
+      vanguardIds = Map.keysSet (Map.filterWithKey (\oid _ -> Vanguard.isVanguard oid gs) rebuilt)
+      inCommandIds = Set.union commanderIds vanguardIds
+      commandZoneCards = fmap toCommandCard (Map.restrictKeys rebuilt inCommandIds)
+      cards = fmap toLibraryCard (Map.withoutKeys rebuilt inCommandIds)
       libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) cards))
   State.put
     gs
-      { GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) exempt, cards, commanders],
+      { GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) exempt, cards, commandZoneCards],
         GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) owners),
         GameState.hand = Map.empty,
         GameState.graveyard = Map.empty,
         GameState.battlefield = mempty,
         GameState.phasedOut = mempty,
         GameState.exile = exempt,
-        GameState.command = commanderIds,
+        GameState.command = inCommandIds,
         GameState.stack = []
       }
   Monad.forM_ owners Event.shuffleLibrary
@@ -450,16 +494,27 @@ rotateTo starter order = case break (== starter) order of
 -- REBUILT seat count: CR 727.1 restarts for the players who were in the game
 -- when it ended, and CR 729.4 leaves a player outside the subgame, so either
 -- rebuild can seat fewer players than the game it came from.
-resetPlayers :: GameSettings.GameSettings -> Int -> Map.Map PlayerId Player.Player -> Map.Map PlayerId Player.Player
-resetPlayers settings seats players =
-  let reset player = case Player.status player of
+--
+-- Takes the life modifier per player for the same reason it takes the settings:
+-- CR 902.4's number is read off a card in the command zone, and this function is
+-- handed a players map rather than the state that holds one. Both callers pass
+-- Pawl.Engine.Vanguard.lifeModifierOf against the board the rebuild starts from,
+-- where CR 313.2 has kept every vanguard sitting since the game began.
+resetPlayers :: GameSettings.GameSettings -> Int -> (PlayerId -> Integer) -> Map.Map PlayerId Player.Player -> Map.Map PlayerId Player.Player
+resetPlayers settings seats lifeModifier players =
+  let reset pid player = case Player.status player of
         Status.Playing ->
           player
             { -- CR 903.7 again: Player.commander survives the rebuild (see
               -- Player.commanderCasts below), so a restarted Commander game
               -- starts back at forty rather than at twenty -- or at CR
               -- 903.12f's number, the settings carried in having survived too.
-              Player.life = startingLife settings seats (Player.commander player),
+              --
+              -- CR 902.4 survives it the same way and for a sharper reason: CR
+              -- 727.2 and CR 729.2 rebuild the game from the cards, and CR 313.2
+              -- forbids the vanguard card to leave the command zone, so the card
+              -- the modifier is read off is still there to be read.
+              Player.life = startingLife settings seats (Player.commander player) (lifeModifier pid),
               Player.counters = Map.empty,
               -- CR 727.1 / 729.2: a NEW game, so the Ring has tempted nobody in
               -- it. The command zone this line's callers empty is where the
@@ -493,7 +548,7 @@ resetPlayers settings seats players =
               Player.completedDungeonNames = Set.empty
             }
         Status.Departed _ -> player
-   in fmap reset players
+   in Map.mapWithKey reset players
 
 -- CR 727: restart the game in place. CR 727.1a's starting player is `starter`
 -- (the controller of the restarting ability), so the turn order is rotated to
@@ -522,7 +577,10 @@ restartGame perform exempt starter = do
             -- forth in rule 103" for the same players with the same decks, and
             -- nothing in rule 727 turns an option off. CR 727.7 confirms the
             -- direction by naming an option the restarted game is still using.
-            GameState.players = resetPlayers (GameState.settings gs) (length order) (GameState.players gs),
+            -- CR 902.4: the modifier is read off `gs`, the board the restart
+            -- starts from, where CR 313.2 has kept every vanguard card since the
+            -- game began -- and startGameFromCards leaves it there.
+            GameState.players = resetPlayers (GameState.settings gs) (length order) (\pid -> Vanguard.lifeModifierOf pid gs) (GameState.players gs),
             GameState.manaPool = Map.empty,
             GameState.combat = Combat.emptyCombat,
             GameState.events = Seq.empty,
@@ -608,10 +666,11 @@ restartGame perform exempt starter = do
   startGameFromCards perform exempt
 
 -- CR 729.2: build a fresh subgame state from the parent's LIBRARY cards, plus
--- CR 729.2c's commanders; no other main-game zone enters. The object pool is
+-- CR 729.2b's vanguards and CR 729.2c's commanders; no other main-game zone
+-- enters. The object pool is
 -- restricted to those objects; startGameFromCards (called by playSubgame) then
--- rebuilds each subgame library from that pool, puts each commander back in the
--- subgame's command zone (CR 903.6), shuffles, and draws opening hands (CR
+-- rebuilds each subgame library from that pool, puts each of those back in the
+-- subgame's command zone (CR 903.6, CR 313.2), shuffles, and draws opening hands (CR
 -- 103). Every transient field is cleared as restartGame does, EXCEPT the
 -- object/timestamp id supplies, which are inherited from the parent so every
 -- object the subgame mints (CR 400.7) gets an id above every parent id --
@@ -628,23 +687,28 @@ subgameStateFrom starter parent =
           (concatMap (\pid -> Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library parent))) (GameState.turnOrder parent))
       -- CR 729.2c: "as a subgame of a Commander game starts, each player moves
       -- their commander from the main-game command zone (if it's there) to the
-      -- subgame command zone". Nothing ELSE in the main-game command zone moves --
-      -- CR 729.2's "no other cards in a main-game zone are moved" -- and its two
-      -- siblings have no format here: CR 729.2a's supplementary decks of
-      -- nontraditional cards are the attraction (#871), planar (#934) and scheme
-      -- (#935) decks CR 100.2d names, none of them implemented, and neither are
-      -- CR 729.2b's vanguard cards (#936).
+      -- subgame command zone", and CR 729.2b says the same of a vanguard card.
+      -- Nothing ELSE in the main-game command zone moves -- CR 729.2's "no other
+      -- cards in a main-game zone are moved" -- and their remaining sibling has no
+      -- format here: CR 729.2a's supplementary decks of nontraditional cards are
+      -- the attraction (#871), planar (#934) and scheme (#935) decks CR 100.2d
+      -- names, neither of them implemented.
       --
       -- The command-zone residents pawl DOES have -- an emblem, and a dungeon a
       -- player has ventured into -- stay in the parent, which is what CR 729.2
       -- asks rather than an elision: `movedObjects` below restricts to the
-      -- libraries and CR 729.2c's commanders, so nothing else crosses.
+      -- libraries, CR 729.2b's vanguards and CR 729.2c's commanders, so nothing
+      -- else crosses.
       --
       -- The parent's own copy is deliberately left where it is: the parent is
       -- untouched while the subgame runs (CR 729.1a), and funnelBack drops these
       -- ids from it and refunds them from the subgame, exactly as it does for
       -- `libIds`.
-      cmdIds = Set.filter (\oid -> Commander.isCommander oid parent) (GameState.command parent)
+      -- CR 729.2b beside CR 729.2c: a vanguard card crosses into the subgame on
+      -- the same terms a commander does, and rule 729.2b states it without rule
+      -- 729.2c's "if it's there" because CR 313.2 has kept it in the command zone
+      -- all along.
+      cmdIds = Set.filter (\oid -> Commander.isCommander oid parent || Vanguard.isVanguard oid parent) (GameState.command parent)
       movedObjects = Map.restrictKeys (GameState.objects parent) (Set.union libIds cmdIds)
       -- Invariant: `libIds` here and funnelBack's `oldLibIds` MUST compute the
       -- identical id set, and so must `cmdIds` and funnelBack's `oldCmdIds`.
@@ -666,7 +730,8 @@ subgameStateFrom starter parent =
       -- CR 729.4: "all objects in the main game and all cards outside the main
       -- game are considered outside the subgame (except those specifically
       -- brought into the subgame)". The exception is `movedObjects` -- CR
-      -- 729.2's libraries and CR 729.2c's commanders -- which are IN the
+      -- 729.2's libraries, CR 729.2b's vanguards and CR 729.2c's commanders --
+      -- which are IN the
       -- subgame and so are excluded here. Only Source.OfCard objects: CR
       -- 400.11c's "spells and abilities that allow those cards to be brought
       -- into the game" is what a road into a subgame is, and a token or an
@@ -711,7 +776,10 @@ subgameStateFrom starter parent =
           -- 729.2c speaks of "a subgame of a Commander game" -- the subgame is
           -- played in the format the main game is. CR 729.1b keeps EFFECTS from
           -- crossing, not the options the game was started with.
-          GameState.players = resetPlayers (GameState.settings parent) (length order) (GameState.players parent),
+          -- CR 902.4 / CR 729.2b: read off the PARENT, whose command zone still
+          -- holds every vanguard card at this point -- `cmdIds` below is what
+          -- moves them into the subgame, and it is computed from the same board.
+          GameState.players = resetPlayers (GameState.settings parent) (length order) (\pid -> Vanguard.lifeModifierOf pid parent) (GameState.players parent),
           GameState.outsideObjects = outside,
           -- CR 729.4a: nothing has crossed into this subgame yet.
           GameState.broughtIn = Seq.empty,
@@ -1029,28 +1097,30 @@ funnelBack finalSub parent =
       toCommandCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Command}
       -- CR 729.5's own exclusion: "all traditional cards they own that are in the
       -- subgame OTHER THAN those in the subgame command zone". So the library
-      -- funnel skips the subgame's command zone wholesale, and CR 729.5c takes
-      -- back out of it exactly the commanders. Any other CARD that ended there is
-      -- covered by rule 729.5's "except as specified in rules 729.5a-c, all other
-      -- objects in the subgame cease to exist", which is the literal reading; a
-      -- commander is the only card a subgame can put in that zone anyway
-      -- (CR 903.9a), and an emblem there is not a card and never was in scope.
+      -- funnel skips the subgame's command zone wholesale, and CR 729.5b and CR
+      -- 729.5c take back out of it exactly the vanguards and the commanders. Any
+      -- other CARD that ended there is covered by rule 729.5's "except as
+      -- specified in rules 729.5a-c, all other objects in the subgame cease to
+      -- exist", which is the literal reading; those two are the only cards a
+      -- subgame can put in that zone anyway (CR 903.9a, CR 313.2), and an emblem
+      -- there is not a card and never was in scope.
       subCmdIds = GameState.command finalSub
       returned = fmap toLibraryCard (Map.filter isCard (Map.withoutKeys (GameState.objects finalSub) subCmdIds))
       backFromSub =
         fmap
           toCommandCard
-          (Map.filterWithKey (\oid obj -> isCard obj && Commander.isCommander oid finalSub) (Map.restrictKeys (GameState.objects finalSub) subCmdIds))
+          (Map.filterWithKey (\oid obj -> isCard obj && (Commander.isCommander oid finalSub || Vanguard.isVanguard oid finalSub)) (Map.restrictKeys (GameState.objects finalSub) subCmdIds))
       oldLibIds =
         Set.fromList
           (concatMap (\pid -> Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library parent))) (GameState.turnOrder parent))
       -- The same expression as subgameStateFrom's `cmdIds`; see the invariant note
-      -- there. These are the ids CR 729.2c moved out of the parent's command zone,
-      -- so they are dropped from the parent and refunded from the subgame -- into
-      -- the command zone by `backFromSub` if the commander is still there (CR
-      -- 729.5c's "if it's there"), and into the library by `returned` if it ended
-      -- the subgame anywhere else (CR 729.5's first sentence).
-      oldCmdIds = Set.filter (\oid -> Commander.isCommander oid parent) (GameState.command parent)
+      -- there. These are the ids CR 729.2b and CR 729.2c moved out of the parent's
+      -- command zone, so they are dropped from the parent and refunded from the
+      -- subgame -- into the command zone by `backFromSub` if the card is still
+      -- there (CR 729.5c's "if it's there"; a vanguard always is, by CR 313.2),
+      -- and into the library by `returned` if it ended the subgame anywhere else
+      -- (CR 729.5's first sentence).
+      oldCmdIds = Set.filter (\oid -> Commander.isCommander oid parent || Vanguard.isVanguard oid parent) (GameState.command parent)
       movedIds = Set.union oldLibIds oldCmdIds
       ownersPresentInSub = Set.fromList (fmap Object.owner (Map.elems (GameState.objects finalSub)))
       removedByDeparture oid = case Map.lookup oid (GameState.objects parent) of

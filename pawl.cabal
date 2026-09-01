@@ -840,6 +840,8 @@ library codec
     Pawl.Codec.UntapRewriteSpec
     Pawl.Codec.Uses
     Pawl.Codec.UsesSpec
+    Pawl.Codec.Vanguard
+    Pawl.Codec.VanguardSpec
     Pawl.Codec.VentureMarkerEntered
     Pawl.Codec.VentureMarkerEnteredSpec
     Pawl.Codec.While
@@ -964,6 +966,7 @@ library engine
     Pawl.Engine.Target
     Pawl.Engine.Turn
     Pawl.Engine.UntapRestriction
+    Pawl.Engine.Vanguard
 
 -- The catalog of every exception Pawl can throw, and nothing else.
 library exceptions
@@ -1286,6 +1289,7 @@ library test
     Pawl.TriggerSpec
     Pawl.TurnSpec
     Pawl.UntapRestrictionSpec
+    Pawl.VanguardSpec
     Pawl.VariableEffectSpec
     Pawl.ZoneChangeSpec
     Pawl.ZoneReplacementSpec
@@ -1732,6 +1736,7 @@ library types
     Pawl.Types.UntapRestriction
     Pawl.Types.UntapRewrite
     Pawl.Types.Uses
+    Pawl.Types.Vanguard
     Pawl.Types.VentureMarkerEntered
     Pawl.Types.While
     Pawl.Types.WithCounters

@@ -55,6 +55,7 @@ import qualified Pawl.Codec.Toughness as Toughness
 import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Codec.TypeLine as TypeLine
 import qualified Pawl.Codec.UntapRestriction as UntapRestriction
+import qualified Pawl.Codec.Vanguard as Vanguard
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -83,6 +84,8 @@ codec cardCodec = Fields.object $ do
   toughness <- Fields.defaulted "toughness" Nothing (Common.maybe Toughness.codec) Face.toughness
   loyalty <- Fields.defaulted "loyalty" Nothing (Common.maybe Loyalty.codec) Face.loyalty
   defense <- Fields.defaulted "defense" Nothing (Common.maybe Defense.codec) Face.defense
+  -- CR 313.6 / 313.7: absent on every card but a vanguard.
+  vanguard <- Fields.defaulted "vanguard" Nothing (Common.maybe Vanguard.codec) Face.vanguard
   characteristicPT <- Fields.defaulted "characteristicPT" Nothing (Common.maybe Quantity.codec) Face.characteristicPT
   enchant <- Fields.defaulted "enchant" [] (Common.list TargetSlot.codec) Face.enchant
   keywords <- Fields.defaulted "keywords" Set.empty (Common.set Keyword.codec) Face.keywords
@@ -137,6 +140,7 @@ codec cardCodec = Fields.object $ do
         Face.toughness = toughness,
         Face.loyalty = loyalty,
         Face.defense = defense,
+        Face.vanguard = vanguard,
         Face.characteristicPT = characteristicPT,
         Face.enchant = enchant,
         Face.keywords = keywords,
