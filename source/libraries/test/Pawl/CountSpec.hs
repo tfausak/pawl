@@ -1106,13 +1106,23 @@ relicRunnerSpec s registry =
           Spec.assertEqWith s "bob's blocker never traded" (S.creaturesInPlay S.bob after) 1
           Spec.assertEqWith s "and the Runner lived, beside the Worker" (S.creaturesInPlay S.alice after) 2
 
+-- Fill every target slot with the candidate naming `oid`. The offered set is
+-- FILTERED rather than answered with a hand-built recipient, so CR 608.2b's
+-- re-read at resolution still finds the target (Pawl.DamageSpec's `aimedAt` is
+-- the same answerer).
+aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> Recipient.objectOf r == Just oid) sets
+  _ -> S.identityAnswer p
+
 -- CR 613.1b / CR 400.1: a count whose SCOPE names the controller of a bound
 -- object. Layer 2 is what decides who controls a permanent, so
 -- Count.playersFor reads the reference off the injected view rather than off
 -- the resolution's bindings; the hand it then indexes is CR 400.1's per-player
--- zone, which CR 108.3 gives to that player. GAMEPLAY LEVEL for the Aetherflux
--- group's reason -- what is on trial is that the reference resolves against the
--- projection the resolution supplies, which a stubbed ViewOf would not show.
+-- zone, so "that player's hand" is a read no filter has to narrow. GAMEPLAY
+-- LEVEL for the Aetherflux group's reason -- what is on trial is that the
+-- reference resolves against the projection the resolution supplies, which a
+-- stubbed ViewOf would not show.
 --
 -- Flunk, {1}{B} Instant: "Target creature gets -X/-X until end of turn, where X
 -- is 7 minus the number of cards in that creature's controller's hand." Nothing
@@ -1137,15 +1147,6 @@ relicRunnerSpec s registry =
 -- alice keeps a Piker of her own on the battlefield, so the target slot offers
 -- two creatures and the answerer has to pick one rather than the offer
 -- collapsing onto the only candidate.
--- Fill every target slot with the candidate naming `oid`. The offered set is
--- FILTERED rather than answered with a hand-built recipient, so CR 608.2b's
--- re-read at resolution still finds the target (Pawl.DamageSpec's `aimedAt` is
--- the same answerer).
-aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-aimedAt oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> Recipient.objectOf r == Just oid) sets
-  _ -> S.identityAnswer p
-
 flunkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 flunkSpec s registry =
   let handOf printing pid n g = List.foldl' (\g' _ -> snd (S.addHandCard printing pid g')) g [1 .. (n :: Int)]

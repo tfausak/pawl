@@ -410,8 +410,8 @@ aggregate quantityOf aggregation members = case aggregation of
 
 -- CR 400.1: whose copy of the zone -- and, for Pawl.Engine.ManaCount, whose
 -- mana pool, which CR 106.4 attaches to a player the same way. Nothing when the
--- reference cannot be resolved: a Relative with no perspective, or a slot that
--- is unbound or bound to something that is not a player.
+-- reference cannot be resolved: a Relative with no perspective, or a slot the
+-- arm reading it can make no player of.
 --
 -- Takes the same ViewOf `evaluate` does, and for the reason that function's
 -- haddock gives: CR 613.1b makes control a layer-2 question, so the arm reading
