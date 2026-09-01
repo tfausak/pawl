@@ -44,10 +44,10 @@ import qualified Pawl.Types.Zone as Zone
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Object" $ do
   -- CR 402.1: a card in a hand, which is most of what a game state holds. Every
-  -- optional axis is at its absent value, so this case is where a codec that
-  -- elided a null or wrote an empty array as an absent key is caught -- and
-  -- where `plotted` is Nothing against the Just 0 below, which CR 702.170a makes
-  -- two different cards rather than one.
+  -- optional axis is at its default, so the literal is the five required keys and
+  -- nothing else -- this is the case that pins the OMISSION, and a field switched
+  -- back to 'Fields.required' reappears here. `plotted` is absent against the
+  -- Just 0 below, which CR 702.170a makes two different cards rather than one.
   Spec.it s "a card in a hand" $
     Common.assertCodec
       s
@@ -93,20 +93,9 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.doesNotUntapNext = False,
           Object.exertedBy = Set.empty
         }
-      ( " {\"owner\":1,\"enteredUnder\":null,\"source\":{\"type\":\"OfCard\",\"value\":2}"
-          <> ",\"zone\":{\"type\":\"Hand\"},\"tapped\":{\"type\":\"Untapped\"}"
-          <> ",\"facing\":{\"type\":\"FaceUp\"},\"exiledFaceDown\":false,\"damage\":0"
-          <> ",\"sickness\":{\"type\":\"Sick\"},\"bindings\":{},\"counters\":[]"
-          <> ",\"counterTimestamps\":[],\"attachedTo\":null,\"chosenColor\":null"
-          <> ",\"chosenSubtype\":null,\"chosenNames\":[],\"chosenPlayer\":null"
-          <> ",\"timestamp\":3,\"face\":null,\"turnedOverAt\":null,\"worldSince\":null"
-          <> ",\"playableFromExile\":null,\"plotted\":null,\"foretold\":null"
-          <> ",\"ringBearerFor\":null,\"protector\":null,\"ventureRoom\":null"
-          <> ",\"classLevel\":null,\"unlockedHalves\":[],\"designations\":[]"
-          <> ",\"kicked\":[],\"bestowed\":false,\"phyrexianLifePaid\":0"
-          <> ",\"manaSpent\":[]"
-          <> ",\"announcedX\":null,\"detainedUntil\":[],\"goadedBy\":[]"
-          <> ",\"doesNotUntapNext\":false,\"exertedBy\":[]} "
+      ( " {\"owner\":1,\"source\":{\"type\":\"OfCard\",\"value\":2}"
+          <> ",\"zone\":{\"type\":\"Hand\"},\"sickness\":{\"type\":\"Sick\"}"
+          <> ",\"timestamp\":3} "
       )
   -- Every axis away from the case above, so no two same-typed fields hold the
   -- same value and a codec swapping a pair of them is caught: the six PlayerId
