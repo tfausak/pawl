@@ -675,9 +675,10 @@ playerView pid =
 data Context = MkContext
   { -- | CR 808.1: which team each player is on, so that the relation atoms below
     -- can take CR 102.3's teammates out of a candidate's opponents. Supplied by
-    -- the caller for `defendingPlayer`'s reason -- this module holds no game
-    -- state -- and Teams.none wherever no board frames the match, which is CR
-    -- 102.4's game that is not played between teams.
+    -- the caller for `defendingPlayer`'s reason: this module holds no game state,
+    -- and every caller in the engine hands it the board's own
+    -- (Pawl.Engine.Game.teams). Teams.none is CR 102.4's game that is not played
+    -- between teams, which is what a match with no board behind it gets.
     teams :: Teams.Teams,
     perspective :: Maybe PlayerId.PlayerId,
     source :: Maybe ObjectId.ObjectId,

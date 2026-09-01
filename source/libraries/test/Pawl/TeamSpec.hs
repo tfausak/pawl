@@ -2,10 +2,13 @@
 
 -- Covers: CR 102.3's teammates and CR 808's Team vs. Team variant --
 -- Pawl.Types.Teams, the Pawl.Types.GameSettings field that carries them, and the
--- three readers that answer "who are my opponents": Pawl.Engine.Combat's
+-- readers that answer "who are my opponents", one case each: Pawl.Engine.Combat's
 -- attackableOpponents (CR 506.2a), Pawl.Engine.Resolve's playerRefPlayers
--- (PlayerRef.Relative Opponent) and Pawl.Engine.Count's playersFor (the same
--- reference under a Count).
+-- (PlayerRef.Relative Opponent), Pawl.Engine.Target's slot filter (the
+-- Filter.IsPlayer atom, which reads Pawl.Engine.Filter's Context), Pawl.Engine's
+-- PlayerEffect.inScope (PlayerScope.Opponents) and Pawl.Engine.Count's playersFor
+-- (the same PlayerRef under a Count). Pawl.BattleSpec holds the sixth, CR
+-- 310.12a's protector candidates, beside its siblings.
 --
 -- FOUR SEATS IN TWO TEAMS throughout, which is the smallest board on which CR
 -- 102.3 and CR 806.1 disagree: at three seats in two teams a player has one

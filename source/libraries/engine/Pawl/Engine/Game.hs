@@ -970,8 +970,9 @@ areOpponents :: GameState -> PlayerId -> PlayerId -> Bool
 areOpponents gs = Teams.areOpponents (teams gs)
 
 -- CR 102.3 with CR 104.2a: this player's opponents who are still in the game, in
--- PlayerId order -- stillPlaying's order, which the callers that want another
--- one re-sort (Pawl.Engine.Combat.attackableOpponents takes APNAP).
+-- stillPlaying's PlayerId order -- which is the order the offers built from it
+-- were already in. A caller wanting CR 101.4's seating order filters apnapOrder
+-- through areOpponents instead, as Pawl.Engine.Combat.attackableOpponents does.
 opponentsOf :: PlayerId -> GameState -> [PlayerId]
 opponentsOf you gs = filter (areOpponents gs you) (stillPlaying gs)
 
