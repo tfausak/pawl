@@ -738,8 +738,8 @@ viewOfSnapshot mController isToken counters snapshot =
       -- CR 111.6: "A token isn't a card", which is a fact about the OBJECT and
       -- not a characteristic, so the arm supplies it above.
       Filter.token = isToken,
-      -- CR 113.3b: CR 608.2h's record is of a permanent that has left the
-      -- battlefield, which is never an ability on the stack.
+      -- CR 113.3b: CR 608.2h's record is of characteristics rather than of an
+      -- object on the stack, so there is no ability here to be either kind.
       Filter.activatedAbility = False,
       Filter.tapped = False,
       -- CR 110.5a says status is not a characteristic, and CR 608.2h's record is

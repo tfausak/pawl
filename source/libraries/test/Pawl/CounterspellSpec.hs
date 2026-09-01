@@ -2621,8 +2621,9 @@ squelchSpec s registry = Spec.describe s "Squelch" $ do
                 (\g p -> snd (S.addCreature p S.alice g))
                 withFlash
                 [mountain, mountain, island, island]
-            -- CR 121.3: the draw needs a library to draw from, or alice loses to
-            -- CR 104.3c before the assertions run.
+            -- CR 121.1: the draw takes the top card of a library, and CR 104.3c
+            -- would lose alice the game before the assertions run if there were
+            -- none.
             withLibrary = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) withLands [1 .. (3 :: Int)]
             (squelchId, withSquelch) = S.addHandCard squelch S.alice withLibrary
             (pikerId, gs) = S.addHandCard piker S.alice withSquelch

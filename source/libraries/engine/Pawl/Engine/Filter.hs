@@ -357,10 +357,9 @@ data View = MkView
     -- never from a projection: which kind of ability an object is is no
     -- characteristic (CR 109.3), so no CR 613 layer can change the answer.
     --
-    -- False for every candidate that is not an ability on the stack -- a
-    -- permanent, a spell, a player, a printed face, an event snapshot -- which
-    -- is what keeps Squelch's slot inside Pawl.Types.Pool.Abilities rather than
-    -- widening it.
+    -- False for every candidate that is not an ability on the stack: a
+    -- permanent, a spell, a player, a printed face, an event snapshot. Each
+    -- builder says so at its own site.
     activatedAbility :: Bool,
     -- | CR 110.5a's tap status. Not a characteristic, so no projection writes it;
     -- read straight off the object.
