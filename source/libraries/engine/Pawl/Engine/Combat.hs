@@ -175,22 +175,10 @@ attackTargets defender gs =
       <> fmap AttackTarget.OfBattle (attackableBattles defender gs)
 
 -- CR 508.1c through CR 802.3a: may this creature be announced as attacking this
--- target? The pairwise attacking restriction read against ONE announcement, the
--- pairs having been gathered once per declaration pass
--- (CombatRestriction.cantAttackPlayer).
---
--- Exhaustive over CR 506.3's three things that can be attacked rather than a
--- wildcard, so a fourth of them fails to compile here instead of silently
--- answering True. Only the player arm consults the set today, and that is the
--- rule and not an omission: Blazing Archon's "creatures can't attack you" leaves
--- a planeswalker its controller controls attackable, which is a different
--- announcement. Not implemented: a restriction naming a planeswalker or a battle
--- (#2891), which would give the other two arms a set of their own.
-attackTargetAllowed :: Set (ObjectId, PlayerId) -> ObjectId -> AttackTarget.AttackTarget -> Bool
-attackTargetAllowed barred oid target = case target of
-  AttackTarget.OfPlayer pid -> not (Set.member (oid, pid) barred)
-  AttackTarget.OfPlaneswalker _ -> True
-  AttackTarget.OfBattle _ -> True
+-- target? A membership test, the whole judgement having been made once per
+-- declaration pass by barredAnnouncements.
+attackTargetAllowed :: Set (ObjectId, AttackTarget.AttackTarget) -> ObjectId -> AttackTarget.AttackTarget -> Bool
+attackTargetAllowed barred oid target = not (Set.member (oid, target) barred)
 
 -- CR 306.6 / CR 508.1b: the planeswalkers a defending player controls, in
 -- ascending id order. PROJECTED rather than printed: CR 613.1d puts card types in
@@ -460,19 +448,57 @@ withinLimit limit size = case limit of
 -- stands.
 attackCeiling :: [ObjectId] -> GameState -> (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget)
 attackCeiling candidates gs =
-  attackCeilingGiven (CombatRestriction.attackLimit gs) (CombatRestriction.cantAttackAlone candidates gs) (barredAttacks candidates gs) candidates gs
+  attackCeilingGiven (CombatRestriction.attackLimit gs) (CombatRestriction.cantAttackAlone candidates gs) (barredAnnouncements candidates gs) candidates gs
 
--- CR 508.1c's aimed-at restriction over the whole declaration pass: every
--- (creature, defending player) pair it forbids. Hoisted beside the bound and the
--- attacks-alone set, and gathered from the same list the announcements will be
--- drawn from (Defender.defendingPlayers, which declarableTargets also walks).
-barredAttacks :: [ObjectId] -> GameState -> Set (ObjectId, PlayerId)
-barredAttacks candidates gs = CombatRestriction.cantAttackPlayer candidates (Defender.defendingPlayers gs) gs
+-- CR 508.1c through CR 802.3a: every ANNOUNCEMENT no legal declaration may
+-- contain -- each (creature, attack target) pair some restriction in force
+-- forbids. Hoisted beside the bound and the attacks-alone set, and built from the
+-- same two lists the declaration is drawn from (declarableTargets and
+-- Defender.defendingPlayers).
+--
+-- TWO restrictions land here and they map a target to a player DIFFERENTLY, which
+-- is why one set is built from two:
+--
+--   * The AIMED-AT one (Blazing Archon, "creatures can't attack you") names the
+--     thing being attacked, so only CR 506.3's player arm can match it. A
+--     planeswalker its controller controls stays attackable -- a different
+--     announcement, and what tells this restriction from a blanket "can't
+--     attack".
+--   * The GATED one (Armored Galleon, "can't attack unless defending player
+--     controls an Island") names the DEFENDING PLAYER of the announcement, which
+--     CR 508.5 and CR 802.2a read off the planeswalker's controller or the
+--     battle's protector as readily as off the seat attacked directly. So every
+--     arm consults it, through targetDefender.
+--
+-- Exhaustive over CR 506.3's three things rather than a wildcard, so a fourth of
+-- them fails to compile here. Not implemented: an AIMED-AT restriction naming a
+-- planeswalker or a battle (#2891), which is the other two arms of the first
+-- case.
+--
+-- targetDefender answering Nothing is an announcement naming no defending player
+-- at all, which CR 508.1b's candidate list cannot produce: the gate has nobody to
+-- be about, so nothing is forbidden.
+barredAnnouncements :: [ObjectId] -> GameState -> Set (ObjectId, AttackTarget.AttackTarget)
+barredAnnouncements candidates gs =
+  let defenders = Defender.defendingPlayers gs
+      aimed = CombatRestriction.cantAttackPlayer candidates defenders gs
+      gated = CombatRestriction.cantAttackDefender candidates defenders gs
+      aimedAt oid target = case target of
+        AttackTarget.OfPlayer pid -> Set.member (oid, pid) aimed
+        AttackTarget.OfPlaneswalker _ -> False
+        AttackTarget.OfBattle _ -> False
+      gatedAt oid target = Maybe.maybe False (\d -> Set.member (oid, d) gated) (targetDefender target gs)
+   in Set.fromList
+        [ (oid, target)
+        | oid <- candidates,
+          target <- declarableTargets gs,
+          aimedAt oid target || gatedAt oid target
+        ]
 
 -- attackCeiling against the restrictions the caller already gathered: each caller
 -- also asks attackDeclarationAllowed of the player's own declaration, and the two
 -- must be judging the same board.
-attackCeilingGiven :: Maybe Natural -> Set ObjectId -> Set (ObjectId, PlayerId) -> [ObjectId] -> GameState -> (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget)
+attackCeilingGiven :: Maybe Natural -> Set ObjectId -> Set (ObjectId, AttackTarget.AttackTarget) -> [ObjectId] -> GameState -> (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget)
 attackCeilingGiven limit alone barred candidates gs =
   let targets = declarableTargets gs
       required = AttackRequirement.instances candidates targets gs
@@ -628,7 +654,7 @@ legalAttackDeclarationGiven candidates chosen gs =
   -- maximization have to be judging one board.
   let alone = CombatRestriction.cantAttackAlone candidates gs
       limit = CombatRestriction.attackLimit gs
-      barred = barredAttacks candidates gs
+      barred = barredAnnouncements candidates gs
    in all (\oid -> List.elem oid candidates) (Map.keys chosen)
         -- CR 508.1b: an announcement outside the list is not a declaration at all.
         -- Vacuous on the empty declaration, which is what keeps declining legal in
@@ -665,7 +691,7 @@ forcedAttackDeclaration (_, best) =
 -- canBlockGiven/legalBlockersGiven are canAttackGiven's pair, hoisted for the
 -- same reason and with the same snapshot argument.
 canBlock :: PlayerId -> ObjectId -> GameState -> Bool
-canBlock pid oid gs = canBlockGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.cantBlock [oid] gs) pid oid gs
+canBlock pid oid gs = canBlockGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.cantBlock (Just pid) [oid] gs) pid oid gs
 
 canBlockGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> Set ObjectId -> PlayerId -> ObjectId -> GameState -> Bool
 canBlockGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs of
@@ -690,7 +716,10 @@ legalBlockers pid gs = legalBlockersGiven (Projection.controlGrants gs) (Project
 legalBlockersGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
 legalBlockersGiven grants pcs pid gs =
   let controlled = Projection.controlsGiven grants pid gs
-      restricted = CombatRestriction.cantBlock controlled gs
+      -- CR 509.1a's defending player is `pid`, the one declaring blocks, so a
+      -- CR 508.5 gate about them is read at that seat. Unobserved by any board;
+      -- CombatRestriction.cantBlock says why.
+      restricted = CombatRestriction.cantBlock (Just pid) controlled gs
    in filter (\oid -> canBlockGiven grants pcs restricted pid oid gs) controlled
 
 -- CR 702.9b: a creature with flying can't be blocked except by creatures with
@@ -890,7 +919,11 @@ menaceAllowsGiven pcs declaration gs =
 -- blockDeclarationAllowed.
 pairAllowed :: [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
 pairAllowed candidates attackers blocker attacker gs =
-  pairAllowedGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.cantBeBlockedBy candidates attackers gs) candidates attackers blocker attacker gs
+  -- CR 508.5's seat for a gate that names the defending player: this entry point
+  -- takes no player, where blockCeilingGiven and legalBlockDeclaration hand over
+  -- the one declaring blocks. Nothing in the pool gates a pairwise blocking
+  -- restriction, so the two readings are indistinguishable today.
+  pairAllowedGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.cantBeBlockedBy (CombatRestriction.defendingSeat gs) candidates attackers gs) candidates attackers blocker attacker gs
 
 -- pairAllowed against a pre-projected board: this is asked once per (blocker,
 -- attacker) PAIR, so each evasion read would otherwise be a fresh gather in a
@@ -1006,9 +1039,9 @@ blockCeilingGiven grants pcs pid gs =
       candidates = legalBlockersGiven grants pcs pid gs
       -- One walk for the whole search: CR 509.1b's pairwise restrictions are
       -- decided once here and read by every pair `able` judges.
-      barred = CombatRestriction.cantBeBlockedBy candidates attackers gs
+      barred = CombatRestriction.cantBeBlockedBy (Just pid) candidates attackers gs
       able blocker attacker = pairAllowedGiven grants pcs barred candidates attackers blocker attacker gs
-      limit = CombatRestriction.blockLimit gs
+      limit = CombatRestriction.blockLimit (Just pid) gs
       arity = blockArityGiven candidates gs
       requirements = BlockRequirement.instances able candidates attackers gs
       -- CR 509.1c's cost clause is a filter on the CREATURE, never on its
@@ -1045,9 +1078,9 @@ legalBlockDeclaration pid declaration gs =
       candidates = legalBlockersGiven grants pcs pid gs
       -- One walk for the whole search: CR 509.1b's pairwise restrictions are
       -- decided once here and read by every pair `able` judges.
-      barred = CombatRestriction.cantBeBlockedBy candidates attackers gs
+      barred = CombatRestriction.cantBeBlockedBy (Just pid) candidates attackers gs
       able blocker attacker = pairAllowedGiven grants pcs barred candidates attackers blocker attacker gs
-      limit = CombatRestriction.blockLimit gs
+      limit = CombatRestriction.blockLimit (Just pid) gs
       arity = blockArityGiven candidates gs
       (requirements, best) = blockCeilingGiven grants pcs pid gs
    in blockDeclarationAllowed limit arity pcs able declaration gs
@@ -1324,7 +1357,7 @@ attemptAttackDeclaration pid rejected = do
   let legal = legalAttackers pid gs
       -- CR 508.1c's aimed-at restriction, gathered ONCE for the whole pass and
       -- over the WIDER list, so the narrowing below and the ceiling read one set.
-      barred = barredAttacks legal gs
+      barred = barredAnnouncements legal gs
       -- CR 508.1b's announcements this creature may actually make. Every one
       -- being forbidden is a creature in no legal declaration at all, so it is
       -- off the candidate list -- legalAttackers' posture for the per-creature

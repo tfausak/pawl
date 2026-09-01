@@ -3614,6 +3614,93 @@ aimedAttackRestrictionSpec s registry = Spec.describe s "AimedAttackRestriction"
         Spec.assertEqWith s "and both were declared" (S.attackerDeclarationsOf control) [pikerId, archonId]
       _ -> Spec.assertFailure s "fixture should give alice a Piker and bob an Archon"
 
+-- CR 802.3a: a restriction that applies to attacking a SPECIFIC PLAYER applies
+-- only to the creatures attacking that player. Armored Galleon ({4}{U} Creature
+-- -- Human Pirate 5/4, "This creature can't attack unless defending player
+-- controls an Island.") is the pool's producer, and CR 508.5 is what makes its
+-- gate about the player being attacked rather than about its controller.
+--
+-- THREE SEATS with BOTH opponents defending throughout (CR 802.2), which is the
+-- only board that can tell the rule from pawl's old reading: with one defending
+-- player there is one answer and the first seat in turn order is it.
+-- defendingPlayerRestrictionSpec above is that board, one defender at a time, and
+-- proves the gate is read at all.
+--
+-- carol holds the only Island in every case, so "the seat that frees the attack"
+-- is never the first defending player in turn order -- the seat the old reading
+-- took.
+perDefenderRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+perDefenderRestrictionSpec s registry = Spec.describe s "PerDefenderAttackRestriction" $ do
+  Spec.it s "CR 802.3a the Galleon may attack the defender with an Island and not the one without" $ do
+    galleon <- S.printingOf s registry "Armored Galleon"
+    island <- S.printingOf s registry "Island"
+    let (gs, mine, _, _) = S.threePlayerCombat [galleon] [] [island]
+        declaring g =
+          g
+            { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+              GameState.combat = (GameState.combat g) {Combat.Type.defenders = [S.bob, S.carol]}
+            }
+        board = declaring gs
+        -- The PAIR: the same board with carol's Island taken away, where the
+        -- restriction binds at BOTH seats and the Galleon cannot attack at all.
+        (bare, bareMine, _, _) = S.threePlayerCombat [galleon] [] []
+        noIsland = declaring bare
+    case (mine, bareMine) of
+      ([ship], [bareShip]) -> do
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(ship, AttackTarget.OfPlayer S.carol)] board) "CR 802.3a: attacking carol, who controls the Island, is legal"
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(ship, AttackTarget.OfPlayer S.bob)] board)) "and attacking bob, who does not, is not"
+        -- CR 508.1a's candidate list, which the old reading took the Galleon off
+        -- entirely: the restriction binds at one seat, so the creature is able to
+        -- attack and it is the ANNOUNCEMENT that is refused.
+        Spec.assertBool s (Combat.canAttack S.alice ship board) "the Galleon is a candidate"
+        Spec.assertBool s (not (Combat.canAttack S.alice bareShip noIsland)) "and is not one when NEITHER defender controls an Island"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] board) "declining stays legal"
+      _ -> Spec.assertFailure s "fixture should give alice one Galleon on each board"
+  Spec.it s "CR 508.5 the defending player of an attack on a planeswalker is its controller" $ do
+    -- The gate is read through the ANNOUNCEMENT's defending player, not off the
+    -- seat named directly: bob controls the planeswalker and no Island, so
+    -- attacking it is refused while attacking carol is not. A reader that
+    -- consulted only CR 506.3's player arm would allow the planeswalker.
+    galleon <- S.printingOf s registry "Armored Galleon"
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, mine, theirs, _) = S.threePlayerCombat [galleon] [jace] [island]
+    case (mine, theirs) of
+      ([ship], [jaceId]) -> do
+        let board =
+              (S.addCounter CounterKind.Loyalty 3 jaceId gs)
+                { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+                  GameState.combat = (GameState.combat gs) {Combat.Type.defenders = [S.bob, S.carol]}
+                }
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(ship, AttackTarget.OfPlaneswalker jaceId)] board)) "CR 508.5: bob controls the planeswalker and no Island, so his planeswalker is off limits too"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(ship, AttackTarget.OfPlayer S.carol)] board) "while carol, who controls the Island, may still be attacked"
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(ship, AttackTarget.OfPlayer S.bob)] board)) "and bob himself may not"
+        -- The fixture pin: without loyalty the planeswalker is a CR 704.5i
+        -- casualty and the first assertion is about a board that cannot exist.
+        Spec.assertEqWith s "Jace is on the board with loyalty" (S.counterOf CounterKind.Loyalty jaceId board) 3
+      _ -> Spec.assertFailure s "fixture should give alice a Galleon and bob a Jace"
+  Spec.it s "CR 802.3a whole cards: the declare attackers step sends the Galleon at the Island's controller" $ do
+    -- GAMEPLAY LEVEL, from the beginning of combat step, so CR 703.4h picks both
+    -- defending players (CR 802.2) rather than the fixture stating them. The two
+    -- boards differ in exactly one thing: which opponent holds the Island.
+    galleon <- S.printingOf s registry "Armored Galleon"
+    island <- S.printingOf s registry "Island"
+    let (atCarol, _, _, _) = S.threePlayerCombat [galleon] [] [island]
+        (atBob, _, _, _) = S.threePlayerCombat [galleon] [island] []
+        after = S.runCombat S.aggressiveAnswer atCarol
+        control = S.runCombat S.aggressiveAnswer atBob
+        -- Read at the declare blockers step, since the end of combat step empties
+        -- the record the pins below read.
+        atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer atCarol
+    Spec.assertEqWith s "carol holds the Island, so carol takes the Galleon's five" (S.lifeOf S.carol after) (Just 15)
+    Spec.assertEqWith s "and bob, who does not, takes nothing" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "with the Island moved to bob, bob takes the five" (S.lifeOf S.bob control) (Just 15)
+    Spec.assertEqWith s "and carol takes nothing" (S.lifeOf S.carol control) (Just 20)
+    Spec.assertEqWith s "the announcement really named carol (CR 508.1b)" (Map.elems (Combat.Type.attackers (GameState.combat atBlockers))) [AttackTarget.OfPlayer S.carol]
+    -- The fixture pin: CR 802.2 really did make BOTH opponents defending players,
+    -- so each case above is a choice between two seats and not a one-seat combat.
+    Spec.assertEqWith s "both opponents defended" (Combat.Type.defenders (GameState.combat atBlockers)) [S.bob, S.carol]
+
 -- CR 612.1 reaching a combat restriction's GATE. Glacial Crasher ({4}{U}{U}
 -- Creature -- Elemental 5/5, "Trample. This creature can't attack unless there is
 -- a Mountain on the battlefield." -- checked against Scryfall, 2026-08-05) is the
@@ -4321,6 +4408,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   conditionalCombatRestrictionSpec s registry
   defendingPlayerRestrictionSpec s registry
   aimedAttackRestrictionSpec s registry
+  perDefenderRestrictionSpec s registry
   textChangedCombatRestrictionSpec s registry
   textChangedCombatAffectedSpec s registry
   controlChangeSicknessSpec s registry
