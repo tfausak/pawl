@@ -1158,7 +1158,7 @@ castableWhileSearching pid gs =
             -- not have (CR 708.2a). Unreachable either way -- no card holds both.
             proposed = asProposed oid name Facing.FaceUp gs
          in permitsCastWhileSearching face
-              && castableWhenOffered pid oid name (Cost.costsFor name oid proposed) proposed
+              && castableWhenOffered pid oid name (Cost.candidateCostsFor name oid proposed) proposed
       proposals oid = fmap (\face -> (oid, Face.name face)) (filter (allowed oid) (foldMap Card.castableFaces (Game.cardOf oid gs)))
    in concatMap proposals (Game.zoneMembers Zone.Library pid gs)
 
@@ -1185,23 +1185,29 @@ castableWhileSearching pid gs =
 -- The candidates arrive as an ARGUMENT rather than being read from the object,
 -- because that is exactly what CR 118.9's "applied to it from another effect"
 -- changes: an offer carrying that alternative hands in the one cost the rule
--- allows (CR 118.9a), where an offer carrying none hands in Cost.costsFor's own
--- list.
+-- allows (CR 118.9a), where an offer carrying none hands in
+-- Cost.candidateCostsFor's own list -- tagged, so CR 702.103d can tell the
+-- bestow candidate from the printed one.
 --
 -- `gs` must already be `asProposed`-stamped for the half being offered, as
 -- `castable`'s conjuncts require.
-castableWhenOffered :: PlayerId -> ObjectId -> CardName.CardName -> [Cost Keyword] -> GameState -> Bool
+castableWhenOffered :: PlayerId -> ObjectId -> CardName.CardName -> [CandidateCost.CandidateCost] -> GameState -> Bool
 castableWhenOffered pid oid name candidates proposed =
-  -- CR 601.3's prohibit half, asked with the half's own name and its object: a
-  -- quality-bearing prohibition stops one card without stopping any other
-  -- candidate.
-  not (PlayerEffect.prohibitsCasting pid oid name proposed)
-    -- CR 702.61a stays too, for CR 601.3's own reason above: an offered cast is
-    -- still a cast. Reachable because CR 702.61b keeps triggered abilities going
-    -- on the stack, so one can resolve ABOVE the split-second spell and offer a
-    -- cast while it is still there.
-    && not (SplitSecond.inForce proposed)
-    && any (payableCost (spendingFor pid oid proposed) pid oid proposed) candidates
+  -- CR 702.61a, for CR 601.3's own reason: an offered cast is still a cast.
+  -- Reachable because CR 702.61b keeps triggered abilities going on the stack, so
+  -- one can resolve ABOVE the split-second spell and offer a cast while it is
+  -- still there.
+  not (SplitSecond.inForce proposed)
+    -- CR 601.3's prohibit half and CR 601.2b's affordability, asked per candidate
+    -- for `castable`'s reason and through its predicate: CR 702.103d judges a
+    -- bestow announcement on the Aura it makes of the spell, and an offer that
+    -- hands in the card's own list (CR 118.9's absent) carries that candidate.
+    && any
+      ( \candidate ->
+          candidateAllowed pid oid name proposed candidate
+            && payableCost (spendingFor pid oid proposed) pid oid (proposedFor oid (CandidateCost.keyword candidate) proposed) (CandidateCost.cost candidate)
+      )
+      candidates
     && printedRestrictionsOk pid oid name proposed
     && legendaryRestrictionOk pid oid name proposed
     && targetable pid oid name proposed

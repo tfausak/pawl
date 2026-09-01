@@ -78,6 +78,7 @@ import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Binding as Binding.Type
+import qualified Pawl.Types.CandidateCost as CandidateCost
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
@@ -3444,7 +3445,7 @@ offerCast resolving caster slot optionality offer = do
             -- Face up: CR 708.4's face-down cast is a morph permission (CR
             -- 702.37d), and an OfferCast opcode carries no such rider.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
-            candidates = maybe (Cost.costsFor name oid proposed) pure applied
+            candidates = maybe (Cost.candidateCostsFor name oid proposed) (pure . Cost.untagged) applied
          in if Cast.castableWhenOffered caster oid name candidates proposed
               then
                 -- CR 118.8c, read off the same candidates the cast will be
@@ -3454,7 +3455,7 @@ offerCast resolving caster slot optionality offer = do
                 -- Not implemented: a cost APPLIED from another effect (CR 118.8)
                 -- arrives as CostAdjustments.components and is not read here
                 -- (#1834).
-                Just (oid, name, applied, any Cost.statesHiddenQuality candidates)
+                Just (oid, name, applied, any (Cost.statesHiddenQuality . CandidateCost.cost) candidates)
               else Nothing
       offers = Maybe.fromMaybe [] $ do
         oid <- slotOne slot resolving gs
