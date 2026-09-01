@@ -1414,8 +1414,8 @@ combatRestrictionCounts restriction = case restriction of
   CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless _ condition) -> foldMap conditionCounts condition
   -- The blocker Filter beside the gate holds no Count either.
   CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ condition) -> foldMap conditionCounts condition
-  -- The PlayerScope beside the gate holds no Count either.
-  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ condition) -> foldMap conditionCounts condition
+  -- The PlayerScope and the CR 506.3 kinds beside the gate hold no Count either.
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ _ condition) -> foldMap conditionCounts condition
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ condition) -> foldMap conditionCounts condition
   CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionCounts condition
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionCounts condition
@@ -4810,10 +4810,10 @@ combatRestrictionFilters restriction = case restriction of
   -- barred from them, and the gate.
   CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy affected blockers condition) -> unframed (affectedFilters affected <> [blockers]) <> foldMap conditionFilters condition
   -- Two on the attacking one: the creatures restricted and the gate. The
-  -- players they may not attack are a PlayerScope, which is card data with no
-  -- Filter in it -- so nothing stands in for it here, the size-bounding arms'
-  -- posture.
-  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer affected _ condition) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
+  -- players they may not attack are a PlayerScope and the announcements barred
+  -- at those seats are CR 506.3 kinds, both card data with no Filter in them --
+  -- so nothing stands in for either here, the size-bounding arms' posture.
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer affected _ _ condition) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless affected condition) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
   CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionFilters condition
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionFilters condition

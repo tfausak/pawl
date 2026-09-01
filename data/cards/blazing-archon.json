@@ -16,7 +16,12 @@
             },
             "defenders": {
               "type": "You"
-            }
+            },
+            "kinds": [
+              {
+                "type": "OfPlayer"
+              }
+            ]
           }
         }
       ],
