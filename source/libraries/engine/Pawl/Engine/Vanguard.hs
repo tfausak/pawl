@@ -9,10 +9,11 @@
 -- Pawl.Types.PlayerEffect or a printed static ability.
 --
 -- What the variant needs and this module does NOT hold is CR 902.7's abilities
--- functioning from the command zone, which is Pawl.Engine.Event's trigger walk
--- and Pawl.Engine.Projection's static walk -- the same two places an emblem's
--- abilities are found (CR 114.4), since the rule is the same rule. Both call
--- isVanguard below rather than growing a second reading of rule 313.
+-- functioning from the command zone, which is where an emblem's are found for the
+-- same reason (CR 114.4). The triggered half is Pawl.Engine.Event's command-zone
+-- walk, which calls isVanguard below rather than growing a second reading of rule
+-- 313; the static half needed nothing at all, Pawl.Engine.Projection's walk
+-- already admitting an ability that names no zone.
 --
 -- There is no GameSettings field for "this is a Vanguard game", and CR 902 asks
 -- for none: every rule in it is stated of a player's vanguard CARD, so having one
@@ -89,11 +90,12 @@ modifiersOf pid gs = do
 -- the starting hand size and the maximum hand size, which the two rules state in
 -- the same words over the same modifier.
 --
--- CR 107.1b is the floor, which is what the saturating conversion performs: "if
--- a calculation determines a number that would be less than zero, the result is
--- 0 instead", and no exception in that rule is a hand size. No vanguard in the
--- pool can reach it -- the largest negative modifier ever printed is Gerrard's
--- -4 -- so the floor is a regression fence rather than a proved behaviour.
+-- CR 107.1b is the floor, which is what the saturating conversion performs, and
+-- none of the exceptions that rule carves out is a hand size --
+-- Pawl.Engine.PlayerEffect.maximumHandSize's reduction arm reads it the same way.
+-- No vanguard in the pool can reach it: the largest negative modifier ever
+-- printed is Gerrard's -4, so the floor is a regression fence rather than a
+-- proved behaviour.
 --
 -- A player with no vanguard gets the base back unchanged, which is every game
 -- outside the variant.
@@ -105,10 +107,10 @@ handSize base pid gs =
 -- Pawl.Engine.Setup.startingLife. Zero for a player with no vanguard.
 --
 -- An Integer and not a floor, unlike the hand size above: CR 902.4 says "20 plus
--- or minus the life modifier" and states no minimum, and pawl's life total is
--- itself an Integer because CR 118.5 lets one go negative. A vanguard whose
--- modifier took a player below zero would have them lose to CR 704.5a at once,
--- which is what the rules say happens; none has ever been printed (the largest
--- negative in the set is Ashnod's -8).
+-- or minus the life modifier" and states no minimum, and CR 104.3b speaks of a
+-- life total of "0 or less", so pawl's is an Integer. A vanguard whose modifier
+-- took a player below zero would have them lose to that rule at once, which is
+-- what it says happens; none has ever been printed, the largest negative in the
+-- set being Ashnod's -8.
 lifeModifierOf :: PlayerId -> GameState -> Integer
 lifeModifierOf pid gs = maybe 0 Vanguard.lifeModifier (modifiersOf pid gs)
