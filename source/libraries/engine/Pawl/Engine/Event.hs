@@ -11452,15 +11452,17 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- under CR 704.5n leaves the bearer standing, and an effect that sent the Aura
   -- elsewhere in the same batch put it somewhere the rule cannot look. Both are
   -- CR 400.7f's own answer rather than a hole -- the payload finds nothing and
-  -- moves nothing -- and eventBindingSlots below says why the floor is still the
-  -- slot.
+  -- moves nothing -- and eventBindingSlots below says why the floor still claims
+  -- `became`.
   --
   -- CR 303.4b's ENCHANTED CREATURE beside it, under Binding.departedPermanent:
   -- Banewasp Affliction's "that creature's controller loses life equal to ITS
   -- toughness" names the host rather than the Aura, and both halves of that
-  -- sentence are CR 608.2h reads of a permanent CR 400.7 has already replaced --
-  -- Pawl.Engine.Resolve.effectViewOf and Pawl.Engine.Projection.controllerWithLastKnown
-  -- are what answer them, and both are keyed to exactly this slot.
+  -- sentence are CR 608.2h reads of a permanent CR 400.7 has already replaced.
+  -- Pawl.Engine.Resolve.effectViewOf is what answers the toughness, and it looks
+  -- back for exactly this slot and Binding.sacrificedPermanent;
+  -- Pawl.Engine.Projection.controllerWithLastKnown answers the controller for any
+  -- slot PlayerRef.ControllerOfBound names.
   --
   -- ZoneChange.departed, not the arrival: the id the card says "that creature"
   -- about is the permanent as it last existed on the battlefield, which is the

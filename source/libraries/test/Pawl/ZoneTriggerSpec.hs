@@ -4947,9 +4947,12 @@ screamsFromWithinSpec s registry =
 -- above never reads. Banewasp Affliction {1}{B} Enchantment -- Aura: "Enchant
 -- creature / When enchanted creature dies, that creature's controller loses life
 -- equal to its toughness." (Name, cost, type line and oracle text checked against
--- Scryfall.) Both halves of that sentence read the host, and neither can read the
--- graveyard card it became: CR 108.4 gives a card in a graveyard no controller,
--- and CR 400.7 left it with no battlefield toughness. Event.eventBindings stamps
+-- Scryfall.) Both halves of that sentence read the host as CR 608.2h's last known
+-- information, not the graveyard card it became: CR 108.4 gives a card in a
+-- graveyard no controller and CR 400.7 left it with no battlefield toughness. The
+-- controller HALF cannot tell the two apart on this board -- pawl answers the same
+-- seat for either id -- so the toughness is what the counter below discriminates
+-- on. Event.eventBindings stamps
 -- the id under Binding.departedPermanent, which is the one slot besides
 -- Binding.sacrificedPermanent that Resolve.effectViewOf answers off CR 608.2h
 -- last known information.
