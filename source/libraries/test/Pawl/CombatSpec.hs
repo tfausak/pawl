@@ -310,7 +310,7 @@ runRecordingBlockers gs =
    in (seen, after)
 
 -- CR 802: the attack multiple players option, which every game pawl starts uses
--- (Pawl.Types.GameSettings.attackMultiplePlayers). THREE SEATS throughout, since
+-- (Pawl.Types.GameSettings.attackOption). THREE SEATS throughout, since
 -- at two the option and CR 506.2's base rule coincide exactly and nothing here
 -- can differ.
 --

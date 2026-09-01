@@ -1044,8 +1044,14 @@ matchesZoneOwner gs you rel oid =
           -- everything, exactly as the Opponents arm below does: two absent
           -- answers are not a match.
           _ -> False
+        -- CR 102.3's opponents and not "not mine": a teammate's card reaches
+        -- their own graveyard. Game.areOpponents is the one predicate, the same
+        -- one matchesPlayer, matchesCandidatePlayer and matchesController ask
+        -- through -- this arm is the fourth of them, and Pawl.TeamSpec's
+        -- "CR 102.3 a teammate's card is not put into an opponent's graveyard"
+        -- is the test that proves it.
         ControllerRelation.Opponents -> case (ownerOf oid, you) of
-          (Just owner, Just mine) -> owner /= mine
+          (Just owner, Just mine) -> Game.areOpponents gs mine owner
           -- An unknown owner or a sourceless effect admits nothing rather than
           -- everything: a redirect with no controller has no opponents.
           _ -> False
