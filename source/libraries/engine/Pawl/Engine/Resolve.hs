@@ -4264,9 +4264,12 @@ targetsOnStack oid gs =
 -- offered set leaves the copied targets standing rather than being patched into
 -- something the player did not choose.
 --
--- Not implemented: Target.selectionLegal's joint check, so `wellFormed` measures
--- each slot against the UNION and two slots that exclude each other are not
--- judged together (#2472). Every such slot in the pool is on a spell.
+-- CR 601.2c's joint check reaches this answer as it reaches a cast's: the offer
+-- above is the UNION over what a sibling slot could take, so two slots that
+-- exclude each other pass `wellFormed` and Target.jointlyCoherent is what judges
+-- them together. Asked on the DRAWN answer rather than the raw one, so what the
+-- re-derivation reads is the card CR 406.4 picked out of a pile -- the order
+-- Pawl.Engine.Cast.castProposed takes, chooseTargets drawing before it asks.
 chooseNewTargetsFor :: PlayerId -> ObjectId -> Game ()
 chooseNewTargetsFor controller copyId = do
   gs <- State.get
@@ -4325,8 +4328,9 @@ chooseNewTargetsFor controller copyId = do
             Map.traverseWithKey
               (\slot picked -> Target.drawFromPiles (Just controller) (Map.findWithDefault Set.empty slot fresh) picked)
               answer
-          let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients drawn) (Object.bindings o)}
-          State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)})
+          Monad.when (Target.jointlyCoherent (Just controller) seed copyId slots drawn gs) $ do
+            let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients drawn) (Object.bindings o)}
+            State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)})
 
 -- One effect, applied. `runSubgame` is the injected nested-game runner; only
 -- the PlaySubgame arm consults it.

@@ -88,6 +88,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -1145,6 +1146,32 @@ boltThenTwincast answer boltId twincastId board =
         -- Twincast, then the copy it put on the stack, then the Bolt itself.
         pure (resolveOne S.identityAnswer (resolveOne S.identityAnswer (resolveOne answer cast2)))
 
+-- CR 601.2c's whole announcement for Fall of the Hammer, pinned per slot name and
+-- FILTERED out of the offered set for pinTarget's reason. Reaches both the cast
+-- and CR 707.10c's re-target prompt, which is why each run below hands it its
+-- own pair.
+retargetHammer :: ObjectId -> ObjectId -> Prompt.Prompt r -> r
+retargetHammer dealerId victimId p = case p of
+  Prompt.ChooseTargets _ _ _ asked ->
+    Map.mapWithKey
+      ( \slot (_, offered) ->
+          let wanted = if slot == SlotName.MkSlotName (Text.pack "dealer") then dealerId else victimId
+           in Set.filter ((==) (Just wanted) . Recipient.objectOf) offered
+      )
+      asked
+  _ -> S.identityAnswer p
+
+-- alice casts Fall of the Hammer with the Giant dealing to bob's Wall, then --
+-- CR 117.3c, still holding priority -- Twincast at it, and resolves Twincast,
+-- then the copy, then the original. `answer` is what CR 707.10c's prompt reaches.
+hammerThenTwincast :: (forall r. Prompt.Prompt r -> r) -> ObjectId -> ObjectId -> ObjectId -> ObjectId -> GameState.GameState -> Maybe GameState.GameState
+hammerThenTwincast answer dealerId victimId hammerId twincastId board =
+  let cast1 = snd (Engine.runGamePure (retargetHammer dealerId victimId) board (S.cast S.alice hammerId))
+   in do
+        hammerSpell <- topOfStack cast1
+        let cast2 = snd (Engine.runGamePure (pinTarget (Recipient.ToObject hammerSpell)) cast1 (S.cast S.alice twincastId))
+        pure (resolveOne S.identityAnswer (resolveOne S.identityAnswer (resolveOne answer cast2)))
+
 copySpellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- CR 707.10 end to end: the copy exists, carries the original's decisions (CR
@@ -1195,6 +1222,55 @@ copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "carol took the re-targeted copy's 3" (S.lifeOf S.carol after) (Just 17)
         Spec.assertEqWith s "bob took only the original Bolt's 3" (S.lifeOf S.bob after) (Just 17)
         Spec.assertEqWith s "and alice, who cast both, took none" (S.lifeOf S.alice after) (Just 20)
+  -- CR 707.10c through CR 601.2c: the new targets are judged as ONE
+  -- announcement, not slot by slot. The offered set per slot is the union over
+  -- what a sibling slot could still take, so a pair of slots that exclude each
+  -- other passes the per-slot check and only the joint re-derivation catches it;
+  -- the rule's own no-op is what a rejection falls to, "the player may leave any
+  -- number of the targets unchanged".
+  --
+  -- Fall of the Hammer {1}{R} Instant (data/cards/fall-of-the-hammer.json):
+  -- "Target creature you control deals damage equal to its power to another
+  -- target creature." Its victim slot is Filter.Not (Filter.IsBound "dealer"),
+  -- a filter-side sibling read (Pawl.TargetSpec has its cast-time cases).
+  --
+  -- THREE RUNS off one board, differing in exactly one thing -- the answer CR
+  -- 707.10c's prompt is given -- and no two share a number. The Wall of Stone is
+  -- 0/8 so that nothing dies in any run: a dead dealer would leave the ORIGINAL
+  -- spell with an illegal target and make every run read zero for its own reason.
+  Spec.it s "CR 707.10c a copy's new targets are judged as one announcement" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    giant <- S.printingOf s registry "Hill Giant"
+    spider <- S.printingOf s registry "Giant Spider"
+    wall <- S.printingOf s registry "Wall of Stone"
+    hammer <- S.printingOf s registry "Fall of the Hammer"
+    twincast <- S.printingOf s registry "Twincast"
+    let lands = S.landsFor island S.alice 2 (S.landsFor mountain S.alice 2 S.threePlayerGame)
+        (giantId, g1) = S.addCreature giant S.alice lands
+        (spiderId, g2) = S.addCreature spider S.alice g1
+        (wallId, g3) = S.addCreature wall S.bob g2
+        (withHammer, hammerId) = S.handOne hammer g3
+        (twincastId, board) = handAppend twincast S.alice withHammer
+        run dealerId victimId = hammerThenTwincast (retargetHammer dealerId victimId) giantId wallId hammerId twincastId board
+        atSelf = run giantId giantId
+        atSpider = run spiderId wallId
+        atGiant = run spiderId giantId
+        damage oid = fmap (S.damageOf oid)
+    -- The behaviour first: naming the Giant in both of the copy's slots is not an
+    -- announcement CR 601.2c allows, so the copy keeps the targets CR 707.10
+    -- gave it and the Wall takes the Giant's 3 twice over.
+    Spec.assertEqWith s "the rejected re-target leaves the copy where it was, so the Wall takes the Giant's 3 from the copy and 3 from the original" (damage wallId atSelf) (Just (Just 6))
+    Spec.assertEqWith s "and the Giant, named twice, took none of its own damage" (damage giantId atSelf) (Just (Just 0))
+    -- The prompt is LIVE on this board, which is what keeps the run above from
+    -- passing off a prompt that was never raised: the same prompt moves the
+    -- copy's dealer slot to the Spider, and 2 + 3 is a number no other run reads.
+    Spec.assertEqWith s "re-targeting the copy's dealer at the Spider, the Wall takes 2 from the copy and 3 from the original" (damage wallId atSpider) (Just (Just 5))
+    -- And the Giant IS offered for the victim slot, so the first run's rejection
+    -- is the joint check rather than a slot the offer had emptied.
+    Spec.assertEqWith s "with the Spider dealing instead, the Giant is a legal victim and takes its 2" (damage giantId atGiant) (Just (Just 2))
+    Spec.assertEqWith s "while the Wall then takes only the original's 3" (damage wallId atGiant) (Just (Just 3))
+
   -- CR 707.10: "a copy of a spell is owned by the player under whose control it
   -- was put on the stack ... a copy of a spell or ability is controlled by the
   -- player under whose control it was put on the stack". The copying effect's
