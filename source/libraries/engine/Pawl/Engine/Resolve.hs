@@ -2589,7 +2589,7 @@ payGatePaidBy resolving source idx cIdx legal payer gate = do
           -- DuringResolution: rule 118.12's cost is paid as the spell or ability
           -- resolves, which is CR 609.1's effect, so a blight paid here is CR
           -- 614.16's subject where Soul Immolation's additional cost is not.
-          outcome <- Cost.pay PaymentMoment.DuringResolution PaymentSubject.ForNeither ManaSpending.AsProduced payer source announced
+          outcome <- Cost.pay PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer source announced
           -- Not implemented: the slots this payment bound are dropped, so a
           -- CR 118.12 cost that sacrifices a permanent cannot be read by a
           -- later clause of the same resolution (#1872).
@@ -3734,7 +3734,14 @@ damageSourceCandidates context gs filter_ =
 -- bindings by Come Back Wrong's under Auriok Replica.
 referredToSources :: GameState -> [ObjectId]
 referredToSources gs =
-  foldMap (\oid -> foldMap referentsOfObject (Game.lookupObject oid gs)) (GameState.stack gs)
+  -- ITSELF EXCLUDED. Pawl.Engine.Activate binds an activated ability's own id
+  -- under Binding.thisAbility ("this ability"), and a self-reference is not what
+  -- CR 609.7a's third class is about: its second class admits "a spell on the
+  -- stack" and deliberately stops short of an ability, which counting the
+  -- self-binding would undo. Pawl.ReplacementSpec's "CR 609.7a an activated
+  -- ability on the stack is not a spell, so it is not offered as a source" is the
+  -- proof. Harmless for a spell, which the `isSpell` clause above already offers.
+  foldMap (\oid -> filter (/= oid) (foldMap referentsOfObject (Game.lookupObject oid gs))) (GameState.stack gs)
     <> foldMap (\row -> ActiveReplacement.source row : (referentsOfReplacement (ActiveReplacement.effect row) <> foldMap Set.toList (ActiveReplacement.slots row))) (GameState.replacements gs)
     <> foldMap (\entry -> DelayedTrigger.source entry : referentsOfBindings (DelayedTrigger.bindings entry)) (GameState.delayedTriggers gs)
 

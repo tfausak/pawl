@@ -680,7 +680,7 @@ quantityCounts quantity = case quantity of
   -- the game, and none of this module's three Quantity traversals reaches the
   -- arm (gap #2836).
   Quantity.Type.TimesKickedWith {} -> []
-  Quantity.Type.SnowWasSpent -> []
+  Quantity.Type.TagWasSpent {} -> []
   Quantity.Type.WasToken -> []
   Quantity.Type.WasBlocking -> []
   Quantity.Type.DamageDealtToThisTurn -> []
@@ -1766,7 +1766,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.ClassLevel -> False
   Quantity.Type.WasKicked -> False
   Quantity.Type.TimesKickedWith {} -> False
-  Quantity.Type.SnowWasSpent -> False
+  Quantity.Type.TagWasSpent {} -> False
   Quantity.Type.WasToken -> False
   Quantity.Type.WasBlocking -> False
   Quantity.Type.DamageDealtToThisTurn -> False
@@ -2577,6 +2577,11 @@ triggeredAbilityOffends ability =
 --     source slot, so Brothers of Fire's "and 1 damage to you" is a slot read.
 --     Cast.castSpell stamps it for every SPELL as well (Char), which the spell
 --     lint takes on its read side.
+--   * Binding.thisAbility. CR 602.2a: "That ability is created on the stack as
+--     an object that's not a card" -- stamped for every activation beside the
+--     two above, so Forsworn Paladin's "if mana from a Treasure was spent to
+--     activate this ability" is a slot read. Not `triggerSource`, which names
+--     the ability's SOURCE and carries the record of a different payment.
 --   * Binding.variableX, and ONLY when the ability's own cost prints an {X}:
 --     CR 601.2b's "the player announces the value of that variable", measured
 --     against what CR 602.2b calls "an activated ability's analog to a spell's
@@ -2621,7 +2626,7 @@ activatedAbilityOffends ability =
         if tapsAsCost (ActivatedAbility.cost ability)
           then Set.singleton Binding.tappedPermanent
           else Set.empty
-   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you], announcedX, sacrificed, tapped]) (ActivatedAbility.modal ability)
+   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped]) (ActivatedAbility.modal ability)
 
 -- Does this cost sacrifice a permanent the payer CHOOSES? Binding.variableX's
 -- shape exactly: CR 601.2h's payment binds the slot (Cost.payComponent's
@@ -2807,6 +2812,7 @@ reservedSlots =
       Binding.sacrificedPermanent,
       Binding.tappedPermanent,
       Binding.castSpell,
+      Binding.thisAbility,
       Binding.targetingObject,
       Binding.blockingCreature,
       Binding.blockedCreature,
@@ -3795,7 +3801,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
   Quantity.Type.TimesKickedWith {} -> []
-  Quantity.Type.SnowWasSpent -> []
+  Quantity.Type.TagWasSpent {} -> []
   Quantity.Type.WasToken -> []
   Quantity.Type.WasBlocking -> []
   Quantity.Type.DamageDealtToThisTurn -> []

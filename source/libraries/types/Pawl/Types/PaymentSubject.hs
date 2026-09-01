@@ -27,17 +27,9 @@ data PaymentSubject
     Casting ObjectId.ObjectId
   | -- | CR 602.2b: the SOURCE of the ability being activated, which is the
     -- object "activate abilities of artifacts" is about rather than the ability.
+    --
+    -- Which is why CR 400.7d's record of the mana spent does NOT read this: the
+    -- ability object is what the record belongs on, and Pawl.Engine.Cost.pay takes
+    -- it as its own argument.
     Activating ObjectId.ObjectId
   deriving (Eq, Ord, Show)
-
--- | The spell being cast, and Nothing for the other two arms.
---
--- CR 400.7d's record of which mana paid for a spell is the one question that
--- wants this narrowing rather than the whole subject: Pawl.Engine.Cost's
--- @recordSpent@ writes only for a cast, since every printing that reads the
--- record asks about one.
-castOf :: PaymentSubject -> Maybe ObjectId.ObjectId
-castOf subject = case subject of
-  ForNeither -> Nothing
-  Casting oid -> Just oid
-  Activating _ -> Nothing

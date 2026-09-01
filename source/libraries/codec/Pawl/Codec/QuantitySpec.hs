@@ -23,6 +23,7 @@ import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Plus as Plus
+import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.Scope as Scope
@@ -240,14 +241,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.TimesKickedWith (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []))
       " {\"type\":\"TimesKickedWith\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
-  -- CR 107.4h's third sentence, with nothing on the wire for WasKicked's reason:
-  -- the tag it asks about is the constructor.
-  Spec.it s "SnowWasSpent" $
+  -- CR 107.4h's third sentence, with the tag on the wire and the object still
+  -- implicit for WasKicked's reason.
+  Spec.it s "TagWasSpent" $
     Common.assertCodec
       s
       Quantity.codec
-      Quantity.SnowWasSpent
-      " {\"type\":\"SnowWasSpent\"} "
+      (Quantity.TagWasSpent ProductionTag.Snow)
+      " {\"type\":\"TagWasSpent\",\"value\":{\"type\":\"Snow\"}} "
   -- CR 111.6 and CR 509.1g, with nothing on the wire for WasKicked's reason: the
   -- object is whichever one the quantity is evaluated against.
   Spec.it s "WasToken" $

@@ -89,7 +89,7 @@ endEffect pid oid = do
   case offerToEnd oid before of
     Nothing -> pure ()
     Just offer -> do
-      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither ManaSpending.AsProduced pid oid (PaidExpiry.cost offer)
+      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid (PaidExpiry.cost offer)
       case payment of
         Payment.Unpaid -> State.put before
         Payment.Paid _ -> State.modify' (Expiry.dropWhenPaidBy oid)

@@ -241,7 +241,7 @@ turnFaceUp pid procedure oid = do
     else case costOf procedure oid before of
       Nothing -> pure ()
       Just cost -> do
-        payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither ManaSpending.AsProduced pid oid cost
+        payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid cost
         case payment of
           Payment.Unpaid -> State.put before
           -- The payment's bound slots are dropped, Pawl.Engine.Ignore's reason:

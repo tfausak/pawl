@@ -438,19 +438,25 @@ manaOptionsOfGiven pcs oid gs =
 -- on the payment path, and the object a resolving ability came from on the other.
 -- CR 107.4h then asks whether that source is a snow one, and the rules define no
 -- separate term for it: a snow source is a source that is snow, which for a
--- permanent is CR 205.4g's supertype and nothing else.
+-- permanent is CR 205.4g's supertype and nothing else. Forsworn Paladin's "mana
+-- from a Treasure" is the same question one type line over, CR 205.3g's artifact
+-- subtype.
 --
--- CR 205.4g is PERMANENT-scoped and CR 106.3's first clause is wider, so this
--- read would be too narrow for a source that is not a permanent. Nothing reaches
+-- CR 205.4g and CR 205.3g are PERMANENT-scoped and CR 106.3's first clause is
+-- wider, so this read would be too narrow for a source that is not a permanent. Nothing reaches
 -- it with one. Pawl.Engine.Cost.tapForMana and payableResolutions take their oid
 -- from manaSourcesGiven, which filters the battlefield; Pawl.Engine.Resolve's
 -- Effect.AddMana arm takes the resolving ability's source, which is a permanent
 -- for every producer in the pool and need not be one in general.
 productionTagsGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> Set.Set ProductionTag.ProductionTag
 productionTagsGiven pcs oid gs =
-  if Set.member Supertype.Snow (Projection.supertypesGiven pcs oid gs)
-    then Set.singleton ProductionTag.Snow
-    else Set.empty
+  Set.union
+    (if Set.member Supertype.Snow (Projection.supertypesGiven pcs oid gs) then Set.singleton ProductionTag.Snow else Set.empty)
+    -- Forsworn Paladin's "mana from a Treasure", read off the same source and by
+    -- the same rule: CR 106.3 names the source, and being a Treasure is CR
+    -- 205.3g's subtype where being snow is CR 205.4g's supertype. Two independent
+    -- axes, so the answer is a union rather than a choice.
+    (if Set.member Subtype.Treasure (Projection.subtypesGiven pcs oid gs) then Set.singleton ProductionTag.Treasure else Set.empty)
 
 -- The units of one yield, in printed order.
 unitsOf :: Mana -> [ManaUnit]

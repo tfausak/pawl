@@ -499,10 +499,11 @@ data View = MkView
     -- the forgetting (see Pawl.Types.Object).
     kicked :: Map.Map (Cost.Cost Keyword.Type.Keyword) Natural.Natural,
     -- CR 400.7d / CR 107.4h: the production tags of the mana that was spent to
-    -- cast the spell this candidate is, or was -- read off Object.manaSpent, and
-    -- empty where there is no object to read it off, both for the reasons
-    -- `designations` above gives. Its one reader is Pawl.Engine.Quantity's
-    -- SnowWasSpent arm, answering Berg Strider's clause condition.
+    -- cast the spell this candidate is, or was, or to activate the CR 602.2a
+    -- ability it is -- read off Object.manaSpent, and empty where there is no
+    -- object to read it off, both for the reasons `designations` above gives. Its
+    -- one reader is Pawl.Engine.Quantity's TagWasSpent arm, answering Berg
+    -- Strider's and Forsworn Paladin's clause conditions.
     --
     -- The TAGS and not the units: Pawl.Types.ProductionTag is the closed half of
     -- what a unit carries (see its header), so this field is a classification the

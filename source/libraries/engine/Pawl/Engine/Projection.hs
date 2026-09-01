@@ -1338,7 +1338,9 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.kicked = foldMap Object.kicked (Game.lookupObject oid gs),
       -- CR 400.7d / CR 107.4h: read live off the object like `kicked`, and
       -- flattened to the tags here because that is the whole of what the
-      -- vocabulary asks (see the field's own comment in Pawl.Engine.Filter).
+      -- vocabulary asks (see the field's own comment in Pawl.Engine.Filter). The
+      -- object may be a CR 602.2a ability on the stack as well as a spell or the
+      -- permanent one became; every one of them carries the field.
       Filter.manaSpentTags = foldMap (foldMap ManaUnit.tags . Mana.unwrap . Object.manaSpent) (Game.lookupObject oid gs),
       -- CR 602.1 / 605.1a off the PROJECTION like `keywords`: abilities are
       -- characteristics (CR 109.3) written by layer 6. The whole list the object
@@ -3080,7 +3082,7 @@ rewriteQuantity pairs quantity = case quantity of
   -- (Game.faceOf), so rewriting the identifier here would ask about a cost no
   -- announcement was ever recorded under.
   Quantity.Type.TimesKickedWith _ -> quantity
-  Quantity.Type.SnowWasSpent -> quantity
+  Quantity.Type.TagWasSpent {} -> quantity
   Quantity.Type.WasToken -> quantity
   Quantity.Type.WasBlocking -> quantity
   Quantity.Type.DamageDealtToThisTurn -> quantity
@@ -4552,7 +4554,7 @@ quantityReads q = case q of
   Quantity.Type.ClassLevel -> Set.empty
   Quantity.Type.WasKicked -> Set.empty
   Quantity.Type.TimesKickedWith _ -> Set.empty
-  Quantity.Type.SnowWasSpent -> Set.empty
+  Quantity.Type.TagWasSpent {} -> Set.empty
   Quantity.Type.WasToken -> Set.empty
   Quantity.Type.WasBlocking -> Set.empty
   Quantity.Type.DamageDealtToThisTurn -> Set.empty
