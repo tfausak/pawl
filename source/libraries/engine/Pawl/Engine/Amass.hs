@@ -88,6 +88,7 @@ armyToken subtype =
               Face.toughness = Just (Toughness.MkToughness (Quantity.Literal 0)),
               Face.loyalty = Nothing,
               Face.defense = Nothing,
+              Face.vanguard = Nothing,
               Face.keywords = Set.empty,
               Face.colorIndicator = Set.singleton Color.Black,
               Face.characteristicPT = Nothing,

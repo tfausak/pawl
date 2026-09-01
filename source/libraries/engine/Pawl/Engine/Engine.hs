@@ -1652,8 +1652,8 @@ playGame =
 -- StateT, so its prompts flow through the SAME Program interpreter and Replay
 -- fold and a transcript stays replayable across one. The parent GameState sits
 -- untouched in the outer frame (CR 729.1a); at the end cards funnel back to
--- their owner's library (CR 729.5) and commanders to the command zone (CR
--- 729.5c). Nesting terminates: each level's library comes from the parent's at
+-- their owner's library (CR 729.5) and vanguards and commanders to the command
+-- zone (CR 729.5b, CR 729.5c). Nesting terminates: each level's library comes from the parent's at
 -- cast time, so depth is bounded by |library| / 7.
 --
 -- CR 729.4 runs the other way too: a subgame's wish reaches the main game's
@@ -1664,10 +1664,10 @@ playGame =
 -- ended -- exact rather than late, since CR 729.1a discontinued the main game
 -- throughout. Setup.applyCrossings carries that argument in full.
 --
--- Of CR 729.2a-c and CR 729.5a-c's command-zone residents, commanders are the
--- kind Setup carries both ways, and dungeons ride Player.dungeons rather than
--- the command zone; planes and phenomena (#934), schemes (#935), vanguards
--- (#936) and conspiracies (#937) do not exist.
+-- Of CR 729.2a-c and CR 729.5a-c's command-zone residents, commanders and
+-- vanguards are the kinds Setup carries both ways, and dungeons ride
+-- Player.dungeons rather than the command zone; planes and phenomena (#934),
+-- schemes (#935) and conspiracies (#937) do not exist.
 playSubgame :: Game Result
 playSubgame = do
   parent <- State.get

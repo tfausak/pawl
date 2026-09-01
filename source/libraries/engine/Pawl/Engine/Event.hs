@@ -54,6 +54,7 @@ import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
+import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
@@ -13256,12 +13257,15 @@ eventTriggers events gs =
       -- upkeep" is a condition that triggers perfectly well from the battlefield,
       -- so CR 113.6's default sends it there and the emblem would never be asked.
       --
-      -- EMBLEMS alone, where a graveyard walk takes the whole zone, for the reason
-      -- Pawl.Engine.CombatRestriction.inForce narrows the same walk: the command
-      -- zone also holds a commander and a dungeon card, whose abilities CR 113.6
-      -- leaves functioning on the battlefield and CR 309.4c mints rather than
-      -- prints. Asking Source.OfEmblem is reading the rulebook's own list (CR
-      -- 113.6p), not an effect's identity.
+      -- EMBLEMS AND VANGUARDS, where a graveyard walk takes the whole zone, for
+      -- the reason Pawl.Engine.CombatRestriction.inForce narrows the same walk:
+      -- the command zone also holds a commander and a dungeon card, whose
+      -- abilities CR 113.6 leaves functioning on the battlefield and CR 309.4c
+      -- mints rather than prints. Asking Source.OfEmblem is reading the rulebook's
+      -- own list (CR 113.6p), not an effect's identity, and CR 313.4 / CR 902.7
+      -- put the vanguard card on that same list in the same words -- "its
+      -- triggered abilities may trigger" -- so it takes the same unfiltered walk
+      -- and for the same reason.
       --
       -- The controller is the OWNER: CR 114.2 makes an emblem both owned and
       -- controlled by the player it was created for, and createEmblem leaves
@@ -13274,18 +13278,26 @@ eventTriggers events gs =
       -- 114.3) -- no projection is involved, which is the posture
       -- Projection.gatherGiven's emblem walk takes for its static half: an emblem
       -- is not a creature, so the pool's CR 613.1f removers never reach it.
-      emblemCandidate oid = case Game.lookupObject oid gs of
+      -- CR 902.6 gives the vanguard card the same owner-is-controller answer CR
+      -- 114.2 gives an emblem, so the two share this line as well: rule 902.6's
+      -- "the controller of a face-up vanguard card is its owner".
+      commandCandidate oid = case Game.lookupObject oid gs of
         Nothing -> Nothing
-        Just obj -> case Object.source obj of
-          Source.OfEmblem _ -> case Game.faceOf oid gs of
-            Nothing -> Nothing
-            Just face -> case Face.triggeredAbilities face of
-              [] -> Nothing
-              abilities -> Just (oid, (Object.owner obj, abilities))
-          _ -> Nothing
+        Just obj ->
+          let functionsHere = case Object.source obj of
+                Source.OfEmblem _ -> True
+                Source.OfCard _ -> Vanguard.isVanguard oid gs
+                _ -> False
+           in if not functionsHere
+                then Nothing
+                else case Game.faceOf oid gs of
+                  Nothing -> Nothing
+                  Just face -> case Face.triggeredAbilities face of
+                    [] -> Nothing
+                    abilities -> Just (oid, (Object.owner obj, abilities))
       inCommand =
         Map.fromList
-          (Maybe.mapMaybe emblemCandidate (Set.toAscList (GameState.command gs)))
+          (Maybe.mapMaybe commandCandidate (Set.toAscList (GameState.command gs)))
       -- CR 113.6k's last zone: the card a player just revealed from their HAND as
       -- they drew it (CR 702.94a, CR 121.9). The ability is borne by an object that
       -- is on nobody's battlefield, in nobody's graveyard and on no stack -- rule

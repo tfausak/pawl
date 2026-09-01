@@ -38,6 +38,7 @@ bareFace n =
       Face.toughness = Nothing,
       Face.loyalty = Nothing,
       Face.defense = Nothing,
+      Face.vanguard = Nothing,
       Face.keywords = Set.empty,
       Face.colorIndicator = Set.empty,
       Face.characteristicPT = Nothing,

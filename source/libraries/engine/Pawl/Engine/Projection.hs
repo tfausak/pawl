@@ -3361,16 +3361,25 @@ gatherGiven stripped functioning seed gs =
          in fmap one (NonEmpty.toList (grantedDefiningParts (ContinuousEffect.modification eff)))
       stored = concatMap fromStored (GameState.continuousEffects gs)
       static = concatMap (fmap snd . permanentParts stripped functioning setEffs setStripped gs) (abilitySources gs)
-      fromEmblem emblemId = case Game.lookupObject emblemId gs of
+      fromCommandZone commandId = case Game.lookupObject commandId gs of
         Nothing -> []
-        Just emblemObj -> case Game.faceOfObject gs emblemObj of
+        Just commandObj -> case Game.faceOfObject gs commandObj of
           Nothing -> []
           Just face ->
             -- CR 114.4 / 113.6: an emblem's abilities function in the command
             -- zone, sharing the emblem's timestamp (CR 613.7a). Never stripped:
             -- the pool's CR 613.1f removers reach creatures (CR 114.5).
-            concat [gatherStatic (functioning emblemId) emblemId (Object.timestamp emblemObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), functionsFromZone Zone.Command sa]
-      emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
+            --
+            -- CR 313.4 / CR 902.7 puts a vanguard card's static abilities here on
+            -- the same terms, and this walk already reaches them with no test of
+            -- its own: a vanguard prints no zone clause -- rule 313.4 is the
+            -- rulebook's statement and not the card's -- so functionsFromZone's
+            -- empty-set default admits it, exactly as it admits an emblem's.
+            -- Pawl.VanguardSpec's "CR 902.7 a vanguard's static ability functions
+            -- from the command zone" is what proves that, against a control board
+            -- differing only in the card.
+            concat [gatherStatic (functioning commandId) commandId (Object.timestamp commandObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), functionsFromZone Zone.Command sa]
+      emblems = concatMap fromCommandZone (Set.toList (GameState.command gs))
       fromSpell spellId = case Game.lookupObject spellId gs of
         Nothing -> []
         Just spellObj -> case Game.faceOfObject gs spellObj of

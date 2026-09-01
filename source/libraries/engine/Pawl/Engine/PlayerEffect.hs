@@ -39,6 +39,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaFilter as ManaFilter
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
@@ -1946,6 +1947,12 @@ defaultMaximumHandSize = 7
 -- question in this module folds order-independently, which is why `applying`
 -- sorts once for all of them rather than each sorting for itself.
 --
+-- The fold's SEED and not one more effect applied to a seven: CR 902.5b makes CR
+-- 313.6's hand modifier part of what the maximum hand size IS, where CR 613.11's
+-- effects are applied to that number afterwards. A vanguard whose modifier is -1
+-- beside a Minamo Scrollkeeper leaves a maximum of seven, and beside a Reliquary
+-- Tower leaves none at all -- the removal has a number to remove either way.
+--
 -- A left fold from CR 402.2's seven rather than a search for the newest effect:
 -- "applied in timestamp order" is a sequence of edits to one value, and reading
 -- only the last one would be a different rule for the two ADJUSTING arms, which
@@ -1998,7 +2005,7 @@ maximumHandSize pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> current
         PlayerEffect.CantGetCounters _ -> current
         PlayerEffect.StateCoinFlip _ -> current
-   in List.foldl' (\current row -> apply current (snd row)) (Just defaultMaximumHandSize) (applying pid gs)
+   in List.foldl' (\current row -> apply current (snd row)) (Just (Vanguard.handSize defaultMaximumHandSize pid gs)) (applying pid gs)
 
 -- CR 500.5 / 106.4 / 613.11: which of the unspent mana in this player's pool do
 -- they keep as a step or phase ends (Upwelling, Omnath Locus of Mana)? The typed

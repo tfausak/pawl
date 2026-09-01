@@ -512,7 +512,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
   Spec.it s "CR 309.2 a deck's dungeon cards are recorded on its player and minted into no zone" $ do
     lostMine <- S.printingOf s registry "Lost Mine of Phandelver"
     tomb <- S.printingOf s registry "Tomb of Annihilation"
-    let deck = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Nothing, Deck.dungeons = Set.fromList [lostMine, tomb], Deck.sideboard = Map.empty}
+    let deck = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Nothing, Deck.vanguard = Nothing, Deck.dungeons = Set.fromList [lostMine, tomb], Deck.sideboard = Map.empty}
         after = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.createDeck S.alice deck)
         ownedBy pid = fmap List.sort (traverse (\i -> Game.printingOf i after) (Set.toList (maybe Set.empty Player.dungeons (Map.lookup pid (GameState.players after)))))
     Spec.assertEqWith s "alice owns both" (ownedBy S.alice) (Just (List.sort [lostMine, tomb]))

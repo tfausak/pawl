@@ -74,6 +74,7 @@ import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UntapRestriction as UntapRestriction
+import qualified Pawl.Types.Vanguard as Vanguard
 import qualified Pawl.Types.Zone as Zone
 
 -- Fixtures --------------------------------------------------------------------
@@ -124,6 +125,7 @@ baseFace =
       Face.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
       Face.loyalty = Nothing,
       Face.defense = Nothing,
+      Face.vanguard = Nothing,
       Face.keywords = Set.empty,
       Face.staticAbilities = [],
       Face.spell = minimalModal,
@@ -172,6 +174,7 @@ minimalFace =
       Face.toughness = Nothing,
       Face.loyalty = Nothing,
       Face.defense = Nothing,
+      Face.vanguard = Nothing,
       Face.keywords = Set.empty,
       Face.colorIndicator = Set.empty,
       Face.characteristicPT = Nothing,
@@ -329,6 +332,9 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "loyalty (CR 306.5) defaults to Nothing" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.loyalty <$> decodeFace v) (Right Nothing)
+    Spec.it s "vanguard (CR 313.6/313.7) defaults to Nothing" $ do
+      v <- Common.assertJson s baseFaceJson
+      Spec.assertEq s (Face.vanguard <$> decodeFace v) (Right Nothing)
     Spec.it s "colorIndicator (CR 204.1/204.2) defaults to the empty set" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.colorIndicator <$> decodeFace v) (Right Set.empty)
@@ -598,6 +604,12 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         decodeFace
         baseFace {Face.castingRestrictions = [CastingRestriction.AttackedThisStep]}
         (init baseFaceJson <> ",\"castingRestrictions\":[{\"type\":\"AttackedThisStep\"}]}")
+  -- CR 313.6 / 313.7: the populated half of the field above. A decode and not a
+  -- round trip, because the encoder writes this key in its codec position and
+  -- baseFaceJson can only be extended by appending.
+  Spec.it s "MkFace, a vanguard's printed modifiers" $ do
+    v <- Common.assertJson s " {\"name\":\"Gerrard\",\"typeLine\":{\"types\":[{\"type\":\"Vanguard\"}]},\"vanguard\":{\"handModifier\":-4,\"lifeModifier\":0}} "
+    Spec.assertEq s (Face.vanguard <$> decodeFace v) (Right (Just Vanguard.MkVanguard {Vanguard.handModifier = -4, Vanguard.lifeModifier = 0}))
   -- Every field at once, including the recursive card-in-card ones that only
   -- Card itself ties the knot on.
   Spec.it s "MkFace, every field populated at once" $
