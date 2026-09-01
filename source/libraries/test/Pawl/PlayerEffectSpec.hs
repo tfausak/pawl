@@ -4085,9 +4085,10 @@ isPlay action = case action of
 -- so "bob may not enchant alice" is told apart from "bob may not enchant
 -- anybody" on one board, and from "the Curse is illegal" on one pass.
 --
--- Every case is a PAIR differing in the chosen NAME alone. A board where the
--- Halo names Goblin Piker is the same board in every other respect, which is
--- what keeps the mana, the phase and the Curse's own legality out of the answer.
+-- Every case is boards differing in ONE thing -- the chosen NAME, or which seat
+-- the case asks about. A board where the Halo names Goblin Piker is the same
+-- board in every other respect, which is what keeps the mana, the phase and the
+-- Curse's own legality out of the answer.
 runedHaloBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 runedHaloBoard plains halo curse =
   let lands = S.landsFor plains S.bob 3 (S.landsFor plains S.alice 2 S.threePlayerGame)
