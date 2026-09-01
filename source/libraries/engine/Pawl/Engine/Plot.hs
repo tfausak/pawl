@@ -124,7 +124,12 @@ plot pid oid = do
   if not (canPlot pid oid before)
     then pure ()
     else do
-      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid (Maybe.fromMaybe Cost.unpayable (plotCostOf oid before))
+      -- CR 118.13c, Pawl.Engine.FaceDown.turnFaceUp's announcement and for its
+      -- reasons. No printed plot cost holds such a symbol -- Scryfall
+      -- `keyword:plot`, 2026-09-01, every plot cost generic or monocoloured
+      -- -- so no prompt is raised today.
+      (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (Maybe.fromMaybe Cost.unpayable (plotCostOf oid before))
+      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
         Payment.Unpaid -> State.put before
         -- Dropped, Pawl.Engine.Foretell's reason exactly: the card is exiled and

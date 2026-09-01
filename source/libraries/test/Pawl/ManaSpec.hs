@@ -5366,11 +5366,11 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   -- What CR 118.13a's announcement leaves behind. Both halves are payable
   -- out of this pool and they leave DIFFERENT pools behind, so the choice
   -- is observable and `spend` makes it: it takes the fewest units. A cast,
-  -- an activation and a CR 118.12 pay gate no longer reach this,
-  -- because `announce` has settled every {2/X} before payment -- what still
-  -- does is a special action's cost (#1990) and a cost to attack (#1991),
-  -- which is why this calls `spend` directly.
-  Spec.it s "CR 118.13c with nothing announced, spend takes a {2/R}'s one-mana half (#1990)" $
+  -- an activation, a CR 118.12 pay gate, a special action and a combat toll no
+  -- longer reach this, because `announce` has settled every {2/X} before
+  -- payment -- what still does is a mana ability's own activation cost
+  -- (#2909), which is why this calls `spend` directly.
+  Spec.it s "CR 601.2b with nothing announced, spend takes a {2/R}'s one-mana half (#2909)" $
     let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
         colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
      in Spec.assertEqWith
@@ -5598,8 +5598,8 @@ atLife n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) S.a
 --
 -- TWO PATHS, and which one a case takes decides who chooses. A case calling
 -- Cost.payMana directly pays an UNANNOUNCED cost, where the least-life rule still
--- decides -- what the engine's own remaining unannounced payments look like
--- (#1990, #1991); a case going through Cast.castSpell announces first, under CR
+-- decides -- what the engine's own remaining unannounced payment looks like
+-- (#2909); a case going through Cast.castSpell announces first, under CR
 -- 118.13a, and the player decides. The CR 118.13a cases at the end of this group
 -- are the second path.
 phyrexianSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -5611,7 +5611,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- It also pins what Cost.payMana does with an UNANNOUNCED cost, which is
   -- what this and the four cases after it exercise: they call Cost.payMana
   -- directly, so no announcement has happened and the least-life
-  -- rule still decides, which here means none (#1990, #1991). A cast goes through
+  -- rule still decides, which here means none (#2909). A cast goes through
   -- Cast.castSpell instead and asks -- see the CR 118.13a cases at the end of
   -- this group.
   Spec.it s "CR 107.4f one {G/P} is paid with one green mana and no life" $ do
@@ -5774,7 +5774,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- is gone and CR 107.4f's 2 life is all that is left. pawl pays it rather
   -- than failing the payment, which is the same MORE PERMISSIVE posture
   -- Cost.payMana's haddock takes towards a mis-tapped colour. Reached only
-  -- because this calls Cost.payMana directly, with nothing announced (#1990, #1991).
+  -- because this calls Cost.payMana directly, with nothing announced (#2909).
   Spec.it s "CR 107.4f a Birds tapped for blue still pays a {G/P}, out of life" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
     let (_, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
@@ -6172,7 +6172,8 @@ moltensteelSpec s registry = Spec.describe s "Moltensteel" $ do
   -- activation cost, so CR 118.13a is, and the choice belongs at proposal
   -- rather than at payment. Rule 118.13b announces at its own site
   -- (Pawl.Engine.Resolve.payGatePaidBy, the Shu Yun group above); rule
-  -- 118.13c's special action is still unreached (#1990).
+  -- 118.13c's special action announces at its own
+  -- (Pawl.FaceDownSpec's Dog Walker case).
   Spec.it s "CR 118.13a/602.2b an activation cost's {R/P} is asked, and mana taps the Mountain" $ do
     mountain <- S.printingOf s registry "Mountain"
     dragon <- S.printingOf s registry "Moltensteel Dragon"
@@ -6517,8 +6518,8 @@ sigilSpec s registry = Spec.describe s "SyntheticHybridPhyrexianSigil" $ do
     Spec.assertEqWith s "neither cost life" (S.lifeOf S.alice afterGreen, S.lifeOf S.alice afterBlue) (Just 20, Just 20)
 
   -- Pawl.Engine.Mana.waysOf's three rows, read directly off an UNANNOUNCED
-  -- cost -- the path a special action's cost and a cost to attack still take
-  -- (#1990, #1991), and the only one that asks this function what the symbol
+  -- cost -- the path a mana ability's own activation cost still takes
+  -- (#2909), and the only one that asks this function what the symbol
   -- costs rather than what CR 601.2b left behind. The Phyrexian group's
   -- least-life case one group up is the same reading for the monocoloured
   -- symbol.

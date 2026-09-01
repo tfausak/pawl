@@ -2552,6 +2552,31 @@ primalWhispererSpec s registry = Spec.describe s "Counting face-down creatures (
         Spec.assertEqWith s "CR 708.8 and the Tracker is what turned over" (fmap Object.facing (Game.lookupObject victim after)) (Just Facing.FaceUp)
       Nothing -> Spec.assertFailure s "the face-down permanents did not reach the battlefield"
 
+-- The two halves of Dog Walker's {R/W}, named so the assertions below read as
+-- colours rather than as constructors.
+redMana, whiteMana :: ManaType.ManaType
+redMana = ManaType.Colored Color.Red
+whiteMana = ManaType.Colored Color.White
+
+-- Answers CR 601.2b's colour/colour hybrid announcement with `half` wherever it
+-- is on offer, and defers everything else to S.identityAnswer -- Pawl.ManaSpec's
+-- `announcesHalf`, duplicated rather than hoisted.
+--
+-- The fall-through matters to the case that uses it: on a board offering only
+-- one half this answers the same way whatever `half` says, so two legs that
+-- DIFFER are two legs that were each asked.
+announcesRedOrWhite :: ManaType.ManaType -> Prompt.Prompt r -> r
+announcesRedOrWhite half p = case p of
+  Prompt.AnnounceHybridHalf _ _ _ _ offers ->
+    if elem half (NonEmpty.toList offers) then half else NonEmpty.head offers
+  _ -> S.identityAnswer p
+
+-- How many of these permanents are tapped. What a case asks of two Mountains and
+-- two Plains to read WHICH colour a payment spent, the count being the whole
+-- difference between the two announcements.
+tappedAmong :: [ObjectId.ObjectId] -> GameState.GameState -> Int
+tappedAmong oids gs = length (filter (\oid -> fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Tapped) oids)
+
 -- CR 702.168 disguise: rule 702.37's twin, and the one place rule 708.2's "no
 -- characteristics other than those LISTED" has a keyword in the list.
 --
@@ -2680,6 +2705,60 @@ disguiseSpec s registry =
             Just permanent -> do
               Spec.assertBool s (maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject permanent down)) "the permanent really is face down"
               Spec.assertEqWith s "CR 702.168d no procedure is affordable" (FaceDown.turnableFaceUp S.alice down) []
+
+        -- CR 118.13c: "if the cost associated with a special action contains a
+        -- mana symbol that can be paid in multiple ways, the player taking the
+        -- special action chooses how to pay for that symbol immediately before
+        -- they pay that cost". The moment rule 118.13a's cast and 118.13b's
+        -- resolution-time payment (Pawl.ManaSpec's Shu Yun case) do not cover.
+        --
+        -- Dog Walker is the card, {R}{W} 3/1 Human Citizen with vigilance and
+        -- "Disguise {R/W}{R/W}" -- the cheapest of the four printings whose
+        -- morph, megamorph or disguise cost holds a symbol payable more than one
+        -- way, so CR 116.2b's special action is where rule 118.13c is reachable
+        -- at all.
+        --
+        -- The cast happens on a board of three Forests alone, so nothing the
+        -- announcement could spend is tapped paying CR 702.168a's {3}. The two
+        -- Mountains and two Plains arrive afterwards, which makes both halves of
+        -- each {R/W} payable and the prompt a real one: with only one colour on
+        -- the board `announcesRedOrWhite` would fall through to the single offer
+        -- and the two legs would be identical.
+        Spec.it s "CR 118.13c the half announced before the disguise cost is paid is the mana it spends" $ do
+          forest <- S.printingOf s registry "Forest"
+          mountain <- S.printingOf s registry "Mountain"
+          plains <- S.printingOf s registry "Plains"
+          walker <- S.printingOf s registry "Dog Walker"
+          let (gs, oid) = morphBoard forest walker 3
+              (cast, entered) = castAndResolve walker disguised gs oid
+              (mountainOne, m1) = S.addCreature mountain S.alice cast
+              (mountainTwo, m2) = S.addCreature mountain S.alice m1
+              (plainsOne, p1) = S.addCreature plains S.alice m2
+              (plainsTwo, down) = S.addCreature plains S.alice p1
+              mountains = [mountainOne, mountainTwo]
+              plainses = [plainsOne, plainsTwo]
+          case entered of
+            Nothing -> Spec.assertFailure s "the disguise cast did not reach the battlefield"
+            Just permanent -> do
+              let legOf half = S.runPure (announcesRedOrWhite half) down (FaceDown.turnFaceUp S.alice TurnUpProcedure.Disguise permanent)
+                  redLeg = legOf redMana
+                  whiteLeg = legOf whiteMana
+              Spec.assertEqWith s "CR 118.13c white was announced, so both Plains paid the disguise cost" (tappedAmong plainses whiteLeg) 2
+              Spec.assertEqWith s "CR 118.13c red was announced on the same board, so neither Plains was touched" (tappedAmong plainses redLeg) 0
+              Spec.assertEqWith s "and the red announcement is what the two Mountains paid" (tappedAmong mountains redLeg) 2
+              -- The white leg tapped the Mountains TOO, and that is Cost.payMana's
+              -- rule rather than a second announcement: S.identityAnswer answers
+              -- every Prompt.ChooseManaSource with the head candidate, a Mountain
+              -- while one is untapped, and a mis-tapped colour is a choice the
+              -- engine must honour. So the white {W}{W} is paid by the Plains
+              -- with the Mountains' {R}{R} left floating, which is the seven
+              -- tapped lands below against the red leg's five.
+              Spec.assertEqWith s "CR 702.168a/CR 118.13c the red leg spent three lands on the cast and two on the cost" (S.tappedCount S.alice redLeg) 5
+              Spec.assertEqWith s "and the white leg spent two more, the red it could not use floating" (S.tappedCount S.alice whiteLeg) 7
+              -- Both legs PAID, so the difference above is the announcement and
+              -- not one leg failing to turn the permanent over at all.
+              Spec.assertEqWith s "CR 702.168d the red leg turned it face up" (fmap Object.facing (Game.lookupObject permanent redLeg)) (Just Facing.FaceUp)
+              Spec.assertEqWith s "and so did the white leg" (fmap Object.facing (Game.lookupObject permanent whiteLeg)) (Just Facing.FaceUp)
 
         -- THE PAIR: a morph card offers CR 702.37e's procedure and never CR
         -- 702.168d's, so the two special actions are told apart by the card's
