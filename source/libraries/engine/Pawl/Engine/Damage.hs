@@ -280,12 +280,14 @@ damageEvent gs kind source target amount =
 -- attacking that player" -- so Combat.attackers still names the planeswalker and
 -- CR 506.4c's record is untouched.
 --
--- The defending player is read off the combat record (Combat.defender) and not
--- re-derived from the planeswalker, which is gone -- CR 508.5's second sentence,
--- the same reading Defender.playerOf now takes for every caller: pawl's combat has
--- ONE defending player (see Pawl.Types.Combat) and an attack on a planeswalker is
--- declared against that player's planeswalkers (CR 508.1b), so the record's player
--- is the controller it had before it was removed from combat.
+-- The defending player is read off the combat's designation
+-- (Defender.defendingPlayers) and not re-derived from the planeswalker, which is
+-- gone -- CR 508.5's second sentence, the same reading Defender.playerOf now takes
+-- for every caller: pawl's combat has ONE defending player (see
+-- Pawl.Engine.Defender) and an attack on a planeswalker is declared against that
+-- player's planeswalkers (CR 508.1b), so that player is the controller it had
+-- before it was removed from combat. Narrowed to one and never folded, which is
+-- CR 802.2a's own instruction.
 --
 -- Read at ASSIGNMENT and at every place assignment can name a recipient (the
 -- unblocked/trample-through event and the CR 702.19b threshold map the prompt
@@ -313,7 +315,7 @@ combatRecipient gs attacker target =
             Combat.stillAttacked oid gs ->
               Just (Recipient.ToPlaneswalker oid)
           | Projection.hasKeyword Keyword.TrampleOverPlaneswalkers attacker gs ->
-              stillPlaying =<< Combat.Type.defender (GameState.combat gs)
+              stillPlaying =<< Maybe.listToMaybe (Defender.defendingPlayers gs)
           | otherwise -> Nothing
         -- CR 310.5 / 506.4, the planeswalker arm's twin: a battle that has left the
         -- battlefield is removed from combat and stops being attacked, so CR 510.1b
