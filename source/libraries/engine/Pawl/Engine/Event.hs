@@ -4586,16 +4586,17 @@ reanchor oldId newIds eff = case ContinuousEffect.affected eff of
 -- `lastController` is CR 109.5's "you" for the arming, read from the same
 -- pre-departure board.
 --
--- TWO roads reach this, because a permanent leaves the battlefield two ways:
--- changeZoneAttaching above for a zone change, and
--- Pawl.Engine.Departure.objectsLeaveWith for CR 800.4a's first clause, which
--- takes a departing player's objects out of the game without one. Neither gate
--- is written here: this function is asked about a permanent that has already
--- been decided to be leaving, and each caller decides that its own way -- the
--- funnel off Object.zone, the departure off GameState.battlefield membership,
--- which is CR 702.26b on that road: a phased-out permanent is treated as though
--- it does not exist, so it was generating no effect to continue -- CR 702.26k
--- still takes it out of the game with its owner.
+-- THREE roads reach this, because a permanent leaves the battlefield three ways:
+-- changeZoneAttaching above for a zone change, and two that take it out of the
+-- GAME without one -- Pawl.Engine.Departure.objectsLeaveWith for CR 800.4a's
+-- first clause, and Pawl.Engine.Setup.applyCrossings for CR 729.4a's card a
+-- subgame brought in. No gate is written here: this function is asked about a
+-- permanent that has already been decided to be leaving, and each caller decides
+-- that its own way -- the funnel off Object.zone, and both roads out of the game
+-- off GameState.battlefield membership, which is CR 702.26b on those: a
+-- phased-out permanent is treated as though it does not exist, so it was
+-- generating no effect to continue -- CR 702.26k still takes it out of the game
+-- with its owner.
 --
 -- Short-circuited on the cheap COPIABLE read (Projection.staticAbilitiesOf,
 -- which is projection-free), so an ordinary zone change -- every one in the pool
