@@ -39,6 +39,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AttackOption as AttackOption
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
@@ -452,6 +453,101 @@ attackMultiplePlayersSpec s registry = Spec.describe s "AttackMultiplePlayers" $
           (not (Combat.legalBlockDeclaration S.bob (Map.singleton bobsGuard (Set.singleton atBob2)) lured))
           "CR 509.1c bob, who can block it, may not leave the Lured creature unblocked"
       _ -> Spec.assertFailure s "fixture should give alice four Pikers and carol one Palace Guard"
+
+-- CR 803.1a/803.1b: the attack left and attack right options, which cut CR
+-- 506.2a's candidate list down to the ONE seat next to the attacking player.
+-- THREE and FOUR seats, since at two the two options and CR 506.2's base rule
+-- all name the same one opponent and nothing here could differ.
+--
+-- Both cases drive the whole declaration rather than reading
+-- Combat.attackableOpponents, because the candidate list is not the deliverable:
+-- what CR 803.1 restricts is whom a creature ends up attacking.
+attackLeftRightSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+attackLeftRightSpec s registry = Spec.describe s "AttackLeftRight" $ do
+  Spec.it s "CR 803.1a/803.1b alice attacks the neighbouring seat, and the option says which one" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    -- Seated [alice, bob, carol] with alice attacking, so bob is immediately to
+    -- her left and carol immediately to her right.
+    --
+    -- ONE answerer for both legs, aimed at CAROL: under attack left she is not
+    -- a candidate at all, so the interpreter that takes her under attack right
+    -- cannot take her here. That is what discriminates against a candidate list
+    -- left unrestricted, which would answer carol on both legs.
+    let (board, _, _, _) = S.threePlayerCombat [piker] [] []
+        declaredWith option =
+          let staged = S.attackOption (Just option) board
+              settled = S.runPure (S.attackTo S.carol) staged (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
+           in S.runPure (S.attackTo S.carol) settled (Combat.declareAttackers S.alice)
+        left = declaredWith AttackOption.Leftward
+        right = declaredWith AttackOption.Rightward
+    Spec.assertEqWith
+      s
+      "CR 803.1a the creature attacks bob, the seat to alice's left"
+      (Map.elems (Combat.Type.attackers (GameState.combat left)))
+      [AttackTarget.OfPlayer S.bob]
+    Spec.assertEqWith
+      s
+      "CR 803.1b and attacks carol, the seat to alice's right, on the same board"
+      (Map.elems (Combat.Type.attackers (GameState.combat right)))
+      [AttackTarget.OfPlayer S.carol]
+    -- The designation behind those two, after them so it cannot absorb a
+    -- mutation: CR 803.1 leaves one candidate, so CR 507.1's choice is settled
+    -- without a prompt.
+    Spec.assertEqWith
+      s
+      "CR 507.1 the left-hand neighbour is the only defending player"
+      (Combat.Type.defenders (GameState.combat left))
+      [S.bob]
+    Spec.assertEqWith
+      s
+      "CR 507.1 and the right-hand neighbour is, on the other leg"
+      (Combat.Type.defenders (GameState.combat right))
+      [S.carol]
+  Spec.it s "CR 803.1a a player whose nearest opponent to the left is more than one seat away can't attack" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    -- FOUR seats, because three cannot put an opponent two seats away in one
+    -- direction while leaving one adjacent in the other.
+    --
+    -- bob concedes, so the seat immediately to alice's left is empty and carol,
+    -- the nearest opponent that way, is two seats off. GameState.turnOrder is
+    -- the permanent seating roster, which is what makes that distance real
+    -- rather than closing the gap.
+    let (_, seated) = S.addCreature piker S.alice S.fourPlayerGame
+        board = seated {GameState.phase = Phase.Combat CombatStep.BeginningOfCombat}
+        gone = S.departs Departure.Type.Conceded S.bob board
+        declaredWith option gs =
+          let staged = S.attackOption (Just option) gs
+              settled = S.runPure (S.attackTo S.carol) staged (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
+           in S.runPure (S.attackTo S.carol) settled (Combat.declareAttackers S.alice)
+    Spec.assertEqWith
+      s
+      "CR 803.1a nothing attacks when the seat to alice's left is empty"
+      (Map.elems (Combat.Type.attackers (GameState.combat (declaredWith AttackOption.Leftward gone))))
+      []
+    -- The paired board, differing in the option and nothing else: dave is still
+    -- seated immediately to alice's right, so the same departure leaves that
+    -- direction attackable. Without it the case above passes for want of a
+    -- creature or a step.
+    Spec.assertEqWith
+      s
+      "CR 803.1b dave, immediately to alice's right, is attacked on the same departed board"
+      (Map.elems (Combat.Type.attackers (GameState.combat (declaredWith AttackOption.Rightward gone))))
+      [AttackTarget.OfPlayer S.dave]
+    -- And the paired board differing in the departure and nothing else, which
+    -- is what makes it the EMPTY SEAT rather than the seat count that stops
+    -- the attack.
+    Spec.assertEqWith
+      s
+      "CR 803.1a and bob is attacked while he is still seated there"
+      (Map.elems (Combat.Type.attackers (GameState.combat (declaredWith AttackOption.Leftward board))))
+      [AttackTarget.OfPlayer S.bob]
+    -- CR 803.1a is no attack, not a fallback: carol never becomes a defending
+    -- player. After the gameplay assertions, being the same claim upstream.
+    Spec.assertEqWith
+      s
+      "CR 803.1a nobody is designated a defending player"
+      (Combat.Type.defenders (GameState.combat (declaredWith AttackOption.Leftward gone)))
+      []
 
 -- CR 506.2/506.2a/507.1/703.4h: WHO is being attacked. Distinct from
 -- defenderSpec, which is the Defender KEYWORD (CR 702.3b).
@@ -4069,6 +4165,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   defenderSpec s registry
   defendingPlayerSpec s registry
   attackMultiplePlayersSpec s registry
+  attackLeftRightSpec s registry
   hasteSpec s registry
   evasionSpec s registry
   textChangedLandwalkSpec s registry

@@ -29,6 +29,7 @@ import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.AttackOption as AttackOption
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
@@ -117,11 +118,39 @@ skipEmptyCombat gs =
 -- list to Combat.defenders unchanged, CR 802.4 and CR 802.5 both reading it in
 -- that order. Game.apnapOrder is the SEATING roster rotated, so it still names
 -- a departed seat; stillPlaying is what drops one.
+--
+-- CR 803.1a and CR 803.1b are that same list cut to ONE SEAT: under attack left
+-- only the opponent seated immediately to the attacking player's left may be
+-- attacked, and under attack right only the one immediately to their right. The
+-- planeswalker and battle halves of those two rules need no clause of their own
+-- -- they name what the same one opponent controls or protects, and every
+-- attackable planeswalker and battle in this module is already derived from the
+-- defending players.
+--
+-- The seat and not the nearest survivor: CR 803.1a's second sentence says that
+-- if the nearest opponent to the left is more than one seat away the player
+-- can't attack, so the adjacent SEAT being empty is no attack rather than a
+-- fallback to whoever is beyond it. That is what filtering the neighbouring seat
+-- through the still-playing list expresses -- Game.apnapOrder keeps a departed
+-- seat, so it is the emptied seat itself that is named and then dropped.
+--
+-- Left is the next seat in turn order and right is the previous one, which is CR
+-- 101.4's identification of the two ("the next player in turn order (usually the
+-- player seated to the active player's left)"); GameState.turnOrder is the
+-- seating roster, so those are the two ends of Game.apnapOrder with the active
+-- player's own seat removed.
 attackableOpponents :: GameState -> [PlayerId]
 attackableOpponents gs =
   let playing = Game.stillPlaying gs
       active = GameState.activePlayer gs
-   in filter (\pid -> pid /= active && List.elem pid playing) (Game.apnapOrder gs)
+      seats = Game.apnapOrder gs
+      others = drop 1 seats
+      opponents = filter (\pid -> pid /= active && List.elem pid playing) seats
+      seatedAt neighbour = filter (\pid -> Just pid == neighbour) opponents
+   in case GameSettings.attackOption (GameState.settings gs) of
+        Just AttackOption.Leftward -> seatedAt (Maybe.listToMaybe others)
+        Just AttackOption.Rightward -> seatedAt (Maybe.listToMaybe (reverse others))
+        _ -> opponents
 
 -- CR 508.1b: what the active player may announce a chosen creature is attacking,
 -- for ONE defending player -- which player, planeswalker or battle. CR 506.2's
@@ -1115,6 +1144,10 @@ noteAttackingNothing gs =
 -- ability. It runs before any trigger by construction: Engine.runStep calls
 -- runTurnBasedActions before priorityLoop.
 --
+-- CR 803.1a and CR 803.1b take the CR 507.1 branch and never reach its prompt:
+-- attackableOpponents has already cut the candidates to one seat, so the choice
+-- is made or there is none to make.
+--
 -- CR 703.4h's own condition is what makes one function of the two: the rule asks
 -- for a choice only "in which the active player's opponents don't all
 -- automatically become defending players", which is exactly the negation of CR
@@ -1123,8 +1156,10 @@ noteAttackingNothing gs =
 -- player is the one candidate, so no prompt is issued either way.
 --
 -- No candidates leaves the field empty, which declareAttackers reads through
--- Defender.defendingPlayers as no attack being possible; unreachable in a
--- running game (CR 104.2a).
+-- Defender.defendingPlayers as no attack being possible. That is CR 803.1a's
+-- and CR 803.1b's own second sentence -- the adjacent seat is empty and the
+-- nearest opponent in that direction is more than one seat away -- and is
+-- otherwise unreachable in a running game (CR 104.2a).
 --
 -- An answer outside the candidate list is a broken interpreter, not a game state,
 -- and degrades to the first candidate -- the same value Replay.defaultAnswer gives
@@ -1144,7 +1179,7 @@ designateDefenders = do
       Nothing -> pure ()
       Just candidates -> do
         chosen <-
-          if GameSettings.attackMultiplePlayers (GameState.settings gs)
+          if GameSettings.attackOption (GameState.settings gs) == Just AttackOption.MultiplePlayers
             then -- CR 802.2: the action is taken and asks nothing. The whole
             -- candidate list is the answer, already in CR 802.4's APNAP order.
               pure (NonEmpty.toList candidates)
