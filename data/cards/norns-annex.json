@@ -1,0 +1,61 @@
+{
+  "faces": [
+    {
+      "attackCosts": [
+        {
+          "perAttacker": {
+            "type": "Fixed",
+            "value": {
+              "mana": [
+                {
+                  "type": "Phyrexian",
+                  "value": {
+                    "type": "White"
+                  }
+                }
+              ]
+            }
+          },
+          "scope": {
+            "type": "ControllerAndPlaneswalkers"
+          },
+          "subject": {
+            "type": "Matching",
+            "value": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "Phyrexian",
+          "value": {
+            "type": "White"
+          }
+        },
+        {
+          "type": "Phyrexian",
+          "value": {
+            "type": "White"
+          }
+        }
+      ],
+      "name": "Norn's Annex",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -872,9 +872,10 @@ everyManaType =
 --
 -- CR 107.4f's ways, and BOTH of CR 107.4e's hybrids' ways, are collapsed to ONE
 -- before payment by `announce`, which is what CR 601.2b calls for at CR 118.13a's
--- moment and Pawl.Engine.Resolve.payGatePaidBy at CR 118.13b's -- so those
--- enumerations reach payment only where nothing announced: a special action's
--- cost (CR 118.13c, #1990) and a cost to attack (CR 508.1j, #1991). The
+-- moment, Pawl.Engine.Resolve.payGatePaidBy at CR 118.13b's, the special actions
+-- at CR 118.13c's and Pawl.Engine.Cost.announceToll at CR 508.1j's and CR
+-- 509.1f's -- so those enumerations reach payment only where nothing announced,
+-- which is a mana ability's own activation cost (#2909). The
 -- colour/colour hybrid still gets a single way here rather than two, because both
 -- halves are one mana of a stated type: unannounced, they are one demand over two
 -- types, which is exactly the permission the symbol grants.
@@ -943,15 +944,16 @@ waysOf symbol = case symbol of
 --   1. LEAST LIFE first, by the sort. CR 107.4f's life is the resource that does
 --      not come back: an unspent pool empties every step (CR 500.5) and a land
 --      untaps. Conservative, and still pawl choosing -- which is why a cast, an
---      activation (`announce`, CR 118.13a) and a cost paid on resolution
---      (Pawl.Engine.Resolve.payGatePaidBy, CR 118.13b) all announce first and
---      reach this sort with no Phyrexian symbol left to order. A special action's
---      cost (#1990) and a cost to attack (#1991) have no such announcement.
+--      activation (`announce`, CR 118.13a), a cost paid on resolution
+--      (Pawl.Engine.Resolve.payGatePaidBy, CR 118.13b), a special action (CR
+--      118.13c) and a combat toll (Pawl.Engine.Cost.announceToll) all announce
+--      first and reach this sort with no Phyrexian symbol left to order. A mana
+--      ability's own activation cost has no such announcement (#2909).
 --   2. Among equal life, FEWEST UNITS, which waysOf's per-symbol order already
 --      gives and a STABLE sort preserves. Pawl choosing again, and reached on the
 --      same terms: every announcing site above clears its monocolored hybrids
---      first, so only those same two unannounced costs arrive here with a {2/X}
---      to order (#1990, #1991).
+--      first, so only that same unannounced cost arrives here with a {2/X} to
+--      order (#2909).
 --
 -- The sort is what makes rule 1 hold across symbols rather than within one: for
 -- {2/R}{G/P} the product alone would offer a 2-life way before a 0-life one.
@@ -1871,9 +1873,10 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
 -- keeps that order, so the head is the minimum.
 --
 -- This is the budget Pawl.Engine.Cost.payMana pays under. A cast, an activation
--- (`announce`, CR 118.13a) and a cost paid on resolution (CR 118.13b) have all
+-- (`announce`, CR 118.13a), a cost paid on resolution (CR 118.13b), a special
+-- action (CR 118.13c) and a combat toll (Pawl.Engine.Cost.announceToll) have all
 -- announced their Phyrexian symbols away by now, so this answers 0 for them; it
--- decides anything only where nothing announced (#1990, #1991).
+-- decides anything only where nothing announced (#2909).
 --
 -- Nothing committed and nothing claimed, unlike the gates: this runs DURING the
 -- payment, where the cost's components may already have been paid, so the whole

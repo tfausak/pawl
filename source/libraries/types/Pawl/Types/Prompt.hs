@@ -939,8 +939,10 @@ data Prompt r where
   ChooseToPay :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> ClauseIndex.ClauseIndex -> Cost.Cost Keyword.Keyword -> Prompt PaymentDecision.PaymentDecision
   -- | CR 601.2b: whether 2 life or a coloured mana pays each Phyrexian symbol.
   -- CR 118.13a puts the choice here rather than at payment for a cast and an
-  -- activation, and CR 118.13b puts it immediately before a resolution-time
-  -- cost is paid (Pawl.Engine.Resolve.payGatePaidBy). The ManaSymbol is the
+  -- activation; CR 118.13b puts it immediately before a resolution-time cost
+  -- is paid (Pawl.Engine.Resolve.payGatePaidBy) and CR 118.13c before a
+  -- special action's; a combat toll asks at the same moment
+  -- (Pawl.Engine.Cost.announceToll). The ManaSymbol is the
   -- symbol itself, so two symbols of different colours are distinguishable and
   -- CR 107.4f's hybrid Phyrexian symbol is sayable here at all.
   --
@@ -955,8 +957,9 @@ data Prompt r where
   -- and the same 2 life. Elided when only one route is payable.
   AnnouncePhyrexianPayment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ManaSymbol.ManaSymbol -> NonEmpty.NonEmpty PhyrexianPayment.PhyrexianPayment -> Prompt PhyrexianPayment.PhyrexianPayment
   -- | CR 601.2b: the nonhybrid equivalent cost for CR 107.4e's MONOCOLORED
-  -- hybrid ({2/R}), whose two ways spend a different NUMBER of mana. CR 118.13a
-  -- and CR 118.13b put the choice here rather than at payment. The ManaType is
+  -- hybrid ({2/R}), whose two ways spend a different NUMBER of mana. All three
+  -- of rule 118.13's moments put the choice here rather than at payment, and so
+  -- does a combat toll (Pawl.Engine.Cost.announceToll). The ManaType is
   -- the symbol's own stated type, so a {2/R} and a {2/G} are distinguishable.
   -- The colour/colour hybrid is AnnounceHybridHalf, whose two ways are two mana
   -- types rather than a type against generic mana.

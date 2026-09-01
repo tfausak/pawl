@@ -58,6 +58,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -3479,6 +3480,19 @@ stillThere oids gs = length (filter (\oid -> Set.member oid (GameState.battlefie
 -- other way -- Exalted Dragon sacrifices one rather than tapping it (CR 508.1h),
 -- so a land that is GONE is that toll's trace and a land that is TAPPED is the
 -- other's.
+-- Answers CR 107.4f's mana-or-life announcement with `way` wherever it is on
+-- offer, and defers everything else to S.aggressiveAnswer -- Pawl.ManaSpec's
+-- `announces`, duplicated rather than hoisted.
+--
+-- The fall-through matters to the case that uses it: on a board offering only
+-- one route this answers the same way whatever `way` says, so two legs that
+-- DIFFER are two legs that were each asked.
+announcesWay :: PhyrexianPayment.PhyrexianPayment -> Prompt.Prompt r -> r
+announcesWay way p = case p of
+  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers ->
+    if elem way (NonEmpty.toList offers) then way else NonEmpty.head offers
+  _ -> S.aggressiveAnswer p
+
 attackCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
   Spec.it s "CR 508.1h/508.1j attacking under a Ghostly Prison costs {2}, and the mana is paid" $ do
@@ -3489,6 +3503,37 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
         after = S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.alice)
     Spec.assertEqWith s "the Piker really was declared" (S.attackerDeclarationsOf after) mine
     Spec.assertBool s (allTapped forests after) "CR 508.1j: both Forests paid for it"
+  Spec.it s "CR 508.1j the way the attacker's controller announced is the way the toll is paid" $ do
+    -- The choice rule 118.13 does not state a moment for. Its three moments are a
+    -- cast or an activation (118.13a), a cost paid during a resolution (118.13b)
+    -- and a special action (118.13c); CR 508.1j's toll is none of them, and the
+    -- choice is still the payer's, so Cost.announceToll asks immediately before
+    -- CR 508.1i's window opens.
+    --
+    -- Norn's Annex is the card, {3}{W/P}{W/P} Artifact, "Creatures can't attack
+    -- you or planeswalkers you control unless their controller pays {W/P} for
+    -- each of those creatures" -- the only printing whose attack- or
+    -- block-declaration cost holds a symbol payable in more than one way.
+    --
+    -- ONE Plains and twenty life, so both of CR 107.4f's routes are payable and
+    -- the two legs differ in nothing but the answer. The Plains is what makes it
+    -- a real prompt: with no white source `announcesWay` would fall through to
+    -- the single life offer and both legs would read the same.
+    annex <- S.printingOf s registry "Norn's Annex"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, lands) = imprisoning annex plains S.bob [piker] 1
+        legOf way = S.runPure (announcesWay way) gs (Combat.declareAttackers S.alice)
+        manaLeg = legOf PhyrexianPayment.PaysMana
+        lifeLeg = legOf PhyrexianPayment.PaysLife
+    Spec.assertBool s (allTapped lands manaLeg) "CR 107.4f the mana route was announced, so the Plains paid"
+    Spec.assertEqWith s "and alice's life is untouched" (S.lifeOf S.alice manaLeg) (Just 20)
+    Spec.assertEqWith s "CR 107.4f the life route was announced on the same board, so alice paid 2 life" (S.lifeOf S.alice lifeLeg) (Just 18)
+    Spec.assertBool s (allUntapped lands lifeLeg) "and the Plains is still untapped"
+    -- Both legs PAID, so the difference above is the announcement and not one leg
+    -- failing CR 508.1j and rewinding the declaration.
+    Spec.assertEqWith s "CR 508.1k the mana leg's Piker attacks" (S.attackerDeclarationsOf manaLeg) mine
+    Spec.assertEqWith s "and so does the life leg's" (S.attackerDeclarationsOf lifeLeg) mine
   Spec.it s "CR 508.1 the same board WITHOUT the Prison pays nothing" $ do
     -- The control for the test above, and the reason it is not vacuous: attacking
     -- is free by default (CR 508.1f: "tapping a creature when it's declared as an

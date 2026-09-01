@@ -102,7 +102,13 @@ ignore pid oid = do
   case ignoreCostOf oid before of
     Nothing -> pure ()
     Just cost -> do
-      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid cost
+      -- CR 118.13c, Pawl.Engine.FaceDown.turnFaceUp's announcement and for its
+      -- reasons. CR 116.2d's cost is the ignoring permanent's own printed one,
+      -- and nothing in `data/cards/` prints a hybrid or Phyrexian symbol in
+      -- one, so no prompt is raised today. A printing that did would be the
+      -- one to refute that.
+      (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure cost
+      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
         Payment.Unpaid -> State.put before
         -- The payment's bound slots are dropped: CR 116.2d's special action puts

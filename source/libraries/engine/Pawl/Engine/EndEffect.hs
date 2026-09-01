@@ -89,7 +89,13 @@ endEffect pid oid = do
   case offerToEnd oid before of
     Nothing -> pure ()
     Just offer -> do
-      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid (PaidExpiry.cost offer)
+      -- CR 118.13c, Pawl.Engine.FaceDown.turnFaceUp's announcement and for its
+      -- reasons. CR 116.2c's cost comes off the stored effect, and nothing in
+      -- `data/cards/` writes a hybrid or Phyrexian symbol into one, so no
+      -- prompt is raised today. A printing that did would be the one to
+      -- refute that.
+      (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (PaidExpiry.cost offer)
+      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
         Payment.Unpaid -> State.put before
         Payment.Paid _ -> State.modify' (Expiry.dropWhenPaidBy oid)
