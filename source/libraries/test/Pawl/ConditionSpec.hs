@@ -3,7 +3,8 @@
 
 -- Covers Pawl.Engine.Condition, Pawl.Types.Condition and Pawl.Types.Comparison,
 -- including what Condition.holds makes of Pawl.Engine.Quantity's IsMonarch,
--- EnteredThisTurn, EnteredFrom, WasCastFrom, WasToken and WasBlocking.
+-- EnteredThisTurn, EnteredFrom, WasCastFrom, WasToken, WasBlocking and
+-- DamageDealtToThisTurn.
 module Pawl.ConditionSpec where
 
 import qualified Data.Map as Map
@@ -30,6 +31,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -39,6 +41,7 @@ import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
@@ -530,6 +533,87 @@ lastKnownBlockingSpec s registry =
             Spec.assertEqWith s "off a Prowler that was never blocking" (fmap Filter.blocking (Projection.viewWithLastKnownAnywhere declared prowlerId)) (Just False)
             Spec.assertEqWith s "and died the same way" (Set.member prowlerId (GameState.battlefield killed)) False
 
+-- Aims a target slot at one OBJECT by filtering the offered set, `bouncing`'s
+-- shape for a slot that must be answered: a hand-built recipient could miss CR
+-- 608.2b's re-read, and a fixture that merely PREFERS the victim would repair a
+-- mutation by finding another legal target.
+damaging :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+damaging victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter ((== Just victim) . Recipient.objectOf) candidates) sets
+  _ -> S.identityAnswer p
+
+-- Its player-shaped twin, for CR 120.1's fourth recipient.
+damagingPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+damagingPlayer pid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter (== Recipient.ToPlayer pid) candidates) sets
+  _ -> S.identityAnswer p
+
+-- CR 120.1 / 608.2i read on CR 603.4's intervening "if", for a creature CR 400.7
+-- has already deleted.
+--
+-- Burning-Eye Zubera {2}{R}{R} 3/3 Zubera Spirit: "When this creature dies, if 4
+-- or more damage was dealt to it this turn, this creature deals 3 damage to any
+-- target." (data/cards/burning-eye-zubera.json; Oracle text checked against
+-- api.scryfall.com, 2026-09-01.)
+--
+-- CR 608.2i and not CR 608.2h: "was dealt this turn" looks back in time, so the
+-- answer comes off GameState.events, which the death does not touch, rather than
+-- off a Pawl.Types.LastKnown field. Object.damage could not answer it either --
+-- CR 400.7 deletes the object the marks were on.
+--
+-- The two legs are one board differing in ONE thing: alice's Prodigal Sorcerer
+-- pings the Zubera or the Hill Giant standing beside it. The same Lightning Bolt
+-- kills the Zubera in both (CR 704.5g -- 3 damage is lethal to a 3/3, marked or
+-- pinged), so the 3 damage alice takes cannot be the kill's doing; only the
+-- ping's one point moves the turn's total from 3 to 4.
+damageDealtToItSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+damageDealtToItSpec s registry =
+  let run sorcerer zubera giant mountain bolt pingsZubera k =
+        case Face.activatedAbilities (S.combinedFace sorcerer) of
+          ping : _ ->
+            let (sorcererId, gs1) = S.addCreature sorcerer S.alice (S.landsInPlay mountain 1)
+                (zuberaId, gs2) = S.addCreature zubera S.bob gs1
+                (giantId, gs3) = S.addCreature giant S.bob gs2
+                (staged, boltId) = S.handOne bolt gs3
+                ready = staged {GameState.priority = Just S.alice}
+                pingedAt = if pingsZubera then zuberaId else giantId
+                pinged = S.runPure (damaging pingedAt) ready (do Activate.activateAbility S.alice sorcererId ping; Stack.resolveTop)
+                cast = S.runPure (damaging zuberaId) pinged (S.cast S.alice boltId)
+                killed = S.settleSba (S.runPure (damaging zuberaId) cast Stack.resolveTop)
+                onStack = S.runPure (damagingPlayer S.alice) killed Engine.settleForPriority
+             in k zuberaId pinged killed onStack (S.runPure S.identityAnswer onStack Stack.resolveTop)
+          [] -> Spec.assertFailure s "Prodigal Sorcerer should print an activated ability"
+   in Spec.describe s "DamageDealtToThisTurn" $ do
+        -- THE PROVING TEST for #992. Nothing on the board can be asked how much
+        -- damage the Zubera took: CR 400.7 deleted the object its marks were on.
+        Spec.it s "CR 608.2i a Zubera dealt 4 damage before it died deals 3 to alice" $ do
+          sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+          zubera <- S.printingOf s registry "Burning-Eye Zubera"
+          giant <- S.printingOf s registry "Hill Giant"
+          mountain <- S.printingOf s registry "Mountain"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          run sorcerer zubera giant mountain bolt True $ \zuberaId pinged killed onStack after -> do
+            Spec.assertEqWith s "alice took the Zubera's 3 damage, so CR 603.4's clause was true" (S.lifeOf S.alice after) (Just 17)
+            -- The preconditions, after the behaviour so none of them can absorb a
+            -- mutation of the atom.
+            Spec.assertEqWith s "off a Zubera the ping really had damaged first" (S.damageOf zuberaId pinged) (Just 1)
+            Spec.assertEqWith s "which really did die" (Set.member zuberaId (GameState.battlefield killed)) False
+            Spec.assertEqWith s "with its trigger on the stack before it resolved" (length (GameState.stack onStack)) 1
+
+        -- The negative's twin, one difference: the Sorcerer pings the Hill Giant
+        -- instead, so the Zubera is dealt 3 this turn rather than 4.
+        Spec.it s "CR 603.4 the same Zubera dealt only 3 deals nothing" $ do
+          sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+          zubera <- S.printingOf s registry "Burning-Eye Zubera"
+          giant <- S.printingOf s registry "Hill Giant"
+          mountain <- S.printingOf s registry "Mountain"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          run sorcerer zubera giant mountain bolt False $ \zuberaId pinged killed onStack after -> do
+            Spec.assertEqWith s "alice is untouched at 20" (S.lifeOf S.alice after) (Just 20)
+            Spec.assertEqWith s "off a Zubera nothing had pinged" (S.damageOf zuberaId pinged) (Just 0)
+            Spec.assertEqWith s "which died the same way" (Set.member zuberaId (GameState.battlefield killed)) False
+            Spec.assertEqWith s "and nothing was gathered onto the stack" (length (GameState.stack onStack)) 0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   Spec.describe s "Exactly" $ do
@@ -610,3 +694,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   interveningRecheckSpec s registry
   lastKnownTokenSpec s registry
   lastKnownBlockingSpec s registry
+  damageDealtToItSpec s registry

@@ -596,6 +596,22 @@ data Quantity
     --
     -- A LEAF, like LifeTotal, Speed and CardsDiscardedThisTurn: it holds no Quantity.
     PlayersDealtDamageThisTurn PlayerRef.PlayerRef
+  | -- | CR 120.1 / 608.2i: how much damage was dealt this turn to the object this
+    -- quantity is evaluated against -- Burning-Eye Zubera's "if 4 or more damage
+    -- was dealt to it this turn", asked of a creature CR 400.7 has already
+    -- deleted.
+    --
+    -- A total of the AMOUNTS and not a tally of the events, LifeGainedThisTurn's
+    -- shape rather than PlayersDealtDamageThisTurn's, because "4 or more damage"
+    -- is a quantity of damage and two Lightning Bolts are one event apiece.
+    --
+    -- Read off the event log and never off Object.damage, so it answers for the
+    -- three cases where the two part company: CR 120.6's regeneration and
+    -- cleanup remove the marks, and CR 120.3d marks none at all for wither and
+    -- infect.
+    --
+    -- A LEAF, like WasToken and WasBlocking: it holds no Quantity.
+    DamageDealtToThisTurn
   | -- | CR 601.2i / 608.2i: how many spells that player cast during the turn just
     -- ended -- Daybreak Ranger's "if no spells were cast last turn" and Nightfall
     -- Predator's "if a player cast two or more spells last turn".

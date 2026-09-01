@@ -262,6 +262,13 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.WasBlocking
       " {\"type\":\"WasBlocking\"} "
+  -- CR 120.1's damage total, on the wire the same way and for the same reason.
+  Spec.it s "DamageDealtToThisTurn" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.DamageDealtToThisTurn
+      " {\"type\":\"DamageDealtToThisTurn\"} "
   -- CR 122.1, with BOTH halves on the wire: a PlayerRef saying whose and a
   -- PlayerCounterKind saying which. Rule 728.1's reading is the Relative one.
   Spec.it s "PlayerCounters, relative and from a slot" $ do
