@@ -41,6 +41,7 @@ import Pawl.Types.Combat (Combat)
 import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -66,11 +67,11 @@ emptyCombat =
       Combat.declaredBlockers = Set.empty,
       Combat.blockersDeclared = False,
       Combat.attackingNothing = Set.empty,
-      Combat.defender = Nothing
+      Combat.defenders = []
     }
 
 -- CR 511.3: as the end of combat step ends, everything is removed from combat.
--- Combat.defender is reset alongside on CR 506.2's authority (the designation is
+-- Combat.defenders is reset alongside on CR 506.2's authority (the designation is
 -- scoped to the combat phase) and Combat.blockersDeclared on CR 506.7c's (the
 -- next combat phase asks CR 506.7b's question afresh).
 --
@@ -107,16 +108,25 @@ skipEmptyCombat gs =
     else gs
 
 -- CR 506.2a: the candidates the attacking player chooses from (CR 102.1, CR
--- 806.1). Not implemented: CR 102.3's teammates, pawl having no teams (#175).
+-- 806.1), and under CR 802.2 the defending players themselves -- the whole list
+-- rather than one of it. Not implemented: CR 102.3's teammates, pawl having no
+-- teams (#175).
 --
--- SEATING order (CR 103.1), not player-id order, so the first candidate is the
--- next seat rather than the lowest id.
+-- APNAP order (CR 101.4), not player-id order, so the first entry is the next
+-- seat rather than the lowest id -- and so that designateDefenders can hand the
+-- list to Combat.defenders unchanged, CR 802.4 and CR 802.5 both reading it in
+-- that order. Game.apnapOrder is the SEATING roster rotated, so it still names
+-- a departed seat; stillPlaying is what drops one.
 attackableOpponents :: GameState -> [PlayerId]
-attackableOpponents gs = filter (/= GameState.activePlayer gs) (Game.stillPlayingInOrder gs)
+attackableOpponents gs =
+  let playing = Game.stillPlaying gs
+      active = GameState.activePlayer gs
+   in filter (\pid -> pid /= active && List.elem pid playing) (Game.apnapOrder gs)
 
--- CR 508.1b: what the active player may announce a chosen creature is attacking --
--- which player, planeswalker or battle. CR 506.2's second sentence is the same
--- list scoped to a two-player game.
+-- CR 508.1b: what the active player may announce a chosen creature is attacking,
+-- for ONE defending player -- which player, planeswalker or battle. CR 506.2's
+-- second sentence is the same list scoped to a two-player game, and
+-- declarableTargets is CR 802.3's, over every defending player.
 --
 -- The defending player is FIRST, the one candidate that exists on every board, so
 -- an interpreter taking the head gets what Replay.defaultAnswer's fallback gives.
@@ -124,9 +134,6 @@ attackableOpponents gs = filter (/= GameState.activePlayer gs) (Game.stillPlayin
 -- re-asking this filter is HALF of CR 506.4's removal, the other half being the
 -- record noteAttackingNothing keeps so that a removal already sampled cannot be
 -- re-derived away.
---
--- Not implemented: CR 802's attack-multiple-players option, which would put a
--- second player on this list (#175).
 attackTargets :: PlayerId -> GameState -> NonEmpty.NonEmpty AttackTarget.AttackTarget
 attackTargets defender gs =
   AttackTarget.OfPlayer defender
@@ -154,6 +161,44 @@ attackableBattles defender gs =
   let protects oid = Battle.protectorOf oid gs == Just defender
       isOne oid = Battle.isBattle (Projection.project oid gs)
    in filter (\oid -> protects oid && isOne oid) (Set.toAscList (GameState.battlefield gs))
+
+-- CR 802.2a: which defending player an ATTACK TARGET names, or Nothing where it
+-- names none of them -- a planeswalker or battle CR 506.4 has removed from
+-- combat, or a player who has left the game (CR 800.4e).
+--
+-- Defender.playerOf is the same question asked of a creature's ability, and the
+-- two arms come apart on purpose: that one must answer a seat for CR 702.19e's
+-- trampler even once the planeswalker is gone, where this one is a partition of
+-- the attackers over the defending players and must answer nobody rather than
+-- guess. So this reads the CANDIDATE LISTS -- the same ones CR 508.1b drew the
+-- declaration from -- and Defender.playerOf reads the combat record.
+targetDefender :: AttackTarget.AttackTarget -> GameState -> Maybe PlayerId
+targetDefender target gs = case target of
+  AttackTarget.OfPlayer pid -> if List.elem pid (Defender.defendingPlayers gs) then Just pid else Nothing
+  AttackTarget.OfPlaneswalker pw -> List.find (\d -> List.elem pw (attackablePlaneswalkers d gs)) (Defender.defendingPlayers gs)
+  AttackTarget.OfBattle battle -> List.find (\d -> List.elem battle (attackableBattles d gs)) (Defender.defendingPlayers gs)
+
+-- CR 802.4a: the attacking creatures one defending player may block -- the ones
+-- attacking them, a planeswalker they control, or a battle they protect. Every
+-- attacker wherever one player defends, which is what keeps CR 509.1 a special
+-- case of CR 802.4a rather than a second rule.
+--
+-- CR 802.4b is the same list read the other way: the ceiling and the legality
+-- check below are handed it, so a defending player's blocks are judged ignoring
+-- creatures attacking anyone else.
+--
+-- An attacker whose target names NO defending player is offered to every one of
+-- them rather than to none, which keeps CR 506.4c's creature -- still attacking,
+-- attacking nothing -- blockable exactly as it was before this list narrowed.
+-- Not implemented: narrowing that creature to the one player CR 802.2a says it
+-- is still attacking, which needs the per-attacker record #2841 describes.
+attackersOn :: PlayerId -> GameState -> [ObjectId]
+attackersOn pid gs =
+  let recorded = Combat.attackers (GameState.combat gs)
+      mine oid = case Map.lookup oid recorded of
+        Nothing -> False
+        Just target -> Maybe.maybe True (== pid) (targetDefender target gs)
+   in filter mine (Map.keys recorded)
 
 -- CR 506.4: is this planeswalker still one that is being attacked -- or has it
 -- been removed from combat since the declaration?
@@ -873,7 +918,8 @@ blockCeiling pid gs = blockCeilingGiven (Projection.controlGrants gs) (Projectio
 
 blockCeilingGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> (Map (ObjectId, ObjectId) Natural, Map ObjectId (Set ObjectId))
 blockCeilingGiven grants pcs pid gs =
-  let attackers = Map.keys (Combat.attackers (GameState.combat gs))
+  -- CR 802.4b: judged ignoring any creature attacking anyone else.
+  let attackers = attackersOn pid gs
       candidates = legalBlockersGiven grants pcs pid gs
       -- One walk for the whole search: CR 509.1b's pairwise restrictions are
       -- decided once here and read by every pair `able` judges.
@@ -909,7 +955,10 @@ legalBlockDeclaration :: PlayerId -> Map ObjectId (Set ObjectId) -> GameState ->
 legalBlockDeclaration pid declaration gs =
   let grants = Projection.controlGrants gs
       pcs = Projection.projectAll gs
-      attackers = Map.keys (Combat.attackers (GameState.combat gs))
+      -- CR 802.4b: judged ignoring any creature attacking anyone else, which is
+      -- also CR 802.4a's restriction -- pairAllowedGiven refuses a pair whose
+      -- attacker is not on this list.
+      attackers = attackersOn pid gs
       candidates = legalBlockersGiven grants pcs pid gs
       -- One walk for the whole search: CR 509.1b's pairwise restrictions are
       -- decided once here and read by every pair `able` judges.
@@ -1058,23 +1107,30 @@ noteAttackingNothing gs =
       gone = Map.keysSet (Map.filter removed (Combat.attackers c))
    in gs {GameState.combat = c {Combat.attackingNothing = Set.union gone (Combat.attackingNothing c)}}
 
--- CR 507.1 / CR 703.4h: immediately after the beginning of combat step begins,
--- the active player chooses one of their opponents, and that player becomes the
--- defending player. The turn-based action does not use the stack (CR 507.1), which
--- is why this is a plain Game () and not an ability. It runs before any trigger by
--- construction: Engine.runStep calls runTurnBasedActions before priorityLoop.
+-- CR 703.4h: immediately after the beginning of combat step begins, who is
+-- defending this combat phase is settled. Under CR 802.2 nothing is chosen and
+-- every one of the attacking player's opponents is a defending player; otherwise
+-- CR 507.1 has the active player choose one of them. The turn-based action does
+-- not use the stack (CR 507.1), which is why this is a plain Game () and not an
+-- ability. It runs before any trigger by construction: Engine.runStep calls
+-- runTurnBasedActions before priorityLoop.
 --
--- Not prompted with one candidate: CR 507.1's condition is a multiplayer
--- game, and a two-player game's defending player is CR 506.2's nonactive player.
--- No candidates leaves the field Nothing, which declareAttackers reads through
+-- CR 703.4h's own condition is what makes one function of the two: the rule asks
+-- for a choice only "in which the active player's opponents don't all
+-- automatically become defending players", which is exactly the negation of CR
+-- 802.2. A two-player game takes the CR 802.2 branch on the default settings and
+-- the CR 507.1 branch otherwise, and the two agree there: CR 506.2's nonactive
+-- player is the one candidate, so no prompt is issued either way.
+--
+-- No candidates leaves the field empty, which declareAttackers reads through
 -- Defender.defendingPlayers as no attack being possible; unreachable in a
 -- running game (CR 104.2a).
 --
 -- An answer outside the candidate list is a broken interpreter, not a game state,
 -- and degrades to the first candidate -- the same value Replay.defaultAnswer gives
 -- this prompt. The two must agree, since neither path can observe the other.
-chooseDefender :: Game ()
-chooseDefender = do
+designateDefenders :: Game ()
+designateDefenders = do
   gs <- State.get
   let pid = GameState.activePlayer gs
   -- Not implemented: CR 800.4h's handing of this choice to the next player in turn
@@ -1087,17 +1143,23 @@ chooseDefender = do
     case NonEmpty.nonEmpty (attackableOpponents gs) of
       Nothing -> pure ()
       Just candidates -> do
-        chosen <- case candidates of
-          only NonEmpty.:| [] -> pure only
-          _ -> do
-            let decider = Decide.deciderFor pid gs
-            answer <- Game.choose (Prompt.ChooseDefender decider pid candidates)
-            pure $
-              if List.elem answer (NonEmpty.toList candidates)
-                then answer
-                else NonEmpty.head candidates
+        chosen <-
+          if GameSettings.attackMultiplePlayers (GameState.settings gs)
+            then -- CR 802.2: the action is taken and asks nothing. The whole
+            -- candidate list is the answer, already in CR 802.4's APNAP order.
+              pure (NonEmpty.toList candidates)
+            else case candidates of
+              only NonEmpty.:| [] -> pure [only]
+              _ -> do
+                let decider = Decide.deciderFor pid gs
+                answer <- Game.choose (Prompt.ChooseDefender decider pid candidates)
+                pure
+                  [ if List.elem answer (NonEmpty.toList candidates)
+                      then answer
+                      else NonEmpty.head candidates
+                  ]
         State.modify' $ \g ->
-          g {GameState.combat = (GameState.combat g) {Combat.defender = Just chosen}}
+          g {GameState.combat = (GameState.combat g) {Combat.defenders = chosen}}
 
 -- CR 508.1b's announcement for ONE creature, and CR 508.4's choice for one
 -- creature put onto the battlefield attacking -- the same question, so one
@@ -1106,7 +1168,7 @@ chooseDefender = do
 -- Not prompted with one candidate, which is CR 508.1b's own condition: the rule
 -- calls for an announcement only when the defending player controls a planeswalker
 -- or battle, or the game allows attacking multiple players. An out-of-list answer
--- degrades to the first candidate, the defending player -- chooseDefender's
+-- degrades to the first candidate, the defending player -- designateDefenders'
 -- posture and Replay.defaultAnswer's value for this prompt.
 announceAttackTarget :: PlayerId -> ObjectId -> NonEmpty.NonEmpty AttackTarget.AttackTarget -> Game AttackTarget.AttackTarget
 announceAttackTarget pid oid options = case options of
@@ -1141,11 +1203,12 @@ declareAttackers pid = do
   -- active player (CR 800.4j), or it found no opponents. Never a place to
   -- recompute one.
   --
-  -- ONE defending player is passed on, which is all CR 507.1 ever names. CR
-  -- 802.3 is what would widen the announcement to every defender's players,
-  -- planeswalkers and battles.
-  Monad.forM_ (Maybe.listToMaybe (Defender.defendingPlayers gs)) $ \defender ->
-    attemptAttackDeclaration pid defender Set.empty
+  -- ONE declaration over EVERY defending player, which is CR 802.3a's own
+  -- shape: each creature chooses whom it attacks (CR 802.3, through
+  -- declarableTargets), and the entire group of attacking creatures is still
+  -- judged as a whole.
+  Monad.unless (null (Defender.defendingPlayers gs)) $
+    attemptAttackDeclaration pid Set.empty
 
 -- One attempt at CR 508.1's declaration, plus the preamble's retry. Two steps can
 -- make the attempt fail: CR 508.1c/508.1d judge the declaration illegal, and CR
@@ -1166,11 +1229,15 @@ declareAttackers pid = do
 --
 -- No legal attackers means no prompt: declining is then the only legal answer, CR
 -- 508.1d's instances being minted from the candidate list.
-attemptAttackDeclaration :: PlayerId -> PlayerId -> Set (Map ObjectId AttackTarget.AttackTarget) -> Game ()
-attemptAttackDeclaration pid defender rejected = do
+attemptAttackDeclaration :: PlayerId -> Set (Map ObjectId AttackTarget.AttackTarget) -> Game ()
+attemptAttackDeclaration pid rejected = do
   gs <- State.get
   let candidates = legalAttackers pid gs
-  Monad.unless (null candidates) $ do
+  -- CR 508.1b / CR 802.3's candidates -- every defending player's own seat,
+  -- planeswalkers and battles -- taken ONCE and from the state the declaration
+  -- is judged against. Empty is a combat with no defending player, which
+  -- declareAttackers has already excluded on the engine's path.
+  Monad.unless (null candidates) . Monad.forM_ (NonEmpty.nonEmpty (declarableTargets gs)) $ \targets -> do
     let decider = Decide.deciderFor pid gs
     chosen <- Game.choose (Prompt.DeclareAttackers decider pid candidates)
     -- Filtered, not trusted: an interpreter cannot attack with a creature
@@ -1180,9 +1247,6 @@ attemptAttackDeclaration pid defender rejected = do
         -- fold below would otherwise record a creature's declaration twice and
         -- make CR 506.5's count disagree with it.
         offered = List.nub (filter isCandidate chosen)
-        -- CR 508.1b's candidates, taken ONCE and from the state the
-        -- declaration is judged against.
-        targets = attackTargets defender gs
     -- CR 508.1b: the announcement, one question per chosen creature, in the
     -- rule's own order -- BEFORE CR 508.1c's restrictions and CR 508.1d's
     -- requirements, which is what a requirement naming its object (Alluring
@@ -1213,7 +1277,7 @@ attemptAttackDeclaration pid defender rejected = do
     -- CombatEffectSpec's "CR 508.1d an illegal declaration is rewound and asked
     -- again, not replaced by the ceiling's" is the proof.
     if not allowed && again
-      then attemptAttackDeclaration pid defender (Set.insert proposal rejected)
+      then attemptAttackDeclaration pid (Set.insert proposal rejected)
       else do
         -- A declaration already rewound once and offered again degrades to
         -- forcedAttackDeclaration. The whole answer is replaced rather than
@@ -1349,7 +1413,7 @@ attemptAttackDeclaration pid defender rejected = do
             -- declaration is made again: two Pikers under a Ghostly Prison
             -- become one" is the proof; the case beside it is what a repeated
             -- answer does instead.
-            Monad.when again (attemptAttackDeclaration pid defender (Set.insert proposal rejected))
+            Monad.when again (attemptAttackDeclaration pid (Set.insert proposal rejected))
           else
             -- CR 508.1k: each chosen creature becomes an attacking creature. After
             -- the payment, which is the rules' own order.
@@ -1365,9 +1429,11 @@ attemptAttackDeclaration pid defender rejected = do
               -- The event also carries CR 506.5's count of this declaration, the
               -- same on every event of the batch, and CR 508.5's defending player,
               -- computed per creature because CR 508.5a resolves the phrase through
-              -- what each creature is attacking. Nothing reaches the `defender`
-              -- fallback: every target here came from attackTargets, and each of
-              -- the three arms answers a player for one of those.
+              -- what each creature is attacking -- which is CR 802.2a's narrowing,
+              -- and the reason this is not one seat for the batch. A creature
+              -- whose target names no player records no event: unreachable, every
+              -- target here came from declarableTargets, and each of the three
+              -- arms answers a player for one of those.
               --
               -- Not implemented: CR 508.3a's attacks-a-permanent form, which
               -- neither event below can be matched on -- it needs the target
@@ -1375,9 +1441,10 @@ attemptAttackDeclaration pid defender rejected = do
               -- defending player instead (#2279).
               State.modify'
                 ( \g ->
-                    let defendingFor oid = Maybe.fromMaybe defender ((\t -> Defender.playerOf t g) =<< Map.lookup oid recorded)
+                    let defendingFor oid = (\t -> Defender.playerOf t g) =<< Map.lookup oid recorded
                         declared = Natural.length attacking
-                     in List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid (defendingFor oid) declared)) h) g attacking
+                        record h oid = Maybe.maybe h (\d -> Event.recordEvent (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid d declared)) h) (defendingFor oid)
+                     in List.foldl' record g attacking
                 )
               -- CR 508.3b's arity, which is the declaration's rather than the
               -- creature's: one event per DISTINCT target, so a player five
@@ -1435,26 +1502,34 @@ attemptAttackDeclaration pid defender rejected = do
 -- the board AT THIS MOMENT, and CR 508.4d holds by construction: the creature gets
 -- no key in Combat.blockers.
 --
--- CR 508.4's CHOICE is prompted per permanent over CR 508.1b's candidates, which
--- Hanweir Garrison's and Meandering Towershell's rulings both require; elided at
--- one candidate.
+-- CR 508.4's CHOICE is prompted per permanent over CR 508.1b's candidates -- CR
+-- 802.3's every defending player included, this being the same announcement --
+-- which Hanweir Garrison's and Meandering Towershell's rulings both require;
+-- elided at one candidate.
 putOntoBattlefieldAttacking :: ObjectId -> Game ()
 putOntoBattlefieldAttacking oid = do
   gs <- State.get
   let c = GameState.combat gs
-  case (Maybe.listToMaybe (Defender.defendingPlayers gs), Projection.controllerOf oid gs) of
-    (Just defender, Just controller)
+      -- declarableTargets with CR 506.3c / CR 508.4a's liveness filter applied
+      -- to the defending players first: a player who has left the game is no
+      -- longer one to be put onto the battlefield attacking, and under CR 802.2
+      -- the others still are.
+      playing = Game.stillPlaying gs
+      targets =
+        concatMap
+          (\defender -> NonEmpty.toList (attackTargets defender gs))
+          (filter (\defender -> List.elem defender playing) (Defender.defendingPlayers gs))
+  case (NonEmpty.nonEmpty targets, Projection.controllerOf oid gs) of
+    (Just options, Just controller)
       | Set.member oid (GameState.battlefield gs),
         -- CR 506.3a
         isCreatureObject oid gs,
         -- CR 506.3b / CR 506.2: the attacking player is the active player
-        controller == GameState.activePlayer gs,
-        -- CR 506.3c / CR 508.4a
-        List.elem defender (Game.stillPlaying gs) -> do
+        controller == GameState.activePlayer gs -> do
           -- CR 508.4's chooser is the creature's controller, whom the guard above
           -- makes the attacking player -- which is what lets CR 508.1b's
           -- announcement and this one share a prompt.
-          target <- announceAttackTarget controller oid (attackTargets defender gs)
+          target <- announceAttackTarget controller oid options
           State.put
             gs
               { GameState.combat =
@@ -1525,11 +1600,12 @@ putOntoBattlefieldAttacking oid = do
 -- they control -- and it is re-read at CR 608.2b; Aetherplasm's slot is the
 -- attacker its own blocking trigger bound, which CR 509.1a already had attacking
 -- that same defending player, a planeswalker they control or a battle they
--- protect -- rule 506.3e's three cases exactly. So no board reaches this function with
--- an attacker that has left combat or one attacking somebody else. The second
--- becomes reachable under CR 802's attack-multiple-players (#175); the first
--- needs a card that removes the target from combat between targeting and
--- resolution.
+-- protect -- rule 506.3e's three cases exactly. So no board reaches this function
+-- with an attacker that has left combat or one attacking somebody else: the
+-- second is reachable in principle now that CR 802.2 gives a combat several
+-- defending players, but Aetherplasm's own trigger still binds an attacker its
+-- controller was allowed to block; the first needs a card that removes the
+-- target from combat between targeting and resolution.
 putOntoBattlefieldBlocking :: ObjectId -> ObjectId -> Game ()
 putOntoBattlefieldBlocking oid attacker = do
   gs <- State.get
@@ -1600,16 +1676,14 @@ putOntoBattlefieldBlocking oid attacker = do
             State.modify' (Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker controller 1)))
     _ -> pure ()
 
--- CR 509.1: the defending player declares blockers -- singular. The loop is over
--- at most one player, and Maybe.maybeToList is what makes "nobody is being
--- attacked" and "one player is" one code path.
+-- CR 509.1 / CR 802.4: each defending player declares blockers, in APNAP order
+-- (CR 101.4) -- the order Defender.defendingPlayers already comes back in. One
+-- player is the ordinary game and needs no special case.
 --
--- Not implemented: CR 802.4's APNAP declaration by several defending players and
--- CR 802.4a's restriction, both needing the attack-multiple-players option (#175).
---
--- CR 310.9c needs no clause of its own: this asks the defending player and nobody
--- else, and attackableBattles admits a battle only when that player is its
--- protector. Pawl.BattleSpec's pair of CR 310.9c cases is the proof.
+-- CR 310.9c needs no clause of its own: this asks each defending player about
+-- their own attackers and nobody else's, and attackableBattles admits a battle
+-- only when that player is its protector. Pawl.BattleSpec's pair of CR 310.9c
+-- cases is the proof.
 --
 -- No still-playing guard: at three or more seats CR 800.4a has removed a departed
 -- player's objects, so legalBlockers finds nothing. At two seats CR 800.4a never
@@ -1629,7 +1703,11 @@ declareBlockers = do
   let attacking = Map.keys (Combat.attackers (GameState.combat start))
   Monad.unless (null attacking) $ do
     Monad.forM_ (Defender.defendingPlayers start) $ \pid ->
-      attemptBlockDeclaration pid attacking Set.empty
+      -- CR 802.4a: those creatures can block only creatures attacking that
+      -- player, a planeswalker that player controls, or a battle that player
+      -- protects -- which is attackersOn's list, and is the whole of `attacking`
+      -- wherever one player defends.
+      attemptBlockDeclaration pid (attackersOn pid start) Set.empty
     -- CR 509.1h's other half, performed once CR 509.1g has assigned the blockers:
     -- every attacking creature the declaration named no blockers for became an
     -- UNBLOCKED creature. TriggerCondition.SelfAttacksUnblocked is the reader.

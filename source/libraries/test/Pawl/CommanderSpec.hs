@@ -568,7 +568,7 @@ commanderDamageSpec s registry = Spec.describe s "CommanderDamage" $ do
 brawlDuel :: Printing.Printing -> Printing.Printing -> GameState.GameState
 brawlDuel mine theirs =
   let empty = Setup.emptyGame S.bothPlayers
-      brawling = empty {GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = True}}
+      brawling = empty {GameState.settings = (GameState.settings empty) {GameSettings.brawl = True}}
    in intoPlay S.alice (designating [(S.alice, mine), (S.bob, theirs)] brawling)
 
 brawlSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()

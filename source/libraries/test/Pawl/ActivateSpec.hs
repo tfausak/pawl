@@ -1607,12 +1607,14 @@ printedActivationRestrictionSpec s registry = Spec.describe s "PrintedActivation
 kongmingBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 kongmingBoard piker contraptions sorcerer defender =
   let (gs0, _, theirs, _) = S.threePlayerCombat [piker] [contraptions, sorcerer] []
-      -- Combat.defender is STATED rather than run: CR 507.1's turn-based action
-      -- is what would fill it in, and a direct-call test never reaches it.
+      -- Combat.defenders is STATED rather than run: the beginning of combat
+      -- step's turn-based action is what would fill it in, and a direct-call
+      -- test never reaches it. ONE seat in it, so the declaration below has
+      -- exactly one target and CR 802.3's announcement is elided.
       ready =
         gs0
           { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-            GameState.combat = (GameState.combat gs0) {Combat.Type.defender = Just defender}
+            GameState.combat = (GameState.combat gs0) {Combat.Type.defenders = [defender]}
           }
       -- CR 508.1, then priority to bob -- who is the defending player on one of
       -- these two boards and a bystander on the other, which is the variable.
@@ -1633,6 +1635,9 @@ kongmingBoard piker contraptions sorcerer defender =
 kongmingAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 kongmingAnswer who p = case p of
   Prompt.ChooseDefender {} -> who
+  -- CR 802.3's announcement: with every opponent a defending player, saying who
+  -- defends is not enough -- each creature says whom it attacks.
+  Prompt.ChooseAttackTarget {} -> S.attackTo who p
   Prompt.DeclareBlockers {} -> Map.empty
   Prompt.ChooseAction _ _ options -> case filter isActivate options of
     a : _ -> a

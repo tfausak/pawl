@@ -290,22 +290,20 @@ inForce gs =
       -- source's controller (Armored Galleon, "can't attack unless defending
       -- player controls an Island"), so CR 802.2a's one specific defending player
       -- is supplied to Filter.ControlledByDefendingPlayer here. ONE read for the
-      -- whole combat rather than one per (creature, attack target) pair: CR 508.5a
-      -- determines the defending player individually for each attacking
-      -- creature, and the two readings coincide on every board pawl can build,
-      -- since Combat.attackTargets is derived from that one defender and
-      -- Defender.playerOf answers it on all three arms -- the OfPlayer arm IS
-      -- the defender, the OfPlaneswalker arm reads the designation, and
-      -- Combat.attackableBattles admits only battles that player protects. CR
-      -- 802's attack-multiple-players option is what would separate them, and
-      -- pawl has no options concept to read it from (#175).
+      -- whole combat rather than one per (creature, attack target) pair.
+      --
+      -- Not implemented: CR 802.3a's split, where a restriction or requirement
+      -- ABOUT attacking a specific player applies only to the creatures
+      -- attacking that player. This reads the FIRST defending player, which is
+      -- exact while one player defends and the wrong seat otherwise; the
+      -- candidate list Combat.canAttack is built from carries no attack target
+      -- to read a defending player off (#2842).
       --
       -- Nothing outside combat, which leaves the atom False (Filter.matches) and
       -- so leaves the restriction in force -- the honest answer, there being no
       -- attack to make and no defending player to name. Filled uniformly across
-      -- the arms rather than only on CantAttack: CR 508.5 pins one defending
-      -- player per combat, so a block-side gate naming that player would read
-      -- the same seat.
+      -- the arms rather than only on CantAttack, for the same reason: one read
+      -- per combat, so a block-side gate naming that player reads the same seat.
       defending = Maybe.listToMaybe (Defender.defendingPlayers gs)
       lifted source changes restriction = case gate restriction of
         Nothing -> False

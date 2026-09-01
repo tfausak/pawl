@@ -413,10 +413,10 @@ runTurnBasedActions phase = do
       skip <- State.gets skipsDraw
       Monad.unless skip (Event.drawCard active)
     -- CR 703.4h: choose the defending player. The active player's action (CR
-    -- 507.1), so it takes the same guard -- redundantly, Combat.chooseDefender
+    -- 507.1), so it takes the same guard -- redundantly, Combat.designateDefenders
     -- computing the identical test, and kept so this arm still reads off CR
     -- 800.4j's enumeration above.
-    Phase.Combat CombatStep.BeginningOfCombat -> Monad.when hasActive Combat.chooseDefender
+    Phase.Combat CombatStep.BeginningOfCombat -> Monad.when hasActive Combat.designateDefenders
     Phase.Combat CombatStep.DeclareAttackers -> Monad.when hasActive (Combat.declareAttackers active)
     Phase.Combat CombatStep.DeclareBlockers -> Combat.declareBlockers
     Phase.Combat CombatStep.CombatDamage -> do

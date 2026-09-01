@@ -257,7 +257,7 @@ setupSpec s registry = Spec.describe s "Setup" $ do
 -- is untouched, so the Brawl legs above differ from their controls in exactly
 -- one thing.
 settingsOf :: Bool -> GameState.GameState -> GameState.GameState
-settingsOf brawl gs = gs {GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = brawl}}
+settingsOf brawl gs = gs {GameState.settings = (GameState.settings gs) {GameSettings.brawl = brawl}}
 
 greenBlackSetup :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
 greenBlackSetup s registry = do

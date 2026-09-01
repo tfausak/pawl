@@ -218,8 +218,10 @@ instances candidates targets gs =
       -- object takes above. The second mints one per target that IS another
       -- player: attacking a planeswalker or a battle is not attacking a player
       -- (CR 508.1b lists the three separately), so it obeys the first
-      -- requirement and not the second -- which is the only thing that makes the
-      -- second observable, pawl choosing ONE defending player per combat -- see #175.
+      -- requirement and not the second. CR 802.2's several defending players are
+      -- the other thing that makes the second observable: a goaded creature that
+      -- must attack a player other than its goader now has another player to
+      -- attack.
       --
       -- Per GOADER, since CR 701.15b names "the controller of the permanent,
       -- spell, or ability that caused it to be goaded" and two goaders exclude

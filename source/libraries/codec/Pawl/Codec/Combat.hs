@@ -14,13 +14,16 @@ import qualified Pawl.Types.Combat as Combat
 -- 'Common.naturalMap': a JSON object keyed by the decimal id rather than an array
 -- of entries, which is what keeps a written-out combat diffable.
 --
--- `struckFirst` and `defender` are 'Fields.required' over 'Common.maybe' rather
--- than 'Fields.defaulted', so the absent state is written as an explicit null.
--- For `struckFirst` that is load-bearing beyond taste: CR 510.4's Nothing means
--- the first combat damage step has not happened, while an empty set means it has
--- and nobody had first or double strike -- so a second combat damage step is due
--- in one case and already run in the other. An encoder folding the two together
--- would lose that, which is why each has its own case in the spec.
+-- `struckFirst` is 'Fields.required' over 'Common.maybe' rather than
+-- 'Fields.defaulted', so the absent state is written as an explicit null. That
+-- is load-bearing beyond taste: CR 510.4's Nothing means the first combat
+-- damage step has not happened, while an empty set means it has and nobody had
+-- first or double strike -- so a second combat damage step is due in one case
+-- and already run in the other. An encoder folding the two together would lose
+-- that, which is why it has its own case in the spec.
+--
+-- `defenders` is a LIST and not a set: CR 802.4 and CR 802.5 both read it in
+-- APNAP order, so the order is part of the value.
 codec :: Codec.Codec Combat.Combat
 codec = Fields.object $ do
   attackers <- Fields.required "attackers" (Common.naturalMap ObjectId.codec AttackTarget.codec) Combat.attackers
@@ -34,7 +37,7 @@ codec = Fields.object $ do
   declaredBlockers <- Fields.required "declaredBlockers" (Common.set ObjectId.codec) Combat.declaredBlockers
   blockersDeclared <- Fields.required "blockersDeclared" Common.boolean Combat.blockersDeclared
   attackingNothing <- Fields.required "attackingNothing" (Common.set ObjectId.codec) Combat.attackingNothing
-  defender <- Fields.required "defender" (Common.maybe PlayerId.codec) Combat.defender
+  defenders <- Fields.required "defenders" (Common.list PlayerId.codec) Combat.defenders
   pure
     Combat.MkCombat
       { Combat.attackers = attackers,
@@ -48,5 +51,5 @@ codec = Fields.object $ do
         Combat.declaredBlockers = declaredBlockers,
         Combat.blockersDeclared = blockersDeclared,
         Combat.attackingNothing = attackingNothing,
-        Combat.defender = defender
+        Combat.defenders = defenders
       }

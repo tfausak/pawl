@@ -2179,7 +2179,7 @@ departedAttackerSpec s registry =
                       -- Combat.blockers above.
                       Combat.Type.blockersDeclared = True,
                       Combat.Type.attackingNothing = Set.empty,
-                      Combat.Type.defender = Just S.bob
+                      Combat.Type.defenders = [S.bob]
                     }
               }
           gone = S.departs Departure.Type.Conceded S.alice fighting
@@ -2254,7 +2254,7 @@ departedDefenderSpec s registry =
                       -- which is the moment the comment above describes.
                       Combat.Type.blockersDeclared = False,
                       Combat.Type.attackingNothing = Set.empty,
-                      Combat.Type.defender = Just S.bob
+                      Combat.Type.defenders = [S.bob]
                     }
               }
           gone = S.departs Departure.Type.Conceded S.bob attacking
@@ -2306,7 +2306,7 @@ departedDefenderSpec s registry =
                       Combat.Type.declaredBlockers = Set.empty,
                       Combat.Type.blockersDeclared = True,
                       Combat.Type.attackingNothing = Set.empty,
-                      Combat.Type.defender = Just S.carol
+                      Combat.Type.defenders = [S.carol]
                     }
               }
           gone = S.departs Departure.Type.Conceded S.carol attacking

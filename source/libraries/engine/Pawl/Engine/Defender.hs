@@ -21,32 +21,30 @@ import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 
 -- CR 506.2 / CR 802.2: the players defending the combat in progress, in APNAP
--- order (CR 101.4) -- the order CR 802.4 has them declare blockers in. Empty
--- outside combat, and on a combat phase whose CR 507.1 turn-based action found
--- no opponent to name.
+-- order (CR 101.4) -- the order CR 802.4 has them declare blockers in and CR
+-- 802.5 has them assign combat damage in. Empty outside combat, and on a combat
+-- phase whose beginning-of-combat turn-based action found no opponent.
 --
 -- The one place the designation is read, so that CR 802's several defending
--- players arrive here rather than at each reader. Today it is exactly
--- Pawl.Types.Combat's defender field: CR 506.2 makes the nonactive player the
--- defending player in a two-player game and CR 507.1 names one opponent in the
--- games where it runs, so the list is a singleton or empty and its order is
--- trivial.
+-- players arrive here rather than at each reader. Exactly Pawl.Types.Combat's
+-- defenders field: the beginning of combat step settles the whole group, one
+-- player under CR 507.1 and every opponent under CR 802.2, so nothing is left
+-- for this function to derive.
 --
--- A LIST and not the field itself, because CR 802.2a denies that several
--- defending players can be folded into one: a reader wanting "a defending
--- player" wants one specific one, resolved per attacking creature from what
--- that creature is attacking (playerOf below), never the whole group.
---
--- Not implemented: CR 802's attack-multiple-players option, which is what makes
--- this list longer than one (#175).
+-- A LIST and not one player, because CR 802.2a denies that several defending
+-- players can be folded into one: a reader wanting "a defending player" wants
+-- one specific one, resolved per attacking creature from what that creature is
+-- attacking (playerOf below), never the whole group.
 defendingPlayers :: GameState -> [PlayerId]
-defendingPlayers gs = Maybe.maybeToList (Combat.defender (GameState.combat gs))
+defendingPlayers = Combat.defenders . GameState.combat
 
--- CR 508.5: the defending player an attacking creature's ability refers to --
--- "the player that creature is attacking, the controller of the planeswalker that
--- creature is attacking, or the protector of the battle that creature is
--- attacking". One arm per AttackTarget arm, because that rule's case split IS this
--- type's.
+-- CR 508.5 / CR 802.2a: the defending player an attacking creature's ability
+-- refers to -- "the player that creature is attacking, the controller of the
+-- planeswalker that creature is attacking, or the protector of the battle that
+-- creature is attacking". One arm per AttackTarget arm, because that rule's case
+-- split IS this type's, and it is the narrowing CR 802.2a demands: with several
+-- defending players "a defending player" is resolved here, per attacking
+-- creature, and never off the group.
 --
 -- CR 310.9d is the battle arm's other half, and it is wider than CR 508.5: while a
 -- battle is being attacked, EVERY rule and effect that refers to the defending
@@ -54,24 +52,20 @@ defendingPlayers gs = Maybe.maybeToList (Combat.defender (GameState.combat gs))
 -- rather than off the combat record is what makes that true of a battle whose
 -- controller is the attacking player -- the case CR 310.9b's "notably" creates.
 --
--- The planeswalker arm answers CR 508.5's BOTH sentences with the combat record's
--- defending player, and never asks the planeswalker. Both ways a target is
--- recorded draw it from Pawl.Engine.Combat.attackTargets -- CR 508.1b's
--- declaration and CR 508.4's entry -- and that list offers only planeswalkers the
--- defending player controls, so while the planeswalker is attacked its controller
--- IS that player. Once CR 506.4 removes it from combat the rule's second sentence
--- wants the controller it had "before it was removed from combat", which is the
--- same seat; reading the object instead answers NOBODY once CR 704.5i has buried
--- it, since the burial leaves no object to read a controller off, and answers the
--- owner on any board where the two seats differ. Pawl.CombatSpec's
--- LastKnownDefendingPlayer group is that board, built with a Confiscate. CR 702.19e
--- is what settles that a creature attacking a removed planeswalker still HAS a
--- defending player: it assigns damage to one.
---
--- CR 802's attack-multiple-players option is what would break the identity, since
--- several defending players make the record's one player the wrong answer for some
--- attacker; pawl has no options concept to read it from (#175), and this arm reads
--- the per-attacker record again when it arrives.
+-- Not implemented: CR 802.2a's answer for a creature whose PLANESWALKER has left
+-- combat. That arm answers the first defending player, which is exact while the
+-- list is a singleton and the wrong seat otherwise; this module sits below
+-- Pawl.Engine.Projection, so it cannot ask who controlled the planeswalker
+-- (#2841). While the planeswalker is still attacked the answer is right at any
+-- seat count without asking: both ways a target is recorded draw it from
+-- Pawl.Engine.Combat.attackTargets -- CR 508.1b's declaration and CR 508.4's
+-- entry -- and that list offers a defending player only their own planeswalkers,
+-- so its controller is a defending player and the fallback below is reached only
+-- once CR 506.4 has removed it. CR 702.19e is what settles that such a creature
+-- still HAS a defending player: it assigns damage to one. Pawl.CombatSpec's
+-- LastKnownDefendingPlayer group is the board where reading the object instead
+-- would answer nobody, a Confiscate having moved the planeswalker's control
+-- before CR 704.5i buried it.
 --
 -- Nothing means the target names no player: no defending player at all (outside
 -- combat), or a battle mid-repair with no designation (CR 310.11).

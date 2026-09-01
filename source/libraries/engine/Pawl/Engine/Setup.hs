@@ -100,7 +100,10 @@ emptyGame order =
       -- so a game that uses an option is reached by record-updating
       -- GameState.settings afterwards rather than by being started with it
       -- (#2837).
-      settings = GameSettings.MkGameSettings {GameSettings.brawl = False}
+      -- CR 802.1 is ON by default: at two seats it coincides exactly with CR
+      -- 506.2, and at three or more CR 806.2b requires one of the three attack
+      -- options and this is the one pawl implements.
+      settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackMultiplePlayers = True}
       newPlayer pid =
         ( pid,
           Player.MkPlayer
