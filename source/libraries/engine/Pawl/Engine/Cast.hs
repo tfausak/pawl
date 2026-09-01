@@ -506,6 +506,35 @@ castBestowed castFor = case castFor of
   Just (Keyword.Type.Bestow _) -> True
   _ -> False
 
+-- CR 702.103d: the board ONE candidate's cast is judged against -- "when casting
+-- a spell bestowed, only its characteristics as modified by the bestow ability
+-- are evaluated to determine if it can be cast". The bestow stamp is the whole of
+-- it, because bestow is the only candidate CR 601.2b can settle on that rewrites
+-- the spell (CR 702.103b); every other keyword offering a cost leaves the
+-- characteristics the gate reads exactly as they were, and answers the same board
+-- it was handed.
+--
+-- Applied to a state the caller only READS -- asProposed's posture, and one zone
+-- earlier than stampBestowed's real write: the castability gate and CR 601.2b's
+-- payability filter both have to price a candidate before the player has chosen
+-- it, so each candidate gets its own copy of the board and none of them lands on
+-- the game. Projection.bestowGathered is what makes the stamp visible on a card
+-- still lying in the zone it would be cast from.
+proposedFor :: ObjectId -> Maybe Keyword -> GameState -> GameState
+proposedFor oid castFor gs = if castBestowed castFor then stampBestowed oid gs else gs
+
+-- CR 601.3a asked of ONE candidate, through the board rule 702.103d says to judge
+-- it on: Aether Storm's "creature spells can't be cast" stops Nyxborn Rollicker's
+-- printed cost and leaves its bestow cost alone, off one card in one hand.
+--
+-- The PROHIBITION half alone, where `castable` below pairs it with payability:
+-- the two are settled at different moments, since CR 601.2f's additional costs
+-- (kicker, entwine) are announced after this and land on the candidate before
+-- anything can say whether it is payable.
+candidateAllowed :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> CandidateCost.CandidateCost -> Bool
+candidateAllowed pid oid name proposed candidate =
+  not (PlayerEffect.prohibitsCasting pid oid name (proposedFor oid (CandidateCost.keyword candidate) proposed))
+
 -- CR 601.3: the zones a spell can be cast from at all, in the engine's
 -- canonical order -- what castableSpells scans, and the list castableZones
 -- filters, so the two can never disagree about where to look.
@@ -872,6 +901,12 @@ asProposed oid name facing gs =
 -- things: a continuous effect on the player (Rule of Law, Silence), the card's
 -- own printed text, and CR 205.4e itself.
 --
+-- And asked of ONE CANDIDATE AT A TIME where the rules let the announcement
+-- change what the spell is: CR 702.103d evaluates a bestowed cast on "only its
+-- characteristics as modified by the bestow ability", so the prohibition and the
+-- affordability are one `any` over the candidates rather than two conjuncts over
+-- the card. `proposedFor` is the board each is judged against.
+--
 -- Asked of ONE HALF, named: CR 709.3a and CR 715.3a evaluate only the chosen half
 -- to see if it can be cast, so a multi-face card is asked this question once per
 -- half. That name reaches the conjuncts TWICE over, belt and braces rather than
@@ -879,7 +914,7 @@ asProposed oid name facing gs =
 -- job the other cannot: as an ARGUMENT, which is how the ones that read the CARD
 -- -- the timing window, the printed restrictions, the candidate costs, the target
 -- slots -- resolve their face, and where the name is used AS A NAME (CR 601.3a's
--- prohibitions, Null Chamber; Cost.costsFor); and as `asProposed`'s STAMP, which
+-- prohibitions, Null Chamber; Cost.candidateCostsFor); and as `asProposed`'s STAMP, which
 -- is how the ones that go on to read the
 -- OBJECT resolve theirs: CR 601.2f's adjustments through Cost.total, and any
 -- filter measuring the spell's own characteristics. Thalia's "noncreature spells
@@ -901,27 +936,40 @@ castable pid oid name facing gs =
       -- half's own -- the two coincide for every face-up cast, since
       -- `proposedFace` resolved that half by this very name.
       proposedName = maybe name Face.name (proposedFace oid name proposed)
+      -- CR 601.3 and CR 601.2b, asked TOGETHER and per candidate, because CR
+      -- 702.103d makes them one question: a candidate is one this player may
+      -- announce when the board its own choice produces neither prohibits it nor
+      -- leaves it unpayable, and a cast is castable when SOME candidate is. Split
+      -- into two independent `any`s, an unpayable bestow route and a prohibited
+      -- printed one would together offer a cast neither of them allows.
+      --
+      -- CR 601.3's prohibition names a quality of the spell (Null Chamber by
+      -- name, Damping Engine by Filter), and both readings go through
+      -- `candidateAllowed` -- the half's own name, and the OBJECT for the Filter,
+      -- read off the `proposed` stamp this call already carries.
+      --
+      -- CR 118.14 is read off the card WHERE IT LIES, which is the only place it
+      -- can be read: this gate runs before any move, so the permission is still
+      -- on the object. Off `proposed` rather than the candidate's board, since
+      -- nothing rule 702.103b writes is a thing rule 118.14's rider reads.
+      candidateOk candidate =
+        candidateAllowed pid oid proposedName proposed candidate
+          && payableCost (spendingFor pid oid proposed) pid oid (proposedFor oid (CandidateCost.keyword candidate) proposed) (CandidateCost.cost candidate)
    in timingOk pid oid name proposed
         && inCastableZone pid oid name proposed
-        -- CR 601.3: gated HERE, upstream of Action.legalActions, because the
-        -- engine never offers an illegal action and then rejects it. The half's
-        -- own name goes with it, since CR 601.3a's prohibitions name a quality of
-        -- the spell (Null Chamber) and CR 709.3a evaluates only the chosen half --
-        -- and the OBJECT with it, since a quality can also be a Filter over the
-        -- spell's characteristics (Damping Engine), which is read off the
-        -- `proposed` stamp this call already carries.
-        && not (PlayerEffect.prohibitsCasting pid oid proposedName proposed)
-        -- CR 601.3's prohibit half again, from a different CARRIER: a spell on
-        -- the stack (CR 702.61a) rather than a continuous effect on a player. It
-        -- names neither a player nor a quality of the spell, so it takes no
-        -- argument beyond the board.
+        -- CR 601.3's prohibit half from a different CARRIER: a spell on the stack
+        -- (CR 702.61a) rather than a continuous effect on a player. It names
+        -- neither a player nor a quality of the spell, so no candidate can escape
+        -- it and it stays out of `candidateOk` above.
         && not (SplitSecond.inForce proposed)
         && printedRestrictionsOk pid oid name proposed
         && legendaryRestrictionOk pid oid name proposed
-        -- CR 118.14 read off the card WHERE IT LIES, which is the only place it
-        -- can be read: this gate runs before any move, so the permission is still
-        -- on the object.
-        && any (payableCost (spendingFor pid oid proposed) pid oid proposed) (Cost.costsFor name oid proposed)
+        -- Gated HERE, upstream of Action.legalActions, because the engine never
+        -- offers an illegal action and then rejects it.
+        && any candidateOk (Cost.candidateCostsFor name oid proposed)
+        -- Not implemented: CR 601.2c is asked of the printed spell, so a bestow
+        -- candidate offered on a board with no creature to enchant is offered and
+        -- then rejected at the target step (#2911).
         && targetable pid oid name proposed
 
 -- Every cast this player may propose right now, in castZones' order, as the
@@ -1284,10 +1332,26 @@ castSpellWith applied pid oid name facing = do
           -- 702.34a's "if the flashback cost was paid" is asked of once the
           -- payment is made; a cost `applied` from another effect (CR 118.9)
           -- carries none, because no keyword offered it.
+          --
+          -- FILTERED by CR 601.3 one candidate at a time, the same predicate the
+          -- gate above passed: CR 702.103d judges each announcement on the
+          -- characteristics its own choice gives the spell, so a prohibition that
+          -- reaches only some of them must narrow what CR 601.2b offers rather
+          -- than refuse the cast. Asked HERE, one step ahead of rule 601.2a's
+          -- move, because that is where prohibitsCasting can be asked at all --
+          -- its sorcery-speed arm reads an empty stack, which this spell would
+          -- otherwise be standing on.
+          --
+          -- A no-op for every cast the pool can otherwise propose: with no
+          -- bestow candidate every board is the same board, so the filter keeps
+          -- all of them or the gate above kept none.
           candidates =
-            fmap
-              (\candidate -> candidate {CandidateCost.cost = taxed (CandidateCost.cost candidate)})
-              (maybe (Cost.candidateCostsFor name oid proposed) (pure . Cost.untagged) applied)
+            filter
+              (candidateAllowed pid oid (Face.name face) proposed)
+              ( fmap
+                  (\candidate -> candidate {CandidateCost.cost = taxed (CandidateCost.cost candidate)})
+                  (maybe (Cost.candidateCostsFor name oid proposed) (pure . Cost.untagged) applied)
+              )
           -- CR 400.7g / 613.1: the keywords the card has WHERE IT LIES, read one
           -- step ahead of the move below for the reason `castFrom` is. The move
           -- mints a fresh incarnation on the stack, and an ability granting this
@@ -1514,9 +1578,15 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
           -- chosen, so a kicked flashback cast is still the flashback cost
           -- being paid (CR 118.9d sends an additional cost through an
           -- alternative one unchanged).
+          --
+          -- CR 702.103d again, and CR 118.9d with it: each candidate is priced
+          -- against the board its own choice produces, so CR 601.2f's
+          -- adjustments read the Aura a bestow announcement would make of the
+          -- spell rather than the creature it prints. Thalia's "noncreature
+          -- spells cost {1} more" is what tells the two apart.
           payableCandidates =
             filter
-              (payableCost spending pid sid gs . CandidateCost.cost)
+              (\candidate -> payableCost spending pid sid (proposedFor sid (CandidateCost.keyword candidate) gs) (CandidateCost.cost candidate))
               (fmap (\candidate -> candidate {CandidateCost.cost = withKicker (withEntwine (CandidateCost.cost candidate))}) candidateCosts)
           payable = fmap CandidateCost.cost payableCandidates
       if null payable || overKickerLimit
@@ -1552,15 +1622,13 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
               -- target for that spell as defined by its enchant creature ability
               -- and rule 601.2c").
               Monad.when (castBestowed castFor) (State.modify' (stampBestowed sid))
-              -- Re-read, because `gs` above predates the stamp and CR 601.2c has
-              -- to be judged on the spell as rule 702.103b left it. The two reads
-              -- below are the whole of what moves: every cost question was asked
-              -- and settled at CR 601.2b, one step up.
-              --
-              -- Not implemented: CR 702.103d's "only its characteristics as
-              -- modified by the bestow ability are evaluated to determine if it
-              -- can be cast" -- `castable` and CR 601.2f's cost adjustments both
-              -- still read the unbestowed spell (#2356).
+              -- Re-read, because `gs` above predates the stamp and both CR 601.2c
+              -- and CR 601.2f have to be judged on the spell as rule 702.103b
+              -- left it -- CR 702.103d's "only its characteristics as modified by
+              -- the bestow ability", which CR 118.9d carries onto the total. Every
+              -- read below this line takes this board and not `gs`; the payability
+              -- filter one step up, which runs before the stamp exists, stamps a
+              -- copy of its own per candidate (proposedFor).
               bestowedGs <- State.get
               let slots = Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) chosenModes face
                   -- CR 101.1: the ceiling this card's own words put on the value
@@ -1574,7 +1642,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   -- is printedRestrictionsOk's reading and carries its caveat --
                   -- an effect granting or removing the sentence is missed
                   -- (CR 113.6e, #1859).
-                  mCeiling = Cost.maximumX pid sid face gs
+                  mCeiling = Cost.maximumX pid sid face bestowedGs
               -- CR 601.2b's announcement is free of the board -- any Natural --
               -- but the player making it is told what the board can pay, and
               -- narrowed to what the card permits. The affordable half rides the
@@ -1582,7 +1650,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
               -- unaffordable announcement still reverses the whole cast (#417).
               mAmount <-
                 if Cost.hasVariable chosenCost
-                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid (affordableX mCeiling spending pid sid gs chosenCost)))
+                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid (affordableX mCeiling spending pid sid bestowedGs chosenCost)))
                   else pure Nothing
               -- CR 101.1, and CR 101.2 for its direction: the card's sentence
               -- overrides the rule that would otherwise leave X free, and a
@@ -1620,7 +1688,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
               -- one predicate over one cost instead of two spellings of when the
               -- gate applies.
               let announcedAtX = maybe chosenCost (\x -> Cost.substituteX x chosenCost) mAmount
-              if overCeiling || not (payableCost spending pid sid gs announcedAtX)
+              if overCeiling || not (payableCost spending pid sid bestowedGs announcedAtX)
                 then reject
                 else do
                   -- CR 601.2b's own order puts the hybrid and Phyrexian
@@ -1630,8 +1698,8 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   --
                   -- Cost.totalManas is handed in so that the routes offered are the
                   -- ones CR 601.2f's total can pay -- the same adjusted cost
-                  -- payableCost gated this cast on, read from the same `gs` the
-                  -- total below is.
+                  -- payableCost gated this cast on, read from the same
+                  -- `bestowedGs` the total below is.
                   --
                   -- CR 601.2f's additional components are on the cost by this
                   -- point (Cost.plusComponents), which is what payableCost
@@ -1640,7 +1708,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   -- a Phyrexian symbol offered without the added "Sacrifice a
                   -- Swamp" in view would be offered against a board that has one
                   -- Swamp too many.
-                  let gathered = Cost.spellAdjustments pid sid gs
+                  let gathered = Cost.spellAdjustments pid sid bestowedGs
                   (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
                   -- CR 400.7d's cost record, stamped on the SPELL and carried
                   -- onto the permanent it becomes by
@@ -1720,7 +1788,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                       -- produced it, does nothing. Pawl.CostSpec's Altar's Reap
                       -- group is the proof (Baral pays the sacrifice, and the
                       -- Reap still costs {B}).
-                      adjustments <- Cost.announceReductions pid sid gs announcedCost (Cost.spellAdjustments pid sid gs)
+                      adjustments <- Cost.announceReductions pid sid bestowedGs announcedCost (Cost.spellAdjustments pid sid bestowedGs)
                       let paidCost = Cost.totalWith adjustments announcedCost
                       payment <- Cost.pay PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid paidCost
                       case payment of

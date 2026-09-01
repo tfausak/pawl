@@ -2594,9 +2594,16 @@ cloudformBoard island piker cloudform =
 -- with one collapses it, and then nothing separates "the granted enchant slot was
 -- consulted" from "the host was hardcoded".
 --
--- Not implemented: CR 702.103d's castability (#2356), with an elision comment at
--- the site it belongs to. CR 702.103c's copies hold by construction but no board
--- in the pool mints one; see #2355.
+-- CR 702.103d brings two more cards, and each is judged on the Aura the bestow
+-- ability makes of the spell rather than on the creature it prints: Thalia,
+-- Guardian of Thraben ("noncreature spells cost {1} more to cast", CR 601.2f and
+-- CR 118.9d) and Aether Storm ({3}{U} Enchantment, "Creature spells can't be
+-- cast", CR 601.3a). Not implemented: Aether Storm's second ability is written
+-- without "Any player may activate this ability" (#2213), which leaves pawl's
+-- card stricter than printed -- only its controller can destroy it.
+--
+-- CR 702.103c's copies hold by construction but no board in the pool mints one;
+-- see #2355.
 bestowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 bestowSpec s registry = Spec.describe s "Bestow" $ do
   -- THE discriminating pair the issue asks for: the spell's own card types and
@@ -2792,6 +2799,90 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
       (Just (Set.singleton Subtype.Aura))
     Spec.assertEqWith s "control: the host died while the spell was still on the stack" (Game.lookupObject host killed) Nothing
     Spec.assertEqWith s "and alice's graveyard holds the host alone" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+  -- CR 702.103d's COST half, through CR 601.2f and CR 118.9d: Thalia taxes
+  -- noncreature spells, and a bestowed Rollicker is an enchantment spell. Three
+  -- boards off one fixture, differing in one thing each -- Thalia present or
+  -- absent, and which candidate the answerer names -- so neither the tax nor the
+  -- candidate can be the other's explanation.
+  --
+  -- Counted in TAPPED LANDS rather than in the announced cost: the cost is what
+  -- the fix writes, and the mana actually spent is what a player observes. Four
+  -- Mountains make three, two and one distinct readings, and a rejected cast
+  -- rewinds to zero, so no two outcomes here collide.
+  Spec.it s "CR 601.2f / 118.9d: Thalia taxes the bestowed cast and not the printed one" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+    let base = S.landsInPlay mountain 4
+        (_, gs1) = S.addCreature piker S.alice base
+        (host, gs2) = S.addCreature mammoth S.alice gs1
+        (board, spellId) = S.handOne rollicker gs2
+        taxing = snd (S.addCreature thalia S.alice board)
+        castWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+        castWith answer gs = S.runPure answer gs (S.cast S.alice spellId)
+        bestowedTaxed = castWith (bestowing host) taxing
+        bestowedFree = castWith (bestowing host) board
+        printedTaxed = castWith (payingPrinted host) taxing
+    -- THE gameplay-level trio, first. Bestow {1}{R} taxed is three mana; untaxed
+    -- it is two; the printed {R} is one, because a creature spell is not what
+    -- Thalia's Filter names.
+    Spec.assertEqWith s "CR 118.9d: the bestowed cast pays {2}{R} beside Thalia" (S.tappedCount S.alice bestowedTaxed) 3
+    Spec.assertEqWith s "and {1}{R} with Thalia off the board" (S.tappedCount S.alice bestowedFree) 2
+    Spec.assertEqWith s "CR 601.2f: the printed cast is a creature spell and pays {R} untaxed" (S.tappedCount S.alice printedTaxed) 1
+    -- Each really cast, and each really settled on the candidate the answerer
+    -- named: a rewind and a mis-taxed cast would otherwise share a reading.
+    Spec.assertEqWith
+      s
+      "control: the taxed cast is the bestowed one, an Aura spell on the stack"
+      (fmap (\oid -> Projection.cardTypesOf oid bestowedTaxed) (topOfStack bestowedTaxed))
+      (Just (Set.singleton CardType.Enchantment))
+    Spec.assertEqWith
+      s
+      "control: and the untaxed one is the creature spell"
+      (fmap (\oid -> Projection.cardTypesOf oid printedTaxed) (topOfStack printedTaxed))
+      (Just (Set.fromList [CardType.Creature, CardType.Enchantment]))
+  -- CR 702.103d's PROHIBITION half, through CR 601.3a: Aether Storm stops
+  -- creature spells, and the bestow candidate is not one. Two boards differing in
+  -- exactly one permanent, and ONE answerer across both -- the one that names the
+  -- printed cost -- so what changes is which candidate CR 601.2b had left to
+  -- offer.
+  Spec.it s "CR 702.103d / 601.3a: Aether Storm leaves the bestow candidate and takes the printed one away" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+    storm <- S.printingOf s registry "Aether Storm"
+    let base = S.landsInPlay mountain 4
+        (_, gs1) = S.addCreature piker S.alice base
+        (host, gs2) = S.addCreature mammoth S.alice gs1
+        (open, spellId) = S.handOne rollicker gs2
+        (plainCreature, board) = S.addHandCard piker S.alice open
+        stormed = snd (S.addCreature storm S.alice board)
+        castThere gs = S.runPure (payingPrinted host) gs (S.cast S.alice spellId)
+    -- THE gameplay-level pair, first: one answerer, two boards. Under Aether
+    -- Storm the printed candidate is gone, so the announcement settles on the
+    -- only one left and the spell on the stack is an Aura.
+    Spec.assertEqWith
+      s
+      "CR 702.103d: under Aether Storm the Rollicker reaches the stack as an Aura spell"
+      (fmap (\oid -> Projection.cardTypesOf oid (castThere stormed)) (topOfStack (castThere stormed)))
+      (Just (Set.singleton CardType.Enchantment))
+    Spec.assertEqWith
+      s
+      "and without it the same answerer takes the printed cost and leaves a creature spell"
+      (fmap (\oid -> Projection.cardTypesOf oid (castThere board)) (topOfStack (castThere board)))
+      (Just (Set.fromList [CardType.Creature, CardType.Enchantment]))
+    -- Aether Storm really does prohibit creature spells, which is what makes the
+    -- pair above a fact about bestow: an ordinary creature card in the same hand
+    -- cannot be cast at all.
+    Spec.assertBool s (not (S.castable S.alice plainCreature stormed)) "CR 601.3a: the Goblin Piker in hand is prohibited"
+    Spec.assertBool s (S.castable S.alice plainCreature board) "and is castable off the same mana with Aether Storm gone"
+    -- CR 702.103d at the gate itself: the offer survives, because one candidate
+    -- escapes -- which is what keeps the cast above from being offered and then
+    -- rejected.
+    Spec.assertBool s (S.castable S.alice spellId stormed) "CR 702.103d: the bestow card is still offered under Aether Storm"
 
 -- The spell CR 601.2a put on the stack -- the incarnation every assertion above
 -- reads, since CR 400.7 makes it a different object from the card in the hand.

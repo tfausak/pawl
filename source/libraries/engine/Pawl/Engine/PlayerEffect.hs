@@ -474,7 +474,14 @@ castsPerPlayer gs =
 -- CR 601.3a's LOOKAHEAD rides on the Filter arm, in choiceCouldEscape below: a
 -- prohibition that names the spell as it stands is ignored when a choice still to
 -- be made during the proposal could take it out of the class. X is the one such
--- choice pawl has, and Void Winnower against Molten Disaster is what observes it.
+-- choice searched for there, and Void Winnower against Molten Disaster is what
+-- observes it.
+--
+-- CR 702.103b's bestow is the other one, and it does not come through this
+-- function at all: Pawl.Engine.Cast.castable asks this predicate once per
+-- CANDIDATE, each time against the board that candidate's own announcement
+-- produces (Cast.proposedFor), which is what CR 702.103d asks for and is why
+-- Aether Storm stops Nyxborn Rollicker's printed cast and not its bestowed one.
 --
 -- The two choices CR 601.2b names as preceding the announcement -- "choosing to
 -- cast a spell with flashback from a graveyard or choosing to cast a creature
@@ -944,16 +951,21 @@ contextFrom src oid gs =
 -- criterion to stop naming it? A True here is the rule's "the player may begin to
 -- cast the spell, ignoring the effect", so prohibitsCasting negates it.
 --
--- ONE choice can do it in pawl, and X is that choice. CR 202.3e gives a variable
--- a contribution of zero off the stack, so a card's mana value in hand is fixed
--- while the spell's is not, and Void Winnower's "spells with even mana values"
--- lands on opposite sides of the two for an {X}{R}{R} card (Molten Disaster).
--- Every other characteristic a Filter can read is settled before the announcement
--- CR 601.2b governs: a card type, a colour, a supertype and a subtype are all
--- fixed by the half and the facing, and both of the choices CR 601.2b names as
--- preceding the announcement -- flashback from a graveyard, a face-down morph --
--- are their own Action here, so each is asked this question with its own answers
--- rather than searched for.
+-- ONE choice is SEARCHED for here, and X is that choice. CR 202.3e gives a
+-- variable a contribution of zero off the stack, so a card's mana value in hand
+-- is fixed while the spell's is not, and Void Winnower's "spells with even mana
+-- values" lands on opposite sides of the two for an {X}{R}{R} card (Molten
+-- Disaster).
+--
+-- The other choices that move a characteristic a Filter can read are each ASKED
+-- with their own answers rather than searched for, and every one of them is an
+-- announcement pawl has already made by the time this runs: flashback from a
+-- graveyard and a face-down morph are their own Action (CR 601.2b's two named
+-- pre-announcement choices), and CR 702.103b's bestow -- which really does rewrite
+-- a card type and a subtype at CR 601.2b -- is judged one candidate at a time by
+-- Pawl.Engine.Cast.castable, against the board CR 702.103d says to judge it on
+-- (Cast.proposedFor). A colour and a supertype are fixed by the half and the
+-- facing and move at no step of the announcement.
 --
 -- The other proposal choices reach nothing: CR 601.2b's modes, CR 601.2b's
 -- targets and CR 601.2f's cost payments change no characteristic of the spell
@@ -1471,6 +1483,13 @@ mayCastAsThoughItHadFlash pid oid gs =
 -- card in that hand. Projection.bestowedView is what the choice would make of the
 -- object, applied to no state -- nothing is stamped, since the player has not
 -- chosen anything yet.
+--
+-- A HYPOTHETICAL here where CR 601.3a's prohibition side takes the stamp instead,
+-- and the difference is which question the caller is asking. Pawl.Engine.Cast
+-- offers one action per (half, facing) pair and asks THIS gate once for it, since
+-- rule 601.3b's permission is about when the proposal may begin rather than about
+-- any one candidate; the prohibition is asked per candidate, so it can afford to
+-- name the board each announcement would produce.
 --
 -- Morph reaches this and needs none of it: CR 708.4 makes a face-down cast a
 -- proposal of its own, so Cast.castableSpells offers it as a separate action and
