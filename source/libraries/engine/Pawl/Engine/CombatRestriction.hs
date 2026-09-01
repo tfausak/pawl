@@ -61,23 +61,77 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 
 -- CR 508.1c: which of `candidates` an effect in force right now says CAN'T
--- ATTACK. Pacifism's first half, Blind-Spot Giant's when its gate is shut, CR
--- 701.35a's first clause, and Netter en-Dal's stored restriction.
+-- ATTACK AT ALL. Pacifism's first half, Blind-Spot Giant's when its gate is shut,
+-- CR 701.35a's first clause, and Netter en-Dal's stored restriction.
+--
+-- The printed half is an INTERSECTION over the defending players, not a union,
+-- and CR 802.3a is why: a restriction gated on the defending player (Armored
+-- Galleon) applies only to the creatures attacking THAT player, so a creature it
+-- reaches at one seat and not another is still able to attack -- it just cannot
+-- be announced at the seat that binds. `cantAttackDefender` is that per-seat
+-- residue, and Pawl.Engine.Combat.attackTargetAllowed is what reads it. A
+-- restriction with no such gate reads the same at every seat, so it survives the
+-- intersection and lands here as it always did.
+--
+-- One defending player -- every two-player game, and every multiplayer one CR
+-- 507.1 rather than CR 802.2 applies to -- makes the intersection a singleton
+-- reading, so nothing about those boards changed.
+--
+-- Detain and a stored prohibition are outside the intersection because they name
+-- no defending player at all (see `detained` and `attackProhibited`): rule 701.35a
+-- forbids the declaration outright.
 cantAttack :: [ObjectId] -> GameState -> Set ObjectId
 cantAttack candidates gs =
-  Set.unions
-    [ restricted attacking candidates gs,
-      detained candidates gs,
-      attackProhibited candidates gs
-    ]
+  let seats = case Defender.defendingPlayers gs of
+        -- No defending player: the one reading `lifted` calls Nothing, which is
+        -- the answer outside combat and the answer inside one nobody defends.
+        [] -> [Nothing]
+        players -> fmap Just players
+      barredAt seat = restricted attacking seat candidates gs
+   in Set.unions
+        [ case fmap barredAt seats of
+            -- Unreachable: `seats` is a non-empty list by the case above. Total
+            -- rather than a foldr1, since an empty one would mean no restriction
+            -- reaches any creature.
+            [] -> Set.empty
+            first : rest -> List.foldl' Set.intersection first rest,
+          detained candidates gs,
+          attackProhibited candidates gs
+        ]
+
+-- CR 802.3a: which (creature, defending player) pairs a CR 508.1c restriction
+-- forbids -- the per-seat residue `cantAttack`'s intersection drops. Armored
+-- Galleon's "can't attack unless defending player controls an Island" is the
+-- pool's producer, and it is observable only where several players defend at
+-- once (CR 802.2).
+--
+-- ONE gather for every seat, which is what `gathered` and `lifted` are split for:
+-- the battlefield walk is taken once and only the gate is re-read per player.
+--
+-- Pawl.Engine.Combat.attackTargetAllowed maps an announcement to the player whose
+-- entry it must consult (CR 508.5's defending player), so a planeswalker's
+-- controller answers for an attack on their planeswalker. Nothing of the source
+-- survives into the answer, `cantBeBlockedBy`'s posture.
+cantAttackDefender :: [ObjectId] -> [PlayerId] -> GameState -> Set (ObjectId, PlayerId)
+cantAttackDefender candidates players gs =
+  let rows = gathered gs
+      forSeat player =
+        Set.map
+          (\oid -> (oid, player))
+          (restrictedIn (filter (not . lifted (Just player) gs) rows) attacking candidates gs)
+   in Set.unions (fmap forSeat players)
 
 -- CR 509.1b: which of `candidates` an effect in force right now says CAN'T
 -- BLOCK. Pacifism's second half, Blind-Spot Giant's when its gate is shut, CR
 -- 701.35a's second clause, and Zirda, the Dawnwaker's stored restriction.
-cantBlock :: [ObjectId] -> GameState -> Set ObjectId
-cantBlock candidates gs =
+--
+-- The DEFENDING PLAYER is the one declaring blocks, which CR 509.1a names, so a
+-- gate about them (CR 508.5) is read at that seat rather than at the first
+-- defending player in turn order -- the caller has it in hand and hands it over.
+cantBlock :: Maybe PlayerId -> [ObjectId] -> GameState -> Set ObjectId
+cantBlock defending candidates gs =
   Set.unions
-    [ restricted blocking candidates gs,
+    [ restricted blocking defending candidates gs,
       detained candidates gs,
       blockProhibited candidates gs
     ]
@@ -153,7 +207,7 @@ detained candidates gs = Set.fromList (filter (`Detain.detained` gs) candidates)
 -- declaration's check (Pawl.Engine.Combat.attackDeclarationAllowed) rather than a
 -- filter on the candidate list. See `restricted` below.
 cantAttackAlone :: [ObjectId] -> GameState -> Set ObjectId
-cantAttackAlone = restricted attackingAlone
+cantAttackAlone candidates gs = restricted attackingAlone (defendingSeat gs) candidates gs
 
 -- CR 508.1c: the TIGHTEST bound in force right now on how many creatures may be
 -- declared as attackers, or Nothing when nothing bounds it. Silent Arbiter's
@@ -165,10 +219,10 @@ cantAttackAlone = restricted attackingAlone
 -- two" beside a "no more than one" binds at one, which is what makes the answer
 -- a minimum.
 attackLimit :: GameState -> Maybe Natural
-attackLimit = bounded attackingMoreThan
+attackLimit gs = bounded attackingMoreThan (defendingSeat gs) gs
 
 -- CR 509.1b, the blocking counterpart. Silent Arbiter's second sentence.
-blockLimit :: GameState -> Maybe Natural
+blockLimit :: Maybe PlayerId -> GameState -> Maybe Natural
 blockLimit = bounded blockingMoreThan
 
 -- The selectors, written out rather than a wildcard: an exhaustive case is what
@@ -278,71 +332,26 @@ gate cr = case cr of
 -- Every combat restriction some permanent on the battlefield -- or some object in
 -- the command zone, whose abilities CR 114.4 makes function there -- states right
 -- now, each paired with its SOURCE and with CR 612.1's word swap over that
--- source's own text. A restriction whose gate HOLDS is not here at all, because CR
--- 508.1c / CR 509.1b's "unless" lifts it, so both readers below see only
--- restrictions in force.
+-- source's own text. CR 508.1c / CR 509.1b's "unless" gate is NOT applied here:
+-- `inForce` applies it, and every reader goes through that.
+--
+-- The split is CR 802.3a's. A gate naming the defending player has a different
+-- answer per seat, so the same board has to be read once per defending player --
+-- and the walk this function is (every permanent, its projection, its text
+-- changes) is the expensive half, where the gate is a handful of conditions. One
+-- gather, one gate reading per seat.
 --
 -- The shared half of `restricted` and `bounded`, which is where the liveness
--- checks, the gate and the text change belong: those three are properties of the
--- SOURCE and of the printed sentence, and neither depends on whether the reader
--- wants a set of creatures or a number.
-inForce :: GameState -> [(ObjectId, [(Subtype.Subtype, Subtype.Subtype)], CombatRestriction.CombatRestriction)]
-inForce gs =
+-- checks and the text change belong: both are properties of the SOURCE and of the
+-- printed sentence, and neither depends on whether the reader wants a set of
+-- creatures or a number.
+gathered :: GameState -> [(ObjectId, [(Subtype.Subtype, Subtype.Subtype)], CombatRestriction.CombatRestriction)]
+gathered gs =
   let -- Hoisted out of the walk as AttackRequirement.instances hoists them, and
       -- both unforced until some permanent actually declares a restriction.
       setEffs = Projection.setLandSubtypeEffects gs
       removed = Projection.abilityRemoval gs
       removedAfter = Projection.abilityRemovalAfter gs
-      -- CR 508.1c / CR 509.1b's second clause. A gate that HOLDS lifts the
-      -- restriction, so it is dropped here; one that does not leaves it in
-      -- force, which is why an ungated restriction is False here.
-      --
-      -- Evaluated once per RESTRICTION and not per candidate, because the
-      -- clause belongs to the ability rather than to the creature it names: CR
-      -- 109.5 fixes the "you" inside it as the SOURCE's controller, and
-      -- Filter.IsSource names the source -- which is what makes Blind-Spot
-      -- Giant's "another Giant" exclude the Giant printing the sentence.
-      --
-      -- Projection.fullView, matching the affected set `restricted` reads (CR
-      -- 613.11). The source is on the battlefield by construction, so no CR
-      -- 608.2h last known information is in play.
-      --
-      -- CR 612.1: the gate is REWRITTEN before it is asked, so a hacked Glacial
-      -- Crasher ("can't attack unless there is a Mountain on the battlefield")
-      -- counts Islands. The clause is words printed on the source's card, which
-      -- is what CR 612.1 reaches, and rewriteCondition is the same descent
-      -- gatherStatic applies to a static ability's CR 604.2 "as long as" gate.
-      --
-      -- CR 508.5: the gate may also name the DEFENDING PLAYER rather than the
-      -- source's controller (Armored Galleon, "can't attack unless defending
-      -- player controls an Island"), so CR 802.2a's one specific defending player
-      -- is supplied to Filter.ControlledByDefendingPlayer here. ONE read for the
-      -- whole combat rather than one per (creature, attack target) pair.
-      --
-      -- Not implemented: CR 802.3a's split, where a restriction or requirement
-      -- ABOUT attacking a specific player applies only to the creatures
-      -- attacking that player. This reads the FIRST defending player, which is
-      -- exact while one player defends and the wrong seat otherwise; the
-      -- candidate list Combat.canAttack is built from carries no attack target
-      -- to read a defending player off (#2842).
-      --
-      -- Nothing outside combat, which leaves the atom False (Filter.matches) and
-      -- so leaves the restriction in force -- the honest answer, there being no
-      -- attack to make and no defending player to name. Filled uniformly across
-      -- the arms rather than only on CantAttack, for the same reason: one read
-      -- per combat, so a block-side gate naming that player reads the same seat.
-      defending = Maybe.listToMaybe (Defender.defendingPlayers gs)
-      lifted source changes restriction = case gate restriction of
-        Nothing -> False
-        Just condition ->
-          Condition.holds
-            (Projection.fullView gs)
-            (Filter.contextFor (Game.teams gs) (Projection.controllerOf source gs) (Just source))
-              { Filter.defendingPlayer = defending
-              }
-            gs
-            source
-            (if null changes then condition else Projection.rewriteCondition changes condition)
       -- CR 702: the restrictions rule 702 gives a permanent for HOLDING A
       -- KEYWORD, which until unleash (CR 702.98a) nothing produced -- every row
       -- here was printed card data. Pawl.Engine.Keyword.mintedCombatRestrictionsOf
@@ -357,15 +366,14 @@ inForce gs =
       -- No CR 612.1 word swap either, and none is owed: what a keyword MEANS is
       -- rule 702's text, and CR 612.2 reaches words printed on the card.
       --
-      -- Through the same "unless" gate the printed rows pass, with an empty text
-      -- change: unleash's row is ungated, so this filter keeps nothing out today
-      -- and is here so the next minted restriction that IS gated cannot slip past
-      -- CR 508.1c's second clause.
+      -- Through `inForce`'s "unless" gate like every printed row, unleash's own
+      -- being ungated: the gate is applied to the finished list rather than here,
+      -- so a minted restriction that IS gated cannot slip past CR 508.1c's second
+      -- clause either.
       mintedRows source =
         [ (source, [], restriction)
         | anyMinted,
-          restriction <- Keyword.mintedCombatRestrictionsOf (Projection.keywordsOf source gs),
-          not (lifted source [] restriction)
+          restriction <- Keyword.mintedCombatRestrictionsOf (Projection.keywordsOf source gs)
         ]
       -- The short-circuit Pawl.Engine.Projection.replacementsAffecting takes, for
       -- its reason: projecting every permanent on every declaration would cost
@@ -493,10 +501,7 @@ inForce gs =
                   -- 612.1 changes the words printed on THAT object, and the gate
                   -- is printed on the card stating the restriction.
                   let changes = Projection.textChangesAffecting source gs
-                   in [ (source, changes, restriction)
-                      | restriction <- restrictions,
-                        not (lifted source changes restriction)
-                      ]
+                   in fmap (\restriction -> (source, changes, restriction)) restrictions
                 else []
       -- CR 114.4: "abilities of emblems function in the command zone", which is
       -- what makes CR 701.54c's restriction on the emblem named The Ring do
@@ -520,14 +525,72 @@ inForce gs =
       fromCommandZone source = case Game.faceOf source gs of
         Just face
           | isEmblem source ->
-              fmap
-                (\restriction -> (source, [], restriction))
-                (filter (not . lifted source []) (Face.combatRestrictions face))
+              fmap (\restriction -> (source, [], restriction)) (Face.combatRestrictions face)
         _ -> []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
         <> concatMap fromCommandZone (Set.toList (GameState.command gs))
 
--- The shared walk behind the three SUBJECT-CARRYING questions above, over the
+-- CR 508.1c / CR 509.1b's second clause, asked of ONE row against ONE defending
+-- player. A gate that HOLDS lifts the restriction, so `inForce` drops it; one
+-- that does not leaves it in force, which is why an ungated restriction is False
+-- here.
+--
+-- Evaluated once per RESTRICTION and not per candidate, because the clause
+-- belongs to the ability rather than to the creature it names: CR 109.5 fixes the
+-- "you" inside it as the SOURCE's controller, and Filter.IsSource names the
+-- source -- which is what makes Blind-Spot Giant's "another Giant" exclude the
+-- Giant printing the sentence.
+--
+-- Projection.fullView, matching the affected set `restricted` reads (CR 613.11).
+-- The source is on the battlefield or in the command zone by construction, so no
+-- CR 608.2h last known information is in play.
+--
+-- CR 612.1: the gate is REWRITTEN before it is asked, so a hacked Glacial Crasher
+-- ("can't attack unless there is a Mountain on the battlefield") counts Islands.
+-- The clause is words printed on the source's card, which is what CR 612.1
+-- reaches, and rewriteCondition is the same descent gatherStatic applies to a
+-- static ability's CR 604.2 "as long as" gate.
+--
+-- CR 508.5: the gate may name the DEFENDING PLAYER rather than the source's
+-- controller (Armored Galleon, "can't attack unless defending player controls an
+-- Island"), and CR 508.5a says that is ONE specific defending player. Which one
+-- is the caller's to say, and CR 802.3a is why it cannot be settled here: the
+-- answer belongs to an attack target rather than to the combat.
+--
+-- Nothing is the reading with NO defending player to name, which leaves the atom
+-- False (Filter.matches) and so leaves the restriction in force -- the honest
+-- answer outside combat, there being no attack to make.
+lifted :: Maybe PlayerId -> GameState -> (ObjectId, [(Subtype.Subtype, Subtype.Subtype)], CombatRestriction.CombatRestriction) -> Bool
+lifted defending gs (source, changes, restriction) = case gate restriction of
+  Nothing -> False
+  Just condition ->
+    Condition.holds
+      (Projection.fullView gs)
+      (Filter.contextFor (Game.teams gs) (Projection.controllerOf source gs) (Just source))
+        { Filter.defendingPlayer = defending
+        }
+      gs
+      source
+      (if null changes then condition else Projection.rewriteCondition changes condition)
+
+-- The rows `gathered` found whose CR 508.1c / CR 509.1b gate does not lift them,
+-- judged against the defending player the caller names. Every reader below goes
+-- through this rather than through `gathered`.
+inForce :: Maybe PlayerId -> GameState -> [(ObjectId, [(Subtype.Subtype, Subtype.Subtype)], CombatRestriction.CombatRestriction)]
+inForce defending gs = filter (not . lifted defending gs) (gathered gs)
+
+-- CR 508.5a's "one specific defending player" where the reader has no attack
+-- target to derive one from -- the first defending player in turn order.
+--
+-- Not implemented: CR 802.3a's split for the two WHOLE-DECLARATION restrictions,
+-- `cantAttackAlone` and `attackLimit`. Those are facts about the declaration
+-- rather than about one announcement, so there is no attack target to read a
+-- defending player off, and a gate on either would be judged at this one seat.
+-- Nothing in the pool gates either (#2894).
+defendingSeat :: GameState -> Maybe PlayerId
+defendingSeat gs = Maybe.listToMaybe (Defender.defendingPlayers gs)
+
+-- The shared walk behind the SUBJECT-CARRYING questions above, over the
 -- restrictions `select` keeps.
 --
 -- A set of ids and not a per-creature predicate: the caller asks this once per
@@ -544,9 +607,17 @@ inForce gs =
 -- requirement. `cantAttackAlone` names creatures that are in SOME legal
 -- declaration, so its set must stay on the candidate list and be asked of the
 -- finished declaration instead -- subtracting it would forbid the very
--- declaration CR 508.1c's Example calls legal.
-restricted :: (CombatRestriction.CombatRestriction -> Maybe Affected.Affected) -> [ObjectId] -> GameState -> Set ObjectId
-restricted select candidates gs =
+-- declaration CR 508.1c's Example calls legal. `cantAttackDefender` names
+-- creatures that are in some legal declaration too, and for CR 802.3a's reason
+-- rather than CR 506.5's: what is refused is one ANNOUNCEMENT.
+restricted :: (CombatRestriction.CombatRestriction -> Maybe Affected.Affected) -> Maybe PlayerId -> [ObjectId] -> GameState -> Set ObjectId
+restricted select defending candidates gs = restrictedIn (inForce defending gs) select candidates gs
+
+-- `restricted` against rows the caller has already gated, so a reader asking the
+-- same board once per defending player pays for one gather rather than one each
+-- (cantAttackDefender).
+restrictedIn :: [(ObjectId, [(Subtype.Subtype, Subtype.Subtype)], CombatRestriction.CombatRestriction)] -> (CombatRestriction.CombatRestriction -> Maybe Affected.Affected) -> [ObjectId] -> GameState -> Set ObjectId
+restrictedIn rows select candidates gs =
   let -- CR 613.11 puts these effects after every layer, so the affected set is
       -- read against the FULL projection -- the opposite of
       -- Projection.affects's callers inside the layer fold, which read
@@ -567,7 +638,7 @@ restricted select candidates gs =
       fromRestriction (source, changes, restriction) = case select restriction of
         Nothing -> []
         Just affected -> filter (named source (if null changes then affected else Projection.rewriteAffected changes affected)) candidates
-   in Set.fromList (concatMap fromRestriction (inForce gs))
+   in Set.fromList (concatMap fromRestriction rows)
 
 -- CR 509.1b's PAIRWISE restrictions: which (blocker, attacker) pairs an effect in
 -- force right now forbids. CR 701.54c's "can't be blocked by creatures with
@@ -605,8 +676,8 @@ restricted select candidates gs =
 -- The power is read off the full projection (CR 613), as skulk's is in
 -- Pawl.Engine.Combat.skulkAllowsGiven, and read at the moment the declaration is
 -- checked -- CR 509.1b's second paragraph is what says nothing re-checks it after.
-cantBeBlockedBy :: [ObjectId] -> [ObjectId] -> GameState -> Set (ObjectId, ObjectId)
-cantBeBlockedBy blockers attackers gs =
+cantBeBlockedBy :: Maybe PlayerId -> [ObjectId] -> [ObjectId] -> GameState -> Set (ObjectId, ObjectId)
+cantBeBlockedBy defending blockers attackers gs =
   let named source affected creature =
         Projection.affects
           source
@@ -629,7 +700,7 @@ cantBeBlockedBy blockers attackers gs =
               matched attacker blocker = Filter.matches (context attacker) (Projection.viewOfObject blocker gs) wanted
               barred attacker = fmap (\blocker -> (blocker, attacker)) (filter (matched attacker) blockers)
            in concatMap barred (filter (named source subject) attackers)
-   in Set.fromList (concatMap fromRestriction (inForce gs))
+   in Set.fromList (concatMap fromRestriction (inForce defending gs))
 
 -- CR 508.1c through CR 802.3a: which (creature, player) pairs an effect in force
 -- right now forbids -- the creatures that may not be announced as attacking
@@ -654,22 +725,28 @@ cantBeBlockedBy blockers attackers gs =
 -- rewrites it, both halves being words on the source's card.
 cantAttackPlayer :: [ObjectId] -> [PlayerId] -> GameState -> Set (ObjectId, PlayerId)
 cantAttackPlayer candidates players gs =
-  let named source affected creature =
+  let rows = gathered gs
+      named source affected creature =
         Projection.affects
           source
           creature
           affected
           (Projection.project creature gs)
           gs
-      fromRestriction (source, changes, restriction) = case attackingPlayer restriction of
+      fromRestriction player (source, changes, restriction) = case attackingPlayer restriction of
         Nothing -> []
         Just (affected, scope) ->
           let subject = if null changes then affected else Projection.rewriteAffected changes affected
               barred = case Projection.controllerOf source gs of
                 Nothing -> []
-                Just you -> filter (\pid -> PlayerEffect.inScope pid you gs scope) players
+                Just you -> filter (\pid -> PlayerEffect.inScope pid you gs scope) [player]
            in [(creature, pid) | creature <- filter (named source subject) candidates, pid <- barred]
-   in Set.fromList (concatMap fromRestriction (inForce gs))
+      -- CR 508.5 through CR 802.3a: this arm's own gate is read at the seat the
+      -- pair names, which is the player being attacked and so the defending player
+      -- of that announcement. One gather, one gate reading per seat,
+      -- cantAttackDefender's shape. No printing gates this arm today.
+      forSeat player = concatMap (fromRestriction player) (filter (not . lifted (Just player) gs) rows)
+   in Set.fromList (concatMap forSeat players)
 
 -- The shared walk behind the two BOUNDS above, over the restrictions `select`
 -- keeps: the tightest of them, or Nothing where none is in force.
@@ -683,7 +760,7 @@ cantAttackPlayer candidates players gs =
 -- another, and the only words a bound prints beyond its gate are a number, which
 -- no text-changing effect in the pool reaches. The gate itself was already
 -- rewritten and asked in `inForce`.
-bounded :: (CombatRestriction.CombatRestriction -> Maybe Natural) -> GameState -> Maybe Natural
-bounded select gs =
+bounded :: (CombatRestriction.CombatRestriction -> Maybe Natural) -> Maybe PlayerId -> GameState -> Maybe Natural
+bounded select defending gs =
   let tighter acc n = Just (maybe n (min n) acc)
-   in List.foldl' tighter Nothing (Maybe.mapMaybe (\(_, _, restriction) -> select restriction) (inForce gs))
+   in List.foldl' tighter Nothing (Maybe.mapMaybe (\(_, _, restriction) -> select restriction) (inForce defending gs))
