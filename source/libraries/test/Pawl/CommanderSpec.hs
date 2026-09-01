@@ -184,7 +184,7 @@ designationSpec s registry = Spec.describe s "Designation" $ do
   -- CR 113.6p in rule 113.6's list rather than under it, so the object's own kind
   -- decides nothing once a row names a zone. Grist, the Hunger Tide ({1}{B}{G}
   -- Legendary Planeswalker -- Grist, "As long as Grist isn't on the battlefield,
-  -- Grist is a 1/1 Insect creature in addition to its other types" -- checked
+  -- it's a 1/1 Insect creature in addition to its other types" -- checked
   -- against Scryfall, 2026-09-01) is an ordinary commander whose row states this
   -- zone, so it is a creature there; CR 113.6c is the negative form that row
   -- expresses, the same one Pawl.ProjectionSpec reads in a hand and on the stack.
