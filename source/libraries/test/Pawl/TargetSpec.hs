@@ -1975,7 +1975,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertBool s (not (activates alone)) "with the Defense alone on the battlefield, its ability is not offered at all"
     Spec.assertBool s (activates together) "and with a Piker beside it, the same ability off the same floating five is offered"
 
-  -- The two cases above put CR 601.2c's "another" on a card chosen once. CR
+  -- The three cases above put CR 601.2c's "another" on a card chosen once. CR
   -- 700.2d puts it on a card whose mode may be chosen twice, and then the
   -- filter's slot NAME has to follow the occurrence exactly as the key and the
   -- pool do -- read under its printed name from occurrence 1 it names occurrence
