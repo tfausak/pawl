@@ -1232,7 +1232,7 @@ copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- Fall of the Hammer {1}{R} Instant (data/cards/fall-of-the-hammer.json):
   -- "Target creature you control deals damage equal to its power to another
   -- target creature." Its victim slot is Filter.Not (Filter.IsBound "dealer"),
-  -- the pool's filter-side sibling read (Pawl.TargetSpec has its cast-time case).
+  -- a filter-side sibling read (Pawl.TargetSpec has its cast-time cases).
   --
   -- THREE RUNS off one board, differing in exactly one thing -- the answer CR
   -- 707.10c's prompt is given -- and no two share a number. The Wall of Stone is

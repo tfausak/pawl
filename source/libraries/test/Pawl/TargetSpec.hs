@@ -1931,12 +1931,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "the victim slot is offered the Piker by itself" (slotNamed "victim") (Set.singleton (Recipient.ToCreature dealerId))
     Spec.assertEqWith s "and so is the dealer slot" (slotNamed "dealer") (Set.singleton (Recipient.ToCreature dealerId))
 
-  -- The case above put CR 601.2c's "another" on a card chosen once. CR 700.2d
-  -- puts it on a card whose mode may be chosen twice, and then the filter's slot
-  -- NAME has to follow the occurrence exactly as the key and the pool do -- read
-  -- under its printed name from occurrence 1 it names occurrence 0's dealer, and
-  -- the creature occurrence 1 itself named becomes a legal victim of its own
-  -- damage. Weaker than printed, in the caster's favour.
+  -- The two cases above put CR 601.2c's "another" on a card chosen once. CR
+  -- 700.2d puts it on a card whose mode may be chosen twice, and then the
+  -- filter's slot NAME has to follow the occurrence exactly as the key and the
+  -- pool do -- read under its printed name from occurrence 1 it names occurrence
+  -- 0's dealer, and the creature occurrence 1 itself named becomes a legal victim
+  -- of its own damage. Weaker than printed, in the caster's favour.
   --
   -- Synthetic Hammer Refrain {1}{R} Instant
   -- (data/cards/synthetic-hammer-refrain.json): "Choose two. You may choose the
