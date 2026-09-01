@@ -293,6 +293,7 @@ import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
+import qualified Pawl.Types.ZoneScope as ZoneScope
 import qualified System.Directory as Directory
 
 -- Not red-specific despite its first callers: just the Maybe wrapper every
@@ -3642,7 +3643,7 @@ objectRefFilters ref = case ref of
   -- Day of Judgment's "all creatures", Boil's "all Islands".
   ObjectRef.EachMatching f -> unframed [f]
   -- Rise of the Dark Realms' "all creature cards from all graveyards"; its
-  -- GraveyardScope names players rather than characteristics, so the Filter is
+  -- ZoneScope names players rather than characteristics, so the Filter is
   -- the whole of what there is to lint.
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard _ f) -> unframed [f]
   -- Ignorant Bliss' "all cards from your hand" holds none: the printing takes
@@ -3684,7 +3685,7 @@ objectRefFilters ref = case ref of
   -- match-defining Filter here, and whatever a Count or a CR 122.1b counter kind
   -- under the count would hold via the arm above's route.
   ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil _ f _) -> unframed [f] <> refFilters ref
-  -- Port of Karfell's "a creature card from your graveyard"; its PlayerScope and
+  -- Port of Karfell's "a creature card from your graveyard"; its ZoneScope and
   -- its Chooser name players, so the Filter is the whole of what there is to
   -- lint, exactly as for the graveyard sweep above.
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ f) -> unframed [f]
@@ -8337,7 +8338,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     exhume <- S.printingOf s registry "Exhume"
     let anyCard = Filter.Type.HasCardType CardType.Creature
         group = SlotName.MkSlotName (Text.pack "revealed")
-        inGraveyard = ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.You anyCard)
+        inGraveyard = ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController (ZoneScope.Scoped PlayerScope.You) anyCard)
         inHand = ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard)
         fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard (Quantity.Type.Literal 1) (PlayerRef.Relative PlayerRelation.You))
         atRandom = ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.You)

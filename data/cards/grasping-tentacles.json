@@ -11,12 +11,21 @@
           "value": {
             "type": "Colored",
             "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
               "type": "Black"
             }
           }
         }
       ],
-      "name": "Corpse Churn",
+      "name": "Grasping Tentacles",
       "spell": {
         "modes": [
           {
@@ -27,14 +36,12 @@
                     "type": "Mill",
                     "value": {
                       "player": {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
+                        "type": "InSlot",
+                        "value": "opponent"
                       },
                       "quantity": {
                         "type": "Literal",
-                        "value": 3
+                        "value": 8
                       }
                     }
                   }
@@ -54,19 +61,17 @@
                           "filter": {
                             "type": "HasCardType",
                             "value": {
-                              "type": "Creature"
+                              "type": "Artifact"
                             }
                           },
                           "players": {
-                            "type": "Scoped",
-                            "value": {
-                              "type": "You"
-                            }
+                            "type": "InSlot",
+                            "value": "opponent"
                           }
                         }
                       },
                       "zone": {
-                        "type": "Hand"
+                        "type": "Battlefield"
                       }
                     }
                   }
@@ -75,14 +80,27 @@
                   "type": "Optional"
                 }
               }
-            ]
+            ],
+            "targetSlots": {
+              "opponent": {
+                "filter": {
+                  "type": "IsPlayer",
+                  "value": {
+                    "type": "Opponent"
+                  }
+                },
+                "pool": {
+                  "type": "Players"
+                }
+              }
+            }
           }
         ]
       },
       "typeLine": {
         "types": [
           {
-            "type": "Instant"
+            "type": "Sorcery"
           }
         ]
       }

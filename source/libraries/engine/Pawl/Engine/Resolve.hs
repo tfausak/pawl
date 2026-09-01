@@ -159,7 +159,6 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
-import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
@@ -214,7 +213,6 @@ import Pawl.Types.PlayerRef (PlayerRef)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
-import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
@@ -274,6 +272,7 @@ import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
+import qualified Pawl.Types.ZoneScope as ZoneScope
 
 -- The read side of the D4 dataflow lint: WHICH slots, and HOW MANY recipients
 -- apiece (a slot read through an ObjectRef can hold CR 601.2c's "up to two").
@@ -361,13 +360,13 @@ chooserSlots chooser = case chooser of
   Chooser.EachInScope -> Map.empty
   Chooser.BoundInSlot slot -> Map.singleton slot SlotArity.One
 
--- The slots a GraveyardScope reads. Only InSlot names one, and at arity Many: the
+-- The slots a ZoneScope reads. Only InSlot names one, and at arity Many: the
 -- reader takes the whole recipient set, so "each of up to two target players'
 -- graveyards" would be seen whole.
-graveyardScopeSlots :: GraveyardScope.GraveyardScope -> Map.Map SlotName SlotArity
-graveyardScopeSlots scope = case scope of
-  GraveyardScope.Scoped _ -> Map.empty
-  GraveyardScope.InSlot slot -> Map.singleton slot SlotArity.Many
+zoneScopeSlots :: ZoneScope.ZoneScope -> Map.Map SlotName SlotArity
+zoneScopeSlots scope = case scope of
+  ZoneScope.Scoped _ -> Map.empty
+  ZoneScope.InSlot slot -> Map.singleton slot SlotArity.Many
 
 -- The slots an ObjectRef reads. InSlot names one directly, and
 -- EachCardInGraveyard and EachCardInHand name one through their scope; the other
@@ -389,12 +388,12 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- targets. Reported, not dropped, because the D4 dataflow lint reads this: a
   -- card whose ONLY use of that slot is the scope would otherwise declare a
   -- target nothing reads.
-  ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope _) -> graveyardScopeSlots scope
+  ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope _) -> zoneScopeSlots scope
   ObjectRef.EachCardInYourHand -> Map.empty
   -- The arm above's scope over the other per-player zone, reported for its
   -- reason: Amnesia's ONLY use of its target slot is this scope, so dropping the
   -- read would have the D4 dataflow lint call that target unread.
-  ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand scope _) -> graveyardScopeSlots scope
+  ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand scope _) -> zoneScopeSlots scope
   -- EachCardInYourHand's answer over the other hidden per-player zone: the
   -- seat is CR 109.5's "you", so no slot names it.
   ObjectRef.EachCardInYourLibrary -> Map.empty
@@ -410,8 +409,10 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- What a MATCH is is a Filter, and no arm here reports the slots a Filter
   -- reads, for the reason the header states.
   ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil _ _ count) -> quantitySlots count
-  -- CR 109.5: whose graveyards names no slot; who CHOOSES may.
-  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser _ _) -> chooserSlots chooser
+  -- Both halves name a slot: WHO CHOOSES through the Chooser, and WHOSE
+  -- graveyards through the scope -- reported for EachCardInGraveyard's reason,
+  -- since Grasping Tentacles' scope is a read of the slot its own mill targets.
+  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser scope _) -> joinTwo (chooserSlots chooser) (zoneScopeSlots scope)
   -- CR 402.3: the choosers own the hands, so the PlayerRef is the whole read --
   -- reported by objectRefPlayerRefs rather than here.
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand _ _) -> Map.empty
@@ -1147,13 +1148,13 @@ poolSlot pool = case pool of
   Pool.SpellsAndPermanents -> Map.empty
   Pool.PlayersAndPlaneswalkers -> Map.empty
   Pool.CardsInGraveyard scope -> case scope of
-    GraveyardScope.Scoped _ -> Map.empty
-    GraveyardScope.InSlot slot -> oneSlot slot
+    ZoneScope.Scoped _ -> Map.empty
+    ZoneScope.InSlot slot -> oneSlot slot
   Pool.CardsInExile -> Map.empty
   -- The graveyard half's scope; the battlefield half names no slot.
   Pool.CreaturesAndCardsInGraveyard scope -> case scope of
-    GraveyardScope.Scoped _ -> Map.empty
-    GraveyardScope.InSlot slot -> oneSlot slot
+    ZoneScope.Scoped _ -> Map.empty
+    ZoneScope.InSlot slot -> oneSlot slot
 
 -- Both sides of a comparison are a Quantity, and either may read a slot.
 conditionSlots :: Condition.Type.Condition -> Map.Map SlotName SlotArity
@@ -2955,17 +2956,17 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.ChosenPermanent _ -> []
   -- EachMatching's sweep with CR 109.2's battlefield default switched off by the
   -- card's own words (CR 109.2a), over CR 400.1's per-player zone. Whose
-  -- graveyards is graveyardScopePlayers below -- either the perspective's own
+  -- graveyards is zoneScopePlayers below -- either the perspective's own
   -- reading of CR 109.5 or the players another slot of this announcement targets
   -- -- and what matches within each is graveyardCardsOf.
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope filter_) ->
-    concatMap (\pid -> graveyardCardsOf (effectContext (Game.teams gs) controller source legal (slotBindings resolving gs)) gs pid filter_) (graveyardScopePlayers legal controller gs scope)
+    concatMap (\pid -> graveyardCardsOf (effectContext (Game.teams gs) controller source legal (slotBindings resolving gs)) gs pid filter_) (zoneScopePlayers legal controller gs scope)
   -- CR 400.1's per-player zone again, but only the RESOLVING CONTROLLER's, so no
   -- scope to fold over and no APNAP order to impose. In the zone's own order,
   -- which no rule reads: CR 402.3 leaves a hand's arrangement to its owner.
   ObjectRef.EachCardInYourHand -> Game.zoneMembers Zone.Hand controller gs
   -- The arm above's zone under EachCardInGraveyard's scope and filter: CR
-  -- 109.2a's reading again, over the hands graveyardScopePlayers names rather
+  -- 109.2a's reading again, over the hands zoneScopePlayers names rather
   -- than the resolving controller's alone. In APNAP order (CR 608.2f) across
   -- seats, and within a seat in the hand's own order, which no rule reads (CR
   -- 402.3) -- the arm above's answer.
@@ -2983,7 +2984,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
         held pid = case mFilter of
           Nothing -> Game.zoneMembers Zone.Hand pid gs
           Just filter_ -> handCardsOf context gs pid filter_
-     in concatMap held (graveyardScopePlayers legal controller gs scope)
+     in concatMap held (zoneScopePlayers legal controller gs scope)
   -- CR 400.1's other hidden per-player zone, and only the RESOLVING
   -- CONTROLLER's, so no scope to fold over and no APNAP order to impose --
   -- EachCardInYourHand's answer above. CR 400.12 is what makes "from your
@@ -3110,27 +3111,19 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- Answered for real by the REVEAL arm, over the seats handChoosers names.
   ObjectRef.RandomCardInHand _ -> []
 
--- The players a PlayerScope names, in APNAP order: the seat half of
--- graveyardCards, needed by ObjectRef.ChosenCardInGraveyard's EachInScope
--- chooser, which asks each seat separately. An absent perspective is empty.
---
--- No bindings, and none to pass: a PlayerScope has no arm that names a slot,
--- which is exactly why ObjectRef.EachCardInGraveyard stopped carrying one.
-graveyardPlayers :: PlayerId -> GameState -> PlayerScope.PlayerScope -> [PlayerId]
-graveyardPlayers controller gs = graveyardScopePlayers Map.empty controller gs . GraveyardScope.Scoped
-
--- graveyardPlayers over the WIDER scope an ObjectRef.EachCardInGraveyard carries,
--- and the function that actually reads it: whose graveyards is
--- Target.graveyardScopePlayers, the same answer a target pool over CR 400.1's
+-- The players a ZoneScope names, in APNAP order -- whose graveyards is
+-- Target.zoneScopePlayers, the same answer a target pool over CR 400.1's
 -- per-player zone gets, and the order imposed on it here is APNAP (CR 608.2f, CR
--- 101.4) restricted to the players still in the game.
+-- 101.4) restricted to the players still in the game. The seat half of both
+-- graveyardCards and ObjectRef.ChosenCardInGraveyard's EachInScope chooser,
+-- which asks each seat separately.
 --
 -- The bindings are the ones the CALLER holds, which is CR 608.2b's re-checked set
 -- at resolution: an InSlot scope naming a slot whose target went illegal names
 -- nobody, and CR 101.3 ignores that share of the effect.
-graveyardScopePlayers :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> GraveyardScope.GraveyardScope -> [PlayerId]
-graveyardScopePlayers bindings controller gs scope =
-  let named = Target.graveyardScopePlayers (Just controller) bindings scope gs
+zoneScopePlayers :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> ZoneScope.ZoneScope -> [PlayerId]
+zoneScopePlayers bindings controller gs scope =
+  let named = Target.zoneScopePlayers (Just controller) bindings scope gs
    in filter (`elem` named) (Game.apnapOrder gs)
 
 -- The cards in ONE player's graveyard matching the filter, in ascending
@@ -3149,13 +3142,13 @@ graveyardCardsOf context gs pid filter_ =
 
 -- The cards in the named graveyards matching the filter, for
 -- ChosenCardInGraveyard's TheController chooser -- ObjectRef.EachCardInGraveyard
--- is this fold over the wider scope, spelled out at its own arm. A card in a
+-- is this same fold, spelled out at its own arm. A card in a
 -- graveyard has no controller, so Filter.ControlledBy is vacuously False. APNAP
 -- (CR 101.4) then ascending ObjectId, not the graveyard's own pile order (CR
 -- 404.2), which no rule makes a batch's processing order.
-graveyardCards :: Filter.Context -> PlayerId -> GameState -> PlayerScope.PlayerScope -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
-graveyardCards context controller gs scope filter_ =
-  concatMap (\pid -> graveyardCardsOf context gs pid filter_) (graveyardPlayers controller gs scope)
+graveyardCards :: Filter.Context -> Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> ZoneScope.ZoneScope -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
+graveyardCards context bindings controller gs scope filter_ =
+  concatMap (\pid -> graveyardCardsOf context gs pid filter_) (zoneScopePlayers bindings controller gs scope)
 
 -- The seats an ObjectRef.ChosenCardInHand asks -- and an
 -- ObjectRef.RandomCardInHand reads -- in APNAP order. One list, not a chooser
@@ -4262,7 +4255,7 @@ chooseNewTargetsFor controller copyId = do
           -- for a copy that object IS the announcement's holder. So the behaviour
           -- Pawl.CopySpec's stirCopySpec proves stands with this seed empty too,
           -- and what the seed adds is every OTHER slot atom -- Filter's
-          -- SameNameAsBound and IsBound, a GraveyardScope.InSlot pool -- reading a
+          -- SameNameAsBound and IsBound, a ZoneScope.InSlot pool -- reading a
           -- binding of the copy's that is not one of the re-chosen slots. Nothing
           -- drives that half: stirCopySpec is the only case that copies a spell
           -- whose slot reads the announcement at all, and its slot reads the X.
@@ -5378,10 +5371,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor asked gs) asked source offered)
                         pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
                 case chooser of
-                  Chooser.TheController -> ask controller (graveyardCards (chooseContext gs) controller gs scope filter_)
+                  Chooser.TheController -> ask controller (graveyardCards (chooseContext gs) legal controller gs scope filter_)
                   Chooser.EachInScope ->
                     fmap concat . Monad.mapM (\pid -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)) $
-                      graveyardPlayers controller gs scope
+                      zoneScopePlayers legal controller gs scope
                   -- ONE chooser, read out of the slot a ChooseOpponent bound,
                   -- choosing out of their own graveyard. Through playerRefPlayers so
                   -- the slot is read as every other is (CR 608.2b): an unfilled,
@@ -5390,7 +5383,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- a chooser the scope does not name is offered nothing.
                   Chooser.BoundInSlot slot ->
                     case playerRefPlayers legal controller gs (PlayerRef.InSlot slot) of
-                      [pid] | List.elem pid (graveyardPlayers controller gs scope) -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)
+                      [pid] | List.elem pid (zoneScopePlayers legal controller gs scope) -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)
                       _ -> pure []
               -- The arm above over the hidden zone CR 400.2 makes a hand: what it
               -- says about when the candidates are read (CR 608.2c), about the asks

@@ -6,7 +6,7 @@ import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 
--- | Tagged, in Pawl.Codec.GraveyardScope's shape for the same pair of readings: a
+-- | Tagged, in Pawl.Codec.ZoneScope's shape for the same pair of readings: a
 -- nested PlayerScope, or the thing the second arm names.
 --
 -- PARAMETRIC in that second thing, because both of the type's instantiations are

@@ -1,6 +1,6 @@
 module Pawl.Types.Pool where
 
-import qualified Pawl.Types.GraveyardScope as GraveyardScope
+import qualified Pawl.Types.ZoneScope as ZoneScope
 
 -- | CR 115: the closed set of recipient kinds a target slot may draw from, fixing
 -- both WHICH objects are candidates and HOW they are referenced
@@ -59,7 +59,7 @@ data Pool
     -- untagged card, exactly as it is for Permanents, and the pool is DISJOINT
     -- from Creatures rather than a widening of it.
     --
-    -- The GraveyardScope is the axis no battlefield pool needs and this one
+    -- The ZoneScope is the axis no battlefield pool needs and this one
     -- cannot do without: CR 400.1 gives each player their own graveyard, so
     -- "your graveyard" (Raise Dead), "an opponent's", "a graveyard" (Withered
     -- Wretch) and "their graveyard" (Dwell on the Past) are different candidate
@@ -69,7 +69,7 @@ data Pool
     --
     -- No pool reaches a hand or a library, so a graveyard and exile below are
     -- the only other zones clause (a) can name here (#559).
-    CardsInGraveyard GraveyardScope.GraveyardScope
+    CardsInGraveyard ZoneScope.ZoneScope
   | -- | CR 406.1: the cards in the exile zone (ToObject) -- Riftsweeper's "choose
     -- target face-up exiled card". Clause (a)'s other-zone half again. Public
     -- (CR 400.2), so every candidate is visible to the chooser -- that rule's
@@ -111,7 +111,7 @@ data Pool
     -- graveyard half under CR 109.2a. A filter that can only hold of one zone's
     -- members simply empties the other half.
     --
-    -- Carries CardsInGraveyard's GraveyardScope for that pool's reason (CR 400.1's
+    -- Carries CardsInGraveyard's ZoneScope for that pool's reason (CR 400.1's
     -- per-player graveyards) and for no other: the battlefield half needs none.
-    CreaturesAndCardsInGraveyard GraveyardScope.GraveyardScope
+    CreaturesAndCardsInGraveyard ZoneScope.ZoneScope
   deriving (Eq, Ord, Show)

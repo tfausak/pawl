@@ -81,12 +81,12 @@ data ObjectRef
     -- A hidden zone (CR 400.2) owes a visibility question a graveyard does not,
     -- and Pawl.Types.EachCardInHand is where that answer is written.
     --
-    -- The Pawl.Types.GraveyardScope is WHOSE, which CR 400.1 forces this arm to
+    -- The Pawl.Types.ZoneScope is WHOSE, which CR 400.1 forces this arm to
     -- say and EachMatching's shared battlefield never has to. The SAME type a
     -- target pool carries, so both readings are stated once: the perspective's
     -- own (Rise of the Dark Realms' "all graveyards") and the players another
     -- slot of the announcement targets (Angel of Finality's "target player's
-    -- graveyard"). Read by Pawl.Engine.Target.graveyardScopePlayers for both, so
+    -- graveyard"). Read by Pawl.Engine.Target.zoneScopePlayers for both, so
     -- the sweep and the pool cannot drift.
     --
     -- Not a target and never one (CR 115.10a), and swept when the effect executes
@@ -121,7 +121,7 @@ data ObjectRef
     -- it, the first by asking that hand's own owner (CR 402.3) and the second by
     -- naming the card without anybody looking at all.
     EachCardInYourHand
-  | -- | Every card in the hands a Pawl.Types.GraveyardScope names that the
+  | -- | Every card in the hands a Pawl.Types.ZoneScope names that the
     -- optional Filter matches -- Amnesia's "target player reveals their hand and
     -- discards all nonland cards". EachCardInGraveyard's scope and filter over
     -- the arm above's zone, both of which that arm declines;
@@ -390,7 +390,7 @@ data ObjectRef
     -- does not, so the choice is made while applying the effect (CR 608.2d)
     -- rather than announced on the stack (CR 601.2c), and CR 608.2b has nothing
     -- to re-validate. That is also why the arm is here rather than in
-    -- Pawl.Types.GraveyardScope, which is a TARGET pool: the two questions look
+    -- Pawl.Types.ZoneScope, which is a TARGET pool: the two questions look
     -- alike on the board and differ in every rule that reads them -- shroud,
     -- hexproof, "becomes the target" triggers and the fizzle.
     --
@@ -404,14 +404,11 @@ data ObjectRef
     -- from their graveyard to their hand", where Effect.ChooseOpponent filled the
     -- slot a sentence earlier.
     --
-    -- Still a PlayerScope where EachCardInGraveyard now takes a
-    -- Pawl.Types.GraveyardScope: no card in data/cards/ draws these candidates
-    -- from the graveyards another slot names, and Skullwinder -- whose CHOOSER is
-    -- slot-bound -- draws from "a graveyard" rather than that opponent's. Not
-    -- implemented: a slot-named scope here (#1952).
-    --
-    -- The PlayerScope is WHOSE GRAVEYARDS the candidates are drawn from, which
-    -- CR 400.1 forces this arm to say for EachCardInGraveyard's reason. Under
+    -- The Pawl.Types.ZoneScope is WHOSE GRAVEYARDS the candidates are drawn
+    -- from, which CR 400.1 forces this arm to say for EachCardInGraveyard's
+    -- reason -- and the same type that arm carries, so the InSlot reading is
+    -- open here too: Grasping Tentacles' "an artifact card from that player's
+    -- graveyard" names the seat its own mill targeted. Under
     -- TheController it is independent of the chooser -- `You` is Port of
     -- Karfell's "your graveyard", and the wider scopes are Extract from
     -- Darkness' "a graveyard", still chosen from by the effect's controller.

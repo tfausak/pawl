@@ -653,7 +653,7 @@ aimAtObject oid p = case p of
 --
 -- Lightning Bolt in ALICE's graveyard and Raise Dead in BOB's. Two different
 -- cards, both admitted by the slot's own filter (instant, sorcery), so the pool's
--- GraveyardScope is the only thing that can tell them apart. With alice's
+-- ZoneScope is the only thing that can tell them apart. With alice's
 -- graveyard alone, "from your graveyard" and "from any graveyard" put the same
 -- card in the same hand and the case would prove nothing about CR 400.1's
 -- per-player zone; with an EMPTY graveyard the trigger has no legal target, CR
