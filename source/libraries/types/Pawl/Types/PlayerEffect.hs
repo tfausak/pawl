@@ -341,7 +341,7 @@ data PlayerEffect
     -- through Pawl.Engine.Replacement.collect's third segment, which mints a CR
     -- 615.1 shield off Pawl.Engine.PlayerEffect.protectionCarriers -- the player
     -- twin of the row Pawl.Engine.Keyword mints from the keyword. Proven by
-    -- Pawl.PlayerEffectSpec's "CR 702.16e" Runed Halo pair.
+    -- Pawl.PlayerEffectSpec's "CR 702.16e" Runed Halo case.
     HasProtectionFromChosenName
   | -- | CR 601.3b / Vedalken Orrery: this player may cast a matching spell as
     -- though it had flash -- which by CR 702.8a and CR 117.1a's first sentence

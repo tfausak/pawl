@@ -4105,14 +4105,15 @@ runedHaloBoard plains halo curse =
 -- runedHaloBoard carried through one combat: the Halo enters naming `name`, bob's
 -- Goblin Piker attacks `defender` alone, and the pair (before, after) comes back
 -- so a case can read the life it cost. Nothing blocks -- neither alice nor carol
--- has a creature -- so CR 510.1c assigns the Piker's 2 to the defending player.
+-- has a creature -- so CR 510.1b assigns the Piker's 2 to the player it attacks.
 --
 -- COMBAT damage and not a burn spell, which is the whole reason this helper
 -- exists: rule 702.16b already stops a spell with the chosen name from TARGETING
 -- the protected player, so a Lightning Bolt aimed at alice never reaches rule
 -- 702.16e -- and a case built on one stays green with the prevention deleted,
--- which is how this one was found. Combat damage targets nothing (CR 508.1),
--- so rule 702.16e is the only thing that can stop it.
+-- which is how this one was found. CR 510.2's combat damage is a turn-based
+-- action that uses no stack and chooses no CR 115.1 target, so rule 702.16e is
+-- the only clause of rule 702.16 that can stop it.
 --
 -- The attacker is bob's, so it is bob's combat: the board is re-pointed at him
 -- after the Halo resolves on alice's own main phase, which is the only order
