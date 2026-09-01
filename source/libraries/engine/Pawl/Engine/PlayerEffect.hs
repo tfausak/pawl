@@ -1822,8 +1822,8 @@ protectedFromGiven rows oid gs =
         PlayerEffect.HasProtectionFromChosenName -> not (Set.null (Set.intersection (chosenNamesOf source gs) names))
         -- CR 702.18a and CR 702.11c are a different immunity, and a narrower
         -- one: they stop TARGETING alone, where rule 702.16 also bars an Aura
-        -- and, by rule 702.16e, prevents damage (#2878). Read at their own
-        -- gate (protectedFromTargeting above).
+        -- and, by rule 702.16e, prevents damage. Read at their own gate
+        -- (protectedFromTargeting above).
         PlayerEffect.CantBeTargetedBy _ -> False
         -- Every other arm is about casting, playing, countering, searching,
         -- paying, keeping mana or how a coin flip came out. None of them says
@@ -1860,6 +1860,72 @@ protectedFromGiven rows oid gs =
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
    in any stops rows
+
+-- CR 702.16e's damage half, as the (protected player, carrier) pairs
+-- Pawl.Engine.Replacement.collect mints a CR 615.1 shield from: "any damage that
+-- would be dealt by sources that have the stated quality to a permanent or player
+-- with protection is prevented."
+--
+-- The third consequence of the one relation protectedFrom above answers, and the
+-- only one this module cannot answer itself: the other two are gates a caller
+-- asks (Pawl.Engine.Target.targetable, Pawl.Engine.Sba.fallsOff), where a
+-- prevention is a replacement effect that has to exist as a row before an event
+-- is proposed. So this returns the CARRIER and leaves the row to that module,
+-- which is where every other prevention shield is built.
+--
+-- The carrier and not the names, deliberately: the shield's source side is CR
+-- 201.4's chosen names read off it through chosenNamesOf, so the names stay a
+-- LIVE read at the damage event (CR 609.7b's recheck) rather than a set frozen
+-- when the pair was gathered.
+--
+-- A row with no carrier makes no pair, which costs nothing today -- both carriers
+-- on this axis name their source (see `applying`) -- and is the honest answer
+-- rather than a shield from nowhere.
+--
+-- ONE PAIR PER (player, carrier), which is CR 702.16m's redundancy arriving for
+-- free on the far side: two carriers naming one card give the player two
+-- PreventAll rows, and the second has nothing left to prevent.
+--
+-- A walk per SEAT, which is what `applying` is, rather than one gather over the
+-- axis: CR 116.2d's ignore and every scope in Pawl.Types.PlayerScope are asked
+-- about a particular player, so a single-pass version would restate both.
+protectionCarriers :: GameState -> [(PlayerId, ObjectId)]
+protectionCarriers gs =
+  let carrier pid (source, effect) = case effect of
+        PlayerEffect.HasProtectionFromChosenName -> fmap (\oid -> (pid, oid)) source
+        PlayerEffect.CantBeTargetedBy _ -> Nothing
+        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantCastMoreThan _ -> Nothing
+        PlayerEffect.CantCastChosenName -> Nothing
+        PlayerEffect.CantPlayLandChosenName -> Nothing
+        PlayerEffect.IncreaseSpellCost {} -> Nothing
+        PlayerEffect.IncreaseActivationCost {} -> Nothing
+        PlayerEffect.ReduceSpellCost {} -> Nothing
+        PlayerEffect.ReduceActivationCost {} -> Nothing
+        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AddSpellCost {} -> Nothing
+        PlayerEffect.PlayAdditionalLands _ -> Nothing
+        PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.SetMaximumHandSize _ -> Nothing
+        PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
+        PlayerEffect.ReduceMaximumHandSize _ -> Nothing
+        PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.SpendManaAsThough _ -> Nothing
+        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.CantBeCountered _ -> Nothing
+        PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.DamageCantBeRedirected _ -> Nothing
+        PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
+        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CastFromGraveyard _ -> Nothing
+        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
+        PlayerEffect.CantGetCounters _ -> Nothing
+        PlayerEffect.StateCoinFlip _ -> Nothing
+   in concatMap (\pid -> Maybe.mapMaybe (carrier pid) (applying pid gs)) (Game.stillPlaying gs)
 
 -- CR 305.2: the number of lands a player may normally play during their turn.
 -- The base of landPlaysAllowed below, named for the same reason

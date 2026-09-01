@@ -1413,7 +1413,9 @@ mintedReplacementsFor keyword count = case keyword of
   --
   -- The PERMANENT half only. Rule 702.16e's "or player" is unreachable from a
   -- keyword -- a player has no keywords, the same split
-  -- Pawl.Engine.Target.targetable states for CR 702.16b.
+  -- Pawl.Engine.Target.targetable states for CR 702.16b -- so the player half is
+  -- minted from the CR 613.11 axis instead, by Pawl.Engine.Replacement.collect's
+  -- third segment.
   Keyword.Protection quality ->
     [ ReplacementEffect.DamageR
         DamageR.MkDamageR
