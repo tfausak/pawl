@@ -1249,6 +1249,7 @@ entryRewriteReads rewrite = case rewrite of
   EntryRewrite.ChooseBasicLandType -> ([], [])
   EntryRewrite.ChoosePlayer -> ([], [])
   EntryRewrite.ChooseCardNames restriction -> ([restriction], [])
+  EntryRewrite.ChooseCardName restriction -> ([restriction], [])
   -- CR 614.1c's count per kind, evaluated as the row applies and against the ROW's
   -- Context (Pawl.Engine.Event's WithCounters arm), so a Quantity.InSlot in one
   -- reads the captured map. The KINDS beside them cannot name a slot.

@@ -18,6 +18,7 @@ import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
@@ -361,6 +362,20 @@ fallsOff pcs gs oid = case Map.lookup oid pcs of
             -- becomesUnattached carries rule 702.16d's sentence for the same
             -- reason, off the same answer.
             || Maybe.maybe False (\host -> AttachRestriction.refusesGiven pcs oid host gs) (Recipient.objectOf recipient)
+            -- CR 702.16c's second sentence again, for a PLAYER host. The clause
+            -- above cannot carry it: a player has no keywords for
+            -- Pawl.Engine.Keyword to mint an AttachRestriction row from, so the
+            -- prohibition rides the CR 613.11 player axis instead
+            -- (Pawl.Types.PlayerEffect.HasProtectionFromChosenName). Rule
+            -- 702.16d has no player half, so becomesUnattached above needs no
+            -- twin of this.
+            --
+            -- No `pcs` to read it off: Pawl.Engine.PlayerEffect.applying gathers
+            -- the CR 613.11 axis from the board rather than from the layer
+            -- machine, so the pre-pass map holds nothing this asks for. Paid
+            -- only by an Aura attached to a player, which is no Aura at all on
+            -- almost every board.
+            || Maybe.maybe False (\pid -> PlayerEffect.protectedFrom oid pid gs) (Recipient.playerOf recipient)
 
 -- CR 303.4c: is `recipient` still one the enchanting Aura `source`'s enchant
 -- slot ADMITS?

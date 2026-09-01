@@ -30,6 +30,7 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Types.CardType as CardType
@@ -107,6 +108,21 @@ attachmentFor src destination gs
   -- 702.5d's enchanted PLAYER is not a permanent, so nothing on the battlefield
   -- can carry a limit about them.
   | Maybe.maybe False (\oid -> AttachRestriction.refuses src oid gs) (Recipient.objectOf destination) = Nothing
+  -- CR 702.16c's player half, which the object-shaped restriction above cannot
+  -- carry: a player has no keywords for Pawl.Engine.Keyword to mint a row from,
+  -- so the prohibition rides the CR 613.11 player axis instead
+  -- (Pawl.Types.PlayerEffect.HasProtectionFromChosenName). Rule 702.16d states
+  -- no player half, and rule 701.3b makes a permanent that is neither Aura,
+  -- Equipment nor Fortification unattachable anyway, so this needs no
+  -- subtype conjunct for the same reason the minted row needs none.
+  --
+  -- A REGRESSION FENCE rather than a proven behaviour: no card in `data/cards/`
+  -- attaches an Aura to a player by a CR 701.3 move, and CR 608.3c's Aura spell
+  -- reaches its player without coming through here, so Pawl.Engine.Sba.fallsOff
+  -- is the gate the pool actually drives. Written because CR 101.2 makes the
+  -- "can't" beat rule 701.3a's permission below, exactly as the object case
+  -- above is.
+  | Maybe.maybe False (\pid -> PlayerEffect.protectedFrom src pid gs) (Recipient.playerOf destination) = Nothing
   -- CR 301.5, "it can't legally be attached to anything that isn't a creature" --
   -- which is also why a player destination falls to Nothing here rather than
   -- getting a branch of its own.

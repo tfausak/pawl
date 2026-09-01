@@ -1694,6 +1694,23 @@ apply batch candidate event =
           let stamp o = o {Object.chosenNames = picked}
            in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
         pure (Just event)
+      -- CR 614.1c with CR 201.4: Runed Halo's as-enters name choice. The arm
+      -- above with ONE chooser -- the card names its controller and nobody else
+      -- -- so there is no CR 101.4 ordering to settle and no opponent to pick.
+      EntryRewrite.ChooseCardName restriction -> do
+        gs <- State.get
+        picked <- case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for the arm above's reason: names NOTHING
+          -- rather than conjuring one, CR 201.4's offer being every card in the
+          -- Oracle card reference.
+          Nothing -> pure Set.empty
+          Just controller ->
+            fmap Set.singleton (Game.choose (Prompt.ChooseCardName (Decide.deciderFor controller gs) controller oid restriction))
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        State.modify' $ \g ->
+          let stamp o = o {Object.chosenNames = picked}
+           in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
+        pure (Just event)
       -- CR 306.5b via CR 614.1c: this permanent enters with N counters. Into the
       -- pending map through addEnteringCounters, and NOT a direct write to
       -- Object.counters, because CR 614.16 makes a counter-scaling replacement

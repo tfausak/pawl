@@ -16,7 +16,7 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- (CR 208.2b); ChoiceByCoinFlip is Molten Sentry, the same options picked by CR
 -- 705.2's winnerless coin flip; ChooseColor is Painter's Servant (CR 614.1c);
 -- ChooseBasicLandType is Convincing Mirage (CR 614.1c); ChoosePlayer is Stuffy
--- Doll (CR 614.1c); ChooseCardNames is Null
+-- Doll (CR 614.1c); ChooseCardName is Runed Halo and ChooseCardNames is Null
 -- Chamber (CR 614.1c with CR 201.4); WithCounters is CR 306.5b's intrinsic
 -- loyalty; UnderSourceControl is Gather Specimens (CR 616.1b); Tapped is Zof
 -- Bloodbog and Headless Skaab (CR 614.1d); PayLifeOrTapped is Razorgrass Field
@@ -119,6 +119,17 @@ data EntryRewrite effect
     -- and passed to the prompt so the answerer can obey it; the engine does not
     -- check the answer against it (#663).
     ChooseCardNames (Filter.Filter Keyword.Keyword)
+  | -- | CR 614.1c with CR 201.4: as this object enters, its CONTROLLER alone
+    -- chooses one card name ("As this enchantment enters, choose a card name" --
+    -- Runed Halo). Written to Object.chosenNames, for ChooseColor's reason.
+    --
+    -- A SEPARATE arm from ChooseCardNames above rather than a count on it,
+    -- because the two differ in WHO chooses and not only in how many: that arm's
+    -- second name is an opponent's, which no number can say.
+    --
+    -- The Filter is CR 201.4a's restriction, read and passed exactly as that
+    -- arm's is; Runed Halo states none and writes `And []`.
+    ChooseCardName (Filter.Filter Keyword.Keyword)
   | -- | CR 614.1c's other shape: "[This permanent] enters with ...". Printed
     -- (Barkhide Troll, Workhorse) and minted alike -- CR 306.5b's intrinsic
     -- loyalty, CR 310.4b's defense, CR 714.3a's lore counter, and the three

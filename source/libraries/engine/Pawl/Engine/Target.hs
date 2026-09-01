@@ -607,7 +607,16 @@ targetable pcs perspective source sourceView gs recipient =
                 || any protects (Maybe.mapMaybe protectionQuality (Map.keys keywords))
          in not (Set.member oid (GameState.battlefield gs) && restricted)
    in case recipient of
-        Recipient.ToPlayer pid -> not (PlayerEffect.protectedFromTargeting perspective pid gs)
+        -- CR 702.18a's and CR 702.11c's player halves, then CR 702.16b's. Two
+        -- readers because the two rules ask different things: shroud and
+        -- hexproof narrow by WHO controls the spell, and protection by what the
+        -- SOURCE is -- which is `source` here for the same reason
+        -- `restrictedObject` reads `sourceView`, CR 702.16b naming a spell's
+        -- quality and an ability's source in one sentence.
+        Recipient.ToPlayer pid ->
+          let rows = PlayerEffect.applying pid gs
+           in not (PlayerEffect.protectedFromTargetingGiven rows perspective pid gs)
+                && not (PlayerEffect.protectedFromGiven rows source gs)
         Recipient.ToCreature oid -> restrictedObject oid
         Recipient.ToPlaneswalker oid -> restrictedObject oid
         Recipient.ToBattle oid -> restrictedObject oid
