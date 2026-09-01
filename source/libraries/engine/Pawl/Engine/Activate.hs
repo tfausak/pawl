@@ -209,7 +209,7 @@ zoneAbilitiesOf zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs
     let functionsHere = functionsIn zone
         granted ability = case ActivatedAbility.condition ability of
           Nothing -> True
-          Just cond -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Just (Object.owner obj)) (Just oid)) gs oid cond
+          Just cond -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just (Object.owner obj)) (Just oid)) gs oid cond
      in filter (\ability -> functionsHere ability && granted ability) (Face.activatedAbilities face)
   _ -> []
 

@@ -788,6 +788,10 @@ library codec
     Pawl.Codec.TargetCountSpec
     Pawl.Codec.TargetSlot
     Pawl.Codec.TargetSlotSpec
+    Pawl.Codec.TeamId
+    Pawl.Codec.TeamIdSpec
+    Pawl.Codec.Teams
+    Pawl.Codec.TeamsSpec
     Pawl.Codec.Timestamp
     Pawl.Codec.TimestampSpec
     Pawl.Codec.TokenPattern
@@ -1268,6 +1272,7 @@ library test
     Pawl.SplitSecondSpec
     Pawl.Support
     Pawl.TargetSpec
+    Pawl.TeamSpec
     Pawl.Test
     Pawl.TransformSpec
     Pawl.TriggerSpec
@@ -1692,6 +1697,8 @@ library types
     Pawl.Types.TapState
     Pawl.Types.TargetCount
     Pawl.Types.TargetSlot
+    Pawl.Types.TeamId
+    Pawl.Types.Teams
     Pawl.Types.Timestamp
     Pawl.Types.TokenPattern
     Pawl.Types.TokenR

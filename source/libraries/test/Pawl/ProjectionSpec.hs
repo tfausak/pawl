@@ -100,6 +100,7 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -1029,7 +1030,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         -- answer for quantities that name no slot. Resolve's caller supplies the
         -- resolution's own bindings instead, which Pawl.ResolveSpec's Rush of
         -- Blood case is the gameplay-level proof of.
-        freeze = Projection.freezeQuantities gs pikerId pikerId (Filter.contextFor (Just S.alice) (Just pikerId))
+        freeze = Projection.freezeQuantities gs pikerId pikerId (Filter.contextFor Teams.none (Just S.alice) (Just pikerId))
     Spec.assertEqWith
       s
       "read against the SOURCE, the Piker's power locks in at 2"
@@ -4045,7 +4046,7 @@ levelerSpec s registry = Spec.describe s "Leveler" $ do
   Spec.it s "CR 702.87a the Student answers to the level up FAMILY, not only to level up {W}" $ do
     (oid, gs) <- studentBoard s registry 0
     let view = Projection.viewOfObject oid gs
-        context = Filter.contextFor (Just S.alice) (Just oid)
+        context = Filter.contextFor Teams.none (Just S.alice) (Just oid)
         white = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White)])) []
         blue = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []
     Spec.assertBool s (Filter.matches context view (Filter.Type.HasKeywordFamily KeywordFamily.LevelUp)) "the family reaches it"
@@ -4297,7 +4298,7 @@ attachedHostSpec s registry = Spec.describe s "AttachedTo" $ do
         (gownId, g3) = S.addCreature gown S.alice g2
         gs = S.attach gownId swampId g3
         cands = Projection.gather gs
-        context = Filter.contextFor (Just S.alice) (Just gownId)
+        context = Filter.contextFor Teams.none (Just S.alice) (Just gownId)
         onto bound =
           fmap
             (\view -> Filter.matches context view (Filter.Type.AttachedTo (Filter.Type.HasCardType CardType.Creature)))
@@ -4444,7 +4445,7 @@ conditionalAbilitySpec s registry = Spec.describe s "ConditionalActivatedAbility
     let (ogreId, g1) = S.addCreature ogre S.alice (Setup.emptyGame S.bothPlayers)
         gs = snd (S.addCreature nexus S.alice g1)
         cands = Projection.gather gs
-        context = Filter.contextFor (Just S.alice) (Just ogreId)
+        context = Filter.contextFor Teams.none (Just S.alice) (Just ogreId)
         onto bound =
           fmap
             (\view -> Filter.matches context view Filter.Type.HasNonManaActivatedAbility)

@@ -76,7 +76,7 @@ import qualified Pawl.Types.Zone as Zone
 eligible :: Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> PlayerId -> GameState.GameState -> [OutsideCard.OutsideCard]
 eligible predicate source pid gs =
   let pool = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs))
-      context = Filter.contextFor (Just pid) (Just source)
+      context = Filter.contextFor (Game.teams gs) (Just pid) (Just source)
       admits printingId = case Game.cardOfPrinting printingId gs of
         Nothing -> False
         Just card -> Filter.matches context (Projection.viewOfCard (Game.resolveFaceFor Nothing card)) predicate

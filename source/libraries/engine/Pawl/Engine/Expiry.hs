@@ -98,7 +98,7 @@ arm players controller source duration gs = case duration of
   -- one line below.
   Duration.ForAsLongAs cond ->
     let baked = Condition.bakeBound players cond
-     in if Condition.holds (Projection.fullView gs) (Filter.contextFor (Just controller) (Just source)) gs source baked
+     in if Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just controller) (Just source)) gs source baked
           then Just (Expiry.While (While.MkWhile controller baked))
           else Nothing
   -- CR 500.5a / 511.2: "until end of combat" is the end of the combat PHASE, so
@@ -212,7 +212,7 @@ sweepConditional :: Game Bool
 sweepConditional = do
   gs <- State.get
   let survives source expiry = case expiry of
-        Expiry.While (While.MkWhile you cond) -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Just you) (Just source)) gs source cond
+        Expiry.While (While.MkWhile you cond) -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just you) (Just source)) gs source cond
         Expiry.AtCleanup -> True
         Expiry.Never -> True
         -- Alchemy's "perpetually" lasts for the rest of the game, as Never does.

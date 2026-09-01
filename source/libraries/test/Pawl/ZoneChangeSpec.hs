@@ -396,9 +396,9 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
   -- The discriminator, and it needs a THIRD seat: at two players an
   -- `Opponent` arm that reached only ONE opponent is indistinguishable from
   -- one that reaches them all. CR 806.1: in a Free-for-All the players
-  -- compete as individuals, so every other player is an opponent (CR 102.3's
-  -- teammates are the one exception, and pawl has no teams, #175) and both
-  -- of them draw.
+  -- compete as individuals, so every other player is an opponent -- CR 102.3's
+  -- teammates are the one exception, and this board is played between no teams
+  -- -- and both of them draw.
   Spec.it s "CR 806.1 at three seats each opponent draws off Master of the Feast, and only opponents" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     masterOfTheFeast <- S.printingOf s registry "Master of the Feast"

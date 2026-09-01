@@ -223,7 +223,7 @@ attachableWithLastKnown src host gs = case Projection.lastKnownOf host gs of
 hostsFor :: PlayerId -> ObjectId -> ObjectId -> Filter.Type.Filter Keyword.Keyword -> GameState -> [ObjectId]
 hostsFor controller source subject filter_ gs =
   let host = Game.lookupObject subject gs >>= Object.attachedTo >>= Recipient.objectOf
-      context = Filter.contextFor (Just controller) (Just source)
+      context = Filter.contextFor (Game.teams gs) (Just controller) (Just source)
       viewOf oid =
         (Projection.viewOfObject oid gs)
           { Filter.canHostSubject = Maybe.isJust (attachmentFor subject (Recipient.ToObject oid) gs)

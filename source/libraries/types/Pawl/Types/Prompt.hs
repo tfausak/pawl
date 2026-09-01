@@ -199,7 +199,7 @@ data Prompt r where
   -- Pawl.Engine.Resolve checks the permutation. Choose, not target.
   --
   -- Elided only below two candidates. Not implemented: CR 810.9f's "not more
-  -- than one member of each team", pawl having no teams (#175).
+  -- than one member of each team", which is a Two-Headed Giant rule (#2849).
   ChooseRedistribution :: Decider.Decider -> PlayerId.PlayerId -> [(PlayerId.PlayerId, Integer)] -> Prompt (Map.Map PlayerId.PlayerId PlayerId.PlayerId)
   -- | CR 701.54a: which creature a tempted player controls becomes their
   -- Ring-bearer. Choose, not target. Raised only for two or more candidates,

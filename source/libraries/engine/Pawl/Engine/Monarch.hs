@@ -122,7 +122,7 @@ inherentMatch monarch cond gs event = case (cond, event) of
     -- inherent abilities "controlled by the player who was the monarch at the
     -- time the abilities triggered", so they are the "you" CR 109.5 would give a
     -- printed one.
-    scopeOk s a = Event.turnScopeAdmits s a monarch
+    scopeOk s a = Event.turnScopeAdmits (Game.teams gs) s a monarch
 
 -- CR 725.1/725.2: the inherent triggers that fire on this batch of events, as
 -- ordinary PendingTriggers whose source is TriggerSource.Sourceless -- which is
@@ -239,20 +239,20 @@ crown pid gs =
   if GameState.monarch gs == Just pid
     then gs
     else
-      let -- "An opponent" is every player other than the effect's controller. Not
-          -- a two-player shortcut: in a free-for-all every other player is an
-          -- opponent by construction (CR 806.1), so the opponent half of the test
-          -- is just "the crowned player is not the controller". Only CR 102.3's
-          -- teammates would break that, and pawl has no teams (#175).
+      let -- "An opponent" is CR 102.3's: every player not on the entry
+          -- controller's team, which in a free-for-all (CR 806.1) is every other
+          -- player. Game.areOpponents is the predicate, so a teammate crowned in
+          -- a Team vs. Team game does not discharge the watch.
           --
           -- When the controller has LEFT the game, CR 800.4i freezes their
-          -- opponent set at departure, and the same comparison computes it: CR
+          -- opponent set at departure, and the same predicate computes it: CR
           -- 725.4 guarantees the crowned player is still in the game, so a
-          -- departed controller is never crowned. Nothing needs to be stored.
+          -- departed controller is never crowned, and CR 800.2's teams are
+          -- settled before the game begins. Nothing needs to be stored.
           mark watch =
-            if MonarchWatch.controller watch == pid
-              then watch
-              else watch {MonarchWatch.due = True}
+            if Game.areOpponents gs (MonarchWatch.controller watch) pid
+              then watch {MonarchWatch.due = True}
+              else watch
        in Event.recordEvent
             (GameEvent.BecameMonarch pid)
             gs

@@ -101,6 +101,7 @@ import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.Zone as Zone
 
@@ -2967,7 +2968,7 @@ millikinSpec s registry =
       millikin <- S.printingOf s registry "Millikin"
       let (millikinId, board) = millikinBoard millikin 3
           after = S.runPure S.identityAnswer board (Activate.activateAbility S.alice millikinId (theAbility millikin))
-          context = Filter.contextFor (Just S.alice) Nothing
+          context = Filter.contextFor Teams.none (Just S.alice) Nothing
           milledThisTurn oid = Filter.matches context (Projection.viewOfObject oid after) Filter.Type.MilledThisTurn
       Spec.assertEqWith s "the mill put one card in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
       Spec.assertBool s (all milledThisTurn (Game.zoneMembers Zone.Graveyard S.alice after)) "which answers CR 701.17a's look-back"

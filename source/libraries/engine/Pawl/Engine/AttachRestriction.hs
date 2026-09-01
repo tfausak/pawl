@@ -116,7 +116,7 @@ refusesGiven pcs subject host gs =
                 gs
             barred =
               Filter.matches
-                (Filter.contextFor (Projection.controllerOf source gs) (Just source))
+                (Filter.contextFor (Game.teams gs) (Projection.controllerOf source gs) (Just source))
                 subjectView
                 (if null changes then attachers else Filter.rewrite changes attachers)
          in named && barred

@@ -720,7 +720,7 @@ admitsUnder subject pid gs =
         PaymentSubject.ForNeither -> Nothing
         PaymentSubject.Casting oid -> Just (ManaRestriction.casts, oid)
         PaymentSubject.Activating oid -> Just (ManaRestriction.activations, oid)
-      asked = fmap (\(half, oid) -> (half, Filter.contextFor (Just pid) Nothing, Projection.viewOfObject oid gs)) paidFor
+      asked = fmap (\(half, oid) -> (half, Filter.contextFor (Game.teams gs) (Just pid) Nothing, Projection.viewOfObject oid gs)) paidFor
    in \unit -> case ManaUnit.restriction unit of
         Nothing -> True
         Just restriction -> case asked of

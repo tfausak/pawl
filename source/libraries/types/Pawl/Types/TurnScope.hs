@@ -19,11 +19,9 @@ data TurnScope
   = EachTurn
   | ControllersTurn
   | -- | The mirror of ControllersTurn: Brineborn Cutthroat's "during an
-    -- opponent's turn". Read as "the active player is not the reader's own
-    -- player", which is exactly CR 102.2's opponent in a two-player game and CR
-    -- 806.1's in a Free-for-All, where "a group of players compete as
-    -- INDIVIDUALS against each other" and so every other seat is an opponent.
-    -- CR 102.3's teams are the one arrangement where the two readings part, and
-    -- pawl has no team format (#175).
+    -- opponent's turn". Read as CR 102.3's relation between the active player
+    -- and the reader's own player (Pawl.Engine.Event.turnScopeAdmits), which is
+    -- every other seat at two seats (CR 102.2) and in a Free-for-All (CR 806.1),
+    -- and a seat on another team in a game between teams.
     OpponentsTurn
   deriving (Bounded, Enum, Eq, Ord, Show)

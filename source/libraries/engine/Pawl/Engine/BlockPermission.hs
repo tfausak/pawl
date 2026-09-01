@@ -55,7 +55,7 @@ additionalBlocks candidates gs =
       -- One reading of the source, shared by the gate and the amount below: CR
       -- 109.5's "you" and Filter.IsSource both mean the permanent printing the
       -- sentence, so both ask through the same Context.
-      contextOf source = Filter.contextFor (Projection.controllerOf source gs) (Just source)
+      contextOf source = Filter.contextFor (Game.teams gs) (Projection.controllerOf source gs) (Just source)
       -- CR 604.2's "as long as", read exactly as CombatRestriction.inForce reads
       -- its "unless" and with the opposite polarity: a permission whose gate does
       -- NOT hold grants nothing. Asked once per permission and not per candidate,

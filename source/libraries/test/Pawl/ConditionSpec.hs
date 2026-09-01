@@ -48,6 +48,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -72,7 +73,7 @@ boardOf swamp n =
    in (S.stubView table, gs)
 
 context :: Filter.Context
-context = Filter.contextFor (Just S.alice) (Just (ObjectId.MkObjectId 0))
+context = Filter.contextFor Teams.none (Just S.alice) (Just (ObjectId.MkObjectId 0))
 
 check :: Printing.Printing -> Integer -> Comparison.Comparison -> Integer -> Bool
 check swamp n comparison threshold =
@@ -579,7 +580,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
         ( not $
             Condition.holds
               viewOf
-              (Filter.contextFor Nothing Nothing)
+              (Filter.contextFor Teams.none Nothing Nothing)
               gs
               (ObjectId.MkObjectId 0)
               (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Count count) Comparison.Exactly (Quantity.Type.Literal 0)))
