@@ -18,6 +18,7 @@ import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.AttackOption as AttackOption
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
@@ -101,12 +102,13 @@ emptyGame order =
       -- so a game that uses an option is reached by record-updating
       -- GameState.settings afterwards rather than by being started with it
       -- (#2837).
-      -- CR 802.1 is ON by default: at two seats it coincides exactly with CR
-      -- 506.2, and at three or more CR 806.2b requires one of the three attack
-      -- options and this is the one pawl implements.
-      -- CR 102.4 / CR 808.1: a game not played between teams, which every
-      -- variant but CR 808's, CR 810's and CR 811's is.
-      settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackMultiplePlayers = True, GameSettings.teams = Teams.none}
+      -- CR 802.1 is the option in use by default: at two seats it coincides
+      -- exactly with CR 506.2, and at three or more CR 806.2b requires one of
+      -- the three and this is the one that needs no seating to be agreed.
+      --
+      -- CR 102.4 / CR 808.1: and a game not played between teams, which every
+      -- variant but CR 808's, CR 809's, CR 810's and CR 811's is.
+      settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none}
       newPlayer pid =
         ( pid,
           Player.MkPlayer

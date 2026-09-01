@@ -21,8 +21,8 @@
 -- it takes anybody else, so no case here can pass by stopping early.
 --
 -- CR 808.3a needs nothing from these boards: the attack multiple players option
--- is already on by default (Pawl.Types.GameSettings.attackMultiplePlayers), which
--- is why the combat case can read the whole defending group.
+-- is already the one in use by default (Pawl.Types.GameSettings.attackOption),
+-- which is why the combat case can read the whole defending group.
 module Pawl.TeamSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State

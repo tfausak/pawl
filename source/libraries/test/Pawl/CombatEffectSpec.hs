@@ -2205,11 +2205,12 @@ pinnedAssignments base answers p = case p of
 -- power, loyalty, and the 4 that spills past it -- are all distinct and no two
 -- readings of CR 702.19c land on the same board.
 --
--- "That planeswalker's controller" and "the defending player" are one seat here.
--- That is not the two-player collapse that hides a bug: CR 702.19c names the
--- planeswalker's controller precisely because the attack was declared against
--- that player's planeswalker (CR 508.1b), so the two are the same player on every
--- board pawl can build.
+-- "That planeswalker's controller" and "the defending player" are one seat here,
+-- because these boards have one defending player. CR 508.1b is why they cannot
+-- disagree while the planeswalker is still attacked -- the attack was declared
+-- against that player's own planeswalker -- but Damage.combatRecipient's CR
+-- 702.19e arm reads the group's head once the planeswalker is gone, which is the
+-- wrong seat at three or more (#2841). No board here has two defenders.
 --
 -- Thrasta's cost reduction is implemented and dormant here: nothing is cast on
 -- these boards, so CR 601.2f is never reached. Pawl.CostSpec is where it is
@@ -2639,6 +2640,66 @@ lastKnownDefendingPlayerSpec s registry = Spec.describe s "LastKnownDefendingPla
     (gs, wraith, blocker, jaceId) <- stolenJaceLandwalkBoard s registry False "Island" "Swamp"
     Spec.assertBool s (S.onBattlefield jaceId gs) "Jace is still on the battlefield"
     Spec.assertBool s (blocks blocker wraith gs) "the owner's Swamp is not bob's, so the block is legal"
+
+-- CR 802.2a: alice attacks CAROL's Jace Beleren with a Bog Wraith at three seats,
+-- with both opponents defending (CR 802.2, the default option). bob is FIRST in CR
+-- 802.4's APNAP order, so an engine folding "a defending player" onto the group's
+-- head answers bob where the rule answers carol.
+--
+-- Bog Wraith is "Creature -- Wraith 3/3, Swampwalk" and nothing else, so CR 702.14c
+-- is exactly an ability of an attacking creature referring to a defending player
+-- and no other text is in play. `bobsLand` and `carolsLand` are the ONE thing the
+-- two cases below differ in.
+splitDefenderJaceBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  String ->
+  String ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+splitDefenderJaceBoard s registry bobsLand carolsLand = do
+  bogWraith <- S.printingOf s registry "Bog Wraith"
+  piker <- S.printingOf s registry "Goblin Piker"
+  jace <- S.printingOf s registry "Jace Beleren"
+  bobs <- S.printingOf s registry bobsLand
+  carols <- S.printingOf s registry carolsLand
+  let (gs0, ours, _, hers) = S.threePlayerCombat [bogWraith] [piker, bobs] [jace, carols, piker]
+  case (ours, hers) of
+    ([wraith], [jaceId, _, blocker]) -> do
+      let staged = S.addCounter CounterKind.Loyalty 3 jaceId gs0
+          settled = S.runPure S.identityAnswer staged (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
+       in pure (S.runPure attackThePlaneswalker settled (Combat.declareAttackers S.alice), wraith, blocker, jaceId)
+    _ -> Spec.assertFailure s "fixture should give alice a Wraith and carol a Jace and a blocker"
+
+-- CR 802.2a: with several defending players, "a defending player" is resolved per
+-- attacking creature from what that creature is attacking -- never off the head of
+-- the group. The planeswalker arm is what this proves; the battle arm's removed
+-- case is still unfenced (Pawl.Engine.Defender.playerOf, #2844).
+splitDefenderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+splitDefenderSpec s registry = Spec.describe s "SplitDefendingPlayer" $ do
+  let blocks blocker wraith = Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith))
+  Spec.it s "CR 802.2a the swampwalking attacker reads the planeswalker's controller, not the first defending player" $ do
+    -- bob holds the Swamp and carol the Island. Carol controls the attacked
+    -- Jace, so CR 702.14c asks about HER lands and the block is legal; an engine
+    -- answering bob finds his Swamp and calls it illegal.
+    (gs, wraith, blocker, jaceId) <- splitDefenderJaceBoard s registry "Swamp" "Island"
+    Spec.assertBool s (blocks blocker wraith gs) "CR 702.14c carol has no Swamp, so her block is legal"
+    -- The premises, after the gameplay assertion so neither can absorb a
+    -- mutation of it: two defending players with bob at the head, and the Wraith
+    -- really attacking carol's Jace.
+    Spec.assertEqWith s "CR 802.2 both opponents defend, bob first" (Combat.Type.defenders (GameState.combat gs)) [S.bob, S.carol]
+    Spec.assertEqWith
+      s
+      "and the Wraith is attacking carol's Jace"
+      (Map.lookup wraith (Combat.Type.attackers (GameState.combat gs)))
+      (Just (AttackTarget.OfPlaneswalker jaceId))
+    Spec.assertEqWith s "which carol controls" (Projection.controllerOf jaceId gs) (Just S.carol)
+  Spec.it s "CR 702.14c and the same board with the lands swapped stops that block" $ do
+    -- THE FALSIFIER, differing in one thing: carol now holds the Swamp. Without
+    -- it the case above would pass on an engine that had lost swampwalk
+    -- altogether rather than one that reads the right seat.
+    (gs, wraith, blocker, _) <- splitDefenderJaceBoard s registry "Island" "Swamp"
+    Spec.assertBool s (not (blocks blocker wraith gs)) "CR 702.14c carol's own Swamp stops her block"
 
 -- Soul Snare's only activated ability -- "{W}, Sacrifice this enchantment: Exile
 -- target creature that's attacking you or a planeswalker you control" -- read off
@@ -5634,6 +5695,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   trampleOverPlaneswalkersSpec s registry
   sharedBlockerSpec s registry
   lastKnownDefendingPlayerSpec s registry
+  splitDefenderSpec s registry
   soulSnareSpec s registry
   attackCostSpec s registry
   alluringSirenSpec s registry

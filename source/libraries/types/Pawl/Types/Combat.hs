@@ -47,12 +47,13 @@ data Combat = MkCombat
     -- difference between them. Nothing else in the game state remembers the
     -- earlier value.
     --
-    -- Not read off the ACTIVE PLAYER (attackers) and Combat.defender (blockers)
-    -- instead, which CR 508.1k and CR 509.1g would license today: that answers a
-    -- DIFFERENT question -- "is an attacking or defending player still its
-    -- controller?" -- which coincides with this one only while there is exactly
-    -- one of each. CR 802 is what makes several players defenders at once, which
-    -- GameSettings.attackMultiplePlayers now turns on.
+    -- Not read off the ACTIVE PLAYER (attackers) and Combat.defenders
+    -- (blockers) instead, which CR 508.1k and CR 509.1g would license: that
+    -- answers a DIFFERENT question -- "is an attacking or defending player still
+    -- its controller?" -- which coincides with this one only while there is
+    -- exactly one of each. CR 802.2 is what makes several players defenders at
+    -- once, and pawl plays that option by default
+    -- (Pawl.Types.GameSettings.attackOption).
     joinedUnder :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
     -- | WHAT has been attacked this combat phase: the CR 508.1b target announced
     -- for each creature declared as an attacker or put onto the battlefield

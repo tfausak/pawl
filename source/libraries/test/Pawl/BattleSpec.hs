@@ -428,7 +428,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     -- board differing in carol's one land. Without it, "illegal" above would pass
     -- on an engine that took the exiled battle to mean nothing may block that
     -- attacker at all -- CR 509.1a's "a battle they protect", which pawl checks
-    -- through Combat.defender rather than per pair.
+    -- through Combat.defenders rather than per pair.
     (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith"] [] ["Goblin Piker", "Island"]
     (armed, bolts) <- twoBolts s registry gs
     case (mine, hers, bolts) of

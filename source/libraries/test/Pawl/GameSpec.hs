@@ -1642,8 +1642,8 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     -- The board sits at the declare attackers step, so CR 703.4h has already
     -- settled the defending player and it has to say who: alice is active, so
-    -- bob is her first candidate (CR 506.2a). Without it Combat.defender is
-    -- Nothing, no attack is possible for either run, and askedControl below
+    -- bob is her first candidate (CR 506.2a). Without it Combat.defenders is
+    -- empty, no attack is possible for either run, and askedControl below
     -- would be [] for a reason that has nothing to do with the CR 800.4j guard.
     let seated =
           S.threePlayerGame
@@ -1683,7 +1683,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- asked -- her Piker actually attacks.
     --
     -- The stated defending player is what keeps that load-bearing: a board at
-    -- the declare attackers step with Combat.defender still Nothing cannot
+    -- the declare attackers step with Combat.defenders still empty cannot
     -- attack at all (no attack is possible), so deleting the guard would leave
     -- this case green for the wrong reason. alice is active, so bob defends
     -- (CR 506.2's second sentence).

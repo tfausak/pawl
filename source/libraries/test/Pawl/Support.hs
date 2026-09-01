@@ -48,6 +48,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AttackOption as AttackOption
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BeginningStep as BeginningStep
@@ -140,16 +141,23 @@ threePlayers = alice NonEmpty.:| [bob, carol]
 threePlayerGame :: GameState.GameState
 threePlayerGame = Setup.emptyGame threePlayers
 
--- CR 802.1 turned OFF, leaving CR 507.1's choice of ONE defending player. The
--- one thing that differs from the board handed in, so a case about CR 507.1's
--- prompt and a case about CR 802.2's absence of one are the same board twice.
+-- Every attack option turned OFF, leaving CR 507.1's choice of ONE defending
+-- player. The one thing that differs from the board handed in, so a case about
+-- CR 507.1's prompt and a case about CR 802.2's absence of one are the same
+-- board twice.
 --
 -- Legal only at two seats (CR 806.2b requires one of the three attack options
 -- at three or more), which is why every caller is a case about the turn-based
 -- action itself rather than about a game being played.
 oneDefendingPlayer :: GameState.GameState -> GameState.GameState
-oneDefendingPlayer gs =
-  gs {GameState.settings = (GameState.settings gs) {GameSettings.attackMultiplePlayers = False}}
+oneDefendingPlayer = attackOption Nothing
+
+-- CR 803.1a / CR 803.1b: the board handed in, playing the named attack option
+-- and differing in nothing else, so a left case and a right case on one board
+-- are the same board twice.
+attackOption :: Maybe AttackOption.AttackOption -> GameState.GameState -> GameState.GameState
+attackOption option gs =
+  gs {GameState.settings = (GameState.settings gs) {GameSettings.attackOption = option}}
 
 -- CR 808.1: the board handed in, played between the teams listed -- one TeamId
 -- per list, in the order given. The one thing that differs from the board handed
@@ -1175,9 +1183,9 @@ combatBoard piker a b = combatBoardOf (replicate a piker) (replicate b piker)
 -- and carol one per printing in `others`, so BOTH opponents are legal
 -- defending-player choices and both can block.
 --
--- Positioned at the BEGINNING of combat, unlike combatBoardOf: Combat.defender is
--- Nothing, and running the step is what fills it (CR 703.4h). A test that wants a
--- particular defender without running the step sets the field itself.
+-- Positioned at the BEGINNING of combat, unlike combatBoardOf: Combat.defenders
+-- is empty, and running the step is what fills it (CR 703.4h). A test that wants
+-- a particular defender without running the step sets the field itself.
 threePlayerCombat :: [Printing.Printing] -> [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId], [ObjectId.ObjectId])
 threePlayerCombat mine theirs others =
   let addAll pid ps gs =
@@ -1626,7 +1634,7 @@ oneMountainState mountain ph =
             Object.exertedBy = Set.empty
           }
    in GameState.MkGameState
-        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackMultiplePlayers = True, GameSettings.teams = Teams.none},
+        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none},
           GameState.objects = Map.singleton oid obj,
           GameState.library = Map.empty,
           GameState.hand = Map.singleton alice (Seq.singleton oid),
