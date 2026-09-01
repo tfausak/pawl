@@ -6,16 +6,16 @@
 -- Pawl.Engine.SacrificeRestriction and Pawl.Engine.UntapRestriction). None is a
 -- layer, and Pawl.Engine.Projection sees none of them.
 --
--- The only reader of Pawl.Types.EntryRestriction. Its caller asks a Bool about one
--- move and never learns which card produced it.
+-- The only reader of Pawl.Types.EntryRestriction. Each caller asks a Bool about
+-- one entry and never learns which card produced it.
 --
--- ONE place asks, unlike Pawl.Engine.SacrificeRestriction's two:
--- Pawl.Engine.Event.changeZoneAttaching is the funnel every battlefield entry
+-- TWO places ask, as Pawl.Engine.SacrificeRestriction's two do.
+-- Pawl.Engine.Event.changeZoneAttaching is the funnel every battlefield MOVE
 -- reaches -- a resolving permanent spell, a resolving Effect.MoveToZone, a land
 -- play, a search that puts a card onto the battlefield, CR 701.40a's manifest --
--- so gating it there gates all of them at once. CR 111.5's token, which
--- Event.createTokens mints without taking that funnel, is the one entry this
--- module does not reach (gap #2066).
+-- so gating it there gates all of them at once. CR 111.5's token takes no move at
+-- all, so Event.createTokens asks separately, passing Zone.Battlefield as the
+-- origin because that is where the token it has just minted sits.
 module Pawl.Engine.EntryRestriction where
 
 import qualified Data.Set as Set
@@ -40,13 +40,15 @@ import Pawl.Types.Zone (Zone)
 --
 -- A Bool about ONE object rather than that function's set over a candidate list,
 -- which is the shape of the question rather than a narrowing: `origin` is a
--- property of the individual move, so a candidate list would need one zone per
--- candidate, and the single caller holds exactly one move.
+-- property of the individual entry, so a candidate list would need one zone per
+-- candidate, and each caller holds exactly one entry.
 --
 -- `origin` is passed in rather than read off the object, because the caller knows
--- which move is being judged: Pawl.Engine.Event.changeZoneAttaching asks after CR
+-- which entry is being judged: Pawl.Engine.Event.changeZoneAttaching asks after CR
 -- 616.1's replacement loop has settled the event (CR 614.6), where the object is
--- still in the zone it is leaving.
+-- still in the zone it is leaving, and Event.createTokens asks about a token that
+-- is already on the battlefield -- see there for why that reading also decides
+-- which printings can reach a token at all.
 prohibited :: ObjectId -> Zone -> GameState -> Bool
 prohibited oid origin gs =
   let setEffs = Projection.setLandSubtypeEffects gs
@@ -71,8 +73,8 @@ prohibited oid origin gs =
               && any (fromRestriction source (Projection.textChangesAffecting source gs)) restrictions
       -- Two of the three gates above are REGRESSION FENCES rather than proven
       -- behaviour, and both were mutated: CR 305.7's setEffs gate cannot fire for
-      -- the pool's one printing, which is an artifact rather than a land, and no
-      -- card in data/cards text-changes a Grafdigger's Cage, so dropping the CR
+      -- any printing in the pool, none of which is a land, and no card in
+      -- data/cards text-changes one of them, so dropping the CR
       -- 612.1 rewrite below leaves the suite green. They are copied from
       -- Pawl.Engine.SacrificeRestriction because the CR states them and an
       -- inconsistency between five carriers is the worse answer. The CR 604.2
