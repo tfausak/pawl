@@ -922,9 +922,9 @@ asProposed oid name facing gs =
 -- job the other cannot: as an ARGUMENT, which is how the ones that read the CARD
 -- -- the timing window, the printed restrictions, the candidate costs, the target
 -- slots -- resolve their face, and where the name is used AS A NAME (CR 601.3a's
--- prohibitions, Null Chamber; Cost.candidateCostsFor); and as `asProposed`'s STAMP, which
--- is how the ones that go on to read the
--- OBJECT resolve theirs: CR 601.2f's adjustments through Cost.total, and any
+-- prohibitions, Null Chamber; Cost.candidateCostsFor); and as `asProposed`'s
+-- STAMP, which is how the ones that go on to read the OBJECT resolve theirs:
+-- CR 601.2f's adjustments through Cost.total, and any
 -- filter measuring the spell's own characteristics. Thalia's "noncreature spells
 -- cost {1} more to cast" is the observable: it taxes the Sorcery half of an
 -- adventurer card and not the Creature half, off one card in one hand.
