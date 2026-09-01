@@ -32,6 +32,7 @@ import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
@@ -217,6 +218,46 @@ setupSpec s registry = Spec.describe s "Setup" $ do
     Spec.assertEqWith s "forty with a commander" (S.lifeOf S.alice (build (Just shimatsu))) (Just 40)
     Spec.assertEqWith s "twenty without" (S.lifeOf S.alice (build Nothing)) (Just 20)
     Spec.assertEqWith s "and bob, whose deck was never built, keeps CR 103.4's twenty" (S.lifeOf S.bob (build (Just shimatsu))) (Just 20)
+
+  -- CR 903.12f against CR 903.7, on ONE deck built four ways. The Brawl option
+  -- and the seat count are varied independently, so neither can be mistaken for
+  -- the other: outside Brawl the seat count changes nothing, and inside it the
+  -- designation changes nothing.
+  Spec.it s "CR 903.12f a Brawl game starts its players at 25 at two seats and 30 at three" $ do
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    let build seats brawl =
+          S.runPure S.identityAnswer (settingsOf brawl (Setup.emptyGame seats)) $
+            Setup.createDeck S.alice Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just shimatsu, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty}
+    Spec.assertEqWith s "two-player Brawl: 25" (S.lifeOf S.alice (build S.bothPlayers True)) (Just 25)
+    Spec.assertEqWith s "multiplayer Brawl: 30" (S.lifeOf S.alice (build S.threePlayers True)) (Just 30)
+    Spec.assertEqWith s "the same deck outside Brawl: CR 903.7's forty" (S.lifeOf S.alice (build S.bothPlayers False)) (Just 40)
+    Spec.assertEqWith s "and forty at three seats too, so the seat count alone is not the cause" (S.lifeOf S.alice (build S.threePlayers False)) (Just 40)
+
+  -- CR 727.1 restarts "following the procedures set forth in rule 103" for the
+  -- same players, and CR 729.2's subgame "proceeds like a normal game": neither
+  -- turns an option off, which is why Setup.restartGame and
+  -- Setup.subgameStateFrom leave GameState.settings out of their updates. Read
+  -- at gameplay level -- CR 903.12f's twenty-five, which only the carried
+  -- setting can produce -- rather than off the field.
+  Spec.it s "CR 727.1 / 729.2 a rebuilt Brawl game is still a Brawl game" $ do
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    mountain <- S.printingOf s registry "Mountain"
+    let deck = Deck.MkDeck {Deck.cards = Map.singleton mountain 10, Deck.commander = Just shimatsu, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty}
+        built brawl =
+          S.runPure S.identityAnswer (settingsOf brawl (Setup.emptyGame S.bothPlayers)) $
+            Setup.createDeck S.alice deck
+        restarted brawl = S.runPure S.identityAnswer (built brawl) (Setup.restartGame S.performer Set.empty S.alice)
+        subgame brawl = S.runPure S.identityAnswer (Setup.subgameStateFrom S.alice (built brawl)) (Setup.startGameFromCards S.performer Set.empty)
+    Spec.assertEqWith s "CR 903.12f survives the restart" (S.lifeOf S.alice (restarted True)) (Just 25)
+    Spec.assertEqWith s "and the restart of an ordinary Commander game still gives forty" (S.lifeOf S.alice (restarted False)) (Just 40)
+    Spec.assertEqWith s "CR 903.12f survives into the subgame" (S.lifeOf S.alice (subgame True)) (Just 25)
+    Spec.assertEqWith s "and the subgame of an ordinary Commander game still gives forty" (S.lifeOf S.alice (subgame False)) (Just 40)
+
+-- CR 800.2: put this game's options where the test wants them. The seat count
+-- is untouched, so the Brawl legs above differ from their controls in exactly
+-- one thing.
+settingsOf :: Bool -> GameState.GameState -> GameState.GameState
+settingsOf brawl gs = gs {GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = brawl}}
 
 greenBlackSetup :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
 greenBlackSetup s registry = do

@@ -25,6 +25,7 @@ import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.HandActionPerformer (HandActionPerformer)
@@ -46,21 +47,36 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 
--- CR 103.4's twenty, and CR 903.7 / CR 103.4c's forty for a Commander game,
--- taken off the deck's CR 903.3 designation.
+-- CR 103.4's twenty, CR 903.7 / CR 103.4c's forty for a Commander game taken off
+-- the deck's CR 903.3 designation, and CR 903.12f / CR 103.4d's twenty-five or
+-- thirty when the Brawl option is in use.
 --
--- "Has a commander designated" standing in for "is a Commander game" is exact
--- today rather than an approximation, and it rests on a capability pawl lacks
--- rather than on a claim about Magic: Deck.commander is set by nothing but a
--- Commander deck, and pawl has no game options at all (#175), so there is no
--- way for the two to come apart.
+-- CR 903.12f reads the SEAT COUNT and not the designation: "in a two-player
+-- Brawl game, each player's starting life total is 25. In a multiplayer Brawl
+-- game, each player's starting life total is 30." Multiplayer is CR 800.1's
+-- "begins with more than two players", which is what `seats` counts, so a
+-- one-seat game -- which the CR does not describe -- takes the two-player
+-- number rather than the multiplayer one.
 --
--- Parametric because the designation reaches it two ways -- as the Deck's
--- Printing when a game is built, and as the Player's PrintingId when one is
--- restarted (CR 727) -- and rule 903.7 turns on WHETHER a commander was
+-- Brawl is tested BEFORE the designation, not beside it: CR 903.12a makes a
+-- Brawl game a Commander game, so both branches hold at once and rule 903.12f
+-- is the modification rule 903.12a announces.
+--
+-- "Has a commander designated" standing in for "is a Commander game" outside
+-- Brawl is exact today rather than an approximation, and it rests on a
+-- capability pawl lacks rather than on a claim about Magic: Deck.commander is
+-- set by nothing but a Commander deck, and GameSettings carries no Commander
+-- variant selection for the two to disagree with (#175).
+--
+-- Parametric in the designation because it reaches this two ways -- as the
+-- Deck's Printing when a game is built, and as the Player's PrintingId when one
+-- is restarted (CR 727) -- and rule 903.7 turns on WHETHER a commander was
 -- designated, never on which card it is.
-startingLife :: Maybe a -> Integer
-startingLife commander = if Maybe.isJust commander then 40 else 20
+startingLife :: GameSettings.GameSettings -> Int -> Maybe a -> Integer
+startingLife settings seats commander
+  | GameSettings.brawl settings = if seats > 2 then 30 else 25
+  | Maybe.isJust commander = 40
+  | otherwise = 20
 
 -- How many cards this deck holds, CR 903.5a's commander included: rule 903.5a
 -- counts the deck at exactly 100 cards "including its commander", so the card
@@ -77,12 +93,20 @@ mirror deck = fmap (\pid -> (pid, deck))
 emptyGame :: NonEmpty.NonEmpty PlayerId -> GameState
 emptyGame order =
   let order_ = NonEmpty.toList order
+      -- CR 800.2 / CR 103: a game with no option in use, which is what rule 103
+      -- describes on its own.
+      --
+      -- Not implemented: an options argument. Nothing threads one down to here,
+      -- so a game that uses an option is reached by record-updating
+      -- GameState.settings afterwards rather than by being started with it
+      -- (#2837).
+      settings = GameSettings.MkGameSettings {GameSettings.brawl = False}
       newPlayer pid =
         ( pid,
           Player.MkPlayer
             { -- CR 903.7 sets the total once the decks are known, which is
               -- createDeck below; no deck has been read yet here.
-              Player.life = startingLife Nothing,
+              Player.life = startingLife settings (length order_) Nothing,
               Player.status = Status.Playing,
               Player.counters = Map.empty,
               -- CR 701.54c: the Ring has tempted nobody in a game that has not
@@ -113,7 +137,8 @@ emptyGame order =
             }
         )
    in GameState.MkGameState
-        { GameState.objects = Map.empty,
+        { GameState.settings = settings,
+          GameState.objects = Map.empty,
           GameState.library = Map.empty,
           GameState.hand = Map.empty,
           GameState.graveyard = Map.empty,
@@ -262,8 +287,9 @@ createDeck pid deck = do
   -- CR 103.2a: the sideboard is set aside before the game, so these are interned
   -- alongside the deck's own printings but no card is created for them.
   sideboardIds <- Monad.mapM (\(printing, n) -> fmap (\i -> (i, n)) (State.state (Game.intern printing))) (Map.toAscList (Deck.sideboard deck))
-  -- CR 903.7 / CR 103.4: the starting life total, which is the deck's business
-  -- and so cannot be settled by emptyGame above.
+  -- CR 903.7 / CR 103.4 / CR 103.4d: the starting life total, which is the
+  -- deck's business -- and the settings' and the seat count's -- and so cannot
+  -- be settled by emptyGame above.
   State.modify' $ \gs ->
     gs
       { GameState.players =
@@ -274,7 +300,7 @@ createDeck pid deck = do
           -- CR 400.11a: the sideboard is recorded on the player for the same
           -- reason and no object is minted for it either. CR 400.11c is what
           -- keeps anything else from reaching these until a card brings one in.
-          Map.adjust (\p -> p {Player.life = startingLife (Deck.commander deck), Player.dungeons = Set.fromList dungeonIds, Player.outsideTheGame = Map.fromList sideboardIds}) pid (GameState.players gs)
+          Map.adjust (\p -> p {Player.life = startingLife (GameState.settings gs) (length (GameState.turnOrder gs)) (Deck.commander deck), Player.dungeons = Set.fromList dungeonIds, Player.outsideTheGame = Map.fromList sideboardIds}) pid (GameState.players gs)
       }
   Monad.forM_ (Map.toList (Deck.cards deck)) $ \(printing, n) -> do
     printingId <- State.state (Game.intern printing)
@@ -410,15 +436,22 @@ rotateTo starter order = case break (== starter) order of
 -- entry in the map rather than being deleted, so every Map.lookup naming them
 -- stays total. Which players are in the rebuilt game is the rebuilt
 -- GameState.turnOrder.
-resetPlayers :: Map.Map PlayerId Player.Player -> Map.Map PlayerId Player.Player
-resetPlayers players =
+--
+-- Takes the rebuilt game's settings and seat count rather than reading them off
+-- the state it is rebuilding, because CR 903.12f's life total turns on the
+-- REBUILT seat count: CR 727.1 restarts for the players who were in the game
+-- when it ended, and CR 729.4 leaves a player outside the subgame, so either
+-- rebuild can seat fewer players than the game it came from.
+resetPlayers :: GameSettings.GameSettings -> Int -> Map.Map PlayerId Player.Player -> Map.Map PlayerId Player.Player
+resetPlayers settings seats players =
   let reset player = case Player.status player of
         Status.Playing ->
           player
             { -- CR 903.7 again: Player.commander survives the rebuild (see
               -- Player.commanderCasts below), so a restarted Commander game
-              -- starts back at forty rather than at twenty.
-              Player.life = startingLife (Player.commander player),
+              -- starts back at forty rather than at twenty -- or at CR
+              -- 903.12f's number, the settings carried in having survived too.
+              Player.life = startingLife settings seats (Player.commander player),
               Player.counters = Map.empty,
               -- CR 727.1 / 729.2: a NEW game, so the Ring has tempted nobody in
               -- it. The command zone this line's callers empty is where the
@@ -476,7 +509,12 @@ restartGame perform exempt starter = do
           { -- GameState.outsideObjects and GameState.broughtIn are deliberately
             -- absent from this update: CR 727.1 restarts the game, and a card
             -- outside it is still outside it, so both are carried over unchanged.
-            GameState.players = resetPlayers (GameState.players gs),
+            -- GameState.settings is deliberately absent from this update, and
+            -- so carries over: CR 727.1 restarts "following the procedures set
+            -- forth in rule 103" for the same players with the same decks, and
+            -- nothing in rule 727 turns an option off. CR 727.7 confirms the
+            -- direction by naming an option the restarted game is still using.
+            GameState.players = resetPlayers (GameState.settings gs) (length order) (GameState.players gs),
             GameState.manaPool = Map.empty,
             GameState.combat = Combat.emptyCombat,
             GameState.events = Seq.empty,
@@ -659,7 +697,13 @@ subgameStateFrom starter parent =
    in parent
         { GameState.objects = movedObjects,
           GameState.turnOrder = order,
-          GameState.players = resetPlayers (GameState.players parent),
+          -- GameState.settings is deliberately absent from this update too, and
+          -- so carries over from the parent: CR 729.2's subgame "proceeds like
+          -- a normal game, following all other rules in rule 103", and CR
+          -- 729.2c speaks of "a subgame of a Commander game" -- the subgame is
+          -- played in the format the main game is. CR 729.1b keeps EFFECTS from
+          -- crossing, not the options the game was started with.
+          GameState.players = resetPlayers (GameState.settings parent) (length order) (GameState.players parent),
           GameState.outsideObjects = outside,
           -- CR 729.4a: nothing has crossed into this subgame yet.
           GameState.broughtIn = Seq.empty,

@@ -23,6 +23,7 @@ import qualified Pawl.Codec.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Codec.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Codec.EventGroup as EventGroup
 import qualified Pawl.Codec.ExtraTurn as ExtraTurn
+import qualified Pawl.Codec.GameSettings as GameSettings
 import qualified Pawl.Codec.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.LastKnown as LastKnown
@@ -66,6 +67,7 @@ import qualified Pawl.Types.SlotName as SlotName.Type
 -- record a second time. That is the size argument, and it is the lesser one.
 codec :: Codec.Codec GameState.GameState
 codec = Fields.object $ do
+  settings <- Fields.required "settings" GameSettings.codec GameState.settings
   objects <- Fields.required "objects" (Common.naturalMap ObjectId.codec Object.codec) GameState.objects
   library <- Fields.required "library" (Common.naturalMap PlayerId.codec (Common.seq ObjectId.codec)) GameState.library
   hand <- Fields.required "hand" (Common.naturalMap PlayerId.codec (Common.seq ObjectId.codec)) GameState.hand
@@ -139,7 +141,8 @@ codec = Fields.object $ do
   turnAnchor <- Fields.required "turnAnchor" (Common.maybe PlayerId.codec) GameState.turnAnchor
   pure
     GameState.MkGameState
-      { GameState.objects = objects,
+      { GameState.settings = settings,
+        GameState.objects = objects,
         GameState.library = library,
         GameState.hand = hand,
         GameState.graveyard = graveyard,

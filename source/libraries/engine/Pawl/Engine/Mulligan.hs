@@ -17,6 +17,7 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
@@ -234,12 +235,18 @@ mulliganRounds perform counts deciding = do
 -- seated from the players who were in the game it came from, so it answers for
 -- itself.
 --
--- A Natural rather than a Bool, because the caller subtracts this. CR 103.5c
--- grants the same allowance to any Brawl game (CR 903.12g), which pawl has no
--- way to know it is playing (#174), so the seat count is the only cause today;
--- a format layer redefines this function rather than chasing call sites.
+-- CR 903.12g grants the same allowance to any Brawl game, which CR 103.5c
+-- states as the UNION of the two causes rather than as two rules: "in a
+-- multiplayer game AND in any Brawl game". So this is one disjunction and not a
+-- sum -- a two-seat Brawl game and a five-seat ordinary one get the same one
+-- free mulligan, and a five-seat Brawl game gets one and not two.
+--
+-- A Natural rather than a Bool, because the caller subtracts this.
 freeMulligans :: GameState.GameState -> Numeric.Natural.Natural
-freeMulligans gs = if length (GameState.turnOrder gs) > 2 then 1 else 0
+freeMulligans gs =
+  if length (GameState.turnOrder gs) > 2 || GameSettings.brawl (GameState.settings gs)
+    then 1
+    else 0
 
 -- CR 103.5 / 103.5c: what this player is told at their declaration -- the raw
 -- number of mulligans they have taken, and how many cards taking one more would

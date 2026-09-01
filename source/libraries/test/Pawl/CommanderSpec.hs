@@ -12,6 +12,9 @@
 -- Pawl.SetupSpec because they need a designated commander and this is the file
 -- that builds one.
 --
+-- CR 903.12h's Brawl group is here for the same reason, and because it is the
+-- CR 903.10a group's board with one setting changed.
+--
 -- Shimatsu the Bloodcloaked is the card pool for every group but CR 903.10a's,
 -- which needs a commander that can attack and says why it uses its own: {3}{R}
 -- Legendary Creature -- Demon Spirit 0/0, "As Shimatsu enters, sacrifice any
@@ -63,6 +66,7 @@ import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -118,6 +122,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Commander" $ do
   taxSpec s registry
   bounceSpec s registry
   commanderDamageSpec s registry
+  brawlSpec s registry
   subgameSpec s registry
   restartSpec s registry
 
@@ -554,6 +559,40 @@ commanderDamageSpec s registry = Spec.describe s "CommanderDamage" $ do
     Spec.assertEqWith s "24 in all, so she is at 16" (S.lifeOf S.carol after) (Just 16)
     Spec.assertEqWith s "and neither tally reaches 21, so she is still playing" (statusOf S.carol after) (Just Status.Playing)
     Spec.assertEqWith s "with no result" (GameState.result after) Nothing
+
+-- CR 903.12a: alice's commander on the battlefield and bob's in the command
+-- zone, exactly as commanderDuel leaves them, but with the Brawl option turned
+-- on BEFORE the decks are built -- CR 903.12f's life total is set by
+-- Setup.createDeck, so a board that turned it on afterwards would still start
+-- at CR 903.7's forty.
+brawlDuel :: Printing.Printing -> Printing.Printing -> GameState.GameState
+brawlDuel mine theirs =
+  let empty = Setup.emptyGame S.bothPlayers
+      brawling = empty {GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = True}}
+   in intoPlay S.alice (designating [(S.alice, mine), (S.bob, theirs)] brawling)
+
+brawlSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+brawlSpec s registry = Spec.describe s "Brawl" $ do
+  -- CR 903.12h: "Brawl games do not use the state-based action described in
+  -- rule 704.6c". The same three swings that kill bob in the CR 903.10a group
+  -- above, on a board differing only in GameState.settings.
+  --
+  -- CR 903.12f is what makes the assertion able to differ rather than vacuous:
+  -- at twenty-five, twenty-one combat damage leaves bob at 4, so rule 704.6c is
+  -- the only rule that could have taken him out and switching it off is the
+  -- only thing that can have spared him.
+  Spec.it s "CR 903.12h twenty-one combat damage from one commander does NOT lose a Brawl game" $ do
+    kalakscion <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    let board = brawlDuel kalakscion jedit
+        after = List.foldl' (\g _ -> swing S.aggressiveAnswer S.alice g) board [1 .. 3 :: Int]
+    Spec.assertEqWith s "CR 903.12f started bob at twenty-five" (S.lifeOf S.bob board) (Just 25)
+    Spec.assertEqWith s "bob is still playing" (statusOf S.bob after) (Just Status.Playing)
+    Spec.assertEqWith s "and the game has no result" (GameState.result after) Nothing
+    Spec.assertEqWith s "he is at 4, so CR 704.5a was never in the race either" (S.lifeOf S.bob after) (Just 4)
+    -- CR 903.12h switches off the state-based action, not CR 903.10a's tally,
+    -- which a card may still read.
+    Spec.assertEqWith s "and the tally still reached 21" (tallyFrom S.alice S.bob after) 21
 
 -- Accepts CR 903.9a's offer; everything else is the identity answerer. The
 -- default (Script.declining, via Replay.defaultAnswer) LEAVES the commander where

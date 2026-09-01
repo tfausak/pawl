@@ -30,6 +30,7 @@ import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
@@ -58,6 +59,11 @@ poolToLibrary pid gs =
           GameState.battlefield = Set.difference (GameState.battlefield gs) (Set.fromList mine),
           GameState.library = Map.insert pid (Seq.fromList mine) (GameState.library gs)
         }
+
+-- CR 903.12a: turn the Brawl option on. The seat count is untouched, so a board
+-- run through this and the same board without it differ in exactly one thing.
+brawling :: GameState.GameState -> GameState.GameState
+brawling gs = gs {GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = True}}
 
 -- n Mountains in each player's library, nothing elsewhere.
 libraryGame :: Printing.Printing -> Int -> GameState.GameState
@@ -864,6 +870,32 @@ spec s registry =
       Spec.assertEqWith s "and nothing went to the bottom of alice's library" (libSize S.alice once) 13
       Spec.assertEqWith s "the second mulligan bottoms exactly one" (S.handSize S.alice twice) 6
       Spec.assertEqWith s "two-player: unchanged, the first mulligan bottoms one" (S.handSize S.alice (run (mulliganUpTo 1) (libraryGame mountain 20))) 6
+    Spec.it s "CR 903.12g/103.5c: a TWO-seat Brawl game's first mulligan is free too" $ do
+      -- CR 103.5c states the union of the two causes -- "in a multiplayer game
+      -- and in any Brawl game" -- so the same allowance is reached at two seats
+      -- by the option alone. Every leg is the same two-seat board with the same
+      -- twenty Mountains; the only difference is GameState.settings.
+      mountain <- S.printingOf s registry "Mountain"
+      let once = run (mulliganUpTo 1) (brawling (libraryGame mountain 20))
+          twice = run (mulliganUpTo 2) (brawling (libraryGame mountain 20))
+          ordinary = run (mulliganUpTo 1) (libraryGame mountain 20)
+      Spec.assertEqWith s "alice's free first mulligan keeps all seven" (S.handSize S.alice once) 7
+      Spec.assertEqWith s "bob's too" (S.handSize S.bob once) 7
+      Spec.assertEqWith s "and nothing went to the bottom of alice's library" (libSize S.alice once) 13
+      Spec.assertEqWith s "her second mulligan bottoms exactly one" (S.handSize S.alice twice) 6
+      Spec.assertEqWith s "the same two seats outside Brawl pay from the first" (S.handSize S.alice ordinary) 6
+    Spec.it s "CR 903.12g second clause: the Brawl game's free mulligan does not count toward the limit either" $ do
+      -- The counting twin of the CR 103.5c second-clause case below, at two
+      -- seats rather than three: hand plus
+      -- library is 20 throughout, so the process ends when the bottomed count
+      -- reaches seven. Ordinary two seats run 6,5,4,3,2,1,0 -- seven asks; the
+      -- Brawl leg gets one more, 7,6,5,4,3,2,1,0.
+      mountain <- S.printingOf s registry "Mountain"
+      let asksIn gs0 = snd (State.runState (Engine.runGame recordAlwaysMulligan gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) [])
+          brawl = asksIn (brawling (libraryGame mountain 20))
+          ordinary = asksIn (libraryGame mountain 20)
+      Spec.assertEqWith s "two-seat Brawl: alice may take eight mulligans" (length (filter (== S.alice) brawl)) 8
+      Spec.assertEqWith s "two seats outside Brawl: seven" (length (filter (== S.alice) ordinary)) 7
     Spec.it s "CR 103.5c second clause: the free mulligan does not count toward the limit either" $ do
       -- Hand + library is 20 throughout, so the redraw is always a full seven
       -- and the process ends exactly when the bottomed count reaches seven.
