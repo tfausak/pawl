@@ -31,17 +31,21 @@
 -- targets, so its case is about CR 601.2c's one announcement over two slots
 -- rather than about the pool alone.
 --
--- Two synthetics sit with it, one per axis the same scope has: Synthetic Exhume
--- the Archive fixes its card count at two, so a board splitting two cards
--- between two graveyards has no coherent announcement at all, and Synthetic
--- Recurring Reclamation puts the mode in CR 700.2d's repeat, where the scope has
--- to name its own occurrence's player slot rather than the first occurrence's.
+-- Three synthetics sit with it: Synthetic Exhume the Archive fixes its card count
+-- at two, so a board splitting two cards between two graveyards has no coherent
+-- announcement at all; Synthetic Recurring Reclamation puts the mode in CR
+-- 700.2d's repeat, where the scope has to name its own occurrence's player slot
+-- rather than the first occurrence's; and Synthetic Reclamation Engine is that
+-- same repeat one object type over, on an ACTIVATED ability, which re-checks CR
+-- 608.2b down a path of its own.
 --
 -- Fall of the Hammer is beside it because it is the other way one slot can
 -- depend on another: not the POOL a slot draws from but the FILTER it is
 -- narrowed by, which is CR 601.2c's "another" between two slots of one
 -- announcement. Its case reads the same union-offer plus joint-check pair
 -- Dwell's does, and turns on an announcement the joint check has to reject.
+-- Synthetic Hammer Refrain is that card under CR 700.2d's repeat, where the
+-- filter's slot name has to follow the occurrence the way the pool's does.
 --
 -- Cancel and Stifle's case has a third beside it, on the same pool one rule
 -- over: CR 115.5's self-exclusion for an ABILITY, which Adric, Mathematical
@@ -229,8 +233,12 @@ aimingDwellObeying oids p = case p of
 
 -- CR 700.2d's whole announcement for Synthetic Recurring Reclamation with its
 -- first mode chosen twice: occurrence 0 names bob and `his`, occurrence 1 names
--- `other` and `hisOther` -- a card in BOB's graveyard whichever player that is.
--- The two runs differ only in `other`.
+-- `other` and `hisOther`. The two runs differ only in `other`.
+--
+-- Synthetic Reclamation Engine's case shares it, that card printing the same two
+-- modes on an activated ability. What `hisOther` is differs with the fixture: a
+-- card in BOB's graveyard for the spell case whichever player `other` is, and a
+-- card in CAROL's for the ability case.
 --
 -- Pinned per slot NAME rather than searched, and the suffixed names are
 -- Modal.instanceSlot's. CR 601.2c offers occurrence 1 the union over every
@@ -278,6 +286,28 @@ aimingHammer dealerId victimId p = case p of
     Map.mapWithKey
       ( \slot (_, offered) ->
           let wanted = if slot == SlotName.MkSlotName (Text.pack "dealer") then dealerId else victimId
+           in Set.filter ((==) (Just wanted) . Recipient.objectOf) offered
+      )
+      asked
+  _ -> S.identityAnswer p
+
+-- CR 700.2d's whole announcement for Synthetic Hammer Refrain with its damage
+-- mode chosen twice: occurrence 0 names `dealer`/`victim`, occurrence 1 names
+-- `dealerTwo`/`victimTwo` under Modal.instanceSlot's suffixed names. Pinned per
+-- slot name and FILTERED out of the offered set, aimingHammer's shape and for its
+-- reason.
+aimingRefrain :: ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimingRefrain dealer victim dealerTwo victimTwo p = case p of
+  Prompt.ChooseModes {} -> Seq.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 0]
+  Prompt.ChooseTargets _ _ _ asked ->
+    Map.mapWithKey
+      ( \slot (_, offered) ->
+          let named name = slot == SlotName.MkSlotName (Text.pack name)
+              wanted
+                | named "dealer" = dealer
+                | named "victim" = victim
+                | named "dealer#1" = dealerTwo
+                | otherwise = victimTwo
            in Set.filter ((==) (Just wanted) . Recipient.objectOf) offered
       )
       asked
@@ -1708,6 +1738,54 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "occurrence 1 naming bob instead, both cards reach his library" (namesIn Zone.Library S.bob atBob) [S.nameOf (Printing.card piker), S.nameOf (Printing.card bolt)]
     Spec.assertEqWith s "leaving his graveyard empty" (namesIn Zone.Graveyard S.bob atBob) []
 
+  -- CR 700.2d one object type over: the case above is a SPELL, and an activated
+  -- ability re-checks CR 608.2b's targets down a second path of its own
+  -- (Pawl.Engine.Resolve.resolveModesWith), which built that map without the
+  -- per-occurrence rename the announcement had made; see #2806. The announcement is
+  -- not what is under test -- Pawl.Engine.Activate goes through
+  -- Modal.modesTargetSlots and always renamed -- so the ability reaches the stack
+  -- either way, and what CR 608.2b decides is whether occurrence 1's card is
+  -- still legal. Judged against OCCURRENCE 0's player it is a card in the wrong
+  -- graveyard, dropped with no error.
+  --
+  -- Synthetic Reclamation Engine {3} Artifact
+  -- (data/cards/synthetic-reclamation-engine.json): "{T}: Choose two. You may
+  -- choose the same mode more than once. -- Target player shuffles up to two
+  -- target cards from their graveyard into their library. -- Draw a card."
+  -- SYNTHETIC because no printing puts that instruction on an ability at all:
+  -- Scryfall o:"choose the same mode more than once", 2026-08-31, returns 22
+  -- cards and every one of them is an instant or a sorcery. CR 700.2a states the
+  -- shape outright -- the controller of a modal activated ability chooses the
+  -- modes as part of activating it -- and CR 700.2d's own sentence is about "a
+  -- modal spell or ability", so nothing in the rules forbids the printing.
+  --
+  -- THE WRONG ANSWER IS STRICTER THAN PRINTED here, where the spell case's was
+  -- weaker: the misjudged card is dropped rather than admitted, so what
+  -- discriminates is that carol's card MOVES.
+  --
+  -- THREE SEATS, the case above's reason: with alice and bob alone the two
+  -- occurrences would name one player and the rename could not be observed.
+  Spec.it s "CR 608.2b a repeated mode on an ABILITY re-checks each occurrence against its own binding" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    engine <- S.printingOf s registry "Synthetic Reclamation Engine"
+    case soleActivatedAbility engine of
+      Nothing -> Spec.assertFailure s "Synthetic Reclamation Engine should declare exactly one activated ability"
+      Just ability -> do
+        let (engineId, g1) = S.addCreature engine S.alice S.threePlayerGame
+            (hisId, g2) = S.addGraveyardCard piker S.bob g1
+            (hersId, board) = S.addGraveyardCard bolt S.carol g2
+            activated = S.runPure (aimingReclamation S.carol hisId hersId) board (Activate.activateAbility S.alice engineId ability)
+            resolved = S.runPure (aimingReclamation S.carol hisId hersId) activated Stack.resolveTop
+        Spec.assertEqWith s "occurrence 1's card reaches CAROL's library, the player her own occurrence named" (namesIn Zone.Library S.carol resolved) [S.nameOf (Printing.card bolt)]
+        Spec.assertEqWith s "leaving her graveyard empty" (namesIn Zone.Graveyard S.carol resolved) []
+        Spec.assertEqWith s "and occurrence 0's card reaches bob's" (namesIn Zone.Library S.bob resolved) [S.nameOf (Printing.card piker)]
+        -- The proxies last: the announcement is not what this case is about, and
+        -- an ability that never reached the stack would leave every graveyard
+        -- alone too.
+        Spec.assertEqWith s "the activation was accepted, so the ability really did resolve" (length (GameState.stack activated)) 1
+        Spec.assertEqWith s "and nothing is left on the stack after it" (length (GameState.stack resolved)) 0
+
   -- CR 601.2c's other sibling-slot reading, and the one the rule states in its
   -- own words: "The same target can't be chosen multiple times for any one
   -- instance of the word 'target' on the spell. However, if the spell uses the
@@ -1774,6 +1852,68 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
       (slotNamed "victim")
       (Set.fromList (fmap Recipient.ToCreature [dealerId, wallId, ratsId]))
     Spec.assertEqWith s "and the dealer slot only alice's two" (slotNamed "dealer") (Set.fromList (fmap Recipient.ToCreature [dealerId, wallId]))
+
+  -- The case above put CR 601.2c's "another" on a card chosen once. CR 700.2d
+  -- puts it on a card whose mode may be chosen twice, and then the filter's slot
+  -- NAME has to follow the occurrence exactly as the key and the pool do -- read
+  -- under its printed name from occurrence 1 it names occurrence 0's dealer, and
+  -- the creature occurrence 1 itself named becomes a legal victim of its own
+  -- damage. Weaker than printed, in the caster's favour.
+  --
+  -- Synthetic Hammer Refrain {1}{R} Instant
+  -- (data/cards/synthetic-hammer-refrain.json): "Choose two. You may choose the
+  -- same mode more than once. -- Target creature you control deals damage equal
+  -- to its power to another target creature. -- Draw a card." SYNTHETIC because
+  -- the two printed sets do not intersect: Scryfall o:"choose the same mode more
+  -- than once", 2026-08-31, returns 22 cards, and no mode of any of them prints
+  -- two targets with one restricting the other. Its damage mode is Fall of the
+  -- Hammer's above, one instruction added.
+  --
+  -- TWO RUNS off one board, differing in exactly one thing -- which creature
+  -- fills occurrence 1's victim slot -- with the same {1}{R} paid off the same
+  -- two Mountains and the same modes chosen. The legal run is what keeps the
+  -- rejected one from passing off a spell that never worked.
+  --
+  -- TWO PIKERS rather than two printings: occurrence 0's dealer and occurrence
+  -- 1's are then indistinguishable except by slot, so a filter that admits the
+  -- second because it compared against the first is the only reading that
+  -- separates the runs.
+  Spec.it s "CR 700.2d a repeated mode's filter reads its own occurrence's sibling slot, not the first's" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wall <- S.printingOf s registry "Wall of Stone"
+    refrain <- S.printingOf s registry "Synthetic Hammer Refrain"
+    let (firstDealerId, g1) = S.addCreature piker S.alice (S.landsInPlay mountain 2)
+        (secondDealerId, g2) = S.addCreature piker S.alice g1
+        (wallId, g3) = S.addCreature wall S.bob g2
+        (board, refrainId) = S.handOne refrain g3
+        run victimTwo =
+          let cast = S.runPure (aimingRefrain firstDealerId wallId secondDealerId victimTwo) board (S.cast S.alice refrainId)
+           in (cast, S.runPure (aimingRefrain firstDealerId wallId secondDealerId victimTwo) cast Stack.resolveTop)
+        (castAtSelf, atSelf) = run secondDealerId
+        (_, atWall) = run wallId
+        slots = Modal.modesTargetSlots (Seq.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 0]) (Face.spell (S.combinedFace refrain))
+        offered = Target.legalSets (Just S.alice) Map.empty S.noSource slots board
+        slotNamed name = Map.findWithDefault Set.empty (SlotName.MkSlotName (Text.pack name)) offered
+    -- The behaviour first: occurrence 1 naming its own dealer is not an
+    -- announcement the rule allows, so CR 601.2e returns the game to before the
+    -- proposal and occurrence 0's damage never happens either.
+    Spec.assertEqWith s "occurrence 1 naming the creature its OWN dealer slot holds, bob's Wall is unharmed: the cast is reversed (CR 601.2e)" (S.damageOf wallId atSelf) (Just 0)
+    Spec.assertEqWith s "and the creature named twice took none of its own two damage" (S.damageOf secondDealerId atSelf) (Just 0)
+    Spec.assertEqWith s "naming the Wall for occurrence 1 instead, both Pikers' two damage reaches it" (S.damageOf wallId atWall) (Just 4)
+    -- The proxies after: a cast that never happened would leave the Wall
+    -- unharmed too.
+    Spec.assertEqWith s "the reversed cast left nothing on the stack" (length (GameState.stack castAtSelf)) 0
+    Spec.assertBool s (elem refrainId (Game.zoneMembers Zone.Hand S.alice castAtSelf)) "and the spell is back in alice's hand"
+    -- The union posture, last and for the case above's reason: occurrence 1's
+    -- victim slot is still OFFERED its own dealer at CR 601.2c, so the first
+    -- assertion is a joint-check rejection rather than a slot the rename emptied.
+    Spec.assertEqWith
+      s
+      "occurrence 1's victim slot is offered every creature, its own dealer's candidate included"
+      (slotNamed "victim#1")
+      (Set.fromList (fmap Recipient.ToCreature [firstDealerId, secondDealerId, wallId]))
+    Spec.assertEqWith s "and its dealer slot only alice's two" (slotNamed "dealer#1") (Set.fromList (fmap Recipient.ToCreature [firstDealerId, secondDealerId]))
 
   -- CR 601.2c's sibling-slot reading in its POSITIVE form, where the case above is
   -- the negative one: "another" excludes what a sibling slot holds, and "with the

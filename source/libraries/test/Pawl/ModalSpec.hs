@@ -793,9 +793,9 @@ confluenceBoard island mysticConfluence libraryCard libraryCards =
 -- CR 700.2d's exception, "some modal spells include the instruction 'You may
 -- choose the same mode more than once' ... If a particular mode is chosen
 -- multiple times, the spell is treated as if that mode appeared that many times
--- in sequence." Mystic Confluence is the pool's one PRINTING of it; Synthetic
--- Recurring Reclamation writes the same instruction over a graveyard-scoped slot
--- (Pawl.TargetSpec's CR 700.2d case).
+-- in sequence." Mystic Confluence is the pool's one PRINTING of it; the
+-- synthetics writing the same instruction over slots that read each other are in
+-- Pawl.TargetSpec's CR 700.2d cases.
 repeatedModeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 repeatedModeSpec s registry = Spec.describe s "RepeatedModes (CR 700.2d)" $ do
   -- The discriminating case: ONE mode, three times, and the count is what
