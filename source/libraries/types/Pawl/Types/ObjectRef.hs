@@ -389,10 +389,10 @@ data ObjectRef
     -- targeted only where its own text says "target [something]". This sentence
     -- does not, so the choice is made while applying the effect (CR 608.2d)
     -- rather than announced on the stack (CR 601.2c), and CR 608.2b has nothing
-    -- to re-validate. That is also why the arm is here rather than in
-    -- Pawl.Types.ZoneScope, which is a TARGET pool: the two questions look
-    -- alike on the board and differ in every rule that reads them -- shroud,
-    -- hexproof, "becomes the target" triggers and the fizzle.
+    -- to re-validate. That is also why the arm is here rather than a
+    -- Pawl.Types.Pool.CardsInGraveyard slot, which is a TARGET pool: the two
+    -- questions look alike on the board and differ in every rule that reads them
+    -- -- shroud, hexproof, "becomes the target" triggers and the fizzle.
     --
     -- WHO CHOOSES is the Pawl.Types.Chooser, which also fixes how many cards
     -- the arm names: TheController is CR 608.2c's default and one card across

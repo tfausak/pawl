@@ -875,16 +875,16 @@ portOfKarfellSpec s registry =
 -- under your control." (name, cost, type line and Oracle text checked against
 -- api.scryfall.com, 2026-09-01). The whole card is transcribed: "under your
 -- control" is CR 110.2a's default for a card the effect's controller puts onto
--- the battlefield, so it states no rider, and the "may" is CR 603.5's, scoped to
--- the second clause.
+-- the battlefield, so it states no rider, and the "may" is a CR 608.2d choice
+-- scoped to the second clause.
 --
 -- THE CHOOSER IS NOT THE SCOPE, which is the pair no arm could state before:
 -- alice chooses (CR 608.2d) out of a graveyard that is not hers, and the seat
 -- whose graveyard it is comes from the slot the FIRST clause targeted.
 --
 -- NOT A TARGET, portOfKarfellSpec's distinction: the card says "target" of the
--- opponent alone, so CR 115.1 leaves the artifact card unannounced and CR 608.2b
--- has nothing to re-check about it.
+-- opponent alone, so CR 115.1a leaves the artifact card unannounced and CR
+-- 608.2b has nothing to re-check about it.
 --
 -- THREE SEATS, with an artifact card in every graveyard a wider reading would
 -- reach: alice's own (which "your graveyard" would take), carol's (which "each
@@ -989,8 +989,8 @@ graspingTentaclesSpec s registry =
             "bob's first artifact card comes instead, where alice's own Medallion is what a wider scope would have offered first"
             (arrivals after)
             [(named "Meekstone", Just S.alice)]
-        -- CR 603.5's "may", declined: the mill is a clause of its own and stands.
-        Spec.it s "CR 603.5 a declined may leaves the mill done and nothing taken" $ do
+        -- The "may", declined: the mill is a clause of its own and stands.
+        Spec.it s "CR 608.2d a declined may leaves the mill done and nothing taken" $ do
           tentacles <- S.printingOf s registry "Grasping Tentacles"
           island <- S.printingOf s registry "Island"
           swamp <- S.printingOf s registry "Swamp"

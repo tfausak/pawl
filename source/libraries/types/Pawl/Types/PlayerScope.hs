@@ -12,11 +12,11 @@ module Pawl.Types.PlayerScope where
 --     Pawl.Types.PlayerEffect applies to, against the effect's CONTROLLER.
 --   * Pawl.Types.ZoneScope.Scoped -- whose copy of a per-player zone a target
 --     slot, a resolution-time sweep or a resolution-time choice reaches (CR
---     400.1), for the readings CR 109.5
---     answers. That type's OTHER arm names a slot, which is why this is not
---     Pawl.Types.PlayerRef and why both of those carry a ZoneScope rather
---     than this type: the two PlayerEffect carriers above have no slots for an
---     InSlot arm to be resolved against.
+--     400.1), for the readings CR 109.5 answers. That type's OTHER arm names a
+--     slot, which is why it is not Pawl.Types.PlayerRef and why every one of
+--     those carriers takes a ZoneScope rather than this type: the two
+--     PlayerEffect carriers above have no slots for an InSlot arm to be resolved
+--     against.
 --   * Pawl.Types.PlayerEffect.CantBeTargetedBy -- whose spells and abilities
 --     cannot target the player the effect applies to (CR 702.18a's shroud, CR
 --     702.11c's hexproof). Its perspective is that PROTECTED player, which is

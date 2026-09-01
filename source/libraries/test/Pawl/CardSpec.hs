@@ -7499,6 +7499,23 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- minted slots on the bound side; nothing here mints, so the bound side
         -- is CR 113.7's source alone.
         delayed modes = modalSlotsOffend (Set.singleton Binding.triggerSource) (TriggeredAbility.modal (modalTrigger TriggerCondition.SelfDies modes))
+        -- The chosen graveyard card's SCOPE as the SOLE reader of a declared
+        -- slot, which is Grasping Tentacles' second clause with its mill set
+        -- aside. The pair differs in the scope alone, so it proves
+        -- Resolve.objectRefSlots reports that read rather than the chooser's.
+        takeFrom scope =
+          Effect.MoveToZone
+            ( MoveToZone.MkMoveToZone
+                (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController scope (Filter.Type.HasCardType CardType.Artifact)))
+                Zone.Battlefield
+                EntryRiders.defaultValue
+                Nothing
+                Nothing
+                LibraryPlacement.defaultValue
+                Nothing
+            )
+        scoped = [lintMode [takeFrom (ZoneScope.Scoped PlayerScope.You)] [victim]]
+        inSlot = [lintMode [takeFrom (ZoneScope.InSlot victim)] [victim]]
     Spec.assertBool s (activatedAbilityOffends (modalActivated unread)) "an activated ability declaring an unread slot is rejected"
     Spec.assertBool s (not (activatedAbilityOffends (modalActivated read_))) "and reading everything it declares is accepted"
     Spec.assertBool s (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfDies unread)) "a triggered ability declaring an unread slot is rejected"
@@ -7512,6 +7529,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (any activatedAbilityOffends (Face.activatedAbilities (S.combinedFace denethor))))
       "Denethor, Stone Seer's two-slot ability is accepted"
+    Spec.assertBool s (not (activatedAbilityOffends (modalActivated inSlot))) "a slot read only by a chosen graveyard card's scope is accepted"
+    Spec.assertBool s (activatedAbilityOffends (modalActivated scoped)) "and the same effect over a scope naming no slot leaves that slot unread"
   -- CR 400.1: every InZone Count over a shared zone (battlefield, stack,
   -- exile, command) must pair with PlayerRef.EachPlayer -- the type
   -- permits any PlayerRef there, but only EachPlayer is meaningful for a
