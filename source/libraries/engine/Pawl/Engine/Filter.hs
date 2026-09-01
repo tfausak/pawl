@@ -351,6 +351,17 @@ data View = MkView
     -- characteristic axis distinguishes the two and no CR 613 layer can change the
     -- answer. False for every candidate with no object behind it.
     token :: Bool,
+    -- CR 113.3b: is this candidate an ACTIVATED ability on the stack, rather
+    -- than CR 113.3c's triggered one? Read from Object.source
+    -- (Pawl.Engine.Game.isActivatedAbility) exactly as `token` above is, and
+    -- never from a projection: which kind of ability an object is is no
+    -- characteristic (CR 109.3), so no CR 613 layer can change the answer.
+    --
+    -- False for every candidate that is not an ability on the stack -- a
+    -- permanent, a spell, a player, a printed face, an event snapshot -- which
+    -- is what keeps Squelch's slot inside Pawl.Types.Pool.Abilities rather than
+    -- widening it.
+    activatedAbility :: Bool,
     -- | CR 110.5a's tap status. Not a characteristic, so no projection writes it;
     -- read straight off the object.
     tapped :: Bool,
@@ -632,6 +643,7 @@ playerView pid =
       canAttachToSubject = False,
       -- CR 111.1: a token represents a PERMANENT, and a player is not one.
       token = False,
+      activatedAbility = False,
       tapped = False,
       -- CR 110.5d gives status to PERMANENTS, and CR 109.1 makes a player none of
       -- those either -- the line below's reason, one status category over.
@@ -1313,6 +1325,9 @@ matches context view predicate = case predicate of
   -- the two arms above it cannot change while the game runs, because CR 111.3
   -- makes a token's characteristics equivalent to a card's.
   Filter.IsToken -> token view
+  -- CR 113.3b against rule 113.3c, read the way IsToken above is: a live read of
+  -- what the object IS (Object.source), which no layer rewrites.
+  Filter.IsActivatedAbility -> activatedAbility view
   Filter.IsTapped -> tapped view
   -- CR 110.5, the same status one category over, and the battlefield scoping is
   -- inside the field for Transformed's reason: see the atom's own comment in
@@ -1490,6 +1505,7 @@ rewrite pairs predicate = case predicate of
   Filter.CanHostSubject -> predicate
   Filter.CanAttachToSubject -> predicate
   Filter.IsToken -> predicate
+  Filter.IsActivatedAbility -> predicate
   Filter.IsTapped -> predicate
   Filter.IsFaceDown -> predicate
   Filter.IsExiledFaceDown -> predicate
@@ -1910,6 +1926,7 @@ bakeBound players predicate = case predicate of
   Filter.CanHostSubject -> predicate
   Filter.CanAttachToSubject -> predicate
   Filter.IsToken -> predicate
+  Filter.IsActivatedAbility -> predicate
   Filter.IsTapped -> predicate
   Filter.IsFaceDown -> predicate
   Filter.IsExiledFaceDown -> predicate
@@ -2023,6 +2040,7 @@ manaValueThresholds predicate = case predicate of
   Filter.CanHostSubject -> []
   Filter.CanAttachToSubject -> []
   Filter.IsToken -> []
+  Filter.IsActivatedAbility -> []
   Filter.IsTapped -> []
   Filter.IsFaceDown -> []
   Filter.IsExiledFaceDown -> []
@@ -2135,6 +2153,7 @@ statesAQuality predicate = case predicate of
   Filter.CanHostSubject -> True
   Filter.CanAttachToSubject -> True
   Filter.IsToken -> True
+  Filter.IsActivatedAbility -> True
   Filter.IsTapped -> True
   Filter.IsFaceDown -> True
   -- True whatever the nest says, AttachedTo's reason: "is represented by a card"

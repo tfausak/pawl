@@ -885,6 +885,31 @@ isAbility oid gs = case lookupObject oid gs of
       Source.OfSpellCopy _ -> False
       Source.OfInherentTrigger _ -> True
 
+-- CR 113.3b: is this object an ACTIVATED ability on the stack? isAbility above
+-- narrowed to one of CR 113.3's two kinds, asking the same two things and in the
+-- same way -- the object's zone and its KIND, never the card's identity -- so a
+-- card that says "target activated ability" (Squelch) reaches what a card that
+-- says "activated or triggered ability" (Stifle) reaches half of.
+--
+-- CR 605.3b keeps a mana ability off the stack entirely, so no mana ability is
+-- ever a candidate here; see Pawl.Types.Pool.Abilities.
+isActivatedAbility :: ObjectId -> GameState -> Bool
+isActivatedAbility oid gs = case lookupObject oid gs of
+  Nothing -> False
+  Just obj ->
+    Object.zone obj == Zone.Stack && case Object.source obj of
+      Source.OfAbility _ -> True
+      -- CR 113.3c's kind, which isAbility above keeps and this one does not. The
+      -- inherent one is a triggered ability all the same (CR 725.2), sourceless or
+      -- not.
+      Source.OfTrigger _ -> False
+      Source.OfInherentTrigger _ -> False
+      Source.OfCard _ -> False
+      Source.OfMeld _ -> False
+      Source.OfToken _ -> False
+      Source.OfEmblem _ -> False
+      Source.OfSpellCopy _ -> False
+
 -- CR 110.5: a permanent's tapped/untapped status. CR 110.5d gives status only
 -- to a permanent, so an unknown id -- and a card outside the battlefield -- is
 -- reported untapped, which is the answer every other status arm gives for a

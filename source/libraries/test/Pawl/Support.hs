@@ -1913,6 +1913,7 @@ stubView table oid =
                 Filter.canHostSubject = False,
                 Filter.canAttachToSubject = False,
                 Filter.token = False,
+                Filter.activatedAbility = False,
                 Filter.tapped = False,
                 Filter.faceDown = False,
                 Filter.representedCard = Nothing,

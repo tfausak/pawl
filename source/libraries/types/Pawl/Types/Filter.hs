@@ -897,6 +897,22 @@ data Filter keyword
     -- so nothing in CR 613 can turn a card into a token or back. That is what lets
     -- Pawl.Engine.Projection.filterReads declare it as reading nothing.
     IsToken
+  | -- | CR 113.3b: the candidate is an ACTIVATED ability on the stack, and not
+    -- CR 113.3c's triggered one. Squelch's "target activated ability", which
+    -- without this atom would have to be written as Stifle's broader "activated
+    -- or triggered ability" and would reach abilities the printed card cannot.
+    --
+    -- Uncharacteristic and IMMUTABLE for IsToken's reason one kind over: which
+    -- of rule 113.3's kinds an ability is comes off Pawl.Types.Source, nothing
+    -- in CR 613 rewrites it, and Pawl.Engine.Projection.filterReads declares it
+    -- as reading nothing.
+    --
+    -- An atom and not a Pool arm, although Pawl.Types.Pool.Abilities is the one
+    -- pool it ever narrows: CR 113.9 draws its line between spells and abilities
+    -- rather than between the two kinds of ability, so the narrowing is a card's
+    -- own restriction. Only a Filter composes under And/Or/Not and is reachable
+    -- from Pawl.Types.Affected.MatchingAnywhere.
+    IsActivatedAbility
   | -- | CR 110.5: the candidate is tapped. Wood Elemental's "untapped Forests"
     -- is spelled `Not IsTapped`, the one-relation-one-spelling posture IsToken's
     -- comment states (#163).

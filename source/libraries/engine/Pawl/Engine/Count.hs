@@ -332,6 +332,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.CanHostSubject -> predicate
   Filter.Type.CanAttachToSubject -> predicate
   Filter.Type.IsToken -> predicate
+  Filter.Type.IsActivatedAbility -> predicate
   Filter.Type.IsTapped -> predicate
   Filter.Type.IsFaceDown -> predicate
   -- NOT descended into, for AttachedTo's reason: CR 708.12's subject is the card
@@ -737,6 +738,9 @@ viewOfSnapshot mController isToken counters snapshot =
       -- CR 111.6: "A token isn't a card", which is a fact about the OBJECT and
       -- not a characteristic, so the arm supplies it above.
       Filter.token = isToken,
+      -- CR 113.3b: CR 608.2h's record is of a permanent that has left the
+      -- battlefield, which is never an ability on the stack.
+      Filter.activatedAbility = False,
       Filter.tapped = False,
       -- CR 110.5a says status is not a characteristic, and CR 608.2h's record is
       -- of characteristics -- so a snapshot holds nothing to answer this with,

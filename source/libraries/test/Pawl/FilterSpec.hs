@@ -71,6 +71,7 @@ blackCreature =
       Filter.canHostSubject = False,
       Filter.canAttachToSubject = False,
       Filter.token = False,
+      Filter.activatedAbility = False,
       Filter.tapped = False,
       Filter.faceDown = False,
       Filter.representedCard = Nothing,
@@ -123,6 +124,7 @@ devoidBigCreature =
       Filter.canHostSubject = False,
       Filter.canAttachToSubject = False,
       Filter.token = False,
+      Filter.activatedAbility = False,
       Filter.tapped = False,
       Filter.faceDown = False,
       Filter.representedCard = Nothing,
@@ -1432,6 +1434,21 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- is not one.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsToken)) "player"
+
+  -- CR 113.3b against CR 113.3c. A bare field read like IsToken above: the
+  -- builder (Pawl.Engine.Projection.viewOfCharacteristics, through
+  -- Pawl.Engine.Game.isActivatedAbility) is where the zone and the kind are
+  -- decided, so the gameplay-level proof is Pawl.CounterspellSpec's Squelch
+  -- group.
+  Spec.describe s "IsActivatedAbility" $ do
+    Spec.it s "matches a view whose object is an activated ability" $ do
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.activatedAbility = True}) Filter.Type.IsActivatedAbility) "activated ability"
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.IsActivatedAbility)) "and a permanent is not one"
+
+    -- CR 113.9: neither kind is a spell and neither contains the other, so a
+    -- player -- who is no object at all -- is vacuously false, IsToken's posture.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsActivatedAbility)) "player"
 
   -- CR 110.5. The atom is a bare field read, Transformed's shape below: the
   -- battlefield scoping CR 110.5d demands lives in the BUILDER that fills the

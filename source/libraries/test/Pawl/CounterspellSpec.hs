@@ -2583,6 +2583,82 @@ stifleSpec s registry = Spec.describe s "Stifle" $ do
         Spec.assertEqWith s "bob's graveyard stayed empty throughout" (length (Game.zoneMembers Zone.Graveyard S.bob second')) 0
         Spec.assertEqWith s "and alice never took the damage" (S.lifeOf S.alice second') (Just 20)
 
+-- CR 113.3b against CR 113.3c, one kind of ability at a time. Squelch ({1}{U}
+-- Instant, "Counter target activated ability. (Mana abilities can't be
+-- targeted.) / Draw a card.") narrows Stifle's Pool.Abilities to the activated
+-- half with Filter.IsActivatedAbility; the parenthetical needs nothing
+-- implemented, for stifleSpec's reason (CR 605.3b).
+--
+-- ONE board carrying one ability of each kind, so neither half can pass by the
+-- pool being empty, and the answerer takes the SMALLEST recipient offered --
+-- Recipient's derived Ord orders ToObject by ObjectId, and Game.freshObjectId
+-- hands out increasing ones, so the Aether Flash trigger (created when the Piker
+-- entered) is the one a Squelch that could reach a trigger would take. That is
+-- what makes alice's life total discriminating: countering the ping is the only
+-- way it stays 20.
+--
+-- Pawl.TargetSpec holds the pool-level twin, where the offered sets are read
+-- directly and Stifle's is the union of both.
+squelchSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+squelchSpec s registry = Spec.describe s "Squelch" $ do
+  Spec.it s "CR 113.3b Squelch counters the activated ability and leaves the trigger, which still kills the Piker" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    aetherFlash <- S.printingOf s registry "Aether Flash"
+    piker <- S.printingOf s registry "Goblin Piker"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    squelch <- S.printingOf s registry "Squelch"
+    case soleActivatedAbility sorcerer of
+      Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+      Just ping -> do
+        let (srcId, withSorcerer) = S.addCreature sorcerer S.bob (Setup.emptyGame S.bothPlayers)
+            -- CR 302.6: the Sorcerer must have settled before its {T} is legal.
+            settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.bob)
+            (flashId, withFlash) = S.addCreature aetherFlash S.alice settled
+            -- Two Mountains for the Piker and two Islands for the Squelch.
+            withLands =
+              List.foldl'
+                (\g p -> snd (S.addCreature p S.alice g))
+                withFlash
+                [mountain, mountain, island, island]
+            -- CR 121.3: the draw needs a library to draw from, or alice loses to
+            -- CR 104.3c before the assertions run.
+            withLibrary = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) withLands [1 .. (3 :: Int)]
+            (squelchId, withSquelch) = S.addHandCard squelch S.alice withLibrary
+            (pikerId, gs) = S.addHandCard piker S.alice withSquelch
+            cast = S.runPure S.identityAnswer gs (S.cast S.alice pikerId)
+            -- CR 603.3: the Piker enters, and Aether Flash's trigger goes on the
+            -- stack the next time a player would receive priority.
+            entered = S.runPure S.identityAnswer cast Stack.resolveTop
+            placed = S.runPure S.identityAnswer entered Engine.settleForPriority
+            atAlice :: Prompt.Prompt r -> r
+            atAlice p = case p of
+              Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
+              _ -> S.identityAnswer p
+            -- bob's ping is aimed at alice, so whether it resolved is readable
+            -- as her life total.
+            pinging = S.runPure atAlice (placed {GameState.priority = Just S.bob}) (Activate.activateAbility S.bob srcId ping)
+            takeOldest :: Prompt.Prompt r -> r
+            takeOldest p = case p of
+              Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> maybe Set.empty Set.singleton (Set.lookupMin legal)) sets
+              _ -> S.identityAnswer p
+            squelched = S.runPure takeOldest (pinging {GameState.priority = Just S.alice}) (S.cast S.alice squelchId)
+            countered = S.runPure S.identityAnswer squelched Stack.resolveTop
+            after = S.runPure S.identityAnswer (S.runPure S.identityAnswer countered Stack.resolveTop) Engine.settleForPriority
+        Spec.assertEqWith s "the stack held one trigger and one activated ability before the Squelch" (length (GameState.stack pinging)) 2
+        -- The discriminating pair. A Squelch that could reach a trigger would
+        -- have taken the older object -- the Aether Flash trigger -- and then the
+        -- ping resolves for 1 and the Piker lives.
+        Spec.assertEqWith s "alice's life is untouched: the ping was countered (CR 701.6a)" (S.lifeOf S.alice after) (Just 20)
+        Spec.assertEqWith s "and the Piker took the Aether Flash's 2: the trigger was not countered" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice after) 0
+        -- Squelch's second sentence, and the reason the resolution got that far.
+        Spec.assertEqWith s "alice drew a card" (S.handSize S.alice after) 1
+        -- Supporting: CR 608.2n's cease for the ability, CR 701.6a's graveyard
+        -- for the spell that did it.
+        Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
+        Spec.assertEqWith s "bob's graveyard is empty: an ability ceases rather than moving" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
+        Spec.assertBool s (Set.member flashId (GameState.battlefield after)) "and Aether Flash itself is untouched"
+
 fizzleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fizzleSpec s registry = Spec.describe s "Fizzle" $ do
   Spec.it s "CR 608.2b Bolt-vs-Bolt through the priority loop: the second fizzles" $ do
@@ -2709,3 +2785,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   magicalHackDurationSpec s registry
   artificialEvolutionSpec s registry
   stifleSpec s registry
+  squelchSpec s registry

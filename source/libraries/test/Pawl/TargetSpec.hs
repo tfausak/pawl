@@ -1115,6 +1115,50 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
             Spec.assertEqWith s "Stifle sees the ability and only the ability" stifleLegal (Set.singleton (Recipient.ToObject abilId))
           _ -> Spec.assertFailure s "the fixture should put one ability and one spell on the stack, and both cards should declare a target slot"
 
+  -- CR 113.3b against CR 113.3c, INSIDE the pool the case above holds against
+  -- Pool.Spells: Stifle's "activated or triggered ability" reaches both kinds and
+  -- Squelch's "target activated ability" reaches one, which is
+  -- Filter.IsActivatedAbility narrowing the same Pool.Abilities rather than a
+  -- second pool. Both offers are read off the committed printings.
+  --
+  -- One board carrying one of each kind, so neither offer can pass by the pool
+  -- being empty: alice's Prodigal Sorcerer's {T} (CR 113.3b) and the Aether Flash
+  -- trigger her Goblin Piker's entry raised (CR 113.3c).
+  --
+  -- Pawl.CounterspellSpec's Squelch group is the gameplay-level twin.
+  Spec.it s "CR 113.3b Squelch's pool holds the activated ability alone where Stifle's holds both" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    aetherFlash <- S.printingOf s registry "Aether Flash"
+    piker <- S.printingOf s registry "Goblin Piker"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    stifle <- S.printingOf s registry "Stifle"
+    squelch <- S.printingOf s registry "Squelch"
+    case soleActivatedAbility sorcerer of
+      Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+      Just ping -> do
+        let (srcId, withSorcerer) = S.addCreature sorcerer S.alice (Setup.emptyGame S.bothPlayers)
+            -- CR 302.6: the Sorcerer has to have settled before its {T} is legal.
+            settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
+            (_, withFlash) = S.addCreature aetherFlash S.alice settled
+            withLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) withFlash [1 .. (2 :: Int)]
+            (pikerId, withPiker) = S.addHandCard piker S.alice withLands
+            cast = S.runPure S.identityAnswer withPiker (S.cast S.alice pikerId)
+            -- CR 603.3 puts Aether Flash's trigger on the stack once the Piker
+            -- has entered.
+            entered = S.runPure S.identityAnswer cast Stack.resolveTop
+            placed = S.runPure S.identityAnswer entered Engine.settleForPriority
+            atAlice :: Prompt.Prompt r -> r
+            atAlice p = case p of
+              Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
+              _ -> S.identityAnswer p
+            gs = S.runPure atAlice (placed {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice srcId ping)
+            legalFor printing = fmap (\theSlot -> Target.legalRecipients (Just S.bob) S.noSource theSlot gs) (soleTargetSlot (Face.spell (S.combinedFace printing)))
+        case (GameState.stack placed, GameState.stack gs, legalFor stifle, legalFor squelch) of
+          ([triggerId], [abilId, _], Just stifleLegal, Just squelchLegal) -> do
+            Spec.assertEqWith s "Squelch sees the activated ability and only it" squelchLegal (Set.singleton (Recipient.ToObject abilId))
+            Spec.assertEqWith s "where Stifle sees both kinds" stifleLegal (Set.fromList [Recipient.ToObject abilId, Recipient.ToObject triggerId])
+          _ -> Spec.assertFailure s "the fixture should put one trigger and then one activated ability on the stack, and both cards should declare a target slot"
+
   -- CR 602.2a creates an activated ability on the stack BEFORE CR 602.2b routes
   -- the rest of the activation through CR 601.2b-i, so CR 601.2c's targets are
   -- chosen in a state that already holds the ability. Activate.activateAbility
