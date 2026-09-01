@@ -13,13 +13,13 @@
 --
 -- The only module that may CASE on Pawl.Types.CombatRestriction.
 -- Pawl.Engine.Keyword constructs one -- rule 702.98a's unleash -- and reads none.
--- Pawl.Engine.Combat asks for a SET OF IDS, for a SET OF PAIRS, or for a NUMBER,
--- and never learns which card, or which keyword, produced any of them. The pairs
+-- Pawl.Engine.Combat asks for a SET OF IDS, for a SET OF ROWS, or for a NUMBER,
+-- and never learns which card, or which keyword, produced any of them. The rows
 -- are the two pairwise restrictions, which no set of creatures could state: CR
--- 509.1b's (cantBeBlockedBy) and CR 508.1c's aimed-at one (cantAttackPlayer),
--- whose rows carry CR 506.3's kind as well as the seat. The Filter that decides
--- the first and the Pawl.Types.PlayerScope that decides the second are both
--- resolved here, so neither crosses into Pawl.Engine.Combat.
+-- 509.1b's (cantBeBlockedBy), a pair, and CR 508.1c's aimed-at one
+-- (cantAttackPlayer), a triple carrying CR 506.3's kind beside the seat. The
+-- Filter that decides the first and the Pawl.Types.PlayerScope that decides the
+-- second are both resolved here, so neither crosses into Pawl.Engine.Combat.
 module Pawl.Engine.CombatRestriction where
 
 import qualified Data.List as List
@@ -761,7 +761,7 @@ cantAttackPlayer candidates players gs =
                 Just you -> filter (\pid -> PlayerEffect.inScope pid you gs scope) [player]
            in [(creature, pid, kind) | creature <- filter (named source subject) candidates, pid <- barred, kind <- Set.toList kinds]
       -- CR 508.5 through CR 802.3a: this arm's own gate is read at the seat the
-      -- pair names, which is the player being attacked and so the defending player
+      -- row names, which is the player being attacked and so the defending player
       -- of that announcement. One gather, one gate reading per seat,
       -- cantAttackDefender's shape. No printing gates this arm today.
       forSeat player = concatMap (fromRestriction player) (filter (not . lifted (Just player) gs) rows)

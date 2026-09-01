@@ -67,11 +67,11 @@ import qualified Pawl.Types.LimitUnless as LimitUnless
 -- attack you": the pair is a creature and the ANNOUNCEMENT it may not make (CR
 -- 508.1b) -- a player from a Pawl.Types.PlayerScope rather than a Filter over
 -- creatures, together with which of CR 506.3's things on that player's side are
--- barred (Vow of Flight's "or planeswalkers you control"). CR 802.3a is the rule that says such a
--- restriction applies only to the creatures attacking that player, and it is not
--- a multiplayer rule in disguise: at two seats a planeswalker its controller
--- controls is a second announcement, so "can't attack you" and "can't attack"
--- already come apart.
+-- barred (Vow of Flight's "or planeswalkers you control"). CR 802.3a is the rule
+-- that says such a restriction applies only to the creatures attacking that
+-- player, and it is not a multiplayer rule in disguise: at two seats a
+-- planeswalker its controller controls is a second announcement, so "can't
+-- attack you" and "can't attack" already come apart.
 --
 -- A restriction a player may PAY THROUGH is one of CR 508.1c's all the same
 -- (Ghostly Prison), but it rides Pawl.Types.AttackCost, the SIXTH carrier. The

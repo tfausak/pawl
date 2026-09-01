@@ -467,7 +467,7 @@ attackCeiling candidates gs =
 -- same two lists the declaration is drawn from (declarableTargets and
 -- Defender.defendingPlayers).
 --
--- TWO restrictions land here and they map a target to a player DIFFERENTLY, which
+-- TWO restrictions land here and they key on an announcement DIFFERENTLY, which
 -- is why one set is built from two:
 --
 --   * The AIMED-AT one (Blazing Archon, "creatures can't attack you"; Vow of
