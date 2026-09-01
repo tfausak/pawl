@@ -839,11 +839,6 @@ subgameStateFrom starter parent =
 -- CR 729.4a's "abilities in the main game that trigger on objects leaving a
 -- main-game zone" (#2463).
 --
--- Not implemented: CR 604.2's handover of an ability that goes on applying after
--- the permanent leaves the battlefield (Titania's Song), which
--- Departure.objectsLeaveWith hands to GameState.continuousEffects through
--- Event.lingeringHandover (#2459).
---
 -- An id that is not one of this game's own objects came from further out: CR
 -- 729.6 makes a subgame's own parent the main game of a subgame below it, so
 -- subgameStateFrom hands a subgame its parent's outsideObjects along with the
@@ -915,15 +910,17 @@ applyCrossings finalSub parent =
       -- Event.recordEvent's CR 603.10 sample is of the board immediately after
       -- this card left and before the next one does.
       --
-      -- The event only for a permanent on the battlefield, which is the set
-      -- Pawl.Types.GameEvent.LeftTheGame documents at its own constructor.
+      -- The event -- and CR 604.2's handover below it -- only for a permanent on
+      -- the battlefield, which is the set Pawl.Types.GameEvent.LeftTheGame
+      -- documents at its own constructor.
       -- Battlefield MEMBERSHIP rather than Object.zone, the way
       -- Departure.objectsLeaveWith reads the same question, since
       -- Pawl.Engine.Phasing takes a phased-out permanent out of that set and
       -- leaves its Object.zone alone (CR 702.26d).
       --
-      -- So a PHASED-OUT permanent crosses without an event, and that is CR
-      -- 702.26b rather than an omission: excepting rules that specifically
+      -- So a PHASED-OUT permanent crosses without an event and hands nothing
+      -- over, and that is CR 702.26b rather than an omission: excepting rules
+      -- that specifically
       -- mention phased-out permanents, such a permanent "is treated as though it
       -- does not exist" and "can't affect or be affected by anything else in the
       -- game". CR 729.4a mentions none, so the main-game abilities it speaks of
@@ -940,8 +937,31 @@ applyCrossings finalSub parent =
               Just (key, value) -> g {GameState.lastKnown = Map.insert key value (GameState.lastKnown g)}
             gone = leave noted oid
          in if Set.member oid (GameState.battlefield g)
-              then Event.recordEvent (GameEvent.LeftTheGame oid) gone
+              then
+                Event.recordEvent
+                  (GameEvent.LeftTheGame oid)
+                  gone {GameState.continuousEffects = handover g oid <> GameState.continuousEffects gone}
               else gone
+      -- CR 604.2's override, the same one Departure.objectsLeaveWith performs on
+      -- the other road out of the game: a permanent that leaves the GAME has left
+      -- the battlefield, so a card whose text says its effect continues anyway --
+      -- Titania's Song -- needs that effect handed to GameState.continuousEffects
+      -- as it goes. Event.lingeringHandover is the single writer.
+      --
+      -- Read from `g`, the running board this crossing is leaving, for `filed`'s
+      -- reason: what continues is what was applying at THIS instant, with every
+      -- earlier crossing already gone. CR 611.2c then freezes the set.
+      --
+      -- Gated by the caller on GameState.battlefield membership, exactly as the
+      -- event above is and for CR 702.26b's reason: a phased-out permanent was
+      -- generating no effect there is anything to continue.
+      --
+      -- The controller is read the way `filed` reads it (CR 109.5 / CR 613.1b),
+      -- and the Object.owner fallback is unreachable for `filed`'s reason.
+      handover g oid = case Map.lookup oid (GameState.objects g) of
+        -- Unreachable, for `leave`'s reason.
+        Nothing -> []
+        Just obj -> Event.lingeringHandover oid (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid g)) g
       applied = List.foldl' cross parent mine
    in applied
         { GameState.outsideObjects = Map.withoutKeys (GameState.outsideObjects applied) (Set.fromList further),

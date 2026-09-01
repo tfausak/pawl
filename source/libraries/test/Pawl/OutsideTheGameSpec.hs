@@ -37,6 +37,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.OutsideTheGame as OutsideTheGame
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -488,6 +489,83 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
     -- follow-on LoseLife excludes. 20 halves to 10.
     Spec.assertEqWith s "CR 729.1b: only bob paid, which is how the subgame ended" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 20, Just 10)
     Spec.assertEqWith s "CR 729.1a: the subgame did not decide the main game" (GameState.result after) Nothing
+  -- CR 604.2's exception on the crossing road, and the case #2459 is about.
+  -- Titania's Song ({3}{G} enchantment, "Each noncreature artifact loses all
+  -- abilities and becomes an artifact creature with power and toughness each
+  -- equal to its mana value. If this enchantment leaves the battlefield, this
+  -- effect continues until end of turn."): CR 604.2 ends a static ability's
+  -- effect when its permanent leaves
+  -- the battlefield, and this card's own text overrides that. CR 729.4a takes the
+  -- enchantment out of the main game, which IS leaving the battlefield, so the
+  -- effect has to go on applying in the main game the subgame was played inside
+  -- -- exactly as it does on CR 800.4a's road out of the game
+  -- (Pawl.DepartureSpec).
+  --
+  -- Death Wish ({1}{B}{B} sorcery, "You may put a card you own from outside the
+  -- game into your hand. You lose half your life, rounded up. Exile Death Wish.")
+  -- is the producer, and its unrestricted filter is why: #2459 was filed reading
+  -- the pool's wishes as naming a card type apiece, but Death Wish names none, so
+  -- CR 729.4 offers it a main-game ENCHANTMENT. The case above proves the same
+  -- filter admits an ordinary sorcery.
+  --
+  -- Jade Statue ({4} artifact) is the probe: a noncreature artifact of mana value
+  -- 4, so an animated one is a 4/4 and an un-animated one is no creature at all.
+  --
+  -- The sizing is the case above's, one wish instead of two: alice starts the
+  -- subgame (CR 729.2) so her turns are 1, 3 and 5, and three Swamps are down on
+  -- turn 5, which is the first turn the {1}{B}{B} wish is castable. Nine cards
+  -- each: bob draws his last two on turns 2 and 4 and draws from an empty library
+  -- on turn 6, ending the subgame one turn after alice's cast. alice's nine are
+  -- the wish and eight Swamps, so whichever end the shuffle leaves the wish at
+  -- she holds it by turn 5.
+  Spec.it s "CR 604.2/729.4a gameplay: Death Wish takes Titania's Song out of the main game and its effect goes on applying there" $ do
+    plains <- S.printingOf s registry "Plains"
+    swamp <- S.printingOf s registry "Swamp"
+    mountain <- S.printingOf s registry "Mountain"
+    shahrazad <- S.printingOf s registry "Shahrazad"
+    deathWish <- S.printingOf s registry "Death Wish"
+    titaniasSong <- S.printingOf s registry "Titania's Song"
+    jadeStatue <- S.printingOf s registry "Jade Statue"
+    let g0 = Setup.emptyGame S.bothPlayers
+        (songId, g1) = S.addCreature titaniasSong S.alice g0
+        (statueId, g2) = S.addCreature jadeStatue S.alice g1
+        g3 = S.landsFor plains S.alice 2 g2
+        g4 = stockLibrary mountain 9 S.bob (stockLibrary swamp 8 S.alice (stockLibrary deathWish 1 S.alice g3))
+        (_shahrazadId, g5) = S.addHandCard shahrazad S.alice g4
+        before =
+          g5
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          -- Death Wish's printed "may" (CR 608.2d).
+          Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+          -- Pinned to the Song by id. The offer also holds her two Plains and the
+          -- Jade Statue, so an answerer taking the head of it would cross a
+          -- different card and every assertion below would redden rather than the
+          -- case passing on the wrong one.
+          Prompt.ChooseFromOutsideTheGame _ _ offered ->
+            Maybe.fromMaybe (NonEmpty.head offered) (List.find (== OutsideCard.InAnotherGame songId) (NonEmpty.toList offered))
+          -- CR 729.2's roll, answered so the turn count above is the one played.
+          Prompt.RandomFirstPlayer _ -> S.alice
+          _ -> S.castAnswer p
+        after = snd (Engine.runGamePure answer before Engine.priorityLoop)
+    -- The fixture's own preconditions, read off the board before anything runs,
+    -- so the runner under test cannot redden them: the Song really was animating
+    -- the Statue in the main game, which is what makes "continues" mean anything.
+    Spec.assertEqWith s "CR 613.4b the Song animates the Statue as a 4/4 before the subgame" (S.powerToughnessOf statueId before) (Just (4, 4))
+    Spec.assertEqWith s "and both are on the main game's battlefield" (Set.member songId (GameState.battlefield before), Set.member statueId (GameState.battlefield before)) (True, True)
+    -- The gameplay-level claim, ahead of every proxy below it.
+    Spec.assertEqWith s "CR 604.2: the Song's effect goes on applying in the main game, so the Statue is still a 4/4" (S.powerToughnessOf statueId after) (Just (4, 4))
+    Spec.assertBool s (Projection.isCreatureOf statueId after) "CR 611.2a: and still an artifact creature"
+    -- What the claim rests on: the Song genuinely left, and the handover is a
+    -- stored effect rather than the Song still projecting from the battlefield.
+    Spec.assertEqWith s "CR 729.4a: the wish took the Song out of the main game entirely" (Map.member songId (GameState.objects after)) False
+    Spec.assertEqWith s "CR 604.2/611.2c: the continuing effect is stored, one per part of the ability" (length (GameState.continuousEffects after)) 4
+    Spec.assertEqWith s "CR 729.5: the Song comes back to her main-game library" (List.elem titaniasSong (printingsIn Zone.Library S.alice after)) True
+    Spec.assertEqWith s "CR 729.1b: alice won the subgame, so only bob paid" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 20, Just 10)
   -- CR 729.5's second sentence, the one the case above does not reach: "the spell
   -- or ability that created the subgame finishes resolving, EVEN IF IT WAS
   -- CREATED BY A SPELL CARD THAT'S NO LONGER ON THE STACK". alice casts Shahrazad
