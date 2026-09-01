@@ -17,8 +17,9 @@
 -- sorcery, "You may reveal a sorcery card you own from outside the game and put
 -- it into your hand. Exile Burning Wish.") for the pool, with Cunning Wish for
 -- the cycle's instant speed and Death Wish for a card that prints no reveal,
--- and, in the last two cases, a Shahrazad subgame for CR 729.4's main game --
--- Living Wish reaching two main-game creatures, then Burning Wish reaching the
+-- and, in the last three cases, a Shahrazad subgame for CR 729.4's main game --
+-- Living Wish reaching two main-game creatures, then Death Wish reaching a
+-- main-game Titania's Song (CR 604.2's handover), then Burning Wish reaching the
 -- resolving Shahrazad itself (CR 729.5).
 --
 -- Not implemented: Ring of Ma'ruf is not in data/cards/, so nothing here reaches
