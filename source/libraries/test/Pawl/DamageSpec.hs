@@ -2758,7 +2758,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Damage" $ do
 -- that clause restricts an ATTACKING creature with protection, so nothing here
 -- makes either block illegal, and alice's attacker dying to the Apostle's own 2 is
 -- what says combat damage was really exchanged rather than the block refused.
-protectionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+protectionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 protectionSpec s registry = Spec.describe s "Protection" $ do
   Spec.it s "CR 702.16e a black attacker's combat damage to the Apostle is prevented, a red attacker's is not" $ do
     apostle <- S.printingOf s registry "Apostle of Purifying Light"
@@ -2775,6 +2775,33 @@ protectionSpec s registry = Spec.describe s "Protection" $ do
     Spec.assertEqWith s "CR 510.2 while the Apostle's own 2 killed the Evangel, so the block really happened" (S.creaturesInPlay S.alice black) 0
     Spec.assertEqWith s "and killed the Piker in the row beside it" (S.creaturesInPlay S.alice red) 0
     Spec.assertEqWith s "the red row's fixture is the same one blocker" (length redDefenders) 1
+
+  -- CR 702.16j: "All damage that would be dealt to such a permanent or player is
+  -- prevented." Progenitus, whose quality is Filter.And [] -- every object -- so
+  -- the shield above is minted with a source half nothing fails.
+  --
+  -- A PAIR OF BLOCKS differing only in WHICH creature blocks. The same red Goblin
+  -- Piker (2/1) assigns the same 2 in both rows; Progenitus takes none of it and
+  -- bob's Hill Giant (3/3, no abilities) takes all of it. The attacker's colour is
+  -- red and not black, so a quality read as any single colour fails the first
+  -- assertion -- protection from everything is not protection from a colour.
+  --
+  -- Both blockers survive the 2 (10/10 and 3/3), so the marks are what
+  -- discriminate rather than a death; the Piker dying in both rows is what says
+  -- combat damage was really exchanged.
+  Spec.it s "CR 702.16j the same attacker's combat damage marks the Hill Giant and never reaches Progenitus" $ do
+    progenitus <- S.printingOf s registry "Progenitus"
+    giant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let blockedBy blocker =
+          let (gs, _, theirs) = S.combatBoardOf [piker] [blocker]
+           in (theirs, S.settleSba (S.fightWith S.aggressiveAnswer gs))
+        (protectedIds, protectedAfter) = blockedBy progenitus
+        (plainIds, plainAfter) = blockedBy giant
+    Spec.assertEqWith s "CR 702.16j nothing is marked on Progenitus" (fmap (\oid -> S.damageOf oid protectedAfter) protectedIds) [Just 0]
+    Spec.assertEqWith s "CR 510.2 while the same 2 marks bob's Hill Giant in the row beside it" (fmap (\oid -> S.damageOf oid plainAfter) plainIds) [Just 2]
+    Spec.assertEqWith s "and the Piker died to each blocker, so both blocks really happened" (S.creaturesInPlay S.alice protectedAfter, S.creaturesInPlay S.alice plainAfter) (0, 0)
+    Spec.assertEqWith s "both blockers outlived the 2 they blocked" (S.creaturesInPlay S.bob protectedAfter, S.creaturesInPlay S.bob plainAfter) (1, 1)
 
 -- Fill every target slot with whichever of the two named permanents that slot's
 -- own filter admits. Prey Upon's slots are disjointly filtered by controller, so
