@@ -73,7 +73,7 @@ codec =
       -- the object still implicit: which kicker cost is asked about is the whole
       -- of what the card names (Pawl.Types.Quantity).
       Arm.payload "TimesKickedWith" (Cost.codec Keyword.codec) Quantity.TimesKickedWith (\x -> case x of Quantity.TimesKickedWith y -> Just y; _ -> Nothing),
-      -- CR 107.4h's third sentence, with nothing on the wire either: which tag is
+      -- CR 107.4h's third sentence, with nothing on the wire: which tag is
       -- asked about is the constructor (Pawl.Types.Quantity), and the object is
       -- whichever one the quantity is evaluated against.
       Arm.nullary "SnowWasSpent" Quantity.SnowWasSpent,

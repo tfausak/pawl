@@ -389,7 +389,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.SnowWasSpent -> fmap (\view -> if Set.member ProductionTag.Snow (Filter.manaSpentTags view) then 1 else 0) mView
   -- CR 111.6's status as a 0/1, WasKicked's arm in every respect. Filter.token
   -- rather than Game.isToken: reading the object directly answers False for an
-  -- id naming nothing, which is the whole case this arm exists for (#1102).
+  -- id naming nothing, which is the whole case this arm exists for; see #1102.
   Quantity.WasToken -> fmap (\view -> if Filter.token view then 1 else 0) mView
   -- CR 509.1g's combat fact as a 0/1, WasToken's arm in every respect --
   -- including the reader, since a creature that has died is out of

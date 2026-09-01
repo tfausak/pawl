@@ -16,6 +16,7 @@ import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
+import qualified Pawl.Engine.Defender as Defender
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -1093,11 +1094,13 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- the same id are the other two conjuncts, and each is its own leg of
       -- Pawl.CombatEffectSpec's Aura Graft pair:
       --
-      -- CONTROLLER, compared against Combat.defender. CR 506.2 admits only the
-      -- defending player's planeswalkers into a declaration, so "its controller
+      -- CONTROLLER, compared against Defender.defendingPlayers. CR 506.2 admits
+      -- only the defending player's planeswalkers into a declaration, so "its controller
       -- changes" and "its controller is no longer the defending player" name the same
       -- planeswalkers -- which is the comparison Combat.stillAttacked makes through
       -- Combat.attackablePlaneswalkers, and asking it here costs no projection.
+      -- MEMBERSHIP rather than Maybe equality, which two Nothings satisfy; the
+      -- arm answers Nothing on that path either way.
       --
       -- CARD TYPE, through `peers`, which is what makes rule 506.4's planeswalker
       -- clause reachable without Projection.isPlaneswalkerOf: that one calls project,
@@ -1126,7 +1129,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
         Just (AttackTarget.OfPlaneswalker pw)
           | Set.notMember oid (Combat.attackingNothing (GameState.combat gs)),
             Set.member pw (GameState.battlefield gs),
-            controllerOf pw gs == Combat.defender (GameState.combat gs),
+            List.any (\defending -> controllerOf pw gs == Just defending) (Defender.defendingPlayers gs),
             any (Set.member CardType.Planeswalker . Filter.cardTypes) (peers pw) ->
               controllerOf pw gs
         _ -> Nothing,
@@ -1150,7 +1153,8 @@ viewOfCharacteristics peers oid pc controller counters gs =
       --
       -- The other two conjuncts are rule 506.4's battle clauses, arm for arm with the
       -- planeswalker field above and with Combat.stillAttackedBattle's own list: the
-      -- PROTECTOR compared against Combat.defender, which CR 310.9d makes the
+      -- PROTECTOR compared against Defender.defendingPlayers -- membership, for the
+      -- planeswalker field's reason -- which CR 310.9d makes the
       -- defending player while a battle is attacked, and the CARD TYPE through
       -- `peers`. The type conjunct is load-bearing precisely because CR 310.9g keeps
       -- the designation when a permanent stops being a battle, so Battle.protectorOf
@@ -1168,7 +1172,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
         Just (AttackTarget.OfBattle battle)
           | Set.notMember oid (Combat.attackingNothing (GameState.combat gs)),
             Set.member battle (GameState.battlefield gs),
-            Battle.protectorOf battle gs == Combat.defender (GameState.combat gs),
+            List.any (\defending -> Battle.protectorOf battle gs == Just defending) (Defender.defendingPlayers gs),
             any (Set.member CardType.Battle . Filter.cardTypes) (peers battle) ->
               Battle.protectorOf battle gs
         _ -> Nothing,

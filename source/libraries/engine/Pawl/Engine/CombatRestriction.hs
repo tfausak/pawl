@@ -27,6 +27,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Defender as Defender
 import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -37,7 +38,6 @@ import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
-import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -288,14 +288,14 @@ inForce gs =
       --
       -- CR 508.5: the gate may also name the DEFENDING PLAYER rather than the
       -- source's controller (Armored Galleon, "can't attack unless defending
-      -- player controls an Island"), so the combat record's defender is supplied
-      -- to Filter.ControlledByDefendingPlayer here. ONE read for the whole
-      -- combat rather than one per (creature, attack target) pair: CR 508.5a
+      -- player controls an Island"), so CR 802.2a's one specific defending player
+      -- is supplied to Filter.ControlledByDefendingPlayer here. ONE read for the
+      -- whole combat rather than one per (creature, attack target) pair: CR 508.5a
       -- determines the defending player individually for each attacking
       -- creature, and the two readings coincide on every board pawl can build,
-      -- since Combat.attackTargets is derived from that single defender and
+      -- since Combat.attackTargets is derived from that one defender and
       -- Defender.playerOf answers it on all three arms -- the OfPlayer arm IS
-      -- the defender, the OfPlaneswalker arm reads the record, and
+      -- the defender, the OfPlaneswalker arm reads the designation, and
       -- Combat.attackableBattles admits only battles that player protects. CR
       -- 802's attack-multiple-players option is what would separate them, and
       -- pawl has no options concept to read it from (#175).
@@ -306,7 +306,7 @@ inForce gs =
       -- the arms rather than only on CantAttack: CR 508.5 pins one defending
       -- player per combat, so a block-side gate naming that player would read
       -- the same seat.
-      defending = Combat.defender (GameState.combat gs)
+      defending = Maybe.listToMaybe (Defender.defendingPlayers gs)
       lifted source changes restriction = case gate restriction of
         Nothing -> False
         Just condition ->
