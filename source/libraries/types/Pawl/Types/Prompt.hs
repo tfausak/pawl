@@ -432,8 +432,10 @@ data Prompt r where
   -- neither of those prompts can stand in for it: the group's cards are still in
   -- the library the reveal showed them from (CR 701.20b).
   --
-  -- The PlayerId is the resolving controller, the only seat that chooses today
-  -- (#1957). Raised only for two or more candidates.
+  -- The PlayerId is the seat the ref's chooser names -- CR 608.2c's resolving
+  -- controller by default, Animal Magnetism's opponent otherwise. Raised only for
+  -- two or more candidates, and once PER CARD for a ref whose count is above one,
+  -- each ask offering what the earlier ones did not take (Ancestral Memories).
   --
   -- ONE prompt however many opcodes read the answer: Carth the Lion's "you may
   -- reveal a planeswalker card from among them and put it into your hand" asks

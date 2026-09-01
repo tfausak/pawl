@@ -19,8 +19,8 @@ import qualified Pawl.Types.SlotName as SlotName
 -- "all" is not a choice, so CR 608.2d has nothing to hand out; the members that
 -- match are named by their own characteristics, read against the CR 613
 -- projection when the instruction is reached (CR 608.2c). Which is also why this
--- arm needs no note about who may choose (#1957) and no note about a count above
--- one (#1956) -- it takes every match, and CR 609.3 covers a group holding none.
+-- arm carries neither of that type's other two fields, the chooser and the count:
+-- it takes every match, and CR 609.3 covers a group holding none.
 --
 -- "The rest" needs no arm of its own: a LATER clause reading the same slot with
 -- Pawl.Types.ObjectRef.InSlot finds the matched cards gone, CR 400.7 having
