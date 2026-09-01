@@ -2483,8 +2483,8 @@ rewriteEffect pairs effect = case effect of
   -- CR 706.1's number of sides is a numeral rather than a computed count; the
   -- modifier added to the result is the Quantity, PutCounters' descent above.
   Effect.RollDie x -> Effect.RollDie x {RollDie.modifier = fmap (rewriteQuantity pairs) (RollDie.modifier x)}
-  -- CR 705.1's number of coins is the Quantity, PutCounters' descent above; the
-  -- reading and the slot name no word rule 612 can swap.
+  -- The number of coins is the Quantity, PutCounters' descent above; the reading
+  -- and the slot name no word rule 612 can swap.
   Effect.FlipCoin x -> Effect.FlipCoin x {FlipCoin.count = rewriteQuantity pairs (FlipCoin.count x)}
   Effect.TakeExtraTurn {} -> effect
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (rewriteObjectRef pairs ref))

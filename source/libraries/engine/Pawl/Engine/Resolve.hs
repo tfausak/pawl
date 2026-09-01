@@ -1024,7 +1024,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- the suite green. A card whose roll added "the number of cards you drew this
   -- way" would refute that. The same holds of the two arms below.
   Effect.RollDie rollDie -> maybe Map.empty quantitySlots (RollDie.modifier rollDie)
-  -- And a DEFINITION too, on top of the slots CR 705.1's number of coins reads.
+  -- And a DEFINITION too, on top of the slots the coin count reads.
   Effect.FlipCoin flipCoin -> quantitySlots (FlipCoin.count flipCoin)
   Effect.TakeExtraTurn {} -> Map.empty
   Effect.ShuffleIntoLibrary {} -> Map.empty
@@ -1647,8 +1647,8 @@ readsX = any effectReadsX
       -- CR 706.2's modifier is an ordinary Quantity, so it may be the X the
       -- caster announced (CR 601.2b).
       Effect.RollDie rollDie -> any Quantity.readsX (RollDie.modifier rollDie)
-      -- CR 705.1's number of coins is an ordinary Quantity, so it may be the X
-      -- the caster announced (Flock of Rabid Sheep's "flip X coins").
+      -- The number of coins is an ordinary Quantity, so it may be the X the
+      -- caster announced (Flock of Rabid Sheep's "flip X coins").
       Effect.FlipCoin flipCoin -> Quantity.readsX (FlipCoin.count flipCoin)
       Effect.TakeExtraTurn {} -> False
       Effect.ShuffleIntoLibrary {} -> False
@@ -5010,7 +5010,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- names none of its own, and CR 705.2's last sentence keeps every other seat
   -- out of it. EVERY coin is recorded, won or lost -- Pawl.Types.CoinFlipped
   -- says why the outcome is a field rather than the presence of an entry -- and
-  -- one entry per coin, since rule 705.1 counts coins rather than instructions.
+  -- one entry per coin, since the event is the log of flips rather than of
+  -- instructions.
   --
   -- TWO WRITERS, two roads. Pawl.Engine.Coin is also called by
   -- Pawl.Engine.Event's ChoiceByCoinFlip arm, the flip made as a permanent
@@ -5034,11 +5035,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext (Game.teams gs) controller source legal (slotBindings resolving gs)
-        -- CR 705.1's number of coins, read ONCE before the first flip: nothing
-        -- in the instruction changes what it counts, and re-reading it per coin
-        -- would let a Mutalith Vortex Beast's "for each opponent you have" flip a
-        -- different number of coins than it announced. CR 107.2's posture for a
-        -- quantity that cannot be evaluated: no coins at all.
+        -- How many coins the instruction flips, read ONCE before the first of
+        -- them: the number is part of the instruction, and re-reading it per coin
+        -- would let a count over the board flip a different number than the
+        -- instruction named. CR 107.2's posture for a quantity that cannot be
+        -- evaluated: no coins at all.
         coins = Integer.toNaturalSaturating (Maybe.fromMaybe 0 (Quantity.evaluateFor viewOf context gs resolving source (FlipCoin.count flipCoin)))
     -- CR 705.3's statements, read once for the whole instruction rather than per
     -- coin -- Pawl.Engine.Coin.statementsFor says why Edgar's "the first time you

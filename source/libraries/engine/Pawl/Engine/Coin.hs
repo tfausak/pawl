@@ -38,8 +38,8 @@ import qualified Pawl.Types.StatedFlip as StatedFlip
 -- you flip one or more coins each turn" is spent on the first INSTRUCTION rather
 -- than on the first flip: its ruling says such an ability "modifies that set of
 -- flips" when an effect tells you to flip multiple coins at once. Proved by
--- Pawl.CoinSpec's "CR 705.3 one statement reaches every coin of the instruction
--- it is spent on".
+-- Pawl.CoinSpec's "CR 705.3 a statement spent on an instruction reaches every
+-- coin of it".
 --
 -- Takes a Maybe seat because the entry road's flipper comes from
 -- Projection.controllerOf, which is a Maybe. No seat means no statement can
