@@ -109,8 +109,8 @@ allTargetSlots m = Map.unions (fmap Mode.targetSlots (Foldable.toList (Modal.mod
 -- first and the rule's "different targets" would be unreachable.
 --
 -- Occurrence 0 keeps the PRINTED name, so a selection with no repeat -- which is
--- every selection in the pool but the ones the two cards writing CR 700.2d's
--- instruction allow, and most of even those -- binds exactly the names it always
+-- every selection in the pool but the ones the handful of cards writing CR
+-- 700.2d's instruction allow, and most of even those -- binds the names it always
 -- did, and nothing downstream of a repeat-free cast can tell this function was
 -- ever called. Later occurrences take
 -- a suffix a card cannot print: Pawl.CardSpec rejects a declared slot name
@@ -292,8 +292,8 @@ mostOf selection = case selection of
 
 -- CR 700.2d: does this instruction print "You may choose the same mode more than
 -- once"? False is that rule's default -- "that player normally can't choose the
--- same mode more than once" -- and is what every card in the pool but Mystic
--- Confluence answers.
+-- same mode more than once" -- and is what all but a handful of cards in the pool
+-- answer, Mystic Confluence being the one PRINTING of the exception.
 --
 -- True implies leastOf == mostOf: no printing pairs the exception with a range,
 -- which is why Pawl.Types.ModeSelection has no such constructor and why the
