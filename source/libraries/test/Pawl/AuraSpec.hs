@@ -95,7 +95,7 @@ import qualified Pawl.Types.Zone as Zone
 -- CR 301.5 / 702.6: Equipment. Shares the attachment substrate with Auras --
 -- Object.attachedTo, Affected.Attached -- so what is genuinely new is the CR
 -- 701.3 Attach keyword action that MOVES an already-on-the-battlefield permanent,
--- and CR 704.5n's detach-rather-than-bury state-based action (#193). The
+-- and CR 704.5n's detach-rather-than-bury state-based action; see #193. The
 -- Reattach group below is the same keyword action aimed the other way, at a
 -- permanent the effect TARGETS rather than at its own source.
 equipmentSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -226,7 +226,7 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
   -- CR 704.5n: "If an Equipment or Fortification is attached to an illegal
   -- permanent or to a player, it becomes unattached from that permanent or
   -- player. It REMAINS ON THE BATTLEFIELD." The shape difference from an
-  -- Aura, which CR 704.5m buries instead (#193).
+  -- Aura, which CR 704.5m buries instead; see #193.
   Spec.it s "CR 704.5n an Equipment whose creature dies detaches and stays on the battlefield" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
