@@ -885,7 +885,8 @@ spec s registry =
       Spec.assertEqWith s "her second mulligan bottoms exactly one" (S.handSize S.alice twice) 6
       Spec.assertEqWith s "the same two seats outside Brawl pay from the first" (S.handSize S.alice ordinary) 6
     Spec.it s "CR 903.12g second clause: the Brawl game's free mulligan does not count toward the limit either" $ do
-      -- The counting twin of the CR 800.6 case below, at two seats: hand plus
+      -- The counting twin of the CR 103.5c second-clause case below, at two
+      -- seats rather than three: hand plus
       -- library is 20 throughout, so the process ends when the bottomed count
       -- reaches seven. Ordinary two seats run 6,5,4,3,2,1,0 -- seven asks; the
       -- Brawl leg gets one more, 7,6,5,4,3,2,1,0.

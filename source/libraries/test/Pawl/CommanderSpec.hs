@@ -577,9 +577,10 @@ brawlSpec s registry = Spec.describe s "Brawl" $ do
   -- rule 704.6c". The same three swings that kill bob in the CR 903.10a group
   -- above, on a board differing only in GameState.settings.
   --
-  -- CR 903.12f is what makes this assertion able to differ rather than vacuous:
-  -- at twenty-five, twenty-one combat damage leaves bob at 4, so CR 704.5a
-  -- cannot be what killed him and rule 704.6c is the only rule in the race.
+  -- CR 903.12f is what makes the assertion able to differ rather than vacuous:
+  -- at twenty-five, twenty-one combat damage leaves bob at 4, so rule 704.6c is
+  -- the only rule that could have taken him out and switching it off is the
+  -- only thing that can have spared him.
   Spec.it s "CR 903.12h twenty-one combat damage from one commander does NOT lose a Brawl game" $ do
     kalakscion <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
     jedit <- S.printingOf s registry "Jedit Ojanen"
@@ -588,7 +589,7 @@ brawlSpec s registry = Spec.describe s "Brawl" $ do
     Spec.assertEqWith s "CR 903.12f started bob at twenty-five" (S.lifeOf S.bob board) (Just 25)
     Spec.assertEqWith s "bob is still playing" (statusOf S.bob after) (Just Status.Playing)
     Spec.assertEqWith s "and the game has no result" (GameState.result after) Nothing
-    Spec.assertEqWith s "he is at 4, so CR 704.5a is not what spared him" (S.lifeOf S.bob after) (Just 4)
+    Spec.assertEqWith s "he is at 4, so CR 704.5a was never in the race either" (S.lifeOf S.bob after) (Just 4)
     -- CR 903.12h switches off the state-based action, not CR 903.10a's tally,
     -- which a card may still read.
     Spec.assertEqWith s "and the tally still reached 21" (tallyFrom S.alice S.bob after) 21
