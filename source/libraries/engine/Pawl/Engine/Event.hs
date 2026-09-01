@@ -13261,9 +13261,10 @@ eventTriggers events gs =
       -- the reason Pawl.Engine.CombatRestriction.inForce narrows the same walk:
       -- the command zone also holds a commander and a dungeon card, whose
       -- abilities CR 113.6 leaves functioning on the battlefield and CR 309.4c
-      -- mints rather than prints. Asking Source.OfEmblem is reading the rulebook's
-      -- own list (CR 113.6p), not an effect's identity, and CR 313.4 / CR 902.7
-      -- put the vanguard card on that same list in the same words -- "its
+      -- mints rather than prints. Vanguard.functionsFromCommandZone is that list
+      -- (CR 113.6p), read the same way by all four walks over this zone, and
+      -- reading the rulebook's own list is not casing on an effect's identity. CR
+      -- 313.4 / CR 902.7 put the vanguard card on it in the same words -- "its
       -- triggered abilities may trigger" -- so it takes the same unfiltered walk
       -- and for the same reason.
       --
@@ -13284,17 +13285,13 @@ eventTriggers events gs =
       commandCandidate oid = case Game.lookupObject oid gs of
         Nothing -> Nothing
         Just obj ->
-          let functionsHere = case Object.source obj of
-                Source.OfEmblem _ -> True
-                Source.OfCard _ -> Vanguard.isVanguard oid gs
-                _ -> False
-           in if not functionsHere
-                then Nothing
-                else case Game.faceOf oid gs of
-                  Nothing -> Nothing
-                  Just face -> case Face.triggeredAbilities face of
-                    [] -> Nothing
-                    abilities -> Just (oid, (Object.owner obj, abilities))
+          if not (Vanguard.functionsFromCommandZone oid gs)
+            then Nothing
+            else case Game.faceOf oid gs of
+              Nothing -> Nothing
+              Just face -> case Face.triggeredAbilities face of
+                [] -> Nothing
+                abilities -> Just (oid, (Object.owner obj, abilities))
       inCommand =
         Map.fromList
           (Maybe.mapMaybe commandCandidate (Set.toAscList (GameState.command gs)))

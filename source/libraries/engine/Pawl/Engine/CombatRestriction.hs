@@ -36,6 +36,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
@@ -56,7 +57,6 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerScope as PlayerScope
-import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 
@@ -520,18 +520,20 @@ gathered gs =
       -- asked, because a gated emblem restriction would otherwise be wired open --
       -- no emblem in the pool prints one.
       --
-      -- EMBLEMS alone, where that walk takes the whole zone: CR 114.4 is about
-      -- emblems, and CR 113.6 leaves a permanent card's abilities functioning only
-      -- on the battlefield. The difference bites here in a way it does not there,
-      -- because two of this module's questions name no creature at all -- a
-      -- commander whose card printed Silent Arbiter's bound would otherwise cap
-      -- the whole table's attackers from the command zone.
-      isEmblem source = case fmap Object.source (Game.lookupObject source gs) of
-        Just (Source.OfEmblem _) -> True
-        _ -> False
+      -- CR 902.7 puts a face-up VANGUARD card's rows here on the same terms, so
+      -- the test is Vanguard.functionsFromCommandZone -- CR 113.6p's own list --
+      -- and Pawl.VanguardSpec's "CR 902.7 a vanguard's combat restriction
+      -- functions from the command zone" is what proves it.
+      --
+      -- Rule 113.6p's list and not the whole zone: CR 113.6 leaves a permanent
+      -- card's abilities functioning only on the battlefield. The difference bites
+      -- here in a way it does not there, because two of this module's questions
+      -- name no creature at all -- a commander whose card printed Silent Arbiter's
+      -- bound would otherwise cap the whole table's attackers from the command
+      -- zone.
       fromCommandZone source = case Game.faceOf source gs of
         Just face
-          | isEmblem source ->
+          | Vanguard.functionsFromCommandZone source gs ->
               fmap (\restriction -> (source, [], restriction)) (Face.combatRestrictions face)
         _ -> []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))

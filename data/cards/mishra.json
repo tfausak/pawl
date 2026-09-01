@@ -1,0 +1,53 @@
+{
+  "faces": [
+    {
+      "name": "Mishra",
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "DamageR",
+            "value": {
+              "matching": {
+                "whatSource": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Creature"
+                      }
+                    },
+                    {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
+                      }
+                    }
+                  ]
+                }
+              },
+              "rewrite": {
+                "type": "Scale",
+                "value": {
+                  "type": "Multiply",
+                  "value": 2
+                }
+              }
+            }
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Vanguard"
+          }
+        ]
+      },
+      "vanguard": {
+        "handModifier": 0,
+        "lifeModifier": -3
+      }
+    }
+  ]
+}
