@@ -92,6 +92,20 @@ data CounterKind keyword
     -- reader is fading's own upkeep ability, minted by Pawl.Engine.Keyword, which
     -- counts Object.counters directly.
     Fade
+  | -- | CR 702.24a: the counters cumulative upkeep counts UP. Rule 122.1 letters
+    -- age counters no clause, so rule 702.24 is the whole citation, exactly as
+    -- rule 702.63 is Time's.
+    --
+    -- Its own kind rather than Fade's or Time's, whose direction is the other
+    -- way: those two are seeded at entry and removed each upkeep, where this pile
+    -- starts empty and grows, and rule 702.24b makes every instance count ONE
+    -- pile whatever put the counters there.
+    --
+    -- Contributes nothing to the CR 613 layer system, so
+    -- Pawl.Engine.Projection.counterGathered grants nothing for this kind. Its
+    -- readers are cumulative upkeep's own upkeep ability, minted by
+    -- Pawl.Engine.Keyword, and card text counting the pile (Revered Unicorn).
+    Age
   | -- | CR 122.1c: shield counters on a permanent create one replacement effect
     -- and one prevention effect that protect it. Unlike every kind above, what
     -- the count does is not read by a rule that counts it: the pair is MINTED

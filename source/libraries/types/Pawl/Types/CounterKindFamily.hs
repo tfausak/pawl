@@ -43,6 +43,8 @@ data CounterKindFamily
     Time
   | -- | CR 702.32a: Pawl.Types.CounterKind.Fade.
     Fade
+  | -- | CR 702.24a: Pawl.Types.CounterKind.Age.
+    Age
   | -- | CR 122.1c: Pawl.Types.CounterKind.Shield.
     Shield
   | -- | CR 122.1h: Pawl.Types.CounterKind.Finality.

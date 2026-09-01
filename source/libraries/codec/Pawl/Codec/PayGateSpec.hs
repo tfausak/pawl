@@ -24,6 +24,7 @@ manaLeak =
       PayGate.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []},
       PayGate.branch = PayBranch.IfNotPaid,
       PayGate.obligation = PayObligation.Optional,
+      PayGate.perCounter = Nothing,
       PayGate.offeredAt = Nothing
     }
 

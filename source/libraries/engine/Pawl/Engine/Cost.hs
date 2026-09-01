@@ -545,6 +545,19 @@ plus base extra =
           Cost.components = Cost.components base <> Cost.components extra
         }
 
+-- CR 702.24a's "[cost] for each age counter on it": N whole copies of this cost,
+-- as ONE cost. `plus` folded over itself, so the mana parts concatenate and the
+-- components are appended in order -- which is also rule 702.24a's "each choice
+-- is made separately for each age counter", since a replicated component is
+-- chosen for again when the payment reaches it.
+--
+-- N of zero is {0} with no components, which CR 118.5 makes payable, and not
+-- CR 118.6's unpayable Nothing. Rule 702.24a cannot reach it -- the counter is
+-- put on before the offer -- but Pawl.Types.PayGate.perCounter is stated over
+-- every count.
+repeated :: Natural -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
+repeated n cost = foldr plus (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) (List.genericReplicate n cost)
+
 -- CR 601.2b: substitute the chosen value of X everywhere in this cost -- the mana
 -- part's ManaSymbol.Variable, and the components' CostComponent.PayLifeX. BOTH
 -- halves, CR 107.3a giving one announced value to the whole cost, so Hatred's X

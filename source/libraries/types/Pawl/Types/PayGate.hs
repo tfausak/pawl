@@ -2,6 +2,7 @@ module Pawl.Types.PayGate where
 
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayObligation as PayObligation
@@ -82,6 +83,31 @@ data PayGate = MkPayGate
     -- Optional (CR 118.12a's rewriting prints the "may"), Standstill's
     -- Mandatory.
     obligation :: PayObligation.PayObligation,
+    -- | CR 702.24a's "for each age counter on it": the kind of counter on the
+    -- ability's SOURCE whose count the cost above is multiplied by, one whole
+    -- copy of the cost per counter. Nothing is the unmultiplied case every card
+    -- but cumulative upkeep's mint writes. Zero counters leaves a cost of {0},
+    -- which CR 118.5 makes payable, so the gate admits its IfPaid branch.
+    --
+    -- ONE COST, not several offers: rule 702.24a says "either the entire set of
+    -- costs is paid, or none of them is paid. Partial payments aren't allowed",
+    -- which is exactly what multiplying Cost.mana's symbol list and replicating
+    -- Cost.components produces -- and replicating the components is also the
+    -- rule's "each choice is made separately for each age counter", since
+    -- Pawl.Engine.Cost pays a component list one element at a time.
+    --
+    -- A COUNTER KIND rather than a general Quantity: a Quantity may name slots
+    -- and carry a Filter, and Pawl.Engine.Projection.rewritePayGate has no
+    -- quantity rewriter to send a CR 613 type change through -- only
+    -- Pawl.Engine.Filter.rewriteCounterKind, which this field can use. Cyclone's
+    -- "sacrifice this enchantment unless you pay {G} for each wind counter on it"
+    -- is rule 702.24a's shape written out on a CR 122.1 named counter, so the
+    -- narrow field says that card too.
+    --
+    -- Not implemented: a CR 118.12 cost scaling with anything that is not a
+    -- counter on the ability's source -- Circular Logic's "for each card in your
+    -- graveyard" (#2872).
+    perCounter :: Maybe (CounterKind.CounterKind Keyword.Keyword),
     -- | Which clause of this mode MAKES the offer, when it is not this one --
     -- CR 118.12 offers a resolution cost once and reads the one answer, so
     -- Don't Make a Sound's second clause names its first rather than asking

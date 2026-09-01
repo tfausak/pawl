@@ -1525,6 +1525,7 @@ rewriteCounterKind pairs kind = case kind of
   CounterKind.Lore -> kind
   CounterKind.Defense -> kind
   CounterKind.Time -> kind
+  CounterKind.Age -> kind
   CounterKind.Fade -> kind
   CounterKind.Shield -> kind
   CounterKind.Finality -> kind
@@ -1691,6 +1692,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- fortify cost is the same.
   Keyword.Type.Equip cost -> Keyword.Type.Equip (rewriteCost pairs cost)
   Keyword.Type.Fortify cost -> Keyword.Type.Fortify (rewriteCost pairs cost)
+  Keyword.Type.CumulativeUpkeep cost -> Keyword.Type.CumulativeUpkeep (rewriteCost pairs cost)
   Keyword.Type.LevelUp cost -> Keyword.Type.LevelUp (rewriteCost pairs cost)
   Keyword.Type.Outlast cost -> Keyword.Type.Outlast (rewriteCost pairs cost)
   Keyword.Type.Prowess -> keyword

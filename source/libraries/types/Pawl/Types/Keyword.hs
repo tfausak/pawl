@@ -110,6 +110,11 @@ data Keyword
     -- for each creature blocking beyond the first. Each instance triggers
     -- separately (CR 702.23c).
     Rampage Natural.Natural
+  | -- | 702.24a: "cumulative upkeep [cost]", an upkeep-triggered ability that
+    -- puts an age counter on this permanent and then offers the cost once per age
+    -- counter, sacrificing it if that whole payment is declined. Each instance
+    -- triggers separately and every instance counts the one pile (CR 702.24b).
+    CumulativeUpkeep (Cost.Cost Keyword)
   | -- | 702.25a: whenever this creature becomes blocked by a creature without
     -- flanking, the blocking creature gets -1/-1 until end of turn. Each instance
     -- triggers separately (CR 702.25b).

@@ -666,6 +666,17 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Codec.encode Keyword.codec (Keyword.Rampage 3) /= Codec.encode Keyword.codec (Keyword.Bushido 3))
       "rampage 3 is not bushido 3"
+  -- CR 702.24a's payload is a Cost like equip's and ward's, and the tag must not
+  -- collide with either: what a card owes each upkeep is not what it owes to
+  -- attach or to be targeted.
+  Spec.it s "CumulativeUpkeep carries its cost" $ do
+    let upkeep n = Keyword.CumulativeUpkeep (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (upkeep 1)
+      " {\"type\":\"CumulativeUpkeep\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (upkeep 2) /= Codec.encode Keyword.codec (Keyword.Ward (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []))) "and is not ward"
   -- CR 702.130a's N rides the constructor the same way, and must not share a tag
   -- with the other payloaded keywords either.
   Spec.it s "Afflict carries its N" $ do

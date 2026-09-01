@@ -387,6 +387,7 @@ inForce gs =
         CounterKind.Lore -> False
         CounterKind.Defense -> False
         CounterKind.Time -> False
+        CounterKind.Age -> False
         CounterKind.Fade -> False
         CounterKind.Shield -> False
         CounterKind.Finality -> False
