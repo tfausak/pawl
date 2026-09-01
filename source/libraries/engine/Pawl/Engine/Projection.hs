@@ -3068,6 +3068,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.SnowWasSpent -> quantity
   Quantity.Type.WasToken -> quantity
   Quantity.Type.WasBlocking -> quantity
+  Quantity.Type.DamageDealtToThisTurn -> quantity
   Quantity.Type.PlayerCounters {} -> quantity
   Quantity.Type.ObjectCounters _ -> quantity
   Quantity.Type.ObjectCountersOfAnyKind -> quantity
@@ -4533,6 +4534,7 @@ quantityReads q = case q of
   Quantity.Type.SnowWasSpent -> Set.empty
   Quantity.Type.WasToken -> Set.empty
   Quantity.Type.WasBlocking -> Set.empty
+  Quantity.Type.DamageDealtToThisTurn -> Set.empty
   Quantity.Type.OpponentsAttacked _ -> Set.empty
   Quantity.Type.CardsDiscardedThisTurn _ -> Set.empty
   Quantity.Type.LifeGainedThisTurn _ -> Set.empty

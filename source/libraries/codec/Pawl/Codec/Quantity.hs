@@ -100,6 +100,10 @@ codec =
       -- CardsDiscardedThisTurn's reason above. The threshold that turns the count
       -- into "an opponent was dealt damage" is the Comparison's, not this arm's.
       Arm.payload "PlayersDealtDamageThisTurn" PlayerRef.codec Quantity.PlayersDealtDamageThisTurn (\x -> case x of Quantity.PlayersDealtDamageThisTurn y -> Just y; _ -> Nothing),
+      -- CR 120.1's damage again, with nothing on the wire for WasToken's reason:
+      -- the object it is measured against is whichever one the quantity is
+      -- evaluated against, and the turn is the log's extent.
+      Arm.nullary "DamageDealtToThisTurn" Quantity.DamageDealtToThisTurn,
       -- CR 601.2i's tally, with only a PlayerRef on the wire for
       -- CardsDiscardedThisTurn's reason above -- but read off the handoff snapshot
       -- rather than the log, since "last turn" outlives the log it was folded

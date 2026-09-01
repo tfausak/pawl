@@ -589,13 +589,25 @@ data Quantity
     --
     -- Rule 702.54b's variant asks a DIFFERENT question -- "the total damage your
     -- opponents have been dealt this turn", which sums amounts where this counts
-    -- players. Not implemented: no quantity measures that sum, and
+    -- players. Not implemented: no quantity sums damage dealt to PLAYERS --
+    -- DamageDealtToThisTurn below sums it for one object, over the same log -- and
     -- Keyword.Bloodthirst's payload is a printed Natural that cannot say X
     -- (#1588). The keyword itself IS implemented -- rule 702.54a's N form, whose
     -- condition is this quantity (Bloodrage Vampire).
     --
     -- A LEAF, like LifeTotal, Speed and CardsDiscardedThisTurn: it holds no Quantity.
     PlayersDealtDamageThisTurn PlayerRef.PlayerRef
+  | -- | CR 120.1 / 608.2i: how much damage was dealt this turn to the object this
+    -- quantity is evaluated against -- Burning-Eye Zubera's "if 4 or more damage
+    -- was dealt to it this turn", asked of a creature CR 400.7 has already
+    -- deleted.
+    --
+    -- A total of the AMOUNTS, LifeGainedThisTurn's shape rather than
+    -- PlayersDealtDamageThisTurn's tally of who: two Lightning Bolts are 6
+    -- damage.
+    --
+    -- A LEAF, like WasToken and WasBlocking: it holds no Quantity.
+    DamageDealtToThisTurn
   | -- | CR 601.2i / 608.2i: how many spells that player cast during the turn just
     -- ended -- Daybreak Ranger's "if no spells were cast last turn" and Nightfall
     -- Predator's "if a player cast two or more spells last turn".
