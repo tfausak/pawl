@@ -469,6 +469,8 @@ objectRefQuantities ref = case ref of
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand _ _) -> []
   -- How many cards are picked out of the group -- Ancestral Memories' printed
   -- two, the library walks' counts above being the only other ObjectRef numbers.
+  -- A REGRESSION FENCE rather than proven behaviour: every count in the pool is a
+  -- Literal, which reads no slot, so dropping this leaves the suite green.
   ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ count _) -> [count]
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
   ObjectRef.RandomCardInHand _ -> []
@@ -500,6 +502,12 @@ objectRefPlayerRefs ref = case ref of
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> [player]
   -- The seat that picks out of the group -- Animal Magnetism's opponent, and by
   -- default CR 608.2c's resolving controller.
+  --
+  -- The arm above's regression fence, for a different reason: the D4 dataflow lint
+  -- subtracts a slot the mode's own ChooseOpponent DEFINES from both sides of its
+  -- equality, so the only card whose chooser names a slot cannot observe this
+  -- report. A chooser naming a DECLARED target slot would, and no printing writes
+  -- one -- Pawl.Types.Chooser's BoundInSlot note says the same of its own.
   ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ _ chooser) -> [chooser]
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
   ObjectRef.RandomCardInHand player -> [player]
@@ -5833,6 +5841,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- -- so the card revealed and the card moved cannot come apart. Asked here
       -- rather than read, which is why it is not among the refs objectRefObjects
       -- answers.
+      --
+      -- Not implemented: a reveal whose ref names SEVERAL cards. showOne binds one
+      -- card at a time, so the last write wins and a later clause reading the slot
+      -- would find one card rather than the group (#2859). Every reveal of a group
+      -- member in the pool has a count of one, Carth the Lion's included.
       ObjectRef.ChosenCardFromAmong from -> do
         picked <- chooseCardFromAmong resolving source controller legal chosen from
         Monad.mapM_ (showOne controller) picked
