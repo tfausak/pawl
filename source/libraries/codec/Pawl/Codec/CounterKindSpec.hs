@@ -67,6 +67,15 @@ spec s = Spec.describe s "Pawl.Codec.CounterKind" $ do
       (CounterKind.codec Keyword.codec)
       CounterKind.Fade
       " {\"type\":\"Fade\"} "
+  -- CR 702.24a's kind, the one that counts UP: an age counter is added each
+  -- upkeep rather than removed, so a card spending one must not read either kind
+  -- above.
+  Spec.it s "Age" $
+    Common.assertCodec
+      s
+      (CounterKind.codec Keyword.codec)
+      CounterKind.Age
+      " {\"type\":\"Age\"} "
   -- CR 122.1c, the kind whose count is how many events its pair may still
   -- replace.
   Spec.it s "Shield" $

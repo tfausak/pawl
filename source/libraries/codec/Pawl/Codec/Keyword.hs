@@ -49,6 +49,7 @@ codec =
       Arm.payload "Ward" (Cost.codec codec) Keyword.Ward (\x -> case x of Keyword.Ward y -> Just y; _ -> Nothing),
       Arm.nullary "Banding" Keyword.Banding,
       Arm.payload "Rampage" Common.natural Keyword.Rampage (\x -> case x of Keyword.Rampage y -> Just y; _ -> Nothing),
+      Arm.payload "CumulativeUpkeep" (Cost.codec codec) Keyword.CumulativeUpkeep (\x -> case x of Keyword.CumulativeUpkeep y -> Just y; _ -> Nothing),
       Arm.nullary "Flanking" Keyword.Flanking,
       Arm.nullary "Phasing" Keyword.Phasing,
       Arm.nullary "Shadow" Keyword.Shadow,

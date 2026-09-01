@@ -114,6 +114,7 @@ spellings family = case family of
   CounterKindFamily.Defense -> one "defense"
   CounterKindFamily.Time -> one "time"
   CounterKindFamily.Fade -> one "fade"
+  CounterKindFamily.Age -> one "age"
   CounterKindFamily.Shield -> one "shield"
   CounterKindFamily.Finality -> one "finality"
   CounterKindFamily.Stun -> one "stun"
@@ -147,6 +148,7 @@ familyOf kind = case kind of
   CounterKind.Defense -> CounterKindFamily.Defense
   CounterKind.Time -> CounterKindFamily.Time
   CounterKind.Fade -> CounterKindFamily.Fade
+  CounterKind.Age -> CounterKindFamily.Age
   CounterKind.Shield -> CounterKindFamily.Shield
   CounterKind.Finality -> CounterKindFamily.Finality
   CounterKind.Stun -> CounterKindFamily.Stun

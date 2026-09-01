@@ -2529,20 +2529,34 @@ payGatePaid resolving source controller idx cIdx legal gate = do
   gs <- State.get
   Monad.foldM
     ( \acc payer -> do
-        paid <- payGatePaidBy resolving source idx cIdx payer gate
+        paid <- payGatePaidBy resolving source idx cIdx legal payer gate
         pure (Map.insert payer paid acc)
     )
     Map.empty
     (apnapPlayersOf (PayGate.payer gate) legal controller gs)
 
 -- One player's answer to one gate. The cost is the PRINTED one with CR 107.3's X
--- resolved (`announcedXOn`), and that substitution is what every reader below
+-- resolved (`announcedXOn`) and then multiplied by CR 702.24a's "for each"
+-- (PayGate.perCounter), and that pair of rewrites is what every reader below
 -- sees -- CR 118.3's affordability test, the prompt the payer is shown, and the
--- payment itself -- so none of them can disagree about what {X} is.
-payGatePaidBy :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> PlayerId -> PayGate.PayGate -> Game Bool
-payGatePaidBy resolving source idx cIdx payer gate = do
+-- payment itself -- so none of them can disagree about what is owed.
+--
+-- The multiplier is read HERE rather than once for the whole gate, which is the
+-- posture payGatePaid's own comment states: rule 101.4b lets an earlier payer's
+-- answer move the board, and CR 118.12's cost is measured against the board each
+-- payer faces. It counts the counters on the ability's SOURCE through
+-- `effectViewOf`, so CR 113.7a's last known record answers for a source that has
+-- already left -- the same read Quantity.ObjectCounters makes. Whether such an
+-- ability should be offering anything at all is its own text's business: rule
+-- 702.24a's intervening "if" is what stops it (CR 603.4), proved at
+-- Pawl.KeywordTriggerSpec's "a Unicorn murdered in response".
+payGatePaidBy :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> PlayerId -> PayGate.PayGate -> Game Bool
+payGatePaidBy resolving source idx cIdx legal payer gate = do
   gs <- State.get
-  let cost = Cost.substituteX (announcedXOn resolving gs) (PayGate.cost gate)
+  let multiplier = case PayGate.perCounter gate of
+        Nothing -> 1
+        Just kind -> maybe 0 (Map.findWithDefault 0 kind . Filter.counters) (effectViewOf source legal gs source)
+      cost = Cost.repeated multiplier (Cost.substituteX (announcedXOn resolving gs) (PayGate.cost gate))
   if not (Cost.canPay payer source cost gs)
     then pure False
     else do

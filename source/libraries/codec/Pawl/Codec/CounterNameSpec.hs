@@ -107,6 +107,7 @@ representative family = case family of
   CounterKindFamily.Defense -> CounterKind.Defense
   CounterKindFamily.Time -> CounterKind.Time
   CounterKindFamily.Fade -> CounterKind.Fade
+  CounterKindFamily.Age -> CounterKind.Age
   CounterKindFamily.Shield -> CounterKind.Shield
   CounterKindFamily.Finality -> CounterKind.Finality
   CounterKindFamily.Stun -> CounterKind.Stun
