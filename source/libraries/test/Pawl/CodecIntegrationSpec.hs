@@ -6,6 +6,7 @@
 -- card data, which a synthetic fixture could not stand in for.
 module Pawl.CodecIntegrationSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -20,6 +21,7 @@ import qualified Pawl.Engine.Card as Card
 -- convention is fixed project-wide so a later import never collides.
 
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.String as String
@@ -30,6 +32,8 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName.Type
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
@@ -300,8 +304,10 @@ noZombiesOnBattlefield =
 gameStateRoundTripSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 gameStateRoundTripSpec s registry = do
   let roundTrips label gs = do
-        Common.assertMatchesSchema s GameState.Codec.codec gs
-        Spec.assertEqWith s label (Codec.decode GameState.Codec.codec (Codec.encode GameState.Codec.codec gs)) (Right gs)
+        resolve <- corpusResolver s
+        let c = GameState.Codec.codec resolve
+        Common.assertMatchesSchema s c gs
+        Spec.assertEqWith s label (Codec.decode c (Codec.encode c gs)) (Right gs)
 
   Spec.it s "a plain board round trips" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -320,9 +326,8 @@ gameStateRoundTripSpec s registry = do
     let (_, gs) = S.spellOnStack bolt S.alice (S.oneMountainState mountain Phase.PrecombatMain)
     roundTrips "a spell on the stack" gs
 
-  -- The two INLINE printing cases: a token's card is built at runtime and an
-  -- emblem's is a function of the temptation count, so neither is in the
-  -- registry and neither could be named rather than written out.
+  -- This token copies a registry card verbatim, so its printing is NAMED like
+  -- any other; the Inline arm's own case is "an unnameable printing" below.
   Spec.it s "a token round trips" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -341,22 +346,69 @@ gameStateRoundTripSpec s registry = do
   -- given a default the record cannot hold, shows up here.
   Spec.it s "a defaulted field is omitted at its default and written once it differs" $ do
     mountain <- S.printingOf s registry "Mountain"
+    resolve <- corpusResolver s
     let plain = S.oneMountainState mountain Phase.PrecombatMain
+        c = GameState.Codec.codec resolve
     Spec.assertEqWith
       s
       "a plain board writes only the required keys and the ones it moved"
-      (fmap (fmap (Text.unpack . String.unwrap . Pair.name)) (Common.asObject (Codec.encode GameState.Codec.codec plain)))
+      (fmap (fmap (Text.unpack . String.unwrap . Pair.name)) (Common.asObject (Codec.encode c plain)))
       (Right plainBoardKeys)
     Spec.assertEqWith
       s
       "monarch is absent while nobody is the monarch"
-      (fmap (Common.lookupPair "monarch") (Common.asObject (Codec.encode GameState.Codec.codec plain)))
+      (fmap (Common.lookupPair "monarch") (Common.asObject (Codec.encode c plain)))
       (Right Nothing)
     Spec.assertEqWith
       s
       "monarch is written once bob has it"
-      (fmap (Common.lookupPair "monarch") (Common.asObject (Codec.encode GameState.Codec.codec (S.withMonarch S.bob plain))))
+      (fmap (Common.lookupPair "monarch") (Common.asObject (Codec.encode c (S.withMonarch S.bob plain))))
       (Right (Just (Codec.encode PlayerId.Codec.codec S.bob)))
+
+  -- The printings table on the wire, read directly rather than through the round
+  -- trip: encode and decode agree on any shape, so the round trip alone would
+  -- pass with the whole record written out (#2120).
+  Spec.it s "a printing the resolver knows is written as its name" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    resolve <- corpusResolver s
+    let gs = S.oneMountainState mountain Phase.PrecombatMain
+    Spec.assertEqWith
+      s
+      "the Mountain is a name reference, not its record"
+      (fmap (Common.lookupPair "printings") (Common.asObject (Codec.encode (GameState.Codec.codec resolve) gs)))
+      (Right (Just (Value.object [Value.pair "0" (Common.tagged "Named" (Just (Value.text (Text.pack "Mountain"))))])))
+
+  -- CR 701.54c: The Ring's emblem is a function of the temptation count, so it is
+  -- not in data/cards and no resolver can answer for it. The Inline arm exists
+  -- for exactly this, and this is the case that drives it.
+  Spec.it s "an unnameable printing is written out in full" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    resolve <- corpusResolver s
+    let emblem = Printing.Type.MkPrinting (Ring.theRingEmblem 1)
+        (_, gs) = S.addToken (Ring.theRingEmblem 1) S.alice (S.oneMountainState mountain Phase.PrecombatMain)
+        c = GameState.Codec.codec resolve
+        -- The Mountain interns as 0 and the emblem as 1.
+        emblemEntry = Common.asObject (Codec.encode c gs) >>= Common.field "printings" >>= Common.asObject >>= Common.field "1"
+    Spec.assertEqWith s "the resolver really cannot answer for it" (resolve (Printing.Codec.firstFaceName (Printing.Type.card emblem))) Nothing
+    Spec.assertEqWith
+      s
+      "the emblem is tagged Inline rather than Named"
+      (fmap fst (emblemEntry >>= Common.asTagged))
+      (Right "Inline")
+    Spec.assertEqWith
+      s
+      "and the tag carries the emblem's whole record"
+      (emblemEntry >>= Codec.decode (Printing.Codec.reference resolve))
+      (Right emblem)
+    roundTrips "an emblem in the intern table" gs
+
+  -- The other half of what the name reference buys: a state written against one
+  -- registry does not silently mis-resolve against another.
+  Spec.it s "a name no resolver knows fails to decode" $
+    Spec.assertBool
+      s
+      (either (const True) (const False) (Codec.decode (Printing.Codec.reference (const Nothing)) (Common.tagged "Named" (Just (Value.text (Text.pack "Mountain"))))))
+      "a Named printing must fail rather than guess when the resolver cannot answer"
 
   -- printingIds is DERIVED on decode rather than written, so this is the case
   -- that says the derivation is exact: the state carries two distinct printings,
@@ -392,6 +444,22 @@ gameStateRoundTripSpec s registry = do
         gs = Setup.subgameStateFrom S.alice gs0
     Spec.assertBool s (not (Map.null (GameState.outsideObjects gs))) "the fixture should hold at least one outside object"
     roundTrips "a subgame's outsideObjects snapshot" gs
+
+-- | The corpus as the pure lookup Pawl.Codec.GameState needs. @pawl:registry@
+-- sits ABOVE @pawl:codec@, so a decoder cannot call a registry and the caller
+-- hands the answer in instead; this is that caller. Keyed by every face name,
+-- which is what Pawl.Registry.index keys too, so a split card resolves under
+-- either half.
+corpusResolver :: Spec.Spec IO n -> IO (CardName.Type.CardName -> Maybe Card.Type.Card)
+corpusResolver s = do
+  ps <- S.allPrintings s
+  let cards =
+        Map.fromList
+          [ (Face.name face, Printing.Type.card p)
+          | p <- ps,
+            face <- NonEmpty.toList (Card.Type.faces (Printing.Type.card p))
+          ]
+  pure (`Map.lookup` cards)
 
 -- | Every key Pawl.Codec.GameState writes for S.oneMountainState. Spelled out so
 -- that the ABSENCE of every other field is asserted rather than assumed: the

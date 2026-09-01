@@ -126,6 +126,18 @@ armEncode arm x = fmap (Common.tagged (tag arm)) (projectValue arm x)
 tagged :: (Typeable.Typeable a) => [Arm a] -> Codec.Codec a
 tagged arms = taggedWith (\x -> Maybe.fromMaybe (Value.object []) (Foldable.asum (fmap (`armEncode` x) arms))) arms
 
+-- | 'tagged' for a union that WRAPS a type rather than being that type's own
+-- wire format, so it is not filed in @$defs@ -- 'Common.maybe' declines for the
+-- same reason. Pawl.Codec.Printing needs it: one of its arms carries the
+-- ordinary Printing codec, which files itself under @Printing@, and
+-- 'Define.define' memoizes on the NAME alone, so a union filed under that name
+-- would swallow its own arm and describe the payload as the union.
+--
+-- Encoding, decoding and the arm schemas are 'tagged'\'s; only the @$defs@
+-- entry is dropped, so the schema is the bare @oneOf@ inline at the use site.
+anonymous :: (Typeable.Typeable a) => [Arm a] -> Codec.Codec a
+anonymous arms = (tagged arms) {Codec.schema = fmap Schema.oneOf (traverse armSchema arms)}
+
 -- | 'tagged' with the encoder written out instead of derived, for a caller that
 -- wants @-Wincomplete-patterns@ to see its constructor list. 'enum' is the one
 -- in-tree user: deriving its encoder would make encoding a scan over every

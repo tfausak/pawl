@@ -51,6 +51,8 @@ import qualified Pawl.Codec.Timestamp as Timestamp
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
+import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName.Type
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Printing as Printing.Type
@@ -77,6 +79,11 @@ import qualified Pawl.Types.SlotName as SlotName.Type
 -- 'Pawl.JsonCodec.Arm.armObject' already declines @additionalProperties@ for
 -- forward compatibility.
 --
+-- The resolver goes to `printings` and nowhere else: Pawl.Codec.Printing's
+-- 'Printing.reference' writes a card's NAME where the resolver reproduces it and
+-- the whole record where none can. It is the caller's, because @pawl:registry@
+-- sits above @pawl:codec@ and a decoder cannot reach one.
+--
 -- GameState.printingIds is NOT written. It is `printings` read backwards, which
 -- Pawl.Types.GameState says at the field itself, so writing it would put the
 -- same table on the wire twice and let the two disagree -- a document whose two
@@ -86,8 +93,8 @@ import qualified Pawl.Types.SlotName as SlotName.Type
 -- Its key is also a whole Printing, so it could not be an object key at all: it
 -- would need an array of key/value pairs, duplicating every printing's entire
 -- record a second time. That is the size argument, and it is the lesser one.
-codec :: Codec.Codec GameState.GameState
-codec = Fields.object $ do
+codec :: (CardName.Type.CardName -> Maybe Card.Type.Card) -> Codec.Codec GameState.GameState
+codec resolve = Fields.object $ do
   settings <- Fields.required "settings" GameSettings.codec GameState.settings
   objects <- Fields.required "objects" (Common.naturalMap ObjectId.codec Object.codec) GameState.objects
   library <- Fields.defaulted "library" Map.empty (Common.naturalMap PlayerId.codec (Common.seq ObjectId.codec)) GameState.library
@@ -139,7 +146,7 @@ codec = Fields.object $ do
   restartSignal <- Fields.defaulted "restartSignal" RestartSignal.Type.Playing RestartSignal.codec GameState.restartSignal
   endTurnSignal <- Fields.defaulted "endTurnSignal" EndTurnSignal.Type.Running EndTurnSignal.codec GameState.endTurnSignal
   nextObjectId <- Fields.required "nextObjectId" ObjectId.codec GameState.nextObjectId
-  printings <- Fields.defaulted "printings" Map.empty (Common.naturalMap PrintingId.codec Printing.codec) GameState.printings
+  printings <- Fields.defaulted "printings" Map.empty (Common.naturalMap PrintingId.codec (Printing.reference resolve)) GameState.printings
   nextPrintingId <- Fields.required "nextPrintingId" PrintingId.codec GameState.nextPrintingId
   nextTimestamp <- Fields.required "nextTimestamp" Timestamp.codec GameState.nextTimestamp
   lastChoice <- Fields.required "lastChoice" Timestamp.codec GameState.lastChoice
