@@ -1463,6 +1463,21 @@ kickerSpec s registry = Spec.describe s "Kicker" $ do
         (asked, _) = castAndResolve (bursts (KickerDecision.MkKickerDecision 1) giantId) gs spellId
     Spec.assertEqWith s "no kicker cost to offer" (fmap (Keyword.Engine.kickerCosts . Face.keywords) (Game.faceOf spellId gs)) (Just [])
     Spec.assertEqWith s "so no kicker question was put, on a board that could pay one" (kickerAnnouncements asked) []
+  -- CR 702.33a's "an additional cost", singular: kicker is payable once, so an
+  -- answer of two is text Burst Lightning does not have. Nine Mountains, which is
+  -- {R} plus the {4} twice over, so nothing but the LIMIT can reject this cast --
+  -- with five the second payment would be unaffordable and CR 601.2's payability
+  -- would answer instead.
+  Spec.it s "CR 702.33a paying the kicker TWICE is not an answer Burst Lightning offers: the cast is rejected" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    burstLightning <- S.printingOf s registry "Burst Lightning"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (gs, spellId, giantId) = kickerBoard mountain burstLightning hillGiant 9
+        (_, after) = castAndResolve (bursts (KickerDecision.MkKickerDecision 2) giantId) gs spellId
+        settled = S.settleSba after
+    Spec.assertEqWith s "no damage was dealt, so the spell never resolved" (S.damageOf giantId settled) (Just 0)
+    Spec.assertEqWith s "CR 601.2e rewound the cast, so no Mountain is tapped" (S.tappedCount S.alice settled) 0
+    Spec.assertEqWith s "and the card is back in alice's hand" (S.countByName (S.printingName burstLightning) S.alice settled) 1
   -- CR 702.33c: multikicker, the same announcement asked as a COUNT. Gnarlid Pack
   -- {1}{G} Creature -- Beast 2/2, whole text "Multikicker {1}{G}" plus "this
   -- creature enters with a +1/+1 counter on it for each time it was kicked"
