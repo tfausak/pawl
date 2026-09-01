@@ -88,6 +88,14 @@ refuses = refusesGiven Map.empty
 -- per attached permanent per pass -- fallsOff's haddock names that cost for its
 -- own enchant read. Pawl.Engine.Attach.attachmentFor holds no such map and passes
 -- Map.empty, exactly as every other *Of/*Given pair in the tree does.
+--
+-- Threading one down to it was considered and declined; see #2396. No caller of
+-- attachmentFor holds a map either, and attachmentFor projects the same host
+-- again beside this call (Projection.isCreatureOf, Projection.cardTypesOf) where
+-- Attach.hostsFor projects it a third time (Projection.viewOfObject), so a map
+-- here would drop one projection of several. Measured 2026-09-01 by making
+-- `refuses` throw: no Pawl.Benchmark scenario reaches it, the Aura pair included,
+-- since CR 608.3c attaches an Aura spell without going through attachmentFor.
 refusesGiven :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> ObjectId -> GameState -> Bool
 refusesGiven pcs subject host gs =
   let setEffs = Projection.setLandSubtypeEffects gs

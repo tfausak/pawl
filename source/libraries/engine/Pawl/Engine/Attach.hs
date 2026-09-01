@@ -80,10 +80,11 @@ import qualified Pawl.Types.Subtype as Subtype
 -- can't enchant anything", whose state-based half is Sba.cannotBeAttached.
 -- Unreachable in this pool, written because it costs one comparison. The Equipment
 -- branch has no counterpart: CR 301.5c's matching restriction carries a
--- reconfigure exception nothing here can express (#193). The Fortification branch
--- DOES have one, and rule 301.6 states it outright rather than by reference: "a
--- Fortification that's also a creature (not a land) can't fortify a land". No
--- reconfigure exception attaches to it, so it is written here in full.
+-- reconfigure exception nothing here can express (gap #1823). The Fortification
+-- branch DOES have one, and rule 301.6 states it outright rather than by
+-- reference: "a Fortification that's also a creature (not a land) can't fortify
+-- a land". No reconfigure exception attaches to it, so it is written here in
+-- full.
 --
 -- The first guard -- the destination naming `src` itself -- is CR 301.5c and CR
 -- 303.4d at once. Nothing for a source that is none of the three, per CR 701.3b.
