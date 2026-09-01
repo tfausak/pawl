@@ -1,11 +1,12 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Engine.Vanguard, and the CR 902 readings its four callers make:
--- Pawl.Engine.Setup's starting life and command zone, Pawl.Engine.Mulligan's
--- starting hand size, Pawl.Engine.PlayerEffect's maximum hand size, and the two
--- walks that let a vanguard's abilities function from the command zone
--- (Pawl.Engine.Event's triggered, Pawl.Engine.Projection's static).
+-- Covers Pawl.Engine.Vanguard and the CR 902 readings its callers make:
+-- Pawl.Engine.Setup's starting life, command zone and rebuild paths,
+-- Pawl.Engine.Mulligan's starting hand size, and Pawl.Engine.PlayerEffect's
+-- maximum hand size. Also the two walks that let a vanguard's abilities function
+-- from the command zone -- Pawl.Engine.Event's triggered one, which calls this
+-- module, and Pawl.Engine.Projection's static one, which needed nothing.
 module Pawl.VanguardSpec where
 
 import qualified Data.List as List

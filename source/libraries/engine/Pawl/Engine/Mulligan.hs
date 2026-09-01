@@ -33,7 +33,8 @@ import qualified Pawl.Types.Zone as Zone
 
 -- CR 103.5: the starting hand size. Deliberately NOT shared with CR 402.2's
 -- maximum hand size (PlayerEffect.defaultMaximumHandSize), a different seven
--- the rules keep apart.
+-- the rules keep apart -- CR 902.5 and CR 902.5b modify the two by the same hand
+-- modifier (Pawl.Engine.Vanguard.handSize) without making them one number.
 openingHand :: Numeric.Natural.Natural
 openingHand = 7
 

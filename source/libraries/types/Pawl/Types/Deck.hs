@@ -5,9 +5,9 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Printing as Printing
 
--- | A deck: the multiset of printings a player's library is built from, plus CR
--- 903.3's commander designation and the two things the player brings alongside
--- it -- CR 309.2's dungeon cards and CR 100.4's sideboard.
+-- | A deck: the multiset of printings a player's library is built from, plus the
+-- things a player brings alongside it -- CR 903.3's commander designation, CR
+-- 902.3's vanguard card, CR 309.2's dungeon cards and CR 100.4's sideboard.
 --
 -- The cards are a multiset because a shuffle erases any order among them, so
 -- counts are the honest model. `Printing` and everything beneath it derive `Ord`,
