@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Coin as Coin
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
@@ -1497,9 +1498,9 @@ apply batch candidate event =
       -- shapes ChoiceOf offers a player. Written into the COPIABLE snapshot
       -- (applyEntryOption), ChoiceOf's road and for its reason.
       --
-      -- Game.ask, never Game.choose, and NO Prompt.CallCoin: "no player wins or
-      -- loses a coin flip for this kind of effect", so there is no call to make
-      -- and nothing for a CR 723 controller to usurp. Proved by
+      -- Pawl.Engine.Coin, never Game.ask directly, and NO Prompt.CallCoin: "no
+      -- player wins or loses a coin flip for this kind of effect", so there is no
+      -- call to make and nothing for a CR 723 controller to usurp. Proved by
       -- Pawl.ReplacementSpec's "CR 705.2 nobody wins Molten Sentry's flip, so its
       -- heads face mints no Treasure", on a board holding a Tavern Scoundrel that
       -- would mint two Treasures off a won one.
@@ -1509,11 +1510,22 @@ apply batch candidate event =
       -- faces named the same shape would still have flipped a coin (which
       -- Pawl.Types.EntryFlip's two required faces keep separate anyway).
       --
-      -- The flip is recorded as a CR 705.1 event with NO outcome, which is what
+      -- The flip is recorded as a CR 705.1 event with no outcome, which is what
       -- keeps CR 705.2's first sentence honest against
-      -- TriggerCondition.PlayerWinsCoinFlip -- see Pawl.Types.CoinFlipped.
+      -- TriggerCondition.PlayerWinsCoinFlip -- see Pawl.Types.CoinFlipped. CR
+      -- 705.3's second clause is the exception the rule itself names: an effect
+      -- may state that a player WINS this flip, and Edgar, King of Figaro's
+      -- ruling says such an ability reaches even a flip that would ordinarily
+      -- have no winner. That is the only road to a winner here.
+      --
+      -- The FLIPPER is read before the flip rather than after the option is
+      -- applied, which is what lets rule 705.3 be asked about the right seat; an
+      -- entry option cannot change who controls the entering permanent, so the
+      -- record below reads the same seat it always did.
       EntryRewrite.ChoiceByCoinFlip entryFlip -> do
-        face <- Game.ask Prompt.FlipCoin
+        before <- State.get
+        let flipper = Projection.controllerOf oid before
+        (face, stated) <- Coin.flipCoin flipper
         let picked = case face of
               CoinFace.Heads -> EntryFlip.heads entryFlip
               CoinFace.Tails -> EntryFlip.tails entryFlip
@@ -1530,14 +1542,13 @@ apply batch candidate event =
         -- battlefield before this loop runs, so controllerOf falls back to its
         -- owner. No event is recorded there rather than a seat being conjured --
         -- the flip still happened and still applied.
-        applied <- State.get
-        Monad.forM_ (Projection.controllerOf oid applied) $ \flipper ->
+        Monad.forM_ flipper $ \seat ->
           State.modify'
             ( recordEvent
                 ( GameEvent.CoinFlipped
                     CoinFlipped.MkCoinFlipped
-                      { CoinFlipped.flipper = flipper,
-                        CoinFlipped.won = Nothing
+                      { CoinFlipped.flipper = seat,
+                        CoinFlipped.won = if stated then Just True else Nothing
                       }
                 )
             )

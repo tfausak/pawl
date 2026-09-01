@@ -10,9 +10,11 @@
 -- group proves with Tavern Scoundrel: what a trigger sees is a rule 603 question
 -- rather than a rule 705 one, and Winter Sky watches nothing.
 --
--- NOT rule 705.2's FIRST sentence either -- the flip nobody wins, which is an
--- entry replacement rather than an effect (Molten Sentry), and is proved in
--- Pawl.ReplacementSpec beside the rest of the CR 614.1c family.
+-- NOT rule 705.2's FIRST sentence on its own -- the flip nobody wins, which is
+-- an entry replacement rather than an effect (Molten Sentry), and is proved in
+-- Pawl.ReplacementSpec beside the rest of the CR 614.1c family. It appears here
+-- once, in the CR 705.3 group, because rule 705.3 is the one rule both roads
+-- have to obey and Pawl.Engine.Coin is the one road they share.
 --
 -- Its own module rather than a group in Pawl.DiceSpec: CR 705 and CR 706 are
 -- different rules sharing no type, no prompt and no effect. A coin has no size,
@@ -64,22 +66,33 @@
 module Pawl.CoinSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
+import qualified Data.Ord as Ord
+import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CoinFace as CoinFace
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ flipCoinSpec s registry
+spec s registry = Spec.describe s "Pawl.Engine.Coin" $ do
+  flipCoinSpec s registry
+  statedFlipSpec s registry
 
 -- Set a seat's life directly, so the two seats start on different numbers and
 -- neither can be read for the other.
@@ -206,3 +219,171 @@ flipCoinSpec s registry = Spec.describe s "FlipCoin" $ do
     -- BEFORE the face, since calling with the face already known is a different
     -- game. Bob is never asked.
     Spec.assertEqWith s "the call, of alice, then the flip" (asked board) [Just S.alice, Nothing]
+
+-- CR 705.3's producer is Edgar, King of Figaro ({4}{U}{U} Legendary Creature --
+-- Human Artificer Noble 4/5, "Two-Headed Coin -- The first time you flip one or
+-- more coins each turn, those coins come up heads and you win those flips";
+-- name, cost, type line and Oracle text checked against api.scryfall.com
+-- 2026-09-01). It states BOTH halves of the rule at once, which is why one card
+-- can prove them together.
+--
+-- THE FIXTURE is the Winter Sky board above with one creature added under alice.
+-- `withEdgar` decides WHICH creature, and that is the only difference between
+-- the two boards: Edgar, or a Bird Maiden (1/2), which is the same shape for
+-- every column `reading` looks at -- one more creature under alice that survives
+-- 1 damage. A negative built by leaving the seat empty instead would differ in
+-- two things.
+--
+-- `skies` is how many Winter Skys sit in alice's hand, which is what the "first
+-- time each turn" narrowing needs: one flip cannot tell "the first" from "every".
+statedBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> Int -> m ([ObjectId.ObjectId], GameState.GameState)
+statedBoard s registry withEdgar skies = do
+  sky <- S.printingOf s registry "Winter Sky"
+  piker <- S.printingOf s registry "Goblin Piker"
+  maiden <- S.printingOf s registry "Bird Maiden"
+  mountain <- S.printingOf s registry "Mountain"
+  edgar <- S.printingOf s registry "Edgar, King of Figaro"
+  let (_, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addCreature piker S.bob g1
+      (_, g3) = S.addCreature maiden S.bob g2
+      (_, g4) = S.addCreature (if withEdgar then edgar else maiden) S.alice g3
+      -- Three cards apiece so a lost flip's draw never decks a seat (CR 104.3c)
+      -- and replaces a hand size with a loss.
+      stocked = repeatedly (snd . S.addLibraryCard mountain S.alice) 3 (repeatedly (snd . S.addLibraryCard mountain S.bob) 3 g4)
+      landed = S.landsFor mountain S.alice (2 * skies + 2) stocked
+      addSky (ids, g) = let (i, g') = S.addHandCard sky S.alice g in (i : ids, g')
+      (skyIds, handed) = repeatedly addSky skies ([], landed)
+   in pure (skyIds, atLife S.bob 17 handed)
+
+-- Apply `f` `n` times.
+repeatedly :: (a -> a) -> Int -> a -> a
+repeatedly f n x = if n <= 0 then x else repeatedly f (n - 1) (f x)
+
+-- Cast each Winter Sky in turn and resolve it, under the ONE pinned answer this
+-- group uses: the coin comes up TAILS and alice calls HEADS. That pair loses on
+-- its own -- it is the primary leg of the group above -- so every win below is
+-- one rule 705.3 stated rather than one the coin produced, and neither the face
+-- nor the call can be the thing the board is reading.
+afterSkies :: [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
+afterSkies skyIds board =
+  S.settleSba (foldl (\g i -> S.runPure (flipAnswer CoinFace.Tails CoinFace.Heads) g (S.cast S.alice i >> Stack.resolveTop)) board skyIds)
+
+-- One Winter Sky won: 1 damage to each player and each creature, so both Pikers
+-- die, alice's extra creature and bob's Bird Maiden survive, and nobody draws.
+wonWithHelper :: (Maybe Integer, Maybe Integer, Int, Int, Int, Int, Int)
+wonWithHelper = (Just 19, Just 16, 1, 1, 0, 0, 0)
+
+-- The same Winter Sky lost: nothing damaged, each player draws one.
+lostWithHelper :: (Maybe Integer, Maybe Integer, Int, Int, Int, Int, Int)
+lostWithHelper = (Just 20, Just 17, 2, 2, 1, 1, 0)
+
+-- Two Winter Skys under Edgar: the FIRST flip is won and the second is not, so
+-- the damage sentence runs once and the draw sentence runs once. An
+-- implementation that ignored "the first time ... each turn" would win both,
+-- which is 18 and 15 with bob's Bird Maiden dead to the second point of damage
+-- and no draws at all -- no column of this reading survives that.
+firstOnly :: (Maybe Integer, Maybe Integer, Int, Int, Int, Int, Int)
+firstOnly = (Just 19, Just 16, 1, 1, 1, 1, 0)
+
+-- alice's Molten Sentry ({3}{R} Creature -- Elemental */*, "As this creature
+-- enters, flip a coin. If the coin comes up heads, this creature enters as a 5/2
+-- creature with haste. If it comes up tails, this creature enters as a 2/5
+-- creature with defender") in hand, over a Tavern Scoundrel ("Whenever you win a
+-- coin flip, create two Treasure tokens") and one more creature under alice --
+-- Edgar or the same Bird Maiden stand-in the Winter Sky boards use.
+sentryBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, GameState.GameState)
+sentryBoard s registry withEdgar = do
+  mountain <- S.printingOf s registry "Mountain"
+  scoundrel <- S.printingOf s registry "Tavern Scoundrel"
+  sentry <- S.printingOf s registry "Molten Sentry"
+  maiden <- S.printingOf s registry "Bird Maiden"
+  edgar <- S.printingOf s registry "Edgar, King of Figaro"
+  let (_, g1) = S.addCreature scoundrel S.alice (S.landsInPlay mountain 6)
+      (_, g2) = S.addCreature (if withEdgar then edgar else maiden) S.alice g1
+      (spellId, g3) = S.addHandCard sentry S.alice g2
+   in pure
+        ( spellId,
+          g3
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        )
+
+-- Cast the Sentry, resolve it, then run the place/resolve cycle twice so a flip
+-- the Scoundrel watches has room to pay out -- CR 603.3 puts the trigger on the
+-- stack at the next priority, and the flip happens inside the entry replacement.
+-- The coin is pinned to TAILS, so a heads face below is one rule 705.3 stated.
+runSentry :: GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+runSentry board spellId =
+  let answer :: Prompt.Prompt r -> r
+      answer = flipAnswer CoinFace.Tails CoinFace.Tails
+      drain n g =
+        if n <= (0 :: Int) || null (GameState.stack g)
+          then g
+          else drain (n - 1) (S.runPure answer g Stack.resolveTop)
+      cycleOnce g = drain 8 (S.runPure answer g Engine.placePendingTriggers)
+      resolved = S.runPure answer board (S.cast S.alice spellId >> Stack.resolveTop)
+   in cycleOnce (cycleOnce resolved)
+
+-- The newest battlefield object whose printed card has this name.
+newestNamed :: CardName.CardName -> GameState.GameState -> Maybe ObjectId.ObjectId
+newestNamed wanted gs =
+  let named oid = fmap Face.name (Game.faceOf oid gs) == Just wanted
+   in Maybe.listToMaybe (List.sortOn Ord.Down (filter named (Set.toList (GameState.battlefield gs))))
+
+statedFlipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+statedFlipSpec s registry = Spec.describe s "StateCoinFlip (CR 705.3)" $ do
+  Spec.it s "CR 705.3 a stated win beats a call the coin did not match" $ do
+    (withEdgar, edgarBoard) <- statedBoard s registry True 1
+    (withHelper, plainBoard) <- statedBoard s registry False 1
+    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
+    -- mutation: tails against a call of heads is a LOST flip everywhere else in
+    -- this module, and under Edgar it is won -- "this can cause a player to win
+    -- a flip that couldn't otherwise be won".
+    Spec.assertEqWith
+      s
+      "CR 705.3: Edgar states the win, so Winter Sky's damage sentence runs"
+      (reading (afterSkies withEdgar edgarBoard))
+      wonWithHelper
+    -- The pair, one thing different: the same board with a vanilla creature in
+    -- Edgar's seat, so every column starts where the line above started.
+    Spec.assertEqWith
+      s
+      "CR 705.2: with nobody stating a result the same flip is lost"
+      (reading (afterSkies withHelper plainBoard))
+      lostWithHelper
+  Spec.it s "CR 705.3 Edgar's statement is spent on the turn's first flip" $ do
+    (skyIds, board) <- statedBoard s registry True 2
+    Spec.assertEqWith
+      s
+      "the first flip is won and the second is not"
+      (reading (afterSkies skyIds board))
+      firstOnly
+  Spec.it s "CR 705.3 reaches the flip CR 705.2 leaves winnerless" $ do
+    (edgarSpell, edgarBoard) <- sentryBoard s registry True
+    (plainSpell, plainBoard) <- sentryBoard s registry False
+    let underEdgar = runSentry edgarBoard edgarSpell
+        underHelper = runSentry plainBoard plainSpell
+    -- Edgar's own ruling: its ability "can cause you to win coin flips that
+    -- would ordinarily have no winner". The Scoundrel is the discrimination --
+    -- two Treasures against none -- and it is asserted FIRST, because the P/T
+    -- below would also move if only the stated FACE had landed.
+    Spec.assertEqWith
+      s
+      "CR 705.3: Molten Sentry's winnerless flip is won, so the Scoundrel mints two Treasures"
+      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Treasure Token")) S.alice underEdgar)
+      2
+    Spec.assertEqWith
+      s
+      "CR 705.2: with nobody stating a result that same flip has no winner"
+      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Treasure Token")) S.alice underHelper)
+      0
+    -- The other half of the same statement, on the same two boards: the coin was
+    -- pinned to TAILS, so a 5/2 with haste is the stated FACE and a 2/5 with
+    -- defender is the one the coin actually came up.
+    case (newestNamed (CardName.MkCardName (Text.pack "Molten Sentry")) underEdgar, newestNamed (CardName.MkCardName (Text.pack "Molten Sentry")) underHelper) of
+      (Just stated, Just actual) -> do
+        Spec.assertEqWith s "CR 705.3: the stated heads picks the 5/2" (S.powerToughnessOf stated underEdgar) (Just (5, 2))
+        Spec.assertEqWith s "CR 705.1: the actual tails picks the 2/5" (S.powerToughnessOf actual underHelper) (Just (2, 5))
+      _ -> Spec.assertFailure s "Molten Sentry did not reach the battlefield"

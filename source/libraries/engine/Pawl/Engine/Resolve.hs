@@ -19,6 +19,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Blight as Blight
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Coin as Coin
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
@@ -4965,21 +4966,29 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- out of it. EVERY flip is recorded, won or lost -- Pawl.Types.CoinFlipped
   -- says why the outcome is a field rather than the presence of an entry.
   --
-  -- TWO WRITERS, two roads. Prompt.FlipCoin is also asked by
+  -- TWO WRITERS, two roads. Pawl.Engine.Coin is also called by
   -- Pawl.Engine.Event's ChoiceByCoinFlip arm, CR 705.2's first-sentence flip
-  -- (Molten Sentry), which records its own winnerless CoinFlipped there. Every
-  -- road that flips records, which is what keeps this event the log of CR 705.1
-  -- flips rather than the log of one opcode.
+  -- (Molten Sentry), which records its own CoinFlipped there. Every road that
+  -- flips records, which is what keeps this event the log of CR 705.1 flips
+  -- rather than the log of one opcode.
   --
   -- Recorded AFTER the binding, the roll's order and for its reason.
   --
-  -- Not implemented: CR 705.3's stated result (#2252); and CR 614's replacement
-  -- over the flip, which Krark's Thumb wants (#2253).
+  -- CR 705.3's second clause is the `stated` half: an effect may state that this
+  -- player WINS the flip, and then the call and the face are both ignored
+  -- ("ignore the actual results of that flip and use the indicated results
+  -- instead"). Its first clause -- the stated FACE -- is applied inside
+  -- Pawl.Engine.Coin, before the comparison here sees the face at all, which is
+  -- why a statement of heads alone still loses this flip against a call of
+  -- tails.
+  --
+  -- Not implemented: CR 614's replacement over the flip, which Krark's Thumb
+  -- wants (#2253).
   Effect.FlipCoin flipCoin -> do
     gs <- State.get
     called <- Game.choose (Prompt.CallCoin (Decide.deciderFor controller gs) controller)
-    face <- Game.ask Prompt.FlipCoin
-    let matched = face == called
+    (face, stated) <- Coin.flipCoin (Just controller)
+    let matched = stated || face == called
         won = if matched then 1 else 0 :: Natural
     State.modify' (bindAmountSlot source (FlipCoin.slot flipCoin) won)
     State.modify'
