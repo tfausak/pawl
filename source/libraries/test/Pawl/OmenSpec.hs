@@ -40,8 +40,8 @@ import qualified Pawl.Types.Zone as Zone
 
 -- The two names the card prints (CR 720.2). The first is the card's own name
 -- under CR 720.4; the second names only the alternative characteristics, and CR
--- 720.5 is what lets a player choose it where a name is asked for -- the open
--- half of that rule is #679.
+-- 720.5 is what lets a player choose it where a name is asked for -- which
+-- Pawl.Registry.index already answers, both face names being keys.
 dawnbreakerName, roarName :: CardName.CardName
 dawnbreakerName = CardName.MkCardName (Text.pack "Riling Dawnbreaker")
 roarName = CardName.MkCardName (Text.pack "Signaling Roar")

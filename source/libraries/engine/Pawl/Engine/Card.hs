@@ -579,7 +579,7 @@ castableFaces card = case Card.layout card of
 -- #2787).
 --
 -- SPLIT alone. A Room is a split card too (CR 709.5) and no printing gives one
--- fuse; the layouts with two faces that are not split cards (Adventure,
+-- fuse; the other layouts that are not split cards (Adventure, Omen,
 -- ModalDoubleFaced, Transforming, Meld) are not what rule 702.102a's "found on
 -- some split cards" reaches.
 fusedFace :: Card.Card -> Maybe (Face.Face Card.Card)
