@@ -99,5 +99,15 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
       Combat.codec
       empty {Combat.struckFirst = Just Set.empty}
       " {\"attackers\":{},\"blockers\":{},\"struckFirst\":[],\"joinedUnder\":{},\"attacked\":[],\"declaredAttacked\":[],\"declaredAttackedThisStep\":[],\"declaredAttackers\":[],\"declaredBlockers\":[],\"blockersDeclared\":false,\"attackingNothing\":[],\"defenders\":[]} "
+  -- CR 802.4 / CR 802.5: defenders is ORDERED, not a set -- both rules read it
+  -- as APNAP order (CR 101.4). Descending ids, so a codec that sorted or
+  -- reversed the list round-trips to a different game rather than to the same
+  -- one; every other case here has at most one defender and could not tell.
+  Spec.it s "several defending players keep their order" $
+    Common.assertCodec
+      s
+      Combat.codec
+      empty {Combat.defenders = [PlayerId.MkPlayerId 14, PlayerId.MkPlayerId 13]}
+      " {\"attackers\":{},\"blockers\":{},\"struckFirst\":null,\"joinedUnder\":{},\"attacked\":[],\"declaredAttacked\":[],\"declaredAttackedThisStep\":[],\"declaredAttackers\":[],\"declaredBlockers\":[],\"blockersDeclared\":false,\"attackingNothing\":[],\"defenders\":[14,13]} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Combat.codec

@@ -195,8 +195,12 @@ instances candidates targets gs =
       --
       -- Pruned by membership exactly as the printed pairs are: a creature that has
       -- since left the battlefield, or that can no longer attack, is not among
-      -- `candidates`, and a player who has left the game is not among `targets`
-      -- (Combat.attackTargets is derived from Game.stillPlayingInOrder).
+      -- `candidates`, and a player who is not being attacked this combat is not
+      -- among `targets` (Combat.declarableTargets walks
+      -- Defender.defendingPlayers). Liveness is not re-asked here and must not
+      -- be: Combat.attackableOpponents applied it once when CR 703.4h settled
+      -- the designation, and a player who leaves AFTER that stays a defending
+      -- player -- CR 800.4e drops the damage, not the attack.
       fromStored active =
         let creature = ActiveAttackRequirement.attacker active
             target = AttackTarget.OfPlayer (ActiveAttackRequirement.defender active)
