@@ -3361,31 +3361,43 @@ gatherGiven stripped functioning seed gs =
          in fmap one (NonEmpty.toList (grantedDefiningParts (ContinuousEffect.modification eff)))
       stored = concatMap fromStored (GameState.continuousEffects gs)
       static = concatMap (fmap snd . permanentParts stripped functioning setEffs setStripped gs) (abilitySources gs)
-      fromCommandZone commandId
-        | not (Vanguard.functionsFromCommandZone commandId gs) = []
-        | otherwise = case Game.lookupObject commandId gs of
-            Nothing -> []
-            Just commandObj -> case Game.faceOfObject gs commandObj of
-              Nothing -> []
-              Just face ->
-                -- CR 114.4 / 113.6p: an emblem's abilities function in the command
-                -- zone, sharing the emblem's timestamp (CR 613.7a). Never stripped:
-                -- the pool's CR 613.1f removers reach creatures (CR 114.5).
-                --
-                -- CR 313.4 / CR 902.7 puts a vanguard card's static abilities here on
-                -- the same terms. Both arrive through Vanguard.functionsFromCommandZone
-                -- above, which is rule 113.6p's list, and the gate is not optional:
-                -- neither an emblem nor a vanguard prints a zone clause -- rule 313.4
-                -- is the rulebook's statement and not the card's -- so
-                -- functionsFromZone's empty-set default would otherwise admit the
-                -- printed statics of a COMMANDER sitting in the same zone, which CR
-                -- 113.6's default leaves functioning on the battlefield alone.
-                -- Pawl.VanguardSpec's "CR 902.7 a vanguard's static ability functions
-                -- from the command zone" and Pawl.CommanderSpec's "CR 113.6 a
-                -- commander's static ability does not function from the command zone"
-                -- are the two halves that prove it, each against a control board
-                -- differing in one thing.
-                concat [gatherStatic (functioning commandId) commandId (Object.timestamp commandObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), functionsFromZone Zone.Command sa]
+      fromCommandZone commandId = case Game.lookupObject commandId gs of
+        Nothing -> []
+        Just commandObj -> case Game.faceOfObject gs commandObj of
+          Nothing -> []
+          Just face ->
+            -- TWO of CR 113.6's exceptions meet in this zone, and `keeps` is the
+            -- fromGraveyardCard split that keeps them apart -- an ability that
+            -- STATES its zones is judged by rule 113.6b alone, and only an ability
+            -- that states none falls back on the object's own rule.
+            --
+            -- CR 113.6p is that fallback: an emblem's abilities function here (CR
+            -- 114.4), sharing the emblem's timestamp (CR 613.7a), and CR 313.4 / CR
+            -- 902.7 put a face-up vanguard card's on the same terms. The test is
+            -- needed rather than optional -- neither prints a zone clause, rule
+            -- 313.4 being the rulebook's statement and not the card's, so the
+            -- empty-set default alone would admit the printed statics of a
+            -- COMMANDER sitting in the same zone, which CR 113.6's own default
+            -- leaves functioning on the battlefield.
+            --
+            -- CR 113.6b is the other limb, and it does NOT care what the object is:
+            -- Grist, the Hunger Tide's "as long as Grist isn't on the battlefield,
+            -- it's a 1/1 Insect creature" arrives as a stated set holding this zone
+            -- (CR 113.6c's negative form, exactly as fromGraveyardCard's comment
+            -- describes), and a Grist that is somebody's commander is a 1/1 Insect
+            -- in the command zone. Pawl.CommanderSpec's "CR 113.6b/113.6c a
+            -- commander's ability that states the command zone functions from
+            -- there" proves both limbs on one board: Grist is a creature there and
+            -- The Walls of Ba Sing Se's unstated row still is not.
+            --
+            -- Never stripped: the pool's CR 613.1f removers reach creatures, which
+            -- CR 114.5 says an emblem is not and CR 313.2 keeps a vanguard card out
+            -- of being.
+            let keeps sa =
+                  if Set.null (StaticAbility.functionsFrom sa)
+                    then Vanguard.functionsFromCommandZone commandId gs
+                    else statesZone Zone.Command sa
+             in concat [gatherStatic (functioning commandId) commandId (Object.timestamp commandObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), keeps sa]
       inCommand = concatMap fromCommandZone (Set.toList (GameState.command gs))
       fromSpell spellId = case Game.lookupObject spellId gs of
         Nothing -> []
@@ -5570,6 +5582,11 @@ replacementsAffecting gs =
       -- CR 114.3 makes the emblem's abilities the whole of it, CR 313.2 keeps a
       -- vanguard card in this zone all game, and no copy effect reaches either.
       --
+      -- Not implemented: CR 113.6b's stated set for this zone. gatherGiven's static
+      -- walk keeps both limbs of rule 113.6 -- an object's own rule decides only
+      -- where the row states no zone -- and this filter runs ahead of
+      -- functionsFromZoneOfRow instead, so a row NAMING the command zone on
+      -- anything but an emblem or a vanguard card is dropped (#2904).
       inCommand = filter (\oid -> Vanguard.functionsFromCommandZone oid gs) (Set.toList (GameState.command gs))
       commandZoneHas oid = case Game.faceOf oid gs of
         Nothing -> False

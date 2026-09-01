@@ -31,6 +31,7 @@ import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AttackOption as AttackOption
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackTargetKind as AttackTargetKind
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttacked as BecameAttacked
@@ -218,6 +219,16 @@ targetDefender target gs = case target of
   AttackTarget.OfPlaneswalker pw -> List.find (\d -> List.elem pw (attackablePlaneswalkers d gs)) (Defender.defendingPlayers gs)
   AttackTarget.OfBattle battle -> List.find (\d -> List.elem battle (attackableBattles d gs)) (Defender.defendingPlayers gs)
 
+-- CR 506.3: which of the three attackable things an announcement names, the
+-- thing itself dropped. The mapping Pawl.Types.AttackTargetKind's arms are named
+-- for, and the reason a restriction can say "or planeswalkers you control"
+-- without naming a planeswalker.
+attackTargetKind :: AttackTarget.AttackTarget -> AttackTargetKind.AttackTargetKind
+attackTargetKind target = case target of
+  AttackTarget.OfPlayer {} -> AttackTargetKind.OfPlayer
+  AttackTarget.OfPlaneswalker {} -> AttackTargetKind.OfPlaneswalker
+  AttackTarget.OfBattle {} -> AttackTargetKind.OfBattle
+
 -- CR 802.4a: the attacking creatures one defending player may block -- the ones
 -- attacking them, a planeswalker they control, or a battle they protect. Every
 -- attacker wherever one player defends, which is what keeps CR 509.1 a special
@@ -230,8 +241,10 @@ targetDefender target gs = case target of
 -- An attacker whose target names NO defending player is offered to every one of
 -- them rather than to none, which keeps CR 506.4c's creature -- still attacking,
 -- attacking nothing -- blockable exactly as it was before this list narrowed.
--- Not implemented: narrowing that creature to the one player CR 802.2a says it
--- is still attacking, which needs the per-attacker record #2841 describes.
+-- Not implemented: whom such a creature may be blocked by at all. CR 509.1a and
+-- CR 802.4a both name only a creature attacking that player, a planeswalker they
+-- control or a battle they protect, and a creature attacking nothing is none of
+-- the three -- against CR 506.4c's own "It may be blocked" (#2899).
 attackersOn :: PlayerId -> GameState -> [ObjectId]
 attackersOn pid gs =
   let recorded = Combat.attackers (GameState.combat gs)
@@ -456,24 +469,25 @@ attackCeiling candidates gs =
 -- same two lists the declaration is drawn from (declarableTargets and
 -- Defender.defendingPlayers).
 --
--- TWO restrictions land here and they map a target to a player DIFFERENTLY, which
+-- TWO restrictions land here and they key on an announcement DIFFERENTLY, which
 -- is why one set is built from two:
 --
---   * The AIMED-AT one (Blazing Archon, "creatures can't attack you") names the
---     thing being attacked, so only CR 506.3's player arm can match it. A
---     planeswalker its controller controls stays attackable -- a different
---     announcement, and what tells this restriction from a blanket "can't
---     attack".
+--   * The AIMED-AT one (Blazing Archon, "creatures can't attack you"; Vow of
+--     Flight, "can't attack you or planeswalkers you control") names WHICH of CR
+--     506.3's things on that player's side are barred, so the announcement's
+--     defending player is not enough on its own -- attackTargetKind is the other
+--     half of the key. Blazing Archon writes OfPlayer alone, which is why a
+--     planeswalker its controller controls stays attackable under it, and what
+--     tells that restriction from a blanket "can't attack".
 --   * The GATED one (Armored Galleon, "can't attack unless defending player
---     controls an Island") names the DEFENDING PLAYER of the announcement, which
---     CR 508.5 and CR 802.2a read off the planeswalker's controller or the
---     battle's protector as readily as off the seat attacked directly. So every
---     arm consults it, through targetDefender.
+--     controls an Island") names the DEFENDING PLAYER of the announcement and
+--     nothing more, which CR 508.5 and CR 802.2a read off the planeswalker's
+--     controller or the battle's protector as readily as off the seat attacked
+--     directly. So it bars every kind at that seat at once.
 --
--- Exhaustive over CR 506.3's three things rather than a wildcard, so a fourth of
--- them fails to compile here. Not implemented: an AIMED-AT restriction naming a
--- planeswalker or a battle (#2891), which is the other two arms of the first
--- case.
+-- Both halves go through targetDefender, which is CR 508.5's reading, and
+-- attackTargetKind is exhaustive over CR 506.3's three things, so a fourth of
+-- them fails to compile.
 --
 -- targetDefender answering Nothing is an announcement naming no defending player
 -- at all, which CR 508.1b's candidate list cannot produce: the gate has nobody to
@@ -483,10 +497,7 @@ barredAnnouncements candidates gs =
   let defenders = Defender.defendingPlayers gs
       aimed = CombatRestriction.cantAttackPlayer candidates defenders gs
       gated = CombatRestriction.cantAttackDefender candidates defenders gs
-      aimedAt oid target = case target of
-        AttackTarget.OfPlayer pid -> Set.member (oid, pid) aimed
-        AttackTarget.OfPlaneswalker _ -> False
-        AttackTarget.OfBattle _ -> False
+      aimedAt oid target = Maybe.maybe False (\d -> Set.member (oid, d, attackTargetKind target) aimed) (targetDefender target gs)
       gatedAt oid target = Maybe.maybe False (\d -> Set.member (oid, d) gated) (targetDefender target gs)
    in Set.fromList
         [ (oid, target)

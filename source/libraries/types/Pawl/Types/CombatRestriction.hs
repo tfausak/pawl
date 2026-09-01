@@ -64,13 +64,14 @@ import qualified Pawl.Types.LimitUnless as LimitUnless
 -- CR 701.54c's is on an emblem.
 --
 -- CantAttackPlayer is the attacking one, Blazing Archon's "creatures can't
--- attack you": the pair is a creature and the PLAYER it may not be announced
--- against (CR 508.1b), so the second half is a Pawl.Types.PlayerScope rather
--- than a Filter over creatures. CR 802.3a is the rule that says such a
--- restriction applies only to the creatures attacking that player, and it is not
--- a multiplayer rule in disguise: at two seats a planeswalker its controller
--- controls is a second announcement, so "can't attack you" and "can't attack"
--- already come apart.
+-- attack you": the pair is a creature and the ANNOUNCEMENT it may not make (CR
+-- 508.1b) -- a player from a Pawl.Types.PlayerScope rather than a Filter over
+-- creatures, together with which of CR 506.3's things on that player's side are
+-- barred (Vow of Flight's "or planeswalkers you control"). CR 802.3a is the rule
+-- that says such a restriction applies only to the creatures attacking that
+-- player, and it is not a multiplayer rule in disguise: at two seats a
+-- planeswalker its controller controls is a second announcement, so "can't
+-- attack you" and "can't attack" already come apart.
 --
 -- A restriction a player may PAY THROUGH is one of CR 508.1c's all the same
 -- (Ghostly Prison), but it rides Pawl.Types.AttackCost, the SIXTH carrier. The
@@ -91,8 +92,8 @@ import qualified Pawl.Types.LimitUnless as LimitUnless
 -- The aimed-at axis is CantAttackPlayer's and not the condition's: CR 508.1b's
 -- per-creature announcement is what a "can't attack you" names, where the
 -- condition below is a predicate over game state that cannot see an announcement
--- at all. Not implemented: naming a planeswalker or a battle rather than a
--- player (#2891).
+-- at all. CR 506.3's three attackable things are that arm's `kinds`, so "or
+-- planeswalkers you control" is the same axis rather than a second one.
 --
 -- Open-half card data, classified rather than identified:
 -- Pawl.Engine.CombatRestriction is the only module that may case on it. Casing
@@ -180,8 +181,9 @@ data CombatRestriction
     -- emblem no power at all. See Pawl.Engine.CombatRestriction.cantBeBlockedBy.
     CantBeBlockedBy CantBeBlockedBy.CantBeBlockedBy
   | -- | CR 508.1c through CR 802.3a: these creatures can't attack the players the
-    -- scope names, unless the gate holds. Blazing Archon's "creatures can't
-    -- attack you" is the pool's printing.
+    -- scope names -- nor, where the kinds say so, what those players control
+    -- (CR 506.3) -- unless the gate holds. Blazing Archon and Vow of Flight are
+    -- the pool's printings.
     --
     -- The attacking side's PAIRWISE arm: what it forbids is an ANNOUNCEMENT (CR
     -- 508.1b), so neither a set of creatures nor a set of players is an answer

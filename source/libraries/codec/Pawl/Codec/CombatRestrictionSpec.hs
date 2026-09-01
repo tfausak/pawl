@@ -1,5 +1,6 @@
 module Pawl.Codec.CombatRestrictionSpec where
 
+import qualified Data.Set as Set
 import qualified Pawl.Codec.CombatRestriction as CombatRestriction
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -7,6 +8,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AttackTargetKind as AttackTargetKind
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
@@ -53,13 +55,14 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       " {\"type\":\"CantBeBlockedBy\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"blockers\":{\"type\":\"PowerGreaterThanSource\"}}} "
   -- CR 508.1c's PAIRWISE arm, the attacking one, whose payload spells
   -- "defenders" where CantBeBlockedBy spells "blockers": the players the
-  -- restricted creatures may not be announced against (CR 508.1b).
-  Spec.it s "CantAttackPlayer carries its Affected and its defenders" $
+  -- restricted creatures may not be announced against (CR 508.1b), together
+  -- with which of CR 506.3's things on that player's side (the "kinds").
+  Spec.it s "CantAttackPlayer carries its Affected, its defenders and its kinds" $
     Common.assertCodec
       s
       CombatRestriction.codec
-      (CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer Affected.Attached PlayerScope.You Nothing))
-      " {\"type\":\"CantAttackPlayer\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"defenders\":{\"type\":\"You\"}}} "
+      (CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer Affected.Attached PlayerScope.You (Set.singleton AttackTargetKind.OfPlaneswalker) Nothing))
+      " {\"type\":\"CantAttackPlayer\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"defenders\":{\"type\":\"You\"},\"kinds\":[{\"type\":\"OfPlaneswalker\"}]}} "
   -- CR 508.1c together with CR 506.5, the SET-SHAPED arm: the same payload as
   -- the two above, so the tag is the only thing that tells a reader this one is
   -- answered against a whole declaration.
