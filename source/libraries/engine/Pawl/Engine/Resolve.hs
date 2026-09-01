@@ -4270,6 +4270,15 @@ targetsOnStack oid gs =
 -- them together. Asked on the DRAWN answer rather than the raw one, so what the
 -- re-derivation reads is the card CR 406.4 picked out of a pile -- the order
 -- Pawl.Engine.Cast.castProposed takes, chooseTargets drawing before it asks.
+--
+-- CR 733.1 is what a rejection falls to, and it is a REVERSAL rather than a
+-- remedy of its own: the choice is undone, and the copy is left holding the
+-- targets CR 707.10 already gave it. Not rule 707.10c's "may leave any number of
+-- the targets unchanged", which is the player's option and not the rules'
+-- handling of an illegal one -- the two coincide here only because undoing this
+-- particular choice restores exactly that state. CR 733.2's redo has no analogue
+-- inside a resolution: nobody holds priority, and a pure prompt-to-answer
+-- decider re-asked would loop on a stubborn answer.
 chooseNewTargetsFor :: PlayerId -> ObjectId -> Game ()
 chooseNewTargetsFor controller copyId = do
   gs <- State.get
