@@ -127,8 +127,10 @@ tagged :: (Typeable.Typeable a) => [Arm a] -> Codec.Codec a
 tagged arms = taggedWith (\x -> Maybe.fromMaybe (Value.object []) (Foldable.asum (fmap (`armEncode` x) arms))) arms
 
 -- | 'tagged' for a union that WRAPS a type rather than being that type's own
--- wire format, so it is not filed in @$defs@ -- 'Common.maybe' declines for the
--- same reason. Pawl.Codec.Printing needs it: one of its arms carries the
+-- wire format, so it is not filed in @$defs@; 'Common.maybe' declines one on the
+-- same ground, that a structural wrapper is not a type a reader wants named.
+--
+-- Pawl.Codec.Printing needs it for a sharper reason: one of its arms carries the
 -- ordinary Printing codec, which files itself under @Printing@, and
 -- 'Define.define' memoizes on the NAME alone, so a union filed under that name
 -- would swallow its own arm and describe the payload as the union.

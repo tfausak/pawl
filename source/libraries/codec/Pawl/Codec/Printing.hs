@@ -68,8 +68,9 @@ reference resolve = Arm.anonymous [named, inline]
 
 -- | The name a printing is written under. The FIRST face's, not the joined
 -- name: CR 709.4a gives a split card two names and no combined one, and
--- Pawl.Registry.index keys each face name separately, so the first face's name
--- is a key every registry has while the joined one -- Pawl.Registry.filedAs, a
--- filing convention -- is a key none of them has.
+-- Pawl.Registry.index keys each face name separately, so a first face's name is
+-- a key the file-backed registry answers to while the joined one --
+-- Pawl.Registry.filedAs, a filing convention rather than a name the card has --
+-- is not.
 firstFaceName :: Card.Type.Card -> CardName.Type.CardName
 firstFaceName = Face.name . NonEmpty.head . Card.Type.faces
