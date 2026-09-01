@@ -2552,24 +2552,6 @@ primalWhispererSpec s registry = Spec.describe s "Counting face-down creatures (
         Spec.assertEqWith s "CR 708.8 and the Tracker is what turned over" (fmap Object.facing (Game.lookupObject victim after)) (Just Facing.FaceUp)
       Nothing -> Spec.assertFailure s "the face-down permanents did not reach the battlefield"
 
--- CR 702.168 disguise: rule 702.37's twin, and the one place rule 708.2's "no
--- characteristics other than those LISTED" has a keyword in the list.
---
--- Defenestrated Phantom is the card, {4}{W}{W} Creature -- Spirit 4/3, "Flying /
--- Disguise {4}{W}", transcribed whole. Chosen as the pool's plainest disguise
--- creature: MKM's others carry investigate or something that happens as they are
--- turned face up -- Bubble Smuggler's CR 614.1e counter clause, at the end of this
--- group, is one -- either of which would put a second observable event beside the
--- one these cases read. Its
--- printed values differ from CR 702.168b's listing on every axis the rule names
--- -- 4/3 against the 2/2, a Spirit against no subtypes, flying against ward {2},
--- a name against none, and a mana value of 6 against CR 202.3a's 0.
---
--- AINOK TRACKER IS THE PAIR, not a second fixture: the two cards differ in the
--- keyword and in nothing else that these cases read. Both are creature cards cast
--- face down for CR 702.37a's and CR 702.168a's shared {3}, both become 2/2s, and
--- only one of them lists ward {2}. Every case below that asserts something about
--- disguise asserts the same thing about morph on the same board.
 -- The two halves of Dog Walker's {R/W}, named so the assertions below read as
 -- colours rather than as constructors.
 redMana, whiteMana :: ManaType.ManaType
@@ -2595,6 +2577,24 @@ announcesRedOrWhite half p = case p of
 tappedAmong :: [ObjectId.ObjectId] -> GameState.GameState -> Int
 tappedAmong oids gs = length (filter (\oid -> fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Tapped) oids)
 
+-- CR 702.168 disguise: rule 702.37's twin, and the one place rule 708.2's "no
+-- characteristics other than those LISTED" has a keyword in the list.
+--
+-- Defenestrated Phantom is the card, {4}{W}{W} Creature -- Spirit 4/3, "Flying /
+-- Disguise {4}{W}", transcribed whole. Chosen as the pool's plainest disguise
+-- creature: MKM's others carry investigate or something that happens as they are
+-- turned face up -- Bubble Smuggler's CR 614.1e counter clause, at the end of this
+-- group, is one -- either of which would put a second observable event beside the
+-- one these cases read. Its
+-- printed values differ from CR 702.168b's listing on every axis the rule names
+-- -- 4/3 against the 2/2, a Spirit against no subtypes, flying against ward {2},
+-- a name against none, and a mana value of 6 against CR 202.3a's 0.
+--
+-- AINOK TRACKER IS THE PAIR, not a second fixture: the two cards differ in the
+-- keyword and in nothing else that these cases read. Both are creature cards cast
+-- face down for CR 702.37a's and CR 702.168a's shared {3}, both become 2/2s, and
+-- only one of them lists ward {2}. Every case below that asserts something about
+-- disguise asserts the same thing about morph on the same board.
 disguiseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 disguiseSpec s registry =
   let disguised = Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.Disguised, FaceDownState.listed = FaceDownCharacteristics.disguisedValue}

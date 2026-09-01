@@ -733,7 +733,7 @@ activateAbility pid srcId ability = do
           -- paid during a resolution announces at its own site
           -- (Pawl.Engine.Resolve.payGatePaidBy), and rule 118.13c's special
           -- action at each of its own (Pawl.Engine.FaceDown.turnFaceUp and
-          -- its four siblings).
+          -- its five siblings).
           --
           -- Measured through the SAME totalling payableCost gated on, off the
           -- same adjustments -- against the printed cost instead, a reduction

@@ -763,7 +763,7 @@ maximumX pid oid face gs =
 -- one step before CR 601.2f's total, rule 118.13b's immediately before a cost
 -- paid during a resolution is paid (Pawl.Engine.Resolve.payGatePaidBy), and rule
 -- 118.13c's immediately before a special action's cost is
--- (Pawl.Engine.FaceDown.turnFaceUp and its four siblings). `announceToll` below
+-- (Pawl.Engine.FaceDown.turnFaceUp and its five siblings). `announceToll` below
 -- is the same choice at a moment rule 118.13 states none for.
 --
 -- The life the announcement committed becomes a CostComponent.PayLife, making
@@ -2214,11 +2214,11 @@ payToll pid charges = do
 -- a spell's or an activated ability's cost, 118.13b a cost paid during a
 -- resolution and 118.13c a special action's, and a cost to attack or block is
 -- none of the three. What puts the choice with the payer is that it IS a choice
--- --- docs/design.md's second invariant --- and the placement is the one both
+-- -- docs/design.md's second invariant -- and the placement is the one both
 -- rules that do state a moment for a cost already settled use, "immediately
 -- before they pay that cost". Norn's Annex is the only printing that reaches
--- this: Scryfall `o:/unless .* pays? \{/`, 2026-09-01, no other attack- or
--- block-declaration cost holds a hybrid or Phyrexian symbol.
+-- this: Scryfall `o:/unless .* pays? \{/`, 2026-09-01, 294 printings and its
+-- {W/P} the only one payable in more than one way.
 --
 -- ONE ANNOUNCEMENT PER CHARGE, tagged with the permanent that printed it, so the
 -- prompt names an object even though CR 508.1h's total is on none
@@ -2251,6 +2251,14 @@ announceToll pid charges = go [] 0 charges
           gs <- State.get
           -- Order within the probe carries nothing -- payability is a question
           -- about a multiset of symbols -- so `done` rides in reversed.
+          --
+          -- `others` and `committed` below are REDUNDANT with each other on
+          -- every board `data/cards/` can build, the pool's only hybrid toll
+          -- being Norn's Annex's {W/P}: dropping either alone leaves
+          -- CombatEffectSpec's "CR 508.1h two taxed attackers at 3 life"
+          -- green, and dropping both puts alice at -1. Both are kept because
+          -- they answer different halves of CR 118.3 -- what the rest of the
+          -- toll still needs, and what earlier answers have already spent.
           let others = concatMap symbolsOf done <> concatMap symbolsOf rest
               total_ mana = [ManaCost.MkManaCost (ManaCost.unwrap mana <> others)]
               claimed = concatMap (\(t, c) -> claimsOf pid t (Cost.components c) gs) charges
