@@ -7,8 +7,8 @@
 -- card isn't manifested ... it remains in its previous zone. If it was face up, it
 -- remains face up" is the manifest case below.
 --
--- Grafdigger's Cage is the first group's fixture: "Creature cards in graveyards and libraries
--- can't enter the battlefield." Its second sentence ("players can't cast spells
+-- Grafdigger's Cage is the first group's fixture: "Creature cards in graveyards
+-- and libraries can't enter the battlefield." Its second sentence ("players can't cast spells
 -- from graveyards or libraries") is on the card too, as a player ability; nothing
 -- here reads it, and Pawl.CastSpec's Grafdigger's Cage group is where it is
 -- proved.
@@ -286,9 +286,10 @@ permanentSpellCase s registry = do
 -- Not implemented, recorded here because a card's JSON carries no comment: Worms
 -- of the Earth's third sentence, whose each-upkeep offer to every player is how
 -- the printed card is destroyed, and Autumn Willow's third, which adds mana when
--- a land creature is tapped (#2865, #2866). Both omissions leave pawl's card STRICTER
--- than printed -- one keeps an enchantment its opponents could remove, the other
--- withholds mana from its controller -- so neither can flatter the cases below.
+-- a land creature is tapped (#2865, #2866). Both omissions leave pawl's card
+-- STRICTER than printed -- one keeps an enchantment its opponents could remove,
+-- the other withholds mana from its controller -- so neither can flatter the
+-- cases below.
 tokenCase :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 tokenCase s registry = do
   let -- The Willow enters WITH its CR 603.6a event, so settleForPriority finds

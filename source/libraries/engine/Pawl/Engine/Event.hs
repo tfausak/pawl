@@ -3691,8 +3691,8 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
         -- why the prohibition is asked here rather than in Pawl.Engine.Projection.
         --
         -- Nothing for every origin but the stack, this funnel's CR 614.6 cancel
-        -- arm one case up and CR 303.4g's
-        -- answer one case down: the object is never deleted and never re-minted
+        -- arm one case up and CR 303.4g's answer one case down: for those the
+        -- object is never deleted and never re-minted
         -- (CR 400.7), so the card in the graveyard or the library is the SAME
         -- object it always was. That is what separates a refusal from a redirect,
         -- and Pawl.EntryRestrictionSpec's "each card remains in its previous zone,
@@ -5100,14 +5100,14 @@ createTokens controller card copy n tapped entering = do
       case resolved of
         Nothing -> pure []
         Just (owner, tokenCard, count) -> do
+          -- CR 111.5's rollback point below, captured AFTER resolveTokens rather
+          -- than before it: rule 614.3's use counts are spent by a replacement
+          -- that applied to the creation event, and rule 111.5 unmakes the token
+          -- rather than the event.
+          unminted <- State.get
           -- Interned ONCE for the whole event, not once per token: `count`
           -- tokens created by one effect are copies of one set of
           -- effect-defined characteristics (CR 111.3), so they name one entry.
-          -- CR 111.5's rollback point, captured AFTER resolveTokens rather than
-          -- before it: rule 614.3's use counts are spent by a replacement that
-          -- applied to the creation event, and rule 111.5 unmakes the token
-          -- rather than the event.
-          unminted <- State.get
           tokenId <- State.state (Game.intern (Printing.MkPrinting tokenCard))
           let mkObj ts =
                 Object.MkObject
