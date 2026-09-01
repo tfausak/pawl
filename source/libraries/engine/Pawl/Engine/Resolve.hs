@@ -2589,7 +2589,7 @@ payGatePaidBy resolving source idx cIdx legal payer gate = do
           -- DuringResolution: rule 118.12's cost is paid as the spell or ability
           -- resolves, which is CR 609.1's effect, so a blight paid here is CR
           -- 614.16's subject where Soul Immolation's additional cost is not.
-          outcome <- Cost.pay PaymentMoment.DuringResolution PaymentSubject.ForNeither ManaSpending.AsProduced payer source announced
+          outcome <- Cost.pay PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer source announced
           -- Not implemented: the slots this payment bound are dropped, so a
           -- CR 118.12 cost that sacrifices a permanent cannot be read by a
           -- later clause of the same resolution (#1872).
@@ -3732,6 +3732,10 @@ damageSourceCandidates context gs filter_ =
 -- baked ids by the Healing Grace case beside it, the row's captured SLOTS by
 -- Synthetic Communal Bulwark's under Healing Grace, and the DELAYED TRIGGER's
 -- bindings by Come Back Wrong's under Auriok Replica.
+--
+-- The two binding-reading carriers -- the stack's and the delayed trigger's -- also
+-- share one EXCLUSION, stated once at referentsOfBindings below rather than at each
+-- of them: an activated ability's own id is not something it refers to.
 referredToSources :: GameState -> [ObjectId]
 referredToSources gs =
   foldMap (\oid -> foldMap referentsOfObject (Game.lookupObject oid gs)) (GameState.stack gs)
@@ -3815,10 +3819,26 @@ sourceObjectOf src = case src of
 -- multi-target slot away through `onlyOne` -- a spell that targets two creatures
 -- refers to both of them, and CR 609.7a asks for every object referred to.
 -- Player recipients drop out, the rule's classes all being objects.
+--
+-- ONE SLOT IS DROPPED, and by NAME rather than by comparing ids: Binding.thisAbility
+-- holds the activated ability's OWN id (CR 602.2a), which pawl stamps so a card can
+-- read the record of the mana that paid for the activation -- not because any
+-- printed text names the ability as another object. Counting it would undo CR
+-- 609.7a's second class, which admits "a spell on the stack" and deliberately stops
+-- short of an ability.
+--
+-- HERE rather than at the carriers, because two of CR 609.7a's three read bindings
+-- and both were wrong: `referentsOfObject` for an ability still on the stack, and
+-- Effect.ArmDelayedTrigger's captured environment for one that has already ceased,
+-- which is unrestricted by design (CR 603.7c). The third carrier reads
+-- ActiveReplacement.slots, already narrowed to the row's own slot names, so it
+-- never sees this one unless a card writes it -- and then the card really does name
+-- it. Pawl.ReplacementSpec proves both binding carriers, one case each.
 referentsOfBindings :: Map.Map SlotName Binding.Type.Binding -> [ObjectId]
 referentsOfBindings bindings =
-  foldMap (Maybe.mapMaybe Recipient.objectOf . Set.toList) (Binding.targetsOf bindings)
-    <> foldMap Foldable.toList (Binding.groupsOf bindings)
+  let named = Map.delete Binding.thisAbility bindings
+   in foldMap (Maybe.mapMaybe Recipient.objectOf . Set.toList) (Binding.targetsOf named)
+        <> foldMap Foldable.toList (Binding.groupsOf named)
 
 -- The context every effect of a resolution evaluates its quantities and its
 -- ref-borne filters in: CR 109.5's "you" is the resolving controller, the source

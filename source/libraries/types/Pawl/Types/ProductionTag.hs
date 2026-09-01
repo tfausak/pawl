@@ -20,4 +20,12 @@ data ProductionTag
     -- Neither a mana type nor a colour (CR 107.4h), so it sits here rather than
     -- in Pawl.Types.ManaType.
     Snow
+  | -- | "Mana from a Treasure" (Forsworn Paladin): the mana's source (CR 106.3)
+    -- was a permanent with the Treasure subtype.
+    --
+    -- No comprehensive rule coins the phrase, exactly as
+    -- Pawl.Types.SpellCast.ordinal's haddock says of "your second spell each
+    -- turn" -- it is plain card text over CR 106.3's source, and this says so
+    -- rather than manufacturing a citation.
+    Treasure
   deriving (Bounded, Enum, Eq, Ord, Show)

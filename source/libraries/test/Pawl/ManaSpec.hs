@@ -596,8 +596,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
         green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
         cost = Cost.Type.MkCost (Just green) []
         tappedElf g = fmap Object.tapped (Game.lookupObject elfId g)
-    Spec.assertEqWith s "asked to tap the Elf, it is tapped" (tappedElf (S.runPure (prefersSource elfId) gs (Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither ManaSpending.AsProduced S.alice elfId cost))) (Just TapState.Tapped)
-    Spec.assertEqWith s "asked to spare the Elf, it is untapped" (tappedElf (S.runPure (avoidsSource elfId) gs (Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither ManaSpending.AsProduced S.alice elfId cost))) (Just TapState.Untapped)
+    Spec.assertEqWith s "asked to tap the Elf, it is tapped" (tappedElf (S.runPure (prefersSource elfId) gs (Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced S.alice elfId cost))) (Just TapState.Tapped)
+    Spec.assertEqWith s "asked to spare the Elf, it is untapped" (tappedElf (S.runPure (avoidsSource elfId) gs (Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced S.alice elfId cost))) (Just TapState.Untapped)
 
   -- The other half of the invariant: WHEN the window asks, counted directly --
   -- without which an implementation that never asks would still pass the test
@@ -4031,13 +4031,13 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
         -- carries the clause, which is what says the inline road (CR 605.3b)
         -- stamped it onto every unit the instruction added.
         Spec.assertEqWith s "CR 106.4 the unspent one floats, restriction and all" (poolOf S.alice equipped) [hawkerMana ManaType.Colorless]
-        -- The BOUNDARY the new subject must not cross. CR 400.7d's record is
-        -- kept for a spell being cast and for nothing else, which is why
-        -- Cost.payMana writes it through PaymentSubject.castOf rather than
-        -- through the subject: an activation paid with this same mana records
-        -- nothing (#2404), and widening the subject is exactly the change that
-        -- would start it recording.
-        Spec.assertEqWith s "CR 400.7d the equip records no mana spent" (fmap Object.manaSpent (Game.lookupObject equipId equipped)) (Just (Mana.Type.MkMana []))
+        -- The BOUNDARY an activation's record must not cross. CR 400.7d's record
+        -- on a PERMANENT is the mana that cast the spell it became, and the equip
+        -- is an activation, whose units go on the CR 602.2a ability object instead
+        -- (Cost.payMana's `record` argument). So the Bonesplitter's own field is
+        -- still empty here -- an implementation recording against the SOURCE would
+        -- have overwritten it, which is what this pins.
+        Spec.assertEqWith s "CR 400.7d the equip records no mana spent on the Bonesplitter" (fmap Object.manaSpent (Game.lookupObject equipId equipped)) (Just (Mana.Type.MkMana []))
 
   -- The CONTROL, one Island apart. Everything the assertions above rest on that
   -- is not CR 106.6 -- the Hawker being unsick enough to tap (CR 302.6), the
@@ -4695,6 +4695,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   spendChoiceSpec s registry
   interchangeableSourcesSpec s registry
   bergStriderSpec s registry
+  forswornPaladinSpec s registry
 
 -- One mana of one type carrying no production tag: what a basic land really puts
 -- in a pool, and the unit the Celestial Dawn cases below seat directly.
@@ -6682,7 +6683,7 @@ greenOnly = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green
 -- reading, where the first sentence's is a payability one -- so what it needs is
 -- a record of the payment, which is Pawl.Types.Object.manaSpent, written by
 -- Pawl.Engine.Cost's mana window and read back through
--- Pawl.Engine.Filter.View.manaSpentTags by Quantity.SnowWasSpent.
+-- Pawl.Engine.Filter.View.manaSpentTags by Quantity.TagWasSpent.
 --
 -- Berg Strider is the card: "When this creature enters, tap target artifact or
 -- creature an opponent controls. If {S} was spent to cast this spell, that
@@ -6771,3 +6772,111 @@ bergSpentTags = foldMap ManaUnit.tags . bergSpent
 
 bergSpentCount :: GameState.GameState -> Int
 bergSpentCount = length . bergSpent
+
+-- CR 602.2a's ability object as CR 400.7d's other record-keeper: "That ability is
+-- created on the stack as an object that's not a card." An ACTIVATION's mana is
+-- recorded there and not on the source permanent, whose own record is the mana
+-- that cast the spell it became -- so activating an ability cannot overwrite what
+-- Berg Strider above reads.
+--
+-- Forsworn Paladin is the card: "{1}{B}, {T}, Pay 1 life: Create a Treasure
+-- token." and "{2}{B}: Target creature gets +2/+0 until end of turn. If mana from
+-- a Treasure was spent to activate this ability, that creature also gains
+-- deathtouch until end of turn." Two clauses on the second ability, and only the
+-- second is conditioned -- so the pump happens on both boards and the deathtouch
+-- is where they part.
+--
+-- The card reaches the record through Quantity.AgainstSlot aimed at
+-- Binding.thisAbility, which Pawl.Engine.Activate stamps: the clause is gated
+-- against the SOURCE (Resolve.gateHolds), and the source is the Paladin rather
+-- than the ability whose payment the printed sentence asks about.
+forswornPaladinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+forswornPaladinSpec s registry = Spec.describe s "ForswornPaladin" $ do
+  -- ONE board, run twice with answerers that differ in a single choice: whether
+  -- the Treasure is tapped for one of the {2}{B} or spared and a fourth Swamp
+  -- tapped instead. Same seats, same Treasure sitting on the battlefield, same
+  -- target, same life total, same everything else -- so a creature that gains
+  -- deathtouch on one run and not the other did so because of where the mana came
+  -- from.
+  --
+  -- The two behavioural assertions come first and both can differ: an engine that
+  -- records nothing for an activation leaves the first run without deathtouch, and
+  -- one that tags every mana leaves the second with it.
+  Spec.it s "CR 602.2a whole card: Forsworn Paladin's target gains deathtouch when a Treasure's mana paid for the ability, and not when Swamps did" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    paladin <- S.printingOf s registry "Forsworn Paladin"
+    piker <- S.printingOf s registry "Goblin Piker"
+    case Face.activatedAbilities (S.combinedFace paladin) of
+      makeTreasure : pump : _ -> do
+        let (paladinId, g1) = S.addCreature paladin S.alice (S.landsInPlay swamp 6)
+            (victim, g2) = S.addCreature piker S.bob g1
+            armed = S.runPure S.identityAnswer g2 (Activate.activateAbility S.alice paladinId makeTreasure *> Stack.resolveTop)
+            treasure = treasureIn armed
+            act = Activate.activateAbility S.alice paladinId pump *> Stack.resolveTop
+            spending = S.runPure (aimedAtSpending victim treasure) armed act
+            sparing = S.runPure (aimedAtSparing victim treasure) armed act
+        Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch victim spending) "the Treasure's mana paid the activation, so the Piker gains deathtouch"
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Deathtouch victim sparing)) "and on the same board with the Treasure spared, which differs in nothing else, it does not"
+        -- The supporting checks, after the behaviour. The pump carries no
+        -- condition at all, so it is insensitive to the record by construction and
+        -- says only that both runs resolved the ability against the same target.
+        Spec.assertEqWith s "setup: both runs ran the unconditional clause, so the 2/1 Piker is 4/1 on each" (S.powerToughnessOf victim spending, S.powerToughnessOf victim sparing) (Just (4, 1), Just (4, 1))
+        -- And that the Treasure was really there to be chosen, so the second run's
+        -- "no deathtouch" is the answer and not an empty offer.
+        Spec.assertBool s (Set.member treasure (GameState.battlefield armed)) "setup: the first ability really made a Treasure, so both answerers were offered it"
+        Spec.assertBool s (not (Set.member treasure (GameState.battlefield spending))) "setup: the run that spent it sacrificed it, and the run that spared it did not"
+        Spec.assertBool s (Set.member treasure (GameState.battlefield sparing)) "setup: the Treasure survives the run that spared it"
+      _ -> Spec.assertFailure s "Forsworn Paladin should print two activated abilities"
+
+  -- The record itself, off the ABILITY OBJECT rather than off the permanent --
+  -- which the case above reads only through its consequence. The Paladin is the
+  -- control: it was never cast on this board, so an activation that recorded
+  -- against its source would show up here as a non-empty record.
+  Spec.it s "CR 400.7d an activation's record goes on the ability object, not on its source" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    paladin <- S.printingOf s registry "Forsworn Paladin"
+    piker <- S.printingOf s registry "Goblin Piker"
+    case Face.activatedAbilities (S.combinedFace paladin) of
+      makeTreasure : pump : _ -> do
+        let (paladinId, g1) = S.addCreature paladin S.alice (S.landsInPlay swamp 6)
+            (_, g2) = S.addCreature piker S.bob g1
+            armed = S.runPure S.identityAnswer g2 (Activate.activateAbility S.alice paladinId makeTreasure *> Stack.resolveTop)
+            treasure = treasureIn armed
+            onStack = S.runPure (aimedAtSpending paladinId treasure) armed (Activate.activateAbility S.alice paladinId pump)
+            abilityId = case GameState.stack onStack of
+              oid : _ -> oid
+              [] -> ObjectId.MkObjectId 0
+            tagsOn oid gs = foldMap ManaUnit.tags (foldMap (Mana.Type.unwrap . Object.manaSpent) (Game.lookupObject oid gs))
+        Spec.assertEqWith s "the ability object remembers a Treasure tag" (tagsOn abilityId onStack) (Set.singleton ProductionTag.Treasure)
+        Spec.assertEqWith s "and the Paladin, whose ability it is, remembers nothing" (tagsOn paladinId onStack) Set.empty
+        Spec.assertEqWith s "and three mana paid the {2}{B}" (length (foldMap (Mana.Type.unwrap . Object.manaSpent) (Game.lookupObject abilityId onStack))) 3
+        Spec.assertBool s (abilityId /= paladinId) "setup: CR 602.2a's ability object is not the permanent whose ability it is"
+      _ -> Spec.assertFailure s "Forsworn Paladin should print two activated abilities"
+
+-- CR 601.2c's target aimed at `victim` and CR 602.2b's mana window aimed at the
+-- Treasure -- the two choices Forsworn Paladin's second ability offers, answered
+-- in one interpreter so the pair of runs below can differ in the second alone.
+--
+-- The offer is FILTERED and not answered with a hand-built recipient (S.preferring),
+-- so a slot that never offered the Piker takes the fallback rather than the
+-- assertion's own object.
+aimedAtSpending :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAtSpending victim wanted p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> Recipient.objectOf r == Just victim) sets
+  _ -> prefersSource wanted p
+
+-- aimedAtSpending's twin, differing in the mana source alone.
+aimedAtSparing :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAtSparing victim unwanted p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> Recipient.objectOf r == Just victim) sets
+  _ -> avoidsSource unwanted p
+
+-- The Treasure token on the battlefield, or a placeholder id that reads as
+-- nothing -- bergStriderOn's shape, so a board where the first ability never
+-- resolved answers empty rather than throwing.
+treasureIn :: GameState.GameState -> ObjectId.ObjectId
+treasureIn gs =
+  let isTreasure oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Treasure Token")
+   in case filter isTreasure (Set.toAscList (GameState.battlefield gs)) of
+        oid : _ -> oid
+        [] -> ObjectId.MkObjectId 0

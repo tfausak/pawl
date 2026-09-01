@@ -700,12 +700,14 @@ data Object = MkObject
     -- printed no Phyrexian symbol or whose controller announced mana for all of
     -- them.
     phyrexianLifePaid :: Natural.Natural,
-    -- | CR 107.4h with CR 601.2h: the mana that was SPENT to pay the cost of
-    -- casting the SPELL that became this object -- the record CR 107.4h's third
-    -- sentence needs, "the {S} symbol can also be used to refer to mana of any
-    -- type produced by a snow source spent to pay a cost". Berg Strider's "if
-    -- {S} was spent to cast this spell" is the one reader, through
-    -- Pawl.Engine.Filter.View's `manaSpentTags` and Quantity.SnowWasSpent.
+    -- | CR 107.4h with CR 601.2h and CR 602.2b: the mana that was SPENT to pay
+    -- the cost of casting the SPELL that became this object, or of activating the
+    -- CR 602.2a ABILITY this object is -- the record CR 107.4h's third sentence
+    -- needs, "the {S} symbol can also be used to refer to mana of any type
+    -- produced by a snow source spent to pay a cost". Berg Strider's "if {S} was
+    -- spent to cast this spell" and Forsworn Paladin's "if mana from a Treasure
+    -- was spent to activate this ability" are the readers, through
+    -- Pawl.Engine.Filter.View's `manaSpentTags` and Quantity.TagWasSpent.
     --
     -- THE UNITS and not the answer to one question. Pawl.Types.ManaUnit already
     -- carries everything a card can ask about a mana it was paid with -- the
@@ -713,9 +715,12 @@ data Object = MkObject
     -- and "what colour was it?" (Boreal Outrider, #2008) as reads rather than as
     -- fields.
     --
-    -- Written by Pawl.Engine.Cost.payMana, which knows WHICH spell it is paying
-    -- for (its `casting` argument) and restores the whole state when the cost
-    -- goes unpaid, so a rejected cast records nothing.
+    -- Written by Pawl.Engine.Cost.payMana, whose caller names the object to
+    -- record against (its `record` argument), and which restores the whole state
+    -- when the cost goes unpaid, so a rejected cast records nothing. An
+    -- ACTIVATION's units land on the ability object and never on its source, whose
+    -- own record is the cast's -- Pawl.ManaSpec's "CR 400.7d an activation's
+    -- record goes on the ability object, not on its source" is the proof.
     --
     -- `kicked` above's exception, and rule 400.7d names this field's contents
     -- outright: an ability of a permanent may reference "what mana was spent to
@@ -723,12 +728,6 @@ data Object = MkObject
     -- Pawl.Engine.Event.changeZoneAttaching carries it across that one move and
     -- newIncarnation forgets it everywhere else -- which is what Berg Strider
     -- needs, its clause being an ability of the PERMANENT.
-    --
-    -- Not implemented: an ACTIVATION cost's mana is not recorded --
-    -- Pawl.Engine.Cost's recordSpent writes this through
-    -- Pawl.Types.PaymentSubject.castOf, which answers only for a spell being
-    -- cast (#2404). The narrowing is at castOf, not for want of somewhere to
-    -- write it: PaymentSubject.Activating carries the source's id.
     --
     -- Empty for every object nothing was spent on: a token, a permanent an
     -- effect put onto the battlefield, and every spell whose cost was free.

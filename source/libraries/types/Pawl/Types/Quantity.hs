@@ -13,6 +13,7 @@ import qualified Pawl.Types.ManaCount as ManaCount
 import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Plus as Plus
+import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.SlotName as SlotName
 
 -- | A number that may not be a literal number.
@@ -431,26 +432,24 @@ data Quantity
     --
     -- A LEAF: it holds no Quantity.
     TimesKickedWith (Cost.Cost Keyword.Keyword)
-  | -- | CR 107.4h's third sentence: was any mana produced by a snow source spent
-    -- to cast the spell this quantity is evaluated against? 1 if so and 0 if not
-    -- -- Berg Strider's "if {S} was spent to cast this spell".
+  | -- | Was any mana carrying this production tag spent to pay for the object
+    -- this quantity is evaluated against? 1 if so and 0 if not -- CR 107.4h's
+    -- third sentence for Berg Strider's "if {S} was spent to cast this spell",
+    -- and Forsworn Paladin's "if mana from a Treasure was spent to activate this
+    -- ability".
     --
     -- WasKicked above in every structural respect, CR 400.7d included: what the
     -- permanent's own triggered ability asks about is the spell that became it,
-    -- and Pawl.Types.Object's `manaSpent` is where that record is kept.
-    --
-    -- CARRIES NOTHING, rather than naming which production tag it asks about:
-    -- Pawl.Types.ProductionTag has one constructor, so the payload would be a
-    -- choice with a single member. It grows into one when a second tag gets a
-    -- retrospective reading of its own.
+    -- and Pawl.Types.Object's `manaSpent` is where that record is kept. CR 602.2a
+    -- puts an activated ability on the stack as an object, so an ACTIVATION's
+    -- record is kept there and reached with AgainstSlot below.
     --
     -- Not the spent mana's COLOUR. Boreal Outrider's "if {S} of any of that
-    -- spell's colors was spent to cast it" does ask that, and it asks it about
-    -- ANOTHER spell rather than about itself, so it wants two things this atom
-    -- has not got (#2008).
+    -- spell's colors was spent to cast it" does ask that, which is a conjunction
+    -- over one unit rather than a tag this atom could name (#2008).
     --
     -- A LEAF: it holds no Quantity.
-    SnowWasSpent
+    TagWasSpent ProductionTag.ProductionTag
   | -- | CR 111.6 / 608.2h: was the object this quantity is evaluated against a
     -- token? 1 if so and 0 if not -- Sunpearl Kirin's "if it was a token", asked
     -- of a permanent the same resolution has just moved to a hidden zone, which

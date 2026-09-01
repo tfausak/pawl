@@ -102,7 +102,7 @@ ignore pid oid = do
   case ignoreCostOf oid before of
     Nothing -> pure ()
     Just cost -> do
-      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither ManaSpending.AsProduced pid oid cost
+      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid cost
       case payment of
         Payment.Unpaid -> State.put before
         -- The payment's bound slots are dropped: CR 116.2d's special action puts
