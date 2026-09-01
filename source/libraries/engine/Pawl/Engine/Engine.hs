@@ -812,9 +812,9 @@ placeBorne srcId pending = do
       -- CR 603.3d: targets for the chosen mode(s) only, chosen as the ability is
       -- placed. A mode with no target slots asks nothing.
       --
-      -- Not implemented: Target.selectionLegal's joint check, which is what
-      -- judges an answer whose slots read each other as CR 601.2c's one act
-      -- (#2472). Every such slot in the pool is on a spell.
+      -- Not implemented: Target.jointlyCoherent, which is what judges an answer
+      -- whose slots read each other as CR 601.2c's one act (#2472). Every such
+      -- slot in the pool is on a spell.
       let slots = Modal.modesTargetSlots chosenModes modal
           sets = Target.legalSets (Just controller) bound srcId slots gs
       -- Zero, there being no announcement to read: CR 601.2b's is made while

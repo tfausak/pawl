@@ -70,12 +70,19 @@ isVanguardFace face = Set.member CardType.Vanguard (TypeLine.types (Face.typeLin
 isVanguard :: ObjectId -> GameState -> Bool
 isVanguard oid gs = maybe False isVanguardFace (Game.faceOf oid gs)
 
--- | CR 113.6p: do this command-zone object's printed abilities function from
--- there? An emblem's do (CR 114.4) and a face-up vanguard card's do (CR 902.7 \/
--- 313.4); everything else in the zone falls back on CR 113.6's own default, which
--- leaves a card's abilities functioning on the battlefield -- so a commander
--- sitting there does nothing, and Pawl.CommanderSpec's "CR 113.6 a commander's
--- static ability does not function from the command zone" is what proves it.
+-- | CR 113.6p: does an ability that STATES NO ZONE function here because of what
+-- this command-zone object is? An emblem's does (CR 114.4) and a face-up vanguard
+-- card's does (CR 902.7 \/ 313.4); everything else falls back on CR 113.6's own
+-- default, which leaves a card's abilities functioning on the battlefield -- so a
+-- commander's unstated row does nothing here, and Pawl.CommanderSpec's "CR 113.6
+-- a commander's static ability does not function from the command zone" is what
+-- proves it.
+--
+-- ONLY the unstated ones. CR 113.6b is a limb of rule 113.6's list beside 113.6p
+-- rather than under it, so a row that names the command zone functions there
+-- whatever the object is -- Grist, the Hunger Tide as a commander -- and every
+-- caller asks this after the row's own stated set, never before it. Callers that
+-- do not are elisions carrying an issue; see #2904.
 --
 -- A CLASSIFICATION and never an identity: the emblem arm reads
 -- Pawl.Types.Source's own tag and the vanguard arm reads the printed card type.

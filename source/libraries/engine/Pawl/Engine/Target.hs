@@ -1393,7 +1393,7 @@ selectionLegal :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectI
 selectionLegal perspective seed source x slots sets chosen gs =
   Set.isSubsetOf (Map.keysSet chosen) (Map.keysSet sets)
     && and (Map.elems (Map.mapWithKey slotLegal slots))
-    && and (Map.elems (Map.mapWithKey coherent (Map.filter (jointlyJudged (Map.keysSet slots)) slots)))
+    && jointlyCoherentGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective seed source slots chosen gs
   where
     pcs = Projection.projectAll gs
     caps = slotCapacities x slots sets gs
@@ -1418,10 +1418,94 @@ selectionLegal perspective seed source x slots sets chosen gs =
           demanded = TargetCount.least (SlotCount.at x (TargetSlot.count targetSlot))
           size = Natural.length picked
        in Set.isSubsetOf picked legal && size >= demanded && size <= hi
+
+-- CR 601.2c's JOINT CHECK on its own: every jointly judged slot re-derived
+-- against what the whole announcement chose, under `seed`. Two callers, and
+-- between them the moments an announcement over declared slots is accepted --
+-- selectionLegal above (CR 601.2e's cast and CR 602.2's activation), and
+-- Pawl.Engine.Resolve.chooseNewTargetsFor (CR 707.10c's re-target). The
+-- re-derivation is exactly the one CR 608.2b will make at resolution, so a
+-- selection this admits cannot be one resolution then drops.
+--
+-- Only the WHICH question, never the how many: a count is measured against
+-- slotCapacities by the caller that has one, and CR 707.10c's caller has no
+-- count to judge at all.
+jointlyCoherent :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
+jointlyCoherent perspective seed source slots chosen gs =
+  let pcs = Projection.projectAll gs
+   in jointlyCoherentGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective seed source slots chosen gs
+
+-- The same answer on a board the caller already walked -- see
+-- legalRecipientsGiven.
+jointlyCoherentGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
+jointlyCoherentGiven pcs grants pools perspective seed source slots chosen gs =
+  and (Map.elems (Map.mapWithKey coherent (Map.filter (jointlyJudged (Map.keysSet slots)) slots)))
+  where
+    bindings = Map.union (fmap Binding.toRecipients chosen) seed
     coherent slot targetSlot =
       Set.isSubsetOf
         (Map.findWithDefault Set.empty slot chosen)
-        (legalRecipientsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective False (Map.union (fmap Binding.toRecipients chosen) seed) source targetSlot gs)
+        (legalRecipientsGiven pcs grants pools perspective False bindings source targetSlot gs)
+
+-- CR 601.2c: is there ONE announcement that fills every slot's minimum at once,
+-- rather than a minimum each slot can meet by itself? The filter half of
+-- jointlyJudged is what makes the two questions differ -- Fall of the Hammer's
+-- victim slot excludes whatever its dealer slot names, so a board holding one
+-- creature fills each slot alone and no announcement at all.
+--
+-- The POOL half is not asked here: slotCapacities already narrows a
+-- ZoneScope.InSlot slot to what one coherent answer could reach, and the caller
+-- measures against that.
+--
+-- A SEARCH rather than a number: the slots some declared filter
+-- names are assigned every subset of their minimum size, and an assignment
+-- passes when every reading slot then still has its own minimum available (and,
+-- where a reader was itself assigned, holds what it was assigned). A slot naming
+-- nothing is left out of the enumeration, its own set already being exact. Cards
+-- with such a filter are rare and their slots count one apiece, so the product is
+-- a handful of re-derivations; modes with no such filter pay one Map.filter.
+--
+-- Not implemented: an announcement ABOVE a slot's minimum, which a sibling
+-- reading a slot POSITIVELY (Filter.IsBound and its neighbours) could need --
+-- taking two where one is demanded widens the reader rather than narrowing it,
+-- so a mode fillable only at the larger announcement is refused here (#2905).
+-- Every slot a sibling filter names in `data/cards/` is counted exactly one --
+-- Bioshift's and Fate Transfer's `from`, Fall of the Hammer's `dealer`,
+-- Resourceful Defense's `from` -- where the minimum IS the whole range and the
+-- enumeration is therefore complete.
+jointlyFillableGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
+jointlyFillableGiven pcs grants pools perspective seed source slots sets gs =
+  Map.null readers || any coherent assignments
+  where
+    reads_ slot = Set.intersection (Map.keysSet slots) (foldMap Filter.boundSlots (TargetSlot.filter slot))
+    readers = Map.filter (not . Set.null . reads_) slots
+    -- The slots being ENUMERATED: the ones a reader names, a reader that is
+    -- itself named included.
+    named = Map.restrictKeys slots (foldMap reads_ readers)
+    demanded slot = TargetCount.least (SlotCount.at 0 (TargetSlot.count slot))
+    legalOf name = Map.findWithDefault Set.empty name sets
+    assignments =
+      List.foldr
+        (\(name, slot) rest -> [Map.insert name option m | option <- subsetsOfSize (demanded slot) (legalOf name), m <- rest])
+        [Map.empty]
+        (Map.toList named)
+    coherent chosen =
+      let bindings = Map.union (fmap Binding.toRecipients chosen) seed
+          admits name slot =
+            let legal = legalRecipientsGiven pcs grants pools perspective True bindings source slot gs
+             in Set.isSubsetOf (Map.findWithDefault Set.empty name chosen) legal
+                  && Natural.length legal >= demanded slot
+       in and (Map.elems (Map.mapWithKey admits readers))
+
+-- The subsets of exactly this size, ascending, which is the shape the search
+-- above enumerates one slot's candidate answers in. Empty when the set is
+-- smaller than the size asked for, since no answer of that size exists.
+subsetsOfSize :: (Ord a) => Natural -> Set a -> [Set a]
+subsetsOfSize n xs
+  | n == 0 = [Set.empty]
+  | otherwise = case Set.minView xs of
+      Nothing -> []
+      Just (h, t) -> fmap (Set.insert h) (subsetsOfSize (n - 1) t) <> subsetsOfSize n t
 
 -- CR 700.2a: the mode indices every one of whose target slots can be filled --
 -- that is, has at least as many legal recipients as its count demands (a mode
@@ -1431,11 +1515,10 @@ selectionLegal perspective seed source x slots sets chosen gs =
 -- (Activate/Engine).
 --
 -- Each slot is asked against slotCapacities, which is what a single coherent
--- announcement could reach through the slot's own POOL. Not implemented:
--- narrowing a mode's fillability across slots that exclude each other through a
--- FILTER (Fall of the Hammer's, through selectionLegal's joint check), so that
--- mode is judged fillable off a board holding one creature and the cast is then
--- reversed at CR 601.2e (#2803).
+-- announcement could reach through the slot's own POOL, and then the mode as a
+-- whole is asked against jointlyFillableGiven, which is the FILTER half -- Fall
+-- of the Hammer is unfillable off a board holding one creature, rather than
+-- fillable slot by slot and reversed at CR 601.2e.
 --
 -- `extra` is the slots EVERY mode carries in addition to its own -- CR 303.4a's
 -- enchant slot, declared by the card rather than by a mode, which castability
@@ -1489,6 +1572,7 @@ fillableModesGiven pcs grants pools perspective seed source extra modal gs =
             -- the MINIMUM its count demands. An "up to one" slot with no legal
             -- recipient demands none, and is answered with zero targets.
             if or (Map.elems (Map.intersectionWith short slots (slotCapacities 0 slots sets gs)))
+              || not (jointlyFillableGiven pcs grants pools perspective seed source slots sets gs)
               then Nothing
               else Just (ModeIndex.MkModeIndex i)
       -- CR 601.2b's X=0 FLOOR, the value every castability and activation gate

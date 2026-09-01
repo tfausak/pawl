@@ -62,6 +62,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -80,6 +81,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -177,6 +179,41 @@ designationSpec s registry = Spec.describe s "Designation" $ do
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Indestructible pikerId board)) "her Piker is not indestructible while the Walls sits in the command zone"
     Spec.assertBool s (Projection.hasKeyword Keyword.Indestructible pikerId played) "and is once a Walls is on the battlefield beside it"
     Spec.assertEqWith s "setup: the command zone holds the Walls on both boards" (fmap (length . inCommandZone) [board, played]) [1, 1]
+  -- CR 113.6b, the OTHER exception this walk has to keep: "an ability that states
+  -- which zones it functions in functions only from those zones". It sits beside
+  -- CR 113.6p in rule 113.6's list rather than under it, so the object's own kind
+  -- decides nothing once a row names a zone. Grist, the Hunger Tide ({1}{B}{G}
+  -- Legendary Planeswalker -- Grist, "As long as Grist isn't on the battlefield,
+  -- it's a 1/1 Insect creature in addition to its other types" -- checked
+  -- against Scryfall, 2026-09-01) is an ordinary commander whose row states this
+  -- zone, so it is a creature there; CR 113.6c is the negative form that row
+  -- expresses, the same one Pawl.ProjectionSpec reads in a hand and on the stack.
+  --
+  -- ONE board carrying BOTH commanders, so the two limbs are told apart on a
+  -- single game rather than across boards that differ in more than the rule:
+  -- alice's Grist states the command zone and functions there, bob's Walls states
+  -- nothing and does not. Without the second half a walk that simply stopped
+  -- gating would pass.
+  Spec.it s "CR 113.6b/113.6c a commander's ability that states the command zone functions from there" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    grist <- S.printingOf s registry "Grist, the Hunger Tide"
+    walls <- S.printingOf s registry "The Walls of Ba Sing Se"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let deckFor c = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just c, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty}
+        seated = S.runPure S.identityAnswer (commanderBoard mountain grist 0) (Setup.createDeck S.bob (deckFor walls))
+        (pikerId, board) = S.addCreature piker S.bob seated
+        (_, played) = S.addCreature walls S.bob board
+    case (Game.zoneMembers Zone.Command S.alice board, Game.zoneMembers Zone.Command S.bob board) of
+      ([gristId], [_]) -> do
+        Spec.assertEqWith s "CR 113.6b Grist is a 1/1 in the command zone" (S.powerToughnessOf gristId board) (Just (1, 1))
+        Spec.assertBool s (Set.member CardType.Creature (Projection.cardTypesOf gristId board)) "and a creature there"
+        Spec.assertBool s (Set.member Subtype.Type.Insect (Projection.subtypesOf gristId board)) "an Insect one, CR 205.1b keeping its printed Grist type beside it"
+        Spec.assertBool s (Set.member Subtype.Type.Grist (Projection.subtypesOf gristId board)) "which it still has"
+        -- The other limb on the same board: the Walls states no zone, so CR 113.6p
+        -- decides, and a commander is not on that list.
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Indestructible pikerId board)) "bob's Piker is not indestructible from a Walls in bob's command zone"
+        Spec.assertBool s (Projection.hasKeyword Keyword.Indestructible pikerId played) "and is once a Walls is on the battlefield beside it"
+      _ -> Spec.assertFailure s "expected one commander in each command zone"
 
 castSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 castSpec s registry = Spec.describe s "Cast" $ do

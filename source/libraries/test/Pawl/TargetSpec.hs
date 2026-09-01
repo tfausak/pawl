@@ -74,6 +74,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural.Type
+import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Damage as Damage
@@ -1897,12 +1898,45 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
       (Set.fromList (fmap Recipient.ToCreature [dealerId, wallId, ratsId]))
     Spec.assertEqWith s "and the dealer slot only alice's two" (slotNamed "dealer") (Set.fromList (fmap Recipient.ToCreature [dealerId, wallId]))
 
-  -- The case above put CR 601.2c's "another" on a card chosen once. CR 700.2d
-  -- puts it on a card whose mode may be chosen twice, and then the filter's slot
-  -- NAME has to follow the occurrence exactly as the key and the pool do -- read
-  -- under its printed name from occurrence 1 it names occurrence 0's dealer, and
-  -- the creature occurrence 1 itself named becomes a legal victim of its own
-  -- damage. Weaker than printed, in the caster's favour.
+  -- CR 601.2c through CR 700.2a: the case above's card, asked one step earlier.
+  -- A mode is fillable when SOME announcement fills every one of its slots, not
+  -- when each slot can be filled on its own -- so Fall of the Hammer off a board
+  -- holding exactly one creature is a spell with no legal announcement and is
+  -- never offered, rather than a cast proposed and reversed at CR 601.2e.
+  --
+  -- Reversal and unofferability are indistinguishable on the board afterwards --
+  -- both leave the spell in hand and the stack empty -- so the observable is
+  -- Action.legalActions, which is where CR 601.2e's cost lands.
+  --
+  -- TWO BOARDS differing in exactly ONE thing: whether bob has a creature. The
+  -- same two Mountains are untapped on both, so the refusal is not the mana, and
+  -- the same Piker is alice's only creature on both, so the dealer slot is
+  -- identical and the victim slot is the whole difference.
+  Spec.it s "CR 700.2a Fall of the Hammer is unfillable on a board holding one creature" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    rats <- S.printingOf s registry "Typhoid Rats"
+    hammer <- S.printingOf s registry "Fall of the Hammer"
+    let (dealerId, g1) = S.addCreature piker S.alice (S.landsInPlay mountain 2)
+        (alone, hammerId) = S.handOne hammer g1
+        (_, together) = S.addCreature rats S.bob alone
+        slots = Modal.allTargetSlots (Face.spell (S.combinedFace hammer))
+        offered = Target.legalSets (Just S.alice) Map.empty S.noSource slots alone
+        slotNamed name = Map.findWithDefault Set.empty (SlotName.MkSlotName (Text.pack name)) offered
+    Spec.assertBool s (not (any (S.isCastOf hammerId) (Action.legalActions S.alice alone))) "with only the Piker on the board, the cast is not offered at all"
+    Spec.assertBool s (any (S.isCastOf hammerId) (Action.legalActions S.alice together)) "and with bob's Rats beside it, the same spell off the same mana is offered"
+    -- The union posture, last and for the case above's reason: each slot still
+    -- has a candidate ON ITS OWN, so the refusal is the cross-slot search and not
+    -- a slot the change emptied.
+    Spec.assertEqWith s "the victim slot is offered the Piker by itself" (slotNamed "victim") (Set.singleton (Recipient.ToCreature dealerId))
+    Spec.assertEqWith s "and so is the dealer slot" (slotNamed "dealer") (Set.singleton (Recipient.ToCreature dealerId))
+
+  -- The two cases above put CR 601.2c's "another" on a card chosen once. CR
+  -- 700.2d puts it on a card whose mode may be chosen twice, and then the
+  -- filter's slot NAME has to follow the occurrence exactly as the key and the
+  -- pool do -- read under its printed name from occurrence 1 it names occurrence
+  -- 0's dealer, and the creature occurrence 1 itself named becomes a legal victim
+  -- of its own damage. Weaker than printed, in the caster's favour.
   --
   -- Synthetic Hammer Refrain {1}{R} Instant
   -- (data/cards/synthetic-hammer-refrain.json): "Choose two. You may choose the

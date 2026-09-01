@@ -3494,6 +3494,8 @@ defendingPlayerRestrictionSpec s registry = Spec.describe s "DefendingPlayerComb
 -- Creature -- Archon 5/6, "Flying / Creatures can't attack you." -- checked
 -- against Scryfall, 2026-09-01) is the pool's first, and CR 802.3a is the rule
 -- that says such a restriction reaches only the creatures attacking that player.
+-- Vow of Flight, at the foot of the group, is the pool's second, and names two
+-- of CR 506.3's three attackable things where the Archon names one.
 --
 -- Two seats throughout, deliberately: this is not a multiplayer rule. CR 508.1b
 -- makes a planeswalker its controller controls a SECOND announcement at two
@@ -3613,6 +3615,56 @@ aimedAttackRestrictionSpec s registry = Spec.describe s "AimedAttackRestriction"
         Spec.assertEqWith s "with the Archon protecting alice instead, the Piker's 2 and the Archon's 5 both land" (S.lifeOf S.bob control) (Just 13)
         Spec.assertEqWith s "and both were declared" (S.attackerDeclarationsOf control) [pikerId, archonId]
       _ -> Spec.assertFailure s "fixture should give alice a Piker and bob an Archon"
+
+  -- CR 506.3's OTHER attackable things. Vow of Flight ({2}{U} Enchantment --
+  -- Aura, "Enchant creature / Enchanted creature gets +2/+2, has flying, and
+  -- can't attack you or planeswalkers you control." -- checked against Scryfall,
+  -- 2026-09-01) names two of the three where Blazing Archon names one, so the
+  -- pair of cards is what tells the `kinds` field from a hardcoded OfPlayer.
+  --
+  -- Both boards carry a Jace with loyalty on them, since a planeswalker at zero
+  -- is a CR 704.5i casualty and the announcement would be about a board that
+  -- cannot exist.
+  Spec.it s "CR 506.3 the Vow bars bob's planeswalker too, where the Archon leaves it attackable" $ do
+    vow <- S.printingOf s registry "Vow of Flight"
+    archon <- S.printingOf s registry "Blazing Archon"
+    jace <- S.printingOf s registry "Jace Beleren"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (vowed, mine, theirs) = S.combatBoardOf [piker] [vow, jace]
+        (guarded, mineGuarded, theirsGuarded) = S.combatBoardOf [piker] [archon, jace]
+    case (mine, theirs, mineGuarded, theirsGuarded) of
+      ([pikerId], [vowId, jaceId], [otherPiker], [_, otherJace]) -> do
+        let board = S.attach vowId pikerId (S.addCounter CounterKind.Loyalty 3 jaceId vowed)
+            control = S.addCounter CounterKind.Loyalty 3 otherJace guarded
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(pikerId, AttackTarget.OfPlaneswalker jaceId)] board)) "CR 506.3: bob's planeswalker is off limits under the Vow"
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(otherPiker, AttackTarget.OfPlaneswalker otherJace)] control) "and attackable under the Archon, whose sentence names only the seat"
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(pikerId, AttackTarget.OfPlayer S.bob)] board)) "CR 508.1b: bob himself is off limits under the Vow"
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(otherPiker, AttackTarget.OfPlayer S.bob)] control)) "and under the Archon, which is the half the two cards share"
+        -- The fixture pin: the Aura has to be ON the Piker for Affected.Attached
+        -- to reach it, and its +2/+2 is the only thing on either board that says
+        -- so.
+        Spec.assertEqWith s "the Vow really is attached, so the 2/1 Piker is a 4/3" (S.powerToughnessOf pikerId board) (Just (4, 3))
+      _ -> Spec.assertFailure s "fixture should give alice a Piker and bob a Vow and a Jace on one board, an Archon and a Jace on the other"
+
+  Spec.it s "CR 506.3 whole cards: with both announcements barred the Piker is not declared at all" $ do
+    -- GAMEPLAY LEVEL, and the control differs in exactly one thing: who controls
+    -- the Vow. CR 109.5's "you" then names alice, so the Aura protects the
+    -- attacker's own seat and both of bob's announcements open back up.
+    vow <- S.printingOf s registry "Vow of Flight"
+    jace <- S.printingOf s registry "Jace Beleren"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = S.combatBoardOf [piker] [vow, jace]
+    case (mine, theirs) of
+      ([pikerId], [vowId, jaceId]) -> do
+        let board = S.attach vowId pikerId (S.addCounter CounterKind.Loyalty 3 jaceId gs)
+            after = S.runCombat S.aggressiveAnswer board
+            control = S.runCombat S.aggressiveAnswer (S.giveControl vowId S.alice board)
+        Spec.assertEqWith s "bob takes nothing" (S.lifeOf S.bob after) (Just 20)
+        Spec.assertEqWith s "and bob's Jace keeps its loyalty, the other announcement being barred too" (S.counterOf CounterKind.Loyalty jaceId after) 3
+        Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf after) []
+        Spec.assertEqWith s "with the Vow protecting alice instead, the enchanted Piker's 4 lands" (S.lifeOf S.bob control) (Just 16)
+        Spec.assertEqWith s "and it was declared" (S.attackerDeclarationsOf control) [pikerId]
+      _ -> Spec.assertFailure s "fixture should give alice a Piker and bob a Vow and a Jace"
 
 -- CR 802.3a: a restriction that applies to attacking a SPECIFIC PLAYER applies
 -- only to the creatures attacking that player. Armored Galleon ({4}{U} Creature

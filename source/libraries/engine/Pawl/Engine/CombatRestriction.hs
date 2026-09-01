@@ -13,13 +13,13 @@
 --
 -- The only module that may CASE on Pawl.Types.CombatRestriction.
 -- Pawl.Engine.Keyword constructs one -- rule 702.98a's unleash -- and reads none.
--- Pawl.Engine.Combat asks for a SET OF IDS, for a SET OF PAIRS, or for a NUMBER,
--- and never learns which card, or which keyword, produced any of them. The pairs
+-- Pawl.Engine.Combat asks for a SET OF IDS, for a SET OF ROWS, or for a NUMBER,
+-- and never learns which card, or which keyword, produced any of them. The rows
 -- are the two pairwise restrictions, which no set of creatures could state: CR
--- 509.1b's (cantBeBlockedBy) and CR 508.1c's aimed-at one (cantAttackPlayer).
--- The Filter that decides the first and the Pawl.Types.PlayerScope that decides
--- the second are both resolved here, so neither crosses into
--- Pawl.Engine.Combat.
+-- 509.1b's (cantBeBlockedBy), a pair, and CR 508.1c's aimed-at one
+-- (cantAttackPlayer), a triple carrying CR 506.3's kind beside the seat. The
+-- Filter that decides the first and the Pawl.Types.PlayerScope that decides the
+-- second are both resolved here, so neither crosses into Pawl.Engine.Combat.
 module Pawl.Engine.CombatRestriction where
 
 import qualified Data.List as List
@@ -41,6 +41,7 @@ import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
+import qualified Pawl.Types.AttackTargetKind as AttackTargetKind
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
@@ -285,13 +286,15 @@ blockedBy cr = case cr of
 -- The other PAIRWISE selector, one declaration over. Its own for `blockedBy`'s
 -- reason: what it answers is an Affected TOGETHER WITH the players those
 -- creatures may not be announced against, and an Affected alone would say "this
--- creature can't attack" full stop.
-attackingPlayer :: CombatRestriction.CombatRestriction -> Maybe (Affected.Affected, PlayerScope.PlayerScope)
+-- creature can't attack" full stop. CR 506.3's kinds ride along for the same
+-- reason: which announcements at that seat are barred is the rest of the
+-- sentence, not a second restriction.
+attackingPlayer :: CombatRestriction.CombatRestriction -> Maybe (Affected.Affected, PlayerScope.PlayerScope, Set AttackTargetKind.AttackTargetKind)
 attackingPlayer cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
-  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer a scope _) -> Just (a, scope)
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer a scope kinds _) -> Just (a, scope, kinds)
   CombatRestriction.CantAttackAlone {} -> Nothing
   CombatRestriction.CantAttackMoreThan {} -> Nothing
   CombatRestriction.CantBlockMoreThan {} -> Nothing
@@ -331,7 +334,7 @@ gate cr = case cr of
   CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless _ c) -> c
   CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless _ c) -> c
   CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ c) -> c
-  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ c) -> c
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ _ c) -> c
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ c) -> c
   CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ c) -> c
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ c) -> c
@@ -712,14 +715,20 @@ cantBeBlockedBy defending blockers attackers gs =
            in concatMap barred (filter (named source subject) attackers)
    in Set.fromList (concatMap fromRestriction (inForce defending gs))
 
--- CR 508.1c through CR 802.3a: which (creature, player) pairs an effect in force
--- right now forbids -- the creatures that may not be announced as attacking
--- those players (CR 508.1b). Blazing Archon's "creatures can't attack you" is
--- the pool's producer.
+-- CR 508.1c through CR 802.3a: which (creature, player, kind) rows an effect in
+-- force right now forbids -- the announcements a creature may not make against
+-- those players (CR 508.1b). Blazing Archon's "creatures can't attack you" and
+-- Vow of Flight's "can't attack you or planeswalkers you control" are the pool's
+-- producers.
 --
--- `cantBeBlockedBy`'s shape one declaration over, and a set of PAIRS for its
--- reason: the restriction is about a creature RELATIVE TO the player it may not
--- attack, so neither side is a set on its own. Computed once per declaration
+-- CR 506.3's kind is the third component and not a second call, because one
+-- printed sentence can name several: the row is the ANNOUNCEMENT it forbids, and
+-- Pawl.Engine.Combat.attackTargetKind is what turns an announcement back into
+-- one. Nothing of the source or of the printed wording survives into the answer.
+--
+-- `cantBeBlockedBy`'s shape one declaration over, and a set of TUPLES for its
+-- reason: the restriction is about a creature RELATIVE TO the announcement it
+-- may not make, so no side is a set on its own. Computed once per declaration
 -- pass and handed to every announcement check, and empty on every board stating
 -- no such restriction, `inForce` yielding nothing for the fold to reach.
 --
@@ -733,7 +742,7 @@ cantBeBlockedBy defending blockers attackers gs =
 -- word of a printed sentence with another, and a PlayerScope prints no word a
 -- text-changing effect reaches. The affected set is rewritten as `restricted`
 -- rewrites it, both halves being words on the source's card.
-cantAttackPlayer :: [ObjectId] -> [PlayerId] -> GameState -> Set (ObjectId, PlayerId)
+cantAttackPlayer :: [ObjectId] -> [PlayerId] -> GameState -> Set (ObjectId, PlayerId, AttackTargetKind.AttackTargetKind)
 cantAttackPlayer candidates players gs =
   let rows = gathered gs
       named source affected creature =
@@ -745,14 +754,14 @@ cantAttackPlayer candidates players gs =
           gs
       fromRestriction player (source, changes, restriction) = case attackingPlayer restriction of
         Nothing -> []
-        Just (affected, scope) ->
+        Just (affected, scope, kinds) ->
           let subject = if null changes then affected else Projection.rewriteAffected changes affected
               barred = case Projection.controllerOf source gs of
                 Nothing -> []
                 Just you -> filter (\pid -> PlayerEffect.inScope pid you gs scope) [player]
-           in [(creature, pid) | creature <- filter (named source subject) candidates, pid <- barred]
+           in [(creature, pid, kind) | creature <- filter (named source subject) candidates, pid <- barred, kind <- Set.toList kinds]
       -- CR 508.5 through CR 802.3a: this arm's own gate is read at the seat the
-      -- pair names, which is the player being attacked and so the defending player
+      -- row names, which is the player being attacked and so the defending player
       -- of that announcement. One gather, one gate reading per seat,
       -- cantAttackDefender's shape. No printing gates this arm today.
       forSeat player = concatMap (fromRestriction player) (filter (not . lifted (Just player) gs) rows)
