@@ -462,6 +462,17 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (kicker 4)
       " {\"type\":\"Kicker\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":4}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (kicker 4) /= Codec.encode Keyword.codec (flashbackOf 4)) "kicker {4} is not flashback {4}"
+  -- CR 702.33c's payload is the same Cost, and the two must not share a tag: the
+  -- announcement kicker asks once is the one multikicker asks any number of times.
+  Spec.it s "Multikicker carries its cost, and is not Kicker" $ do
+    let kicker n = Keyword.Kicker (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+        multikicker n = Keyword.Multikicker (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (multikicker 2)
+      " {\"type\":\"Multikicker\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (multikicker 2) /= Codec.encode Keyword.codec (kicker 2)) "multikicker {2} is not kicker {2}"
   -- CR 702.42a's payload is a whole Cost too, and it must not share Flashback's
   -- tag.
   Spec.it s "Entwine carries its cost, and is not Flashback" $ do

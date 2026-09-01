@@ -778,7 +778,7 @@ mintCard pid under printingId dest position gs =
             Object.classLevel = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
-            Object.kicked = False,
+            Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
@@ -901,7 +901,7 @@ createEmblem pid card = do
             Object.classLevel = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
-            Object.kicked = False,
+            Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
@@ -3920,16 +3920,16 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- the permanent is what enters.
                     --
                     -- So this is `announcedX` above's second instance rather than
-                    -- a new idea: `newIncarnation` has just cleared the flag with
+                    -- a new idea: `newIncarnation` has just cleared the record with
                     -- everything else CR 400.7 forgets, and the exception the rule
                     -- names is written back here, off the departing object.
                     --
                     -- BATTLEFIELD ONLY, and here the gate carries weight where
                     -- announcedX's does not: a kicked spell countered on its way
                     -- to a graveyard becomes a card, and rule 400.7d speaks only
-                    -- about a permanent. Nothing else reads the flag off an object
-                    -- outside the stack.
-                    Object.kicked = Object.kicked obj && dest == Zone.Battlefield,
+                    -- about a permanent. Nothing else reads the record off an
+                    -- object outside the stack.
+                    Object.kicked = if dest == Zone.Battlefield then Object.kicked obj else Map.empty,
                     -- CR 702.103b: "these effects last until the SPELL OR THE
                     -- PERMANENT IT BECOMES ceases to be bestowed", so the
                     -- designation crosses this one move with the object the rule
@@ -5130,7 +5130,7 @@ createTokens controller card copy n tapped entering = do
                     Object.classLevel = Nothing,
                     Object.unlockedHalves = Set.empty,
                     Object.designations = Set.empty,
-                    Object.kicked = False,
+                    Object.kicked = Map.empty,
                     Object.bestowed = False,
                     Object.phyrexianLifePaid = 0,
                     Object.manaSpent = Mana.MkMana [],
@@ -5283,7 +5283,7 @@ meld controller victims resultCard = do
                 Object.classLevel = Nothing,
                 Object.unlockedHalves = Set.empty,
                 Object.designations = Set.empty,
-                Object.kicked = False,
+                Object.kicked = Map.empty,
                 Object.bestowed = False,
                 Object.phyrexianLifePaid = 0,
                 Object.manaSpent = Mana.MkMana [],

@@ -669,11 +669,19 @@ data Prompt r where
   -- announced (CR 601.2f). One question rather than two, that rule being one
   -- sentence, so it is asked BEFORE ChooseModes, which then has nothing to ask.
   ChooseEntwine :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost Keyword.Keyword -> Prompt EntwineDecision.EntwineDecision
-  -- | CR 702.33a: whether this player pays the kicker cost. The Cost is what
-  -- kicking adds on top of the candidate cost then announced (CR 601.2f). Asked
-  -- after ChooseModes and before ChooseCost, CR 601.2b's own order; unlike
-  -- ChooseEntwine it changes no mode choice.
-  ChooseKicker :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost Keyword.Keyword -> Prompt KickerDecision.KickerDecision
+  -- | CR 702.33a: how many times this player pays ONE of the spell's kicker
+  -- costs. The Cost is what each payment adds on top of the candidate cost then
+  -- announced (CR 601.2f). Asked after ChooseModes and before ChooseCost, CR
+  -- 601.2b's own order; unlike ChooseEntwine it changes no mode choice. A spell
+  -- with two kicker costs (CR 702.33b) is asked once per cost, so the Cost is
+  -- what tells the two questions apart.
+  --
+  -- The Natural is the LIMIT: one for rule 702.33a's kicker, and Nothing for
+  -- 702.33c's multikicker, which the rule makes payable "any number of times".
+  -- Advisory only in the sense ChooseX's ceiling is not: an answer past a stated
+  -- limit is text the card does not have, so Pawl.Engine.Cast rejects the cast
+  -- rather than clamping it.
+  ChooseKicker :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost Keyword.Keyword -> Maybe Natural.Natural -> Prompt KickerDecision.KickerDecision
   -- | CR 903.9a: this player's commander is in a graveyard or exile, having
   -- arrived since the last state-based action check. The rule is a "may", so
   -- the object stays put if they decline and is not asked again until it moves

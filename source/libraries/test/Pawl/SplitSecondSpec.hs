@@ -311,8 +311,8 @@ grantedSpec s registry =
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       prodigal <- S.printingOf s registry "Prodigal Sorcerer"
       let b = board mountain moltenDisaster lightningBolt prodigal
-          declined = castDisaster KickerDecision.Declines b
-          kicked = castDisaster KickerDecision.Kicks b
+          declined = castDisaster (KickerDecision.MkKickerDecision 0) b
+          kicked = castDisaster (KickerDecision.MkKickerDecision 1) b
       Spec.assertEqWith s "control: the unkicked spell is on the stack" (length (GameState.stack declined)) 1
       Spec.assertEqWith s "and so is the kicked one, so neither board is empty-handed" (length (GameState.stack kicked)) 1
       Spec.assertBool s (elem (castOf (bobBolt b) lightningBolt) (Action.legalActions S.bob declined)) "control: unkicked, bob's Bolt is offered"
@@ -325,8 +325,8 @@ grantedSpec s registry =
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       prodigal <- S.printingOf s registry "Prodigal Sorcerer"
       let b = board mountain moltenDisaster lightningBolt prodigal
-          declined = castDisaster KickerDecision.Declines b
-          kicked = castDisaster KickerDecision.Kicks b
+          declined = castDisaster (KickerDecision.MkKickerDecision 0) b
+          kicked = castDisaster (KickerDecision.MkKickerDecision 1) b
           activationsOf gs = filter isActivate (Action.legalActions S.bob gs)
       Spec.assertEqWith s "control: unkicked, the Sorcerer's ability is offered" (length (activationsOf declined)) 1
       Spec.assertEqWith s "kicked, it is gone" (activationsOf kicked) []
@@ -346,7 +346,7 @@ grantedSpec s registry =
       let (pikerId, g1) = S.addCreature piker S.bob (S.landsInPlay mountain 8)
           (maidenId, g2) = S.addCreature birdMaiden S.bob g1
           (gs, spellId) = S.handOne moltenDisaster g2
-          answer = disaster KickerDecision.Declines
+          answer = disaster (KickerDecision.MkKickerDecision 0)
           cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
           resolved = snd (Engine.runGamePure answer cast Stack.resolveTop)
       Spec.assertEqWith s "1 marked on the Goblin Piker, which has no flying" (S.damageOf pikerId resolved) (Just 1)

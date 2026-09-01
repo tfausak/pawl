@@ -201,17 +201,24 @@ combatReplaySpec s =
                   { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]),
                     Cost.Type.components = []
                   }
-              p = Prompt.ChooseKicker decider S.alice oid kickerCost
+              p = Prompt.ChooseKicker decider S.alice oid kickerCost (Just 1)
           Spec.assertEqWith
             s
             "kicking round trips"
-            (Replay.decode p (Replay.encode p KickerDecision.Kicks))
-            (Just KickerDecision.Kicks)
+            (Replay.decode p (Replay.encode p (KickerDecision.MkKickerDecision 1)))
+            (Just (KickerDecision.MkKickerDecision 1))
+          -- CR 702.33c: the COUNT is what the transcript carries, so a multikicker
+          -- answer past one has to survive the round trip as itself.
+          Spec.assertEqWith
+            s
+            "a multikicker count round trips as that count"
+            (Replay.decode p (Replay.encode p (KickerDecision.MkKickerDecision 3)))
+            (Just (KickerDecision.MkKickerDecision 3))
           Spec.assertEqWith
             s
             "declining round trips"
-            (Replay.decode p (Replay.encode p KickerDecision.Declines))
-            (Just KickerDecision.Declines)
+            (Replay.decode p (Replay.encode p (KickerDecision.MkKickerDecision 0)))
+            (Just (KickerDecision.MkKickerDecision 0))
           -- Discriminating: fails if ChooseKicker reuses the entwine
           -- announcement rather than getting its own constructor.
           Spec.assertEqWith
@@ -234,9 +241,10 @@ combatReplaySpec s =
                       { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]),
                         Cost.Type.components = []
                       }
+                    (Just 1)
                 )
             )
-            KickerDecision.Declines
+            (KickerDecision.MkKickerDecision 0)
         Spec.it s "ChooseCopyTarget records and replays a Maybe ObjectId" $ do
           let p = Prompt.ChooseCopyTarget decider S.alice oid [ObjectId.MkObjectId 7]
               answer = Just (ObjectId.MkObjectId 7)

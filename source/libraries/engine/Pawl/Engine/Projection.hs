@@ -957,7 +957,7 @@ viewOfCard face =
           -- CR 716.2b gives a level to a PERMANENT, and this builder describes a
           -- printed face.
           Filter.classLevel = Nothing,
-          Filter.kicked = False,
+          Filter.kicked = Map.empty,
           -- CR 601.2h pays the cost of a SPELL, and this builder describes a
           -- printed face.
           Filter.manaSpentTags = Set.empty,
@@ -1321,9 +1321,9 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- the read, which is what a CR 608.2h asker gets for a permanent that is
       -- gone.
       Filter.classLevel = Game.lookupObject oid gs >>= Object.classLevel,
-      -- CR 702.33d: read live off the object, so the CR 608.2h path answers False
-      -- for a spell that has left the stack.
-      Filter.kicked = maybe False Object.kicked (Game.lookupObject oid gs),
+      -- CR 702.33d: read live off the object, so the CR 608.2h path answers "not
+      -- kicked" for a spell that has left the stack.
+      Filter.kicked = foldMap Object.kicked (Game.lookupObject oid gs),
       -- CR 400.7d / CR 107.4h: read live off the object like `kicked`, and
       -- flattened to the tags here because that is the whole of what the
       -- vocabulary asks (see the field's own comment in Pawl.Engine.Filter).
@@ -3056,6 +3056,11 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.HasDesignation _ -> quantity
   Quantity.Type.ClassLevel -> quantity
   Quantity.Type.WasKicked -> quantity
+  -- A LEAF like WasKicked above, and the Cost it names is deliberately NOT
+  -- rewritten: Pawl.Engine.Cast keys the record it stamps off the PRINTED face
+  -- (Game.faceOf), so rewriting the identifier here would ask about a cost no
+  -- announcement was ever recorded under.
+  Quantity.Type.TimesKickedWith _ -> quantity
   Quantity.Type.SnowWasSpent -> quantity
   Quantity.Type.WasToken -> quantity
   Quantity.Type.WasBlocking -> quantity
@@ -4520,6 +4525,7 @@ quantityReads q = case q of
   Quantity.Type.HasDesignation _ -> Set.empty
   Quantity.Type.ClassLevel -> Set.empty
   Quantity.Type.WasKicked -> Set.empty
+  Quantity.Type.TimesKickedWith _ -> Set.empty
   Quantity.Type.SnowWasSpent -> Set.empty
   Quantity.Type.WasToken -> Set.empty
   Quantity.Type.WasBlocking -> Set.empty

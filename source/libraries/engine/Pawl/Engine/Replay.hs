@@ -895,8 +895,9 @@ defaultAnswer p = case p of
   -- cast.
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
   -- CR 702.33a: kicker is a "may", so declining is always legal, and declining
-  -- costs no mana -- entwine's reason above, word for word.
-  Prompt.ChooseKicker {} -> KickerDecision.Declines
+  -- costs no mana -- entwine's reason above, word for word. Zero is the decline,
+  -- and it is CR 702.33c's multikicker answer too.
+  Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision 0
   -- CR 903.9a is a "may", so leaving the commander where it is is always legal
   -- and is the answer that changes nothing.
   Prompt.ReturnCommander {} -> CommandZoneDecision.Leaves

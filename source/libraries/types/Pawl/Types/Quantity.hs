@@ -2,6 +2,7 @@ module Pawl.Types.Quantity where
 
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
@@ -409,8 +410,27 @@ data Quantity
     -- the pool prints, kicker's payoff always being an ability of the kicked object
     -- itself.
     --
+    -- The whole map read as a yes-or-no, where TimesKickedWith below reads one of
+    -- its keys: rule 702.33d designates the spell for "ANY of that spell's kicker
+    -- costs", so a card printing the bare "if this spell was kicked" (Burst
+    -- Lightning) is not naming one of them.
+    --
     -- A LEAF: it holds no Quantity.
     WasKicked
+  | -- | CR 702.33f / 702.33c: how many times was ONE of this spell's kicker costs
+    -- declared (CR 601.2b)? Sunscape Battlemage's "if it was kicked with its
+    -- {1}{G} kicker" as a 0/1, and Gnarlid Pack's "for each time it was kicked" as
+    -- the count rule 702.33c's multikicker can drive past one.
+    --
+    -- Carries the COST because that is what the printed text names and what
+    -- Pawl.Types.Object's `kicked` map is keyed by -- never an index into the
+    -- face's keywords, which would make the card data depend on the Set order.
+    --
+    -- Read off the object the quantity is evaluated against, WasKicked's arm in
+    -- every respect, including CR 400.7d's permanent (see that arm).
+    --
+    -- A LEAF: it holds no Quantity.
+    TimesKickedWith (Cost.Cost Keyword.Keyword)
   | -- | CR 107.4h's third sentence: was any mana produced by a snow source spent
     -- to cast the spell this quantity is evaluated against? 1 if so and 0 if not
     -- -- Berg Strider's "if {S} was spent to cast this spell".

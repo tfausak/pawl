@@ -8,6 +8,7 @@ import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
@@ -15,6 +16,8 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -228,6 +231,15 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.WasKicked
       " {\"type\":\"WasKicked\"} "
+  -- CR 702.33f, with the COST on the wire: which of the spell's kicker costs is
+  -- asked about is the whole of what the card names, the object being whichever
+  -- one the quantity is evaluated against.
+  Spec.it s "TimesKickedWith" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.TimesKickedWith (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []))
+      " {\"type\":\"TimesKickedWith\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
   -- CR 107.4h's third sentence, with nothing on the wire for WasKicked's reason:
   -- the tag it asks about is the constructor.
   Spec.it s "SnowWasSpent" $

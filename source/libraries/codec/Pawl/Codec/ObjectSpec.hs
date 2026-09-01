@@ -10,6 +10,7 @@ import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
@@ -19,8 +20,10 @@ import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaSpending as ManaSpending
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Object as Object
@@ -80,7 +83,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.classLevel = Nothing,
           Object.unlockedHalves = Set.empty,
           Object.designations = Set.empty,
-          Object.kicked = False,
+          Object.kicked = Map.empty,
           Object.bestowed = False,
           Object.phyrexianLifePaid = 0,
           Object.manaSpent = Mana.MkMana [],
@@ -100,7 +103,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"playableFromExile\":null,\"plotted\":null,\"foretold\":null"
           <> ",\"ringBearerFor\":null,\"protector\":null,\"ventureRoom\":null"
           <> ",\"classLevel\":null,\"unlockedHalves\":[],\"designations\":[]"
-          <> ",\"kicked\":false,\"bestowed\":false,\"phyrexianLifePaid\":0"
+          <> ",\"kicked\":[],\"bestowed\":false,\"phyrexianLifePaid\":0"
           <> ",\"manaSpent\":[]"
           <> ",\"announcedX\":null,\"detainedUntil\":[],\"goadedBy\":[]"
           <> ",\"doesNotUntapNext\":false,\"exertedBy\":[]} "
@@ -177,7 +180,10 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.classLevel = Just (ClassLevel.MkClassLevel 2),
           Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Fire")),
           Object.designations = Set.singleton Designation.Renowned,
-          Object.kicked = True,
+          Object.kicked =
+            Map.singleton
+              Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 24]), Cost.components = []}
+              25,
           Object.bestowed = True,
           Object.phyrexianLifePaid = 19,
           Object.manaSpent =
@@ -214,7 +220,8 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"spending\":{\"type\":\"AnyType\"},\"origin\":{\"type\":\"Granted\"}}"
           <> ",\"plotted\":0,\"foretold\":15,\"ringBearerFor\":16,\"protector\":17"
           <> ",\"ventureRoom\":18,\"classLevel\":2,\"unlockedHalves\":[\"Fire\"]"
-          <> ",\"designations\":[{\"type\":\"Renowned\"}],\"kicked\":true"
+          <> ",\"designations\":[{\"type\":\"Renowned\"}]"
+          <> ",\"kicked\":[{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":24}]},\"times\":25}]"
           <> ",\"bestowed\":true"
           <> ",\"phyrexianLifePaid\":19"
           <> ",\"manaSpent\":[{\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}"
