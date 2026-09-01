@@ -53,7 +53,7 @@ copySource = SlotName.MkSlotName (Text.pack "copySource")
 -- it, while the rule above forbids the matching targetSlots entry. What makes it
 -- statable is the discipline this comment named: CardSpec.modalSlotsOffend
 -- SUBTRACTS the reserved names its carrier binds (this one, variableX,
--- chosenModes, copySource, you, thatPlayer, became, thatSpell) from the READ side
+-- chosenModes, copySource, you, thatPlayer, became, thatSpell, thisAbility) from the READ side
 -- before comparing, rather than adding them to the declared side. Loosening it
 -- back to a subset check would silently retire its "declared but never read"
 -- half, which is the shape the ability lints carried until #1043.

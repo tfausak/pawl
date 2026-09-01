@@ -2577,6 +2577,11 @@ triggeredAbilityOffends ability =
 --     source slot, so Brothers of Fire's "and 1 damage to you" is a slot read.
 --     Cast.castSpell stamps it for every SPELL as well (Char), which the spell
 --     lint takes on its read side.
+--   * Binding.thisAbility. CR 602.2a: "That ability is created on the stack as
+--     an object that's not a card" -- stamped for every activation beside the
+--     two above, so Forsworn Paladin's "if mana from a Treasure was spent to
+--     activate this ability" is a slot read. Not `triggerSource`, which names
+--     the ability's SOURCE and carries the record of a different payment.
 --   * Binding.variableX, and ONLY when the ability's own cost prints an {X}:
 --     CR 601.2b's "the player announces the value of that variable", measured
 --     against what CR 602.2b calls "an activated ability's analog to a spell's
