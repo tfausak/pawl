@@ -323,6 +323,25 @@ data PlayerEffect
     -- PLAYER case and not only the permanent one. A membership question, never a
     -- tally.
     CantBeTargetedBy PlayerScope.PlayerScope
+  | -- | CR 702.16c / 702.16b / Runed Halo: this player has protection from the
+    -- card name the source has chosen.
+    --
+    -- The PLAYER half of rule 702.16, here for CantBeTargetedBy's reason above:
+    -- rule 702's keywords live on objects and fold through the CR 613.1-613.7
+    -- layers, and a player has no characteristics for that machine to compute.
+    --
+    -- NO quality payload, CantCastChosenName's shape and for its reason: CR
+    -- 201.4's chosen name is read off the source's Object.chosenNames rather than
+    -- written by the card, so there is nothing here for a Filter to carry. A
+    -- protection ability whose quality IS card data -- rule 702.16j's "protection
+    -- from everything", or a stated colour -- wants a Filter-carrying constructor
+    -- beside this one and has no player-side producer yet (#2229).
+    --
+    -- Not implemented: rule 702.16e's "any damage ... is prevented" for a
+    -- protected PLAYER. Rule 702.16e's permanent half is a CR 615.1 shield
+    -- Pawl.Engine.Keyword mints from the keyword, and no segment of
+    -- Pawl.Engine.Replacement.collect reads the CR 613.11 player axis (#2878).
+    HasProtectionFromChosenName
   | -- | CR 601.3b / Vedalken Orrery: this player may cast a matching spell as
     -- though it had flash -- which by CR 702.8a and CR 117.1a's first sentence
     -- means any time they have priority.

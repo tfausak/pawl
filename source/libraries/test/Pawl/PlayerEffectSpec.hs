@@ -35,6 +35,13 @@
 -- a graveyard before the rows it stored are read, so it is the only card that
 -- reaches CR 608.2h's last-known road into Pawl.Engine.PlayerEffect.chosenNamesOf.
 --
+-- Runed Halo is the card-name choice's other shape -- CR 614.1c with ONE chooser
+-- rather than Null Chamber's two -- and the pool's only card that gives a PLAYER
+-- a rule 702.16 protection ability, so it carries rule 702.16b's and rule
+-- 702.16c's player halves in with it (Pawl.Engine.Target.targetable and
+-- Pawl.Engine.Sba.fallsOff). Curse of Vitality is the enchant-player Aura on the
+-- other side of both.
+--
 -- Artificial Evolution and Magical Hack join Edgewalker for CR 612.1, the second
 -- rule reaching this axis from outside it: the word naming which spells a player
 -- static ability discounts is printed text like any other, so a text change moves
@@ -83,6 +90,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
@@ -4058,6 +4066,128 @@ isPlay action = case action of
   Action.Type.ActivateManaAbility _ -> False
   Action.Type.Pass -> False
 
+-- Runed Halo {W}{W} Enchantment: "As this enchantment enters, choose a card
+-- name. You have protection from the chosen card name." The pool's one card that
+-- gives a PLAYER a rule 702.16 protection ability, and so the producer of both
+-- halves this group proves: CR 702.16b's targeting bar and CR 702.16c's
+-- enchanting bar, each read off Pawl.Engine.PlayerEffect.protectedFrom.
+--
+-- Curse of Vitality is the Aura on the other side, and it has to be an
+-- enchant-PLAYER one (CR 702.5d): rule 702.16c's player half is the clause under
+-- test, and an Aura that enchants a creature never reaches it.
+--
+-- THREE SEATS, and that is what makes each case discriminating rather than
+-- vacuous: alice holds the Halo, bob holds the Curse, and carol holds nothing --
+-- so "bob may not enchant alice" is told apart from "bob may not enchant
+-- anybody" on one board, and from "the Curse is illegal" on one pass.
+--
+-- Every case is a PAIR differing in the chosen NAME alone. A board where the
+-- Halo names Goblin Piker is the same board in every other respect, which is
+-- what keeps the mana, the phase and the Curse's own legality out of the answer.
+runedHaloBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+runedHaloBoard plains halo curse =
+  let lands = S.landsFor plains S.bob 3 (S.landsFor plains S.alice 2 S.threePlayerGame)
+      (haloId, g1) = S.addHandCard halo S.alice lands
+      (curseId, g2) = S.addHandCard curse S.bob g1
+   in ( haloId,
+        curseId,
+        g2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Cast the Halo and let it resolve, naming `name`.
+--
+-- CAST rather than S.addCreature, castChamber's reason: the choice happens only
+-- on the entry path (Event.runEntry), so a Halo placed straight onto the
+-- battlefield has an empty chosenNames and protects from nothing.
+castHalo :: CardName.CardName -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+castHalo name gs oid =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseCardName {} -> name
+        _ -> S.identityAnswer p
+      cast = snd (Engine.runGamePure answer gs (S.cast S.alice oid))
+   in snd (Engine.runGamePure answer cast Stack.resolveTop)
+
+-- castHalo, also recording WHO was asked to name a card. Invisible from the
+-- finished board -- Object.chosenNames is a set of names and remembers no
+-- chooser -- and it is the whole difference between rule 614.1c's one-chooser
+-- rewrite and Null Chamber's two-chooser one above.
+recordingCastHalo :: CardName.CardName -> GameState.GameState -> ObjectId.ObjectId -> [PlayerId.PlayerId]
+recordingCastHalo name gs oid =
+  let answer :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+      answer p = case p of
+        Prompt.ChooseCardName _ chooser _ _ -> do
+          State.modify' (<> [chooser])
+          pure name
+        _ -> pure (S.identityAnswer p)
+   in State.execState (Engine.runGame answer gs (S.cast S.alice oid >> Stack.resolveTop)) []
+
+runedHaloSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+runedHaloSpec s registry =
+  Spec.describe s "RunedHalo" $ do
+    -- CR 614.1c with CR 201.4: the as-enters choice, and the one thing that
+    -- tells EntryRewrite.ChooseCardName from EntryRewrite.ChooseCardNames beside
+    -- it -- Runed Halo says "choose a card name" and names nobody else, where
+    -- Null Chamber says "you and an opponent each choose".
+    Spec.it s "CR 614.1c the controller alone names a card as the Halo enters" $ do
+      plains <- S.printingOf s registry "Plains"
+      halo <- S.printingOf s registry "Runed Halo"
+      curse <- S.printingOf s registry "Curse of Vitality"
+      let (haloId, _, board) = runedHaloBoard plains halo curse
+          after = castHalo (S.printingName curse) board haloId
+          asked = recordingCastHalo (S.printingName curse) board haloId
+      Spec.assertEqWith s "alice was asked, and nobody else" asked [S.alice]
+      case enteredOne board after >>= \oid -> Game.lookupObject oid after of
+        Nothing -> Spec.assertFailure s "Runed Halo did not reach the battlefield"
+        Just entered ->
+          Spec.assertEqWith
+            s
+            "one chosen name, and it is the one she picked"
+            (Object.chosenNames entered)
+            (Set.singleton (S.printingName curse))
+    -- CR 702.16b's PLAYER half: "a permanent or player with protection can't be
+    -- targeted by spells with the stated quality". CR 702.5a makes the enchant
+    -- ability a targeting restriction, so the Curse's own target slot is where
+    -- the rule lands.
+    Spec.it s "CR 702.16b the protected player is not a legal target for a spell with the chosen name" $ do
+      plains <- S.printingOf s registry "Plains"
+      halo <- S.printingOf s registry "Runed Halo"
+      curse <- S.printingOf s registry "Curse of Vitality"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (haloId, curseId, board) = runedHaloBoard plains halo curse
+          offered g = fmap (\theSlot -> Target.legalRecipients (Just S.bob) curseId theSlot g) (Card.enchantTargetSlot (S.combinedFace curse))
+          named = castHalo (S.printingName curse) board haloId
+          other = castHalo (S.printingName piker) board haloId
+      Spec.assertEqWith s "with the Curse named, alice is off the Curse's target list" (fmap (Set.member (Recipient.ToPlayer S.alice)) (offered named)) (Just False)
+      Spec.assertEqWith s "carol is still on it -- the Halo protects its controller alone" (fmap (Set.member (Recipient.ToPlayer S.carol)) (offered named)) (Just True)
+      Spec.assertEqWith s "and with another card named, so is alice" (fmap (Set.member (Recipient.ToPlayer S.alice)) (offered other)) (Just True)
+    -- CR 702.16c's second sentence, the clause that had nowhere to live until
+    -- a player could carry protection (see #2387): "such
+    -- Auras attached to the permanent or player with protection will be put into
+    -- their owners' graveyards as a state-based action" (CR 704.5m).
+    --
+    -- The Curse is attached BEFORE the Halo enters, which is the order the rule
+    -- is about: an Aura already there when the protection starts to apply falls
+    -- off on the next pass.
+    Spec.it s "CR 702.16c / 704.5m an Aura already enchanting the player is buried once she gains protection from its name" $ do
+      plains <- S.printingOf s registry "Plains"
+      halo <- S.printingOf s registry "Runed Halo"
+      curse <- S.printingOf s registry "Curse of Vitality"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (haloId, _, board) = runedHaloBoard plains halo curse
+          (aura, withAura) = S.addCreature curse S.bob board
+          cursed = S.attachTo aura (Recipient.ToPlayer S.alice) withAura
+          named = S.settleSba (castHalo (S.printingName curse) cursed haloId)
+          other = S.settleSba (castHalo (S.printingName piker) cursed haloId)
+      Spec.assertBool s (Set.member aura (GameState.battlefield (S.settleSba cursed))) "before the Halo the Curse is legally attached to alice"
+      Spec.assertBool s (not (Set.member aura (GameState.battlefield named))) "the Halo names it, and it is off the battlefield after one pass"
+      Spec.assertEqWith s "in its OWNER's graveyard, and bob owns it" (length (Game.zoneMembers Zone.Graveyard S.bob named)) 1
+      Spec.assertBool s (Set.member aura (GameState.battlefield other)) "with another card named it stays where it is"
+
 -- Conjurer's Ban {W}{B} Sorcery: "Choose a card name. Until your next turn,
 -- spells with the chosen name can't be cast and lands with the chosen name can't
 -- be played. Draw a card."
@@ -5392,6 +5522,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
   nullChamberSpec s registry
+  runedHaloSpec s registry
   conjurersBanSpec s registry
   adjustmentSpec s
   thaliaSpec s registry

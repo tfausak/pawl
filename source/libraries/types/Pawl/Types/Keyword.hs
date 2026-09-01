@@ -79,10 +79,14 @@ data Keyword
   | -- | 702.16a: four prohibitions under one key -- targeting (702.16b), damage
     -- (702.16e), blocking (702.16f), and attachment (702.16c, 702.16d).
     --
-    -- Not implemented: rule 702.16j's "protection from everything", rule
-    -- 702.16k's "protection from [a player]" -- whose quality is a PLAYER and not
-    -- a characteristic, so no Filter says it -- and the "from each" shorthands of
-    -- rules 702.16h and 702.16i (#2229).
+    -- Rule 702.16j's "protection from everything" needs no shape of its own:
+    -- Filter.And [] matches every object regardless of its characteristic
+    -- values, which is what that rule states. No card in `data/cards/` writes
+    -- one; Progenitus and a level 8 Hexdrinker are the printings (#2229).
+    --
+    -- Not implemented: rule 702.16k's "protection from [a player]" -- whose
+    -- quality is a PLAYER and not a characteristic, so no Filter says it -- and
+    -- the "from each" shorthands of rules 702.16h and 702.16i (#2229).
     Protection (Filter.Filter Keyword)
   | Reach -- 702.17
   | -- | 702.18a: this permanent or player can't be the target of spells or

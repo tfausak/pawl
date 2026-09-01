@@ -1775,10 +1775,12 @@ mintedAttachRestrictionsFor keyword = case keyword of
   -- printed row (Consecrate Land) names a third permanent through
   -- Affected.Attached.
   --
-  -- Not implemented: rule 702.16c's PLAYER half. That rule reaches "a permanent
-  -- or player with protection", and a player has no keywords for this mint to
-  -- read, so CR 702.5d's enchant-player Aura is barred by nothing (#2387).
-  -- Rule 702.16d has no player half to miss.
+  -- The PERMANENT half of rule 702.16c only. That rule reaches "a permanent or
+  -- player with protection", and a player has no keywords for this mint to read,
+  -- so the player half rides the CR 613.11 axis instead --
+  -- Pawl.Types.PlayerEffect.HasProtectionFromChosenName, read by
+  -- Pawl.Engine.Attach.attachmentFor and Pawl.Engine.Sba.fallsOff through
+  -- Pawl.Engine.PlayerEffect.protectedFrom. Rule 702.16d has no player half.
   --
   -- Not implemented: rule 702.16n's and rule 702.16p's exceptions, where an AURA
   -- grants protection from a quality and says the effect does not remove Auras,

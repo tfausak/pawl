@@ -2156,6 +2156,9 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.DamageCantBePrevented _ -> effect
   PlayerEffect.DamageCantBeRedirected _ -> effect
   PlayerEffect.CantSearchLibraries -> effect
+  -- CR 702.16a's quality here is a chosen card NAME, and CR 612.2's second
+  -- sentence keeps a subtype swap off a name.
+  PlayerEffect.HasProtectionFromChosenName -> effect
   PlayerEffect.CantBecomeMonarch -> effect
   PlayerEffect.CastOnlyAtSorcerySpeed -> effect
   PlayerEffect.CantPlayLands -> effect
@@ -2766,6 +2769,7 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   EntryRewrite.ReadAhead -> rewrite
   -- CR 201.4a's restriction on which names may be named.
   EntryRewrite.ChooseCardNames f -> EntryRewrite.ChooseCardNames (Filter.rewrite pairs f)
+  EntryRewrite.ChooseCardName f -> EntryRewrite.ChooseCardName (Filter.rewrite pairs f)
   EntryRewrite.WithCounters w -> EntryRewrite.WithCounters (rewriteWithCounters pairs w)
   EntryRewrite.UnderSourceControl -> rewrite
   EntryRewrite.SacrificeAnyNumber s ->

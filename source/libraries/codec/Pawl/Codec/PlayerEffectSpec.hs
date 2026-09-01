@@ -327,6 +327,13 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       PlayerEffect.CantSearchLibraries
       " {\"type\":\"CantSearchLibraries\"} "
+  -- CR 702.16c / Runed Halo.
+  Spec.it s "HasProtectionFromChosenName" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      PlayerEffect.HasProtectionFromChosenName
+      " {\"type\":\"HasProtectionFromChosenName\"} "
   -- CR 725 / Jared Carthalion, True Heir.
   Spec.it s "CantBecomeMonarch" $
     Common.assertCodec
