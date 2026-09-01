@@ -3568,6 +3568,26 @@ aimedAttackRestrictionSpec s registry = Spec.describe s "AimedAttackRestriction"
           (announced (openPiker, S.addCounter CounterKind.Loyalty 3 openJace open))
           (Just (AttackTarget.OfPlayer S.bob))
       _ -> Spec.assertFailure s "fixture should give alice a Piker on each board"
+  Spec.it s "CR 508.1d a creature with nobody it may attack is not able, so the Curse excuses it" $ do
+    -- CR 508.1d counts the requirements obeyable "without disobeying any
+    -- restrictions", so an announcement this restriction forbids is worth
+    -- nothing to the maximization. Without that, the Curse would demand an
+    -- attack the restriction refuses and no declaration at all would be legal.
+    archon <- S.printingOf s registry "Blazing Archon"
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = cursing curse S.alice [piker] [archon]
+    case mine of
+      [pikerId] -> do
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] gs) "CR 508.1d: declining is legal, the Curse having nothing it can require"
+        -- The PIN, and the reason the assertion above is not vacuous: on the
+        -- same board without the Archon the Curse does forbid declining, so it
+        -- really is in force and really does reach this creature.
+        let (uncursed, _, _) = cursing curse S.alice [piker] []
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] uncursed)) "and it does forbid declining with no Archon on the board"
+        Spec.assertEqWith s "the Piker is a candidate on both boards, so the Curse reaches it" (Combat.legalAttackers S.alice gs) [pikerId]
+      _ -> Spec.assertFailure s "fixture should give alice a Piker"
+
   Spec.it s "CR 508.1c whole cards: with nothing else to attack, no attack is declared" $ do
     -- The other half of the gameplay reading: bob controls no planeswalker, so
     -- every announcement CR 508.1b offers is forbidden and the creature is not
@@ -3578,8 +3598,16 @@ aimedAttackRestrictionSpec s registry = Spec.describe s "AimedAttackRestriction"
     let (gs, mine, theirs) = S.combatBoardOf [piker] [archon]
     case (mine, theirs) of
       ([pikerId], [archonId]) -> do
-        let after = S.runCombat S.aggressiveAnswer gs
-            control = S.runCombat S.aggressiveAnswer (S.giveControl archonId S.alice gs)
+        -- Blocks DECLINED, because the Archon is a 5/6 that would block the very
+        -- Piker it is keeping off bob: with blocks on, "bob takes nothing" is
+        -- true whether or not the restriction bit, and the life assertion proves
+        -- nothing.
+        let unblocking :: Prompt.Prompt r -> r
+            unblocking p = case p of
+              Prompt.DeclareBlockers {} -> Map.empty
+              _ -> S.aggressiveAnswer p
+            after = S.runCombat unblocking gs
+            control = S.runCombat unblocking (S.giveControl archonId S.alice gs)
         Spec.assertEqWith s "bob takes nothing" (S.lifeOf S.bob after) (Just 20)
         Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf after) []
         Spec.assertEqWith s "with the Archon protecting alice instead, the Piker's 2 and the Archon's 5 both land" (S.lifeOf S.bob control) (Just 13)

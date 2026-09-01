@@ -180,12 +180,12 @@ attackTargets defender gs =
 -- (CombatRestriction.cantAttackPlayer).
 --
 -- Exhaustive over CR 506.3's three things that can be attacked rather than a
--- wildcard, so a restriction naming a permanent is a compile error here instead
--- of silently answering True. Only the player arm consults the set today, and
--- that is the rule and not an omission: Blazing Archon's "creatures can't attack
--- you" leaves a planeswalker its controller controls attackable, which is a
--- different announcement. Not implemented: a restriction naming a planeswalker or
--- a battle (#2891).
+-- wildcard, so a fourth of them fails to compile here instead of silently
+-- answering True. Only the player arm consults the set today, and that is the
+-- rule and not an omission: Blazing Archon's "creatures can't attack you" leaves
+-- a planeswalker its controller controls attackable, which is a different
+-- announcement. Not implemented: a restriction naming a planeswalker or a battle
+-- (#2891), which would give the other two arms a set of their own.
 attackTargetAllowed :: Set (ObjectId, PlayerId) -> ObjectId -> AttackTarget.AttackTarget -> Bool
 attackTargetAllowed barred oid target = case target of
   AttackTarget.OfPlayer pid -> not (Set.member (oid, pid) barred)
@@ -1356,6 +1356,7 @@ attemptAttackDeclaration pid rejected = do
     -- The price is that a creature the CR 508.1d degradation below then drops
     -- was asked about; only an interpreter that repeats a rewound declaration
     -- reaches that path.
+    --
     -- The options are this creature's own, not the whole list: CR 508.1c's
     -- aimed-at restriction is asked BEFORE the announcement, so a forbidden
     -- player is never offered. `targets` is the fallback the list cannot need --
