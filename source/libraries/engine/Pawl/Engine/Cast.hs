@@ -422,9 +422,11 @@ withKickerPayments paid candidate =
 --
 -- Two conditions per cost, and each is entwineOffer's above:
 --
---   1. The card HAS that kicker, read off the printed keywords of the half being
---      cast for that function's reason -- rule 702.33a is a static ability of the
---      spell itself (CR 702.33a: "functions while the spell with kicker is on the
+--   1. The card HAS that kicker: `offers` is Keyword.kickerCosts over the printed
+--      keywords of the half being cast, handed in rather than re-read here so the
+--      announcement and castProposed's limit check cannot disagree about which
+--      half's kickers those are. Rule 702.33a is a static ability of the spell
+--      itself (CR 702.33a: "functions while the spell with kicker is on the
 --      stack").
 --   2. Some candidate cost plus this one is payable -- CR 601.2f's "plus all
 --      additional costs", at CR 601.2b's X=0 floor and with the same payableCost
@@ -447,18 +449,16 @@ withKickerPayments paid candidate =
 -- together are payable. How high a multikicker count may go is not gated here at
 -- all -- the answer is honoured and then measured, which is Prompt.ChooseX's
 -- posture, and castProposed rejects a cast whose announced total nothing can pay.
-announceKickers :: ManaSpending -> PlayerId -> ObjectId -> [Cost Keyword] -> GameState -> Game (Map.Map (Cost Keyword) Natural)
-announceKickers spending pid sid candidates gs = case Game.faceOf sid gs of
-  Nothing -> pure Map.empty
-  Just face ->
-    let ask paid (cost, limit) =
-          if any (\candidate -> payableCost spending pid sid gs (Cost.plus (withKickerPayments paid candidate) cost)) candidates
-            then do
-              decision <- Game.choose (Prompt.ChooseKicker (Decide.deciderFor pid gs) pid sid cost limit)
-              let times = KickerDecision.unwrap decision
-              pure (if times == 0 then paid else Map.insert cost times paid)
-            else pure paid
-     in Monad.foldM ask Map.empty (Keyword.kickerCosts (Face.keywords face))
+announceKickers :: ManaSpending -> PlayerId -> ObjectId -> [Cost Keyword] -> [(Cost Keyword, Maybe Natural)] -> GameState -> Game (Map.Map (Cost Keyword) Natural)
+announceKickers spending pid sid candidates offers gs =
+  let ask paid (cost, limit) =
+        if any (\candidate -> payableCost spending pid sid gs (Cost.plus (withKickerPayments paid candidate) cost)) candidates
+          then do
+            decision <- Game.choose (Prompt.ChooseKicker (Decide.deciderFor pid gs) pid sid cost limit)
+            let times = KickerDecision.unwrap decision
+            pure (if times == 0 then paid else Map.insert cost times paid)
+          else pure paid
+   in Monad.foldM ask Map.empty offers
 
 -- CR 702.33d's designation, written onto the spell's own stack incarnation: "that
 -- spell has been kicked". Read back by Quantity.WasKicked and
@@ -1466,6 +1466,10 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
       -- makes it apply to an alternative cost as readily as to the printed one.
       let withEntwine candidate = maybe candidate (Cost.plus candidate) entwined
           entwinedCandidates = fmap withEntwine candidates
+          -- CR 702.33a/b/c's costs, each with the number of times its own rule lets
+          -- it be paid, read ONCE off the half being cast: the announcement below
+          -- and the limit it is judged against are the same list.
+          kickerOffers = Keyword.kickerCosts (Face.keywords face)
       -- CR 702.33a: kicker, asked HERE -- after the modes and before the cost, the
       -- variable and the targets -- because that is where CR 601.2b puts the
       -- announcement of an additional cost, and rule 702.33a bundles nothing else
@@ -1482,7 +1486,13 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
       --
       -- Carried as the counts per cost rather than as a flag, for entwine's
       -- reason: the candidate costs below and the CR 702.33d stamp read one value.
-      kicked <- announceKickers spending pid sid entwinedCandidates gs
+      kicked <- announceKickers spending pid sid entwinedCandidates kickerOffers gs
+      -- Not implemented: CR 702.33g's targets, which a spell whose kicked-only
+      -- clause names a slot of its own should be asked for only on a kicked cast
+      -- (#2833). No card in data/cards/ prints that shape -- Burst Lightning's two
+      -- clauses share one slot -- so the CR 601.2c step below fills every slot the
+      -- chosen modes declare.
+      --
       -- CR 702.33d: "if a spell's controller declares the intention to pay any of
       -- that spell's kicker costs, that spell has been kicked" -- the DECLARATION
       -- is what designates it, so the stamp lands here and not at CR 601.2h's
@@ -1496,7 +1506,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
       let overKickerLimit =
             any
               (\(cost, limit) -> maybe False (Map.findWithDefault 0 cost kicked >) limit)
-              (Keyword.kickerCosts (Face.keywords face))
+              kickerOffers
           withKicker = withKickerPayments kicked
           -- The announced additional costs are folded into each candidate's
           -- COST and never into its keyword: CR 702.33a's kicker and CR
