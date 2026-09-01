@@ -1415,7 +1415,7 @@ combatRestrictionCounts restriction = case restriction of
   -- The blocker Filter beside the gate holds no Count either.
   CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ condition) -> foldMap conditionCounts condition
   -- The PlayerScope beside the gate holds no Count either.
-  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ condition) -> foldMap conditionCounts condition
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ _ condition) -> foldMap conditionCounts condition
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ condition) -> foldMap conditionCounts condition
   CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionCounts condition
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionCounts condition
@@ -4813,7 +4813,7 @@ combatRestrictionFilters restriction = case restriction of
   -- players they may not attack are a PlayerScope, which is card data with no
   -- Filter in it -- so nothing stands in for it here, the size-bounding arms'
   -- posture.
-  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer affected _ condition) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer affected _ _ condition) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless affected condition) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
   CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionFilters condition
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionFilters condition
