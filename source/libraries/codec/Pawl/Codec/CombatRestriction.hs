@@ -1,6 +1,7 @@
 module Pawl.Codec.CombatRestriction where
 
 import qualified Pawl.Codec.AffectedUnless as AffectedUnless
+import qualified Pawl.Codec.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Codec.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Codec.LimitUnless as LimitUnless
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -22,12 +23,16 @@ import qualified Pawl.Types.CombatRestriction as CombatRestriction
 -- The wire format is unchanged by the conversion to a bundle: those three
 -- payloads were already named objects, and giving each a record only supplied
 -- the name their schema definitions needed.
+--
+-- The attacking PAIRWISE arm has a fourth payload, which adds "defenders": the
+-- players the restricted creatures may not attack (CR 508.1b).
 codec :: Codec.Codec CombatRestriction.CombatRestriction
 codec =
   Arm.tagged
     [ Arm.payload "CantAttack" AffectedUnless.codec CombatRestriction.CantAttack (\x -> case x of CombatRestriction.CantAttack y -> Just y; _ -> Nothing),
       Arm.payload "CantBlock" AffectedUnless.codec CombatRestriction.CantBlock (\x -> case x of CombatRestriction.CantBlock y -> Just y; _ -> Nothing),
       Arm.payload "CantBeBlockedBy" CantBeBlockedBy.codec CombatRestriction.CantBeBlockedBy (\x -> case x of CombatRestriction.CantBeBlockedBy y -> Just y; _ -> Nothing),
+      Arm.payload "CantAttackPlayer" CantAttackPlayer.codec CombatRestriction.CantAttackPlayer (\x -> case x of CombatRestriction.CantAttackPlayer y -> Just y; _ -> Nothing),
       Arm.payload "CantAttackAlone" AffectedUnless.codec CombatRestriction.CantAttackAlone (\x -> case x of CombatRestriction.CantAttackAlone y -> Just y; _ -> Nothing),
       Arm.payload "CantAttackMoreThan" LimitUnless.codec CombatRestriction.CantAttackMoreThan (\x -> case x of CombatRestriction.CantAttackMoreThan y -> Just y; _ -> Nothing),
       Arm.payload "CantBlockMoreThan" LimitUnless.codec CombatRestriction.CantBlockMoreThan (\x -> case x of CombatRestriction.CantBlockMoreThan y -> Just y; _ -> Nothing)

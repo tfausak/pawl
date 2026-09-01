@@ -15,9 +15,11 @@
 -- Pawl.Engine.Keyword constructs one -- rule 702.98a's unleash -- and reads none.
 -- Pawl.Engine.Combat asks for a SET OF IDS, for a SET OF PAIRS, or for a NUMBER,
 -- and never learns which card, or which keyword, produced any of them. The pairs
--- are CR 509.1b's pairwise restrictions (cantBeBlockedBy), which no set of
--- creatures could state; the Filter that decides them is evaluated here, so no
--- Filter crosses into Pawl.Engine.Combat.
+-- are the two pairwise restrictions, which no set of creatures could state: CR
+-- 509.1b's (cantBeBlockedBy) and CR 508.1c's aimed-at one (cantAttackPlayer).
+-- The Filter that decides the first and the Pawl.Types.PlayerScope that decides
+-- the second are both resolved here, so neither crosses into
+-- Pawl.Engine.Combat.
 module Pawl.Engine.CombatRestriction where
 
 import qualified Data.List as List
@@ -32,11 +34,13 @@ import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
+import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Condition as Condition.Type
@@ -50,6 +54,8 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LimitUnless as LimitUnless
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
@@ -173,6 +179,7 @@ attacking cr = case cr of
   CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless a _) -> Just a
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
+  CombatRestriction.CantAttackPlayer {} -> Nothing
   CombatRestriction.CantAttackAlone {} -> Nothing
   CombatRestriction.CantAttackMoreThan {} -> Nothing
   CombatRestriction.CantBlockMoreThan {} -> Nothing
@@ -185,6 +192,7 @@ blocking cr = case cr of
   -- see it: answering Just would take the Ring-bearer off CR 509.1a's candidate
   -- list, which is the opposite of what CR 701.54c says.
   CombatRestriction.CantBeBlockedBy {} -> Nothing
+  CombatRestriction.CantAttackPlayer {} -> Nothing
   CombatRestriction.CantAttackAlone {} -> Nothing
   CombatRestriction.CantAttackMoreThan {} -> Nothing
   CombatRestriction.CantBlockMoreThan {} -> Nothing
@@ -194,6 +202,7 @@ attackingAlone cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
+  CombatRestriction.CantAttackPlayer {} -> Nothing
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless a _) -> Just a
   CombatRestriction.CantAttackMoreThan {} -> Nothing
   CombatRestriction.CantBlockMoreThan {} -> Nothing
@@ -207,18 +216,34 @@ blockedBy cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy a f _) -> Just (a, f)
+  CombatRestriction.CantAttackPlayer {} -> Nothing
   CombatRestriction.CantAttackAlone {} -> Nothing
   CombatRestriction.CantAttackMoreThan {} -> Nothing
   CombatRestriction.CantBlockMoreThan {} -> Nothing
 
--- The bound selectors. A separate pair from the four above rather than a fifth
--- and sixth of them, because what they answer is a NUMBER and no Affected can
+-- The other PAIRWISE selector, one declaration over. Its own for `blockedBy`'s
+-- reason: what it answers is an Affected TOGETHER WITH the players those
+-- creatures may not be announced against, and an Affected alone would say "this
+-- creature can't attack" full stop.
+attackingPlayer :: CombatRestriction.CombatRestriction -> Maybe (Affected.Affected, PlayerScope.PlayerScope)
+attackingPlayer cr = case cr of
+  CombatRestriction.CantAttack {} -> Nothing
+  CombatRestriction.CantBlock {} -> Nothing
+  CombatRestriction.CantBeBlockedBy {} -> Nothing
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer a scope _) -> Just (a, scope)
+  CombatRestriction.CantAttackAlone {} -> Nothing
+  CombatRestriction.CantAttackMoreThan {} -> Nothing
+  CombatRestriction.CantBlockMoreThan {} -> Nothing
+
+-- The bound selectors. A separate pair from the five above rather than a sixth
+-- and seventh of them, because what they answer is a NUMBER and no Affected can
 -- stand in for one -- which is the whole reason the arms exist.
 attackingMoreThan :: CombatRestriction.CombatRestriction -> Maybe Natural
 attackingMoreThan cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
+  CombatRestriction.CantAttackPlayer {} -> Nothing
   CombatRestriction.CantAttackAlone {} -> Nothing
   CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless n _) -> Just n
   CombatRestriction.CantBlockMoreThan {} -> Nothing
@@ -228,6 +253,7 @@ blockingMoreThan cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
+  CombatRestriction.CantAttackPlayer {} -> Nothing
   CombatRestriction.CantAttackAlone {} -> Nothing
   CombatRestriction.CantAttackMoreThan {} -> Nothing
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless n _) -> Just n
@@ -244,6 +270,7 @@ gate cr = case cr of
   CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless _ c) -> c
   CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless _ c) -> c
   CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ c) -> c
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ c) -> c
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ c) -> c
   CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ c) -> c
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ c) -> c
@@ -602,6 +629,46 @@ cantBeBlockedBy blockers attackers gs =
               matched attacker blocker = Filter.matches (context attacker) (Projection.viewOfObject blocker gs) wanted
               barred attacker = fmap (\blocker -> (blocker, attacker)) (filter (matched attacker) blockers)
            in concatMap barred (filter (named source subject) attackers)
+   in Set.fromList (concatMap fromRestriction (inForce gs))
+
+-- CR 508.1c through CR 802.3a: which (creature, player) pairs an effect in force
+-- right now forbids -- the creatures that may not be announced as attacking
+-- those players (CR 508.1b). Blazing Archon's "creatures can't attack you" is
+-- the pool's producer.
+--
+-- `cantBeBlockedBy`'s shape one declaration over, and a set of PAIRS for its
+-- reason: the restriction is about a creature RELATIVE TO the player it may not
+-- attack, so neither side is a set on its own. Computed once per declaration
+-- pass and handed to every announcement check, and empty on every board stating
+-- no such restriction, `inForce` yielding nothing for the fold to reach.
+--
+-- The SCOPE's perspective is CR 109.5's "you" -- the source's controller -- and
+-- not the attacker's, which is the opposite pairing from `cantBeBlockedBy`: that
+-- one compares a blocker against the ATTACKER it may not block, where this one
+-- names players by their relation to the card printing the sentence. A source
+-- whose controller cannot be found names nobody rather than everybody.
+--
+-- No CR 612.1 word swap on the scope, and none is owed: the swap replaces one
+-- word of a printed sentence with another, and a PlayerScope prints no word a
+-- text-changing effect reaches. The affected set is rewritten as `restricted`
+-- rewrites it, both halves being words on the source's card.
+cantAttackPlayer :: [ObjectId] -> [PlayerId] -> GameState -> Set (ObjectId, PlayerId)
+cantAttackPlayer candidates players gs =
+  let named source affected creature =
+        Projection.affects
+          source
+          creature
+          affected
+          (Projection.project creature gs)
+          gs
+      fromRestriction (source, changes, restriction) = case attackingPlayer restriction of
+        Nothing -> []
+        Just (affected, scope) ->
+          let subject = if null changes then affected else Projection.rewriteAffected changes affected
+              barred = case Projection.controllerOf source gs of
+                Nothing -> []
+                Just you -> filter (\pid -> PlayerEffect.inScope pid you gs scope) players
+           in [(creature, pid) | creature <- filter (named source subject) candidates, pid <- barred]
    in Set.fromList (concatMap fromRestriction (inForce gs))
 
 -- The shared walk behind the two BOUNDS above, over the restrictions `select`

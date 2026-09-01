@@ -7,6 +7,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Compares as Compares
@@ -18,6 +19,7 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.LimitUnless as LimitUnless
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Subtype as Subtype
@@ -49,6 +51,15 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       CombatRestriction.codec
       (CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy Affected.Attached Filter.PowerGreaterThanSource Nothing))
       " {\"type\":\"CantBeBlockedBy\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"blockers\":{\"type\":\"PowerGreaterThanSource\"}}} "
+  -- CR 508.1c's PAIRWISE arm, the attacking one, whose payload spells
+  -- "defenders" where CantBeBlockedBy spells "blockers": the players the
+  -- restricted creatures may not be announced against (CR 508.1b).
+  Spec.it s "CantAttackPlayer carries its Affected and its defenders" $
+    Common.assertCodec
+      s
+      CombatRestriction.codec
+      (CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer Affected.Attached PlayerScope.You Nothing))
+      " {\"type\":\"CantAttackPlayer\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"defenders\":{\"type\":\"You\"}}} "
   -- CR 508.1c together with CR 506.5, the SET-SHAPED arm: the same payload as
   -- the two above, so the tag is the only thing that tells a reader this one is
   -- answered against a whole declaration.

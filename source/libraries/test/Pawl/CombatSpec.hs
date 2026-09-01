@@ -3489,6 +3489,103 @@ defendingPlayerRestrictionSpec s registry = Spec.describe s "DefendingPlayerComb
         Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf control) []
       _ -> Spec.assertFailure s "fixture should have one creature"
 
+-- CR 508.1c's PAIRWISE attacking restriction: one naming WHAT the attack is aimed
+-- at rather than which creatures may attack. Blazing Archon ({6}{W}{W}{W}
+-- Creature -- Archon 5/6, "Flying / Creatures can't attack you." -- checked
+-- against Scryfall, 2026-09-01) is the pool's first, and CR 802.3a is the rule
+-- that says such a restriction reaches only the creatures attacking that player.
+--
+-- Two seats throughout, deliberately: this is not a multiplayer rule. CR 508.1b
+-- makes a planeswalker its controller controls a SECOND announcement at two
+-- seats, so "can't attack you" and a blanket "can't attack" already come apart
+-- there, and the Jace case below is what tells them apart.
+--
+-- Every pair of boards differs in exactly one thing -- who controls the Archon,
+-- or whether it is on the board at all -- because "the Piker did not attack" is
+-- equally true of summoning sickness and of six other conjuncts of
+-- canAttackGiven.
+aimedAttackRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+aimedAttackRestrictionSpec s registry = Spec.describe s "AimedAttackRestriction" $ do
+  Spec.it s "CR 508.1c the Archon's controller can't be attacked, and CR 109.5 fixes who that is" $ do
+    archon <- S.printingOf s registry "Blazing Archon"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = S.combatBoardOf [piker] [archon]
+    case (mine, theirs) of
+      ([pikerId], [archonId]) -> do
+        -- The PAIRED positive, on the same permanents: the Archon under alice's
+        -- control protects alice, who is not being attacked, so bob is fair game
+        -- again. Discriminates PlayerScope.You from EachPlayer, which would bar
+        -- the attack on either board.
+        let freed = S.giveControl archonId S.alice gs
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [pikerId] gs)) "CR 802.3a: the Piker may not be declared attacking bob"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [pikerId] freed) "and may once the Archon is alice's instead"
+        -- CR 508.1a is untouched: the restriction is about the ANNOUNCEMENT, so
+        -- the Piker stays a candidate on both boards and it is the declaration
+        -- that is refused.
+        Spec.assertBool s (Combat.canAttack S.alice pikerId gs) "the Piker is still a CR 508.1a candidate"
+        Spec.assertEqWith s "and still offered" (Combat.legalAttackers S.alice gs) [pikerId]
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] gs) "declining stays legal"
+      _ -> Spec.assertFailure s "fixture should give alice a Piker and bob an Archon"
+  Spec.it s "CR 508.1b a planeswalker that player controls is a different announcement" $ do
+    -- THE DISCRIMINATOR against a blanket CantAttack, which would refuse both
+    -- announcements below. One board, two declarations of the same creature.
+    archon <- S.printingOf s registry "Blazing Archon"
+    jace <- S.printingOf s registry "Jace Beleren"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = S.combatBoardOf [piker] [archon, jace]
+    case (mine, theirs) of
+      ([pikerId], [_, jaceId]) -> do
+        let board = S.addCounter CounterKind.Loyalty 3 jaceId gs
+        Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(pikerId, AttackTarget.OfPlaneswalker jaceId)] board) "CR 508.1b: attacking bob's planeswalker is legal"
+        Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(pikerId, AttackTarget.OfPlayer S.bob)] board)) "attacking bob himself is not"
+        -- The fixture pin: without the loyalty the planeswalker is a CR 704.5i
+        -- casualty and the case above would be about a board that cannot exist.
+        Spec.assertEqWith s "and Jace really is on the board with loyalty" (S.counterOf CounterKind.Loyalty jaceId board) 3
+      _ -> Spec.assertFailure s "fixture should give alice a Piker and bob an Archon and a Jace"
+  Spec.it s "CR 508.1c whole cards: the declare attackers step aims the Piker at Jace instead" $ do
+    -- GAMEPLAY LEVEL, through CR 703.4i's turn-based action. The control is the
+    -- same board with the Archon left off, where the announcement the engine
+    -- makes is bob's own seat.
+    archon <- S.printingOf s registry "Blazing Archon"
+    jace <- S.printingOf s registry "Jace Beleren"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (guarded, mine, theirs) = S.combatBoardOf [piker] [archon, jace]
+        (open, mineOpen, theirsOpen) = S.combatBoardOf [piker] [jace]
+    case (mine, theirs, mineOpen, theirsOpen) of
+      ([pikerId], [_, jaceId], [openPiker], [openJace]) -> do
+        -- Read at the declare blockers step, before a block can absorb the
+        -- damage: the Archon is a 5/6 and would eat the Piker it is protecting
+        -- bob from.
+        let announced g = Map.lookup (fst g) (Combat.Type.attackers (GameState.combat (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer (snd g))))
+        Spec.assertEqWith
+          s
+          "the Piker was announced at the planeswalker, bob being off limits"
+          (announced (pikerId, S.addCounter CounterKind.Loyalty 3 jaceId guarded))
+          (Just (AttackTarget.OfPlaneswalker jaceId))
+        Spec.assertEqWith
+          s
+          "and at bob himself on the same board without the Archon"
+          (announced (openPiker, S.addCounter CounterKind.Loyalty 3 openJace open))
+          (Just (AttackTarget.OfPlayer S.bob))
+      _ -> Spec.assertFailure s "fixture should give alice a Piker on each board"
+  Spec.it s "CR 508.1c whole cards: with nothing else to attack, no attack is declared" $ do
+    -- The other half of the gameplay reading: bob controls no planeswalker, so
+    -- every announcement CR 508.1b offers is forbidden and the creature is not
+    -- declared at all. Paired with the same board under alice's control, where
+    -- both her creatures connect.
+    archon <- S.printingOf s registry "Blazing Archon"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = S.combatBoardOf [piker] [archon]
+    case (mine, theirs) of
+      ([pikerId], [archonId]) -> do
+        let after = S.runCombat S.aggressiveAnswer gs
+            control = S.runCombat S.aggressiveAnswer (S.giveControl archonId S.alice gs)
+        Spec.assertEqWith s "bob takes nothing" (S.lifeOf S.bob after) (Just 20)
+        Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf after) []
+        Spec.assertEqWith s "with the Archon protecting alice instead, the Piker's 2 and the Archon's 5 both land" (S.lifeOf S.bob control) (Just 13)
+        Spec.assertEqWith s "and both were declared" (S.attackerDeclarationsOf control) [pikerId, archonId]
+      _ -> Spec.assertFailure s "fixture should give alice a Piker and bob an Archon"
+
 -- CR 612.1 reaching a combat restriction's GATE. Glacial Crasher ({4}{U}{U}
 -- Creature -- Elemental 5/5, "Trample. This creature can't attack unless there is
 -- a Mountain on the battlefield." -- checked against Scryfall, 2026-08-05) is the
@@ -4195,6 +4292,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   suspectedAbilityRemovalSpec s registry
   conditionalCombatRestrictionSpec s registry
   defendingPlayerRestrictionSpec s registry
+  aimedAttackRestrictionSpec s registry
   textChangedCombatRestrictionSpec s registry
   textChangedCombatAffectedSpec s registry
   controlChangeSicknessSpec s registry
