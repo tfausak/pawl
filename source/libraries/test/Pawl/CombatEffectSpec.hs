@@ -2207,7 +2207,7 @@ pinnedAssignments base answers p = case p of
 --
 -- "That planeswalker's controller" and "the defending player" are one seat on the
 -- two-seat boards, which is what keeps the arithmetic above about CR 702.19c and
--- nothing else. The last case is the three-seat pair where they come apart, and
+-- nothing else. The last case is the three-seat board where they come apart, and
 -- CR 802.2a is the rule it reads.
 --
 -- Thrasta's cost reduction is implemented and dormant here: nothing is cast on

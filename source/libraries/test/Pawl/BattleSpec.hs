@@ -13,8 +13,7 @@
 -- be attacked by its own controller", CR 310.9c's blocking, and CR 310.9d with CR
 -- 508.5 (Defender.playerOf) -- including CR 506.4c's attacker left attacking a
 -- battle that has gone, whose defending player is CR 608.2h's filed protector.
--- Those are attackSpec
--- below; Pawl.CombatSpec keeps rule 508's own cases.
+-- Those are attackSpec below; Pawl.CombatSpec keeps rule 508's own cases.
 --
 -- Also the pieces rule 310 needed underneath it, exercised here because this is
 -- where a card reaches them: Pawl.Types.Defense, CounterKind.Defense,
@@ -451,7 +450,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
       (wraith : _, blocker : _, [one, two]) -> do
         let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.alice)
             burned = castAt battle S.alice two (castAt battle S.alice one after)
-        Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned) "alice's Swamp is not the defending player's"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned) "alice's Swamp is not the protector's"
         Spec.assertBool s (not (Set.member battle (GameState.battlefield burned))) "the Siege is gone here too"
       _ -> Spec.assertFailure s "fixture should have a Wraith, a blocker and two Bolts"
   -- The same removal at THREE DEFENDING SEATS, which is where CR 802.2a bites:
