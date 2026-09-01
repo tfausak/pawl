@@ -465,6 +465,7 @@ import qualified Pawl.ModalDoubleFacedSpec
 import qualified Pawl.ModalSpec
 import qualified Pawl.MoveCounterSpec
 import qualified Pawl.MulliganSpec
+import qualified Pawl.OmenSpec
 import qualified Pawl.OutsideTheGameSpec
 import qualified Pawl.PhasingSpec
 import qualified Pawl.PlaneswalkerSpec
@@ -1024,6 +1025,7 @@ spec s registry = do
   Pawl.ModalDoubleFacedSpec.spec s registry
   Pawl.ModalSpec.spec s registry
   Pawl.MulliganSpec.spec s registry
+  Pawl.OmenSpec.spec s registry
   Pawl.OutsideTheGameSpec.spec s registry
   Pawl.PhasingSpec.spec s registry
   Pawl.PlaneswalkerSpec.spec s registry

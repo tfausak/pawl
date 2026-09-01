@@ -2083,18 +2083,34 @@ resolveSpellWith runSubgame oid = do
                     (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode)))
                 finishSpell oid face effectController
 
--- CR 608.2n / 715.3d: where the spell goes as the last part of its resolution --
--- its owner's graveyard, unless it was cast as an Adventure, when its controller
--- exiles it and CR 715.3d's permission to play it goes onto the exiled card.
+-- CR 608.2n / 715.3d / 720.3d: where the spell goes as the last part of its
+-- resolution -- its owner's graveyard, unless it was cast as an Adventure, when
+-- its controller exiles it and CR 715.3d's permission to play it goes onto the
+-- exiled card, or as an Omen, when its controller shuffles it into its OWNER's
+-- library instead.
 --
 -- Reached only from the RESOLVING path: a fizzled spell does not resolve (CR
 -- 608.2b), so CR 715.3d's "as it resolves" never applies to it. Written onto the
 -- id the move RETURNS, since CR 400.7 mints a fresh incarnation in exile.
+--
+-- Both riders are keyed on the CHOSEN FACE's spell type (CR 205.3k) rather than
+-- on the card's layout, because the question is which set of characteristics is
+-- resolving rather than which card printed them -- a classification either way,
+-- never an effect's identity.
 finishSpell :: ObjectId -> Face.Face Card.Type.Card -> PlayerId -> Game ()
-finishSpell oid face controller =
-  if not (Card.isAdventure face)
-    then Event.changeZone oid Zone.Graveyard
-    else do
+finishSpell oid face controller
+  -- CR 720.3d: "As an Omen spell resolves, its controller shuffles it into its
+  -- owner's library instead of putting it into its owner's graveyard as it
+  -- resolves." CR 108.3 makes the library the OWNER's, read BEFORE the move for
+  -- Effect.ShuffleIntoLibrary's reason -- CR 400.7 mints a fresh incarnation, so
+  -- the owner has to be in hand whether or not the move produced one. CR 701.24a
+  -- is the randomisation, through the same Event.shuffleLibrary that opcode uses.
+  | Card.isOmen face = do
+      owner <- State.gets (fmap Object.owner . Game.lookupObject oid)
+      Event.changeZone oid Zone.Library
+      Monad.forM_ owner Event.shuffleLibrary
+  | not (Card.isAdventure face) = Event.changeZone oid Zone.Graveyard
+  | otherwise = do
       exiled <- Event.changeZoneReturning oid Zone.Exile
       Monad.forM_ exiled $ \newId ->
         State.modify' $ \gs ->
@@ -3339,7 +3355,7 @@ slotOne slot resolving gs = do
 --   1. IS THERE ANYTHING TO OFFER -- the slot's id (CR 400.7) may no longer
 --      resolve to an object (CR 603.7c).
 --   2. WHICH FACE: CR 712.11a for the `transformed` rider, otherwise
---      Card.castableFaces (CR 709.3, CR 712.11b, CR 715.3), less the face CR
+--      Card.castableFaces (CR 709.3, CR 712.11b, CR 715.3, CR 720.3), less the face CR
 --      702.162a's alternative cost is the only road to when this offer states an
 --      alternative cost of its own (CR 118.9a).
 --   3. WHAT IT COSTS (CR 118.9): `withoutPayingManaCost` or a stated
@@ -3366,8 +3382,8 @@ offerCast resolving caster slot optionality offer = do
       -- 712.11a's rider about which face goes on the stack and says nothing about
       -- payment.
       alternative = CastOffer.withoutPayingManaCost offer || Maybe.isJust (CastOffer.payingInstead offer)
-      -- CR 712.11a for the transformed rider; CR 709.3, CR 712.11b and CR 715.3
-      -- otherwise, via Card.castableFaces. Nothing for a card with no back face
+      -- CR 712.11a for the transformed rider; CR 709.3, CR 712.11b, CR 715.3 and
+      -- CR 720.3 otherwise, via Card.castableFaces. Nothing for a card with no back face
       -- (CR 712.14a): an offer that cannot be made is not made.
       --
       -- Less Card.convertedFace under an alternative, which is CR 118.9a: a spell
