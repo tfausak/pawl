@@ -717,7 +717,8 @@ legalBlockersGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedChar
 legalBlockersGiven grants pcs pid gs =
   let controlled = Projection.controlsGiven grants pid gs
       -- CR 509.1a's defending player is `pid`, the one declaring blocks, so a
-      -- CR 508.5 gate about them is read at that seat.
+      -- CR 508.5 gate about them is read at that seat. Unobserved by any board;
+      -- CombatRestriction.cantBlock says why.
       restricted = CombatRestriction.cantBlock (Just pid) controlled gs
    in filter (\oid -> canBlockGiven grants pcs restricted pid oid gs) controlled
 
