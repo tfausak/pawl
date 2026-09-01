@@ -99,9 +99,10 @@ theRingName = CardName.MkCardName (Text.pack "The Ring")
 -- 613.11 puts a combat restriction outside the layers, so no static ability could
 -- have held it. CR 114.4 is what makes either do anything at all on an object in
 -- the command zone -- "abilities of emblems function in the command zone" -- and
--- Pawl.Engine.Projection.gatherGiven,
+-- Pawl.Engine.Projection.gatherGiven, Pawl.Engine.Projection.replacementsAffecting,
 -- Pawl.Engine.CombatRestriction.inForce and Pawl.Engine.Event.eventTriggers each
--- walk the command zone for exactly that.
+-- walk the command zone for exactly that, all four through
+-- Pawl.Engine.Vanguard.functionsFromCommandZone.
 --
 -- CR 701.54c's three remaining sentences each begin "as long as the Ring has
 -- tempted that player N or more times, it HAS", so the emblem's ability set is a

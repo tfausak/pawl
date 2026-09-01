@@ -54,6 +54,7 @@ import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -68,6 +69,7 @@ import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -155,6 +157,26 @@ designationSpec s registry = Spec.describe s "Designation" $ do
     let deck = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just shimatsu, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty}
     Spec.assertEqWith s "one card" (Setup.deckSize deck) 1
     Spec.assertEqWith s "and none without a commander" (Setup.deckSize (Deck.fromCards Map.empty)) 0
+  -- CR 113.6: rule 113.6p functions an EMBLEM's and a VANGUARD card's abilities in
+  -- the command zone, and names no commander, so a commander's fall back on the
+  -- rule's own default -- the battlefield. The Walls of Ba Sing Se ({8} Legendary
+  -- Artifact Creature -- Wall 0/30, "Defender / Other permanents you control have
+  -- indestructible" -- checked against Scryfall, 2026-09-01) is the pool's
+  -- commander whose static ability would otherwise reach the whole board from
+  -- there.
+  --
+  -- The pair differs in ONE thing: whether a Walls is also on the battlefield. The
+  -- command-zone one is present in both legs, so the positive leg is what proves
+  -- the ability is expressible at all and the negative is about the zone.
+  Spec.it s "CR 113.6 a commander's static ability does not function from the command zone" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    walls <- S.printingOf s registry "The Walls of Ba Sing Se"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, board) = S.addCreature piker S.alice (commanderBoard mountain walls 0)
+        (_, played) = S.addCreature walls S.alice board
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Indestructible pikerId board)) "her Piker is not indestructible while the Walls sits in the command zone"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Indestructible pikerId played) "and is once a Walls is on the battlefield beside it"
+    Spec.assertEqWith s "setup: the command zone holds the Walls on both boards" (fmap (length . inCommandZone) [board, played]) [1, 1]
 
 castSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 castSpec s registry = Spec.describe s "Cast" $ do

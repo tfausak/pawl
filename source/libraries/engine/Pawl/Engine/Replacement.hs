@@ -148,8 +148,8 @@ asZoneChange event = case event of
 -- order, which is what the ChooseReplacement prompt indexes into:
 --
 --   1. STATIC abilities (Projection.replacementsAffecting): battlefield
---      permanents ascending by id, then the command zone's emblems, whose
---      abilities CR 113.6p leaves functioning there, then the rows a card STATES
+--      permanents ascending by id, then the command zone's emblems and vanguard
+--      cards, whose abilities CR 113.6p leaves functioning there, then the rows a card STATES
 --      it functions from elsewhere with (CR 113.6b) -- the stack, then the
 --      graveyards, then the hands, then the libraries; each object's own effects
 --      in printed order. Read from `sources`, which for a CR 608.2f batch is the

@@ -8,12 +8,12 @@
 -- 902.5 says it of whichever card the player brought. So none of this is a
 -- Pawl.Types.PlayerEffect or a printed static ability.
 --
--- What the variant needs and this module does NOT hold is CR 902.7's abilities
--- functioning from the command zone, which is where an emblem's are found for the
--- same reason (CR 114.4). The triggered half is Pawl.Engine.Event's command-zone
--- walk, which calls isVanguard below rather than growing a second reading of rule
--- 313; the static half needed nothing at all, Pawl.Engine.Projection's walk
--- already admitting an ability that names no zone.
+-- CR 902.7's abilities functioning from the command zone is functionsFromCommandZone
+-- below, the ONE reading of CR 113.6p in the engine: every walk that gathers a
+-- printed ability off a command-zone object asks it, rather than growing its own
+-- reading of rule 313. Those walks are Pawl.Engine.Event's triggered gather,
+-- Pawl.Engine.Projection's static and replacement gathers, and
+-- Pawl.Engine.CombatRestriction.inForce.
 --
 -- There is no GameSettings field for "this is a Vanguard game", and CR 902 asks
 -- for none: every rule in it is stated of a player's vanguard CARD, so having one
@@ -43,8 +43,10 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Vanguard as Vanguard
 import qualified Pawl.Types.Zone as Zone
@@ -67,6 +69,29 @@ isVanguardFace face = Set.member CardType.Vanguard (TypeLine.types (Face.typeLin
 -- under CR 400.7.
 isVanguard :: ObjectId -> GameState -> Bool
 isVanguard oid gs = maybe False isVanguardFace (Game.faceOf oid gs)
+
+-- | CR 113.6p: do this command-zone object's printed abilities function from
+-- there? An emblem's do (CR 114.4) and a face-up vanguard card's do (CR 902.7 \/
+-- 313.4); everything else in the zone falls back on CR 113.6's own default, which
+-- leaves a card's abilities functioning on the battlefield -- so a commander
+-- sitting there does nothing, and Pawl.CommanderSpec's "CR 113.6 a commander's
+-- static ability does not function from the command zone" is what proves it.
+--
+-- A CLASSIFICATION and never an identity: the emblem arm reads
+-- Pawl.Types.Source's own tag and the vanguard arm reads the printed card type.
+--
+-- Rule 902.7's "face-up" is not asked, and cannot come apart from the card type:
+-- CR 902.3 places the card face up and CR 313.2 keeps it in this zone, so no rule
+-- pawl implements can turn one over.
+--
+-- Not implemented: rule 113.6p's other three arms -- plane cards (#934), scheme
+-- cards (#935) and conspiracy cards (#937) -- none of which pawl can put into a
+-- command zone at all, so each answers False here by never arriving.
+functionsFromCommandZone :: ObjectId -> GameState -> Bool
+functionsFromCommandZone oid gs = case fmap Object.source (Game.lookupObject oid gs) of
+  Just (Source.OfEmblem _) -> True
+  Just (Source.OfCard _) -> isVanguard oid gs
+  _ -> False
 
 -- | CR 902.3 \/ 902.6: this player's vanguard card, which is theirs to own and
 -- sits in the command zone all game.
