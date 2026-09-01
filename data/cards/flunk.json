@@ -1,0 +1,143 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Flunk",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ModifyTarget",
+                    "value": {
+                      "duration": {
+                        "type": "UntilEndOfTurn"
+                      },
+                      "modification": {
+                        "type": "ModifyPowerToughness",
+                        "value": {
+                          "power": {
+                            "type": "Negate",
+                            "value": {
+                              "type": "Plus",
+                              "value": {
+                                "left": {
+                                  "type": "Literal",
+                                  "value": 7
+                                },
+                                "right": {
+                                  "type": "Negate",
+                                  "value": {
+                                    "type": "Count",
+                                    "value": {
+                                      "aggregation": {
+                                        "type": "Members"
+                                      },
+                                      "filter": {
+                                        "type": "And",
+                                        "value": []
+                                      },
+                                      "scope": {
+                                        "type": "InZone",
+                                        "value": {
+                                          "player": {
+                                            "type": "ControllerOfBound",
+                                            "value": "target"
+                                          },
+                                          "zone": {
+                                            "type": "Hand"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "toughness": {
+                            "type": "Negate",
+                            "value": {
+                              "type": "Plus",
+                              "value": {
+                                "left": {
+                                  "type": "Literal",
+                                  "value": 7
+                                },
+                                "right": {
+                                  "type": "Negate",
+                                  "value": {
+                                    "type": "Count",
+                                    "value": {
+                                      "aggregation": {
+                                        "type": "Members"
+                                      },
+                                      "filter": {
+                                        "type": "And",
+                                        "value": []
+                                      },
+                                      "scope": {
+                                        "type": "InZone",
+                                        "value": {
+                                          "player": {
+                                            "type": "ControllerOfBound",
+                                            "value": "target"
+                                          },
+                                          "zone": {
+                                            "type": "Hand"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "target": {
+                "pool": {
+                  "type": "Creatures"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
