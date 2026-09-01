@@ -30,14 +30,12 @@ empty =
       Combat.defenders = []
     }
 
--- | 'empty' on the wire, spelled once.
+-- | 'empty' on the wire, spelled once. Every field but `struckFirst` is
+-- 'Fields.defaulted' and so omitted at its default, which is what leaves a
+-- cleared combat down to the one key: this literal is where that omission is
+-- pinned, and a field switched back to 'Fields.required' reappears in it.
 emptyJson :: String
-emptyJson =
-  "{\"attackers\":{},\"blockers\":{},\"struckFirst\":null,\"joinedUnder\":{}"
-    <> ",\"attacked\":[],\"declaredAttacked\":[],\"declaredAttackedThisStep\":[]"
-    <> ",\"declaredAttackers\":[],\"declaredBlockers\":[]"
-    <> ",\"blockersDeclared\":false,\"attackingNothing\":[]"
-    <> ",\"defenders\":[]}"
+emptyJson = "{\"struckFirst\":null}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Combat" $ do
@@ -98,7 +96,7 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
       s
       Combat.codec
       empty {Combat.struckFirst = Just Set.empty}
-      " {\"attackers\":{},\"blockers\":{},\"struckFirst\":[],\"joinedUnder\":{},\"attacked\":[],\"declaredAttacked\":[],\"declaredAttackedThisStep\":[],\"declaredAttackers\":[],\"declaredBlockers\":[],\"blockersDeclared\":false,\"attackingNothing\":[],\"defenders\":[]} "
+      " {\"struckFirst\":[]} "
   -- CR 802.4 / CR 802.5: defenders is ORDERED, not a set -- both rules read it
   -- as APNAP order (CR 101.4). Descending ids, so a codec that sorted or
   -- reversed the list round-trips to a different game rather than to the same
@@ -108,6 +106,6 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
       s
       Combat.codec
       empty {Combat.defenders = [PlayerId.MkPlayerId 14, PlayerId.MkPlayerId 13]}
-      " {\"attackers\":{},\"blockers\":{},\"struckFirst\":null,\"joinedUnder\":{},\"attacked\":[],\"declaredAttacked\":[],\"declaredAttackedThisStep\":[],\"declaredAttackers\":[],\"declaredBlockers\":[],\"blockersDeclared\":false,\"attackingNothing\":[],\"defenders\":[14,13]} "
+      " {\"struckFirst\":null,\"defenders\":[14,13]} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Combat.codec

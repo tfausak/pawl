@@ -2,6 +2,8 @@
 
 module Pawl.Codec.Object where
 
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Codec.Binding as Binding
 import qualified Pawl.Codec.CardName as CardName
@@ -28,8 +30,11 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind.Type
+import qualified Pawl.Types.Facing as Facing.Type
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.TapState as TapState.Type
 import qualified Pawl.Types.Timestamp as Timestamp.Type
 
 -- | CR 702.33d: one of a spell's kicker costs and how many times its controller
@@ -53,13 +58,14 @@ counterTimestamp = Fields.object $ do
   timestamp <- Fields.required "timestamp" Timestamp.codec snd
   pure (kind, timestamp)
 
--- | Every field 'Fields.required', the posture Pawl.Codec.Combat takes for the
--- rest of the game state: a Maybe is written as an explicit null rather than
--- elided, and an empty collection as an empty array. Several of the absences are
--- states in their own right rather than a zero -- CR 109.4's object with no
--- controller at all on `enteredUnder`, CR 702.170a's un-plotted card against a card
--- plotted on turn 0 -- and the type's own haddock argues each; writing them all
--- alike is what keeps the reader from having to know which.
+-- | `owner`, `source`, `zone`, `timestamp` and `sickness` are 'Fields.required'
+-- -- none of them has a value that means "unset" -- and every other field is
+-- 'Fields.defaulted', so an object that has done nothing writes those keys and
+-- nothing else. An absence and the default are the same value in both
+-- directions, so the states the type's own haddock distinguishes survive: CR
+-- 109.4's object with no controller at all is `enteredUnder` absent, and CR
+-- 702.170a's un-plotted card is `plotted` absent against a `"plotted":0` for one
+-- plotted on turn 0.
 --
 -- `counters` is 'Common.multiset', whose entries are key/count objects, so a
 -- kind sitting at ZERO survives the round trip: Pawl.Engine.Damage takes CR
@@ -71,44 +77,44 @@ counterTimestamp = Fields.object $ do
 codec :: Codec.Codec Object.Object
 codec = Fields.object $ do
   owner <- Fields.required "owner" PlayerId.codec Object.owner
-  enteredUnder <- Fields.required "enteredUnder" (Common.maybe PlayerId.codec) Object.enteredUnder
+  enteredUnder <- Fields.defaulted "enteredUnder" Nothing (Common.maybe PlayerId.codec) Object.enteredUnder
   source <- Fields.required "source" Source.codec Object.source
   zone <- Fields.required "zone" Zone.codec Object.zone
-  tapped <- Fields.required "tapped" TapState.codec Object.tapped
-  facing <- Fields.required "facing" Facing.codec Object.facing
-  exiledFaceDown <- Fields.required "exiledFaceDown" Common.boolean Object.exiledFaceDown
-  damage <- Fields.required "damage" Common.natural Object.damage
+  tapped <- Fields.defaulted "tapped" TapState.Type.Untapped TapState.codec Object.tapped
+  facing <- Fields.defaulted "facing" Facing.Type.FaceUp Facing.codec Object.facing
+  exiledFaceDown <- Fields.defaulted "exiledFaceDown" False Common.boolean Object.exiledFaceDown
+  damage <- Fields.defaulted "damage" 0 Common.natural Object.damage
   sickness <- Fields.required "sickness" Sickness.codec Object.sickness
-  bindings <- Fields.required "bindings" Binding.codecMap Object.bindings
-  counters <- Fields.required "counters" (Common.multiset (CounterKind.codec Keyword.codec)) Object.counters
-  counterTimestamps <- Fields.required "counterTimestamps" (Common.keyedList counterTimestamp) Object.counterTimestamps
-  attachedTo <- Fields.required "attachedTo" (Common.maybe Recipient.codec) Object.attachedTo
-  chosenColor <- Fields.required "chosenColor" (Common.maybe Color.codec) Object.chosenColor
-  chosenSubtype <- Fields.required "chosenSubtype" (Common.maybe Subtype.codec) Object.chosenSubtype
-  chosenNames <- Fields.required "chosenNames" (Common.set CardName.codec) Object.chosenNames
-  chosenPlayer <- Fields.required "chosenPlayer" (Common.maybe PlayerId.codec) Object.chosenPlayer
+  bindings <- Fields.defaulted "bindings" Map.empty Binding.codecMap Object.bindings
+  counters <- Fields.defaulted "counters" Map.empty (Common.multiset (CounterKind.codec Keyword.codec)) Object.counters
+  counterTimestamps <- Fields.defaulted "counterTimestamps" Map.empty (Common.keyedList counterTimestamp) Object.counterTimestamps
+  attachedTo <- Fields.defaulted "attachedTo" Nothing (Common.maybe Recipient.codec) Object.attachedTo
+  chosenColor <- Fields.defaulted "chosenColor" Nothing (Common.maybe Color.codec) Object.chosenColor
+  chosenSubtype <- Fields.defaulted "chosenSubtype" Nothing (Common.maybe Subtype.codec) Object.chosenSubtype
+  chosenNames <- Fields.defaulted "chosenNames" Set.empty (Common.set CardName.codec) Object.chosenNames
+  chosenPlayer <- Fields.defaulted "chosenPlayer" Nothing (Common.maybe PlayerId.codec) Object.chosenPlayer
   timestamp <- Fields.required "timestamp" Timestamp.codec Object.timestamp
-  face <- Fields.required "face" (Common.maybe CardName.codec) Object.face
-  turnedOverAt <- Fields.required "turnedOverAt" (Common.maybe Timestamp.codec) Object.turnedOverAt
-  worldSince <- Fields.required "worldSince" (Common.maybe Timestamp.codec) Object.worldSince
-  playableFromExile <- Fields.required "playableFromExile" (Common.maybe ExilePlayPermission.codec) Object.playableFromExile
-  plotted <- Fields.required "plotted" (Common.maybe Common.natural) Object.plotted
-  foretold <- Fields.required "foretold" (Common.maybe Common.natural) Object.foretold
-  ringBearerFor <- Fields.required "ringBearerFor" (Common.maybe PlayerId.codec) Object.ringBearerFor
-  protector <- Fields.required "protector" (Common.maybe PlayerId.codec) Object.protector
-  ventureRoom <- Fields.required "ventureRoom" (Common.maybe RoomIndex.codec) Object.ventureRoom
-  classLevel <- Fields.required "classLevel" (Common.maybe ClassLevel.codec) Object.classLevel
-  unlockedHalves <- Fields.required "unlockedHalves" (Common.set CardName.codec) Object.unlockedHalves
-  designations <- Fields.required "designations" (Common.set Designation.codec) Object.designations
-  kicked <- Fields.required "kicked" (Common.keyedList kickerPayment) Object.kicked
-  bestowed <- Fields.required "bestowed" Common.boolean Object.bestowed
-  phyrexianLifePaid <- Fields.required "phyrexianLifePaid" Common.natural Object.phyrexianLifePaid
-  manaSpent <- Fields.required "manaSpent" Mana.codec Object.manaSpent
-  announcedX <- Fields.required "announcedX" (Common.maybe Common.natural) Object.announcedX
-  detainedUntil <- Fields.required "detainedUntil" (Common.set PlayerId.codec) Object.detainedUntil
-  goadedBy <- Fields.required "goadedBy" (Common.set PlayerId.codec) Object.goadedBy
-  doesNotUntapNext <- Fields.required "doesNotUntapNext" Common.boolean Object.doesNotUntapNext
-  exertedBy <- Fields.required "exertedBy" (Common.set PlayerId.codec) Object.exertedBy
+  face <- Fields.defaulted "face" Nothing (Common.maybe CardName.codec) Object.face
+  turnedOverAt <- Fields.defaulted "turnedOverAt" Nothing (Common.maybe Timestamp.codec) Object.turnedOverAt
+  worldSince <- Fields.defaulted "worldSince" Nothing (Common.maybe Timestamp.codec) Object.worldSince
+  playableFromExile <- Fields.defaulted "playableFromExile" Nothing (Common.maybe ExilePlayPermission.codec) Object.playableFromExile
+  plotted <- Fields.defaulted "plotted" Nothing (Common.maybe Common.natural) Object.plotted
+  foretold <- Fields.defaulted "foretold" Nothing (Common.maybe Common.natural) Object.foretold
+  ringBearerFor <- Fields.defaulted "ringBearerFor" Nothing (Common.maybe PlayerId.codec) Object.ringBearerFor
+  protector <- Fields.defaulted "protector" Nothing (Common.maybe PlayerId.codec) Object.protector
+  ventureRoom <- Fields.defaulted "ventureRoom" Nothing (Common.maybe RoomIndex.codec) Object.ventureRoom
+  classLevel <- Fields.defaulted "classLevel" Nothing (Common.maybe ClassLevel.codec) Object.classLevel
+  unlockedHalves <- Fields.defaulted "unlockedHalves" Set.empty (Common.set CardName.codec) Object.unlockedHalves
+  designations <- Fields.defaulted "designations" Set.empty (Common.set Designation.codec) Object.designations
+  kicked <- Fields.defaulted "kicked" Map.empty (Common.keyedList kickerPayment) Object.kicked
+  bestowed <- Fields.defaulted "bestowed" False Common.boolean Object.bestowed
+  phyrexianLifePaid <- Fields.defaulted "phyrexianLifePaid" 0 Common.natural Object.phyrexianLifePaid
+  manaSpent <- Fields.defaulted "manaSpent" (Mana.Type.MkMana []) Mana.codec Object.manaSpent
+  announcedX <- Fields.defaulted "announcedX" Nothing (Common.maybe Common.natural) Object.announcedX
+  detainedUntil <- Fields.defaulted "detainedUntil" Set.empty (Common.set PlayerId.codec) Object.detainedUntil
+  goadedBy <- Fields.defaulted "goadedBy" Set.empty (Common.set PlayerId.codec) Object.goadedBy
+  doesNotUntapNext <- Fields.defaulted "doesNotUntapNext" False Common.boolean Object.doesNotUntapNext
+  exertedBy <- Fields.defaulted "exertedBy" Set.empty (Common.set PlayerId.codec) Object.exertedBy
   pure
     Object.MkObject
       { Object.owner = owner,

@@ -18,8 +18,11 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Player" $ do
   -- CR 103.4's starting life total and nothing else: a player outside a
   -- Commander game (CR 903.3), with no speed at all (CR 702.179b) and no
-  -- counters. `speed` is null here and 0 below, which CR 704.5aa makes two
-  -- different players.
+  -- counters. `speed` is null here and a number below, which CR 702.179b and CR
+  -- 704.5aa make two different players -- no speed at all, against a speed that
+  -- has a value. Every other field is 'Fields.defaulted' and sits at its
+  -- default, so this literal is where the OMISSION is pinned: a field switched
+  -- back to 'Fields.required' reappears in it.
   Spec.it s "a player at the start of an ordinary game" $
     Common.assertCodec
       s
@@ -38,7 +41,7 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.completedDungeons = 0,
           Player.completedDungeonNames = Set.empty
         }
-      " {\"life\":20,\"status\":{\"type\":\"Playing\"},\"counters\":[],\"ringTemptations\":0,\"speed\":null,\"commander\":null,\"commanderCasts\":0,\"commanderDamage\":{},\"dungeons\":[],\"outsideTheGame\":{},\"completedDungeons\":0,\"completedDungeonNames\":[]} "
+      " {\"life\":20,\"speed\":null} "
   -- Every axis away from the case above. `life` is NEGATIVE, which CR 104.3b
   -- reaches through a state-based action rather than clamping at zero, so the
   -- field is an Integer and a Natural encoder would reject this state.

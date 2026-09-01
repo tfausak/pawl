@@ -12,6 +12,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.GameEvent as GameEvent.Codec
 import qualified Pawl.Codec.GameState as GameState.Codec
+import qualified Pawl.Codec.PlayerId as PlayerId.Codec
 import qualified Pawl.Codec.Printing as Printing.Codec
 import qualified Pawl.Engine.Card as Card
 -- Aliased Filter.Type, not Filter, for consistency with FilterSpec: the
@@ -20,6 +21,8 @@ import qualified Pawl.Engine.Card as Card
 
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Json.Pair as Pair
+import qualified Pawl.Json.String as String
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -330,6 +333,31 @@ gameStateRoundTripSpec s registry = do
     mountain <- S.printingOf s registry "Mountain"
     roundTrips "a state with a monarch" (S.withMonarch S.bob (S.oneMountainState mountain Phase.PrecombatMain))
 
+  -- The one thing the round trip above cannot say. `decode . encode == id` holds
+  -- whenever the two sides agree, including on a shape neither of them should
+  -- write, so this reads the encoded object's KEYS instead: a defaulted field is
+  -- absent at its default and present once it differs. The key list is spelled
+  -- out rather than sampled, so a field switched back to Fields.required, or
+  -- given a default the record cannot hold, shows up here.
+  Spec.it s "a defaulted field is omitted at its default and written once it differs" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let plain = S.oneMountainState mountain Phase.PrecombatMain
+    Spec.assertEqWith
+      s
+      "a plain board writes only the required keys and the ones it moved"
+      (fmap (fmap (Text.unpack . String.unwrap . Pair.name)) (Common.asObject (Codec.encode GameState.Codec.codec plain)))
+      (Right plainBoardKeys)
+    Spec.assertEqWith
+      s
+      "monarch is absent while nobody is the monarch"
+      (fmap (Common.lookupPair "monarch") (Common.asObject (Codec.encode GameState.Codec.codec plain)))
+      (Right Nothing)
+    Spec.assertEqWith
+      s
+      "monarch is written once bob has it"
+      (fmap (Common.lookupPair "monarch") (Common.asObject (Codec.encode GameState.Codec.codec (S.withMonarch S.bob plain))))
+      (Right (Just (Codec.encode PlayerId.Codec.codec S.bob)))
+
   -- printingIds is DERIVED on decode rather than written, so this is the case
   -- that says the derivation is exact: the state carries two distinct printings,
   -- and a decode that rebuilt the table wrongly would not equal the original.
@@ -364,3 +392,30 @@ gameStateRoundTripSpec s registry = do
         gs = Setup.subgameStateFrom S.alice gs0
     Spec.assertBool s (not (Map.null (GameState.outsideObjects gs))) "the fixture should hold at least one outside object"
     roundTrips "a subgame's outsideObjects snapshot" gs
+
+-- | Every key Pawl.Codec.GameState writes for S.oneMountainState. Spelled out so
+-- that the ABSENCE of every other field is asserted rather than assumed: the
+-- record has some seventy fields and this board writes these, in the record's
+-- own order. `hand` and `priority` are here because the fixture moved them off
+-- their defaults; `library`, `battlefield` and the rest of the zones are not,
+-- because it did not.
+plainBoardKeys :: [String]
+plainBoardKeys =
+  [ "settings",
+    "objects",
+    "hand",
+    "players",
+    "combat",
+    "nextEventGroup",
+    "turnOrder",
+    "activePlayer",
+    "phase",
+    "remaining",
+    "priority",
+    "turnNumber",
+    "nextObjectId",
+    "printings",
+    "nextPrintingId",
+    "nextTimestamp",
+    "lastChoice"
+  ]

@@ -2,6 +2,8 @@
 
 module Pawl.Codec.Combat where
 
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Pawl.Codec.AttackTarget as AttackTarget
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
@@ -26,18 +28,18 @@ import qualified Pawl.Types.Combat as Combat
 -- APNAP order, so the order is part of the value.
 codec :: Codec.Codec Combat.Combat
 codec = Fields.object $ do
-  attackers <- Fields.required "attackers" (Common.naturalMap ObjectId.codec AttackTarget.codec) Combat.attackers
-  blockers <- Fields.required "blockers" (Common.naturalMap ObjectId.codec (Common.set ObjectId.codec)) Combat.blockers
+  attackers <- Fields.defaulted "attackers" Map.empty (Common.naturalMap ObjectId.codec AttackTarget.codec) Combat.attackers
+  blockers <- Fields.defaulted "blockers" Map.empty (Common.naturalMap ObjectId.codec (Common.set ObjectId.codec)) Combat.blockers
   struckFirst <- Fields.required "struckFirst" (Common.maybe (Common.set ObjectId.codec)) Combat.struckFirst
-  joinedUnder <- Fields.required "joinedUnder" (Common.naturalMap ObjectId.codec PlayerId.codec) Combat.joinedUnder
-  attacked <- Fields.required "attacked" (Common.set AttackTarget.codec) Combat.attacked
-  declaredAttacked <- Fields.required "declaredAttacked" (Common.set AttackTarget.codec) Combat.declaredAttacked
-  declaredAttackedThisStep <- Fields.required "declaredAttackedThisStep" (Common.set AttackTarget.codec) Combat.declaredAttackedThisStep
-  declaredAttackers <- Fields.required "declaredAttackers" (Common.set ObjectId.codec) Combat.declaredAttackers
-  declaredBlockers <- Fields.required "declaredBlockers" (Common.set ObjectId.codec) Combat.declaredBlockers
-  blockersDeclared <- Fields.required "blockersDeclared" Common.boolean Combat.blockersDeclared
-  attackingNothing <- Fields.required "attackingNothing" (Common.set ObjectId.codec) Combat.attackingNothing
-  defenders <- Fields.required "defenders" (Common.list PlayerId.codec) Combat.defenders
+  joinedUnder <- Fields.defaulted "joinedUnder" Map.empty (Common.naturalMap ObjectId.codec PlayerId.codec) Combat.joinedUnder
+  attacked <- Fields.defaulted "attacked" Set.empty (Common.set AttackTarget.codec) Combat.attacked
+  declaredAttacked <- Fields.defaulted "declaredAttacked" Set.empty (Common.set AttackTarget.codec) Combat.declaredAttacked
+  declaredAttackedThisStep <- Fields.defaulted "declaredAttackedThisStep" Set.empty (Common.set AttackTarget.codec) Combat.declaredAttackedThisStep
+  declaredAttackers <- Fields.defaulted "declaredAttackers" Set.empty (Common.set ObjectId.codec) Combat.declaredAttackers
+  declaredBlockers <- Fields.defaulted "declaredBlockers" Set.empty (Common.set ObjectId.codec) Combat.declaredBlockers
+  blockersDeclared <- Fields.defaulted "blockersDeclared" False Common.boolean Combat.blockersDeclared
+  attackingNothing <- Fields.defaulted "attackingNothing" Set.empty (Common.set ObjectId.codec) Combat.attackingNothing
+  defenders <- Fields.defaulted "defenders" [] (Common.list PlayerId.codec) Combat.defenders
   pure
     Combat.MkCombat
       { Combat.attackers = attackers,
