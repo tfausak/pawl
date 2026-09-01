@@ -466,9 +466,9 @@ attackCeiling candidates gs =
 --     attack".
 --   * The GATED one (Armored Galleon, "can't attack unless defending player
 --     controls an Island") names the DEFENDING PLAYER of the announcement, which
---     CR 508.5 reads off the planeswalker's controller or the battle's protector
---     as readily as off the seat attacked directly. So every arm consults it,
---     through targetDefender.
+--     CR 508.5 and CR 802.2a read off the planeswalker's controller or the
+--     battle's protector as readily as off the seat attacked directly. So every
+--     arm consults it, through targetDefender.
 --
 -- Exhaustive over CR 506.3's three things rather than a wildcard, so a fourth of
 -- them fails to compile here. Not implemented: an AIMED-AT restriction naming a
