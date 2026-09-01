@@ -563,9 +563,9 @@ damagingPlayer pid p = case p of
 --
 -- The two legs are one board differing in ONE thing: alice's Prodigal Sorcerer
 -- pings the Zubera or the Hill Giant standing beside it. The same Lightning Bolt
--- kills the Zubera in both (CR 704.5g -- 3 damage is lethal to a 3/3, marked or
--- pinged), so the 3 damage alice takes cannot be the kill's doing; only the
--- ping's one point moves the turn's total from 3 to 4.
+-- kills the Zubera in both (CR 704.5g -- 3 is lethal to a 3/3 whether or not the
+-- ping came first), so the 3 damage alice takes cannot be the kill's doing; only
+-- the ping's one point moves the turn's total from 3 to 4.
 damageDealtToItSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 damageDealtToItSpec s registry =
   let run sorcerer zubera giant mountain bolt pingsZubera k =

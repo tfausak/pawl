@@ -602,14 +602,9 @@ data Quantity
     -- was dealt to it this turn", asked of a creature CR 400.7 has already
     -- deleted.
     --
-    -- A total of the AMOUNTS and not a tally of the events, LifeGainedThisTurn's
-    -- shape rather than PlayersDealtDamageThisTurn's, because "4 or more damage"
-    -- is a quantity of damage and two Lightning Bolts are one event apiece.
-    --
-    -- Read off the event log and never off Object.damage, so it answers for the
-    -- three cases where the two part company: CR 120.6's regeneration and
-    -- cleanup remove the marks, and CR 120.3d marks none at all for wither and
-    -- infect.
+    -- A total of the AMOUNTS, LifeGainedThisTurn's shape rather than
+    -- PlayersDealtDamageThisTurn's tally of who: two Lightning Bolts are 6
+    -- damage.
     --
     -- A LEAF, like WasToken and WasBlocking: it holds no Quantity.
     DamageDealtToThisTurn
