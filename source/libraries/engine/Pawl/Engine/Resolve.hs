@@ -6335,8 +6335,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     case (mSlot, namesEveryToken quantity, minted) of
       (Nothing, _, _) -> pure ()
       -- Nothing was minted, so no slot names anything: an unevaluable or
-      -- non-positive count, or a creator reference naming nobody (CR 101.3).
-      -- createTokens itself always places what it is asked for (CR 111.2).
+      -- non-positive count, a creator reference naming nobody (CR 101.3), a
+      -- creator who has left the game (CR 800.4b), or CR 111.5's prohibited
+      -- token, which createTokens refuses to mint at all.
       (Just _, _, []) -> pure ()
       -- The card says "those tokens", so the slot holds EVERY token this
       -- Create minted (CR 111.1) and there is nothing to ask.

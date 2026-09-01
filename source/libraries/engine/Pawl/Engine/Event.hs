@@ -5056,6 +5056,12 @@ sacrifice pid oid = do
 -- observable. Pawl.CopySpec's "none may copy a sibling" is the proof: deleting
 -- the loop below leaves five 0/0 Clones for CR 704.5f to bury.
 --
+-- ANSWERS [] rather than the ids it was asked for on three roads, which every
+-- caller must read: CR 800.4b's departed player and CR 111.5's prohibition below,
+-- plus resolveTokens declining. Pawl.Engine.Resolve's Create arm binds no slot
+-- for an empty answer and Pawl.Engine.Amass re-reads the board for CR 701.47b's
+-- "impossible choice", so both already say the right thing.
+--
 -- CR 800.4b / 800.4d: no token is created for a player who has left the game. The
 -- two sentences coincide by CR 111.2, which makes a token's owner and controller
 -- the same player, so one guard satisfies both. Checked BEFORE resolveTokens: the
