@@ -48,8 +48,8 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 103.4's twenty, CR 903.7 / CR 103.4c's forty for a Commander game taken off
--- the deck's CR 903.3 designation, and CR 903.12f's twenty-five or thirty when
--- the Brawl option is in use.
+-- the deck's CR 903.3 designation, and CR 903.12f / CR 103.4d's twenty-five or
+-- thirty when the Brawl option is in use.
 --
 -- CR 903.12f reads the SEAT COUNT and not the designation: "in a two-player
 -- Brawl game, each player's starting life total is 25. In a multiplayer Brawl
@@ -287,7 +287,7 @@ createDeck pid deck = do
   -- CR 103.2a: the sideboard is set aside before the game, so these are interned
   -- alongside the deck's own printings but no card is created for them.
   sideboardIds <- Monad.mapM (\(printing, n) -> fmap (\i -> (i, n)) (State.state (Game.intern printing))) (Map.toAscList (Deck.sideboard deck))
-  -- CR 903.7 / CR 103.4 / CR 903.12f: the starting life total, which is the
+  -- CR 903.7 / CR 103.4 / CR 103.4d: the starting life total, which is the
   -- deck's business -- and the settings' and the seat count's -- and so cannot
   -- be settled by emptyGame above.
   State.modify' $ \gs ->
