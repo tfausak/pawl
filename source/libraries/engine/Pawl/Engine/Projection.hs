@@ -929,6 +929,9 @@ viewOfCard face =
           -- CR 111.6: "A token isn't a card." CR 704.5d already made a token in
           -- any zone this builder describes cease to exist.
           Filter.token = False,
+          -- CR 113.3b: an ability on the stack is never a printed face, so this
+          -- builder's candidate cannot be one.
+          Filter.activatedAbility = False,
           Filter.tapped = False,
           -- CR 110.5d: only permanents have status, and this is a printed FACE
           -- with no object behind it -- the rule's own answer rather than an
@@ -1251,6 +1254,11 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- viewWithLastKnownAnywhere writes CR 608.2h's answer over it for the
       -- readers owed one, exactly as `owner` above has it.
       Filter.token = Game.isToken oid gs,
+      -- CR 113.3b, read off Object.source for `token` above's reason: which of CR
+      -- 113.3's kinds an ability is is fixed for the life of the object. False
+      -- for an id naming nothing, and for every object that is not an ability on
+      -- the stack.
+      Filter.activatedAbility = Game.isActivatedAbility oid gs,
       Filter.tapped = Game.isTapped oid gs,
       -- CR 110.5's other status, and the only site that fills the field. Read off
       -- Object.facing, never off the projection: CR 110.5a says status is not a
@@ -4231,6 +4239,10 @@ filterReads f = case f of
   Filter.Type.CanAttachToSubject -> Set.fromList [Types, Subtypes, Colors, Keywords, PowerA, Controller]
   -- Reads nothing: no Modification writes Object.source.
   Filter.Type.IsToken -> Set.empty
+  -- Reads nothing, for the atom above's reason and off the same record: CR
+  -- 113.3's two kinds are told apart by Pawl.Types.Source, which no Modification
+  -- writes.
+  Filter.Type.IsActivatedAbility -> Set.empty
   -- CR 110.5: tap status is not a characteristic, so no layer writes it.
   Filter.Type.IsTapped -> Set.empty
   -- CR 110.5a again, one status category over: face-up/face-down is not a
@@ -4366,6 +4378,7 @@ filterReadsPeers f = case f of
   Filter.Type.IsAttachedToSource -> False
   Filter.Type.IsHostOfSource -> False
   Filter.Type.IsToken -> False
+  Filter.Type.IsActivatedAbility -> False
   Filter.Type.IsTapped -> False
   Filter.Type.IsFaceDown -> False
   Filter.Type.IsExiledFaceDown -> False
