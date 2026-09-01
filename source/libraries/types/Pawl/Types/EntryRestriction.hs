@@ -7,7 +7,8 @@ import qualified Pawl.Types.Zone as Zone
 -- | CR 101.2 / CR 400.4a: one printed ENTRY PROHIBITION -- an effect saying an
 -- object "can't enter the battlefield". Grafdigger's Cage's first sentence
 -- ("creature cards in graveyards and libraries can't enter the battlefield") is
--- the pool's printing.
+-- one of the pool's printings; Worms of the Earth's "lands can't enter the
+-- battlefield" is the other kind, naming no zone.
 --
 -- The two rules divide the sentence. CR 101.2 gives the "can't" its force over
 -- whatever allowed or directed the entry. CR 400.4a says what happens instead --
@@ -62,6 +63,12 @@ data EntryRestriction = MkEntryRestriction
     -- | Which zones the object must be LEAVING for the prohibition to reach it.
     -- Grafdigger's Cage names the graveyard and the library; Worms of the Earth's
     -- "lands can't enter the battlefield" names none, i.e. every zone, which is
+    -- the full set.
+    --
+    -- Whether the set holds Zone.Battlefield is also what decides whether a
+    -- restriction reaches CR 111.5's token, since Pawl.Engine.Event.createTokens
+    -- asks about a token already minted onto the battlefield: a restriction that
+    -- names zones names off-battlefield ones, and only a zone-unscoped one carries
     -- the full set.
     --
     -- A FIELD rather than an atom of the affected filter above, and this is the
