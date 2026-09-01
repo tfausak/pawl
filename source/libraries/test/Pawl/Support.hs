@@ -1169,9 +1169,9 @@ combatBoard piker a b = combatBoardOf (replicate a piker) (replicate b piker)
 -- and carol one per printing in `others`, so BOTH opponents are legal
 -- defending-player choices and both can block.
 --
--- Positioned at the BEGINNING of combat, unlike combatBoardOf: Combat.defender is
--- Nothing, and running the step is what fills it (CR 703.4h). A test that wants a
--- particular defender without running the step sets the field itself.
+-- Positioned at the BEGINNING of combat, unlike combatBoardOf: Combat.defenders
+-- is empty, and running the step is what fills it (CR 703.4h). A test that wants
+-- a particular defender without running the step sets the field itself.
 threePlayerCombat :: [Printing.Printing] -> [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId], [ObjectId.ObjectId])
 threePlayerCombat mine theirs others =
   let addAll pid ps gs =

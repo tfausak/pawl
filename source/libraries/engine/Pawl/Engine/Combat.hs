@@ -777,7 +777,7 @@ landwalkAllowsGiven grants pcs attacker gs =
       -- apart once a battle is attacked. Nothing means the object is not attacking
       -- at all; an attacker whose battle has left still reads CR 506.2's defending
       -- player, which Pawl.BattleSpec's departed-Siege trio proves.
-      defendingPlayer = Defender.playerOfAttacker attacker gs
+      defendingPlayer = Defender.playerOfAttacker Projection.controllerWithLastKnown attacker gs
       -- CR 702.14c's lands of the defending player. Lazy, and load-bearing: this
       -- walks the whole battlefield, and `any` below never forces it for an
       -- attacker without landwalk.
@@ -1057,7 +1057,7 @@ becomeBlocked oid gs =
            in -- The status is conferred either way: with no defending player
               -- there is nobody for a CR 509.3c trigger to bind, and CR 509.1h
               -- still says the creature is blocked.
-              case Defender.playerOfAttacker oid gs Applicative.<|> Maybe.listToMaybe (Defender.defendingPlayers gs) of
+              case Defender.playerOfAttacker Projection.controllerWithLastKnown oid gs Applicative.<|> Maybe.listToMaybe (Defender.defendingPlayers gs) of
                 Nothing -> blocked
                 -- Blocked by ZERO creatures, which is this road's whole point:
                 -- CR 509.3e's count triggers ask how many creatures block it,
@@ -1476,7 +1476,7 @@ attemptAttackDeclaration pid rejected = do
               -- defending player instead (#2279).
               State.modify'
                 ( \g ->
-                    let defendingFor oid = (\t -> Defender.playerOf t g) =<< Map.lookup oid recorded
+                    let defendingFor oid = (\t -> Defender.playerOf Projection.controllerWithLastKnown t g) =<< Map.lookup oid recorded
                         declared = Natural.length attacking
                         record h oid = Maybe.maybe h (\d -> Event.recordEvent (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid d declared)) h) (defendingFor oid)
                      in List.foldl' record g attacking
@@ -1653,7 +1653,7 @@ putOntoBattlefieldBlocking oid attacker = do
         -- CR 509.4a's first clause
         Map.member attacker (Combat.attackers c),
         -- CR 506.3e / CR 509.4a's second clause
-        Defender.playerOfAttacker attacker gs == Just controller -> do
+        Defender.playerOfAttacker Projection.controllerWithLastKnown attacker gs == Just controller -> do
           -- CR 509.3c's "was an unblocked creature at that time", read BEFORE the
           -- write below, and CR 509.3e's comparand read at the same moment: the
           -- creatures blocking this attacker before this one joined them. The two
@@ -1742,7 +1742,17 @@ declareBlockers = do
       -- player, a planeswalker that player controls, or a battle that player
       -- protects -- which is attackersOn's list, and is the whole of `attacking`
       -- wherever one player defends.
-      attemptBlockDeclaration pid (attackersOn pid start) Set.empty
+      --
+      -- A defending player with none of them is SKIPPED rather than asked. CR
+      -- 509.1a's choice is "one creature for it to block that's attacking that
+      -- player, a planeswalker they control, or a battle they protect", so with
+      -- that list empty the empty declaration is the only legal one and there is
+      -- nothing to ask. CR 802.2 makes this ordinary at three or more seats:
+      -- every opponent defends, and only the ones a creature was aimed at have
+      -- an attacker on them.
+      case attackersOn pid start of
+        [] -> pure ()
+        theirs -> attemptBlockDeclaration pid theirs Set.empty
     -- CR 509.1h's other half, performed once CR 509.1g has assigned the blockers:
     -- every attacking creature the declaration named no blockers for became an
     -- UNBLOCKED creature. TriggerCondition.SelfAttacksUnblocked is the reader.
@@ -1949,6 +1959,6 @@ attemptBlockDeclaration pid attacking rejected = do
               let becameBlocked = Set.difference (Set.fromList (fmap snd pairs)) wasBlocked
               State.modify'
                 ( \g ->
-                    let defendingFor oid = Maybe.fromMaybe pid (Defender.playerOfAttacker oid g)
+                    let defendingFor oid = Maybe.fromMaybe pid (Defender.playerOfAttacker Projection.controllerWithLastKnown oid g)
                      in List.foldl' (\h attacker -> Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker (defendingFor attacker) (Natural.length (Map.findWithDefault Set.empty attacker merged)))) h) g (Set.toList becameBlocked)
                 )

@@ -52,34 +52,35 @@ defendingPlayers = Combat.defenders . GameState.combat
 -- rather than off the combat record is what makes that true of a battle whose
 -- controller is the attacking player -- the case CR 310.9b's "notably" creates.
 --
--- Not implemented: CR 802.2a's answer for a creature whose PLANESWALKER has left
--- combat. That arm answers the first defending player, which is exact while the
--- list is a singleton and the wrong seat otherwise; this module sits below
--- Pawl.Engine.Projection, so it cannot ask who controlled the planeswalker
--- (#2841). While the planeswalker is still attacked the answer is right at any
--- seat count without asking: both ways a target is recorded draw it from
--- Pawl.Engine.Combat.attackTargets -- CR 508.1b's declaration and CR 508.4's
--- entry -- and that list offers a defending player only their own planeswalkers,
--- so its controller is a defending player and the fallback below is reached only
--- once CR 506.4 has removed it. CR 702.19e is what settles that such a creature
--- still HAS a defending player: it assigns damage to one. Pawl.CombatSpec's
--- LastKnownDefendingPlayer group is the board where reading the object instead
--- would answer nobody, a Confiscate having moved the planeswalker's control
--- before CR 704.5i buried it.
+-- The controller lookup is a PARAMETER because this module sits below
+-- Pawl.Engine.Projection -- Projection reads the designation from here -- and CR
+-- 508.5's planeswalker arm is a layer-2 question. Every caller passes
+-- Projection.controllerWithLastKnown, which is what CR 608.2h's last known
+-- information asks for once CR 704.5i has buried the planeswalker: reading the
+-- object itself would answer nobody, and reading its owner the wrong seat.
+-- Pawl.CombatEffectSpec's LastKnownDefendingPlayer group is those two falsifiers.
+--
+-- CR 506.4 is why one lookup serves both of CR 802.2a's tenses: a planeswalker
+-- whose controller changes is removed from combat, so "controls" and "controlled
+-- before it was removed" cannot disagree while the creature is still attacking it.
+--
+-- Not implemented: CR 802.2a for a creature whose BATTLE has left the
+-- battlefield. That arm answers the first defending player, which is exact only
+-- while the list is a singleton; CR 310.9's protector is not a characteristic, so
+-- Pawl.Types.LastKnown does not file one and there is nothing to read (#2844).
 --
 -- Nothing means the target names no player: no defending player at all (outside
 -- combat), or a battle mid-repair with no designation (CR 310.11).
-playerOf :: AttackTarget.AttackTarget -> GameState -> Maybe PlayerId
-playerOf target gs = case target of
+playerOf :: (ObjectId -> GameState -> Maybe PlayerId) -> AttackTarget.AttackTarget -> GameState -> Maybe PlayerId
+playerOf controllerOf target gs = case target of
   AttackTarget.OfPlayer pid -> Just pid
-  AttackTarget.OfPlaneswalker _ -> Maybe.listToMaybe (defendingPlayers gs)
+  AttackTarget.OfPlaneswalker pw -> controllerOf pw gs
   -- CR 310.9d while the battle is there: the protector is the defending player
   -- relative to it, including CR 310.11's mid-repair battle whose designation
   -- names nobody. Once it has left, CR 506.4c keeps the creature attacking with
-  -- no battle to read, so the answer is CR 506.2's defending player -- the one
-  -- the combat record holds. Battlefield membership rather than a missing
-  -- object, the question attackableBattles already asks, so it does not rest on
-  -- the departed id having been purged from GameState.objects.
+  -- no battle to read. Battlefield membership rather than a missing object, the
+  -- question attackableBattles already asks, so it does not rest on the departed
+  -- id having been purged from GameState.objects.
   --
   -- The GUARD itself is a regression fence rather than a proven behavior. An
   -- attacked battle's protector and defendingPlayers cannot differ today:
@@ -97,7 +98,7 @@ playerOf target gs = case target of
 -- being phrased about a creature. Nothing when the object is not attacking at
 -- all, which is the honest answer: a creature that is not an attacker has no
 -- defending player.
-playerOfAttacker :: ObjectId -> GameState -> Maybe PlayerId
-playerOfAttacker attacker gs =
-  (\target -> playerOf target gs)
+playerOfAttacker :: (ObjectId -> GameState -> Maybe PlayerId) -> ObjectId -> GameState -> Maybe PlayerId
+playerOfAttacker controllerOf attacker gs =
+  (\target -> playerOf controllerOf target gs)
     =<< Map.lookup attacker (Combat.attackers (GameState.combat gs))

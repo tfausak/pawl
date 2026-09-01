@@ -368,7 +368,7 @@ attackerAssignment gs contested (attacker, target) = case Projection.powerOf att
             -- CR 508.5 / CR 310.9d, shared with the landwalk reading in
             -- Defender.playerOf so the two cannot drift. Read once, for CR
             -- 702.19c's third recipient below and for CR 702.22j's chooser.
-            defending = Defender.playerOf target gs
+            defending = Defender.playerOf Projection.controllerWithLastKnown target gs
             -- CR 702.19b: the trample-through recipient is whatever the creature
             -- is attacking, at threshold 0 -- there is no minimum to assign to it.
             --

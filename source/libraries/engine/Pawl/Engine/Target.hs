@@ -295,7 +295,7 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- CR 508.5, asked of the SOURCE: rule 702.39a's clause is on an
             -- attacking creature, and `source` is the object CR 113.7 says the
             -- ability came from.
-            Filter.defendingPlayer = Defender.playerOfAttacker source gs,
+            Filter.defendingPlayer = Defender.playerOfAttacker Projection.controllerWithLastKnown source gs,
             -- Nothing: a target slot is judged before the effect names anyone, so
             -- there is no recipient it could have reached yet. CR 119.5's atom
             -- lives in an effect's QUANTITY, which is evaluated later and

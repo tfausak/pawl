@@ -411,6 +411,21 @@ attackMultiplePlayersSpec s registry = Spec.describe s "AttackMultiplePlayers" $
           announced
           [bobsGuard, carolsGuard]
       _ -> Spec.assertFailure s "fixture should give alice four Pikers and carol one Palace Guard"
+  Spec.it s "CR 802.4/509.1a a defending player with nothing attacking them is not asked to declare blockers" $ do
+    -- Both opponents defend (CR 802.2) and both hold an untapped Palace Guard,
+    -- so the only thing that differs between the two legs is WHICH of them the
+    -- one Piker was aimed at. attemptBlockDeclaration's own `null candidates`
+    -- guard cannot account for either: each player has a creature that could
+    -- block.
+    piker <- S.printingOf s registry "Goblin Piker"
+    guard <- S.printingOf s registry "Palace Guard"
+    let (board, _, _, _) = S.threePlayerCombat [piker] [guard] [guard]
+        askedWhenAttacking who =
+          let settled = S.runPure S.identityAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
+              declared = S.runPure (S.attackTo who) settled (Combat.declareAttackers S.alice)
+           in fst (fst (runRecordingBlockers declared))
+    Spec.assertEqWith s "CR 802.4 only bob, the one being attacked, is asked" (askedWhenAttacking S.bob) [S.bob]
+    Spec.assertEqWith s "and only carol on the same board with the attack aimed at her" (askedWhenAttacking S.carol) [S.carol]
   Spec.it s "CR 802.4b a requirement on a creature attacking bob does not reach carol's blocker" $ do
     -- CR 802.4b's other half: not which blocks are ALLOWED, but which
     -- requirements CR 509.1c makes carol maximize. Lure ("All creatures able to
