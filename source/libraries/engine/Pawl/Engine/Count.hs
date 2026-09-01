@@ -73,7 +73,7 @@ type QuantityOf quantity = Maybe ObjectId -> Filter.View -> quantity -> Maybe In
 evaluate :: ViewOf -> QuantityOf quantity -> Filter.Context -> GameState -> Count.Type.Count quantity -> Maybe Integer
 evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
   Scope.InZone (InZone.MkInZone zone ref) -> do
-    pids <- playersFor context gs ref
+    pids <- playersFor viewOf context gs ref
     let ids = concatMap (\pid -> Game.zoneMembers zone pid gs) pids
         kept = Maybe.mapMaybe (\oid -> fmap ((,) (Just oid)) (keep predicate context (viewOf oid))) ids
     aggregate quantityOf aggregation kept
@@ -102,7 +102,7 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
   -- "the highest life total among your opponents". So nothing here carries the
   -- candidate beside the view: the view already names it.
   Scope.OverPlayers ref -> do
-    pids <- playersFor context gs ref
+    pids <- playersFor viewOf context gs ref
     -- The predicate is baked PER CANDIDATE (see bakePerspective): CR 110.2's
     -- comparison is answered here, where the board is, and the match below is the
     -- same pure one every other scope makes.
@@ -413,6 +413,11 @@ aggregate quantityOf aggregation members = case aggregation of
 -- reference cannot be resolved: a Relative with no perspective, or a slot that
 -- is unbound or bound to something that is not a player.
 --
+-- Takes the same ViewOf `evaluate` does, and for the reason that function's
+-- haddock gives: CR 613.1b makes control a layer-2 question, so the arm reading
+-- an object's controller needs the caller's projection rather than the bindings
+-- alone. Every caller already held one.
+--
 -- CR 102.1: a departed player keeps their row in GameState.players (only
 -- Player.status changes), so `everyone` is Game.stillPlaying rather than the
 -- map's keys, and neither EachPlayer nor Opponent names a departed seat.
@@ -422,8 +427,8 @@ aggregate quantityOf aggregation members = case aggregation of
 -- what proves it. Through Scope.InZone it still is not: CR 800.4a already
 -- emptied every zone a departing player owned, so naming a departed seat there
 -- folds nothing either way.
-playersFor :: Filter.Context -> GameState -> PlayerRef.PlayerRef -> Maybe [PlayerId]
-playersFor context gs ref =
+playersFor :: ViewOf -> Filter.Context -> GameState -> PlayerRef.PlayerRef -> Maybe [PlayerId]
+playersFor viewOf context gs ref =
   let everyone = Game.stillPlaying gs
    in case ref of
         PlayerRef.EachPlayer -> Just everyone
@@ -506,17 +511,30 @@ playersFor context gs ref =
         -- with no candidate of either kind -- a scope outside such an instruction,
         -- or a ManaCount -- and Nothing is the honest answer for those.
         PlayerRef.Candidate -> Nothing
-        -- The controller of a bound OBJECT, which this function cannot answer
-        -- either: CR 613.1b's layer 2 decides who controls a permanent, and
-        -- projecting that needs a view this function is handed none of.
-        -- Pawl.Engine.Quantity answers it where the view is, exactly as it
-        -- answers the candidate above; what reaches here is the reference in a
-        -- position that holds no view at all -- a Scope naming it, or a ManaCount
-        -- -- and those go unanswered (#1441).
-        PlayerRef.ControllerOfBound _ -> Nothing
-        -- CR 508.6's set, unanswerable here for ControllerOfBound's reason: the
-        -- rule asks who CONTROLS a creature that is attacking, and layer 2 decides
-        -- that off a view this function is handed none of (#1441).
+        -- CR 613.1b / CR 608.2h: the controller of the OBJECT a slot names,
+        -- projected off the injected view -- layer 2 decides who controls a
+        -- permanent, so no read of the bindings alone could answer it. The
+        -- caller's view is what carries CR 608.2h in: a caller that has already
+        -- moved the object supplies a last-known-aware one, and the controller
+        -- still answers. Flunk's "that creature's controller's hand" is what
+        -- proves the Scope road (Pawl.CountSpec).
+        --
+        -- The SAME expression Pawl.Engine.Count.bakePerspective's
+        -- IsControllerOfBound arm makes, so the two cannot come apart about who
+        -- controls the object.
+        --
+        -- Nothing when the slot names no object, names several, or names one the
+        -- view cannot describe -- Candidate's posture above: the count is
+        -- unanswered rather than answered off some other seat.
+        PlayerRef.ControllerOfBound slot ->
+          fmap pure (Filter.slotOneObject slot context >>= viewOf >>= Filter.controller)
+        -- CR 508.6's set: the players controlling a creature attacking the player
+        -- a slot names, narrowed by the relation the card printed.
+        --
+        -- Not implemented: the combat record this would fold is
+        -- GameState.combat, which the arm above's view says nothing about, and no
+        -- card in data/cards/ writes the reference under a Scope or a ManaCount.
+        -- Its one reader is Pawl.Engine.Resolve.playerRefPlayers (#1441).
         PlayerRef.Attacking _ -> Nothing
 
 -- CR 608.2h: the view of a past event, built from the snapshot the event

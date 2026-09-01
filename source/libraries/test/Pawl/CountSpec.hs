@@ -41,12 +41,14 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -168,12 +170,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     Spec.assertEqWith
       s
       "EachPlayer names the two still in the game"
-      (Count.playersFor (Filter.contextFor Teams.none Nothing Nothing) gs PlayerRef.EachPlayer)
+      (Count.playersFor (S.stubView []) (Filter.contextFor Teams.none Nothing Nothing) gs PlayerRef.EachPlayer)
       (Just [S.alice, S.bob])
     Spec.assertEqWith
       s
       "and from alice, carol is not an opponent either"
-      (Count.playersFor (Filter.contextFor Teams.none (Just S.alice) Nothing) gs (PlayerRef.Relative PlayerRelation.Opponent))
+      (Count.playersFor (S.stubView []) (Filter.contextFor Teams.none (Just S.alice) Nothing) gs (PlayerRef.Relative PlayerRelation.Opponent))
       (Just [S.bob])
     -- The seating roster still has three (CR 800.5), so a count off it would
     -- say 3 and 2. These are the numbers only the still-playing reading gives.
@@ -364,6 +366,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   tyranidInvasionSpec s registry
   oreskosExplorerSpec s registry
   relicRunnerSpec s registry
+  flunkSpec s registry
 
 -- CR 608.2i read over CR 601.2i's event: "for each spell you've cast this
 -- turn", the first count whose scope is a shape of event that is NOT a zone
@@ -1102,3 +1105,88 @@ relicRunnerSpec s registry =
           Spec.assertEqWith s "bob is dealt 2" (S.lifeOf S.bob after) (Just 18)
           Spec.assertEqWith s "bob's blocker never traded" (S.creaturesInPlay S.bob after) 1
           Spec.assertEqWith s "and the Runner lived, beside the Worker" (S.creaturesInPlay S.alice after) 2
+
+-- CR 613.1b / CR 400.1: a count whose SCOPE names the controller of a bound
+-- object. Layer 2 is what decides who controls a permanent, so
+-- Count.playersFor reads the reference off the injected view rather than off
+-- the resolution's bindings; the hand it then indexes is CR 400.1's per-player
+-- zone, which CR 108.3 gives to that player. GAMEPLAY LEVEL for the Aetherflux
+-- group's reason -- what is on trial is that the reference resolves against the
+-- projection the resolution supplies, which a stubbed ViewOf would not show.
+--
+-- Flunk, {1}{B} Instant: "Target creature gets -X/-X until end of turn, where X
+-- is 7 minus the number of cards in that creature's controller's hand." Nothing
+-- else on the card, so the target's box is the only thing a case can be reading.
+--
+-- THREE SEATS with THREE DIFFERENT hand sizes, because "that creature's
+-- controller", "you" and "each player" are three sentences a two-seat board or
+-- an equal hand collapses onto one. At resolution alice holds nothing (Flunk
+-- left her hand), bob three and carol one, so the 0/8 Wall of Stone reads:
+--
+--   bob, its controller     X = 7 - 3 = 4   a -4/4
+--   alice, the caster       X = 7 - 0 = 7   a -7/1
+--   carol                   X = 7 - 1 = 6   a -6/2
+--   every player at once    X = 7 - 4 = 3   a -3/5
+--   unanswered              nothing stored, a 0/8
+--
+-- Wall of Stone rather than a smaller creature so that EVERY one of those
+-- readings leaves a positive toughness: a target CR 704.5f put away would
+-- collapse three of the five onto the same absent answer. Its Defender and its
+-- 0 power are read by nothing here.
+--
+-- alice keeps a Piker of her own on the battlefield, so the target slot offers
+-- two creatures and the answerer has to pick one rather than the offer
+-- collapsing onto the only candidate.
+-- Fill every target slot with the candidate naming `oid`. The offered set is
+-- FILTERED rather than answered with a hand-built recipient, so CR 608.2b's
+-- re-read at resolution still finds the target (Pawl.DamageSpec's `aimedAt` is
+-- the same answerer).
+aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> Recipient.objectOf r == Just oid) sets
+  _ -> S.identityAnswer p
+
+flunkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+flunkSpec s registry =
+  let handOf printing pid n g = List.foldl' (\g' _ -> snd (S.addHandCard printing pid g')) g [1 .. (n :: Int)]
+      castAt flunkId target gs =
+        let started = S.runPure (aimedAt target) gs (S.cast S.alice flunkId)
+         in S.runPure (aimedAt target) started Engine.priorityLoop
+      -- alice: three Swamps and a Piker; bob: the Wall. The hands are the
+      -- caller's, since which seat holds how many is what each case varies.
+      board swamp piker wall =
+        let lands = S.landsFor swamp S.alice 3 S.threePlayerGame
+            (wallId, withWall) = S.addCreature wall S.bob lands
+            (_, withPiker) = S.addCreature piker S.alice withWall
+         in (wallId, withPiker)
+   in Spec.describe s "Flunk" $ do
+        Spec.it s "CR 613.1b X counts the hand of the creature's CONTROLLER, not the caster's" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          flunk <- S.printingOf s registry "Flunk"
+          piker <- S.printingOf s registry "Goblin Piker"
+          wall <- S.printingOf s registry "Wall of Stone"
+          let (wallId, base) = board swamp piker wall
+              (withFlunk, flunkId) = S.handOne flunk base
+              staged = handOf piker S.carol 1 (handOf piker S.bob 3 withFlunk)
+              after = castAt flunkId wallId staged
+          Spec.assertEqWith s "the 0/8 Wall is a -4/4: 7 minus bob's three, not minus alice's none" (S.powerToughnessOf wallId after) (Just (-4, 4))
+          Spec.assertEqWith s "bob held the three cards the count read" (S.handSize S.bob after) 3
+          Spec.assertEqWith s "alice's hand is empty, Flunk having left it" (S.handSize S.alice after) 0
+          Spec.assertEqWith s "and carol's one card is nobody's business here" (S.handSize S.carol after) 1
+        -- The OWNER/CONTROLLER discriminator, and the reason the arm reads a
+        -- view at all: bob still OWNS the Wall and holds three cards, while
+        -- carol CONTROLS it and holds one. Reading the owner gives the case
+        -- above's -4/4. The board differs from that one's in the control effect
+        -- alone.
+        Spec.it s "CR 613.1b a Wall STOLEN from bob counts carol's hand, who controls it" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          flunk <- S.printingOf s registry "Flunk"
+          piker <- S.printingOf s registry "Goblin Piker"
+          wall <- S.printingOf s registry "Wall of Stone"
+          let (wallId, base) = board swamp piker wall
+              (withFlunk, flunkId) = S.handOne flunk base
+              staged = S.giveControl wallId S.carol (handOf piker S.carol 1 (handOf piker S.bob 3 withFlunk))
+              after = castAt flunkId wallId staged
+          Spec.assertEqWith s "a -6/2: 7 minus carol's one card" (S.powerToughnessOf wallId after) (Just (-6, 2))
+          Spec.assertEqWith s "carol controls the Wall she does not own" (Projection.controllerOf wallId after) (Just S.carol)
+          Spec.assertEqWith s "its owner bob still holds three" (S.handSize S.bob after) 3

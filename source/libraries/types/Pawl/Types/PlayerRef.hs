@@ -127,13 +127,14 @@ data PlayerRef
     -- hidden zone, the effect uses the object's last known information" is the
     -- clause this arm rests on, and every reader answers it through a last-known
     -- aware view: Pawl.Engine.Resolve.playerRefPlayers through
-    -- Pawl.Engine.Projection.controllerWithLastKnown, Pawl.Engine.Quantity
-    -- through the view its caller supplies.
+    -- Pawl.Engine.Projection.controllerWithLastKnown,
+    -- Pawl.Engine.Count.playersFor -- which Pawl.Engine.Quantity and
+    -- Pawl.Engine.ManaCount both route through -- off the view its caller
+    -- supplies.
     --
-    -- Undeterminable where no view can answer, which is Candidate's posture and
-    -- for a neighbouring reason: Pawl.Engine.Count.playersFor holds no projection,
-    -- so a Scope or a ManaCount naming this reference reads Nothing and its count
-    -- is unanswered (#1441).
+    -- Undeterminable where no view can answer, which is Candidate's posture: a
+    -- slot naming no object, naming several, or naming one the projection cannot
+    -- describe leaves the count unanswered rather than aimed at some other seat.
     ControllerOfBound SlotName.SlotName
   | -- | CR 508.6: the players attacking the player a slot names, narrowed by
     -- relation -- Curse of Vitality's "each opponent attacking that player".
@@ -148,8 +149,8 @@ data PlayerRef
     -- creature attacking a given player -- is about the combat record rather than
     -- about a characteristic.
     --
-    -- Unanswerable where no projection is in hand: Pawl.Engine.Count.playersFor
-    -- reads no controller, so a Scope or a ManaCount naming this reference is
-    -- unanswered, which is ControllerOfBound's posture and for its reason (#1441).
+    -- Not implemented: Pawl.Engine.Count.playersFor folds no combat record, so a
+    -- Scope or a ManaCount naming this reference is unanswered. Its one reader is
+    -- Pawl.Engine.Resolve.playerRefPlayers (#1441).
     Attacking AttackingPlayers.AttackingPlayers
   deriving (Eq, Ord, Show)

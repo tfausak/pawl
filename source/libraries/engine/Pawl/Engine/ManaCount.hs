@@ -3,10 +3,11 @@
 -- learns which effect or card produced it, exactly as Pawl.Engine.Count's fold
 -- over objects does not.
 --
--- Unparameterized, where Pawl.Engine.Count takes a ViewOf and a QuantityOf: a
--- mana unit has no characteristics for a projection to supply and a ManaCount
--- holds no inner Quantity, so there is nothing for a caller to inject and no
--- module cycle to break. Pawl.Engine.Quantity calls this directly.
+-- Takes a ViewOf but no QuantityOf, where Pawl.Engine.Count takes both: a mana
+-- unit has no characteristics for a projection to supply and a ManaCount holds
+-- no inner Quantity, so the view is here only to resolve the PlayerRef -- CR
+-- 613.1b's layer-2 controller, which Count.playersFor reads off it.
+-- Pawl.Engine.Quantity calls this directly.
 module Pawl.Engine.ManaCount where
 
 import qualified Pawl.Engine.Count as Count
@@ -26,12 +27,12 @@ import qualified Pawl.Types.ManaCount as ManaCount
 -- whenever they have priority and CR 605.3b has it resolve immediately without
 -- the stack, so the pool moves with no state-based action (CR 704.3) and no
 -- priority pass in between.
-evaluate :: Filter.Context -> GameState -> ManaCount.ManaCount -> Maybe Integer
-evaluate context gs count = do
+evaluate :: Count.ViewOf -> Filter.Context -> GameState -> ManaCount.ManaCount -> Maybe Integer
+evaluate viewOf context gs count = do
   -- CR 106.4 attaches a pool to a player, so the same PlayerRef reading a
   -- Scope.InZone uses answers WHOSE pool -- one resolution of the reference for
   -- both, which is what keeps the two from disagreeing.
-  pids <- Count.playersFor context gs (ManaCount.player count)
+  pids <- Count.playersFor viewOf context gs (ManaCount.player count)
   let units = concatMap (\pid -> Mana.unwrap (Game.poolOf pid gs)) pids
   -- CR 106.4's pool is a multiset of UNITS (Pawl.Types.Mana), so counting the
   -- survivors is counting mana: one unit is one mana, whatever its type.
