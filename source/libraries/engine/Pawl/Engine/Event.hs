@@ -3690,7 +3690,8 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
         -- manifest. Grafdigger's Cage is the pool's printing, and CR 613.11 is
         -- why the prohibition is asked here rather than in Pawl.Engine.Projection.
         --
-        -- Nothing, this funnel's CR 614.6 cancel arm one case up and CR 303.4g's
+        -- Nothing for every origin but the stack, this funnel's CR 614.6 cancel
+        -- arm one case up and CR 303.4g's
         -- answer one case down: the object is never deleted and never re-minted
         -- (CR 400.7), so the card in the graveyard or the library is the SAME
         -- object it always was. That is what separates a refusal from a redirect,
@@ -3713,13 +3714,25 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
         -- `fromZone` is the "previous zone" both rules name, read off the object
         -- rather than off `settled`: no ZoneChangeR rewrites an event's origin.
         --
-        -- Not implemented: CR 608.3e's permanent spell, which this arm leaves on
-        -- the stack instead of putting into its owner's graveyard (#2065). No card
-        -- reaches it -- the pool's one entry prohibition names the graveyard and
-        -- the library, never the stack.
+        -- CR 608.3e is the one origin CR 400.4a does not answer for: "if a
+        -- permanent spell resolves but its controller can't put it onto the
+        -- battlefield, that player puts it into its owner's graveyard." So a
+        -- refusal FROM THE STACK moves the object on rather than leaving it where
+        -- it was, and the two rules are told apart by `fromZone` alone -- a zone
+        -- read, never the resolving card's identity. Nothing but a resolving
+        -- permanent spell reaches this funnel from the stack asking for the
+        -- battlefield (Pawl.Engine.Stack's two branches).
+        --
+        -- Through the funnel again rather than by hand, because CR 608.3e's "puts
+        -- it into its owner's graveyard" is an ordinary zone change: a
+        -- ReplacementEffect that exiles what would go to a graveyard applies to
+        -- it. The recursion is one deep -- the second move's destination is the
+        -- graveyard, and this guard asks only about the battlefield.
         Just settled
           | ZoneChange.to settled == Zone.Battlefield && EntryRestriction.prohibited oid fromZone gs ->
-              pure Seq.empty
+              if fromZone == Zone.Stack
+                then changeZoneReturning oid Zone.Graveyard
+                else pure Seq.empty
         Just settled -> do
           let dest = ZoneChange.to settled
               -- CR 110.2a: "If an effect instructs a player to put an object onto
@@ -5084,6 +5097,11 @@ createTokens controller card copy n tapped entering = do
           -- Interned ONCE for the whole event, not once per token: `count`
           -- tokens created by one effect are copies of one set of
           -- effect-defined characteristics (CR 111.3), so they name one entry.
+          -- CR 111.5's rollback point, captured AFTER resolveTokens rather than
+          -- before it: rule 614.3's use counts are spent by a replacement that
+          -- applied to the creation event, and rule 111.5 unmakes the token
+          -- rather than the event.
+          unminted <- State.get
           tokenId <- State.state (Game.intern (Printing.MkPrinting tokenCard))
           let mkObj ts =
                 Object.MkObject
@@ -5142,29 +5160,60 @@ createTokens controller card copy n tapped entering = do
                     Object.exertedBy = Set.empty
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue)
-          -- CR 122.6a: the counters the EFFECT says these tokens enter with, gathered
-          -- into the pending map -- so CR 614.16 applies inside each token's own entry
-          -- loop and Vorinclex sees them -- exactly as changeZoneEntering's door does
-          -- for the move that carries the same rider.
+          minted <- State.get
+          -- CR 111.5: "if a spell or ability would create a token, but a rule or
+          -- effect states that a permanent with one or more of that token's
+          -- characteristics can't enter the battlefield, the token is not
+          -- created." The same prohibition changeZoneAttaching asks of a move,
+          -- asked here because a token takes no move -- it is minted straight onto
+          -- the battlefield -- so the funnel's gate cannot see it.
           --
-          -- The WHOLE BATCH is dressed before any token runs its entry loop, rather
-          -- than each token being dressed and then entered. That order buys CR 614.12
-          -- nothing any more and is kept only because it costs nothing: what the
-          -- rule's "characteristics of the permanent as it would exist on the
-          -- battlefield" reads is the OBJECTS, and these counters are no longer on
-          -- them -- Pawl.Engine.Projection cannot see GameState.enteringCounters, and
-          -- the map is per-object, so no sibling's loop reads another's pending
-          -- counters whenever they were written. What CR 614.12 does rest on is
-          -- `placeObject` above having materialized every token first, which is what
-          -- `siblingsOf` then hands each entry loop.
-          let siblingsOf oid = Set.delete oid (Set.fromList ids)
-          Monad.mapM_ (\oid -> Monad.mapM_ (uncurry (addEnteringCounters oid)) (Map.toAscList entering)) ids
-          Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
-          -- No prior incarnation to snapshot, so a token's last known information
-          -- IS what it is now (CR 111.3). Recorded after every entry loop, so the
-          -- events describe settled objects.
-          Monad.mapM_ recordMintedEntry ids
-          pure ids
+          -- MINTED AND ROLLED BACK rather than asked of a hypothetical, because
+          -- the question is about characteristics the projection answers and
+          -- Pawl.Engine.Projection reads an object that exists. Nothing observes
+          -- the interval: placeObject writes only GameState.objects and the zone
+          -- index, and every road out of this function that could be seen -- the
+          -- CR 122.6a counters, each token's CR 616.1 entry loop, the CR 111.3
+          -- minted-entry event -- is below this gate. So a refused batch leaves
+          -- the board exactly as `unminted` had it, which is rule 111.5's "the
+          -- token is not created" and not "a token that dies at once".
+          --
+          -- Zone.Battlefield is the ORIGIN passed, which is the field's own
+          -- reading (Pawl.Types.EntryRestriction.origins: the zone the object is
+          -- in when the move is judged) and not a sentinel. It also decides which
+          -- printings reach a token, correctly: a prohibition that NAMES zones
+          -- names off-battlefield ones -- Grafdigger's Cage's graveyard and
+          -- library -- so it cannot reach a token, while one that names no zone
+          -- carries the full set and does. Worms of the Earth's "lands can't enter
+          -- the battlefield" is the pool's second kind.
+          if any (\tok -> EntryRestriction.prohibited tok Zone.Battlefield minted) ids
+            then do
+              State.put unminted
+              pure []
+            else do
+              -- CR 122.6a: the counters the EFFECT says these tokens enter with, gathered
+              -- into the pending map -- so CR 614.16 applies inside each token's own entry
+              -- loop and Vorinclex sees them -- exactly as changeZoneEntering's door does
+              -- for the move that carries the same rider.
+              --
+              -- The WHOLE BATCH is dressed before any token runs its entry loop, rather
+              -- than each token being dressed and then entered. That order buys CR 614.12
+              -- nothing any more and is kept only because it costs nothing: what the
+              -- rule's "characteristics of the permanent as it would exist on the
+              -- battlefield" reads is the OBJECTS, and these counters are no longer on
+              -- them -- Pawl.Engine.Projection cannot see GameState.enteringCounters, and
+              -- the map is per-object, so no sibling's loop reads another's pending
+              -- counters whenever they were written. What CR 614.12 does rest on is
+              -- `placeObject` above having materialized every token first, which is what
+              -- `siblingsOf` then hands each entry loop.
+              let siblingsOf oid = Set.delete oid (Set.fromList ids)
+              Monad.mapM_ (\oid -> Monad.mapM_ (uncurry (addEnteringCounters oid)) (Map.toAscList entering)) ids
+              Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
+              -- No prior incarnation to snapshot, so a token's last known information
+              -- IS what it is now (CR 111.3). Recorded after every entry loop, so the
+              -- events describe settled objects.
+              Monad.mapM_ recordMintedEntry ids
+              pure ids
 
 -- Nothing departed, so `departed` is the arrival's own id. Harmless rather than a
 -- fiction readers must know about: from == to == Battlefield already fails every

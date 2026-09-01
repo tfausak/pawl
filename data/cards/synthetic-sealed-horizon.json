@@ -1,0 +1,76 @@
+{
+  "faces": [
+    {
+      "entryRestrictions": [
+        {
+          "affected": {
+            "type": "MatchingAnywhere",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                {
+                  "type": "HasColor",
+                  "value": {
+                    "type": "Green"
+                  }
+                }
+              ]
+            }
+          },
+          "origins": [
+            {
+              "type": "Library"
+            },
+            {
+              "type": "Hand"
+            },
+            {
+              "type": "Graveyard"
+            },
+            {
+              "type": "Battlefield"
+            },
+            {
+              "type": "Stack"
+            },
+            {
+              "type": "Exile"
+            },
+            {
+              "type": "Command"
+            }
+          ]
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Sealed Horizon",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,11 +1,13 @@
 -- Covers: CR 101.2 / CR 400.4a's ENTRY PROHIBITION -- Pawl.Types.EntryRestriction,
--- the Bool Pawl.Engine.EntryRestriction answers, and the one place it is asked
--- (Pawl.Engine.Event.changeZoneAttaching, the funnel every battlefield entry
--- reaches). Also CR 701.40f, whose "that card isn't manifested ... it remains in
--- its previous zone. If it was face up, it remains face up" is the manifest case
--- below.
+-- the Bool Pawl.Engine.EntryRestriction answers, and the two places it is asked
+-- (Pawl.Engine.Event.changeZoneAttaching, the funnel every battlefield MOVE
+-- reaches, and Event.createTokens, which CR 111.5 gives its own gate because a
+-- token takes no move). Also CR 608.3e, whose refused permanent spell goes to its
+-- owner's graveyard rather than staying where it was, and CR 701.40f, whose "that
+-- card isn't manifested ... it remains in its previous zone. If it was face up, it
+-- remains face up" is the manifest case below.
 --
--- Grafdigger's Cage is the fixture: "Creature cards in graveyards and libraries
+-- Grafdigger's Cage is the first group's fixture: "Creature cards in graveyards and libraries
 -- can't enter the battlefield." Its second sentence ("players can't cast spells
 -- from graveyards or libraries") is on the card too, as a player ability; nothing
 -- here reads it, and Pawl.CastSpec's Grafdigger's Cage group is where it is
@@ -31,8 +33,11 @@ module Pawl.EntryRestrictionSpec where
 
 import qualified Data.List as List
 import qualified Data.Set as Set
+import qualified Data.Text as Text
+import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -47,10 +52,13 @@ import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-spec s registry = Spec.describe s "Grafdigger's Cage" $ do
-  exhumeCase s registry
-  hardcastCase s registry
-  manifestCase s registry
+spec s registry = do
+  Spec.describe s "Grafdigger's Cage" $ do
+    exhumeCase s registry
+    hardcastCase s registry
+    manifestCase s registry
+  Spec.describe s "Synthetic Sealed Horizon" (permanentSpellCase s registry)
+  Spec.describe s "Worms of the Earth" (tokenCase s registry)
 
 -- The names of the permanents `after` has that `before` did not, sorted. CR 400.7
 -- mints a fresh id at the destination, so an arrival can only be found this way.
@@ -223,6 +231,105 @@ manifestCase s registry = do
       "CR 701.40f and it remains face up"
       (fmap Object.facing (Game.lookupObject top after))
       (Just Facing.FaceUp)
+
+-- CR 608.3e, the one origin CR 400.4a does not answer for: "if a permanent spell
+-- resolves but its controller can't put it onto the battlefield, that player puts
+-- it into its owner's graveyard." Synthetic Sealed Horizon ({2}{W} enchantment,
+-- "green creatures can't enter the battlefield") is what reaches it. No printing
+-- can: Scryfall @o:/can't enter the battlefield/@, 2026-09-01, returns five cards,
+-- and four of them name the graveyard or the library, which a spell has already
+-- left by the time it resolves. The fifth is Worms of the Earth below, whose
+-- lands are played rather than cast.
+--
+-- Llanowar Elves is the spell: a GREEN creature, so the Horizon's filter reads it,
+-- and {G} so two Forests pay for it twice over.
+permanentSpellCase :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+permanentSpellCase s registry = do
+  let board forest elves horizon =
+        let g1 = foldr (\c g -> snd (S.addCreature c S.alice g)) (S.landsInPlay forest 2) horizon
+            (g2, spell) = S.handOne elves g1
+         in (spell, g2)
+      fixtures = do
+        forest <- S.printingOf s registry "Forest"
+        elves <- S.printingOf s registry "Llanowar Elves"
+        horizon <- S.printingOf s registry "Synthetic Sealed Horizon"
+        pure (forest, elves, horizon)
+  -- THE PAIRED CONTROL, differing in that one permanent: without the Horizon the
+  -- same cast puts the Elves onto the battlefield and leaves the graveyard empty,
+  -- so neither absence below is an absence this board has for free.
+  Spec.it s "CR 608.3a without the Horizon the creature spell becomes a permanent" $ do
+    (forest, elves, _) <- fixtures
+    let (spell, before) = board forest elves []
+        after = S.runPure S.identityAnswer before (S.cast S.alice spell >> Stack.resolveTop)
+    Spec.assertEqWith s "the Elves are on the battlefield" (arrivals before after) [Just (S.printingName elves)]
+    Spec.assertEqWith s "and nothing is in alice's graveyard" (namesIn Zone.Graveyard S.alice after) []
+  Spec.it s "CR 608.3e a permanent spell refused entry goes to its owner's graveyard" $ do
+    (forest, elves, horizon) <- fixtures
+    let (spell, before) = board forest elves [horizon]
+        after = S.runPure S.identityAnswer before (S.cast S.alice spell >> Stack.resolveTop)
+    -- THE HEADLINE, and first so that no proxy below can absorb a mutation: CR
+    -- 400.4a's "remains in its previous zone" would leave the card on the stack,
+    -- which is the behaviour this case exists to rule out.
+    Spec.assertEqWith s "CR 608.3e the card is in its owner's graveyard" (namesIn Zone.Graveyard S.alice after) [S.printingName elves]
+    Spec.assertEqWith s "CR 101.2 nothing entered the battlefield" (arrivals before after) []
+    Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
+
+-- CR 111.5: "if a spell or ability would create a token, but a rule or effect
+-- states that a permanent with one or more of that token's characteristics can't
+-- enter the battlefield, the token is not created."
+--
+-- Worms of the Earth ({2}{B}{B}{B} enchantment) is the prohibition -- "lands can't
+-- enter the battlefield", which names no zone and so reaches a token; Autumn
+-- Willow, Harmony ({3}{G}{G}) is the maker, whose enters trigger creates a 1/1
+-- green Forest Dryad LAND creature token.
+--
+-- Not implemented, recorded here because a card's JSON carries no comment: Worms
+-- of the Earth's third sentence, whose each-upkeep offer to every player is how
+-- the printed card is destroyed, and Autumn Willow's third, which adds mana when
+-- a land creature is tapped (#2865, #2866). Both omissions leave pawl's card STRICTER
+-- than printed -- one keeps an enchantment its opponents could remove, the other
+-- withholds mana from its controller -- so neither can flatter the cases below.
+tokenCase :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tokenCase s registry = do
+  let -- The Willow enters WITH its CR 603.6a event, so settleForPriority finds
+      -- the trigger pending; the prohibition, where one is named, is arranged
+      -- beside it and takes no move of its own.
+      board willow prohibition =
+        let g1 = foldr (\c g -> snd (S.addCreature c S.alice g)) (Setup.emptyGame S.bothPlayers) prohibition
+         in snd (S.entersWithTrigger willow S.alice g1)
+      settled gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      run gs = S.runPure S.identityAnswer (settled gs) Stack.resolveTop
+      fixtures = do
+        willow <- S.printingOf s registry "Autumn Willow, Harmony"
+        worms <- S.printingOf s registry "Worms of the Earth"
+        cage <- S.printingOf s registry "Grafdigger's Cage"
+        pure (willow, worms, cage)
+      token = CardName.MkCardName (Text.pack "Forest Dryad Token")
+  -- THE PAIRED CONTROL: the same board with no prohibition mints the token, so
+  -- the empty answers below are absences of something this board can produce.
+  Spec.it s "CR 111.2 without the prohibition the enters trigger mints its land token" $ do
+    (willow, _, _) <- fixtures
+    let before = board willow []
+        after = run before
+    Spec.assertEqWith s "one Forest Dryad token entered" (arrivals before after) [Just token]
+  Spec.it s "CR 111.5 no token is created when a permanent like it can't enter" $ do
+    (willow, worms, _) <- fixtures
+    let before = board willow [worms]
+    -- The trigger really is on the stack, so the empty answer below cannot be an
+    -- ability that never resolved.
+    Spec.assertBool s (not (null (GameState.stack (settled before)))) "the Willow's enters trigger is on the stack"
+    let after = run before
+    Spec.assertEqWith s "CR 111.5 the token is not created" (arrivals before after) []
+    Spec.assertEqWith s "and the ability resolved off the stack" (GameState.stack after) []
+  -- THE DISCRIMINATOR against a gate that refuses a token whenever any entry
+  -- prohibition is in force. Grafdigger's Cage names creature cards in graveyards
+  -- and libraries; a token is a card in neither, so the same trigger mints the
+  -- same token under it.
+  Spec.it s "CR 111.5 a prohibition scoped to other zones does not reach a token" $ do
+    (willow, _, cage) <- fixtures
+    let before = board willow [cage]
+        after = run before
+    Spec.assertEqWith s "the Forest Dryad token entered anyway" (arrivals before after) [Just token]
 
 -- The card names in one player's zone. Local rather than hoisted into
 -- Pawl.Support, which rebuilds every spec in the tree.
