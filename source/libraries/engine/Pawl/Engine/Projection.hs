@@ -1094,13 +1094,13 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- the same id are the other two conjuncts, and each is its own leg of
       -- Pawl.CombatEffectSpec's Aura Graft pair:
       --
-      -- CONTROLLER, compared against Defender.defendingPlayers. CR 506.2 admits only the
-      -- defending player's planeswalkers into a declaration, so "its controller
+      -- CONTROLLER, compared against Defender.defendingPlayers. CR 506.2 admits
+      -- only the defending player's planeswalkers into a declaration, so "its controller
       -- changes" and "its controller is no longer the defending player" name the same
       -- planeswalkers -- which is the comparison Combat.stillAttacked makes through
       -- Combat.attackablePlaneswalkers, and asking it here costs no projection.
-      -- MEMBERSHIP and not Maybe equality, which used to hold when neither seat
-      -- existed; the arm answered Nothing on that path anyway.
+      -- MEMBERSHIP rather than Maybe equality, which two Nothings satisfy; the
+      -- arm answers Nothing on that path either way.
       --
       -- CARD TYPE, through `peers`, which is what makes rule 506.4's planeswalker
       -- clause reachable without Projection.isPlaneswalkerOf: that one calls project,

@@ -286,8 +286,8 @@ damageEvent gs kind source target amount =
 -- for every caller: pawl's combat has ONE defending player (see
 -- Pawl.Engine.Defender) and an attack on a planeswalker is declared against that
 -- player's planeswalkers (CR 508.1b), so that player is the controller it had
--- before it was removed from combat. CR 802.2a is why the several defenders it
--- will one day hold are narrowed to one here rather than folded together.
+-- before it was removed from combat. Narrowed to one and never folded, which is
+-- CR 802.2a's own instruction.
 --
 -- Read at ASSIGNMENT and at every place assignment can name a recipient (the
 -- unblocked/trample-through event and the CR 702.19b threshold map the prompt

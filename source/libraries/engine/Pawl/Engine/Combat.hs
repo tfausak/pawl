@@ -1141,9 +1141,9 @@ declareAttackers pid = do
   -- active player (CR 800.4j), or it found no opponents. Never a place to
   -- recompute one.
   --
-  -- CR 802.2a's one specific defending player, and today the only one: CR 802.3
-  -- is what would have the declaration draw its targets from every defender at
-  -- once, which is declarableTargets above.
+  -- ONE defending player is passed on, which is all CR 507.1 ever names. CR
+  -- 802.3 is what would widen the announcement to every defender's players,
+  -- planeswalkers and battles.
   Monad.forM_ (Maybe.listToMaybe (Defender.defendingPlayers gs)) $ \defender ->
     attemptAttackDeclaration pid defender Set.empty
 
@@ -1429,7 +1429,8 @@ attemptAttackDeclaration pid defender rejected = do
 --
 -- The guards are the ways the rules say the creature enters WITHOUT being an
 -- attacking creature -- CR 506.3a, CR 506.3b, CR 506.3c / CR 508.4a, and an empty
--- Defender.defendingPlayers -- each a silent no-op, which is what those rules say. CR
+-- Defender.defendingPlayers -- each a silent no-op, which is what those rules
+-- say. CR
 -- 508.4a's remaining clauses need no check, attackTargets deriving the offer from
 -- the board AT THIS MOMENT, and CR 508.4d holds by construction: the creature gets
 -- no key in Combat.blockers.

@@ -218,7 +218,7 @@ data Combat = MkCombat
     -- who thereby became the defending player (CR 506.2a). Nothing where no such
     -- action was taken.
     --
-    -- Cleared with the rest of the record, which is exact rather than lucky. The
+    -- Cleared with the rest of the record. The
     -- RULES scope the designation to the combat phase (CR 506.2), and CR 703.4h
     -- makes the choice per beginning-of-combat step, so a turn with a second
     -- combat phase (CR 500.8) chooses again rather than inheriting. CR 511.3
@@ -246,8 +246,6 @@ data Combat = MkCombat
     -- Read through Pawl.Engine.Defender.defendingPlayers rather than directly:
     -- that is where CR 802.2's several defenders will arrive, and where CR
     -- 802.2a's narrowing to one is made explicit at each site that needs one.
-    -- The only readers of the field itself are Pawl.Codec.Combat and
-    -- Pawl.Engine.Combat.chooseDefender, its writer.
     defender :: Maybe PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)

@@ -289,13 +289,13 @@ inForce gs =
       -- CR 508.5: the gate may also name the DEFENDING PLAYER rather than the
       -- source's controller (Armored Galleon, "can't attack unless defending
       -- player controls an Island"), so CR 802.2a's one specific defending player
-      -- is supplied to Filter.ControlledByDefendingPlayer here. ONE read for the whole
-      -- combat rather than one per (creature, attack target) pair: CR 508.5a
+      -- is supplied to Filter.ControlledByDefendingPlayer here. ONE read for the
+      -- whole combat rather than one per (creature, attack target) pair: CR 508.5a
       -- determines the defending player individually for each attacking
       -- creature, and the two readings coincide on every board pawl can build,
       -- since Combat.attackTargets is derived from that one defender and
       -- Defender.playerOf answers it on all three arms -- the OfPlayer arm IS
-      -- the defender, the OfPlaneswalker arm reads the record, and
+      -- the defender, the OfPlaneswalker arm reads the designation, and
       -- Combat.attackableBattles admits only battles that player protects. CR
       -- 802's attack-multiple-players option is what would separate them, and
       -- pawl has no options concept to read it from (#175).
