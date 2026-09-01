@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 -- Covers: CR 102.3's teammates and CR 808's Team vs. Team variant --
 -- Pawl.Types.Teams, the Pawl.Types.GameSettings field that carries them, and the
 -- three readers that answer "who are my opponents": Pawl.Engine.Combat's
@@ -23,9 +25,13 @@
 -- is why the combat case can read the whole defending group.
 module Pawl.TeamSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -36,6 +42,8 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 
 -- CR 808.1 / CR 808.2: alice and bob against carol and dave, each team in
 -- adjacent seats of the turn order [alice, bob, carol, dave].
@@ -112,6 +120,58 @@ spec s registry = Spec.describe s "Teams" $ do
       (fmap (\pid -> S.playerCounterOf PlayerCounterKind.Poison pid after) [S.alice, S.bob, S.carol, S.dave])
       [0, 0, 1, 1]
     Spec.assertEqWith s "the spell resolved" (GameState.stack after) []
+  -- CR 102.3 through a TARGET SLOT, which neither case above reaches: the offer
+  -- comes from Pawl.Engine.Target's Filter.IsPlayer atom rather than from a
+  -- PlayerRef, and it is filtered against a Context built by Target.slotContext.
+  --
+  -- Ravenous Rats, {1}{B} Rat: "When this creature enters, target opponent
+  -- discards a card." The OFFER is what is asserted, and it is the engine's own
+  -- output: an answer naming bob would be filtered out rather than obeyed, so
+  -- reading the offer is what distinguishes a slot that never admitted him.
+  Spec.it s "CR 102.3 a target opponent slot does not offer the teammate" $ do
+    rats <- S.printingOf s registry "Ravenous Rats"
+    swamp <- S.printingOf s registry "Swamp"
+    let lands = S.landsFor swamp S.alice 2 (twoTeams S.fourPlayerGame)
+        (held, staged) = S.addHandCard rats S.alice lands
+        board =
+          staged
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        recording :: Prompt.Prompt r -> State.State [[Recipient.Recipient]] r
+        recording p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> do
+            State.modify' (<> fmap (Set.toAscList . snd) (Map.elems sets))
+            pure (fmap snd sets)
+          _ -> pure (S.identityAnswer p)
+        cast = S.runPure S.identityAnswer board (S.cast S.alice held)
+        offered = State.execState (Engine.runGame recording cast Engine.priorityLoop) []
+    Spec.assertEqWith
+      s
+      "CR 102.3 only carol and dave are offered"
+      offered
+      [[Recipient.ToPlayer S.carol, Recipient.ToPlayer S.dave]]
+  -- CR 702.11c through Pawl.Engine.PlayerEffect.inScope's PlayerScope.Opponents,
+  -- which is the reader neither the PlayerRef nor the target-slot case above
+  -- touches: "'Hexproof' on a player means 'You can't be the target of spells or
+  -- abilities your opponents control.'"
+  --
+  -- Leyline of Sanctity on BOB, and the three readings come apart on one board:
+  -- his teammate alice may still target him, his opponent carol may not, and he
+  -- may target himself (rule 702.11c names only opponents). Pawl.TargetSpec's
+  -- Leyline case is the same card with no teams, where alice is the opponent.
+  Spec.it s "CR 702.11c hexproof from opponents does not stop a teammate" $ do
+    leyline <- S.printingOf s registry "Leyline of Sanctity"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (_, warded) = S.addCreature leyline S.bob (twoTeams S.fourPlayerGame)
+    case S.spellTargetSlot bolt of
+      Nothing -> Spec.assertFailure s "Lightning Bolt should declare a target slot"
+      Just theSlot -> do
+        let legalFor who = Target.legalRecipients (Just who) S.noSource theSlot warded
+        Spec.assertBool s (Set.member (Recipient.ToPlayer S.bob) (legalFor S.alice)) "CR 102.3 alice, bob's teammate, may still bolt him"
+        Spec.assertBool s (not (Set.member (Recipient.ToPlayer S.bob) (legalFor S.carol))) "CR 702.11c carol, his opponent, may not"
+        Spec.assertBool s (Set.member (Recipient.ToPlayer S.bob) (legalFor S.bob)) "and bob may bolt himself"
   -- CR 102.3 through a Count over the same reference, which
   -- Pawl.Engine.Count.playersFor resolves and which no effect above reaches.
   --
