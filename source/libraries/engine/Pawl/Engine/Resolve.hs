@@ -2544,8 +2544,11 @@ payGatePaid resolving source controller idx cIdx legal gate = do
 -- posture payGatePaid's own comment states: rule 101.4b lets an earlier payer's
 -- answer move the board, and CR 118.12's cost is measured against the board each
 -- payer faces. It counts the counters on the ability's SOURCE through
--- `effectViewOf`, so CR 608.2h's last known record answers for a source that has
--- already left -- the same read Quantity.ObjectCounters makes.
+-- `effectViewOf`, so CR 113.7a's last known record answers for a source that has
+-- already left -- the same read Quantity.ObjectCounters makes. Whether such an
+-- ability should be offering anything at all is its own text's business: rule
+-- 702.24a's intervening "if" is what stops it (CR 603.4), proved at
+-- Pawl.KeywordTriggerSpec's "a Unicorn murdered in response".
 payGatePaidBy :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> PlayerId -> PayGate.PayGate -> Game Bool
 payGatePaidBy resolving source idx cIdx legal payer gate = do
   gs <- State.get

@@ -96,13 +96,17 @@ data PayGate = MkPayGate
     -- rule's "each choice is made separately for each age counter", since
     -- Pawl.Engine.Cost pays a component list one element at a time.
     --
-    -- A COUNTER KIND rather than a general Quantity, which is the shape "for each
-    -- [anything]" would want: a Quantity may name slots and carry a Filter, and
-    -- Pawl.Engine.Projection.rewritePayGate has no quantity rewriter to send a CR
-    -- 613 type change through -- only Pawl.Engine.Filter.rewriteCounterKind,
-    -- which this field can use. Rule 702.24a is the only "for each" a CR 118.12
-    -- cost carries in `data/cards/`; a printing whose resolution cost scaled with
-    -- something that is not a counter on the source is what widens this.
+    -- A COUNTER KIND rather than a general Quantity: a Quantity may name slots
+    -- and carry a Filter, and Pawl.Engine.Projection.rewritePayGate has no
+    -- quantity rewriter to send a CR 613 type change through -- only
+    -- Pawl.Engine.Filter.rewriteCounterKind, which this field can use. Cyclone's
+    -- "sacrifice this enchantment unless you pay {G} for each wind counter on it"
+    -- is rule 702.24a's shape written out on a CR 122.1 named counter, so the
+    -- narrow field says that card too.
+    --
+    -- Not implemented: a CR 118.12 cost scaling with anything that is not a
+    -- counter on the ability's source -- Circular Logic's "for each card in your
+    -- graveyard" (#2872).
     perCounter :: Maybe (CounterKind.CounterKind Keyword.Keyword),
     -- | Which clause of this mode MAKES the offer, when it is not this one --
     -- CR 118.12 offers a resolution cost once and reads the one answer, so

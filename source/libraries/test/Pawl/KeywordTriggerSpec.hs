@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
@@ -77,6 +78,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
@@ -3948,6 +3950,16 @@ paysFor who p = case p of
         PaymentDecision.Pays
   _ -> S.identityAnswer p
 
+-- The pay-or-not answers in a transcript, in order -- ZoneTriggerSpec's helper
+-- of the same name, duplicated for `paysFor`'s reason.
+payResponses :: [Response.Response] -> [Response.Response]
+payResponses = filter isPayResponse
+
+isPayResponse :: Response.Response -> Bool
+isPayResponse response = case response of
+  Response.ChoseToPay _ -> True
+  _ -> False
+
 -- CR 702.24 cumulative upkeep, the first keyword whose CR 118.12 payment is not
 -- the cost the card prints: rule 702.24a's "you may pay [cost] for each age
 -- counter on it" multiplies the printed cost by a pile that grows an upkeep at a
@@ -4029,10 +4041,37 @@ cumulativeUpkeepSpec s registry =
         Spec.it s "CR 702.24a bob's upkeep ages nothing" $ do
           (oid, gs) <- boardOf
           let (settled, resolved) = upkeepOf S.bob gs
-          Spec.assertEqWith s "nothing was even put on the stack" (GameState.stack settled) []
-          Spec.assertEqWith s "so the pile is untouched" (ages oid resolved) 2
+          Spec.assertEqWith s "CR 702.24a the pile is untouched by bob's upkeep" (ages oid resolved) 2
           Spec.assertEqWith s "no mana was spent" (S.tappedCount S.alice resolved) 0
           Spec.assertBool s (S.onBattlefield oid resolved) "and the Unicorn is untouched"
+          -- The proxy LAST, so a mutation has to move the board before it moves
+          -- the stack. What keeps the ability off it is the trigger condition
+          -- never matching, CR 603.3a making bob's upkeep somebody else's.
+          Spec.assertEqWith s "nothing was even put on the stack" (GameState.stack settled) []
+        -- CR 603.4's re-check, which is rule 702.24a's own "if this permanent is
+        -- on the battlefield": bob murders the Unicorn with the upkeep trigger
+        -- already on the stack, so the ability resolves with its permanent gone
+        -- and does nothing at all.
+        --
+        -- The mana is what witnesses it. CR 113.7a sends the departed source
+        -- through last known information (Pawl.Engine.Projection.viewWithLastKnown),
+        -- so an engine that skipped rule 702.24a's "if" would still find the two
+        -- age counters the Unicorn died on, offer {2} against five untapped
+        -- Forests, and take them -- for an ability rule 603.4 says does nothing.
+        Spec.it s "CR 603.4 a Unicorn murdered in response is never offered the cost" $ do
+          (_, gs0) <- boardOf
+          swamp <- S.printingOf s registry "Swamp"
+          murder <- S.printingOf s registry "Murder"
+          let (held, gs) = S.addHandCard murder S.bob (S.landsFor swamp S.bob 3 gs0)
+              settled = fst (upkeepOf S.alice gs)
+              killed = S.runPure (paysFor S.alice) settled (S.cast S.bob held >> Stack.resolveTop)
+              ((_, done), transcript) = Replay.record (paysFor S.alice) killed (Engine.settleForPriority >> Engine.priorityLoop)
+          Spec.assertEqWith s "the trigger really was on the stack when bob cast" (length (GameState.stack settled)) 1
+          Spec.assertEqWith s "CR 603.4 not one Forest went to an ability whose permanent had gone" (S.tappedCount S.alice done) 0
+          Spec.assertEqWith s "because alice was never offered rule 702.24a's cost at all" (payResponses transcript) []
+          -- The leaves-play trigger read the pile bob's Murder left it on, which
+          -- is the head start and not a third counter.
+          Spec.assertEqWith s "and alice gained TWO life, the pile the Unicorn died on" (S.lifeOf S.alice done) (Just 22)
         -- The mint, spelled out for vanishingSpec's reason. Rule 702.24b states
         -- the multiplicity clause explicitly -- "if a permanent has multiple
         -- instances of cumulative upkeep, each triggers separately" -- and rule

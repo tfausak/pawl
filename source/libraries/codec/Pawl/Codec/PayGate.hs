@@ -24,10 +24,11 @@ import qualified Pawl.Types.PayObligation as PayObligation
 -- The other three are elided when unmarked, which is what every card but
 -- Standstill and Don't Make a Sound writes: CR 118.12a's rewriting makes an
 -- "unless" cost optional, a clause that names no other clause makes its own
--- offer, and a cost is offered once rather than once per counter. No card writes
--- `perCounter` at all -- CR 702.24a's mint is its only producer, and a minted
--- ability never goes on the wire -- so the key exists to keep the round trip
--- total over the type.
+-- offer, and a cost is offered once rather than once per counter. Nothing in
+-- `data/cards/` writes `perCounter` yet -- CR 702.24a's mint is its only
+-- producer so far, and a minted ability never goes on the wire -- but the key is
+-- a card's to write: Cyclone prints rule 702.24a's shape as ordinary text over a
+-- wind counter.
 codec :: Codec.Codec PayGate.PayGate
 codec = Fields.object $ do
   payer <- Fields.required "payer" PlayerRef.codec PayGate.payer
