@@ -374,6 +374,18 @@ attackMultiplePlayersSpec s registry = Spec.describe s "AttackMultiplePlayers" $
           "CR 802.4 bob declares before carol, whose Guard has the lower id"
           asked
           [(S.bob, [atBob1, atBob2]), (S.carol, [atCarol1, atCarol2])]
+        -- CR 802.4a / 802.4b as a LEGALITY question rather than an offer, since
+        -- an interpreter can propose a block that was never offered. The pair
+        -- differs in one thing -- which attacker carol's Guard is declared
+        -- against -- so the negative cannot pass for want of a legal blocker.
+        Spec.assertBool
+          s
+          (not (Combat.legalBlockDeclaration S.carol (Map.singleton carolsGuard (Set.singleton atBob1)) declared))
+          "CR 802.4a carol may not block a creature attacking bob"
+        Spec.assertBool
+          s
+          (Combat.legalBlockDeclaration S.carol (Map.singleton carolsGuard (Set.fromList [atCarol1, atCarol2])) declared)
+          "CR 802.4b and the same Guard may block both creatures attacking her"
         -- CR 802.5 / CR 703.4k: each player in APNAP order announces how their
         -- creatures assign. alice's four attackers are each blocked by one
         -- creature and so are forced (CR 510.1c), leaving the two Guards as the
