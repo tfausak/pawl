@@ -1470,9 +1470,10 @@ jointlyCoherentGiven pcs grants pools perspective seed source slots chosen gs =
 -- taking two where one is demanded widens the reader rather than narrowing it,
 -- so a mode fillable only at the larger announcement is refused here (#2905).
 -- Every slot a sibling filter names in `data/cards/` is counted exactly one --
--- Bioshift's and Fate Transfer's `from`, Fall of the Hammer's `dealer`,
--- Resourceful Defense's `from` -- where the minimum IS the whole range and the
--- enumeration is therefore complete.
+-- Bioshift's, Fate Transfer's and Resourceful Defense's `from`, Fall of the
+-- Hammer's `dealer`, and Synthetic Hammer Refrain's `dealer` per occurrence --
+-- where the minimum IS the whole range and the enumeration is therefore
+-- complete.
 jointlyFillableGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
 jointlyFillableGiven pcs grants pools perspective seed source slots sets gs =
   Map.null readers || any coherent assignments
