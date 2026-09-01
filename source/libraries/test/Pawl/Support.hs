@@ -48,6 +48,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
@@ -136,6 +137,17 @@ threePlayers = alice NonEmpty.:| [bob, carol]
 -- priority tests, mirroring what `Setup.emptyGame bothPlayers` is for two.
 threePlayerGame :: GameState.GameState
 threePlayerGame = Setup.emptyGame threePlayers
+
+-- CR 802.1 turned OFF, leaving CR 507.1's choice of ONE defending player. The
+-- one thing that differs from the board handed in, so a case about CR 507.1's
+-- prompt and a case about CR 802.2's absence of one are the same board twice.
+--
+-- Legal only at two seats (CR 806.2b requires one of the three attack options
+-- at three or more), which is why every caller is a case about the turn-based
+-- action itself rather than about a game being played.
+oneDefendingPlayer :: GameState.GameState -> GameState.GameState
+oneDefendingPlayer gs =
+  gs {GameState.settings = (GameState.settings gs) {GameSettings.attackMultiplePlayers = False}}
 
 -- A fourth seat, alongside threePlayers, for cases where three seats cannot
 -- distinguish two candidate answers (a departure walk with only one
@@ -318,9 +330,15 @@ fightAnswer p = case p of
   Prompt.ChooseAction {} -> castAnswer p
   _ -> aggressiveAnswer p
 
--- Answers Prompt.ChooseDefender with `who` and everything else with
--- aggressiveAnswer -- the shared shape of CombatSpec's and GameSpec's M5.6d
--- defending-player fixtures. Its own type is the ordinary rank-1 `forall r.
+-- Aims the attack at `who`: both halves of that, since CR 802.2 makes every
+-- opponent a defending player and CR 802.3 then asks each creature whom it
+-- attacks. Prompt.ChooseDefender is answered with `who` for a game whose
+-- settings turn CR 802.2 off (CR 507.1), and Prompt.ChooseAttackTarget with
+-- `who`'s own seat whenever it is offered -- the announcement CR 802.3 raises,
+-- and the one prompt that actually settles which opponent is attacked. Falls
+-- through to aggressiveAnswer's head otherwise, which is a board where `who` is
+-- not a defending player at all. Everything else is aggressiveAnswer -- the
+-- shared shape of CombatSpec's and GameSpec's M5.6d defending-player fixtures. Its own type is the ordinary rank-1 `forall r.
 -- PlayerId -> Prompt r -> r` (the implicit forall is outermost, quantifying
 -- the whole arrow chain), so it needs no RankNTypes of its own; partially
 -- applying `attackTo who` gives exactly the `forall r. Prompt.Prompt r -> r`
@@ -331,6 +349,8 @@ fightAnswer p = case p of
 attackTo :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 attackTo who p = case p of
   Prompt.ChooseDefender {} -> who
+  Prompt.ChooseAttackTarget _ _ _ options ->
+    Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer who) (NonEmpty.toList options))
   _ -> aggressiveAnswer p
 
 -- Always plays a land when one is legal, otherwise passes.
@@ -1112,7 +1132,7 @@ combatBoardOf mine theirs =
             -- active, so by CR 506.2's second sentence bob is the defending
             -- player. Stated rather than derived, because a direct-call test
             -- never runs the turn-based action that would fill this in.
-            GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just bob},
+            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure bob},
             -- The steps after declare attackers, so a runStep-driven test (Tasks
             -- 2 and 4) can advance through combat. Direct-call tests ignore it.
             GameState.remaining =
@@ -1590,7 +1610,7 @@ oneMountainState mountain ph =
             Object.exertedBy = Set.empty
           }
    in GameState.MkGameState
-        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False},
+        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackMultiplePlayers = True},
           GameState.objects = Map.singleton oid obj,
           GameState.library = Map.empty,
           GameState.hand = Map.singleton alice (Seq.singleton oid),

@@ -224,7 +224,7 @@ needsProtector pc controller playing attacked designated = case designated of
 -- outcome, so the options are indistinguishable and the engine decides nothing by
 -- not asking. See Prompt.ChooseProtector.
 --
--- Filters rather than trusts the answer, the posture Combat.chooseDefender and
+-- Filters rather than trusts the answer, the posture Combat.designateDefenders and
 -- Sba.chooseLegendVictims both take: an interpreter that names a player who is not
 -- a candidate gets the head of the list instead of an illegal designation.
 designateProtector ::

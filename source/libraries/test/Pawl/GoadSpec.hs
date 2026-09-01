@@ -134,7 +134,7 @@ attacking defender gs =
   gs
     { GameState.activePlayer = S.alice,
       GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-      GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just defender},
+      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure defender},
       GameState.remaining =
         Seq.fromList
           [ Phase.Combat CombatStep.DeclareBlockers,

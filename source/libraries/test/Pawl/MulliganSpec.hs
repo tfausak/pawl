@@ -63,7 +63,7 @@ poolToLibrary pid gs =
 -- CR 903.12a: turn the Brawl option on. The seat count is untouched, so a board
 -- run through this and the same board without it differ in exactly one thing.
 brawling :: GameState.GameState -> GameState.GameState
-brawling gs = gs {GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = True}}
+brawling gs = gs {GameState.settings = (GameState.settings gs) {GameSettings.brawl = True}}
 
 -- n Mountains in each player's library, nothing elsewhere.
 libraryGame :: Printing.Printing -> Int -> GameState.GameState

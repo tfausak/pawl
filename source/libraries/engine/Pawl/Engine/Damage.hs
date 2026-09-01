@@ -282,12 +282,11 @@ damageEvent gs kind source target amount =
 --
 -- The defending player is read off the combat's designation
 -- (Defender.defendingPlayers) and not re-derived from the planeswalker, which is
--- gone -- CR 508.5's second sentence, the same reading Defender.playerOf now takes
--- for every caller: pawl's combat has ONE defending player (see
--- Pawl.Engine.Defender) and an attack on a planeswalker is declared against that
--- player's planeswalkers (CR 508.1b), so that player is the controller it had
--- before it was removed from combat. Narrowed to one and never folded, which is
--- CR 802.2a's own instruction.
+-- gone -- CR 508.5's second sentence. Not implemented: CR 802.2a's answer where
+-- several players defend, this taking the first of them rather than the seat
+-- that controlled the planeswalker (#2841). Exact while one player defends, an
+-- attack on a planeswalker being declared against that player's own
+-- planeswalkers (CR 508.1b).
 --
 -- Read at ASSIGNMENT and at every place assignment can name a recipient (the
 -- unblocked/trample-through event and the CR 702.19b threshold map the prompt
@@ -590,9 +589,33 @@ gatherCombatDamage assigns = do
             blocker <- Set.toList blockers,
             assigns blocker
           ]
-  announced <- Monad.mapM (\a -> attackerAssignment gs (contestedAssignment gs attackers a) a) attackers
-  fromBlockers <- Monad.mapM (blockerAssignment gs) blocking
-  pure (settleAssignments announced <> concat fromBlockers)
+      -- CR 703.4k / CR 802.5: each player in APNAP order announces how each
+      -- attacking or blocking creature THEY CONTROL assigns its combat damage.
+      -- Partitioned by controller rather than by role: attackers-then-blockers
+      -- is APNAP order only while every blocker belongs to one nonactive
+      -- player, which is what CR 802.2's several defending players break.
+      --
+      -- Rule 703.4k gives no order WITHIN a player, so each seat's attackers
+      -- are asked before its blockers, which is the order the two lists were
+      -- already built in.
+      --
+      -- Anything whose controller is not a seat in the game is announced LAST
+      -- rather than dropped: the rule names players, and a creature CR 800.4a
+      -- has not removed still assigns its damage.
+      seats = Game.apnapOrder gs
+      controllerOfEntry entry = Projection.controllerOf (fst entry) gs
+      order owned =
+        fmap (\pid -> filter (\entry -> controllerOfEntry entry == Just pid) owned) seats
+          <> [filter (Maybe.maybe True (\pid -> List.notElem pid seats) . controllerOfEntry) owned]
+  waves <-
+    Monad.mapM
+      ( \(mine, theirs) -> do
+          a <- Monad.mapM (\x -> attackerAssignment gs (contestedAssignment gs attackers x) x) mine
+          b <- Monad.mapM (blockerAssignment gs) theirs
+          pure (a, b)
+      )
+      (zip (order attackers) (order blocking))
+  pure (settleAssignments (concatMap fst waves) <> concatMap (concat . snd) waves)
 
 -- Can any OTHER attacking creature assigning damage this step pay part of a bar
 -- this one is gated by? The two ways CR 702.19b and CR 702.19c let that happen,

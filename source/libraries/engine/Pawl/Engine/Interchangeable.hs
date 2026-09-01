@@ -168,7 +168,7 @@ noCombat =
       Combat.declaredBlockers = Set.empty,
       Combat.blockersDeclared = False,
       Combat.attackingNothing = Set.empty,
-      Combat.defender = Nothing
+      Combat.defenders = []
     }
 
 -- Whether one of the board's ID-KEYED RELATIONS names this object. Each is

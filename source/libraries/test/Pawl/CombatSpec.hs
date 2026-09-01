@@ -273,7 +273,7 @@ choosesDefender who p = case p of
 
 -- Sibling of choosesDefender that records the prompt's Decider instead of its
 -- PlayerId subject. CR 723.1/723.5: while a player is controlled, their
--- controller makes their choices, and Combat.chooseDefender's
+-- controller makes their choices, and Combat.designateDefenders's
 -- `Decide.deciderFor pid gs` is what routes ChooseDefender there. choosesDefender
 -- above discards the Decider entirely, so it cannot tell that routing apart from
 -- a regression to the raw active-player id; this helper is what makes the
@@ -323,9 +323,9 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- the tuple comes back (after, asked).
     let (after, asked) =
           State.runState
-            (fmap snd (Engine.runGame (choosesDefender S.carol) S.threePlayerGame (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
+            (fmap snd (Engine.runGame (choosesDefender S.carol) (S.oneDefendingPlayer S.threePlayerGame) (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
             []
-    Spec.assertEqWith s "carol is the defending player" (Combat.Type.defender (GameState.combat after)) (Just S.carol)
+    Spec.assertEqWith s "carol is the defending player" (Combat.Type.defenders (GameState.combat after)) [S.carol]
     Spec.assertEqWith s "and alice, the active player, is who was asked" asked [S.alice]
   Spec.it s "CR 723.1 a controlled active player's choice of defender routes to their controller" $ do
     -- THREE seats (alice active, bob, carol) with carol controlling alice
@@ -342,17 +342,17 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- does not change the point here). Combined with CR 723.5 (the controller
     -- makes the controlled player's choices) and CR 723.3 (the controlled
     -- player is still the active player), alice remains the active player
-    -- named in the prompt but carol is who must be asked. Combat.chooseDefender
+    -- named in the prompt but carol is who must be asked. Combat.designateDefenders
     -- gets this right by computing `Decide.deciderFor pid gs` rather than
     -- defaulting to `Decider.MkDecider pid`.
     --
-    -- Discriminates exactly that regression: a `chooseDefender` that used
+    -- Discriminates exactly that regression: a `designateDefenders` that used
     -- `Decider.MkDecider pid` (the raw active player, alice) instead of
     -- `Decide.deciderFor pid gs` would record `[Decider.MkDecider S.alice]`
     -- below -- handing alice's own choice back to her, which is the CR 723.1
     -- violation this test exists to catch -- and none of the other six cases in
     -- this group sets activeControl, so none of them would notice.
-    let controlled = S.threePlayerGame {GameState.activeControl = Just (Decider.MkDecider S.carol)}
+    let controlled = (S.oneDefendingPlayer S.threePlayerGame) {GameState.activeControl = Just (Decider.MkDecider S.carol)}
         (_, deciders) =
           State.runState
             (fmap snd (Engine.runGame (choosesDefenderRecordingDecider S.bob) controlled (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
@@ -369,7 +369,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
           State.runState
             (fmap snd (Engine.runGame (choosesDefender S.alice) (Setup.emptyGame S.bothPlayers) (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
             []
-    Spec.assertEqWith s "bob defends" (Combat.Type.defender (GameState.combat after)) (Just S.bob)
+    Spec.assertEqWith s "bob defends" (Combat.Type.defenders (GameState.combat after)) [S.bob]
     Spec.assertEqWith s "nobody was asked" asked []
   Spec.it s "CR 507.1 a multiplayer game down to one opponent is not asked either" $ do
     -- The case #169 is actually about: CR 703.4h still applies (the game BEGAN
@@ -381,7 +381,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
           State.runState
             (fmap snd (Engine.runGame (choosesDefender S.carol) gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
             []
-    Spec.assertEqWith s "bob, the only one left" (Combat.Type.defender (GameState.combat after)) (Just S.bob)
+    Spec.assertEqWith s "bob, the only one left" (Combat.Type.defenders (GameState.combat after)) [S.bob]
     Spec.assertEqWith s "nobody was asked" asked []
   Spec.it s "CR 507.1 with no opponents left the action does not happen at all" $ do
     -- Not reachable in a running game (CR 104.2a ends it), but the branch has
@@ -392,7 +392,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
           State.runState
             (fmap snd (Engine.runGame (choosesDefender S.bob) alone (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
             []
-    Spec.assertEqWith s "nobody defends" (Combat.Type.defender (GameState.combat after)) Nothing
+    Spec.assertEqWith s "nobody defends" (Combat.Type.defenders (GameState.combat after)) []
     Spec.assertEqWith s "nobody was asked" asked []
   Spec.it s "CR 800.4h #181 a turn whose active player has left chooses no defending player, diverging from the next-seat reassignment" $ do
     -- CR 800.4j: the turn continues without an active player, so the action
@@ -405,20 +405,20 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- guard entirely.
     --
     -- This drives Engine.runTurnBasedActions, and the guard exists at BOTH
-    -- ends of that call (Engine.hs's hasActive and chooseDefender's own test),
+    -- ends of that call (Engine.hs's hasActive and designateDefenders's own test),
     -- so this case passes with either one alone and isolates neither. The
-    -- sibling case below is the one that isolates chooseDefender's; the
+    -- sibling case below is the one that isolates designateDefenders's; the
     -- engine-side copy is redundant on this path and has nothing to isolate.
     let gone = S.departs Departure.Type.Conceded S.alice S.threePlayerGame
         (after, asked) =
           State.runState
             (fmap snd (Engine.runGame (choosesDefender S.carol) gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
             []
-    Spec.assertEqWith s "no defending player" (Combat.Type.defender (GameState.combat after)) Nothing
+    Spec.assertEqWith s "no defending player" (Combat.Type.defenders (GameState.combat after)) []
     Spec.assertEqWith s "and nobody was asked" asked []
-  Spec.it s "CR 800.4j chooseDefender called directly still chooses nobody" $ do
+  Spec.it s "CR 800.4j designateDefenders called directly still chooses nobody" $ do
     -- The same rule at the other end of the call, reached WITHOUT
-    -- Engine.runTurnBasedActions so that only chooseDefender's own membership
+    -- Engine.runTurnBasedActions so that only designateDefenders's own membership
     -- test can be responsible. Discriminating exactly that line: with it gone,
     -- alice -- who has left the game -- is asked, and carol becomes the
     -- defending player on a turn CR 800.4j says has no active player to choose
@@ -427,9 +427,9 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     let gone = S.departs Departure.Type.Conceded S.alice S.threePlayerGame
         (after, asked) =
           State.runState
-            (fmap snd (Engine.runGame (choosesDefender S.carol) gone Combat.chooseDefender))
+            (fmap snd (Engine.runGame (choosesDefender S.carol) gone Combat.designateDefenders))
             []
-    Spec.assertEqWith s "no defending player" (Combat.Type.defender (GameState.combat after)) Nothing
+    Spec.assertEqWith s "no defending player" (Combat.Type.defenders (GameState.combat after)) []
     Spec.assertEqWith s "and nobody was asked" asked []
   Spec.it s "CR 507.1 an answer that is not one of the candidates falls back to the first" $ do
     -- A broken interpreter, not a game state: it names the ACTIVE player.
@@ -438,9 +438,9 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- the attacking player.
     let (after, _) =
           State.runState
-            (fmap snd (Engine.runGame (choosesDefender S.alice) S.threePlayerGame (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
+            (fmap snd (Engine.runGame (choosesDefender S.alice) (S.oneDefendingPlayer S.threePlayerGame) (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
             []
-    Spec.assertEqWith s "the first candidate, never the active player" (Combat.Type.defender (GameState.combat after)) (Just S.bob)
+    Spec.assertEqWith s "the first candidate, never the active player" (Combat.Type.defenders (GameState.combat after)) [S.bob]
   Spec.it s "CR 506.2a the candidates are every other player still in the game" $
     -- Three seats, because two cannot tell "the chosen opponent" from "the
     -- only opponent". Discriminating: an implementation that forgot to drop
@@ -454,26 +454,34 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     let gone = S.departs Departure.Type.Conceded S.bob S.fourPlayerGame
     Spec.assertEqWith s "bob is dropped, carol and dave remain" (Combat.attackableOpponents gone) [S.carol, S.dave]
     Spec.assertEqWith s "and before he left there were three" (Combat.attackableOpponents S.fourPlayerGame) [S.bob, S.carol, S.dave]
-  Spec.it s "CR 506.2a the candidates come back in SEATING order, not player-id order" $ do
-    -- The discriminator between Game.stillPlayingInOrder and
-    -- Game.stillPlaying: seated carol-alice-bob with alice attacking,
-    -- seating order gives [carol, bob] and the players map gives [bob, carol].
-    -- Every other fixture in the suite is seated ascending, so this is the
-    -- only place the two readings disagree.
+  Spec.it s "CR 101.4 the candidates come back in APNAP order, not seating or player-id order" $ do
+    -- Seated carol-alice-bob with alice attacking, so all three readings
+    -- disagree: APNAP gives [bob, carol], the raw seating roster gives
+    -- [carol, bob], and the players map gives [bob, carol] by id rather than
+    -- by seat. Every other fixture in the suite is seated ascending, so this
+    -- is the only place they come apart.
+    --
+    -- APNAP and not the roster, because designateDefenders hands this list
+    -- straight to Combat.defenders under CR 802.2 and CR 802.4 and CR 802.5
+    -- both read it in that order. Discriminating: the roster reading answers
+    -- carol first, and the players-map reading answers bob first for the wrong
+    -- reason -- which the case below separates by leaving carol out.
     let rotated = (Setup.emptyGame (S.carol NonEmpty.:| [S.alice, S.bob])) {GameState.activePlayer = S.alice}
-    Spec.assertEqWith s "carol's seat comes first" (Combat.attackableOpponents rotated) [S.carol, S.bob]
+    Spec.assertEqWith s "bob, the seat after alice, comes first" (Combat.attackableOpponents rotated) [S.bob, S.carol]
+    let rotatedFour = (Setup.emptyGame (S.carol NonEmpty.:| [S.dave, S.alice, S.bob])) {GameState.activePlayer = S.alice}
+    Spec.assertEqWith s "and the wrap-around follows the seating, not the ids" (Combat.attackableOpponents rotatedFour) [S.bob, S.carol, S.dave]
   Spec.it s "CR 703.4h no defending player has been chosen before the beginning of combat step" $
     -- Discriminating: a field defaulted to Just <somebody> would let a board
     -- that has never run the turn-based action declare attackers.
-    Spec.assertEqWith s "empty combat names nobody" (Combat.Type.defender (GameState.combat S.threePlayerGame)) Nothing
+    Spec.assertEqWith s "empty combat names nobody" (Combat.Type.defenders (GameState.combat S.threePlayerGame)) []
   Spec.it s "CR 506.2 the designation does not outlive the combat phase" $ do
     -- CR 506.2's sentences are all scoped "During the combat phase", and
     -- CR 703.4h makes the choice per beginning-of-combat step, so a second
     -- combat phase in one turn chooses again. Discriminating: a clearCombat
     -- that reset only attackers and blockers would leave Just carol here, and
     -- the next combat phase would inherit a stale defender.
-    let busy = S.threePlayerGame {GameState.combat = (GameState.combat S.threePlayerGame) {Combat.Type.defender = Just S.carol}}
-    Spec.assertEqWith s "cleared at end of combat" (Combat.Type.defender (GameState.combat (Combat.clearCombat busy))) Nothing
+    let busy = S.threePlayerGame {GameState.combat = (GameState.combat S.threePlayerGame) {Combat.Type.defenders = pure S.carol}}
+    Spec.assertEqWith s "cleared at end of combat" (Combat.Type.defenders (GameState.combat (Combat.clearCombat busy))) []
   Spec.it s "CR 508.1 every attacker attacks the CHOSEN defending player" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (board, mine, _, _) = S.threePlayerCombat [piker, piker] [piker] [piker]
@@ -481,7 +489,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
         ready =
           board
             { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-              GameState.combat = (GameState.combat board) {Combat.Type.defender = Just S.carol}
+              GameState.combat = (GameState.combat board) {Combat.Type.defenders = pure S.carol}
             }
         after = S.runPure S.aggressiveAnswer ready (Combat.declareAttackers S.alice)
     Spec.assertEqWith s "both of alice's creatures attack" (length mine) 2
@@ -519,7 +527,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
             { GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
               GameState.combat =
                 (GameState.combat board)
-                  { Combat.Type.defender = Just S.carol,
+                  { Combat.Type.defenders = pure S.carol,
                     Combat.Type.attackers = attackMap
                   }
             }
@@ -3200,7 +3208,7 @@ defendingPlayerRestrictionSpec s registry = Spec.describe s "DefendingPlayerComb
         defendedBy who =
           gs
             { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-              GameState.combat = (GameState.combat gs) {Combat.Type.defender = Just who}
+              GameState.combat = (GameState.combat gs) {Combat.Type.defenders = pure who}
             }
     case mine of
       [ship] -> do
@@ -3554,7 +3562,7 @@ declaringAttackers gs =
     S.aggressiveAnswer
     gs
       { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-        GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.bob}
+        GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure S.bob}
       }
     (Combat.declareAttackers S.alice)
 
@@ -3889,7 +3897,7 @@ facingBob :: GameState.GameState -> GameState.GameState
 facingBob gs =
   gs
     { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-      GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.bob}
+      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure S.bob}
     }
 
 -- Alice active with priority in her precombat main phase, which is when the

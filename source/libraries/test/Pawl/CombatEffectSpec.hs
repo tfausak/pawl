@@ -737,7 +737,7 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
                       Combat.Type.declaredBlockers = Set.empty,
                       Combat.Type.blockersDeclared = True,
                       Combat.Type.attackingNothing = Set.empty,
-                      Combat.Type.defender = Just S.bob
+                      Combat.Type.defenders = pure S.bob
                     }
               }
     Spec.assertEqWith s "starts empty" (Combat.Type.attackers (GameState.combat gs)) Map.empty
@@ -935,7 +935,7 @@ endOfCombatSpec s registry = Spec.describe s "EndOfCombat" $ do
     Spec.assertEqWith s "no attackers" (Combat.Type.attackers (GameState.combat after)) Map.empty
     -- CR 506.2's designation is scoped to the combat phase, and clearCombat
     -- resets it alongside the attackers.
-    Spec.assertEqWith s "no defending player" (Combat.Type.defender (GameState.combat after)) Nothing
+    Spec.assertEqWith s "no defending player" (Combat.Type.defenders (GameState.combat after)) []
   Spec.it s "CR 511.3 the twin: the same Kill Shot has no target in the postcombat main phase" $ do
     -- The discriminator for the case above. If IsAttacking simply read True
     -- for every creature, or if combat were never cleared at all, this would
@@ -2580,7 +2580,7 @@ stolenJaceLandwalkBoard s registry bolted defendersLand ownersLand = do
                 -- CR 506.2a / CR 507.1's choice, stated rather than run: bob
                 -- defends, which is what puts carol's Jace among the attackable
                 -- planeswalkers (CR 306.6 reads the CONTROLLER).
-                GameState.combat = (GameState.combat gs3) {Combat.Type.defender = Just S.bob}
+                GameState.combat = (GameState.combat gs3) {Combat.Type.defenders = pure S.bob}
               }
           declared = snd (Engine.runGamePure attackThePlaneswalker board (Combat.declareAttackers S.alice))
           burned = S.runPure (aimedAtObject jaceId) declared (do S.cast S.alice boltId; Stack.resolveTop)
@@ -5328,7 +5328,7 @@ publicEnemySpec s registry = Spec.describe s "PublicEnemy" $ do
         defending =
           base
             { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-              GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.bob}
+              GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure S.bob}
             }
         enchanting host =
           let (aura, withAura) = S.addCreature enemy S.alice defending
@@ -5455,21 +5455,21 @@ conditionalAttackRequirementSpec s registry = Spec.describe s "ConditionalAttack
 -- THREE SEATS, and that is load-bearing: CR 102.2 leaves a two-player game
 -- exactly one opponent, so the pick is elided and every implementation agrees.
 --
--- The pair of boards differs in ONE thing -- which opponent alice named as the
--- defending player at CR 507.1, before the trigger resolved -- and the random
--- pick is pinned to carol on both. Only one opponent is attackable at a time (CR
--- 506.2a), so the assertion is whether the requirement can be obeyed:
+-- The pair of boards differs in ONE thing -- which opponent randomness named --
+-- and under CR 802.2 both opponents are defending players, so BOTH are
+-- attackable on both boards and the requirement is what separates them:
 --
---   * defender carol: the requirement names the attackable seat, so CR 508.1d
---     forbids declining.
---   * defender bob: it names a seat that cannot be attacked at all, so the
---     maximum is zero and declining is legal.
+--   * named carol: attacking carol obeys the requirement, attacking bob does
+--     not, and CR 508.1d forbids both declining and the bob declaration.
+--   * named bob: the same three assertions with the seats swapped.
 --
--- An engine that rolled the head of the offer itself (bob) rather than honouring
--- the answer flips BOTH, and one that never landed the bind makes declining legal
--- on both. Pinned to NonEmpty.last for exactly that reason: Replay.defaultAnswer
--- -- which S.identityAnswer falls through to -- answers this prompt with the
--- HEAD, so a head-pinned board could not tell the two apart.
+-- That symmetry is what CR 802.2 bought. Before it the bob leg was vacuous --
+-- one opponent was attackable at a time, so a requirement naming the other
+-- could not be obeyed by any declaration and declining was legal.
+--
+-- An engine that rolled the head of the offer itself rather than honouring the
+-- answer collapses the pair onto the bob leg, and one that never landed the bind
+-- makes declining legal on both.
 randomOpponentSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 randomOpponentSpec s registry = Spec.describe s "RandomOpponent" $ do
   Spec.it s "CR 608.2d the opponent randomness named is the one the requirement makes Ruhan attack" $ do
@@ -5479,22 +5479,35 @@ randomOpponentSpec s registry = Spec.describe s "RandomOpponent" $ do
         atBob = S.runToStep (Phase.Combat CombatStep.DeclareAttackers) (ruhanAnswer S.bob) board
     case mine of
       [ruhanId] -> do
-        -- THE GAMEPLAY ASSERTION. carol is the attackable seat and the
-        -- requirement names her, so CR 508.1d refuses the empty declaration.
+        -- THE GAMEPLAY ASSERTION. The requirement names carol, so CR 508.1d
+        -- refuses both the empty declaration and the one aimed at bob -- who
+        -- CR 802.2 makes just as attackable.
         Spec.assertBool
           s
           (not (Combat.legalAttackDeclaration S.alice [] atCarol))
-          "CR 508.1d: with carol defending, declining disobeys the requirement randomness bound"
+          "CR 508.1d: with carol named, declining disobeys the requirement randomness bound"
+        Spec.assertBool
+          s
+          (not (Combat.legalAttackDeclarationAs S.alice [(ruhanId, AttackTarget.OfPlayer S.bob)] atCarol))
+          "and so does attacking bob, whom CR 802.2 leaves attackable"
         Spec.assertBool
           s
           (Combat.legalAttackDeclarationAs S.alice [(ruhanId, AttackTarget.OfPlayer S.carol)] atCarol)
           "and attacking carol obeys it"
-        -- The paired board, one thing different: bob defends, so the requirement
-        -- names a seat CR 506.2a leaves unattackable and the maximum is zero.
+        -- The paired board, one thing different: randomness named bob, so the
+        -- three assertions above hold with the seats swapped.
         Spec.assertBool
           s
-          (Combat.legalAttackDeclaration S.alice [] atBob)
-          "CR 508.1d: with bob defending, the requirement cannot be obeyed and declining is legal"
+          (not (Combat.legalAttackDeclaration S.alice [] atBob))
+          "CR 508.1d: with bob named, declining disobeys it too"
+        Spec.assertBool
+          s
+          (not (Combat.legalAttackDeclarationAs S.alice [(ruhanId, AttackTarget.OfPlayer S.carol)] atBob))
+          "and attacking carol is what is illegal on that board"
+        Spec.assertBool
+          s
+          (Combat.legalAttackDeclarationAs S.alice [(ruhanId, AttackTarget.OfPlayer S.bob)] atBob)
+          "while attacking bob obeys it"
         -- Supporting, and LAST so it cannot absorb a mutation the two above
         -- should catch: the requirement really was stored against carol, not bob.
         Spec.assertEqWith
@@ -5523,17 +5536,16 @@ randomOpponentSpec s registry = Spec.describe s "RandomOpponent" $ do
     -- WHAT it offered is the part of that posture a test can see.
     Spec.assertEqWith s "asked once, offering both opponents and not alice" offers [[S.bob, S.carol]]
 
--- Pins BOTH of the beginning-of-combat step's questions: which opponent alice
--- names as the defending player (CR 507.1), and which opponent randomness names
--- (CR 608.2d). The defender is FILTERED out of the offered candidates rather than
--- built, so an answer the engine never offered cannot slip through; the random
--- pick is NonEmpty.last, which on this board is carol and is never the value
--- Replay.defaultAnswer would supply.
+-- Pins which opponent randomness names (CR 608.2d). FILTERED out of the offered
+-- candidates rather than built, so an answer the engine never offered cannot slip
+-- through, and falling back to the head where `who` was not offered.
+--
+-- CR 507.1's question is not pinned because it is not asked: CR 802.2 takes the
+-- turn-based action without a choice, and every opponent defends.
 ruhanAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
-ruhanAnswer defending p = case p of
-  Prompt.ChooseDefender _ _ candidates ->
-    Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== defending) (NonEmpty.toList candidates))
-  Prompt.RandomOpponent offered -> NonEmpty.last offered
+ruhanAnswer who p = case p of
+  Prompt.RandomOpponent offered ->
+    Maybe.fromMaybe (NonEmpty.head offered) (List.find (== who) (NonEmpty.toList offered))
   _ -> S.identityAnswer p
 
 -- Declines CR 508.1a's declaration the first time and declares everything the

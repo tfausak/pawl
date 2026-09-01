@@ -376,6 +376,7 @@ annihilatorSpec s registry =
       declaring :: ObjectId.ObjectId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
       declaring attacker who p = case p of
         Prompt.ChooseDefender {} -> who
+        Prompt.ChooseAttackTarget {} -> S.attackTo who p
         Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
         Prompt.DeclareBlockers {} -> Map.empty
         Prompt.ChooseSacrifices _ _ _ candidates _ -> Set.fromList (take 1 (reverse candidates))
@@ -1755,6 +1756,7 @@ selfAttacksUnblockedSpec s registry =
       attacking :: PlayerId.PlayerId -> Prompt.Prompt r -> r
       attacking who p = case p of
         Prompt.ChooseDefender {} -> who
+        Prompt.ChooseAttackTarget {} -> S.attackTo who p
         _ -> S.aggressiveAnswer p
       -- The same, with CR 509.1's declaration switched off -- the control leg,
       -- and the only difference between the two answerers.
@@ -1868,6 +1870,7 @@ frenzySpec s registry =
       plan :: PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
       plan who attackers p = case p of
         Prompt.ChooseDefender {} -> who
+        Prompt.ChooseAttackTarget {} -> S.attackTo who p
         Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
         _ -> S.aggressiveAnswer p
       -- The same, with CR 509.1's declaration switched off. The blocked and
@@ -2738,6 +2741,7 @@ trygonPredatorSpec s registry =
   let plan :: Prompt.Prompt r -> r
       plan p = case p of
         Prompt.ChooseDefender {} -> S.carol
+        Prompt.ChooseAttackTarget {} -> S.attackTo S.carol p
         -- CR 603.5's printed "may", always exercised: a declined clause would
         -- destroy nothing, and this group is about which permanent it reaches.
         Prompt.ChooseOptional {} -> OptionalDecision.Exercises
@@ -2906,6 +2910,8 @@ larcenySpec s registry =
   let plan :: Prompt.Prompt r -> r
       plan p = case p of
         Prompt.ChooseDefender {} -> S.carol
+        -- CR 508.1b / CR 802.3's choice pinned to the PLAYER, and to carol's
+        -- seat rather than bob's, whom CR 802.2 also makes a defending player.
         Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer S.carol) (NonEmpty.toList options))
         Prompt.DeclareBlockers {} -> Map.empty
         _ -> S.aggressiveAnswer p
@@ -4545,6 +4551,7 @@ afflictSpec s registry =
       attacking :: PlayerId.PlayerId -> Prompt.Prompt r -> r
       attacking who p = case p of
         Prompt.ChooseDefender {} -> who
+        Prompt.ChooseAttackTarget {} -> S.attackTo who p
         _ -> S.aggressiveAnswer p
       -- The same, with CR 509.1's declaration switched off -- the control leg, and
       -- the only difference between the two answerers.
@@ -4629,6 +4636,7 @@ meleeSpec s registry =
       attacking :: PlayerId.PlayerId -> Prompt.Prompt r -> r
       attacking who p = case p of
         Prompt.ChooseDefender {} -> who
+        Prompt.ChooseAttackTarget {} -> S.attackTo who p
         _ -> S.aggressiveAnswer p
       isPlaneswalker target = case target of
         AttackTarget.OfPlaneswalker _ -> True
@@ -4763,6 +4771,7 @@ dethroneSpec s registry =
       attacking :: PlayerId.PlayerId -> Prompt.Prompt r -> r
       attacking who p = case p of
         Prompt.ChooseDefender {} -> who
+        Prompt.ChooseAttackTarget {} -> S.attackTo who p
         _ -> S.aggressiveAnswer p
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
    in Spec.describe s "Dethrone" $ do
@@ -4849,6 +4858,7 @@ marchesasDecreeSpec s registry =
       attacking :: PlayerId.PlayerId -> Prompt.Prompt r -> r
       attacking who p = case p of
         Prompt.ChooseDefender {} -> who
+        Prompt.ChooseAttackTarget {} -> S.attackTo who p
         _ -> S.aggressiveAnswer p
       -- The same board with the declaration itself declined, which is the leg
       -- that separates "a creature attacked you" from "the step began".

@@ -631,7 +631,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
           board
             { GameState.activePlayer = S.bob,
               GameState.activeControl = Just (Decider.MkDecider S.alice),
-              GameState.combat = (GameState.combat board) {Combat.Type.defender = Just S.alice}
+              GameState.combat = (GameState.combat board) {Combat.Type.defenders = pure S.alice}
             }
         after = S.runCombat controlCombatAnswer g0
     Spec.assertEqWith s "alice took 2 from bob's Piker, declared by alice-as-bob" (S.lifeOf S.alice after) (Just 18)
@@ -1648,7 +1648,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     let seated =
           S.threePlayerGame
             { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-              GameState.combat = (GameState.combat S.threePlayerGame) {Combat.Type.defender = Just S.bob}
+              GameState.combat = (GameState.combat S.threePlayerGame) {Combat.Type.defenders = pure S.bob}
             }
         (pikerId, board) = S.addCreature piker S.alice seated
         gone = S.departs Departure.Type.Conceded S.alice board
@@ -1691,7 +1691,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     let seated =
           (Setup.emptyGame S.bothPlayers)
             { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-              GameState.combat = (GameState.combat (Setup.emptyGame S.bothPlayers)) {Combat.Type.defender = Just S.bob}
+              GameState.combat = (GameState.combat (Setup.emptyGame S.bothPlayers)) {Combat.Type.defenders = pure S.bob}
             }
         (pikerId, board) = S.addCreature piker S.alice seated
         gone = S.departs Departure.Type.Conceded S.alice board
