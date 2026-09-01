@@ -94,7 +94,12 @@ emptyGame :: NonEmpty.NonEmpty PlayerId -> GameState
 emptyGame order =
   let order_ = NonEmpty.toList order
       -- CR 800.2 / CR 103: a game with no option in use, which is what rule 103
-      -- describes on its own. Every caller that wants one turns it on here.
+      -- describes on its own.
+      --
+      -- Not implemented: an options argument. Nothing threads one down to here,
+      -- so a game that uses an option is reached by record-updating
+      -- GameState.settings afterwards rather than by being started with it
+      -- (#2837).
       settings = GameSettings.MkGameSettings {GameSettings.brawl = False}
       newPlayer pid =
         ( pid,
