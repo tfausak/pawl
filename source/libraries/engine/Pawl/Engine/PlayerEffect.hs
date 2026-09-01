@@ -1716,8 +1716,8 @@ mayPlayLandsFromGraveyard pid gs =
 -- The scope is read against `pid`, the PROTECTED player: CR 702.11c's "you" is
 -- the player who has hexproof, and "your opponents" are theirs. That is a
 -- DIFFERENT anchor from the one PlayerStaticAbility.scope uses (the effect's
--- controller), which is why the argument order here is (caster, protected) and
--- inScope's is (asked-about, controller). See
+-- controller), which is why the two player arguments here read (caster,
+-- protected) and inScope's read (asked-about, controller). See
 -- Pawl.Types.PlayerEffect.CantBeTargetedBy for where the two would come apart.
 --
 -- A Nothing caster is a question with no CR 109.5 "you" in it. Hexproof does not
@@ -1728,17 +1728,15 @@ mayPlayLandsFromGraveyard pid gs =
 --
 -- MEMBERSHIP, never a tally: CR 702.18b and CR 702.11h make multiple instances
 -- redundant for the player half as well as the permanent half.
-protectedFromTargeting :: Maybe PlayerId -> PlayerId -> GameState -> Bool
-protectedFromTargeting caster pid gs = protectedFromTargetingGiven (applying pid gs) caster pid gs
-
--- protectedFromTargeting against an already-gathered row list, the *Of/*Given
--- pairing this module already uses: Pawl.Engine.Target.targetable asks this and
+--
+-- Takes the gathered rows rather than gathering them, where every other question
+-- here takes a PlayerId: Pawl.Engine.Target.targetable asks this and
 -- protectedFromGiven below about the SAME player in one breath, and `applying`
 -- forces Projection.abilityRemoval, a whole-board gather, the moment any
--- permanent carries a player ability. Two gathers per player candidate is what
--- this pairing avoids.
-protectedFromTargetingGiven :: [(Maybe ObjectId, PlayerEffect)] -> Maybe PlayerId -> PlayerId -> GameState -> Bool
-protectedFromTargetingGiven rows caster pid gs =
+-- permanent carries a player ability. One walk for two questions is why there is
+-- no PlayerId-taking wrapper beside this -- nothing would call it.
+protectedFromTargeting :: [(Maybe ObjectId, PlayerEffect)] -> Maybe PlayerId -> PlayerId -> GameState -> Bool
+protectedFromTargeting rows caster pid gs =
   let stops effect = case effect of
         PlayerEffect.CantBeTargetedBy scope -> case caster of
           Just who -> inScope who pid gs scope
@@ -1823,8 +1821,8 @@ protectedFromGiven rows oid gs =
         PlayerEffect.HasProtectionFromChosenName -> not (Set.null (Set.intersection (chosenNamesOf source gs) names))
         -- CR 702.18a and CR 702.11c are a different immunity, and a narrower
         -- one: they stop TARGETING alone, where rule 702.16 also bars an Aura
-        -- and prevents damage. Read at their own gate
-        -- (protectedFromTargeting above).
+        -- and, by rule 702.16e, prevents damage (#2878). Read at their own
+        -- gate (protectedFromTargeting above).
         PlayerEffect.CantBeTargetedBy _ -> False
         -- Every other arm is about casting, playing, countering, searching,
         -- paying, keeping mana or how a coin flip came out. None of them says

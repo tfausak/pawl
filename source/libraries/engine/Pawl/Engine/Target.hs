@@ -547,9 +547,9 @@ poolHeldLastKnown pool view =
 -- 613.10/613.11 player axis: PlayerEffect.CantBeTargetedBy for shroud and
 -- hexproof (Ivory Mask, Leyline of Sanctity) and
 -- PlayerEffect.HasProtectionFromChosenName for rule 702.16b (Runed Halo).
--- PlayerEffect.protectedFromTargetingGiven and PlayerEffect.protectedFromGiven
--- are the typed questions; this module never sees either constructor, and takes
--- their Given form so that one `applying` walk answers both. The two halves are
+-- PlayerEffect.protectedFromTargeting and PlayerEffect.protectedFromGiven are
+-- the typed questions; this module never sees either constructor, and hands both
+-- one gathered row list so that a player candidate is walked once. The two halves are
 -- separate readers because they read different things -- post-layer KEYWORDS,
 -- which `pcs` holds, versus the CR 613.10/613.11 tier, which the layer machine
 -- does not compute at all -- and neither could serve the other.
@@ -618,7 +618,7 @@ targetable pcs perspective source sourceView gs recipient =
         -- quality and an ability's source in one sentence.
         Recipient.ToPlayer pid ->
           let rows = PlayerEffect.applying pid gs
-           in not (PlayerEffect.protectedFromTargetingGiven rows perspective pid gs)
+           in not (PlayerEffect.protectedFromTargeting rows perspective pid gs)
                 && not (PlayerEffect.protectedFromGiven rows source gs)
         Recipient.ToCreature oid -> restrictedObject oid
         Recipient.ToPlaneswalker oid -> restrictedObject oid
