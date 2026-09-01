@@ -1420,8 +1420,8 @@ selectionLegal perspective seed source x slots sets chosen gs =
        in Set.isSubsetOf picked legal && size >= demanded && size <= hi
 
 -- CR 601.2c's JOINT CHECK on its own: every jointly judged slot re-derived
--- against what the whole announcement chose, under `seed`. Three callers, and
--- they are the three moments an announcement over declared slots is accepted --
+-- against what the whole announcement chose, under `seed`. Two callers, and
+-- between them the moments an announcement over declared slots is accepted --
 -- selectionLegal above (CR 601.2e's cast and CR 602.2's activation), and
 -- Pawl.Engine.Resolve.chooseNewTargetsFor (CR 707.10c's re-target). The
 -- re-derivation is exactly the one CR 608.2b will make at resolution, so a
@@ -1457,7 +1457,7 @@ jointlyCoherentGiven pcs grants pools perspective seed source slots chosen gs =
 -- ZoneScope.InSlot slot to what one coherent answer could reach, and the caller
 -- measures against that.
 --
--- A SEARCH, and the only one in this module: the slots some declared filter
+-- A SEARCH rather than a number: the slots some declared filter
 -- names are assigned every subset of their minimum size, and an assignment
 -- passes when every reading slot then still has its own minimum available (and,
 -- where a reader was itself assigned, holds what it was assigned). A slot naming

@@ -4264,12 +4264,12 @@ targetsOnStack oid gs =
 -- offered set leaves the copied targets standing rather than being patched into
 -- something the player did not choose.
 --
--- CR 601.2c reaches this announcement as it reaches CR 601.2c's own: the offered
--- set per slot is the UNION over what a sibling slot could take, so two slots
--- that exclude each other pass `wellFormed` and are judged together by
--- Target.jointlyCoherent afterwards. Judged on the DRAWN answer rather than the
--- raw one, so a pile CR 406.4 resolved into a card is what the re-derivation
--- reads -- the same order Pawl.Engine.Cast.castProposed takes.
+-- CR 601.2c's joint check reaches this answer as it reaches a cast's: the offer
+-- above is the UNION over what a sibling slot could take, so two slots that
+-- exclude each other pass `wellFormed` and Target.jointlyCoherent is what judges
+-- them together. Asked on the DRAWN answer rather than the raw one, so what the
+-- re-derivation reads is the card CR 406.4 picked out of a pile -- the order
+-- Pawl.Engine.Cast.castProposed takes, chooseTargets drawing before it asks.
 chooseNewTargetsFor :: PlayerId -> ObjectId -> Game ()
 chooseNewTargetsFor controller copyId = do
   gs <- State.get
