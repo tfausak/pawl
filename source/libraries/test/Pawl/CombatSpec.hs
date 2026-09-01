@@ -308,6 +308,97 @@ runRecordingBlockers gs =
   let (after, seen) = State.runState (fmap snd (Engine.runGame recordingBlockers gs Combat.declareBlockers)) ([], [])
    in (seen, after)
 
+-- CR 802: the attack multiple players option, which every game pawl starts uses
+-- (Pawl.Types.GameSettings.attackMultiplePlayers). THREE SEATS throughout, since
+-- at two the option and CR 506.2's base rule coincide exactly and nothing here
+-- can differ.
+--
+-- One board carries the whole rule, because CR 802's five clauses are five
+-- questions about one combat: who defends (802.2), whom each creature attacks
+-- (802.3), who is asked to block and about what (802.4, 802.4a/b), and in what
+-- order damage is announced (802.5).
+--
+-- carol's Palace Guard is created BEFORE bob's, so her id is the LOWER one. That
+-- is the discriminator for the two ordering assertions: the implementations this
+-- replaces walked Combat.blockers in ascending ObjectId order, which on this
+-- board answers carol first, where CR 802.4 and CR 802.5 both answer bob.
+--
+-- Palace Guard (1/4, "can block any number of creatures") and not a plain
+-- blocker, for the damage assertion alone: CR 510.1d asks nothing of a creature
+-- blocking ONE attacker, so a one-block board raises no AssignCombatDamage prompt
+-- to put in an order. Two attackers apiece is what makes each guard's division a
+-- real choice.
+attackMultiplePlayersSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+attackMultiplePlayersSpec s registry = Spec.describe s "AttackMultiplePlayers" $ do
+  Spec.it s "CR 802.2/802.3/802.4/802.5 alice attacks both opponents, each blocks in turn order, and damage is announced in turn order" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    guard <- S.printingOf s registry "Palace Guard"
+    let (board, mine, _, hers) = S.threePlayerCombat [piker, piker, piker, piker] [] [guard]
+        (bobsGuard, staged) = S.addCreature guard S.bob board
+    case (mine, hers) of
+      ([atBob1, atBob2, atCarol1, atCarol2], [carolsGuard]) -> do
+        let -- CR 508.1b / CR 802.3: each creature announces whom it attacks, by
+            -- id rather than by prompt order, so the declaration is pinned even
+            -- if the engine asks in a different sequence.
+            aimed oid = if List.elem oid [atBob1, atBob2] then S.bob else S.carol
+            declaring :: Prompt.Prompt r -> r
+            declaring p = case p of
+              Prompt.ChooseAttackTarget _ _ oid options ->
+                Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer (aimed oid)) (NonEmpty.toList options))
+              _ -> S.aggressiveAnswer p
+            settled = S.runPure S.identityAnswer staged (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
+            declared = S.runPure declaring settled (Combat.declareAttackers S.alice)
+        -- CR 802.2: nobody was chosen and BOTH opponents defend, in APNAP order.
+        Spec.assertEqWith s "CR 802.2 both opponents are defending players" (Combat.Type.defenders (GameState.combat declared)) [S.bob, S.carol]
+        -- CR 802.3: one declaration, two victims.
+        Spec.assertEqWith
+          s
+          "CR 802.3 two creatures attack bob and two attack carol"
+          (Map.elems (Combat.Type.attackers (GameState.combat declared)))
+          [AttackTarget.OfPlayer S.bob, AttackTarget.OfPlayer S.bob, AttackTarget.OfPlayer S.carol, AttackTarget.OfPlayer S.carol]
+        -- CR 802.4 / 802.4a: each defending player is asked, in APNAP order, and
+        -- offered only the creatures attacking them. Recorded as (who was asked,
+        -- what they were offered) so the two clauses cannot be confused.
+        let blocking :: Prompt.Prompt r -> State.State [(PlayerId.PlayerId, [ObjectId.ObjectId])] r
+            blocking p = case p of
+              Prompt.DeclareBlockers _ pid candidates attackers -> do
+                State.modify' (<> [(pid, attackers)])
+                pure (Map.fromList (fmap (\b -> (b, Set.fromList attackers)) candidates))
+              _ -> pure (S.identityAnswer p)
+            (blocked, asked) =
+              State.runState
+                (fmap snd (Engine.runGame blocking declared Combat.declareBlockers))
+                []
+        Spec.assertEqWith
+          s
+          "CR 802.4 bob declares before carol, whose Guard has the lower id"
+          asked
+          [(S.bob, [atBob1, atBob2]), (S.carol, [atCarol1, atCarol2])]
+        -- CR 802.5 / CR 703.4k: each player in APNAP order announces how their
+        -- creatures assign. alice's four attackers are each blocked by one
+        -- creature and so are forced (CR 510.1c), leaving the two Guards as the
+        -- only creatures with a division to announce.
+        let assigning :: Prompt.Prompt r -> State.State [ObjectId.ObjectId] r
+            assigning p = case p of
+              Prompt.AssignCombatDamage _ _ source thresholds power -> do
+                State.modify' (<> [source])
+                pure
+                  ( case Map.keys thresholds of
+                      recipient : _ -> Map.singleton recipient power
+                      [] -> Map.empty
+                  )
+              _ -> pure (S.identityAnswer p)
+            announced =
+              State.execState
+                (Engine.runGame assigning blocked (Damage.gatherCombatDamage (const True)))
+                []
+        Spec.assertEqWith
+          s
+          "CR 802.5 bob's Guard announces before carol's, whose id is lower"
+          announced
+          [bobsGuard, carolsGuard]
+      _ -> Spec.assertFailure s "fixture should give alice four Pikers and carol one Palace Guard"
+
 -- CR 506.2/506.2a/507.1/703.4h: WHO is being attacked. Distinct from
 -- defenderSpec, which is the Defender KEYWORD (CR 702.3b).
 defendingPlayerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -3923,6 +4014,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatDamageSpec s registry
   defenderSpec s registry
   defendingPlayerSpec s registry
+  attackMultiplePlayersSpec s registry
   hasteSpec s registry
   evasionSpec s registry
   textChangedLandwalkSpec s registry
