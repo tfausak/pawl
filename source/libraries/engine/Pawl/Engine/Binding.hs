@@ -378,7 +378,10 @@ tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
 -- battlefield, which is CR 603.10a's look-back and CR 608.2h's last known
 -- information.
 --
--- Bound for the BYSTANDER condition only. Under
+-- Bound for the BYSTANDER conditions only --
+-- TriggerCondition.PermanentLeavesTheBattlefield and, for CR 303.4b's enchanted
+-- creature, AttachedCreatureDies, where Banewasp Affliction's "that creature's
+-- controller loses life equal to its toughness" reads it. Under
 -- TriggerCondition.SelfLeavesTheBattlefield and SelfDies the departed id already
 -- IS CR 113.7a's `triggerSource`, so a second name for one object would be the
 -- redundancy SelfPutIntoGraveyardFromAnywhere's empty floor declines.

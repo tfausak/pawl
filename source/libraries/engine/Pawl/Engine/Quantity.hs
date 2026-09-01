@@ -990,7 +990,7 @@ slots quantity = case quantity of
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
   -- And another, CR 119.3's life-gain tally likewise.
   Quantity.LifeGainedThisTurn _ -> Set.empty
-  -- And a ninth, CR 120.1's damage tally likewise.
+  -- And another, CR 120.1's damage tally likewise.
   Quantity.PlayersDealtDamageThisTurn _ -> Set.empty
   -- And another in that same position, CR 601.2i's cast tally having nothing
   -- beside its PlayerRef either.
