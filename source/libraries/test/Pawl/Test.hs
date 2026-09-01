@@ -80,6 +80,7 @@ import qualified Pawl.Codec.ClassLevelChangeSpec
 import qualified Pawl.Codec.ClassLevelSpec
 import qualified Pawl.Codec.ClauseIndexSpec
 import qualified Pawl.Codec.ClauseSpec
+import qualified Pawl.Codec.CoinFaceSpec
 import qualified Pawl.Codec.CoinFlippedSpec
 import qualified Pawl.Codec.ColorSpec
 import qualified Pawl.Codec.CombatRestrictionSpec
@@ -348,6 +349,7 @@ import qualified Pawl.Codec.SpellCastSpec
 import qualified Pawl.Codec.SpellWasCastSpec
 import qualified Pawl.Codec.SpendManaAsThoughSpec
 import qualified Pawl.Codec.StackObjectKindSpec
+import qualified Pawl.Codec.StatedFlipSpec
 import qualified Pawl.Codec.StaticAbilitySpec
 import qualified Pawl.Codec.StatusSpec
 import qualified Pawl.Codec.StepBeganSpec
@@ -641,6 +643,7 @@ spec s registry = do
   Pawl.Codec.ClassLevelSpec.spec s
   Pawl.Codec.ClauseIndexSpec.spec s
   Pawl.Codec.ClauseSpec.spec s
+  Pawl.Codec.CoinFaceSpec.spec s
   Pawl.Codec.CoinFlippedSpec.spec s
   Pawl.Codec.ColorSpec.spec s
   Pawl.Codec.CombatRestrictionSpec.spec s
@@ -910,6 +913,7 @@ spec s registry = do
   Pawl.Codec.SpendManaAsThoughSpec.spec s
   Pawl.Codec.StackObjectKindSpec.spec s
   Pawl.Codec.StaticAbilitySpec.spec s
+  Pawl.Codec.StatedFlipSpec.spec s
   Pawl.Codec.StatusSpec.spec s
   Pawl.Codec.StepBeganSpec.spec s
   Pawl.Codec.StepBeginsSpec.spec s

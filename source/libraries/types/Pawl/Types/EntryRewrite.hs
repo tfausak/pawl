@@ -66,8 +66,9 @@ data EntryRewrite effect
     --
     -- NO WINNER, which is the whole of rule 705.2's first sentence: nothing here
     -- asks Prompt.CallCoin, and the GameEvent.CoinFlipped Pawl.Engine.Event
-    -- records carries no outcome at all. A flip recorded as LOST would be the
-    -- same board today and the wrong claim -- see Pawl.Types.CoinFlipped.
+    -- records carries no outcome -- unless CR 705.3 states one, the exception the
+    -- rule itself names. A flip recorded as LOST would be the same board today
+    -- and the wrong claim -- see Pawl.Types.CoinFlipped.
     ChoiceByCoinFlip EntryFlip.EntryFlip
   | -- | CR 614.1c's other choosing shape: choose a colour as this enters
     -- (Painter's Servant). Nullary -- CR 105.1's five colours are the offer, and
