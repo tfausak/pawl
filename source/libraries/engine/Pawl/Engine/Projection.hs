@@ -5582,6 +5582,11 @@ replacementsAffecting gs =
       -- CR 114.3 makes the emblem's abilities the whole of it, CR 313.2 keeps a
       -- vanguard card in this zone all game, and no copy effect reaches either.
       --
+      -- Not implemented: CR 113.6b's stated set for this zone. gatherGiven's static
+      -- walk keeps both limbs of rule 113.6 -- an object's own rule decides only
+      -- where the row states no zone -- and this filter runs ahead of
+      -- functionsFromZoneOfRow instead, so a row NAMING the command zone on
+      -- anything but an emblem or a vanguard card is dropped (#2904).
       inCommand = filter (\oid -> Vanguard.functionsFromCommandZone oid gs) (Set.toList (GameState.command gs))
       commandZoneHas oid = case Game.faceOf oid gs of
         Nothing -> False
