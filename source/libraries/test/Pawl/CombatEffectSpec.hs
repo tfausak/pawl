@@ -737,7 +737,7 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
                       Combat.Type.declaredBlockers = Set.empty,
                       Combat.Type.blockersDeclared = True,
                       Combat.Type.attackingNothing = Set.empty,
-                      Combat.Type.defenders = pure S.bob
+                      Combat.Type.defenders = [S.bob]
                     }
               }
     Spec.assertEqWith s "starts empty" (Combat.Type.attackers (GameState.combat gs)) Map.empty
@@ -2580,7 +2580,7 @@ stolenJaceLandwalkBoard s registry bolted defendersLand ownersLand = do
                 -- CR 506.2a / CR 507.1's choice, stated rather than run: bob
                 -- defends, which is what puts carol's Jace among the attackable
                 -- planeswalkers (CR 306.6 reads the CONTROLLER).
-                GameState.combat = (GameState.combat gs3) {Combat.Type.defenders = pure S.bob}
+                GameState.combat = (GameState.combat gs3) {Combat.Type.defenders = [S.bob]}
               }
           declared = snd (Engine.runGamePure attackThePlaneswalker board (Combat.declareAttackers S.alice))
           burned = S.runPure (aimedAtObject jaceId) declared (do S.cast S.alice boltId; Stack.resolveTop)
@@ -5328,7 +5328,7 @@ publicEnemySpec s registry = Spec.describe s "PublicEnemy" $ do
         defending =
           base
             { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-              GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure S.bob}
+              GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]}
             }
         enchanting host =
           let (aura, withAura) = S.addCreature enemy S.alice defending

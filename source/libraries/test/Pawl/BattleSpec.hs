@@ -1129,7 +1129,7 @@ battleCombat s registry protector defender mine theirs hers = do
     ( gs3
         { GameState.activePlayer = S.alice,
           GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-          GameState.combat = (GameState.combat gs3) {Combat.Type.defenders = pure defender}
+          GameState.combat = (GameState.combat gs3) {Combat.Type.defenders = [defender]}
         },
       battle,
       ours,

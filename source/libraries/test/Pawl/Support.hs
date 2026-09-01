@@ -338,7 +338,9 @@ fightAnswer p = case p of
 -- and the one prompt that actually settles which opponent is attacked. Falls
 -- through to aggressiveAnswer's head otherwise, which is a board where `who` is
 -- not a defending player at all. Everything else is aggressiveAnswer -- the
--- shared shape of CombatSpec's and GameSpec's M5.6d defending-player fixtures. Its own type is the ordinary rank-1 `forall r.
+-- shared shape of CombatSpec's and GameSpec's M5.6d defending-player fixtures.
+--
+-- Its own type is the ordinary rank-1 `forall r.
 -- PlayerId -> Prompt r -> r` (the implicit forall is outermost, quantifying
 -- the whole arrow chain), so it needs no RankNTypes of its own; partially
 -- applying `attackTo who` gives exactly the `forall r. Prompt.Prompt r -> r`
@@ -1132,7 +1134,7 @@ combatBoardOf mine theirs =
             -- active, so by CR 506.2's second sentence bob is the defending
             -- player. Stated rather than derived, because a direct-call test
             -- never runs the turn-based action that would fill this in.
-            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure bob},
+            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [bob]},
             -- The steps after declare attackers, so a runStep-driven test (Tasks
             -- 2 and 4) can advance through combat. Direct-call tests ignore it.
             GameState.remaining =

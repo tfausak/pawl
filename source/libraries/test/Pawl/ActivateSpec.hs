@@ -1614,7 +1614,7 @@ kongmingBoard piker contraptions sorcerer defender =
       ready =
         gs0
           { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-            GameState.combat = (GameState.combat gs0) {Combat.Type.defenders = pure defender}
+            GameState.combat = (GameState.combat gs0) {Combat.Type.defenders = [defender]}
           }
       -- CR 508.1, then priority to bob -- who is the defending player on one of
       -- these two boards and a bystander on the other, which is the variable.

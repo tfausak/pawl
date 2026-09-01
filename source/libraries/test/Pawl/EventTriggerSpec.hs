@@ -3673,7 +3673,7 @@ avatarRokuSpec s registry =
       bobsTurn gs =
         gs
           { GameState.activePlayer = S.bob,
-            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure S.alice}
+            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.alice]}
           }
    in Spec.describe s "Avatar Roku, Firebender" $ do
         -- The proving test: a player who is NOT the ability's controller
@@ -3782,7 +3782,7 @@ hermesSpec s registry =
       bobsTurn gs =
         gs
           { GameState.activePlayer = S.bob,
-            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure S.alice}
+            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.alice]}
           }
    in Spec.describe s "Hermes, Overseer of Elpis" $ do
         -- The proving case. TWO Birds are declared together and exactly TWO cards
@@ -3939,7 +3939,7 @@ everWatchingThresholdSpec s registry =
         gs
           { GameState.activePlayer = S.bob,
             GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure defending},
+            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [defending]},
             GameState.remaining =
               Seq.fromList
                 [ Phase.Combat CombatStep.DeclareBlockers,

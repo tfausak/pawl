@@ -110,7 +110,7 @@ bobAttacks gs =
   gs
     { GameState.activePlayer = S.bob,
       GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure S.alice},
+      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.alice]},
       GameState.remaining =
         Seq.fromList
           [ Phase.Combat CombatStep.DeclareBlockers,

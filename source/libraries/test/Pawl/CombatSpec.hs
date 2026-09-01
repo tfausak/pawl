@@ -625,7 +625,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- combat phase in one turn chooses again. Discriminating: a clearCombat
     -- that reset only attackers and blockers would leave Just carol here, and
     -- the next combat phase would inherit a stale defender.
-    let busy = S.threePlayerGame {GameState.combat = (GameState.combat S.threePlayerGame) {Combat.Type.defenders = pure S.carol}}
+    let busy = S.threePlayerGame {GameState.combat = (GameState.combat S.threePlayerGame) {Combat.Type.defenders = [S.carol]}}
     Spec.assertEqWith s "cleared at end of combat" (Combat.Type.defenders (GameState.combat (Combat.clearCombat busy))) []
   Spec.it s "CR 508.1 every attacker attacks the CHOSEN defending player" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -634,7 +634,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
         ready =
           board
             { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-              GameState.combat = (GameState.combat board) {Combat.Type.defenders = pure S.carol}
+              GameState.combat = (GameState.combat board) {Combat.Type.defenders = [S.carol]}
             }
         after = S.runPure S.aggressiveAnswer ready (Combat.declareAttackers S.alice)
     Spec.assertEqWith s "both of alice's creatures attack" (length mine) 2
@@ -672,7 +672,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
             { GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
               GameState.combat =
                 (GameState.combat board)
-                  { Combat.Type.defenders = pure S.carol,
+                  { Combat.Type.defenders = [S.carol],
                     Combat.Type.attackers = attackMap
                   }
             }
@@ -3353,7 +3353,7 @@ defendingPlayerRestrictionSpec s registry = Spec.describe s "DefendingPlayerComb
         defendedBy who =
           gs
             { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-              GameState.combat = (GameState.combat gs) {Combat.Type.defenders = pure who}
+              GameState.combat = (GameState.combat gs) {Combat.Type.defenders = [who]}
             }
     case mine of
       [ship] -> do
@@ -3707,7 +3707,7 @@ declaringAttackers gs =
     S.aggressiveAnswer
     gs
       { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-        GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure S.bob}
+        GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]}
       }
     (Combat.declareAttackers S.alice)
 
@@ -4042,7 +4042,7 @@ facingBob :: GameState.GameState -> GameState.GameState
 facingBob gs =
   gs
     { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure S.bob}
+      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]}
     }
 
 -- Alice active with priority in her precombat main phase, which is when the

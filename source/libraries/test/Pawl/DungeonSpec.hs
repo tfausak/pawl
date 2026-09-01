@@ -411,7 +411,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
         staged =
           finished
             { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-              GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure S.bob},
+              GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]},
               GameState.remaining =
                 Seq.fromList
                   [ Phase.Combat CombatStep.DeclareBlockers,

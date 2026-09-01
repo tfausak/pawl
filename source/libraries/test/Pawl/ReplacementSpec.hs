@@ -2380,7 +2380,7 @@ testOfFaithSpec s registry = Spec.describe s "Test of Faith (CR 615.5)" $ do
             GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
             -- CR 703.4h has already happened on this board, so the defending
             -- player is stated rather than derived (S.combatBoardOf's posture).
-            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure S.bob},
+            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]},
             GameState.remaining =
               Seq.fromList
                 [ Phase.Combat CombatStep.DeclareBlockers,
@@ -2488,7 +2488,7 @@ bobAttacks gs =
       GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
       -- CR 703.4h has already happened on this board, so the defending player is
       -- stated rather than derived (S.combatBoardOf's posture).
-      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure S.alice},
+      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.alice]},
       GameState.remaining =
         Seq.fromList
           [ Phase.Combat CombatStep.DeclareBlockers,
@@ -3599,7 +3599,7 @@ stormwildCapridorSpec s registry = Spec.describe s "Stormwild Capridor (CR 615.5
             g2
               { GameState.activePlayer = S.alice,
                 GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-                GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure S.bob},
+                GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]},
                 GameState.remaining =
                   Seq.fromList
                     [ Phase.Combat CombatStep.DeclareBlockers,
@@ -8429,7 +8429,7 @@ atDeclareAttackers :: GameState.GameState -> GameState.GameState
 atDeclareAttackers gs =
   gs
     { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
-      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = pure S.bob}
+      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]}
     }
 
 attackersIn :: GameState.GameState -> [ObjectId.ObjectId]
