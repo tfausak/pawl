@@ -21,7 +21,7 @@ codec :: Codec.Codec Printing.Printing
 codec = Common.wrapper Card.codec Printing.MkPrinting Printing.card
 
 -- | A printing in a game state's intern table: its NAME where a resolver can
--- reproduce it, and the whole record where none can (#2120).
+-- reproduce it, and the whole record where none can.
 --
 -- The resolver is the portability knob and the decoder's only source of cards:
 -- one answering 'Nothing' for everything inlines the table, giving a
@@ -33,11 +33,17 @@ codec = Common.wrapper Card.codec Printing.MkPrinting Printing.card
 -- guessing: a state is only as portable as the registry it was written against,
 -- and this is what makes the format say so.
 --
--- @Inline@ is not a fallback for a name the encoder could have written. Two
--- producers have no name to write at all: Pawl.Engine.Ring.theRingEmblem builds
--- The Ring's emblem as a function of the temptation count, and
--- Pawl.Engine.Event.resolveTokens hands back a card that has been through
--- applyReplacements. Neither is in @data\/cards@, so neither resolves.
+-- @Inline@ carries every printing the resolver does not reproduce EXACTLY, which
+-- covers both the printings no registry could hold and a name it answers
+-- differently for. Two producers make the arm necessary rather than defensive:
+-- Pawl.Engine.Ring.theRingEmblem builds The Ring's emblem as a function of the
+-- temptation count, and Pawl.Engine.Event.resolveTokens hands back a card that
+-- has been through applyReplacements. Neither is in @data\/cards@.
+--
+-- The equality check is what makes @Named@ safe: a resolver answering with a
+-- DIFFERENT card under this name would decode to that other card, so the name is
+-- not written. Pawl.Codec.PrintingSpec's "a name the resolver answers
+-- differently for is written out in full" is that case.
 reference :: (CardName.Type.CardName -> Maybe Card.Type.Card) -> Codec.Codec Printing.Printing
 reference resolve = Arm.anonymous [named, inline]
   where

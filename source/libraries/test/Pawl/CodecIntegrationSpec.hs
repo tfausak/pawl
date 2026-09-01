@@ -367,7 +367,7 @@ gameStateRoundTripSpec s registry = do
 
   -- The printings table on the wire, read directly rather than through the round
   -- trip: encode and decode agree on any shape, so the round trip alone would
-  -- pass with the whole record written out (#2120).
+  -- pass with the whole record written out.
   Spec.it s "a printing the resolver knows is written as its name" $ do
     mountain <- S.printingOf s registry "Mountain"
     resolve <- corpusResolver s
