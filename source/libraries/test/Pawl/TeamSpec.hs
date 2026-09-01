@@ -6,9 +6,11 @@
 -- attackableOpponents (CR 506.2a), Pawl.Engine.Resolve's playerRefPlayers
 -- (PlayerRef.Relative Opponent), Pawl.Engine.Target's slot filter (the
 -- Filter.IsPlayer atom, which reads Pawl.Engine.Filter's Context), Pawl.Engine's
--- PlayerEffect.inScope (PlayerScope.Opponents) and Pawl.Engine.Count's playersFor
--- (the same PlayerRef under a Count). Pawl.BattleSpec holds the sixth, CR
--- 310.12a's protector candidates, beside its siblings.
+-- PlayerEffect.inScope (PlayerScope.Opponents), Pawl.Engine.Replacement's
+-- matchesZoneOwner (CR 400.3's owner, for a zone-change redirect) and
+-- Pawl.Engine.Count's playersFor (the same PlayerRef under a Count).
+-- Pawl.BattleSpec holds the seventh, CR 310.12a's protector candidates, beside
+-- its siblings.
 --
 -- FOUR SEATS IN TWO TEAMS throughout, which is the smallest board on which CR
 -- 102.3 and CR 806.1 disagree: at three seats in two teams a player has one
@@ -34,6 +36,8 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -47,6 +51,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Zone as Zone
 
 -- CR 808.1 / CR 808.2: alice and bob against carol and dave, each team in
 -- adjacent seats of the turn order [alice, bob, carol, dave].
@@ -175,6 +180,28 @@ spec s registry = Spec.describe s "Teams" $ do
         Spec.assertBool s (Set.member (Recipient.ToPlayer S.bob) (legalFor S.alice)) "CR 102.3 alice, bob's teammate, may still bolt him"
         Spec.assertBool s (not (Set.member (Recipient.ToPlayer S.bob) (legalFor S.carol))) "CR 702.11c carol, his opponent, may not"
         Spec.assertBool s (Set.member (Recipient.ToPlayer S.bob) (legalFor S.bob)) "and bob may bolt himself"
+  -- CR 102.3 through the fourth arm that judges ControllerRelation.Opponents,
+  -- Pawl.Engine.Replacement's matchesZoneOwner, which the three cases above do
+  -- not reach: a zone change asks who OWNS the moving card (CR 400.3), not who
+  -- controls anything.
+  --
+  -- Leyline of the Void, {2}{B}{B} Enchantment: "If a card would be put into an
+  -- opponent's graveyard from anywhere, exile it instead." ONE board and one
+  -- funnel, with two cards differing in nothing but their owner -- bob's, alice's
+  -- teammate, and carol's, her opponent -- so the negative cannot pass for want
+  -- of a working redirect: carol's card is exiled on the same board.
+  Spec.it s "CR 102.3 a teammate's card is not put into an opponent's graveyard" $ do
+    leyline <- S.printingOf s registry "Leyline of the Void"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addCreature leyline S.alice (twoTeams S.fourPlayerGame)
+        (teammates, g1) = S.addLibraryCard piker S.bob g0
+        (opponents, g2) = S.addLibraryCard piker S.carol g1
+        after = S.runPure S.identityAnswer g2 (Event.changeZone teammates Zone.Graveyard)
+        alsoAfter = S.runPure S.identityAnswer after (Event.changeZone opponents Zone.Graveyard)
+    Spec.assertEqWith s "CR 102.3 bob's card reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob alsoAfter)) 1
+    Spec.assertEqWith s "and nothing of bob's was exiled" (length (Game.zoneMembers Zone.Exile S.bob alsoAfter)) 0
+    Spec.assertEqWith s "CR 614.1a carol's was exiled instead" (length (Game.zoneMembers Zone.Exile S.carol alsoAfter)) 1
+    Spec.assertEqWith s "and never reached carol's graveyard" (length (Game.zoneMembers Zone.Graveyard S.carol alsoAfter)) 0
   -- CR 102.3 through a Count over the same reference, which
   -- Pawl.Engine.Count.playersFor resolves and which no effect above reaches.
   --
