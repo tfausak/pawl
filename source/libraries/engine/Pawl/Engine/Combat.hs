@@ -123,9 +123,10 @@ attackableOpponents gs =
       active = GameState.activePlayer gs
    in filter (\pid -> pid /= active && List.elem pid playing) (Game.apnapOrder gs)
 
--- CR 508.1b: what the active player may announce a chosen creature is attacking --
--- which player, planeswalker or battle. CR 506.2's second sentence is the same
--- list scoped to a two-player game.
+-- CR 508.1b: what the active player may announce a chosen creature is attacking,
+-- for ONE defending player -- which player, planeswalker or battle. CR 506.2's
+-- second sentence is the same list scoped to a two-player game, and
+-- declarableTargets is CR 802.3's, over every defending player.
 --
 -- The defending player is FIRST, the one candidate that exists on every board, so
 -- an interpreter taking the head gets what Replay.defaultAnswer's fallback gives.
@@ -133,9 +134,6 @@ attackableOpponents gs =
 -- re-asking this filter is HALF of CR 506.4's removal, the other half being the
 -- record noteAttackingNothing keeps so that a removal already sampled cannot be
 -- re-derived away.
---
--- Not implemented: CR 802's attack-multiple-players option, which would put a
--- second player on this list (#175).
 attackTargets :: PlayerId -> GameState -> NonEmpty.NonEmpty AttackTarget.AttackTarget
 attackTargets defender gs =
   AttackTarget.OfPlayer defender
@@ -1602,11 +1600,12 @@ putOntoBattlefieldAttacking oid = do
 -- they control -- and it is re-read at CR 608.2b; Aetherplasm's slot is the
 -- attacker its own blocking trigger bound, which CR 509.1a already had attacking
 -- that same defending player, a planeswalker they control or a battle they
--- protect -- rule 506.3e's three cases exactly. So no board reaches this function with
--- an attacker that has left combat or one attacking somebody else. The second
--- becomes reachable under CR 802's attack-multiple-players (#175); the first
--- needs a card that removes the target from combat between targeting and
--- resolution.
+-- protect -- rule 506.3e's three cases exactly. So no board reaches this function
+-- with an attacker that has left combat or one attacking somebody else: the
+-- second is reachable in principle now that CR 802.2 gives a combat several
+-- defending players, but Aetherplasm's own trigger still binds an attacker its
+-- controller was allowed to block; the first needs a card that removes the
+-- target from combat between targeting and resolution.
 putOntoBattlefieldBlocking :: ObjectId -> ObjectId -> Game ()
 putOntoBattlefieldBlocking oid attacker = do
   gs <- State.get

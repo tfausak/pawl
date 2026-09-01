@@ -328,7 +328,7 @@ runRecordingBlockers gs =
 -- blocking ONE attacker, so a one-block board raises no AssignCombatDamage prompt
 -- to put in an order. Two attackers apiece is what makes each guard's division a
 -- real choice.
-attackMultiplePlayersSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+attackMultiplePlayersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 attackMultiplePlayersSpec s registry = Spec.describe s "AttackMultiplePlayers" $ do
   Spec.it s "CR 802.2/802.3/802.4/802.5 alice attacks both opponents, each blocks in turn order, and damage is announced in turn order" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -409,6 +409,48 @@ attackMultiplePlayersSpec s registry = Spec.describe s "AttackMultiplePlayers" $
           "CR 802.5 bob's Guard announces before carol's, whose id is lower"
           announced
           [bobsGuard, carolsGuard]
+      _ -> Spec.assertFailure s "fixture should give alice four Pikers and carol one Palace Guard"
+  Spec.it s "CR 802.4b a requirement on a creature attacking bob does not reach carol's blocker" $ do
+    -- CR 802.4b's other half: not which blocks are ALLOWED, but which
+    -- requirements CR 509.1c makes carol maximize. Lure ("All creatures able to
+    -- block enchanted creature do so") on a creature attacking BOB is the
+    -- producer -- carol's Guard is not able to block it at all, so no instance
+    -- is minted for her, and her own declaration stays legal.
+    --
+    -- Its own case rather than another assertion on the board above, because
+    -- the Lure changes what BOB may legally declare and that board asserts the
+    -- offer he was given.
+    piker <- S.printingOf s registry "Goblin Piker"
+    guard <- S.printingOf s registry "Palace Guard"
+    lure <- S.printingOf s registry "Lure"
+    let (board, mine, _, hers) = S.threePlayerCombat [piker, piker, piker, piker] [] [guard]
+        (bobsGuard, staged) = S.addCreature guard S.bob board
+    case (mine, hers) of
+      ([atBob1, atBob2, atCarol1, atCarol2], [carolsGuard]) -> do
+        let aimed oid = if List.elem oid [atBob1, atBob2] then S.bob else S.carol
+            declaring :: Prompt.Prompt r -> r
+            declaring p = case p of
+              Prompt.ChooseAttackTarget _ _ oid options ->
+                Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer (aimed oid)) (NonEmpty.toList options))
+              _ -> S.aggressiveAnswer p
+            settled = S.runPure S.identityAnswer staged (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
+            declared = S.runPure declaring settled (Combat.declareAttackers S.alice)
+            (aura, withAura) = S.addCreature lure S.alice declared
+            lured = S.attach aura atBob1 withAura
+        -- THE GAMEPLAY ASSERTION, and first so nothing ahead of it can absorb a
+        -- mutation: the Lured creature is attacking bob, so CR 802.4b has carol
+        -- judge her blocks as though it were not there.
+        Spec.assertBool
+          s
+          (Combat.legalBlockDeclaration S.carol (Map.singleton carolsGuard (Set.fromList [atCarol1, atCarol2])) lured)
+          "CR 802.4b carol's own blocks are legal though a Lured creature goes unblocked"
+        -- The control, and the anti-vacuity check: the same Lure DOES bind bob,
+        -- whose Guard is able to block it, so a board where the Lure never took
+        -- effect fails here rather than passing the assertion above for free.
+        Spec.assertBool
+          s
+          (not (Combat.legalBlockDeclaration S.bob (Map.singleton bobsGuard (Set.singleton atBob2)) lured))
+          "CR 509.1c bob, who can block it, may not leave the Lured creature unblocked"
       _ -> Spec.assertFailure s "fixture should give alice four Pikers and carol one Palace Guard"
 
 -- CR 506.2/506.2a/507.1/703.4h: WHO is being attacked. Distinct from
