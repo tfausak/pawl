@@ -427,6 +427,8 @@ library codec
     Pawl.Codec.FromOutsideTheGameSpec
     Pawl.Codec.GameEvent
     Pawl.Codec.GameEventSpec
+    Pawl.Codec.GameSettings
+    Pawl.Codec.GameSettingsSpec
     Pawl.Codec.GameState
     Pawl.Codec.GrantedAbility
     Pawl.Codec.GrantedAbilitySpec
@@ -1480,6 +1482,7 @@ library types
     Pawl.Types.FromOutsideTheGame
     Pawl.Types.Game
     Pawl.Types.GameEvent
+    Pawl.Types.GameSettings
     Pawl.Types.GameState
     Pawl.Types.GrantedAbility
     Pawl.Types.GrantPlayFromExile

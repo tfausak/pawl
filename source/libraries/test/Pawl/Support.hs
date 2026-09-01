@@ -74,6 +74,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.InZone as InZone
@@ -1589,7 +1590,8 @@ oneMountainState mountain ph =
             Object.exertedBy = Set.empty
           }
    in GameState.MkGameState
-        { GameState.objects = Map.singleton oid obj,
+        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False},
+          GameState.objects = Map.singleton oid obj,
           GameState.library = Map.empty,
           GameState.hand = Map.singleton alice (Seq.singleton oid),
           GameState.graveyard = Map.empty,

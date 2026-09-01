@@ -37,6 +37,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.Cost as Cost
 import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -140,10 +141,20 @@ commanderOwnerOf oid gs
 --
 -- ">= 21" and not "== 21", because rule 903.10a says "21 or more" and one
 -- damage event can carry the difference on its own.
+--
+-- CR 903.12h removes the rule outright in a Brawl game -- "Brawl games do not
+-- use the state-based action described in rule 704.6c" -- so the option is
+-- tested before the tally rather than folded into the threshold: there is no
+-- number of commander damage that loses a Brawl game, and a higher threshold
+-- would be a different rule. The tally itself is still kept (CR 903.10a's
+-- "over the course of the game" is not what 903.12h switches off), so a card
+-- that reads it still can.
 lethalDamage :: PlayerId -> GameState -> Bool
-lethalDamage pid gs = case Map.lookup pid (GameState.players gs) of
-  Nothing -> False
-  Just player -> any (>= 21) (Map.elems (Player.commanderDamage player))
+lethalDamage pid gs
+  | GameSettings.brawl (GameState.settings gs) = False
+  | otherwise = case Map.lookup pid (GameState.players gs) of
+      Nothing -> False
+      Just player -> any (>= 21) (Map.elems (Player.commanderDamage player))
 
 -- | CR 903.8: "a commander's owner may cast it from the command zone for its mana
 -- cost plus {2} for each previous time they cast it from the command zone this

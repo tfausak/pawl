@@ -23,6 +23,7 @@ import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -48,7 +49,12 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Timestamp as Timestamp
 
 data GameState = MkGameState
-  { objects :: Map.Map ObjectId.ObjectId Object.Object,
+  { -- | CR 800.2: the options this game was started with. Settled before the
+    -- game begins and never written afterwards; the two paths that rebuild a
+    -- game in place, Setup.restartGame (CR 727.1) and Setup.subgameStateFrom
+    -- (CR 729.2), each carry it forward.
+    settings :: GameSettings.GameSettings,
+    objects :: Map.Map ObjectId.ObjectId Object.Object,
     library :: Map.Map PlayerId.PlayerId (Seq.Seq ObjectId.ObjectId),
     hand :: Map.Map PlayerId.PlayerId (Seq.Seq ObjectId.ObjectId),
     graveyard :: Map.Map PlayerId.PlayerId (Seq.Seq ObjectId.ObjectId),
