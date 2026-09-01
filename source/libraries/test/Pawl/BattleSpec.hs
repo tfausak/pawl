@@ -12,8 +12,8 @@
 -- (Combat.attackableBattles), CR 310.9b including its "notably, a Siege battle can
 -- be attacked by its own controller", CR 310.9c's blocking, and CR 310.9d with CR
 -- 508.5 (Defender.playerOf) -- including CR 506.4c's attacker left attacking a
--- battle that has gone, whose defending player is CR 506.2's. Those are attackSpec
--- below; Pawl.CombatSpec keeps rule 508's own cases.
+-- battle that has gone, whose defending player is CR 608.2h's filed protector.
+-- Those are attackSpec below; Pawl.CombatSpec keeps rule 508's own cases.
 --
 -- Also the pieces rule 310 needed underneath it, exercised here because this is
 -- where a card reaches them: Pawl.Types.Defense, CounterKind.Defense,
@@ -402,13 +402,14 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) after) "legal"
       _ -> Spec.assertFailure s "fixture should have a Wraith and a blocker"
 
-  Spec.it s "CR 506.4c / 506.2 the same block stays illegal once the Siege has left the battlefield" $ do
+  Spec.it s "CR 506.4c / 508.5 the same block stays illegal once the Siege has left the battlefield" $ do
     -- Two Bolts take the Siege's five defense counters off inside the declare
     -- attackers step, CR 310.12b exiles it, and CR 506.4c leaves the Wraith an
     -- attacking creature that is attacking nothing. Its swampwalk still refers to
-    -- a defending player, and CR 506.2's is the one the combat record holds --
-    -- carol, the seat with the Swamp. Reading the departed battle live finds no
-    -- object at all and would call this block legal.
+    -- a defending player, and CR 508.5's second sentence names the protector it
+    -- had before it was removed from combat -- carol, the seat with the Swamp,
+    -- read off CR 608.2h's filed designation. Reading the departed battle live
+    -- finds no object at all and would call this block legal.
     (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith"] [] ["Goblin Piker", "Swamp"]
     (armed, bolts) <- twoBolts s registry gs
     case (mine, hers, bolts) of
@@ -438,18 +439,59 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned) "no Swamp on carol's side, so the block is legal"
         Spec.assertBool s (not (Set.member battle (GameState.battlefield burned))) "the Siege is gone here too"
       _ -> Spec.assertFailure s "fixture should have a Wraith, a blocker and two Bolts"
-  Spec.it s "CR 506.2 the departed battle's CONTROLLER is not the seat that is read" $ do
-    -- THE FALSIFIER for falling back to the battle's last known controller rather
-    -- than to the combat record. The Swamp sits with alice, who controlled the
-    -- Siege and attacks with the Wraith; carol, the defending player, holds an
-    -- Island. A controller-reading fallback would call this block illegal.
+  Spec.it s "CR 508.5 the departed battle's CONTROLLER is not the seat that is read" $ do
+    -- THE FALSIFIER for reading the departed battle's last known CONTROLLER where
+    -- CR 508.5 names its protector. The Swamp sits with alice, who controlled the
+    -- Siege and attacks with the Wraith; carol, who protected it, holds an Island.
+    -- A controller-reading fallback would call this block illegal.
     (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith", "Swamp"] [] ["Goblin Piker", "Island"]
     (armed, bolts) <- twoBolts s registry gs
     case (mine, hers, bolts) of
       (wraith : _, blocker : _, [one, two]) -> do
         let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.alice)
             burned = castAt battle S.alice two (castAt battle S.alice one after)
-        Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned) "alice's Swamp is not the defending player's"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned) "alice's Swamp is not the protector's"
+        Spec.assertBool s (not (Set.member battle (GameState.battlefield burned))) "the Siege is gone here too"
+      _ -> Spec.assertFailure s "fixture should have a Wraith, a blocker and two Bolts"
+  -- The same removal at THREE DEFENDING SEATS, which is where CR 802.2a bites:
+  -- both of alice's opponents defend (CR 802.2, the default option) and bob heads
+  -- CR 802.4's APNAP order, so "the protector of the battle that creature was
+  -- attacking" and "the first defending player" name different seats. CR 508.5's
+  -- second sentence is what has to be read off CR 608.2h's filed designation,
+  -- there being no live battle left to ask.
+  --
+  -- The pair differs in one thing -- which of bob and carol holds the Swamp -- and
+  -- the two readings answer it the opposite way round, so neither case can pass on
+  -- an engine that had merely lost swampwalk.
+  Spec.it s "CR 802.2a the departed battle's attacker reads its PROTECTOR, not the first defending player" $ do
+    (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith"] ["Island"] ["Goblin Piker", "Swamp"]
+    (armed, bolts) <- twoBolts s registry (bothDefending gs)
+    case (mine, hers, bolts) of
+      ([wraith], blocker : _, [one, two]) -> do
+        let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.alice)
+            burned = castAt battle S.alice two (castAt battle S.alice one after)
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned)) "carol protected the Siege, so her Swamp stops the block"
+        -- The premises, after the gameplay assertion so neither can absorb a
+        -- mutation of it.
+        Spec.assertEqWith s "CR 802.2: both opponents defend, bob first" (Combat.Type.defenders (GameState.combat burned)) [S.bob, S.carol]
+        Spec.assertBool s (not (Set.member battle (GameState.battlefield burned))) "CR 310.12b: the second Bolt took the last defense counter"
+        Spec.assertEqWith
+          s
+          "CR 506.4c: still attacking the battle it was declared against"
+          (Map.lookup wraith (Combat.Type.attackers (GameState.combat burned)))
+          (Just (AttackTarget.OfBattle battle))
+      _ -> Spec.assertFailure s "fixture should have a Wraith, a blocker and two Bolts"
+  Spec.it s "CR 702.14c and the same three-seat board with the lands swapped leaves the block legal" $ do
+    -- THE FALSIFIER, differing in one thing: bob, who merely comes first among the
+    -- defending players, now holds the Swamp and carol an Island. An engine reading
+    -- the head of that list calls this block illegal and the case above legal.
+    (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith"] ["Swamp"] ["Goblin Piker", "Island"]
+    (armed, bolts) <- twoBolts s registry (bothDefending gs)
+    case (mine, hers, bolts) of
+      ([wraith], blocker : _, [one, two]) -> do
+        let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.alice)
+            burned = castAt battle S.alice two (castAt battle S.alice one after)
+        Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned) "bob's Swamp is not the protector's, so the block is legal"
         Spec.assertBool s (not (Set.member battle (GameState.battlefield burned))) "the Siege is gone here too"
       _ -> Spec.assertFailure s "fixture should have a Wraith, a blocker and two Bolts"
 
@@ -1087,6 +1129,11 @@ attackTheBattle battle p = case p of
       (NonEmpty.head options)
       (List.find (== AttackTarget.OfBattle battle) (NonEmpty.toList options))
   _ -> S.aggressiveAnswer p
+
+-- CR 802.2: both of alice's opponents defending, bob ahead of carol in CR 101.4's
+-- APNAP order, on a board battleCombat left with one designated seat.
+bothDefending :: GameState.GameState -> GameState.GameState
+bothDefending gs = gs {GameState.combat = (GameState.combat gs) {Combat.Type.defenders = [S.bob, S.carol]}}
 
 -- battleCombat by card NAME, for the cases whose printings differ per seat.
 battleCombatOf ::

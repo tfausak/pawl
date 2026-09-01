@@ -2205,12 +2205,10 @@ pinnedAssignments base answers p = case p of
 -- power, loyalty, and the 4 that spills past it -- are all distinct and no two
 -- readings of CR 702.19c land on the same board.
 --
--- "That planeswalker's controller" and "the defending player" are one seat here,
--- because these boards have one defending player. CR 508.1b is why they cannot
--- disagree while the planeswalker is still attacked -- the attack was declared
--- against that player's own planeswalker -- but Damage.combatRecipient's CR
--- 702.19e arm reads the group's head once the planeswalker is gone, which is the
--- wrong seat at three or more (#2841). No board here has two defenders.
+-- "That planeswalker's controller" and "the defending player" are one seat on the
+-- two-seat boards, which is what keeps the arithmetic above about CR 702.19c and
+-- nothing else. The last case is the three-seat board where they come apart, and
+-- CR 802.2a is the rule it reads.
 --
 -- Thrasta's cost reduction is implemented and dormant here: nothing is cast on
 -- these boards, so CR 601.2f is never reached. Pawl.CostSpec is where it is
@@ -2351,6 +2349,40 @@ trampleOverPlaneswalkersSpec s registry = Spec.describe s "TrampleOverPlaneswalk
       "CR 506.4c / CR 510.1b: a plain trampler in the same seat assigns nothing"
       (S.lifeOf S.bob (S.runCombat attackThePlaneswalker control))
       (Just 20)
+  -- The case above at THREE seats, where CR 802.2a is what picks the seat: alice
+  -- attacks CAROL's Jace with Thrasta and the same two first strikers, both
+  -- opponents defend (CR 802.2, the default option), and bob heads CR 802.4's
+  -- APNAP order. So the two readings of rule 702.19e's "the defending player"
+  -- name different players and the board tells them apart -- carol, who
+  -- controlled the planeswalker, against bob, who merely comes first.
+  --
+  -- Nothing is on either opponent's battlefield, so Thrasta is unblocked and its
+  -- whole 7 is forced (CR 510.1b): what the case reads is WHO took it, not how it
+  -- was divided, which the two-seat cases above already prove.
+  Spec.it s "CR 802.2a the removed planeswalker's trampler drains ITS controller, not the first defender" $ do
+    thrasta <- S.printingOf s registry "Thrasta, Tempest's Roar"
+    tiger <- S.printingOf s registry "Sabretooth Tiger"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs0, ours, _, hers) = S.threePlayerCombat [thrasta, tiger, tiger] [] [jace]
+        thrastaId = case ours of t : _ -> t; _ -> S.noSource
+        jaceId = case hers of [j] -> j; _ -> S.noSource
+        staged = S.addCounter CounterKind.Loyalty 3 jaceId gs0
+        after = S.runCombat attackThePlaneswalker staged
+        -- The same run stopped before blockers, which is where CR 511.3 has not
+        -- yet cleared the combat record the premises below read.
+        declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) attackThePlaneswalker staged
+    Spec.assertEqWith s "CR 702.19e / CR 802.2a: Thrasta's 7 reached carol, who controlled the Jace" (S.lifeOf S.carol after) (Just 13)
+    Spec.assertEqWith s "and bob, who merely heads the defending players, is untouched" (S.lifeOf S.bob after) (Just 20)
+    -- The premises, after the gameplay assertions so neither can absorb a
+    -- mutation of them.
+    Spec.assertBool s (not (Set.member jaceId (GameState.battlefield after))) "the two first strikers buried carol's Jace"
+    Spec.assertEqWith s "CR 802.2 both opponents defend, bob first" (Combat.Type.defenders (GameState.combat declared)) [S.bob, S.carol]
+    Spec.assertEqWith
+      s
+      "and Thrasta really was announced at carol's Jace"
+      (Map.lookup thrastaId (Combat.Type.attackers (GameState.combat declared)))
+      (Just (AttackTarget.OfPlaneswalker jaceId))
+    Spec.assertEqWith s "which carol controls" (Projection.controllerOf jaceId declared) (Just S.carol)
 
 -- CR 702.19b's last sentence, the twin of CR 702.19c's above: "when checking for
 -- assigned lethal damage, take into account damage already marked on the creature
@@ -2673,8 +2705,8 @@ splitDefenderJaceBoard s registry bobsLand carolsLand = do
 
 -- CR 802.2a: with several defending players, "a defending player" is resolved per
 -- attacking creature from what that creature is attacking -- never off the head of
--- the group. The planeswalker arm is what this proves; the battle arm's removed
--- case is still unfenced (Pawl.Engine.Defender.playerOf, #2844).
+-- the group. The planeswalker arm is what this proves; Pawl.BattleSpec's own
+-- "CR 802.2a" pair is the battle arm's.
 splitDefenderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 splitDefenderSpec s registry = Spec.describe s "SplitDefendingPlayer" $ do
   let blocks blocker wraith = Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith))

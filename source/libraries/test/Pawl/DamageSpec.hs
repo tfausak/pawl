@@ -877,7 +877,9 @@ lastKnownRiderSpec s registry =
                     -- CR 201.4: nothing named a card here.
                     LastKnown.chosenNames = Set.empty,
                     -- CR 509.1g: this board declares no combat at all.
-                    LastKnown.blocking = False
+                    LastKnown.blocking = False,
+                    -- CR 310.9a: the Sorcerer is no battle, so nobody protects it.
+                    LastKnown.protector = Nothing
                   }
               humbled = S.withHumility humility equipped
               planted =

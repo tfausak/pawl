@@ -973,6 +973,9 @@ applyCrossings finalSub parent =
                 (Object.attachedTo obj)
                 (Object.chosenNames obj)
                 (Game.isBlocking oid g)
+                -- CR 310.9a, read straight off the object like the owner above:
+                -- Nothing for everything that is not a battle.
+                (Object.protector obj)
             )
       -- One crossing: file, delete, then record. The event LAST, so that
       -- Event.recordEvent's CR 603.10 sample is of the board immediately after
