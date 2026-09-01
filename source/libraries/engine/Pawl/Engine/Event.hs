@@ -11448,17 +11448,33 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- host's death is offered by none of eventTriggers' candidate sources, so its
   -- trigger is never gathered and this is never asked about it.
   --
-  -- The EVENT is not read -- see the first argument's note on the signature -- so
-  -- the pattern is a wildcard rather than the Moved shape matchesTrigger accepted.
-  --
   -- Nothing where the bearer did not reach a graveyard: an Equipment host dying
   -- under CR 704.5n leaves the bearer standing, and an effect that sent the Aura
   -- elsewhere in the same batch put it somewhere the rule cannot look. Both are
   -- CR 400.7f's own answer rather than a hole -- the payload finds nothing and
   -- moves nothing -- and eventBindingSlots below says why the floor is still the
   -- slot.
-  (TriggerCondition.AttachedCreatureDies, _) ->
-    maybe Map.empty (`Binding.setBecame` Map.empty) bearerBecame
+  --
+  -- CR 303.4b's ENCHANTED CREATURE beside it, under Binding.departedPermanent:
+  -- Banewasp Affliction's "that creature's controller loses life equal to ITS
+  -- toughness" names the host rather than the Aura, and both halves of that
+  -- sentence are CR 608.2h reads of a permanent CR 400.7 has already replaced --
+  -- Pawl.Engine.Resolve.effectViewOf and Pawl.Engine.Projection.controllerWithLastKnown
+  -- are what answer them, and both are keyed to exactly this slot.
+  --
+  -- ZoneChange.departed, not the arrival: the id the card says "that creature"
+  -- about is the permanent as it last existed on the battlefield, which is the
+  -- argument Pawl.Engine.Binding.departedPermanent already carries for CR
+  -- 603.10a. The graveyard incarnation has no controller (CR 108.4) and no
+  -- battlefield toughness, so the arrival would answer neither clause.
+  --
+  -- Unconditional given a match, which is what lets eventBindingSlots below claim
+  -- it: matchesTrigger accepts only a GameEvent.Moved out of the battlefield into
+  -- a graveyard whose `departed` IS the bearer's host, so the id is always there.
+  -- The event is therefore matched rather than wildcarded, unlike every other
+  -- arm's use of the first argument.
+  (TriggerCondition.AttachedCreatureDies, GameEvent.Moved (Moved.MkMoved zc _ _)) ->
+    Binding.setDepartedPermanent (ZoneChange.departed zc) (maybe Map.empty (`Binding.setBecame` Map.empty) bearerBecame)
   -- Nothing at all, stated rather than left to the fallthrough below: the
   -- attachment link already names the permanent that became tapped, and CR 109.5
   -- answers the Aura's "you" from Binding.triggerSource. There is no second
@@ -11999,13 +12015,17 @@ eventBindingSlots cond = case cond of
   -- Legion's "that creature" has no other name to be read under. Guaranteed given a
   -- match, as this classification has to be: every Mentored event carries both ids.
   TriggerCondition.AttachedCreatureMentors -> Set.singleton Binding.mentoredCreature
-  -- CR 400.7f's `became`, and only it. CR 303.4b's "enchanted creature" is the
-  -- other permanent the event names, and it gets NO slot: Screams from Within's
-  -- payload acts on the bearer alone, and a card that did name the host -- Reins
-  -- of the Vinesteed's "that creature" -- would need a second slot here
-  -- (gap #1893).
+  -- CR 400.7f's `became` for the Aura's own new incarnation, which Screams from
+  -- Within's payload returns, and CR 303.4b's `departedPermanent` for the
+  -- enchanted creature, which Banewasp Affliction's "that creature's controller
+  -- loses life equal to its toughness" reads on both clauses. The event names
+  -- exactly those two permanents and each gets one slot.
   --
-  -- GUARANTEED given a match, on CR 704.5m rather than on the event: an Aura
+  -- `departedPermanent` is GUARANTEED off the event, the ordinary way: every
+  -- pair matchesTrigger accepts is a battlefield-to-graveyard GameEvent.Moved
+  -- whose `departed` is the host itself, so no shape of the event withholds it.
+  --
+  -- `became` is guaranteed on CR 704.5m rather than on the event: an Aura
   -- whose host has left the battlefield is attached to nothing, and that rule
   -- puts it into its owner's graveyard as a state-based action, which CR 117.5
   -- runs to completion before any trigger is placed. matchesTrigger's arm makes
@@ -12022,7 +12042,7 @@ eventBindingSlots cond = case cond of
   -- exists to catch. That is what separates this arm from
   -- SelfLeavesTheBattlefield's floor, where a BOUNCE is an ordinary printed
   -- destination and the slot's absence is an ordinary printed case (#505).
-  TriggerCondition.AttachedCreatureDies -> Set.singleton Binding.became
+  TriggerCondition.AttachedCreatureDies -> Set.fromList [Binding.became, Binding.departedPermanent]
   -- Empty, and for the opposite reason to the arm above: nothing MOVED, so there
   -- is no arrival for a payload to find. The tapped permanent is still the one
   -- Object.attachedTo names.

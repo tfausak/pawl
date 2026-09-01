@@ -2166,14 +2166,18 @@ representativeEvents cond =
         -- reading the event rather than the attachment.
         TriggerCondition.AttachedCreatureMentors -> one (GameEvent.Mentored (Mentored.MkMentored departed arrived))
         -- CR 700.4's battlefield-to-graveyard move, the only event this condition
-        -- admits. Whether the departed permanent is the bearer's host does not
-        -- matter here: eventBindings claims nothing either way, and the floor is
-        -- what this pins.
+        -- admits. TWO distinct ids, which is what the pin needs: eventBindings
+        -- stamps `departed` under CR 303.4b's `thatDepartedPermanent` and the
+        -- BEARER's own arrival under CR 400.7f's `became`, so an arm that bound
+        -- the move's arrival for either would still agree with eventBindingSlots
+        -- if the ids coincided. Whether the departed permanent is really the
+        -- bearer's host does not matter, eventBindings reading the event rather
+        -- than the attachment.
         TriggerCondition.AttachedCreatureDies -> one (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics))
         -- CR 701.26a's own event, and the only one this condition admits. Whether
-        -- the tapped permanent is the bearer's host does not matter here for the
-        -- AttachedCreatureDies arm's reason: eventBindings claims nothing either
-        -- way, and the floor is what this pins.
+        -- the tapped permanent is the bearer's host does not matter here:
+        -- eventBindings claims nothing either way, and the floor is what this
+        -- pins.
         TriggerCondition.AttachedCreatureBecomesTapped -> one (GameEvent.BecameTapped departed)
         -- CR 702.149c's own event, and the only one this condition admits, on
         -- `departed` for SelfEvolves' reason: the pair does not match, which pins
@@ -2754,8 +2758,16 @@ becameSlotSpec s registry =
             s
             "became names the Aura's incarnation, not the host's"
             (Event.eventBindings (Just bearerArrived) TriggerCondition.AttachedCreatureDies hostDied)
-            (Map.singleton Binding.became (Binding.toObject bearerArrived))
-          Spec.assertEqWith s "and nothing at all where the bearer reached no graveyard" (Event.eventBindings Nothing TriggerCondition.AttachedCreatureDies hostDied) Map.empty
+            (Map.fromList [(Binding.became, Binding.toObject bearerArrived), (Binding.departedPermanent, Binding.toObject departed)])
+          -- CR 303.4b's half stands alone where the bearer reached no graveyard:
+          -- the host's departure is the EVENT's datum and CR 704.5n's Equipment
+          -- shape does not withhold it, which is why eventBindingSlots claims the
+          -- two slots on different arguments.
+          Spec.assertEqWith
+            s
+            "and the host alone where the bearer reached no graveyard"
+            (Event.eventBindings Nothing TriggerCondition.AttachedCreatureDies hostDied)
+            (Map.singleton Binding.departedPermanent (Binding.toObject departed))
         -- The pin on Event.eventBindingSlots, the per-CONDITION slot set the
         -- card lint asks (CardSpec's "every slot a triggered ability reads is
         -- bound for its condition"). That function is a second statement of
@@ -4930,6 +4942,58 @@ screamsFromWithinSpec s registry =
           Spec.assertEqWith s "Squee's ability functions only in the graveyard" (fmap Event.zoneFunctionedFrom (Face.triggeredAbilities (S.combinedFace squee))) [Just Zone.Graveyard]
           Spec.assertEqWith s "the Aura's names no zone at all" (fmap Event.zoneFunctionedFrom (Face.triggeredAbilities (S.combinedFace screams))) [Nothing]
 
+-- CR 303.4b's ENCHANTED CREATURE under CR 400.7f's condition: the other
+-- permanent an "enchanted creature dies" event names, which Screams from Within
+-- above never reads. Banewasp Affliction {1}{B} Enchantment -- Aura: "Enchant
+-- creature / When enchanted creature dies, that creature's controller loses life
+-- equal to its toughness." (Name, cost, type line and oracle text checked against
+-- Scryfall.) Both halves of that sentence read the host, and neither can read the
+-- graveyard card it became: CR 108.4 gives a card in a graveyard no controller,
+-- and CR 400.7 left it with no battlefield toughness. Event.eventBindings stamps
+-- the id under Binding.departedPermanent, which is the one slot besides
+-- Binding.sacrificedPermanent that Resolve.effectViewOf answers off CR 608.2h
+-- last known information.
+--
+-- THE HOST IS BOB'S AND THE AURA IS ALICE'S, which is what separates CR 108.4's
+-- "that creature's controller" from CR 109.5's "you": an arm reading the Aura's
+-- own controller instead lands the loss on alice, and the pair of legs below
+-- differ in exactly that one thing.
+--
+-- Giant Spider (2/4) is the host because power and toughness differ: an arm
+-- reading Quantity.Power off the same slot would take four life on a 3/3 and is
+-- caught only here.
+banewaspAfflictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+banewaspAfflictionSpec s registry =
+  let board host = do
+        affliction <- S.printingOf s registry "Banewasp Affliction"
+        spider <- S.printingOf s registry "Giant Spider"
+        let (enchanted, g1) = S.addCreature spider host (Setup.emptyGame S.bothPlayers)
+            (aura, g2) = S.addCreature affliction S.alice g1
+        pure (enchanted, S.attach aura enchanted g2)
+      -- Kill the host, settle CR 117.5 so the SBA pass buries it and the
+      -- now-unattached Aura and the trigger is placed, then resolve it.
+      run enchanted gs =
+        S.runPure
+          S.identityAnswer
+          gs
+          (Event.destroy Regenerability.Regenerable [enchanted] >> Engine.settleForPriority >> Stack.resolveTop)
+      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs)
+   in Spec.describe s "BanewaspAffliction" $ do
+        Spec.it s "CR 608.2h the host's controller loses life equal to the dead host's toughness" $ do
+          (enchanted, gs) <- board S.bob
+          let after = run enchanted gs
+          Spec.assertEqWith s "CR 108.4 bob paid the Spider's 4 toughness and alice paid nothing" (lives after) (Just 20, Just 16)
+          -- The preconditions the assertion rests on, AFTER it so neither can
+          -- absorb a mutation aimed at the binding.
+          Spec.assertEqWith s "the enchanted Giant Spider really died" (Game.lookupObject enchanted after) Nothing
+          Spec.assertEqWith s "and the trigger really resolved" (length (GameState.stack after)) 0
+        -- The same board with the host moved one seat, which is the only
+        -- difference: CR 109.5's "you" is alice in both legs, so a reading that
+        -- had substituted her would answer the same pair twice.
+        Spec.it s "CR 108.4 the loss follows the host's controller rather than the Aura's" $ do
+          (enchanted, gs) <- board S.alice
+          Spec.assertEqWith s "alice controlled the Spider, so alice pays" (lives (run enchanted gs)) (Just 16, Just 20)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cyclingTriggerSpec s registry
@@ -4961,6 +5025,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   soulshiftSpec s registry
   hauntSpec s registry
   screamsFromWithinSpec s registry
+  banewaspAfflictionSpec s registry
   strippedTriggerSpec s registry
   bystanderSpec s registry
   bystanderZoneSpec s registry
