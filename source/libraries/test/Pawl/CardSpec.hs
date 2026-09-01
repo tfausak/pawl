@@ -3306,10 +3306,10 @@ withCountersFilters w =
     <> concatMap quantityFilters (Map.elems (WithCounters.counters w))
 
 -- Both Filter positions a CR 118.12 gate has: the COST the payer is offered,
--- whose components carry card text (Grist's "sacrifice another creature"), and
--- CR 702.24a's counter KIND, which CR 122.1b lets carry a whole Keyword. One
--- function for the same reason riderFilters is one -- the two halves of a gate
--- must not be swept apart.
+-- whose components carry card text (Lithophage's "unless you sacrifice a
+-- Mountain"), and CR 702.24a's counter KIND, which CR 122.1b lets carry a whole
+-- Keyword. One function for the same reason riderFilters is one -- the two
+-- halves of a gate must not be swept apart.
 --
 -- UNFRAMED on both counts. Pawl.Engine.Resolve.payGatePaidBy asks
 -- Pawl.Engine.Cost.canPay and counts the source's own counters, and neither read
@@ -5541,7 +5541,7 @@ modalFilters modal =
         concatMap effectFilters (Mode.allEffects mode)
           <> frame Unframed (concatMap conditionFilters (modeClauseConditions mode))
           -- CR 118.12's gate, the fourth thing a clause carries that a card
-          -- writes filters into (#2876).
+          -- writes filters into; see #2876.
           <> concatMap payGateFilters (Maybe.mapMaybe Clause.payGate (Foldable.toList (Mode.clauses mode)))
           -- THE target-slot-framed position: a mode's own slot, matched by
           -- Pawl.Engine.Target.admittedGiven at both of CR 115's moments.
@@ -9607,8 +9607,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         slot = SlotName.MkSlotName (Text.pack "target")
         anywhere = ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)
         riders = EntryRiders.defaultValue {EntryRiders.counters = Map.singleton kind one}
-        -- CR 118.12's gate, whose counter kind is rule 702.24a's multiplier
-        -- (#2876). Its cost is empty, so the row below reports the KIND rather
+        -- CR 118.12's gate, whose counter kind is rule 702.24a's multiplier;
+        -- see #2876. Its cost is empty, so the row below reports the KIND rather
         -- than a walk that found the cost's filters instead.
         gate =
           PayGate.MkPayGate
@@ -9718,9 +9718,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (canAttachToSubjectOffends plainly)) "and the lint accepts it"
     -- The gate's OTHER position, end to end over a printing rather than a
     -- fixture: Lithophage's "unless you sacrifice a Mountain" writes card text
-    -- into PayGate.cost, and eleven printings write one. That half was unswept
-    -- before #2876 for the same reason the kind was, and a corpus card is the
-    -- evidence a hand-built mode would not be.
+    -- into PayGate.cost, and it is far from the only printing that does. That
+    -- half was unswept before #2876 for the same reason the kind was, and a
+    -- corpus card is the evidence a hand-built mode would not be.
     lithophage <- S.printingOf s registry "Lithophage"
     Spec.assertBool
       s

@@ -552,16 +552,21 @@ plus base extra =
 -- chosen for again when the payment reaches it.
 --
 -- THE FOLD'S UNIT IS TAKEN FROM `cost`, which is the whole of #2875: a cost with
--- no mana part is CR 118.6's unpayable one, and rule 118.6a says an unpayable
--- cost that an effect increases or adds to "is still unpayable" -- so scaling one
--- by any count leaves it unpayable, zero included. A constant `Just
--- (MkManaCost [])` unit answered {0} at n == 0 whatever it was handed, which
--- Cost.canPay would then admit; `plus` already carried Nothing through for every
--- n >= 1, so only the empty fold ever lost it.
+-- no mana part is CR 118.6's UNPAYABLE one, and this function must not be the
+-- thing that makes it payable. A constant `Just (MkManaCost [])` unit answered
+-- {0} at n == 0 whatever it was handed, and Cost.canPay admits {0}; `plus`
+-- already carried Nothing through for every n >= 1, so only the empty fold ever
+-- lost it.
+--
+-- CR 118.6a is the direction and not a ruling on the zero case, which no
+-- printing states: that rule keeps an unpayable cost unpayable when an effect
+-- increases it or adds to it, and its one exception is an ALTERNATIVE cost,
+-- which a multiplier is not. Nothing else in rule 118 turns an unpayable cost
+-- payable, so unpayable in, unpayable out, at every count.
 --
 -- N of zero over a PAYABLE cost is {0} with no components, which CR 118.5 makes
--- payable and is what "for each" of nothing means. Rule 702.24a cannot reach
--- either zero case -- the age counter is put on before the offer -- but
+-- real and payable and is what "for each" of nothing means. Rule 702.24a reaches
+-- neither zero case -- the age counter is put on before the offer -- but
 -- Pawl.Types.PayGate.perCounter is stated over every count.
 repeated :: Natural -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
 repeated n cost = foldr plus (Cost.MkCost (fmap (const (ManaCost.MkManaCost [])) (Cost.mana cost)) []) (List.genericReplicate n cost)

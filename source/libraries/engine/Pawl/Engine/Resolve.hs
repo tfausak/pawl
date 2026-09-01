@@ -4995,7 +4995,6 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Pawl.Engine.Coin, before the comparison here sees the face at all, which is
   -- why a statement of heads alone still loses this flip against a call of
   -- tails.
-  --
   Effect.FlipCoin flipCoin -> do
     gs <- State.get
     called <- Game.choose (Prompt.CallCoin (Decide.deciderFor controller gs) controller)
