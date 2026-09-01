@@ -2782,9 +2782,10 @@ protectionSpec s registry = Spec.describe s "Protection" $ do
   --
   -- A PAIR OF BLOCKS differing only in WHICH creature blocks. The same red Goblin
   -- Piker (2/1) assigns the same 2 in both rows; Progenitus takes none of it and
-  -- bob's Hill Giant (3/3, no abilities) takes all of it. The attacker's colour is
-  -- red and not black, so a quality read as any single colour fails the first
-  -- assertion -- protection from everything is not protection from a colour.
+  -- bob's Hill Giant (3/3, no abilities) takes all of it. The Piker is an ordinary
+  -- red creature with no abilities, so any quality narrowed to something it lacks
+  -- reddens the first assertion -- only one that matches every object leaves it
+  -- green, which is what rule 702.16j says and a colour does not.
   --
   -- Both blockers survive the 2 (10/10 and 3/3), so the marks are what
   -- discriminate rather than a death; the Piker dying in both rows is what says
