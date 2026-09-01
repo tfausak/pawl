@@ -3312,13 +3312,18 @@ withCountersFilters w =
 -- Keyword. One function for the same reason riderFilters is one -- the two
 -- halves of a gate must not be swept apart.
 --
--- UNFRAMED on both counts. Pawl.Engine.Resolve.payGatePaidBy asks
--- Pawl.Engine.Cost.canPay and counts the source's own counters, and neither read
--- supplies the host a CR 701.3a question would be asked about, which is what the
--- other framings mark.
+-- The COST half is SlotlessCostFramed: Pawl.Engine.Resolve.payGatePaidBy pays it
+-- through Pawl.Engine.Cost, whose Filter.Context comes from
+-- Pawl.Engine.Filter.contextFor and carries none of the resolution's slots, so
+-- Filter.IsBound there is a silent False. Unframed promised the opposite; see
+-- #2881.
+--
+-- The KIND half carries whatever counterKindFilters hands out, which is
+-- KeywordFramed for CR 122.1b's keyword counter and nothing at all for every
+-- other kind -- so it needs no tag of its own.
 payGateFilters :: PayGate.PayGate -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 payGateFilters gate =
-  unframed (costFilters (PayGate.cost gate))
+  fmap ((,) SlotlessCostFramed) (costFilters (PayGate.cost gate))
     <> concatMap counterKindFilters (Maybe.maybeToList (PayGate.perCounter gate))
 
 -- CR 122.1b: the one counter kind with a Filter under it, since it carries a
@@ -4926,6 +4931,23 @@ data Framing
     -- positions that are themselves framed, and the quoting position's promise is
     -- not the keyword's.
     KeywordFramed
+  | -- | A COST whose payment context is built by Pawl.Engine.Filter.contextFor,
+    -- which fills no `slotObjects` -- so Filter.IsBound there is a silent False,
+    -- exactly as it is under OutsideTheGameFramed, and for the mirror-image
+    -- reason: the candidate is an object all right, but no slot of any
+    -- resolution names it.
+    --
+    -- The position is CR 118.12's gate cost, paid by
+    -- Pawl.Engine.Resolve.payGatePaidBy through Pawl.Engine.Cost.canPay and
+    -- .pay. Card text reaches it -- Lithophage's "unless you sacrifice a
+    -- Mountain" -- so it is swept, and it was Unframed until #2881 said what
+    -- Unframed had quietly promised on its behalf.
+    --
+    -- Not implemented: the THREE sibling positions of the same shape, which are
+    -- still Unframed and still get the promise they cannot keep --
+    -- Face.additionalCosts, Face.alternativeCosts' cost half and
+    -- Face.specialActions, all paid through the same contextFor (#2883).
+    SlotlessCostFramed
   -- Bounded and Enum so the framing coverage case below enumerates
   -- [minBound .. maxBound] rather than a hand-kept list: a constructor added
   -- here joins that case with no edit, which is the tripwire a hand-kept list
@@ -4944,6 +4966,9 @@ hostFramed framing = case framing of
   SearchFramed -> False
   OutsideTheGameFramed -> False
   KeywordFramed -> False
+  -- Pawl.Engine.Filter.contextFor leaves `sourceAttachedTo` empty too, so a CR
+  -- 303.4b question is as unanswerable here as a slot one.
+  SlotlessCostFramed -> False
 
 -- Is this position's Filter swept for a slot read singly (filterSlotsReadSingly
 -- above)? Every framing but a keyword's own, which is not: no evaluator of a
@@ -4981,6 +5006,11 @@ sweptForSingularSlots framing = case framing of
   SearchFramed -> True
   OutsideTheGameFramed -> True
   ReplacementRowFramed -> True
+  -- SWEPT, though no slot is readable here at all: what this walk reports is a
+  -- BATCH slot read singly, and the atoms it reads are not only Filter.IsBound,
+  -- which isBoundCounts rejects outright at this position. Keeping the sweep is
+  -- what Unframed did before #2881, and it can only reject more.
+  SlotlessCostFramed -> True
 
 -- filterSlotsReadSingly against a TAGGED position, and the one funnel every
 -- reader of that walk goes through, so two routes to the same keyword filter
@@ -6042,14 +6072,14 @@ isBoundTag :: Text.Text
 isBoundTag = Text.pack "IsBound"
 
 -- How many CR 115.10a bound-object atoms this card carries in a position with no
--- resolution behind it -- a WISH's filter, or a KEYWORD's own -- and how many
--- anywhere else. The FIRST number is the offence here, which is the sibling
--- position lints turned around: the atom is answerable in every position whose
--- evaluator supplies the resolution's slots, and unanswerable in the two that
--- supply none.
+-- resolution behind it -- a WISH's filter, a KEYWORD's own, or a COST paid
+-- through Pawl.Engine.Filter.contextFor -- and how many anywhere else. The FIRST
+-- number is the offence here, which is the sibling position lints turned around:
+-- the atom is answerable in every position whose evaluator supplies the
+-- resolution's slots, and unanswerable in the three that supply none.
 isBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
 isBoundCounts card =
-  let total wanted = sum [filterAtoms isBoundTag f | (framing, f) <- cardFilters card, elem framing [OutsideTheGameFramed, KeywordFramed] == wanted]
+  let total wanted = sum [filterAtoms isBoundTag f | (framing, f) <- cardFilters card, elem framing [OutsideTheGameFramed, KeywordFramed, SlotlessCostFramed] == wanted]
    in (total True, total False)
 
 -- CR 400.11c's candidates are cards outside the game, which no spell or ability
@@ -9500,6 +9530,47 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let destroying = base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing Nothing)]}
     Spec.assertEqWith s "the same atom over objects is not" (isBoundCounts destroying) (0, 1)
     Spec.assertBool s (not (isBoundOffends destroying)) "and the lint accepts it"
+    -- THE THIRD POSITION, and the one this case gained after #2881: a CR 118.12
+    -- gate's cost is paid through Pawl.Engine.Filter.contextFor, which fills no
+    -- slots, so the same buried atom is as unanswerable there as in a wish's
+    -- filter. The shape is the #2141 widening -- Not (IsBound "target") reads as
+    -- "each OTHER creature", and against an empty slot map it is vacuously true
+    -- of every creature including the bound one.
+    --
+    -- Written as a gate over the SAME `base` face and the SAME `buried` filter as
+    -- the two legs above, so the three differ in position and in nothing else.
+    let gated =
+          base
+            { Face.spell =
+                Modal.MkModal
+                  ( Seq.singleton
+                      ( Mode.MkMode
+                          ( Seq.singleton
+                              ( Clause.MkClause
+                                  Nothing
+                                  Nothing
+                                  Nothing
+                                  Optionality.Mandatory
+                                  ( Just
+                                      PayGate.MkPayGate
+                                        { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
+                                          PayGate.cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 buried)],
+                                          PayGate.branch = PayBranch.IfNotPaid,
+                                          PayGate.obligation = PayObligation.Optional,
+                                          PayGate.perCounter = Nothing,
+                                          PayGate.offeredAt = Nothing
+                                        }
+                                  )
+                                  (Seq.singleton (Effect.Sacrifice slot))
+                              )
+                          )
+                          Map.empty
+                      )
+                  )
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "CR 118.12 a planted atom in a gate's cost is an offence" (isBoundCounts gated) (1, 0)
+    Spec.assertBool s (isBoundOffends gated) "and the lint says so"
   -- CR 702 / CR 122.1b: a keyword's own Filter is read off a continuous effect or
   -- off the printed face, through Pawl.Engine.Filter.contextFor, which fills
   -- neither the resolution's slots nor the source's host. keywordFilters tags it
@@ -9734,8 +9805,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     lithophage <- S.printingOf s registry "Lithophage"
     Spec.assertBool
       s
-      (elem (Unframed, Filter.Type.HasSubtype Subtype.Mountain) (cardFilters (S.combinedFace lithophage)))
-      "CR 118.12 a gate cost's own filter reaches cardFilters"
+      (elem (SlotlessCostFramed, Filter.Type.HasSubtype Subtype.Mountain) (cardFilters (S.combinedFace lithophage)))
+      "CR 118.12 a gate cost's own filter reaches cardFilters, tagged for the slots it does not get"
   -- The batch-bound slot lint used to answer two ways about one piece of text.
   -- filterSlotsReadSingly deliberately does not descend into Filter.HasKeyword or
   -- Filter.HasCounters -- a keyword's own Filter is read through
@@ -9785,7 +9856,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         (SearchFramed, [bound]),
         (ReplacementRowFramed, [bound]),
         (OutsideTheGameFramed, [bound]),
-        (KeywordFramed, [])
+        (KeywordFramed, []),
+        (SlotlessCostFramed, [bound])
       ]
   -- The two source-power comparisons are answerable only where the CONTEXT
   -- supplies a source power: Filter.Context.sourcePower is filled by

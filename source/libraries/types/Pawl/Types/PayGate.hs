@@ -86,8 +86,14 @@ data PayGate = MkPayGate
     -- | CR 702.24a's "for each age counter on it": the kind of counter on the
     -- ability's SOURCE whose count the cost above is multiplied by, one whole
     -- copy of the cost per counter. Nothing is the unmultiplied case every card
-    -- but cumulative upkeep's mint writes. Zero counters leaves a cost of {0},
-    -- which CR 118.5 makes payable, so the gate admits its IfPaid branch.
+    -- but cumulative upkeep's mint writes.
+    --
+    -- ZERO counters leaves no copies of the cost, which
+    -- Pawl.Engine.Cost.repeated answers for in the cost's own terms: {0} when the
+    -- cost has a mana part, which CR 118.5 makes payable and which admits the
+    -- IfPaid branch, and CR 118.6's unpayable Nothing when it has none, which
+    -- Cost.canPay refuses. Zero copies of an unpayable cost is not a free one;
+    -- see #2875.
     --
     -- ONE COST, not several offers: rule 702.24a says "either the entire set of
     -- costs is paid, or none of them is paid. Partial payments aren't allowed",
