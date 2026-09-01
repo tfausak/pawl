@@ -150,7 +150,11 @@ attackableOpponents gs =
    in case GameSettings.attackOption (GameState.settings gs) of
         Just AttackOption.Leftward -> seatedAt (Maybe.listToMaybe others)
         Just AttackOption.Rightward -> seatedAt (Maybe.listToMaybe (reverse others))
-        _ -> opponents
+        -- Exhaustive rather than a wildcard, so a fourth attack option -- CR
+        -- 809.3c's is the one the CR already has -- is named by -Werror here
+        -- instead of silently inheriting CR 507.1's unrestricted list.
+        Just AttackOption.MultiplePlayers -> opponents
+        Nothing -> opponents
 
 -- CR 508.1b: what the active player may announce a chosen creature is attacking,
 -- for ONE defending player -- which player, planeswalker or battle. CR 506.2's
@@ -1758,9 +1762,9 @@ declareBlockers = do
     -- UNBLOCKED creature. TriggerCondition.SelfAttacksUnblocked is the reader.
     --
     -- OUTSIDE the loop above, and the placement is the point: that loop is guarded
-    -- three times over -- `attacking`, the defending player, and
-    -- attemptBlockDeclaration's own candidate check -- and a board where nobody
-    -- can block trips all three --
+    -- four times over -- `attacking`, the defending player, the attackers on that
+    -- player, and attemptBlockDeclaration's own candidate check -- and a board
+    -- where nobody can block trips all of them --
     -- exactly the board on which every attacker is unblocked. Rule 509.1h carries
     -- no such condition.
     --
