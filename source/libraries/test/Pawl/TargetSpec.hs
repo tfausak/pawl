@@ -1066,41 +1066,46 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- FOUR ANSWERS OFF ONE BOARD, in two pairs differing only in which of bob's two
   -- creatures the spell is aimed at. A Hill Giant (3/3, no abilities) stands
   -- beside Progenitus so neither negative can pass for a spell that reaches
-  -- nothing at all, and the two spells differ in COLOUR -- alice's black Doom
-  -- Blade and her white Angelic Edict -- which is what tells this quality from
-  -- any single-colour one: an implementation reading Progenitus as protection
-  -- from one colour admits the other spell.
+  -- nothing at all, and the two spells differ in COLOUR -- alice's black Murder
+  -- and her white Angelic Edict -- which is what tells this quality from any
+  -- single-colour one: an implementation reading Progenitus as protection from
+  -- one colour admits the other spell.
+  --
+  -- MURDER and not the Doom Blade the CR 702.16b case above uses: Progenitus is
+  -- itself black (CR 202.2), so "target nonblack creature" could never aim at it
+  -- and that leg would pass with no protection anywhere. Murder's pool is
+  -- Creatures unfiltered.
   Spec.it s "CR 702.16j Progenitus's protection from everything stops a black spell and a white one alike" $ do
     progenitus <- S.printingOf s registry "Progenitus"
     giant <- S.printingOf s registry "Hill Giant"
-    doomBlade <- S.printingOf s registry "Doom Blade"
+    murder <- S.printingOf s registry "Murder"
     angelicEdict <- S.printingOf s registry "Angelic Edict"
-    case (S.spellTargetSlot doomBlade, S.spellTargetSlot angelicEdict) of
+    case (S.spellTargetSlot murder, S.spellTargetSlot angelicEdict) of
       (Just blackSlot, Just whiteSlot) -> do
         let (progenitusId, board0) = S.addCreature progenitus S.bob (Setup.emptyGame S.bothPlayers)
             (giantId, board) = S.addCreature giant S.bob board0
-            -- Doom Blade's pool is Creatures and Angelic Edict's is Permanents,
-            -- so the same creature is tagged differently in the two sets (CR 115).
+            -- Murder's pool is Creatures and Angelic Edict's is Permanents, so
+            -- the same creature is tagged differently in the two sets (CR 115).
             reaches printing theSlot tag victim =
               let (spellId, onStack) = S.spellOnStack printing S.alice board
                in Set.member (tag victim) (Target.legalRecipients (Just S.alice) spellId theSlot onStack)
         Spec.assertBool
           s
-          (not (reaches doomBlade blackSlot Recipient.ToCreature progenitusId))
-          "CR 702.16j alice's black Doom Blade cannot target bob's Progenitus"
+          (not (reaches murder blackSlot Recipient.ToCreature progenitusId))
+          "CR 702.16j alice's black Murder cannot target bob's Progenitus"
         Spec.assertBool
           s
           (not (reaches angelicEdict whiteSlot Recipient.ToObject progenitusId))
           "and neither can her white Angelic Edict -- the leg a single-colour quality loses"
         Spec.assertBool
           s
-          (reaches doomBlade blackSlot Recipient.ToCreature giantId)
-          "while the Hill Giant beside it admits the Doom Blade"
+          (reaches murder blackSlot Recipient.ToCreature giantId)
+          "while the Hill Giant beside it admits the Murder"
         Spec.assertBool
           s
           (reaches angelicEdict whiteSlot Recipient.ToObject giantId)
           "and the Angelic Edict too, so neither refusal above is a spell that reaches nothing"
-      _ -> Spec.assertFailure s "Doom Blade and Angelic Edict should each declare a target slot"
+      _ -> Spec.assertFailure s "Murder and Angelic Edict should each declare a target slot"
 
   -- CR 608.2b: "If the spell or ability specifies targets, it checks whether the
   -- targets are still legal. ... If all its targets, for every instance of the
