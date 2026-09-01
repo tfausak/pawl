@@ -544,12 +544,15 @@ poolHeldLastKnown pool view =
 -- CR 702.18a's "or player" half, CR 702.11c's and CR 702.16b's come in through a
 -- DIFFERENT reader. A player has no keywords: rule 702's keywords live on objects
 -- and are folded by the CR 613.1-613.7 layers, so the player halves ride the CR
--- 613.10/613.11 player axis as PlayerEffect.CantBeTargetedBy (Ivory Mask, Leyline
--- of Sanctity). PlayerEffect.protectedFromTargeting is the typed question; this
--- module never sees the constructor. The two halves are separate readers because
--- they read different things -- post-layer KEYWORDS, which `pcs` holds, versus
--- the CR 613.10/613.11 tier, which the layer machine does not compute at all --
--- and neither could serve the other.
+-- 613.10/613.11 player axis: PlayerEffect.CantBeTargetedBy for shroud and
+-- hexproof (Ivory Mask, Leyline of Sanctity) and
+-- PlayerEffect.HasProtectionFromChosenName for rule 702.16b (Runed Halo).
+-- PlayerEffect.protectedFromTargetingGiven and PlayerEffect.protectedFromGiven
+-- are the typed questions; this module never sees either constructor, and takes
+-- their Given form so that one `applying` walk answers both. The two halves are
+-- separate readers because they read different things -- post-layer KEYWORDS,
+-- which `pcs` holds, versus the CR 613.10/613.11 tier, which the layer machine
+-- does not compute at all -- and neither could serve the other.
 --
 -- NOT because the player half is cheap: PlayerEffect.applying forces
 -- Projection.abilityRemoval, a whole-board gather, the moment any permanent
@@ -669,7 +672,8 @@ hexproofQuality keyword = case keyword of
 -- for a keyword that is not one at all. hexproofQuality above without the inner
 -- Maybe: rule 702.16a states a quality on every protection ability, where rule
 -- 702.11b's plain hexproof states none. Rule 702.16j's "protection from
--- everything" is the variant that would want one, and is not modelled (#2229).
+-- everything" is not that variant either: Filter.And [] is a quality like any
+-- other here, and matches every object.
 protectionQuality :: Keyword.Keyword -> Maybe (Filter.Type.Filter Keyword.Keyword)
 protectionQuality keyword = case keyword of
   Keyword.Protection quality -> Just quality

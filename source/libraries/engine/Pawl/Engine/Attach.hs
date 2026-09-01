@@ -104,9 +104,9 @@ attachmentFor src destination gs
   -- limit on what may become attached to it, which CR 101.2 makes beat rule
   -- 701.3a's permission below. Asked before either branch, since Consecrate
   -- Land's clause and Goblin Brawler's are one prohibition
-  -- (Pawl.Types.AttachRestriction), and only of an object destination -- CR
-  -- 702.5d's enchanted PLAYER is not a permanent, so nothing on the battlefield
-  -- can carry a limit about them.
+  -- (Pawl.Types.AttachRestriction), and only of an object destination: CR
+  -- 702.5d's enchanted PLAYER is not a permanent, so no row of that type is
+  -- about them. The guard below is the player axis's own.
   | Maybe.maybe False (\oid -> AttachRestriction.refuses src oid gs) (Recipient.objectOf destination) = Nothing
   -- CR 702.16c's player half, which the object-shaped restriction above cannot
   -- carry: a player has no keywords for Pawl.Engine.Keyword to mint a row from,

@@ -31,13 +31,19 @@
 -- 608.2b keeps it legal, CR 608.3c attaches it, CR 704.5m buries it on the next
 -- state-based check). Protection is the one quality that also forbids the
 -- targeting, in a clause of its own (CR 702.16b), which
--- Pawl.Engine.Target.targetable answers off Keyword.Protection.
+-- Pawl.Engine.Target.targetable answers off Keyword.Protection -- and, for a
+-- player, off Pawl.Engine.PlayerEffect.protectedFrom.
 --
 -- TWO SOURCES of rows, where every sibling above reads printed card data alone:
 -- a face's own Face.attachRestrictions, and the rows rule 702 MINTS for a
 -- permanent holding a keyword (Pawl.Engine.Keyword.mintedAttachRestrictionsOf).
 -- Protection is the pool's minter, rule 702.16c and rule 702.16d being the
 -- rulebook's own instances of this type's shape.
+--
+-- Rule 702.16c's PLAYER half is not here and cannot be: this type's two
+-- positions are ObjectIds, and a player has no keywords to mint from. It rides
+-- Pawl.Engine.PlayerEffect.protectedFrom, which Attach.attachmentFor and
+-- Sba.fallsOff ask beside the two calls above.
 module Pawl.Engine.AttachRestriction where
 
 import Data.Map (Map)

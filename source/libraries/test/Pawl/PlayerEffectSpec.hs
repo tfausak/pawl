@@ -35,6 +35,13 @@
 -- a graveyard before the rows it stored are read, so it is the only card that
 -- reaches CR 608.2h's last-known road into Pawl.Engine.PlayerEffect.chosenNamesOf.
 --
+-- Runed Halo is the card-name choice's other shape -- CR 614.1c with ONE chooser
+-- rather than Null Chamber's two -- and the pool's only card that gives a PLAYER
+-- a rule 702.16 protection ability, so it carries rule 702.16b's and rule
+-- 702.16c's player halves in with it (Pawl.Engine.Target.targetable and
+-- Pawl.Engine.Sba.fallsOff). Curse of Vitality is the enchant-player Aura on the
+-- other side of both.
+--
 -- Artificial Evolution and Magical Hack join Edgewalker for CR 612.1, the second
 -- rule reaching this axis from outside it: the word naming which spells a player
 -- static ability discounts is printed text like any other, so a text change moves

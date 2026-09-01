@@ -340,7 +340,7 @@ data PlayerEffect
     -- Not implemented: rule 702.16e's "any damage ... is prevented" for a
     -- protected PLAYER. Rule 702.16e's permanent half is a CR 615.1 shield
     -- Pawl.Engine.Keyword mints from the keyword, and no segment of
-    -- Pawl.Engine.Replacement.collect reads the CR 613.11 player axis (#2875).
+    -- Pawl.Engine.Replacement.collect reads the CR 613.11 player axis (#2878).
     HasProtectionFromChosenName
   | -- | CR 601.3b / Vedalken Orrery: this player may cast a matching spell as
     -- though it had flash -- which by CR 702.8a and CR 117.1a's first sentence

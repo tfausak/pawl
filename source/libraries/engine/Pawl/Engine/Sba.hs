@@ -388,7 +388,8 @@ fallsOff pcs gs oid = case Map.lookup oid pcs of
 -- player as defined by the enchant ability, which rule 702's TARGETING
 -- restrictions do not speak to. Protection would bury this Aura, but by its own
 -- separate clause (CR 702.16c), which fallsOff above answers through
--- Pawl.Engine.AttachRestriction rather than here, while shroud (CR 702.18) and
+-- Pawl.Engine.AttachRestriction and Pawl.Engine.PlayerEffect.protectedFrom
+-- rather than here, while shroud (CR 702.18) and
 -- hexproof (CR 702.11) restrict targeting and nothing else -- so an Aura stays
 -- attached to a host that gains either. See Target.admittedRecipients.
 --
