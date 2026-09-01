@@ -1722,7 +1722,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                       -- Reap still costs {B}).
                       adjustments <- Cost.announceReductions pid sid gs announcedCost (Cost.spellAdjustments pid sid gs)
                       let paidCost = Cost.totalWith adjustments announcedCost
-                      payment <- Cost.pay PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) spending pid sid paidCost
+                      payment <- Cost.pay PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid paidCost
                       case payment of
                         -- CR 601.2h: the payment failed, so the cast is illegal
                         -- and CR 601.2 returns the game to before it was proposed

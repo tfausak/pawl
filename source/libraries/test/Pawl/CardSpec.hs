@@ -680,7 +680,7 @@ quantityCounts quantity = case quantity of
   -- the game, and none of this module's three Quantity traversals reaches the
   -- arm (gap #2836).
   Quantity.Type.TimesKickedWith {} -> []
-  Quantity.Type.SnowWasSpent -> []
+  Quantity.Type.TagWasSpent {} -> []
   Quantity.Type.WasToken -> []
   Quantity.Type.WasBlocking -> []
   Quantity.Type.DamageDealtToThisTurn -> []
@@ -1766,7 +1766,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.ClassLevel -> False
   Quantity.Type.WasKicked -> False
   Quantity.Type.TimesKickedWith {} -> False
-  Quantity.Type.SnowWasSpent -> False
+  Quantity.Type.TagWasSpent {} -> False
   Quantity.Type.WasToken -> False
   Quantity.Type.WasBlocking -> False
   Quantity.Type.DamageDealtToThisTurn -> False
@@ -2621,7 +2621,7 @@ activatedAbilityOffends ability =
         if tapsAsCost (ActivatedAbility.cost ability)
           then Set.singleton Binding.tappedPermanent
           else Set.empty
-   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you], announcedX, sacrificed, tapped]) (ActivatedAbility.modal ability)
+   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped]) (ActivatedAbility.modal ability)
 
 -- Does this cost sacrifice a permanent the payer CHOOSES? Binding.variableX's
 -- shape exactly: CR 601.2h's payment binds the slot (Cost.payComponent's
@@ -2807,6 +2807,7 @@ reservedSlots =
       Binding.sacrificedPermanent,
       Binding.tappedPermanent,
       Binding.castSpell,
+      Binding.thisAbility,
       Binding.targetingObject,
       Binding.blockingCreature,
       Binding.blockedCreature,
@@ -3790,7 +3791,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
   Quantity.Type.TimesKickedWith {} -> []
-  Quantity.Type.SnowWasSpent -> []
+  Quantity.Type.TagWasSpent {} -> []
   Quantity.Type.WasToken -> []
   Quantity.Type.WasBlocking -> []
   Quantity.Type.DamageDealtToThisTurn -> []

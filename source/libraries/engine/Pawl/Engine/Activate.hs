@@ -791,7 +791,7 @@ activateAbility pid srcId ability = do
               -- ability keeps all three once its source is gone: "Once activated or
               -- triggered, an ability exists on the stack independently of its
               -- source."
-              State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setYou pid (Binding.setTriggerSource srcId (Binding.fromChoices chosen mAmount chosenModes))}) abilId (GameState.objects g)})
+              State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setThisAbility abilId (Binding.setYou pid (Binding.setTriggerSource srcId (Binding.fromChoices chosen mAmount chosenModes)))}) abilId (GameState.objects g)})
               -- CR 601.2f, at the position CR 602.2b gives it and in Cast.castSpell's
               -- own order: the reductions that apply to this activation are announced
               -- (CR 118.7e's choice of half) and then applied to the announced cost.
@@ -829,7 +829,7 @@ activateAbility pid srcId ability = do
               -- mis-tapped colour is a choice the engine must honour (Cost.payMana).
               -- Reject-not-repair restores the whole activation, including the
               -- ability object this function put on the stack.
-              payment <- Cost.pay PaymentMoment.OutsideResolution (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId paidCost
+              payment <- Cost.pay PaymentMoment.OutsideResolution (PaymentSubject.Activating srcId) (Just abilId) ManaSpending.AsProduced pid srcId paidCost
               case payment of
                 -- CR 606.3: record that a loyalty ability of THIS PERMANENT was
                 -- activated, which is the whole of the once-per-turn limit's storage

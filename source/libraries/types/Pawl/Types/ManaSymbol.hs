@@ -90,7 +90,7 @@ data ManaSymbol
     -- CR 107.4h's third sentence -- {S} referring to snow-produced mana SPENT to
     -- pay a cost -- is a different reading of the same symbol and lives
     -- elsewhere: the record is Pawl.Types.Object.manaSpent, and Berg Strider asks
-    -- about it through Pawl.Types.Quantity.SnowWasSpent. Nothing in a COST
+    -- about it through Pawl.Types.Quantity.TagWasSpent. Nothing in a COST
     -- expresses it, which is why this constructor is untouched by it.
     --
     -- The other two neighbours are done, and both are elsewhere. CR 106.11 --

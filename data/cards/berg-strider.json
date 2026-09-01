@@ -53,7 +53,10 @@
                           "type": "Exactly"
                         },
                         "measured": {
-                          "type": "SnowWasSpent"
+                          "type": "TagWasSpent",
+                          "value": {
+                            "type": "Snow"
+                          }
                         },
                         "threshold": {
                           "type": "Literal",

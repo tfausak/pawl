@@ -146,7 +146,7 @@ foretell pid oid = do
   if not (canForetell pid oid before)
     then pure ()
     else do
-      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither ManaSpending.AsProduced pid oid actionCost
+      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid actionCost
       case payment of
         Payment.Unpaid -> State.put before
         -- Dropped, Pawl.Engine.Ignore's reason: this action exiles a card and

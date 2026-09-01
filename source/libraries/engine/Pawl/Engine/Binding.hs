@@ -444,6 +444,27 @@ departedPermanent = SlotName.MkSlotName (Text.pack "thatDepartedPermanent")
 castSpell :: SlotName
 castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 
+-- CR 602.2a: the reserved slot under which an ACTIVATED ABILITY'S OWN STACK
+-- OBJECT is bound -- the printed "this ability" in Forsworn Paladin's "if mana
+-- from a Treasure was spent to activate this ability". Stamped by
+-- Pawl.Engine.Activate as the ability is put on the stack, alongside
+-- `triggerSource` and `you`.
+--
+-- Distinct from `triggerSource` (CR 113.7), which names the ability's SOURCE:
+-- rule 602.2a creates the ability as an object that is not the source, and the
+-- two carry different records -- CR 400.7d's mana is the source's for the spell
+-- that became it and the ability's for the activation. Reading the source would
+-- answer about the wrong payment.
+--
+-- Not a target, so the same CR 608.2b posture as `castSpell`; the "no card's
+-- targetSlots may name it" rule and Pawl.CardSpec's binding sweep apply here
+-- too.
+--
+-- Bound for an ACTIVATED ability only. A triggered ability has no activation to
+-- ask about, and CR 605.3b's mana ability never reaches the stack.
+thisAbility :: SlotName
+thisAbility = SlotName.MkSlotName (Text.pack "thisAbility")
+
 -- CR 601.2c: the reserved slot under which the SPELL OR ABILITY THAT DID THE
 -- TARGETING is bound -- rule 702.21a's "that spell or ability", which ward
 -- counters and whose controller ward offers the cost to. Stamped by
@@ -673,6 +694,10 @@ setDepartedPermanent oid = Map.insert departedPermanent (toObject oid)
 -- Bind an object under the reserved castSpell slot (CR 601.2i).
 setCastSpell :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setCastSpell oid = Map.insert castSpell (toObject oid)
+
+-- Bind an object under the reserved thisAbility slot (CR 602.2a).
+setThisAbility :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setThisAbility oid = Map.insert thisAbility (toObject oid)
 
 -- Bind an object under the reserved targetingObject slot (CR 601.2c).
 setTargetingObject :: ObjectId -> Map SlotName Binding -> Map SlotName Binding

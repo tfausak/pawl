@@ -4851,8 +4851,8 @@ counterOne source controller oid = do
     -- CR 106.6 through CR 101.2, and ahead of the branch split for CR 613.11's
     -- reason: rule 106.6 says an additional effect "affects the spell or
     -- ability that mana is spent on", so both of CR 701.6a's subjects are in
-    -- reach. An ability records no payment today (#2404), which makes this
-    -- vacuous for one rather than wrong.
+    -- reach. Both records exist: Pawl.Engine.Cost's recordSpent writes a cast's
+    -- units onto the spell and an activation's onto the CR 602.2a ability object.
     --
     -- The typed question again, so this module never sees a ManaRiderEffect
     -- constructor; Pawl.Engine.ManaRider is where the casing lives.

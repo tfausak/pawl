@@ -13,6 +13,7 @@ import qualified Pawl.Codec.ManaCount as ManaCount
 import qualified Pawl.Codec.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.Plus as Plus
+import qualified Pawl.Codec.ProductionTag as ProductionTag
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -73,10 +74,11 @@ codec =
       -- the object still implicit: which kicker cost is asked about is the whole
       -- of what the card names (Pawl.Types.Quantity).
       Arm.payload "TimesKickedWith" (Cost.codec Keyword.codec) Quantity.TimesKickedWith (\x -> case x of Quantity.TimesKickedWith y -> Just y; _ -> Nothing),
-      -- CR 107.4h's third sentence, with nothing on the wire: which tag is
-      -- asked about is the constructor (Pawl.Types.Quantity), and the object is
-      -- whichever one the quantity is evaluated against.
-      Arm.nullary "SnowWasSpent" Quantity.SnowWasSpent,
+      -- CR 107.4h's third sentence, with the TAG on the wire and the object
+      -- still implicit: which production tag is asked about is the whole of what
+      -- the card names, and the object is whichever one the quantity is
+      -- evaluated against.
+      Arm.payload "TagWasSpent" ProductionTag.codec Quantity.TagWasSpent (\x -> case x of Quantity.TagWasSpent y -> Just y; _ -> Nothing),
       -- CR 111.6's status and CR 509.1g's combat fact, both with nothing on the
       -- wire for WasKicked's reason: the object is whichever one the quantity is
       -- evaluated against.

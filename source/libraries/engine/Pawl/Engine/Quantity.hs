@@ -35,7 +35,6 @@ import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Plus as Plus
-import qualified Pawl.Types.ProductionTag as ProductionTag
 import Pawl.Types.Quantity (Quantity)
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Rounding as Rounding
@@ -382,12 +381,13 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.TimesKickedWith cost -> fmap (toInteger . Map.findWithDefault 0 cost . Filter.kicked) mView
   -- CR 107.4h's third sentence as a 0/1, WasKicked's arm in every respect --
   -- including the object it reads, which for Berg Strider is the PERMANENT the
-  -- spell became (CR 400.7d).
+  -- spell became (CR 400.7d) and for Forsworn Paladin is the CR 602.2a ability
+  -- object an AgainstSlot aimed it at.
   --
   -- A CLASSIFICATION of the mana and never an effect's identity: what the view
   -- reports is Pawl.Types.ProductionTag, the closed half of what a unit carries,
   -- and this arm asks it for one member.
-  Quantity.SnowWasSpent -> fmap (\view -> if Set.member ProductionTag.Snow (Filter.manaSpentTags view) then 1 else 0) mView
+  Quantity.TagWasSpent tag -> fmap (\view -> if Set.member tag (Filter.manaSpentTags view) then 1 else 0) mView
   -- CR 111.6's status as a 0/1, WasKicked's arm in every respect. Filter.token
   -- rather than Game.isToken: reading the object directly answers False for an
   -- id naming nothing, which is the whole case this arm exists for; see #1102.
@@ -840,7 +840,7 @@ substituteStar star quantity = case quantity of
   -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
   -- own record by equality, never an instruction this traversal descends into.
   Quantity.TimesKickedWith _ -> quantity
-  Quantity.SnowWasSpent -> quantity
+  Quantity.TagWasSpent {} -> quantity
   Quantity.WasToken -> quantity
   Quantity.WasBlocking -> quantity
   Quantity.DamageDealtToThisTurn -> quantity
@@ -977,7 +977,7 @@ slots quantity = case quantity of
   -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
   -- own record by equality, never an instruction this traversal descends into.
   Quantity.TimesKickedWith _ -> Set.empty
-  Quantity.SnowWasSpent -> Set.empty
+  Quantity.TagWasSpent {} -> Set.empty
   Quantity.WasToken -> Set.empty
   Quantity.WasBlocking -> Set.empty
   -- CR 120.1's damage total, naming no slot either: it carries no reference at
@@ -1069,7 +1069,7 @@ objectSlots quantity = case quantity of
   -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
   -- own record by equality, never an instruction this traversal descends into.
   Quantity.TimesKickedWith _ -> Set.empty
-  Quantity.SnowWasSpent -> Set.empty
+  Quantity.TagWasSpent {} -> Set.empty
   Quantity.WasToken -> Set.empty
   Quantity.WasBlocking -> Set.empty
   Quantity.DamageDealtToThisTurn -> Set.empty
@@ -1137,7 +1137,7 @@ nestedRefs quantity = case quantity of
   -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
   -- own record by equality, never an instruction this traversal descends into.
   Quantity.TimesKickedWith _ -> Set.empty
-  Quantity.SnowWasSpent -> Set.empty
+  Quantity.TagWasSpent {} -> Set.empty
   Quantity.WasToken -> Set.empty
   Quantity.WasBlocking -> Set.empty
   Quantity.DamageDealtToThisTurn -> Set.empty
@@ -1323,7 +1323,7 @@ mapPlayerRefs f intoCount quantity = case quantity of
   -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
   -- own record by equality, never an instruction this traversal descends into.
   Quantity.TimesKickedWith _ -> quantity
-  Quantity.SnowWasSpent -> quantity
+  Quantity.TagWasSpent {} -> quantity
   Quantity.WasToken -> quantity
   Quantity.WasBlocking -> quantity
   Quantity.DamageDealtToThisTurn -> quantity
@@ -1438,7 +1438,7 @@ readsX quantity = case quantity of
   -- carries is the IDENTIFIER of one kicker ability, matched against the spell's
   -- own record by equality, never an instruction this traversal descends into.
   Quantity.TimesKickedWith _ -> False
-  Quantity.SnowWasSpent -> False
+  Quantity.TagWasSpent {} -> False
   Quantity.WasToken -> False
   Quantity.WasBlocking -> False
   Quantity.DamageDealtToThisTurn -> False

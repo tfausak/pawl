@@ -2100,8 +2100,13 @@ canPayComponent pid oid component gs = case component of
 -- to, which for a special action is no spell and no ability -- and CR 106.6's
 -- restrictions name one of the two subjects, so the two questions are different
 -- ones. Mana.spendableFor is what reads it.
-pay :: PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
-pay moment subject spending pid oid cost = do
+--
+-- `record` is which object CR 400.7d's record of the mana spent goes onto, and is
+-- a third question again: a cast names the spell, an activation names the CR
+-- 602.2a ability object rather than the source `subject` carries, and every other
+-- payment names nothing (`recordSpent` in payManaExcept).
+pay :: PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
+pay moment subject record spending pid oid cost = do
   before <- State.get
   case Cost.mana cost of
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
@@ -2109,7 +2114,7 @@ pay moment subject spending pid oid cost = do
     -- CR 601.2g: payMana PROMPTS for which sources to activate, so it is monadic
     -- and restores the pre-payment state itself when it cannot be paid.
     Just manaCost -> do
-      paidMana <- payMana subject spending pid manaCost
+      paidMana <- payManaExcept Set.empty record subject spending pid manaCost
       if not paidMana
         then pure Payment.Unpaid
         else do
@@ -2453,8 +2458,8 @@ orderSensitive component = case component of
 -- A permanent with two mana abilities, one of which could pay the other, is
 -- refused here where the rules allow it. No printing in `data/cards/` has two
 -- mana routes of which either eats mana (#2205).
-payManaExcept :: Set.Set ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
-payManaExcept inFlight subject spending pid cost = do
+payManaExcept :: Set.Set ObjectId -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
+payManaExcept inFlight record subject spending pid cost = do
   before <- State.get
   paid <- window Set.empty
   Monad.unless paid (State.put before)
@@ -2523,24 +2528,29 @@ payManaExcept inFlight subject spending pid cost = do
     -- CR 400.7d's cost record for the MANA, kept where CR 107.4h's third
     -- sentence can be asked about it afterwards -- "the {S} symbol can also be
     -- used to refer to mana of any type produced by a snow source spent to pay a
-    -- cost". Berg Strider is the reader.
+    -- cost". Berg Strider and Forsworn Paladin are the readers.
     --
-    -- `PaymentSubject.castOf` is the object it goes on, and it answers Just only
-    -- where the payment is for a spell being cast (see `pay`), which is the whole
-    -- of what any printed card asks about ("if {S} was spent to CAST this
-    -- spell"). An activation's mana is not recorded (#2404) -- the narrowing is
-    -- deliberate and is why this reads `castOf` rather than the subject.
+    -- `record` is the object it goes on, and it is the CALLER's rather than the
+    -- subject's: CR 601.2h's payer names the spell (Pawl.Engine.Cast), and CR
+    -- 602.2b's names the CR 602.2a ability object on the stack rather than the
+    -- source permanent PaymentSubject.Activating carries (Pawl.Engine.Activate).
+    -- Writing an activation's units onto the source would clobber the record of
+    -- the mana that cast it, which is the one CR 400.7d is about.
+    --
+    -- Nothing for the payments with no object to name: a special action's cost, a
+    -- combat toll, CR 118.12's resolution-time payment, and a mana ability's own
+    -- cost, which CR 605.3b keeps off the stack entirely.
     --
     -- Written HERE rather than by the caller because this is the one place that
     -- knows which units went. An unpaid cost writes nothing: `payMana` restores
     -- the state it entered with, and this line is only reached once the payment
     -- has settled.
-    recordSpent spent gs = case PaymentSubject.castOf subject of
+    recordSpent spent gs = case record of
       Nothing -> gs
       Just sid -> gs {GameState.objects = Map.adjust (\o -> o {Object.manaSpent = spent}) sid (GameState.objects gs)}
 
 payMana :: PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
-payMana = payManaExcept Set.empty
+payMana = payManaExcept Set.empty Nothing
 
 -- Which source to tap next, or none. `covered` says whether the pool already
 -- pays the cost, which picks between CR 118.3c's question and CR 601.2g's.
@@ -2670,7 +2680,7 @@ payActivation inFlight pid oid cost = do
     -- so mana restricted to activations may pay it -- Omen Hawker's {C} into
     -- Chromatic Star's {1} -- and mana restricted to casts may not. `oid` is the
     -- ability's SOURCE, which is what "abilities of artifacts" reads.
-    Just manaCost -> payManaExcept (Set.insert oid inFlight) (PaymentSubject.Activating oid) ManaSpending.AsProduced pid manaCost
+    Just manaCost -> payManaExcept (Set.insert oid inFlight) Nothing (PaymentSubject.Activating oid) ManaSpending.AsProduced pid manaCost
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
     Nothing -> pure False
   -- CR 602.2b sends this through CR 601.2h, so the payment is made while the
