@@ -91,6 +91,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -105,6 +106,10 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.Mana as Mana.Type
+import qualified Pawl.Types.ManaRetention as ManaRetention
+import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
@@ -1931,7 +1936,46 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "the victim slot is offered the Piker by itself" (slotNamed "victim") (Set.singleton (Recipient.ToCreature dealerId))
     Spec.assertEqWith s "and so is the dealer slot" (slotNamed "dealer") (Set.singleton (Recipient.ToCreature dealerId))
 
-  -- The two cases above put CR 601.2c's "another" on a card chosen once. CR
+  -- The same question on the ACTIVATION road, which CR 602.2b routes through CR
+  -- 601.2b-i and CR 700.2a gates the same way it gates a spell's. Fall of the
+  -- Hammer above reaches `fillableModesGiven` through Pawl.Engine.Cast; this
+  -- reaches it through Pawl.Engine.Activate.activatableGiven, so the cross-slot
+  -- search is proved on both.
+  --
+  -- Resourceful Defense {2}{W} Enchantment (data/cards/resourceful-defense.json):
+  -- "{4}{W}: Move any number of counters from target permanent you control onto
+  -- a second target permanent you control." Its `to` slot is
+  -- And [ControlledBy You, Not (IsBound "from")], so a controller whose only
+  -- permanent is the Defense itself fills each slot alone and no announcement at
+  -- all, and CR 700.2a is what keeps the ability off the offer.
+  --
+  -- FIVE WHITE MANA FLOATING rather than five Plains, and that is the whole
+  -- reason this board is built by hand: a land is a permanent its controller
+  -- controls, so the mana to activate would fill the second slot by itself and
+  -- there would be no unfillable board to build. Both boards carry the same
+  -- floating five, so neither answer is about affordability.
+  --
+  -- TWO BOARDS differing in exactly ONE thing: whether alice also controls a
+  -- Piker.
+  Spec.it s "CR 700.2a Resourceful Defense's ability is unfillable when it is its controller's only permanent" $ do
+    defense <- S.printingOf s registry "Resourceful Defense"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let white =
+          ManaUnit.MkManaUnit
+            { ManaUnit.manaType = ManaType.Colored Color.White,
+              ManaUnit.tags = Set.empty,
+              ManaUnit.retention = ManaRetention.Ordinary,
+              ManaUnit.restriction = Nothing,
+              ManaUnit.rider = Nothing
+            }
+        funded = (Setup.emptyGame S.bothPlayers) {GameState.manaPool = Map.singleton S.alice (Mana.Type.MkMana (replicate 5 white)), GameState.priority = Just S.alice}
+        (defenseId, alone) = S.addCreature defense S.alice funded
+        (_, together) = S.addCreature piker S.alice alone
+        activates gs = any (\action -> case action of A.Activate oid _ -> oid == defenseId; _ -> False) (Action.legalActions S.alice gs)
+    Spec.assertBool s (not (activates alone)) "with the Defense alone on the battlefield, its ability is not offered at all"
+    Spec.assertBool s (activates together) "and with a Piker beside it, the same ability off the same floating five is offered"
+
+  -- The three cases above put CR 601.2c's "another" on a card chosen once. CR
   -- 700.2d puts it on a card whose mode may be chosen twice, and then the
   -- filter's slot NAME has to follow the occurrence exactly as the key and the
   -- pool do -- read under its printed name from occurrence 1 it names occurrence

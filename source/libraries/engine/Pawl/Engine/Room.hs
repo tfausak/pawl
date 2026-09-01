@@ -174,7 +174,12 @@ unlock pid oid half = do
     else case filter ((== half) . Face.name) (lockedHalves oid before) of
       [] -> pure ()
       face : _ -> do
-        payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid (unlockCostOf face)
+        -- CR 118.13c, Pawl.Engine.FaceDown.turnFaceUp's announcement and for its
+        -- reasons. CR 116.2m's unlock cost is a locked half's mana cost, and no
+        -- printed Room half holds such a symbol -- Scryfall `t:room`,
+        -- 2026-09-01 -- so no prompt is raised today.
+        (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (unlockCostOf face)
+        payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
         case payment of
           Payment.Unpaid -> State.put before
           -- Dropped, Pawl.Engine.Ignore's reason: CR 116.2m's special action

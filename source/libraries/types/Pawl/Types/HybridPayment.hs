@@ -4,8 +4,10 @@ module Pawl.Types.HybridPayment where
 -- one black mana or two mana of any type." This is WHICH of those two, announced
 -- under CR 118.13a as its controller proposes the spell or ability -- CR 601.2b's
 -- "the player announces the nonhybrid equivalent cost they intend to pay", read
--- one symbol at a time -- and under CR 118.13b immediately before a cost paid
--- during a resolution is paid.
+-- one symbol at a time -- and under CR 118.13b and CR 118.13c immediately before
+-- a resolution-time cost or a special action's cost is paid. A cost to attack or
+-- to block announces the same way at the same moment
+-- (Pawl.Engine.Cost.announceToll).
 --
 -- A named sum rather than a Bool, the Pawl.Types.PhyrexianPayment posture, so a
 -- transcript reads as the decision it records.

@@ -496,15 +496,18 @@ data Response
     -- cost to chose to pay it. Distinct from ChoseOptional, which records CR
     -- 603.5's "may" and is always answered by the resolving controller.
     ChoseToPay PaymentDecision.PaymentDecision
-  | -- | CR 118.13a / 601.2b, and CR 118.13b: which way the payer announced they
+  | -- | CR 118.13a / 601.2b, and every other moment an announcement is made at
+    -- (Pawl.Engine.Cost.announce): which way the payer announced they
     -- would pay a Phyrexian mana symbol, so a Mutagenic Growth paid out of life
     -- replays exactly as it was cast.
     AnnouncedPhyrexianPayment PhyrexianPayment.PhyrexianPayment
-  | -- | CR 118.13a / 601.2b, and CR 118.13b: which way the payer announced they
+  | -- | CR 118.13a / 601.2b, and every other announcement moment: which way the
+    -- payer announced they
     -- would pay a monocolored hybrid mana symbol, so a Flame Javelin cast for {6}
     -- replays as that and not as {R}{R}{R}.
     AnnouncedHybridPayment HybridPayment.HybridPayment
-  | -- | CR 118.13a / 601.2b, and CR 118.13b: which half of a colour/colour hybrid
+  | -- | CR 118.13a / 601.2b, and every other announcement moment: which half of a
+    -- colour/colour hybrid
     -- mana symbol the payer announced they would pay, as the mana type it
     -- resolved to, so a Slippery Bogle paid with blue replays as that and not as
     -- green.

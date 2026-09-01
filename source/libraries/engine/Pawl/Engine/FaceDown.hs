@@ -241,7 +241,20 @@ turnFaceUp pid procedure oid = do
     else case costOf procedure oid before of
       Nothing -> pure ()
       Just cost -> do
-        payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid cost
+        -- CR 118.13c: a symbol payable in multiple ways is announced by the player
+        -- taking the special action "immediately before they pay that cost" -- after
+        -- the gate above, since what is announced is how to pay a cost already
+        -- chosen, and before the mana window Cost.pay opens.
+        --
+        -- CR 601.2f's totalling is `pure`, Pawl.Engine.Resolve.payGatePaidBy's
+        -- reason: pawl gathers cost adjustments for a SPELL (Pawl.Engine.Cast) and
+        -- for an ACTIVATION (Pawl.Engine.Activate) and nowhere else, and CR 601.2f
+        -- is a casting rule that reaches no special action, so the announced cost IS
+        -- the cost that will be paid and this offer stays exactly as permissive as
+        -- the payability gate above. Discarded, Pawl.Engine.Activate's reason: rule
+        -- 702.150a asks about the player who CAST the object.
+        (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure cost
+        payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
         case payment of
           Payment.Unpaid -> State.put before
           -- The payment's bound slots are dropped, Pawl.Engine.Ignore's reason:
