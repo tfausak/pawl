@@ -146,7 +146,11 @@ foretell pid oid = do
   if not (canForetell pid oid before)
     then pure ()
     else do
-      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid actionCost
+      -- CR 118.13c, Pawl.Engine.FaceDown.turnFaceUp's announcement and for its
+      -- reasons. CR 116.2h fixes this cost at {2}, so no symbol here is ever
+      -- payable in multiple ways and no prompt is ever raised.
+      (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure actionCost
+      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
         Payment.Unpaid -> State.put before
         -- Dropped, Pawl.Engine.Ignore's reason: this action exiles a card and

@@ -732,7 +732,8 @@ activateAbility pid srcId ability = do
           -- cost is paid. Moltensteel Dragon exercises it; rule 118.13b's cost
           -- paid during a resolution announces at its own site
           -- (Pawl.Engine.Resolve.payGatePaidBy), and rule 118.13c's special
-          -- action is still unreached (#1990).
+          -- action at each of its own (Pawl.Engine.FaceDown.turnFaceUp and
+          -- its five siblings).
           --
           -- Measured through the SAME totalling payableCost gated on, off the
           -- same adjustments -- against the printed cost instead, a reduction

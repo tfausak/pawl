@@ -760,8 +760,11 @@ maximumX pid oid face gs =
 -- the payer -- CR 107.4f's Phyrexian symbol and both of CR 107.4e's hybrids.
 -- WHEN is the caller's, this function being the seam all of rule 118.13's
 -- moments share: rule 118.13a's as the spell or ability is proposed (CR 601.2b),
--- one step before CR 601.2f's total, and rule 118.13b's immediately before a cost
--- paid during a resolution is paid (Pawl.Engine.Resolve.payGatePaidBy).
+-- one step before CR 601.2f's total, rule 118.13b's immediately before a cost
+-- paid during a resolution is paid (Pawl.Engine.Resolve.payGatePaidBy), and rule
+-- 118.13c's immediately before a special action's cost is
+-- (Pawl.Engine.FaceDown.turnFaceUp and its five siblings). `announceToll` below
+-- is the same choice at a moment rule 118.13 states none for.
 --
 -- The life the announcement committed becomes a CostComponent.PayLife, making
 -- the returned cost CR 601.2b's "nonhybrid equivalent cost" in full (CR 107.4f,
@@ -2171,8 +2174,9 @@ payToll pid charges = do
   -- CR 118.6: a toll one of whose parts is unpayable is unpayable whole.
   case traverse (Cost.mana . snd) charges of
     Nothing -> pure False
-    Just manaCosts -> do
-      let pooled = ManaCost.MkManaCost (concatMap ManaCost.unwrap manaCosts)
+    Just _ -> do
+      announced <- announceToll pid charges
+      let pooled = ManaCost.MkManaCost (concatMap (foldMap ManaCost.unwrap . Cost.mana . snd) announced)
       paidMana <-
         if null (ManaCost.unwrap pooled)
           then pure True
@@ -2183,7 +2187,7 @@ payToll pid charges = do
       if not paidMana
         then pure False
         else do
-          let tagged = fmap (fmap Cost.components) charges
+          let tagged = fmap (fmap Cost.components) announced
           ordered <-
             if tollOrderObservable tagged
               then do
@@ -2200,6 +2204,81 @@ payToll pid charges = do
             Payment.Unpaid -> do
               State.put before
               pure False
+
+-- Which way each of the toll's symbols payable in more than one way will be
+-- paid, chosen by the PAYER immediately before CR 508.1j's and CR 509.1f's
+-- payment -- so after CR 508.1h's and CR 509.1d's lock-in, and before CR 508.1i's
+-- and CR 509.1e's mana window, which `payMana` above opens.
+--
+-- NOT one of rule 118.13's moments, and that rule states no fourth: 118.13a names
+-- a spell's or an activated ability's cost, 118.13b a cost paid during a
+-- resolution and 118.13c a special action's, and a cost to attack or block is
+-- none of the three. What puts the choice with the payer is that it IS a choice
+-- -- docs/design.md's second invariant -- and the placement is the one both
+-- rules that do state a moment for a cost already settled use, "immediately
+-- before they pay that cost". Norn's Annex is the only printing that reaches
+-- this: Scryfall `o:/unless .* pays? \{/`, 2026-09-01, 294 printings and its
+-- {W/P} the only one payable in more than one way.
+--
+-- ONE ANNOUNCEMENT PER CHARGE, tagged with the permanent that printed it, so the
+-- prompt names an object even though CR 508.1h's total is on none
+-- (Pawl.Engine.AttackCost.costsOn). Payability is still measured across the WHOLE
+-- toll: `total_` hands Mana.announce the charges already announced beside the
+-- ones still to come, and `committed` carries the life earlier charges took, so a
+-- route offered here is one the rest of the toll survives. Norn's Annex taxing
+-- two attackers is the board that needs it -- at 3 life and no white source
+-- neither {W/P} may take the life route, where a per-charge measure would offer
+-- both and strand the payment.
+--
+-- The life a charge's announcement commits becomes a CostComponent.PayLife on
+-- THAT charge, which payTagged pays against that same permanent -- `announce`
+-- above, one charge at a time. Its Natural is discarded for Activate's reason:
+-- rule 702.150a asks about the player who CAST an object.
+announceToll :: PlayerId -> [(ObjectId, Cost Keyword.Type.Keyword)] -> Game [(ObjectId, Cost Keyword.Type.Keyword)]
+announceToll pid charges = go [] 0 charges
+  where
+    symbolsOf = foldMap ManaCost.unwrap . Cost.mana . snd
+    -- CR 118.3 makes the whole toll one demand on one life total, so every
+    -- charge's own CR 119.4 payments ride on every route offered for any of them.
+    outside = sum (fmap (lifeOwedBy . Cost.components . snd) charges)
+    go done committed remaining = case remaining of
+      [] -> pure (reverse done)
+      (tag, cost) : rest -> case Cost.mana cost of
+        -- CR 118.6: nothing to announce, and unreachable besides -- payToll
+        -- refuses a toll holding an unpayable charge before calling this.
+        Nothing -> go ((tag, cost) : done) committed rest
+        Just manaCost -> do
+          gs <- State.get
+          -- Order within the probe carries nothing -- payability is a question
+          -- about a multiset of symbols -- so `done` rides in reversed.
+          --
+          -- `others` and `committed` below are REDUNDANT with each other on
+          -- every board `data/cards/` can build, the pool's only hybrid toll
+          -- being Norn's Annex's {W/P}: dropping either alone leaves
+          -- CombatEffectSpec's "CR 508.1h two taxed attackers at 3 life"
+          -- green, and dropping both puts alice at -1. Both are kept because
+          -- they answer different halves of CR 118.3 -- what the rest of the
+          -- toll still needs, and what earlier answers have already spent.
+          let others = concatMap symbolsOf done <> concatMap symbolsOf rest
+              total_ mana = [ManaCost.MkManaCost (ManaCost.unwrap mana <> others)]
+              claimed = concatMap (\(t, c) -> claimsOf pid t (Cost.components c) gs) charges
+          (settled, life, _) <-
+            Mana.announce
+              PaymentSubject.ForNeither
+              (manaActivationsGiven (PlayerEffect.applying pid gs))
+              ManaSpending.AsProduced
+              pid
+              tag
+              total_
+              (outside + committed)
+              claimed
+              manaCost
+          let paid =
+                cost
+                  { Cost.mana = Just settled,
+                    Cost.components = Cost.components cost <> [CostComponent.PayLife life | life > 0]
+                  }
+          go ((tag, paid) : done) (committed + life) rest
 
 -- CR 508.1j / 509.1f: can the payer tell one order of a toll's CHARGES from
 -- another? `orderObservable` below, one level up, and its two conditions read
@@ -2437,9 +2516,9 @@ orderSensitive component = case component of
 -- never payable, CR 118.3's gate keeping an unpayable option off the offer.
 --
 -- The life budget only ever binds a cost NOTHING ANNOUNCED for, since a cast, an
--- activation and a CR 118.12 pay gate all run `announce` first; what is left is a
--- special action's cost (#1990) and a cost to attack or to block (#1991), where
--- pawl still chooses. Recomputed on EVERY pass, a tap being able to change
+-- activation, a CR 118.12 pay gate, a special action and a combat toll all run
+-- `announce` first; what is left is a mana ability's own activation cost, where
+-- pawl still chooses (#2909). Recomputed on EVERY pass, a tap being able to change
 -- it -- a Birds of Paradise tapped for blue takes the mana way to an unannounced
 -- {G/P} off the board, leaving CR 107.4f's 2 life.
 --
@@ -3156,8 +3235,7 @@ applyAdjustments adjustments cost =
         -- A monocolored hybrid's {2} half IS generic mana once CR 601.2b's
         -- nonhybrid equivalent names it, and a symbol still spelled {2/R} is one
         -- CR 601.2b has NOT named -- Flame Javelin's own ruling. What still
-        -- arrives unannounced is a special action's cost (#1990) and a cost to
-        -- attack or to block (#1991).
+        -- arrives unannounced is a mana ability's own activation cost (#2909).
         ManaSymbol.MonocoloredHybrid _ -> 0
         -- CR 107.4f makes this a COLOURED symbol whose other half is life.
         ManaSymbol.Phyrexian _ -> 0
@@ -3222,8 +3300,8 @@ applyAdjustments adjustments cost =
         ManaSymbol.OfType manaType -> Just manaType
         -- CR 107.4e names TWO types, and a symbol still spelled {G/U} here is one
         -- CR 601.2b has not named -- Mana.announce leaves an OfType behind when
-        -- it does. What still arrives unannounced is a special action's cost
-        -- (#1990) and a cost to attack or to block (#1991).
+        -- it does. What still arrives unannounced is a mana ability's own
+        -- activation cost (#2909).
         ManaSymbol.Hybrid {} -> Nothing
         ManaSymbol.MonocoloredHybrid _ -> Nothing
         -- EXACT rather than an elision: the symbol is necessarily UNANNOUNCED, CR
