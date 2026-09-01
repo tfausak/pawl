@@ -900,6 +900,11 @@ conjureOntoBattlefield controller card count = do
 -- countered): harmless, nothing reads them here. `enteredUnder = Nothing` is
 -- what makes Projection.defaultControllerOf answer the owner, which is CR
 -- 109.4c and so CR 114.2's last sentence.
+--
+-- Not implemented: CR 800.4d's roster read, which the two conjure funnels above
+-- and createTokens below all make before minting (#2914). Unobservable while
+-- both roads here hand it the resolving controller, who by CR 800.4a controls no
+-- resolving spell or ability once they have left.
 createEmblem :: PlayerId -> Card -> Game ObjectId
 createEmblem pid card = do
   -- An emblem's characteristics are effect-defined (CR 114.3), so its entry is
