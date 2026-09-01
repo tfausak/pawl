@@ -531,6 +531,14 @@ proposedFor oid castFor gs = if castBestowed castFor then stampBestowed oid gs e
 -- the two are settled at different moments, since CR 601.2f's additional costs
 -- (kicker, entwine) are announced after this and land on the candidate before
 -- anything can say whether it is payable.
+--
+-- JUDGED rather than searched, which is the difference from CR 601.3a's lenience
+-- (Pawl.Engine.PlayerEffect.choiceCouldEscape). That rule lets a player BEGIN
+-- while the choice is unmade, and pawl reaches for it only where the choice is a
+-- value it cannot enumerate -- CR 601.2b's X. A candidate cost is not such a
+-- choice: it is one of a finite offered list, so rule 702.103d can be answered
+-- for each of them exactly, and castSpellWith withholds the ones it answers no
+-- for rather than offering a cast CR 601.2 would then have to return from.
 candidateAllowed :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> CandidateCost.CandidateCost -> Bool
 candidateAllowed pid oid name proposed candidate =
   not (PlayerEffect.prohibitsCasting pid oid name (proposedFor oid (CandidateCost.keyword candidate) proposed))
@@ -1202,6 +1210,11 @@ castableWhenOffered pid oid name candidates proposed =
     -- for `castable`'s reason and through its predicate: CR 702.103d judges a
     -- bestow announcement on the Aura it makes of the spell, and an offer that
     -- hands in the card's own list (CR 118.9's absent) carries that candidate.
+    --
+    -- A REGRESSION FENCE on this path rather than a proved behaviour: no board in
+    -- the pool puts a CastOffer, a bestow card and a prohibition together, so
+    -- reverting the per-candidate reading here leaves the suite green. `castable`
+    -- is where the same predicate is proved.
     && any
       ( \candidate ->
           candidateAllowed pid oid name proposed candidate
