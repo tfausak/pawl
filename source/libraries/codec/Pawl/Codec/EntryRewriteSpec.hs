@@ -118,6 +118,14 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
       (EntryRewrite.ChooseCardNames (Filter.Not (Filter.And [Filter.HasSupertype Supertype.Basic, Filter.HasCardType CardType.Land])))
       " {\"type\":\"ChooseCardNames\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSupertype\",\"value\":{\"type\":\"Basic\"}},{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}]}}} "
+  -- CR 614.1c / 201.4a: the one-chooser twin, whose restriction Runed Halo
+  -- leaves empty.
+  Spec.it s "ChooseCardName (Runed Halo)" $
+    Common.assertCodec
+      s
+      (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
+      (EntryRewrite.ChooseCardName (Filter.And []))
+      " {\"type\":\"ChooseCardName\",\"value\":{\"type\":\"And\",\"value\":[]}} "
   -- CR 614.1c / 306.5b: a planeswalker's intrinsic entry-with-counters rewrite.
   Spec.it s "WithCounters (planeswalker loyalty)" $
     Common.assertCodec

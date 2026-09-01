@@ -47,6 +47,7 @@ codec =
       Arm.payload "DamageCantBePrevented" DamagePattern.codec PlayerEffect.DamageCantBePrevented (\x -> case x of PlayerEffect.DamageCantBePrevented y -> Just y; _ -> Nothing),
       Arm.payload "DamageCantBeRedirected" DamagePattern.codec PlayerEffect.DamageCantBeRedirected (\x -> case x of PlayerEffect.DamageCantBeRedirected y -> Just y; _ -> Nothing),
       Arm.nullary "CantSearchLibraries" PlayerEffect.CantSearchLibraries,
+      Arm.nullary "HasProtectionFromChosenName" PlayerEffect.HasProtectionFromChosenName,
       Arm.nullary "CantBecomeMonarch" PlayerEffect.CantBecomeMonarch,
       Arm.payload "CantCastMatching" filterCodec PlayerEffect.CantCastMatching (\x -> case x of PlayerEffect.CantCastMatching y -> Just y; _ -> Nothing),
       Arm.nullary "CastOnlyAtSorcerySpeed" PlayerEffect.CastOnlyAtSorcerySpeed,

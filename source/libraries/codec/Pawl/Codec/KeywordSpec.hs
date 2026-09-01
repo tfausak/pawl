@@ -170,8 +170,8 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     Spec.assertBool s (Codec.encode Keyword.codec (mtmte 1) /= Codec.encode Keyword.codec (mtmte 4)) "the cost is part of the encoding"
   -- CR 702.16a states a quality on EVERY protection ability, so the payload is
   -- required where hexproof's is optional: there is no bare protection tag to
-  -- write, and rule 702.16j's "protection from everything" -- the variant that
-  -- would want one -- is not modelled (#2229).
+  -- write, and rule 702.16j's "protection from everything" is spelled as the
+  -- quality that matches every object, `And []`, rather than as an absent one.
   Spec.it s "Protection carries CR 702.16a's quality" $ do
     Common.assertCodec
       s
