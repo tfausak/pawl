@@ -10,7 +10,8 @@ import qualified Pawl.Types.ChooseBetween as ChooseBetween
 -- However, some modal spells include the instruction 'You may choose the same
 -- mode more than once.'" The first two constructors are those two sentences --
 -- 'ChooseExactly' is the default, 'ChooseExactlyWithRepeats' the printed
--- exception (Mystic Confluence). Both carry n = how many modes are chosen, with
+-- exception (Mystic Confluence is its one printing). Both carry n = how many
+-- modes are chosen, with
 -- n = 1 for a charm AND for every non-modal card (one mode, forced).
 --
 -- 'ChooseBetween' is the third printed shape: an instruction naming a RANGE
