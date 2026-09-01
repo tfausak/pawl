@@ -516,9 +516,10 @@ gathered gs =
       -- for the same rule, and this branch takes its posture for the gates: no
       -- liveness gate, no CR 612.1 text change and no minted rows, since the
       -- pool's CR 613.1f removers and text changers reach creatures on the
-      -- battlefield and an emblem is not one (CR 114.5). The "unless" gate IS
-      -- asked, because a gated emblem restriction would otherwise be wired open --
-      -- no emblem in the pool prints one.
+      -- battlefield and neither an emblem (CR 114.5) nor a vanguard card (CR 313.2)
+      -- is one. The "unless" gate IS asked, because a gated restriction from this
+      -- zone would otherwise be wired open -- nothing in the pool that functions
+      -- here prints one.
       --
       -- CR 902.7 puts a face-up VANGUARD card's rows here on the same terms, so
       -- the test is Vanguard.functionsFromCommandZone -- CR 113.6p's own list --

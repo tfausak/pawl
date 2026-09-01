@@ -13154,10 +13154,9 @@ eventTriggers events gs =
       -- FILTERED BY `functionsIn`, unlike the command zone's source: there the rule
       -- at issue is CR 113.6p, which is about the OBJECT, and every emblem or
       -- vanguard ability would fail a condition test; here the rule at issue IS CR
-      -- 113.6k,
-      -- so the filter is the gate itself. Without it an exiled Doomed Traveler
-      -- would be offered its dies trigger, and an exiled Desolation Twin its cast
-      -- trigger, from a zone CR 113.6 says neither functions in.
+      -- 113.6k, so the filter is the gate itself. Without it an exiled Doomed
+      -- Traveler would be offered its dies trigger, and an exiled Desolation Twin
+      -- its cast trigger, from a zone CR 113.6 says neither functions in.
       --
       -- ONE STANDING SCAN over the whole zone, computed outside the event loop for
       -- `inGraveyards`' reason: a haunting card sits in exile indefinitely and no

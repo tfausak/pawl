@@ -80,6 +80,10 @@ isVanguard oid gs = maybe False isVanguardFace (Game.faceOf oid gs)
 -- A CLASSIFICATION and never an identity: the emblem arm reads
 -- Pawl.Types.Source's own tag and the vanguard arm reads the printed card type.
 --
+-- Rule 902.7's "face-up" is not asked, and cannot come apart from the card type:
+-- CR 902.3 places the card face up and CR 313.2 keeps it in this zone, so no rule
+-- pawl implements can turn one over.
+--
 -- Not implemented: rule 113.6p's other three arms -- plane cards (#934), scheme
 -- cards (#935) and conspiracy cards (#937) -- none of which pawl can put into a
 -- command zone at all, so each answers False here by never arriving.
