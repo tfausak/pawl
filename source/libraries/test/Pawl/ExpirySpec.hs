@@ -92,6 +92,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.While as While
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -323,7 +324,7 @@ whileEffect src target you gs =
 -- Condition S.youControlSource replaces StateCondition.YouControlSource with.
 holdsYouControlSource :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> Bool
 holdsYouControlSource you source gs =
-  Condition.holds (Projection.fullView gs) (Filter.contextFor (Just you) (Just source)) gs source S.youControlSource
+  Condition.holds (Projection.fullView gs) (Filter.contextFor Teams.none (Just you) (Just source)) gs source S.youControlSource
 
 -- The Master Thief shape (piker source, War Mammoth target), built from the
 -- two loaded printings each test case supplies.

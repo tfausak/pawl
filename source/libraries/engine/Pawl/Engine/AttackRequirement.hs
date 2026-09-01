@@ -183,7 +183,7 @@ instances candidates targets gs =
         Just condition ->
           Condition.holds
             (Projection.fullView gs)
-            (Filter.contextFor (Projection.controllerOf source gs) (Just source))
+            (Filter.contextFor (Game.teams gs) (Projection.controllerOf source gs) (Just source))
             gs
             source
             (if null changes then condition else Projection.rewriteCondition changes condition)

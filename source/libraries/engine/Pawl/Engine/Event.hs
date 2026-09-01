@@ -187,6 +187,7 @@ import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.Transformed as Transformed
@@ -1655,7 +1656,7 @@ apply batch candidate event =
             -- 104.3a lets one leave at any time -- so the offer is
             -- Game.stillPlaying and not GameState.turnOrder, which keeps a
             -- departed seat.
-            let opponents = filter (/= controller) (Game.stillPlaying gs)
+            let opponents = Game.opponentsOf controller gs
             opponent <- case opponents of
               -- CR 102.2: a two-player game leaves exactly one opponent, and
               -- one option is not a choice. The empty case is a game whose
@@ -5671,16 +5672,15 @@ castOrdinal context predicate fromZone spell gs =
 -- its own: CR 109.5's "you" for a triggered ability (CR 603.3a), the CR 602.2
 -- activator for an activated one.
 --
--- OpponentsTurn is "not you" rather than an enumeration of opponents, which is
--- CR 102.2 in a two-player game and CR 806.1 in a Free-for-All: there "a group
--- of players compete as individuals against each other", so every other seat is
--- an opponent. Wrong only for CR 102.3's teams, which pawl has no format for
--- (#175).
-turnScopeAdmits :: TurnScope.TurnScope -> PlayerId -> PlayerId -> Bool
-turnScopeAdmits scope active own = case scope of
+-- OpponentsTurn is CR 102.3's relation rather than an enumeration of opponents:
+-- the active player is one, which in a two-player game (CR 102.2) and a
+-- Free-for-All (CR 806.1) is any other seat, and in a game between teams is a
+-- seat on another team. Teams.areOpponents is the one predicate.
+turnScopeAdmits :: Teams.Teams -> TurnScope.TurnScope -> PlayerId -> PlayerId -> Bool
+turnScopeAdmits teams scope active own = case scope of
   TurnScope.EachTurn -> True
   TurnScope.ControllersTurn -> active == own
-  TurnScope.OpponentsTurn -> active /= own
+  TurnScope.OpponentsTurn -> Teams.areOpponents teams own active
 
 -- CR 122's removal as the two bearer-scoped counter-removal conditions read it:
 -- the before/after pair of a GameEvent.CountersRemoved that took counters of
@@ -5843,7 +5843,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           let entrant = ZoneChange.object zc
            in case Projection.viewWithLastKnown entrant gs entrant of
                 Nothing -> False
-                Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+                Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -5894,7 +5894,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 603.2b: this step began, on a turn the scope admits.
   TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted scope) -> case event of
     GameEvent.StepBegan (StepBegan.MkStepBegan began active) ->
-      began == wanted && turnScopeAdmits scope active you
+      began == wanted && turnScopeAdmits (Game.teams gs) scope active you
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.SpellCast {} -> False
@@ -6077,7 +6077,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
         && ( let damager = DamageEvent.source ev
               in case Projection.viewWithLastKnown damager gs damager of
                    Nothing -> False
-                   Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+                   Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
            )
     GameEvent.Moved {} -> False
     GameEvent.StepBegan {} -> False
@@ -6326,9 +6326,9 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 701.9a: a card was discarded, by a player the relation admits. The
   -- discarding player comes from the event; CR 109.5 fixes "you" as the
   -- ability's controller (CR 603.3a), and PlayerRelation.holds is what each arm
-  -- MEANS -- Megrim's "an opponent" is every other player, CR 806.1 in a
-  -- free-for-all and CR 102.2 in a two-player game, with CR 102.3's teams the one
-  -- reading that is wrong for (#175). Every relation-carrying condition below
+  -- MEANS -- Megrim's "an opponent" is CR 102.3's player not on your team, which
+  -- is every other player in a free-for-all (CR 806.1) and at two seats (CR
+  -- 102.2). Every relation-carrying condition below
   -- reads it, so they cannot drift apart.
   --
   -- The bearer is NOT part of the match, unlike every Self- condition here: the
@@ -6342,7 +6342,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- TriggerSpec's "CR 702.29d cycling a card fires the discard trigger exactly
   -- once" is the test that proves it.
   TriggerCondition.PlayerDiscards relation -> case event of
-    GameEvent.Discarded (Discarded.MkDiscarded discarder _ _) -> PlayerRelation.holds relation you discarder
+    GameEvent.Discarded (Discarded.MkDiscarded discarder _ _) -> PlayerRelation.holds (Game.teams gs) relation you discarder
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -6404,7 +6404,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 702.29d needs no clause: one cycle is one Discarded event, so this fires
   -- once by construction, exactly as the discard arm above does.
   TriggerCondition.PlayerCycles relation -> case event of
-    GameEvent.Discarded (Discarded.MkDiscarded discarder _ DiscardCause.ToPayCyclingCost) -> PlayerRelation.holds relation you discarder
+    GameEvent.Discarded (Discarded.MkDiscarded discarder _ DiscardCause.ToPayCyclingCost) -> PlayerRelation.holds (Game.teams gs) relation you discarder
     GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.Ordinary) -> False
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
@@ -6468,7 +6468,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew (Drew.MkDrew drawer ordinal) ->
       ordinal
         == nth
-        && PlayerRelation.holds relation you drawer
+        && PlayerRelation.holds (Game.teams gs) relation you drawer
     GameEvent.Discarded {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -6530,7 +6530,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- the whole comparison and there is no filter to apply. The bearer is NOT part
   -- of the match: Custodi Lich watches a designation, not itself.
   TriggerCondition.PlayerBecomesMonarch relation -> case event of
-    GameEvent.BecameMonarch crowned -> PlayerRelation.holds relation you crowned
+    GameEvent.BecameMonarch crowned -> PlayerRelation.holds (Game.teams gs) relation you crowned
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -6661,7 +6661,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _)
       | oid == bearer ->
           let viewOf = Projection.viewWithLastKnown bearer gs
-              context = Filter.contextComparingPower (Just you) bearer (Filter.power =<< viewOf bearer)
+              context = Filter.contextComparingPower (Game.teams gs) (Just you) bearer (Filter.power =<< viewOf bearer)
               -- Rule 702.149a's "OTHER". Not independently observable while the
               -- Filter's comparison is strict -- nothing has power greater than
               -- its own -- so dropping it leaves the suite green; it is here
@@ -6731,7 +6731,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
       | count == 1 ->
           case Projection.viewWithLastKnown attacker gs attacker of
             Nothing -> False
-            Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+            Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BecameBlocking {} -> False
     GameEvent.BlocksDeclared {} -> False
@@ -6874,7 +6874,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- "whenever you attack" whose payload does not need its controller to have an
   -- attacker.
   TriggerCondition.PlayerAttacks relation -> case event of
-    GameEvent.AttackersDeclared attacker -> PlayerRelation.holds relation you attacker
+    GameEvent.AttackersDeclared attacker -> PlayerRelation.holds (Game.teams gs) relation you attacker
     GameEvent.BecameTapped _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.AttackerDeclared {} -> False
@@ -6952,11 +6952,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- empty slot map is honest here.
   TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith relation f) -> case event of
     GameEvent.AttackersDeclared attacker
-      | PlayerRelation.holds relation you attacker ->
+      | PlayerRelation.holds (Game.teams gs) relation you attacker ->
           let combat = GameState.combat gs
               admits oid =
                 Map.lookup oid (Combat.joinedUnder combat) == Just attacker
-                  && maybe False (\view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown oid gs oid)
+                  && maybe False (\view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown oid gs oid)
            in any admits (Set.toList (Combat.declaredAttackers combat))
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
@@ -7106,8 +7106,8 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.PlayerAttacksPlayer subjects -> case event of
     GameEvent.BecameAttacked payload -> case BecameAttacked.target payload of
       AttackTarget.OfPlayer attacked ->
-        PlayerRelation.holds (PlayerAttacksPlayer.attacker subjects) you (BecameAttacked.attacker payload)
-          && PlayerRelation.holds (PlayerAttacksPlayer.attacked subjects) you attacked
+        PlayerRelation.holds (Game.teams gs) (PlayerAttacksPlayer.attacker subjects) you (BecameAttacked.attacker payload)
+          && PlayerRelation.holds (Game.teams gs) (PlayerAttacksPlayer.attacked subjects) you attacked
       AttackTarget.OfPlaneswalker _ -> False
       AttackTarget.OfBattle _ -> False
     GameEvent.AttackerDeclared {} -> False
@@ -7315,7 +7315,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           let attacker = BecameBlocking.attacker b
            in case Projection.viewWithLastKnown attacker gs attacker of
                 Nothing -> False
-                Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+                Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
     GameEvent.BecameBlocking {} -> False
     -- CR 509.3a's grouped event is the once-per-combat one, and matching it here
     -- would lose a blocker's second attacker.
@@ -7439,7 +7439,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.SelfBlocksOneOrMore f -> case event of
     GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker _)
       | blocker == bearer ->
-          let admits attacker = maybe False (\view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown attacker gs attacker)
+          let admits attacker = maybe False (\view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown attacker gs attacker)
               blocked = [attacker | (attacker, blockers) <- Map.toList (Combat.blockers (GameState.combat gs)), Set.member bearer blockers]
            in any admits blocked
     GameEvent.BlocksDeclared {} -> False
@@ -7572,7 +7572,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
       | attacker == bearer ->
           case Projection.viewWithLastKnown blocker gs blocker of
             Nothing -> False
-            Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+            Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
     GameEvent.BecameBlocking {} -> False
     GameEvent.BlocksDeclared {} -> False
     -- The GROUPED event is CR 509.3c's, and matching it here would collapse two
@@ -7640,7 +7640,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- the same batch -- and a batch is one Resolve.Create's tokens, minted from one
   -- spec, which no Filter can tell apart.
   TriggerCondition.SelfBecomesBlockedByOneOrMore f ->
-    let admits blocker = maybe False (\view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown blocker gs blocker)
+    let admits blocker = maybe False (\view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown blocker gs blocker)
      in case event of
           GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker _ _)
             | attacker == bearer -> any admits (Set.toList (Map.findWithDefault Set.empty bearer (Combat.blockers (GameState.combat gs))))
@@ -7775,7 +7775,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- record for the same reason.
   TriggerCondition.CreatureBecomesBlockedByAtLeast (CreatureBecomesBlockedByAtLeast.MkCreatureBecomesBlockedByAtLeast relation n) ->
     let attacksAdmittedPlayer attacker = case Map.lookup attacker (Combat.attackers (GameState.combat gs)) of
-          Just (AttackTarget.OfPlayer attacked) -> PlayerRelation.holds relation you attacked
+          Just (AttackTarget.OfPlayer attacked) -> PlayerRelation.holds (Game.teams gs) relation you attacked
           _ -> False
      in case event of
           GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker _ blockers) -> attacksAdmittedPlayer attacker && blockers >= n
@@ -8132,7 +8132,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           let deceased = ZoneChange.departed zc
            in case Projection.viewWithLastKnown deceased gs deceased of
                 Nothing -> False
-                Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+                Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -8419,7 +8419,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.PermanentLeavesTheBattlefield f ->
     let admits departed = case Projection.viewWithLastKnown departed gs departed of
           Nothing -> False
-          Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+          Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
      in case event of
           GameEvent.Moved (Moved.MkMoved zc _ _)
             | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
@@ -8488,7 +8488,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.PermanentReturnedToHand f ->
     let admits departed = case Projection.viewWithLastKnown departed gs departed of
           Nothing -> False
-          Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+          Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
      in case event of
           GameEvent.Moved (Moved.MkMoved zc _ _)
             | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Hand ->
@@ -8618,7 +8618,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- countered is not countered at all (CR 101.2), so `counter` records nothing
   -- and there is no event for this arm to see.
   TriggerCondition.SpellOrAbilityCounters relation -> case event of
-    GameEvent.SpellCountered c -> PlayerRelation.holds relation you (Countering.controller c)
+    GameEvent.SpellCountered c -> PlayerRelation.holds (Game.teams gs) relation you (Countering.controller c)
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -8684,7 +8684,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- distinguishes the two.
   TriggerCondition.DamageToPlayerPrevented relation -> case event of
     GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented _ _ recipient _) -> case recipient of
-      Recipient.ToPlayer pid -> PlayerRelation.holds relation you pid
+      Recipient.ToPlayer pid -> PlayerRelation.holds (Game.teams gs) relation you pid
       Recipient.ToCreature _ -> False
       Recipient.ToPlaneswalker _ -> False
       Recipient.ToBattle _ -> False
@@ -8767,7 +8767,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
         && ( let damager = DamagePrevented.source prevented
               in case Projection.viewWithLastKnown damager gs damager of
                    Nothing -> False
-                   Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+                   Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
            )
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -8839,7 +8839,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- below is where that shows: one damage event can record both, and only the
   -- gain fires this.
   TriggerCondition.PlayerGainsLife relation -> case event of
-    GameEvent.LifeGained (LifeChange.MkLifeChange pid _) -> PlayerRelation.holds relation you pid
+    GameEvent.LifeGained (LifeChange.MkLifeChange pid _) -> PlayerRelation.holds (Game.teams gs) relation you pid
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.DamagePrevented {} -> False
@@ -8910,7 +8910,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- damage event can record a loss and a lifelink gain together, and only the
   -- loss fires this.
   TriggerCondition.PlayerLosesLife relation -> case event of
-    GameEvent.LifeLost (LifeChange.MkLifeChange pid _) -> PlayerRelation.holds relation you pid
+    GameEvent.LifeLost (LifeChange.MkLifeChange pid _) -> PlayerRelation.holds (Game.teams gs) relation you pid
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.DamagePrevented {} -> False
@@ -9150,7 +9150,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.CountersPut (CounterChange.MkCounterChange oid kind _ _)
       | kind == wanted -> case Projection.viewWithLastKnown oid gs oid of
           Nothing -> False
-          Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+          Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -9232,17 +9232,17 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ castFrom) -> case Game.lookupObject spell gs of
       Nothing -> False
       Just _ ->
-        turnScopeAdmits scope (GameState.activePlayer gs) you
+        turnScopeAdmits (Game.teams gs) scope (GameState.activePlayer gs) you
           -- CR 601.2a's zone, read off the EVENT and not off the spell: rule
           -- 400.7 left the stack incarnation with no memory of it. A condition
           -- that names no zone admits every cast, which is what almost every
           -- printing writes.
           && maybe True (\z -> castFrom == Just z) fromZone
-          && Filter.matches (Filter.contextFor (Just you) (Just bearer)) (Projection.viewOfSpell caster spell gs) f
+          && Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) (Projection.viewOfSpell caster spell gs) f
           -- Clarion Spirit's "your SECOND spell each turn", asked LAST so the
           -- log walk happens only for a cast the rest of the condition already
           -- admits.
-          && maybe True (castOrdinal (Filter.contextFor (Just you) (Just bearer)) f fromZone spell gs ==) ordinal
+          && maybe True (castOrdinal (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) f fromZone spell gs ==) ordinal
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -9363,7 +9363,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.SelfBecomesTargeted relation -> case event of
     GameEvent.BecameTarget t ->
       Recipient.objectOf (BecameTarget.targeted t) == Just bearer
-        && PlayerRelation.holds relation you (BecameTarget.controller t)
+        && PlayerRelation.holds (Game.teams gs) relation you (BecameTarget.controller t)
     GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
@@ -9431,7 +9431,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTarget t ->
       Recipient.playerOf (BecameTarget.targeted t) == Just you
         && maybe True (== BecameTarget.kind t) (ControllerBecomesTarget.kind c)
-        && PlayerRelation.holds (ControllerBecomesTarget.relation c) you (BecameTarget.controller t)
+        && PlayerRelation.holds (Game.teams gs) (ControllerBecomesTarget.relation c) you (BecameTarget.controller t)
     GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
@@ -9690,7 +9690,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.PermanentTurnedFaceUp f -> case event of
     GameEvent.TurnedFaceUp oid -> case Projection.viewWithLastKnown oid gs oid of
       Nothing -> False
-      Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+      Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -9921,7 +9921,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
       | got /= wanted -> False
       | otherwise -> case Projection.viewWithLastKnown oid gs oid of
           Nothing -> False
-          Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+          Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.Trained _ -> False
@@ -9989,7 +9989,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- because by the time this runs the board may have moved on.
   TriggerCondition.RoomFullyUnlocked relation -> case event of
     GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked _ actor _ fully) ->
-      fully && PlayerRelation.holds relation you actor
+      fully && PlayerRelation.holds (Game.teams gs) relation you actor
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
@@ -10135,7 +10135,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- silence CR 603.10 would give a look-back that found nothing (#1028).
   TriggerCondition.SagaFinalChapterTriggers relation -> case event of
     GameEvent.AbilityTriggered (AbilityTriggered.MkAbilityTriggered srcId controller fired) ->
-      PlayerRelation.holds relation you controller
+      PlayerRelation.holds (Game.teams gs) relation you controller
         && ( let pc = Projection.project srcId gs
               in Saga.tracksLore pc && Saga.chapterOfCondition fired == Just (Saga.finalChapterOf pc)
            )
@@ -10356,7 +10356,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameAttached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
-    GameEvent.Scried scryer -> PlayerRelation.holds relation you scryer
+    GameEvent.Scried scryer -> PlayerRelation.holds (Game.teams gs) relation you scryer
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
@@ -10412,7 +10412,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
-    GameEvent.DungeonCompleted completer -> PlayerRelation.holds relation you completer
+    GameEvent.DungeonCompleted completer -> PlayerRelation.holds (Game.teams gs) relation you completer
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.ClassLevelSet _ -> False
@@ -10464,7 +10464,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
     GameEvent.DungeonCompleted _ -> False
-    GameEvent.Surveiled surveiller -> PlayerRelation.holds relation you surveiller
+    GameEvent.Surveiled surveiller -> PlayerRelation.holds (Game.teams gs) relation you surveiller
     GameEvent.DiceRolled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
@@ -10525,7 +10525,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
-    GameEvent.DiceRolled roller -> PlayerRelation.holds relation you roller
+    GameEvent.DiceRolled roller -> PlayerRelation.holds (Game.teams gs) relation you roller
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -10591,7 +10591,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     -- A flip with NO outcome (CR 705.2's first sentence) is not a won one, so
     -- Nothing answers False exactly as Just False does.
-    GameEvent.CoinFlipped flipped -> CoinFlipped.won flipped == Just True && PlayerRelation.holds relation you (CoinFlipped.flipper flipped)
+    GameEvent.CoinFlipped flipped -> CoinFlipped.won flipped == Just True && PlayerRelation.holds (Game.teams gs) relation you (CoinFlipped.flipper flipped)
   -- CR 702.170a / 702.170c: the bearer's own card became plotted. Self-scoped, so the
   -- match is the id and nothing else -- and the id the event carries is the
   -- CR 400.7 incarnation in exile, which is the bearer here because
@@ -10701,7 +10701,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Plotted _ -> False
     GameEvent.Explored explorer -> case Projection.viewWithLastKnown explorer gs explorer of
       Nothing -> False
-      Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+      Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
     GameEvent.AttackersDeclared _ -> False
@@ -10813,7 +10813,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
       Recipient.objectOf (BecameAttached.host a) == Just bearer
         && ( case Projection.viewWithLastKnown (BecameAttached.attachment a) gs (BecameAttached.attachment a) of
                Nothing -> False
-               Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+               Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
            )
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
@@ -14042,7 +14042,7 @@ stateTriggers gs
         let live ab = liveCondition (TriggeredAbility.condition ab)
             liveCondition condition = case condition of
               TriggerCondition.StateIs cond ->
-                Condition.holds (Projection.fullView gs) (Filter.contextFor (Just ctrl) (Just oid)) gs oid cond
+                Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just ctrl) (Just oid)) gs oid cond
               TriggerCondition.SelfEnters -> False
               -- CR 309.4c is an EVENT trigger too: the marker MOVING into the room
               -- is what fires it, not the marker sitting there.
@@ -14567,7 +14567,7 @@ interveningHolds gs pending =
         -- Ray of Frost's "if enchanted creature is red" is about the SOURCE's
         -- attachment rather than about the event, and Stack's CR 608.2a re-check
         -- supplies the same field so the two checks cannot disagree.
-        ((Filter.contextWithSlots (Just (PendingTrigger.controller pending)) (Just oid) (Binding.slotObjects (PendingTrigger.bindings pending))) {Filter.sourceAttachedTo = Projection.hostOf oid gs})
+        ((Filter.contextWithSlots (Game.teams gs) (Just (PendingTrigger.controller pending)) (Just oid) (Binding.slotObjects (PendingTrigger.bindings pending))) {Filter.sourceAttachedTo = Projection.hostOf oid gs})
         gs
         oid
         cond

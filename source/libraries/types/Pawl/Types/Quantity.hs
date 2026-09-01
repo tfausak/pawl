@@ -494,8 +494,8 @@ data Quantity
     -- The PlayerRef says whose opponents, CR 109.5's "you" being
     -- PlayerRef.Relative PlayerRelation.You. WHO attacked is not recorded and does
     -- not need to be: CR 506.2 makes the attacking player the active player, so
-    -- one combat phase's record can only be that player's attacks (#175 is where
-    -- CR 802 would break that).
+    -- one combat phase's record can only be that player's attacks. CR 805.10a's
+    -- several attacking players are what would break that (#2848).
     --
     -- A LEAF, like LifeTotal, Speed and IsMonarch: it holds no Quantity.
     OpponentsAttacked PlayerRef.PlayerRef

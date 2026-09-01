@@ -1,14 +1,15 @@
 module Pawl.Types.PlayerRelation where
 
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Teams as Teams
 
 -- | How a player a card names -- an object's controller, a trigger event's
 -- player -- stands to the perspective the evaluation carries (the source's
 -- controller when targeting; the effect's controller for a continuous effect).
 -- CR 109.5 fixes "you" as the object's controller; Opponent
--- is every player who is not the perspective -- CR 806.1 in a free-for-all, CR
--- 102.2 in a two-player game, the same predicate either way. CR 102.3's teams
--- are the ONE reading it is wrong for, and pawl has none to express (#175).
+-- is CR 102.3's every player not on the perspective's team, which is every other
+-- player in CR 102.4's game with no teams -- CR 806.1's free-for-all reading and
+-- CR 102.2's two-player one, the same predicate either way.
 -- Resolved at Pawl.Engine.Count.playersFor and Pawl.Engine.Filter.matches, both
 -- of which go through 'holds' below.
 data PlayerRelation
@@ -42,10 +43,10 @@ data PlayerRelation
 --
 -- Sits beside the type for the reason Pawl.Types.Recipient.objectOf does: it is a
 -- fact about what the shape means rather than about the board -- it reads no game
--- state, only the two ids its caller has already resolved -- and callers on both
--- sides of the module graph need it.
-holds :: PlayerRelation -> PlayerId.PlayerId -> PlayerId.PlayerId -> Bool
-holds relation you candidate = case relation of
+-- state beyond the roster of teams, which CR 800.2 settles before the game begins
+-- -- and callers on both sides of the module graph need it.
+holds :: Teams.Teams -> PlayerRelation -> PlayerId.PlayerId -> PlayerId.PlayerId -> Bool
+holds teams relation you candidate = case relation of
   You -> candidate == you
-  Opponent -> candidate /= you
+  Opponent -> Teams.areOpponents teams you candidate
   AnyPlayer -> True

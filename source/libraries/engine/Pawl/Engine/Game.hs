@@ -25,6 +25,7 @@ import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -50,6 +51,7 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timestamp as Timestamp
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
@@ -950,6 +952,28 @@ stillPlayingInOrder :: GameState -> [PlayerId]
 stillPlayingInOrder gs =
   let playing = stillPlaying gs
    in filter (\pid -> List.elem pid playing) (GameState.turnOrder gs)
+
+-- CR 808.1: which team each player in this game is on, or CR 102.4's empty map
+-- for a game not played between teams. GameState.settings is where the option
+-- lives (CR 800.2), and this is the spelling every caller uses so that a reader
+-- asking about teams cannot reach past the settings for them.
+teams :: GameState -> Teams.Teams
+teams = GameSettings.teams . GameState.settings
+
+-- CR 102.3: are these two players opponents -- on different teams, or in a game
+-- with no teams simply not the same player?
+--
+-- The engine's spelling of Pawl.Types.Teams.areOpponents, which is the ONE
+-- definition. Every site that used to read `pid /= you` reads this instead: that
+-- comparison is CR 806.1's free-for-all, exact only while nobody has a teammate.
+areOpponents :: GameState -> PlayerId -> PlayerId -> Bool
+areOpponents gs = Teams.areOpponents (teams gs)
+
+-- CR 102.3 with CR 104.2a: this player's opponents who are still in the game, in
+-- PlayerId order -- stillPlaying's order, which the callers that want another
+-- one re-sort (Pawl.Engine.Combat.attackableOpponents takes APNAP).
+opponentsOf :: PlayerId -> GameState -> [PlayerId]
+opponentsOf you gs = filter (areOpponents gs you) (stillPlaying gs)
 
 -- CR 101.4: the seating roster rotated to APNAP order. The shared anchor for CR
 -- 603.3b (Engine.apnapPlayers, stacking triggers) and CR 121.2c

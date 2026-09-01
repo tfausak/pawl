@@ -30,6 +30,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 608.2h: the "you" player's hand (Inner Calm, Outer Strength's shape).
@@ -109,7 +110,7 @@ noView :: ObjectId.ObjectId -> Maybe Filter.View
 noView _ = Nothing
 
 noContext :: Filter.Context
-noContext = Filter.contextFor Nothing Nothing
+noContext = Filter.contextFor Teams.none Nothing Nothing
 
 quantitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
@@ -216,7 +217,7 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
       s
       ( Quantity.evaluate
           viewOf
-          (Filter.contextFor Nothing Nothing)
+          (Filter.contextFor Teams.none Nothing Nothing)
           gs
           (ObjectId.MkObjectId 0)
           (Quantity.Type.Count cardsInYourHand)
@@ -227,7 +228,7 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _) = S.handOne piker (Setup.emptyGame S.bothPlayers)
         viewOf = Projection.fullView gs
-    Spec.assertEq s (Quantity.evaluate viewOf (Filter.contextFor (Just S.alice) Nothing) gs (ObjectId.MkObjectId 0) (Quantity.Type.Count cardsInYourHand)) $ Just 1
+    Spec.assertEq s (Quantity.evaluate viewOf (Filter.contextFor Teams.none (Just S.alice) Nothing) gs (ObjectId.MkObjectId 0) (Quantity.Type.Count cardsInYourHand)) $ Just 1
 
   Spec.it s "Count CardTypesInAllGraveyards counts DISTINCT card types, not cards" $ do
     piker <- S.printingOf s registry "Goblin Piker"

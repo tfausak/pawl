@@ -12,7 +12,7 @@ data ControllerRelation
     -- except that for a ZONE CHANGE Pawl.Engine.Replacement reads the object's
     -- OWNER (CR 400.3), the destination zone being theirs.
     --
-    -- "Any other player" is CR 806.1's free-for-all reading. Teams (CR 102.3)
-    -- would make it wrong and have no representation (#175).
+    -- Read through Pawl.Types.Teams.areOpponents, so CR 102.3's teammate is not
+    -- one and CR 806.1's free-for-all every other player is.
     Opponents
   deriving (Bounded, Enum, Eq, Ord, Show)

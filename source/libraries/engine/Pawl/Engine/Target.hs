@@ -50,6 +50,7 @@ import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.TargetCount as TargetCount
 import Pawl.Types.TargetSlot (TargetSlot)
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 115: a target slot's legal recipients -- the set the slot itself admits
@@ -280,7 +281,8 @@ slotContext pcs perspective unannounced bindings source amount gs =
       targets = Binding.targetsOf bindings
       base =
         Filter.MkContext
-          { Filter.perspective = perspective,
+          { Filter.teams = Game.teams gs,
+            Filter.perspective = perspective,
             Filter.source = Just source,
             Filter.sourcePower = Projection.powerWithLastKnownGiven pcs source gs,
             -- Nothing HERE and filled below: CR 202.3's computed bound is the slot's
@@ -578,7 +580,7 @@ targetable pcs perspective source sourceView gs recipient =
             -- that rule making it several abilities rather than one compound one.
             stops quality = case quality of
               Nothing -> True
-              Just f -> Filter.matches (Filter.contextFor controller (Just source)) sourceView f
+              Just f -> Filter.matches (Filter.contextFor (Game.teams gs) controller (Just source)) sourceView f
             -- CR 702.16b's qualities, read off the same keys for hexproof's
             -- reason: CR 702.16g makes "protection from [A] and from [B]" two
             -- abilities, so a permanent's protection abilities are however many
@@ -592,7 +594,7 @@ targetable pcs perspective source sourceView gs recipient =
             -- What it asks OF THE SOURCE is `stops (Just f)` above, down to the
             -- Context: rule 702.16b's ability is the CANDIDATE's, so CR 109.5
             -- fixes its "you" as the candidate's controller too.
-            protects = Filter.matches (Filter.contextFor controller (Just source)) sourceView
+            protects = Filter.matches (Filter.contextFor (Game.teams gs) controller (Just source)) sourceView
             -- The conjuncts are in cost order, and the order is the whole reason
             -- `sourceView` costs nothing on an ordinary board: no hexproof or
             -- protection ability at all reads no controller, a hexproof ability
@@ -601,7 +603,7 @@ targetable pcs perspective source sourceView gs recipient =
             -- False without forcing either.
             restricted =
               Map.member Keyword.Shroud keywords
-                || (not (null hexproofs) && opponentOf perspective controller && any stops hexproofs)
+                || (not (null hexproofs) && opponentOf (Game.teams gs) perspective controller && any stops hexproofs)
                 || any protects (Maybe.mapMaybe protectionQuality (Map.keys keywords))
          in not (Set.member oid (GameState.battlefield gs) && restricted)
    in case recipient of
@@ -619,9 +621,9 @@ targetable pcs perspective source sourceView gs recipient =
 -- "you" for the spell or ability being aimed -- someone other than the
 -- candidate's controller?
 --
--- Every other player is an opponent by construction (CR 806.1). CR 102.3 makes a
--- TEAMMATE not an opponent, the only reading this is wrong for, and pawl has no
--- teams -- the same argument Count.playersFor and Filter.matches carry.
+-- CR 102.3's every player not on your team, which in a free-for-all (CR 806.1)
+-- is every other player -- Pawl.Types.Teams.areOpponents, the same predicate
+-- Count.playersFor and Filter.matches ask through.
 --
 -- Takes the controller rather than reading it, because targetable above needs the
 -- same answer for CR 702.11d's Context and reading it twice would rebuild the
@@ -635,9 +637,9 @@ targetable pcs perspective source sourceView gs recipient =
 -- question here already takes: a question with no "you" in it names no opponent,
 -- and neither does a candidate with no controller -- which CR 110.2 makes
 -- unreachable for the battlefield candidates the caller above asks about.
-opponentOf :: Maybe PlayerId -> Maybe PlayerId -> Bool
-opponentOf perspective controller = case (perspective, controller) of
-  (Just you, Just c) -> you /= c
+opponentOf :: Teams.Teams -> Maybe PlayerId -> Maybe PlayerId -> Bool
+opponentOf teams perspective controller = case (perspective, controller) of
+  (Just you, Just c) -> Teams.areOpponents teams you c
   _ -> False
 
 -- CR 702.11b / CR 702.11d: the quality one keyword is a hexproof ability from --

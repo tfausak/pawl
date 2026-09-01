@@ -33,6 +33,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Zone as Zone
 
 -- The characteristics a Filter atom consults. Supplied by the projection on the
@@ -672,7 +673,13 @@ playerView pid =
 -- which object the surrounding effect comes from. Both are Nothing when no
 -- player and no source frame the match (an off-battlefield search).
 data Context = MkContext
-  { perspective :: Maybe PlayerId.PlayerId,
+  { -- | CR 808.1: which team each player is on, so that the relation atoms below
+    -- can take CR 102.3's teammates out of a candidate's opponents. Supplied by
+    -- the caller for `defendingPlayer`'s reason -- this module holds no game
+    -- state -- and Teams.none wherever no board frames the match, which is CR
+    -- 102.4's game that is not played between teams.
+    teams :: Teams.Teams,
+    perspective :: Maybe PlayerId.PlayerId,
     source :: Maybe ObjectId.ObjectId,
     -- CR 208.1: the SOURCE's power, for the two atoms that compare a candidate
     -- against it (PowerLessThanSource, CR 702.134a; PowerGreaterThanSource, CR
@@ -959,13 +966,13 @@ data Context = MkContext
 -- alone, Pawl.Engine.Target.slotContext being the only filler. An atom added
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
-contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
+contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
-contextWithSlots :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId) -> Context
-contextWithSlots p s m = (contextFor p s) {slotObjects = m}
+contextWithSlots :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId) -> Context
+contextWithSlots t p s m = (contextFor t p s) {slotObjects = m}
 
 -- The ONE object a slot names, for the readers that can take no more than one --
 -- Quantity.AgainstSlot's evaluation, Count's IsControllerOfBound. Nothing where
@@ -990,8 +997,8 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- The source's host stays Nothing on both callers for the same reason: neither
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
-contextComparingPower :: Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
+contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1078,9 +1085,9 @@ matches context view predicate = case predicate of
     (Just _, Nothing) -> boundUnannounced context
     _ -> False
   -- PlayerRelation.holds is what each arm MEANS, and its haddock carries the
-  -- argument: every other player is an Opponent by construction (CR 806.1 in a
-  -- free-for-all, CR 102.2 for two players), CR 102.3's teams are the one reading
-  -- that is wrong for (#175), and AnyPlayer admits the perspective too. Unlike
+  -- argument: an Opponent is CR 102.3's player not on your team, which is every
+  -- other player in a free-for-all (CR 806.1) and at two seats (CR 102.2), and
+  -- AnyPlayer admits the perspective too. Unlike
   -- Pawl.Engine.Count.playersFor, which folds a player SET, this arm tests one
   -- candidate `View` at a time, so there is no set here to get the size of wrong.
   --
@@ -1090,7 +1097,7 @@ matches context view predicate = case predicate of
   -- that happens not to need one would make the atom mean something different
   -- depending on which relation it carries.
   Filter.ControlledBy relation -> case (controller view, perspective context) of
-    (Just c, Just p) -> PlayerRelation.holds relation p c
+    (Just c, Just p) -> PlayerRelation.holds (teams context) relation p c
     _ -> False
   -- CR 508.5 / 702.39a: the candidate's controller IS the defending player, which
   -- the Context supplies because it is a fact about the combat record rather than
@@ -1122,12 +1129,11 @@ matches context view predicate = case predicate of
     _ -> False
   -- CR 108.3 / 110.2: the same comparison ControlledBy makes, against the other
   -- player -- so Garland's "creatures you control but don't own" is the two atoms
-  -- conjoined. Every other player is an Opponent by construction, for the reason
-  -- the arm above gives, and CR 102.3's teams are the one reading it is wrong for
-  -- (#175). Vacuously False where no object backs the view, or where no
+  -- conjoined. An Opponent is CR 102.3's, for the reason the arm above gives.
+  -- Vacuously False where no object backs the view, or where no
   -- perspective frames the match.
   Filter.OwnedBy relation -> case (owner view, perspective context) of
-    (Just o, Just p) -> PlayerRelation.holds relation p o
+    (Just o, Just p) -> PlayerRelation.holds (teams context) relation p o
     _ -> False
   Filter.IsSource -> case (identity view, source context) of
     (Just oid, Just src) -> oid == src
@@ -1165,12 +1171,11 @@ matches context view predicate = case predicate of
   -- nothing, and a candidate with no name at all (CR 708.2a), each leave one side
   -- empty and answer False without a case of their own.
   Filter.HasChosenName -> not (Set.disjoint (names view) (sourceChosenNames context))
-  -- CR 115.1's "target opponent". Same "every other player is an opponent"
-  -- reading the ControlledBy arm above argues for, and wrong for the same one
-  -- case (CR 102.3's teams, #175). Vacuously False for an object candidate,
+  -- CR 115.1's "target opponent". The same CR 102.3 reading the ControlledBy arm
+  -- above argues for. Vacuously False for an object candidate,
   -- which has no playerIdentity, and for a match with no perspective.
   Filter.IsPlayer relation -> case (playerIdentity view, perspective context) of
-    (Just candidate, Just you) -> PlayerRelation.holds relation you candidate
+    (Just candidate, Just you) -> PlayerRelation.holds (teams context) relation you candidate
     _ -> False
   -- The controller of the object a slot names, and False WHEREVER IT IS REACHED,
   -- for ControlsMoreThanYou's reason below: Pawl.Engine.Count.bakePerspective
@@ -1204,7 +1209,7 @@ matches context view predicate = case predicate of
   -- candidate attacking nothing, or attacking a planeswalker or a battle, has no
   -- player to relate, and a match nothing framed has no "you" to relate it to.
   Filter.IsAttackingPlayer relation -> case (attackingPlayer view, perspective context) of
-    (Just a, Just p) -> PlayerRelation.holds relation p a
+    (Just a, Just p) -> PlayerRelation.holds (teams context) relation p a
     _ -> False
   -- CR 508.1b: the atom above one arm of AttackTarget over, and the same posture
   -- in every respect -- the relation is answered against the perspective here, and
@@ -1215,7 +1220,7 @@ matches context view predicate = case predicate of
   -- OWNER instead would answer a different player for a planeswalker a Confiscate
   -- has moved, which Pawl.CombatEffectSpec's Soul Snare pair is the board for.
   Filter.IsAttackingPlaneswalker relation -> case (attackingPlaneswalkerController view, perspective context) of
-    (Just c, Just p) -> PlayerRelation.holds relation p c
+    (Just c, Just p) -> PlayerRelation.holds (teams context) relation p c
     _ -> False
   -- CR 310.9d: the last arm of AttackTarget, and the same posture again. The seat
   -- compared is the battle's PROTECTOR, which Pawl.Engine.Projection fills through
@@ -1223,7 +1228,7 @@ matches context view predicate = case predicate of
   -- different player for every Siege (CR 310.12a), which Pawl.BattleSpec's
   -- Synthetic Bulwark Snare trio is the board for.
   Filter.IsAttackingBattle relation -> case (attackingBattleProtector view, perspective context) of
-    (Just protector, Just p) -> PlayerRelation.holds relation p protector
+    (Just protector, Just p) -> PlayerRelation.holds (teams context) relation p protector
     _ -> False
   -- CR 509.1g: the same live read IsAttacking is, off the other map. Never the
   -- question Pawl.Engine.Combat.isBlocked asks: CR 509.1h keeps an attacker

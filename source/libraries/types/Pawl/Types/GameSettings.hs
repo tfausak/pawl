@@ -1,5 +1,7 @@
 module Pawl.Types.GameSettings where
 
+import qualified Pawl.Types.Teams as Teams
+
 -- | CR 800.2: the options a game was started with -- "a series of options that
 -- can be added to a multiplayer game and a number of variant styles of
 -- multiplayer play. A single game may use multiple options but only one
@@ -38,9 +40,25 @@ data GameSettings = MkGameSettings
     -- them.
     --
     -- Not implemented: CR 803.1a's attack left and CR 803.1b's attack right,
-    -- the other two options CR 806.2b allows (#2830, #2832). False therefore
+    -- the other two options CR 806.2b allows (#2830). False therefore
     -- leaves CR 507.1's free choice, which is legal at two seats and is no
     -- legal multiplayer game at three or more.
-    attackMultiplePlayers :: Bool
+    attackMultiplePlayers :: Bool,
+    -- | CR 808.1: which team each player is on, so that CR 102.3 can take a
+    -- player's teammates out of their opponents.
+    --
+    -- Teams.none by default (Pawl.Engine.Setup.newGame), which is CR 102.4's
+    -- game that is not played between teams -- every game pawl started before
+    -- this field existed, and the one CR 806.1's free-for-all reading of
+    -- "opponent" is exact for.
+    --
+    -- Not implemented: CR 808.2's seating and CR 808.4's starting player, which
+    -- are the rest of the Team vs. Team variant -- pawl's turn order is the
+    -- caller's list and no random team is chosen from it (#2847). CR 808.3a's
+    -- attack multiple players option is the field above, on by default, so a
+    -- game with teams gets it without asking. CR 808.5 needs nothing: pawl
+    -- shares no resource between players, and one player has never been able to
+    -- touch another's cards.
+    teams :: Teams.Teams
   }
   deriving (Eq, Ord, Show)

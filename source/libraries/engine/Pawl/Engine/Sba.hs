@@ -535,8 +535,8 @@ chooseLegendVictims (controller, candidates) = do
 -- legendGroups is: CR 707.2 makes a copy of a world permanent world too.
 --
 -- CR 801.12 narrows this rule to a controller's range of influence. CR 801.1
--- makes limited range of influence an OPTION, and pawl has no representation for
--- a multiplayer option at all (#175), so the narrowing is inert.
+-- makes limited range of influence an OPTION, and GameSettings carries no field
+-- for it (#175), so the narrowing is inert.
 --
 -- A put-into-graveyard, NOT a destruction, so the caller consults neither
 -- indestructible (CR 702.12b) nor a regeneration shield.
@@ -721,7 +721,7 @@ performStateBasedActions = Event.simultaneously $ do
         pc <- Map.lookup oid pcs
         Monad.guard (Battle.isBattle pc)
         controller <- Projection.controllerOf oid gs
-        Monad.guard (Battle.needsProtector pc controller (Game.stillPlaying gs) (Battle.isBeingAttacked oid gs) (Object.protector =<< Game.lookupObject oid gs))
+        Monad.guard (Battle.needsProtector (Game.teams gs) pc controller (Game.stillPlaying gs) (Battle.isBeingAttacked oid gs) (Object.protector =<< Game.lookupObject oid gs))
         pure (oid, pc, controller)
       undefended = Maybe.mapMaybe undefendedOne onBattlefield
   -- CR 704.5j: the legend rule is one of the two state-based actions that ASK --

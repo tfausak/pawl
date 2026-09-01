@@ -109,8 +109,9 @@ skipEmptyCombat gs =
 
 -- CR 506.2a: the candidates the attacking player chooses from (CR 102.1, CR
 -- 806.1), and under CR 802.2 the defending players themselves -- the whole list
--- rather than one of it. Not implemented: CR 102.3's teammates, pawl having no
--- teams (#175).
+-- rather than one of it. CR 102.3's teammates are not among them, which is what
+-- Game.areOpponents answers and Pawl.TeamSpec's "CR 102.3 a creature cannot
+-- attack its controller's teammate" proves.
 --
 -- APNAP order (CR 101.4), not player-id order, so the first entry is the next
 -- seat rather than the lowest id -- and so that designateDefenders can hand the
@@ -121,7 +122,7 @@ attackableOpponents :: GameState -> [PlayerId]
 attackableOpponents gs =
   let playing = Game.stillPlaying gs
       active = GameState.activePlayer gs
-   in filter (\pid -> pid /= active && List.elem pid playing) (Game.apnapOrder gs)
+   in filter (\pid -> Game.areOpponents gs active pid && List.elem pid playing) (Game.apnapOrder gs)
 
 -- CR 508.1b: what the active player may announce a chosen creature is attacking,
 -- for ONE defending player -- which player, planeswalker or battle. CR 506.2's
@@ -756,7 +757,7 @@ landwalkAllowsGiven grants pcs attacker gs =
       -- CR 109.5's "you" for the criterion is the ATTACKER's controller and the
       -- source is the attacker, the pairing every keyword-borne Filter takes.
       -- Hoisted, since it does not vary per candidate.
-      context = Filter.contextFor (Projection.controllerOfGiven grants Set.empty attacker gs) (Just attacker)
+      context = Filter.contextFor (Game.teams gs) (Projection.controllerOfGiven grants Set.empty attacker gs) (Just attacker)
       -- The land-ness is asked HERE and never by the criterion: every clause of CR
       -- 702.14c reads "at least one LAND". Load-bearing where the criterion names
       -- no land type at all -- Vectis Gloves' artifact landwalk, Dryad

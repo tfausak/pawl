@@ -110,6 +110,8 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.TeamId as TeamId
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
@@ -148,6 +150,18 @@ threePlayerGame = Setup.emptyGame threePlayers
 oneDefendingPlayer :: GameState.GameState -> GameState.GameState
 oneDefendingPlayer gs =
   gs {GameState.settings = (GameState.settings gs) {GameSettings.attackMultiplePlayers = False}}
+
+-- CR 808.1: the board handed in, played between the teams listed -- one TeamId
+-- per list, in the order given. The one thing that differs from the board handed
+-- in, oneDefendingPlayer's posture, so a free-for-all case and a team case are
+-- the same board twice.
+--
+-- A player named in no list is on no team, which CR 102.3 answers the same way
+-- it answers a player on a team of their own: everybody else is their opponent.
+inTeams :: [[PlayerId.PlayerId]] -> GameState.GameState -> GameState.GameState
+inTeams teams gs =
+  let entries = concat (zipWith (\i team -> fmap (\pid -> (pid, TeamId.MkTeamId i)) team) [0 ..] teams)
+   in gs {GameState.settings = (GameState.settings gs) {GameSettings.teams = Teams.MkTeams (Map.fromList entries)}}
 
 -- A fourth seat, alongside threePlayers, for cases where three seats cannot
 -- distinguish two candidate answers (a departure walk with only one
@@ -1612,7 +1626,7 @@ oneMountainState mountain ph =
             Object.exertedBy = Set.empty
           }
    in GameState.MkGameState
-        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackMultiplePlayers = True},
+        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackMultiplePlayers = True, GameSettings.teams = Teams.none},
           GameState.objects = Map.singleton oid obj,
           GameState.library = Map.empty,
           GameState.hand = Map.singleton alice (Seq.singleton oid),

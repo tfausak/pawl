@@ -187,7 +187,7 @@ belowMaxSpeed =
 inherentPending :: [GameEvent] -> GameState -> [PendingTrigger]
 inherentPending events gs =
   let you = GameState.activePlayer gs
-      opponents = Set.fromList (filter (/= you) (Game.stillPlaying gs))
+      opponents = Set.fromList (Game.opponentsOf you gs)
       -- A PARTIAL case with a wildcard, Pawl.Engine.Monarch.inherentMatch's
       -- posture and not an oversight: this matcher answers about one event shape,
       -- and a new GameEvent constructor is not an event rule 702.179d names.

@@ -449,12 +449,11 @@ playersFor context gs ref =
           you <- Filter.perspective context
           case relation of
             PlayerRelation.You -> Just [you]
-            -- Every other player. Not a two-player shortcut: in a free-for-all
-            -- every other player is an opponent by construction (CR 806.1).
-            -- Only CR 102.3's teammates would break that, and pawl has no teams
-            -- (#175). PlayerRelation.holds is the predicate, so the two arms and
-            -- every reader elsewhere agree on what the relation means.
-            PlayerRelation.Opponent -> Just (filter (PlayerRelation.holds relation you) everyone)
+            -- CR 102.3's every player not on your team, which in a free-for-all
+            -- (CR 806.1) and at two seats (CR 102.2) is every other player.
+            -- PlayerRelation.holds is the predicate, so the two arms and every
+            -- reader elsewhere agree on what the relation means.
+            PlayerRelation.Opponent -> Just (filter (PlayerRelation.holds (Game.teams gs) relation you) everyone)
             -- CR 102.1's whole table, the perspective included -- which is
             -- EachPlayer above, arrived at from the other side. Answered off
             -- `everyone` rather than by consing `you` onto the Opponent set, so a

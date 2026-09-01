@@ -159,8 +159,8 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 --     because that object is leaving; whether the value later reads as "an
 --     opponent" of the new monarch is decided at the next crowning, by
 --     Pawl.Engine.Monarch.crown, under the
---     free-for-all reading recorded there (CR 806.1), whose one exception pawl
---     cannot reach is CR 102.3's teammates (#175). NOT CR 102.2 -- this function
+--     reading recorded there, which is CR 102.3's and takes a teammate out of
+--     the set. NOT CR 102.2 -- this function
 --     only runs behind continuesAfterDeparture, so the game began with more than
 --     two players (CR 800.1).
 --

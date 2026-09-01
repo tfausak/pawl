@@ -310,7 +310,7 @@ inForce gs =
         Just condition ->
           Condition.holds
             (Projection.fullView gs)
-            (Filter.contextFor (Projection.controllerOf source gs) (Just source))
+            (Filter.contextFor (Game.teams gs) (Projection.controllerOf source gs) (Just source))
               { Filter.defendingPlayer = defending
               }
             gs
@@ -597,7 +597,7 @@ cantBeBlockedBy blockers attackers gs =
               wanted = if null changes then criterion else Filter.rewrite changes criterion
               -- Lazy in the power, which a filter naming no source-power atom
               -- never forces.
-              context attacker = Filter.contextComparingPower (Projection.controllerOf attacker gs) attacker (Projection.powerOf attacker gs)
+              context attacker = Filter.contextComparingPower (Game.teams gs) (Projection.controllerOf attacker gs) attacker (Projection.powerOf attacker gs)
               matched attacker blocker = Filter.matches (context attacker) (Projection.viewOfObject blocker gs) wanted
               barred attacker = fmap (\blocker -> (blocker, attacker)) (filter (matched attacker) blockers)
            in concatMap barred (filter (named source subject) attackers)

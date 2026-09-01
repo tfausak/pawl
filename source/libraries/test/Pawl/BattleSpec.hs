@@ -109,6 +109,8 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TeamId as TeamId
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
@@ -192,21 +194,32 @@ candidateSpec s registry = Spec.describe s "Candidates" $ do
     Spec.assertEqWith
       s
       "bob and carol"
-      (Battle.protectorCandidates siege S.alice [S.alice, S.bob, S.carol])
+      (Battle.protectorCandidates Teams.none siege S.alice [S.alice, S.bob, S.carol])
       [S.bob, S.carol]
   Spec.it s "CR 310.9a a battle with no battle types offers only its controller" $ do
     siege <- siegePC s registry
     Spec.assertEqWith
       s
       "alice alone"
-      (Battle.protectorCandidates siege {PC.subtypes = Set.empty} S.alice [S.alice, S.bob, S.carol])
+      (Battle.protectorCandidates Teams.none siege {PC.subtypes = Set.empty} S.alice [S.alice, S.bob, S.carol])
       [S.alice]
   Spec.it s "CR 704.5x a departed player is not a candidate" $ do
     siege <- siegePC s registry
     Spec.assertEqWith
       s
       "carol alone, bob having left"
-      (Battle.protectorCandidates siege S.alice [S.alice, S.carol])
+      (Battle.protectorCandidates Teams.none siege S.alice [S.alice, S.carol])
+      [S.carol]
+  -- CR 102.3 with CR 310.12a: a teammate is not an opponent, so a Siege cannot be
+  -- protected by one. The same board as the first case with one thing changed --
+  -- bob and alice are now on a team -- so the case cannot pass for want of a
+  -- candidate: carol is still offered.
+  Spec.it s "CR 310.12a a Siege does not offer its controller's teammate" $ do
+    siege <- siegePC s registry
+    Spec.assertEqWith
+      s
+      "carol alone, bob being alice's teammate"
+      (Battle.protectorCandidates (Teams.MkTeams (Map.fromList [(S.alice, TeamId.MkTeamId 0), (S.bob, TeamId.MkTeamId 0), (S.carol, TeamId.MkTeamId 1)])) siege S.alice [S.alice, S.bob, S.carol])
       [S.carol]
   -- CR 310.11's second sentence, listed as CR 704.5x's and CR 704.5y's: the branch
   -- that puts the battle into its owner's graveyard. Held HERE rather than at the
@@ -217,18 +230,18 @@ candidateSpec s registry = Spec.describe s "Candidates" $ do
   -- the put-into-graveyard batch whether or not a game can reach it (#853).
   Spec.it s "CR 704.5x a Siege whose controller is alone has no candidate" $ do
     siege <- siegePC s registry
-    Spec.assertEqWith s "nobody" (Battle.protectorCandidates siege S.alice [S.alice]) []
+    Spec.assertEqWith s "nobody" (Battle.protectorCandidates Teams.none siege S.alice [S.alice]) []
   Spec.it s "CR 704.5y a Siege protected by its own controller needs repair" $ do
     siege <- siegePC s registry
     Spec.assertBool
       s
-      (Battle.needsProtector siege S.alice [S.alice, S.bob] False (Just S.alice))
+      (Battle.needsProtector Teams.none siege S.alice [S.alice, S.bob] False (Just S.alice))
       "the controller is not a legal protector of their own Siege"
   Spec.it s "CR 310.11 a legal designation needs no repair" $ do
     siege <- siegePC s registry
     Spec.assertBool
       s
-      (not (Battle.needsProtector siege S.alice [S.alice, S.bob] False (Just S.bob)))
+      (not (Battle.needsProtector Teams.none siege S.alice [S.alice, S.bob] False (Just S.bob)))
       "bob is legal and is left alone"
 
 -- CR 704.5x: the designation is repaired by a state-based action once the
