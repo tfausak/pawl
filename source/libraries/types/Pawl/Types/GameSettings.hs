@@ -33,9 +33,11 @@ data GameSettings = MkGameSettings
     brawl :: Bool,
     -- | CR 806.2b: which of the three attack options this game uses, if any.
     -- 'AttackOption.MultiplePlayers' by default (Pawl.Engine.Setup.newGame),
-    -- and read in one place -- Pawl.Engine.Combat.attackableOpponents, which is
-    -- the candidate list every other combat rule reaches through
-    -- Pawl.Engine.Defender.defendingPlayers.
+    -- and read in two places, both in Pawl.Engine.Combat:
+    -- attackableOpponents cuts the candidate list every other combat rule
+    -- reaches through Pawl.Engine.Defender.defendingPlayers, and
+    -- designateDefenders reads it again to decide whether CR 507.1 has a choice
+    -- to prompt for at all.
     --
     -- Nothing is CR 507.1's free choice among every opponent, which is what CR
     -- 506.2's two-player game plays by and what CR 806.2b forbids at three or
