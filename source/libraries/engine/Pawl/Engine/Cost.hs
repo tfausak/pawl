@@ -551,12 +551,20 @@ plus base extra =
 -- is made separately for each age counter", since a replicated component is
 -- chosen for again when the payment reaches it.
 --
--- N of zero is {0} with no components, which CR 118.5 makes payable, and not
--- CR 118.6's unpayable Nothing. Rule 702.24a cannot reach it -- the counter is
--- put on before the offer -- but Pawl.Types.PayGate.perCounter is stated over
--- every count.
+-- THE FOLD'S UNIT IS TAKEN FROM `cost`, which is the whole of #2875: a cost with
+-- no mana part is CR 118.6's unpayable one, and rule 118.6a says an unpayable
+-- cost that an effect increases or adds to "is still unpayable" -- so scaling one
+-- by any count leaves it unpayable, zero included. A constant `Just
+-- (MkManaCost [])` unit answered {0} at n == 0 whatever it was handed, which
+-- Cost.canPay would then admit; `plus` already carried Nothing through for every
+-- n >= 1, so only the empty fold ever lost it.
+--
+-- N of zero over a PAYABLE cost is {0} with no components, which CR 118.5 makes
+-- payable and is what "for each" of nothing means. Rule 702.24a cannot reach
+-- either zero case -- the age counter is put on before the offer -- but
+-- Pawl.Types.PayGate.perCounter is stated over every count.
 repeated :: Natural -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
-repeated n cost = foldr plus (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) (List.genericReplicate n cost)
+repeated n cost = foldr plus (Cost.MkCost (fmap (const (ManaCost.MkManaCost [])) (Cost.mana cost)) []) (List.genericReplicate n cost)
 
 -- CR 601.2b: substitute the chosen value of X everywhere in this cost -- the mana
 -- part's ManaSymbol.Variable, and the components' CostComponent.PayLifeX. BOTH

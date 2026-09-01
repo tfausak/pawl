@@ -47,6 +47,11 @@ import qualified Pawl.Types.StatedFlip as StatedFlip
 -- Takes a Maybe seat because the entry road's flipper comes from
 -- Projection.controllerOf, which is a Maybe. No seat means no statement can
 -- apply -- rule 705.3's statements are all about a particular player.
+--
+-- Not implemented: CR 614's replacement over the flip, which Krark's Thumb wants
+-- (#2253). The fence is HERE and not in a caller: this is the one road, so a
+-- replacement is wired in once, and a fence sitting in Pawl.Engine.Resolve's
+-- Effect.FlipCoin arm alone read as though the entry road were replaceable.
 flipCoin :: Maybe PlayerId -> Game (CoinFace.CoinFace, Bool)
 flipCoin mFlipper = do
   gs <- State.get

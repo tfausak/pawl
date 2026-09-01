@@ -3305,13 +3305,29 @@ withCountersFilters w =
   concatMap counterKindFilters (Map.keys (WithCounters.counters w))
     <> concatMap quantityFilters (Map.elems (WithCounters.counters w))
 
+-- Both Filter positions a CR 118.12 gate has: the COST the payer is offered,
+-- whose components carry card text (Grist's "sacrifice another creature"), and
+-- CR 702.24a's counter KIND, which CR 122.1b lets carry a whole Keyword. One
+-- function for the same reason riderFilters is one -- the two halves of a gate
+-- must not be swept apart.
+--
+-- UNFRAMED on both counts. Pawl.Engine.Resolve.payGatePaidBy asks
+-- Pawl.Engine.Cost.canPay and counts the source's own counters, and neither read
+-- supplies the host a CR 701.3a question would be asked about, which is what the
+-- other framings mark.
+payGateFilters :: PayGate.PayGate -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+payGateFilters gate =
+  unframed (costFilters (PayGate.cost gate))
+    <> concatMap counterKindFilters (Maybe.maybeToList (PayGate.perCounter gate))
+
 -- CR 122.1b: the one counter kind with a Filter under it, since it carries a
 -- whole Keyword. Exhaustive so a new kind with a payload breaks this build.
 --
 -- EVERY card-authored CounterKind position goes through this, and the list is
 -- greppable rather than asserted: `counterKindFilters` above the effect
--- traversals, plus riderFilters and withCountersFilters, is the whole of the
--- positions that name a KIND; see #2728. The positions that name a NUMBER reach
+-- traversals, plus riderFilters, withCountersFilters and payGateFilters, is the
+-- whole of the positions that name a KIND; see #2728, and #2876 for the gate
+-- position, which was written and unswept. The positions that name a NUMBER reach
 -- it through quantityKindFilters instead, and every traversal that reaches a
 -- Quantity goes through quantityFilters to get there; see #2740.
 --
@@ -5524,6 +5540,9 @@ modalFilters modal =
     ( \mode ->
         concatMap effectFilters (Mode.allEffects mode)
           <> frame Unframed (concatMap conditionFilters (modeClauseConditions mode))
+          -- CR 118.12's gate, the fourth thing a clause carries that a card
+          -- writes filters into (#2876).
+          <> concatMap payGateFilters (Maybe.mapMaybe Clause.payGate (Foldable.toList (Mode.clauses mode)))
           -- THE target-slot-framed position: a mode's own slot, matched by
           -- Pawl.Engine.Target.admittedGiven at both of CR 115's moments.
           <> frame InTargetSlot (concatMap targetSlotFilters (Map.elems (Mode.targetSlots mode)))
@@ -9588,6 +9607,18 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         slot = SlotName.MkSlotName (Text.pack "target")
         anywhere = ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)
         riders = EntryRiders.defaultValue {EntryRiders.counters = Map.singleton kind one}
+        -- CR 118.12's gate, whose counter kind is rule 702.24a's multiplier
+        -- (#2876). Its cost is empty, so the row below reports the KIND rather
+        -- than a walk that found the cost's filters instead.
+        gate =
+          PayGate.MkPayGate
+            { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
+              PayGate.cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [],
+              PayGate.branch = PayBranch.IfNotPaid,
+              PayGate.obligation = PayObligation.Optional,
+              PayGate.perCounter = Just kind,
+              PayGate.offeredAt = Nothing
+            }
         -- The PAIR, not just the Filter: PR #2739's reader's test says a keyword's
         -- own Filter carries KeywordFramed out through every quoting position, and
         -- `frame` fills in only the ones still Unframed, so a position that
@@ -9603,6 +9634,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- traversal that has to reach it. An arm that stops digging names itself.
         walked =
           [ ("EntryRiders' kinds", holds (riderFilters riders)),
+            ("CR 118.12's gate kind", holds (payGateFilters gate)),
             ("Effect.PutCounters' kind", holds (effectFilters (Effect.PutCounters (PutCounters.MkPutCounters kind one anywhere)))),
             ("Effect.RemoveCounters' kind", holds (effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind one slot)))),
             ("Effect.MoveCounters' kinds", holds (effectFilters (Effect.MoveCounters (MoveCounters.MkMoveCounters anywhere (MovedKinds.Named kind one) Nothing anywhere)))),
@@ -9684,6 +9716,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let plainly = base {Face.counterRestrictions = [CounterRestriction.MkCounterRestriction (Affected.Matching (Filter.Type.HasCardType CardType.Creature)) (Just plain)]}
     Spec.assertEqWith s "a prohibition naming a plain kind carries none" (canAttachToSubjectCounts plainly) (0, 0)
     Spec.assertBool s (not (canAttachToSubjectOffends plainly)) "and the lint accepts it"
+    -- The gate's OTHER position, end to end over a printing rather than a
+    -- fixture: Lithophage's "unless you sacrifice a Mountain" writes card text
+    -- into PayGate.cost, and eleven printings write one. That half was unswept
+    -- before #2876 for the same reason the kind was, and a corpus card is the
+    -- evidence a hand-built mode would not be.
+    lithophage <- S.printingOf s registry "Lithophage"
+    Spec.assertBool
+      s
+      (elem (Unframed, Filter.Type.HasSubtype Subtype.Mountain) (cardFilters (S.combinedFace lithophage)))
+      "CR 118.12 a gate cost's own filter reaches cardFilters"
   -- The batch-bound slot lint used to answer two ways about one piece of text.
   -- filterSlotsReadSingly deliberately does not descend into Filter.HasKeyword or
   -- Filter.HasCounters -- a keyword's own Filter is read through

@@ -4996,8 +4996,6 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- why a statement of heads alone still loses this flip against a call of
   -- tails.
   --
-  -- Not implemented: CR 614's replacement over the flip, which Krark's Thumb
-  -- wants (#2253).
   Effect.FlipCoin flipCoin -> do
     gs <- State.get
     called <- Game.choose (Prompt.CallCoin (Decide.deciderFor controller gs) controller)

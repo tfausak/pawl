@@ -1072,6 +1072,44 @@ asmorSpec s registry =
       Spec.assertEqWith s "one spell on the stack" (length (GameState.stack cast)) 1
       Spec.assertEqWith s "the Swamp paid for it" (S.tappedCount S.alice cast) 1
       Spec.assertEqWith s "and it resolved as a 3/3" (entered >>= \oid -> S.powerToughnessOf oid resolved) (Just (3, 3))
+    -- CR 118.6a's FIRST sentence, the half the cases above do not reach: "if an
+    -- unpayable cost is increased by an effect or an additional cost is imposed,
+    -- the cost is still unpayable". Pawl.Engine.Cost.repeated is that kind of
+    -- increase -- rule 702.24a's "[cost] for each age counter on it" -- and it
+    -- answered CR 118.5's payable {0} at a count of zero whatever it was handed
+    -- (#2875).
+    --
+    -- Asmoranomardicadaistinaculdacar's printed cost is the corpus's real
+    -- Nothing, which is why this sits beside its alternative rather than on a
+    -- hand-built value: a fixture asserting Nothing about Nothing would prove
+    -- only the fixture.
+    --
+    -- A REGRESSION FENCE and not a gameplay case, and it cannot be more than
+    -- that today: the only producer of a scaled CR 118.12 cost is
+    -- Pawl.Types.PayGate.perCounter, no card in `data/cards/` writes one, and
+    -- rule 702.24a's own mint puts the age counter on before the offer, so no
+    -- board reaches a count of zero.
+    Spec.it s "CR 118.6a scaling an unpayable cost by any count leaves it unpayable" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      asmorPrinting <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"
+      vultures <- S.printingOf s registry "Circling Vultures"
+      let (asmor, _, gs) = asmorBoard swamp asmorPrinting vultures
+      case Cost.costsFor (S.printingName asmorPrinting) asmor gs of
+        [] -> Spec.assertFailure s "the printed cost was not offered at all"
+        printed : _ -> do
+          Spec.assertEqWith s "the printed cost really is CR 118.6's unpayable one" (Cost.Type.mana printed) Nothing
+          -- The assertion this case exists for, ahead of the counts that were
+          -- already right: ZERO copies.
+          Spec.assertBool s (not (Cost.canPay S.alice asmor (Cost.repeated 0 printed) gs)) "CR 118.6a no copies of it is still unpayable, not {0}"
+          Spec.assertBool s (not (Cost.canPay S.alice asmor (Cost.repeated 1 printed) gs)) "one copy is unpayable"
+          Spec.assertBool s (not (Cost.canPay S.alice asmor (Cost.repeated 3 printed) gs)) "and three"
+          -- The pair that differs in exactly one thing: the same three counts
+          -- over a cost whose mana part is Just, where rule 118.5 makes the empty
+          -- one payable. Without this the fix could have made every count
+          -- unpayable and still been green.
+          let payable = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
+          Spec.assertBool s (Cost.canPay S.alice asmor (Cost.repeated 0 payable) gs) "CR 118.5 no copies of a PAYABLE cost is {0}, which the one Swamp pays"
+          Spec.assertEqWith s "and three copies is {1}{1}{1}" (Cost.Type.mana (Cost.repeated 3 payable)) (Just (ManaCost.MkManaCost (replicate 3 (ManaSymbol.Generic 1))))
 
 -- alice controls Asmoranomardicadaistinaculdacar and, beside it, `foods` Golden
 -- Eggs ({2} Artifact -- Food) and `others` Chromatic Spheres ({1} Artifact, no
