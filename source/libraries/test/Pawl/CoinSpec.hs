@@ -1,9 +1,10 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers: CR 705 FLIPPING A COIN -- Pawl.Types.FlipCoin, Effect.FlipCoin's arm
--- in Pawl.Engine.Resolve, and the Pawl.Types.Prompt / Pawl.Types.Response pairs
--- the call and the flip are externalised through. The transcript legs live in
+-- Covers: CR 705 FLIPPING A COIN -- Pawl.Types.FlipCoin, Pawl.Engine.Coin,
+-- Pawl.Types.StatedFlip, Effect.FlipCoin's arm in Pawl.Engine.Resolve, and the
+-- Pawl.Types.Prompt / Pawl.Types.Response pairs the call and the flip are
+-- externalised through. The transcript legs live in
 -- Pawl.ReplaySpec with the other randomness prompts.
 --
 -- NOT the flip's GameEvent, which Pawl.EventTriggerSpec's PlayerWinsCoinFlip

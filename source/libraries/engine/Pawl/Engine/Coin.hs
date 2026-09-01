@@ -8,9 +8,10 @@
 -- Sentry), which is an entry replacement and so cannot live in Resolve. One
 -- road is what keeps rule 705.3 from having to be written twice.
 --
--- Nothing here decides who WINS: rule 705.2's comparison of the call against the
--- face belongs to the effect that asked for a call, and this module answers only
--- the two questions rule 705.3 lets an effect state.
+-- Rule 705.2's COMPARISON is not here: matching the call against the face
+-- belongs to the effect that asked for a call. This module answers only the two
+-- questions rule 705.3 lets an effect state -- the face, and a win the rule
+-- states outright.
 module Pawl.Engine.Coin where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -66,9 +67,9 @@ statedFor pid gs =
 
 -- | CR 705.3's stated result, out of however many statements apply. The LAST
 -- one, in the timestamp order Pawl.Engine.PlayerEffect.statedFlips returns:
--- rule 705.3 gives no order of its own, and a later effect overriding an earlier
--- one is what CR 613.7a's tie-break does everywhere else a stored effect can
--- disagree with another.
+-- rule 705.3 gives no order of its own, and CR 613.7's timestamp system is what
+-- settles a disagreement everywhere the rules do give one -- later applied last,
+-- so later wins.
 --
 -- UNPROVEN by any board, and it cannot be until a second card states a face:
 -- Edgar, King of Figaro is the only producer, and two Edgars state the same
