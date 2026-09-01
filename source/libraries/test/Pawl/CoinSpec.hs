@@ -259,14 +259,19 @@ statedBoard s registry withEdgar skies = do
 repeatedly :: (a -> a) -> Int -> a -> a
 repeatedly f n x = if n <= 0 then x else repeatedly f (n - 1) (f x)
 
--- Cast each Winter Sky in turn and resolve it, under the ONE pinned answer this
--- group uses: the coin comes up TAILS and alice calls HEADS. That pair loses on
--- its own -- it is the primary leg of the group above -- so every win below is
--- one rule 705.3 stated rather than one the coin produced, and neither the face
--- nor the call can be the thing the board is reading.
-afterSkies :: [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
-afterSkies skyIds board =
-  S.settleSba (foldl (\g i -> S.runPure (flipAnswer CoinFace.Tails CoinFace.Heads) g (S.cast S.alice i >> Stack.resolveTop)) board skyIds)
+-- Cast each Winter Sky in turn and resolve it, with the COIN pinned to tails and
+-- alice's call pinned to `called`. The coin never comes up heads in this group,
+-- so a heads face below is one rule 705.3 stated and never one the coin
+-- produced.
+--
+-- The call is the parameter because Edgar states BOTH halves at once, and the
+-- two halves are told apart by nothing else. A call of HEADS matches the face
+-- Edgar states, so that leg wins whether or not the stated WIN is read; a call
+-- of TAILS does not match it, so that leg wins only through rule 705.3's second
+-- clause.
+afterSkies :: CoinFace.CoinFace -> [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
+afterSkies called skyIds board =
+  S.settleSba (foldl (\g i -> S.runPure (flipAnswer CoinFace.Tails called) g (S.cast S.alice i >> Stack.resolveTop)) board skyIds)
 
 -- One Winter Sky won: 1 damage to each player and each creature, so both Pikers
 -- die, alice's extra creature and bob's Bird Maiden survive, and nobody draws.
@@ -338,27 +343,37 @@ statedFlipSpec s registry = Spec.describe s "StateCoinFlip (CR 705.3)" $ do
     (withEdgar, edgarBoard) <- statedBoard s registry True 1
     (withHelper, plainBoard) <- statedBoard s registry False 1
     -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
-    -- mutation: tails against a call of heads is a LOST flip everywhere else in
-    -- this module, and under Edgar it is won -- "this can cause a player to win
-    -- a flip that couldn't otherwise be won".
+    -- mutation: alice calls TAILS and Edgar states the face is HEADS, so CR
+    -- 705.2's comparison says she LOST -- and rule 705.3's second clause says
+    -- she won anyway, which is the sentence "this can cause a player to win a
+    -- flip that couldn't otherwise be won". Nothing else in this module reaches
+    -- that clause: on every other leg the stated face already matches the call.
     Spec.assertEqWith
       s
-      "CR 705.3: Edgar states the win, so Winter Sky's damage sentence runs"
-      (reading (afterSkies withEdgar edgarBoard))
+      "CR 705.3: the stated win beats a call the stated face does not match"
+      (reading (afterSkies CoinFace.Tails withEdgar edgarBoard))
       wonWithHelper
-    -- The pair, one thing different: the same board with a vanilla creature in
-    -- Edgar's seat, so every column starts where the line above started.
+    -- The same board with the call the coin ACTUALLY came up. Loses without a
+    -- statement and wins with one, which is what the pair below reads.
     Spec.assertEqWith
       s
-      "CR 705.2: with nobody stating a result the same flip is lost"
-      (reading (afterSkies withHelper plainBoard))
+      "CR 705.3: a call of heads against a tails coin wins under Edgar"
+      (reading (afterSkies CoinFace.Heads withEdgar edgarBoard))
+      wonWithHelper
+    -- The pair, one thing different: the same board and the same answers with a
+    -- vanilla creature in Edgar's seat, so every column starts where the line
+    -- above started.
+    Spec.assertEqWith
+      s
+      "CR 705.2: with nobody stating a result that same flip is lost"
+      (reading (afterSkies CoinFace.Heads withHelper plainBoard))
       lostWithHelper
   Spec.it s "CR 705.3 Edgar's statement is spent on the turn's first flip" $ do
     (skyIds, board) <- statedBoard s registry True 2
     Spec.assertEqWith
       s
       "the first flip is won and the second is not"
-      (reading (afterSkies skyIds board))
+      (reading (afterSkies CoinFace.Heads skyIds board))
       firstOnly
   Spec.it s "CR 705.3 reaches the flip CR 705.2 leaves winnerless" $ do
     (edgarSpell, edgarBoard) <- sentryBoard s registry True

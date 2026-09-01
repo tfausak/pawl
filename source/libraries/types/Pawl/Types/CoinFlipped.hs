@@ -19,6 +19,11 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- not the same claim as Just False -- a lost flip is one the flipper called and
 -- missed.
 --
+-- Such a flip still reaches Just True when CR 705.3 states a win, which is
+-- Edgar, King of Figaro and the sentence "this can cause a player to win a flip
+-- that couldn't otherwise be won" -- proved by Pawl.CoinSpec's "CR 705.3 reaches
+-- the flip CR 705.2 leaves winnerless".
+--
 -- NO BOARD TELLS Nothing FROM Just False TODAY.
 -- TriggerCondition.PlayerWinsCoinFlip is the only reader of this field and
 -- answers False to both. What would tell them apart is a "whenever you lose a

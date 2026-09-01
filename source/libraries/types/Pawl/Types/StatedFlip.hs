@@ -23,6 +23,11 @@ data StatedFlip = MkStatedFlip
     -- states every flip. Plain card text narrowing the statement, with no
     -- comprehensive rule behind it -- Pawl.Types.TriggerFrequency says the same
     -- of the trigger side of that phrase.
+    --
+    -- Spent on the first FLIP rather than on the first INSTRUCTION, which is the
+    -- same thing while every instruction flips one coin -- no effect can flip
+    -- more than one (gap #2870), and Edgar's ruling on a five-coin instruction is
+    -- what would tell them apart.
     firstEachTurn :: Bool
   }
   deriving (Eq, Ord, Show)
