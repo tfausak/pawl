@@ -1,0 +1,45 @@
+{
+  "faces": [
+    {
+      "combatRestrictions": [
+        {
+          "type": "CantAttack",
+          "value": {
+            "affected": {
+              "type": "Matching",
+              "value": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Pacifist Avatar",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Vanguard"
+          }
+        ]
+      },
+      "vanguard": {
+        "handModifier": 2,
+        "lifeModifier": 5
+      }
+    }
+  ]
+}
