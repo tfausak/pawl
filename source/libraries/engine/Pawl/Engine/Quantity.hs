@@ -233,12 +233,14 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- despite the mutual recursion -- a Greatest's payload is a strictly smaller
   -- subterm.
   Quantity.Count c -> Count.evaluate viewOf (\mOid' view -> evaluateAgainst viewOf context gs announcedOn mOid' (Just view)) context gs c
-  -- CR 106.4: the mana-pool fold (Pawl.Engine.ManaCount). Takes neither
-  -- injection the Count arm above does: a mana unit has no characteristics for
-  -- the ViewOf to describe, and a ManaCount holds no inner Quantity for the
-  -- reader to evaluate. It still needs the CONTEXT, which is what resolves its
-  -- CR 109.5 "you" -- Omnath, Locus of Mana counts its own controller's pool.
-  Quantity.ManaCount c -> ManaCount.evaluate context gs c
+  -- CR 106.4: the mana-pool fold (Pawl.Engine.ManaCount). Takes the ViewOf but
+  -- not the second injection the Count arm above does: a mana unit has no
+  -- characteristics for a projection to describe, so the view is there only to
+  -- resolve WHOSE pool (CR 613.1b's layer-2 controller), and a ManaCount holds no
+  -- inner Quantity for the reader to evaluate. It still needs the CONTEXT, which
+  -- is what resolves its CR 109.5 "you" -- Omnath, Locus of Mana counts its own
+  -- controller's pool.
+  Quantity.ManaCount c -> ManaCount.evaluate viewOf context gs c
   -- CR 119.1: a player's life total, read STRAIGHT OFF GameState.players at the
   -- moment of the call for the reason the mana-pool arm above is -- CR 119.3
   -- adjusts a life total whenever an effect says so, with no state-based action
@@ -697,7 +699,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
     -- fold's own candidate. That one is answered HERE because this is where the
     -- candidate is: Count.evaluate's Scope.OverPlayers arm hands each candidate
     -- to this reader as a Pawl.Engine.Count.playerView, whose identity IS the
-    -- player, and Count.playersFor holds no view to read it from.
+    -- player, and no id names it for that function's ViewOf to be asked with.
     --
     -- Nothing wherever the evaluation is not aimed at a player -- an object
     -- candidate's view carries no identity, and an evaluation outside a fold
@@ -705,33 +707,25 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
     -- own stated answer there.
     playersOf ref = case ref of
       PlayerRef.Candidate -> fmap pure (mView >>= Filter.playerIdentity)
-      -- The SECOND arm answered here rather than by Count.playersFor, and for a
-      -- neighbouring reason: that function holds no view, and who controls a
-      -- permanent is CR 613.1b's layer-2 question, which only a projection
-      -- answers. The view is the caller's, which is how CR 608.2h reaches this --
+      -- CR 608.2h reaches Count.playersFor's arm through the view passed here --
       -- Spikeshell Harrier reads the speed of the player who controlled the
       -- permanent its own earlier clause has already bounced, and a last-known
       -- aware view is what still names them.
-      --
-      -- Nothing when the slot names no object or the view cannot describe it,
-      -- Candidate's posture: the quantity is unanswered rather than answered off
-      -- the resolving controller.
-      PlayerRef.ControllerOfBound slot ->
-        fmap pure (Filter.slotOneObject slot context >>= viewOf >>= Filter.controller)
-      PlayerRef.EachPlayer -> Count.playersFor context gs ref
-      PlayerRef.EachPlayerExcept _ -> Count.playersFor context gs ref
-      PlayerRef.Relative _ -> Count.playersFor context gs ref
-      PlayerRef.InSlot _ -> Count.playersFor context gs ref
+      PlayerRef.ControllerOfBound _ -> Count.playersFor viewOf context gs ref
+      PlayerRef.EachPlayer -> Count.playersFor viewOf context gs ref
+      PlayerRef.EachPlayerExcept _ -> Count.playersFor viewOf context gs ref
+      PlayerRef.Relative _ -> Count.playersFor viewOf context gs ref
+      PlayerRef.InSlot _ -> Count.playersFor viewOf context gs ref
       -- InSlot's plural, answered there too: the read is off the source's
       -- bindings, which that function holds.
-      PlayerRef.EachInSlot _ -> Count.playersFor context gs ref
-      PlayerRef.Specific _ -> Count.playersFor context gs ref
+      PlayerRef.EachInSlot _ -> Count.playersFor viewOf context gs ref
+      PlayerRef.Specific _ -> Count.playersFor viewOf context gs ref
       -- CR 508.6's set, left with Count.playersFor's Nothing even though the view
       -- IS here: this reference names a set of players and every quantity that
       -- reads one reads exactly one player (see the LifeTotal arm), so answering
       -- it would need a fold this position does not supply. Its reader is
       -- Pawl.Engine.Resolve.playerRefPlayers, which folds (#1441).
-      PlayerRef.Attacking _ -> Count.playersFor context gs ref
+      PlayerRef.Attacking _ -> Count.playersFor viewOf context gs ref
 
     -- Every entry onto the battlefield this log records for one id. A list and not
     -- a Maybe: CR 400.7 makes each arrival a new object, so at most one entry can
