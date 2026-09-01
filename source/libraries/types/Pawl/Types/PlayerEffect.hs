@@ -337,10 +337,11 @@ data PlayerEffect
     -- from everything", or a stated colour -- wants a Filter-carrying constructor
     -- beside this one and has no player-side producer yet (#2229).
     --
-    -- Not implemented: rule 702.16e's "any damage ... is prevented" for a
-    -- protected PLAYER. Rule 702.16e's permanent half is a CR 615.1 shield
-    -- Pawl.Engine.Keyword mints from the keyword, and no segment of
-    -- Pawl.Engine.Replacement.collect reads the CR 613.11 player axis (#2878).
+    -- Rule 702.16e's "any damage ... is prevented" reaches the protected PLAYER
+    -- through Pawl.Engine.Replacement.collect's third segment, which mints a CR
+    -- 615.1 shield off Pawl.Engine.PlayerEffect.protectionCarriers -- the player
+    -- twin of the row Pawl.Engine.Keyword mints from the keyword. Proven by
+    -- Pawl.PlayerEffectSpec's "CR 702.16e" Runed Halo case.
     HasProtectionFromChosenName
   | -- | CR 601.3b / Vedalken Orrery: this player may cast a matching spell as
     -- though it had flash -- which by CR 702.8a and CR 117.1a's first sentence
