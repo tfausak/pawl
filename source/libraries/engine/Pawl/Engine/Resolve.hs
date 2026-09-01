@@ -3732,16 +3732,13 @@ damageSourceCandidates context gs filter_ =
 -- baked ids by the Healing Grace case beside it, the row's captured SLOTS by
 -- Synthetic Communal Bulwark's under Healing Grace, and the DELAYED TRIGGER's
 -- bindings by Come Back Wrong's under Auriok Replica.
+--
+-- The two binding-reading carriers -- the stack's and the delayed trigger's -- also
+-- share one EXCLUSION, stated once at referentsOfBindings below rather than at each
+-- of them: an activated ability's own id is not something it refers to.
 referredToSources :: GameState -> [ObjectId]
 referredToSources gs =
-  -- ITSELF EXCLUDED. Pawl.Engine.Activate binds an activated ability's own id
-  -- under Binding.thisAbility ("this ability"), and a self-reference is not what
-  -- CR 609.7a's third class is about: its second class admits "a spell on the
-  -- stack" and deliberately stops short of an ability, which counting the
-  -- self-binding would undo. Pawl.ReplacementSpec's "CR 609.7a an activated
-  -- ability on the stack is not a spell, so it is not offered as a source" is the
-  -- proof. Harmless for a spell, which the `isSpell` clause above already offers.
-  foldMap (\oid -> filter (/= oid) (foldMap referentsOfObject (Game.lookupObject oid gs))) (GameState.stack gs)
+  foldMap (\oid -> foldMap referentsOfObject (Game.lookupObject oid gs)) (GameState.stack gs)
     <> foldMap (\row -> ActiveReplacement.source row : (referentsOfReplacement (ActiveReplacement.effect row) <> foldMap Set.toList (ActiveReplacement.slots row))) (GameState.replacements gs)
     <> foldMap (\entry -> DelayedTrigger.source entry : referentsOfBindings (DelayedTrigger.bindings entry)) (GameState.delayedTriggers gs)
 
@@ -3822,10 +3819,26 @@ sourceObjectOf src = case src of
 -- multi-target slot away through `onlyOne` -- a spell that targets two creatures
 -- refers to both of them, and CR 609.7a asks for every object referred to.
 -- Player recipients drop out, the rule's classes all being objects.
+--
+-- ONE SLOT IS DROPPED, and by NAME rather than by comparing ids: Binding.thisAbility
+-- holds the activated ability's OWN id (CR 602.2a), which pawl stamps so a card can
+-- read the record of the mana that paid for the activation -- not because any
+-- printed text names the ability as another object. Counting it would undo CR
+-- 609.7a's second class, which admits "a spell on the stack" and deliberately stops
+-- short of an ability.
+--
+-- HERE rather than at the carriers, because two of CR 609.7a's three read bindings
+-- and both were wrong: `referentsOfObject` for an ability still on the stack, and
+-- Effect.ArmDelayedTrigger's captured environment for one that has already ceased,
+-- which is unrestricted by design (CR 603.7c). The third carrier reads
+-- ActiveReplacement.slots, already narrowed to the row's own slot names, so it
+-- never sees this one unless a card writes it -- and then the card really does name
+-- it. Pawl.ReplacementSpec proves both binding carriers, one case each.
 referentsOfBindings :: Map.Map SlotName Binding.Type.Binding -> [ObjectId]
 referentsOfBindings bindings =
-  foldMap (Maybe.mapMaybe Recipient.objectOf . Set.toList) (Binding.targetsOf bindings)
-    <> foldMap Foldable.toList (Binding.groupsOf bindings)
+  let named = Map.delete Binding.thisAbility bindings
+   in foldMap (Maybe.mapMaybe Recipient.objectOf . Set.toList) (Binding.targetsOf named)
+        <> foldMap Foldable.toList (Binding.groupsOf named)
 
 -- The context every effect of a resolution evaluates its quantities and its
 -- ref-borne filters in: CR 109.5's "you" is the resolving controller, the source
