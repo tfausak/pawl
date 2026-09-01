@@ -29,8 +29,11 @@ data CantAttackPlayer = MkCantAttackPlayer
     defenders :: PlayerScope.PlayerScope,
     -- | CR 506.3: which announcements aimed at a player in 'defenders' are
     -- barred -- the seat itself, their planeswalkers, the battles they protect.
-    -- Blazing Archon writes OfPlayer alone, Vow of Flight adds OfPlaneswalker.
-    -- The empty set is a restriction that bars nothing, which no printing writes.
+    -- Blazing Archon writes OfPlayer alone, Vow of Flight adds OfPlaneswalker;
+    -- no card in data/cards writes OfBattle (Scryfall @o:/can't attack
+    -- .*battles/@, 2026-09-01, no hit), so that arm is a regression fence rather
+    -- than a proven behaviour. The empty set bars nothing, which the codec
+    -- accepts as Pawl.Codec.TypeLine accepts an empty required set.
     kinds :: Set AttackTargetKind.AttackTargetKind,
     -- | Nothing is the unconditional restriction. Elided rather than written
     -- null.
