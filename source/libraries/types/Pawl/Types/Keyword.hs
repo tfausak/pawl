@@ -75,8 +75,9 @@ data Keyword
   | -- | 702.16a: four prohibitions under one key -- targeting (702.16b), damage
     -- (702.16e), blocking (702.16f), and attachment (702.16c, 702.16d).
     --
-    -- Rule 702.16j's "protection from everything" is Filter.And [], which no card
-    -- in data/cards/ writes (#2229).
+    -- Rule 702.16j's "protection from everything" is Filter.And [], no variant
+    -- constructor: Progenitus writes it, and Pawl.TargetSpec's "CR 702.16j" and
+    -- Pawl.DamageSpec's "CR 702.16j" prove the targeting and damage halves.
     --
     -- Not implemented: rule 702.16k's "protection from [a player]" -- whose
     -- quality is a PLAYER and not a characteristic, so no Filter says it -- and

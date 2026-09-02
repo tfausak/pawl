@@ -94,6 +94,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
@@ -2482,7 +2483,9 @@ rewriteEffect pairs effect = case effect of
   -- CR 706.1's number of sides is a numeral rather than a computed count; the
   -- modifier added to the result is the Quantity, PutCounters' descent above.
   Effect.RollDie x -> Effect.RollDie x {RollDie.modifier = fmap (rewriteQuantity pairs) (RollDie.modifier x)}
-  Effect.FlipCoin {} -> effect
+  -- The number of coins is the Quantity, PutCounters' descent above; the reading
+  -- and the slot name no word rule 612 can swap.
+  Effect.FlipCoin x -> Effect.FlipCoin x {FlipCoin.count = rewriteQuantity pairs (FlipCoin.count x)}
   Effect.TakeExtraTurn {} -> effect
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (rewriteObjectRef pairs ref))
   -- No ObjectRef to rewrite: the opcode names a library and no objects.
