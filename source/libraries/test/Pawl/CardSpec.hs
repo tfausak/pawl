@@ -898,6 +898,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PermanentsDie _ -> []
   TriggerCondition.PermanentLeavesTheBattlefield _ -> []
   TriggerCondition.PermanentReturnedToHand _ -> []
+  TriggerCondition.PermanentsReturnedToHand _ -> []
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
@@ -3999,6 +4000,10 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 603.6c's bystander form once more, one destination narrower and with
   -- the same kind of Filter, so it is swept the same way.
   TriggerCondition.PermanentReturnedToHand f -> unframed [f]
+  -- CR 603.2c's batch reading of the same form carries the same Filter, swept the
+  -- same way for PermanentsDie's reason: answering [] here would exempt Tameshi,
+  -- Reality Architect's "noncreature permanents" from every corpus filter lint.
+  TriggerCondition.PermanentsReturnedToHand f -> unframed [f]
   TriggerCondition.StateIs condition -> frame Unframed (conditionFilters condition)
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins {} -> []
@@ -4197,6 +4202,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfLeavesTheBattlefield -> []
   TriggerCondition.PermanentLeavesTheBattlefield _ -> []
   TriggerCondition.PermanentReturnedToHand _ -> []
+  TriggerCondition.PermanentsReturnedToHand _ -> []
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []
   -- CR 702.55a names the haunted creature through the haunting object's own
