@@ -105,7 +105,9 @@
                         }
                       }
                     ],
-                    "orElse": 1
+                    "orElse": {
+                      "sibling": 1
+                    }
                   },
                   {
                     "effects": [
@@ -118,7 +120,9 @@
                         }
                       }
                     ],
-                    "orElse": 0
+                    "orElse": {
+                      "sibling": 0
+                    }
                   }
                 ],
                 "targetSlots": {

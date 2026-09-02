@@ -80,7 +80,9 @@
                     }
                   }
                 ],
-                "ifTaken": 1
+                "ifTaken": [
+                  1
+                ]
               }
             ],
             "targetSlots": {

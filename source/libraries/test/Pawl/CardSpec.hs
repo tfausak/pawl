@@ -207,6 +207,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.OrElse as OrElse
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
@@ -2442,12 +2443,14 @@ faceClausePlayerRefs card =
       <> fmap ActivatedAbility.modal (grantedActivatedAbilities card)
       <> fmap TriggeredAbility.modal (grantedTriggeredAbilities card)
 
--- One clause's two: the player CR 118.12's cost is offered to, and the player CR
--- 603.5's "may" is asked of. A clause with no gate offers nobody, and a mandatory
--- one asks nobody.
+-- One clause's three: the player CR 118.12's cost is offered to, the player CR
+-- 603.5's "may" is asked of, and the player CR 608.2d's either-or is announced
+-- by. A clause with no gate offers nobody, a mandatory one asks nobody, and one
+-- printing no either-or has no branch to announce.
 clausePlayerRefs :: Clause.Clause card ability -> [PlayerRef.PlayerRef]
 clausePlayerRefs clause =
   fmap PayGate.payer (Maybe.maybeToList (Clause.payGate clause))
+    <> fmap OrElse.chooser (Maybe.maybeToList (Clause.orElse clause))
     <> case Clause.optionality clause of
       Optionality.Mandatory -> []
       Optionality.Optional ref -> [ref]
@@ -2471,14 +2474,20 @@ cardBranchesAreAsymmetric = any (any modeBranchesOffend . Modal.modes) . faceMod
 
 -- One mode's half of that lint: a clause naming ITSELF offends (there is no pair
 -- to choose between), and so does one whose named sibling is missing or names
--- somebody else.
+-- somebody else. So does a pair whose two halves name different CHOOSERS, the
+-- announcement being made once at whichever branch the resolution reaches first
+-- (Pawl.Engine.Resolve.chosenBranch) -- the loser's own chooser would be data
+-- nothing reads.
 modeBranchesOffend :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 modeBranchesOffend mode =
   let indexed = zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode))
       byIndex = Map.fromList indexed
+      names cIdx chooser = Just (Just (OrElse.MkOrElse cIdx chooser))
       offends (cIdx, clause) = case Clause.orElse clause of
         Nothing -> False
-        Just other -> other == cIdx || fmap Clause.orElse (Map.lookup other byIndex) /= Just (Just cIdx)
+        Just orElse ->
+          OrElse.sibling orElse == cIdx
+            || fmap Clause.orElse (Map.lookup (OrElse.sibling orElse) byIndex) /= names cIdx (OrElse.chooser orElse)
    in any offends indexed
 
 -- Do these slot-name sets overlap? True when any name appears in more than one
@@ -6585,18 +6594,24 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- symmetric, so that each assertion fails for the arm it names: leaving
         -- one clause pointing at a healthy sibling would make the OTHER clause
         -- the offender and the assertion pass without the arm under test.
-        rewrite :: [(Int, Maybe ClauseIndex.ClauseIndex)] -> Face.Face Card.Type.Card
+        rewrite :: [(Int, Maybe OrElse.OrElse)] -> Face.Face Card.Type.Card
         rewrite edits =
           let overClauses clauses = foldr (\(i, orElse) -> Seq.adjust' (\clause -> clause {Clause.orElse = orElse}) i) clauses edits
               overMode mode = mode {Mode.clauses = overClauses (Mode.clauses mode)}
            in face {Face.spell = (Face.spell face) {Modal.modes = fmap overMode (Modal.modes (Face.spell face))}}
-        selfNaming, dangling :: [(Int, Maybe ClauseIndex.ClauseIndex)]
-        selfNaming = [(0, Just (ClauseIndex.MkClauseIndex 0)), (1, Just (ClauseIndex.MkClauseIndex 1))]
-        dangling = [(0, Just (ClauseIndex.MkClauseIndex 7)), (1, Just (ClauseIndex.MkClauseIndex 7))]
+        -- Twiddle's own chooser, the unmarked "you" (CR 405.4): every offender
+        -- below keeps it, so each assertion fails for the arm it names rather
+        -- than for the chooser half.
+        branchTo n = Just (OrElse.MkOrElse (ClauseIndex.MkClauseIndex n) (PlayerRef.Relative PlayerRelation.You))
+        selfNaming, dangling, disagreeing :: [(Int, Maybe OrElse.OrElse)]
+        selfNaming = [(0, branchTo 0), (1, branchTo 1)]
+        dangling = [(0, branchTo 7), (1, branchTo 7)]
+        disagreeing = [(0, Just (OrElse.MkOrElse (ClauseIndex.MkClauseIndex 1) PlayerRef.EachPlayer))]
     Spec.assertBool s (not (cardBranchesAreAsymmetric face)) "Twiddle's tap and untap name each other, and are accepted"
     Spec.assertBool s (cardBranchesAreAsymmetric (rewrite [(1, Nothing)])) "a branch whose sibling names nobody back is rejected"
     Spec.assertBool s (cardBranchesAreAsymmetric (rewrite selfNaming)) "two branches each naming themselves are rejected"
-    Spec.assertBool s (cardBranchesAreAsymmetric (rewrite dangling)) "and branches naming an ordinal no clause has are rejected"
+    Spec.assertBool s (cardBranchesAreAsymmetric (rewrite dangling)) "branches naming an ordinal no clause has are rejected"
+    Spec.assertBool s (cardBranchesAreAsymmetric (rewrite disagreeing)) "and a pair whose halves name different choosers is rejected"
   -- The filing convention, now that no lookup enforces it (#649): a file's stem
   -- must be the slug Registry.filedAs derives from the card inside it.
   --

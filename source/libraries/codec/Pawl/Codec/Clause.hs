@@ -8,6 +8,7 @@ import qualified Pawl.Codec.ClauseIndex as ClauseIndex
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.Optionality as Optionality
+import qualified Pawl.Codec.OrElse as OrElse
 import qualified Pawl.Codec.PayGate as PayGate
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -23,9 +24,9 @@ codec :: (Typeable.Typeable card, Eq card, Typeable.Typeable ability, Eq ability
 codec cardCodec abilityCodec = Fields.object $ do
   condition <- Fields.defaulted "condition" Nothing (Common.maybe Condition.codec) Clause.condition
   effects <- Fields.defaulted "effects" Seq.empty (Common.seq (Effect.codec cardCodec abilityCodec)) Clause.effects
-  ifTaken <- Fields.defaulted "ifTaken" Nothing (Common.maybe ClauseIndex.codec) Clause.ifTaken
+  ifTaken <- Fields.defaulted "ifTaken" Nothing (Common.maybe (Common.nonEmpty ClauseIndex.codec)) Clause.ifTaken
   optionality <- Fields.defaulted "optionality" Optionality.Mandatory Optionality.codec Clause.optionality
-  orElse <- Fields.defaulted "orElse" Nothing (Common.maybe ClauseIndex.codec) Clause.orElse
+  orElse <- Fields.defaulted "orElse" Nothing (Common.maybe OrElse.codec) Clause.orElse
   payGate <- Fields.defaulted "payGate" Nothing (Common.maybe PayGate.codec) Clause.payGate
   pure
     Clause.MkClause

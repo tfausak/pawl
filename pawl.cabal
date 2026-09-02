@@ -585,6 +585,8 @@ library codec
     Pawl.Codec.OnsetSpec
     Pawl.Codec.Optionality
     Pawl.Codec.OptionalitySpec
+    Pawl.Codec.OrElse
+    Pawl.Codec.OrElseSpec
     Pawl.Codec.OutsideObject
     Pawl.Codec.OutsideObjectSpec
     Pawl.Codec.PaidExpiry
@@ -1604,6 +1606,7 @@ library types
     Pawl.Types.Onset
     Pawl.Types.OptionalDecision
     Pawl.Types.Optionality
+    Pawl.Types.OrElse
     Pawl.Types.OutsideCard
     Pawl.Types.OutsideObject
     Pawl.Types.PaidExpiry

@@ -81,6 +81,118 @@
           }
         }
       ],
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": {
+              "phase": {
+                "type": "Beginning",
+                "value": {
+                  "type": "Upkeep"
+                }
+              },
+              "scope": {
+                "type": "EachTurn"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "orElse": {
+                      "chooser": {
+                        "type": "EachPlayer"
+                      },
+                      "sibling": 1
+                    },
+                    "payGate": {
+                      "branch": {
+                        "type": "IfPaid"
+                      },
+                      "cost": {
+                        "components": [
+                          {
+                            "type": "Sacrifice",
+                            "value": {
+                              "count": 2,
+                              "whichPermanents": {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Land"
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "mana": []
+                      },
+                      "payer": {
+                        "type": "EachPlayer"
+                      }
+                    }
+                  },
+                  {
+                    "effects": [
+                      {
+                        "type": "DealDamage",
+                        "value": {
+                          "parts": [
+                            {
+                              "quantity": {
+                                "type": "Literal",
+                                "value": 5
+                              },
+                              "ref": {
+                                "type": "InSlot",
+                                "value": "thoseWhoMay"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ],
+                    "optionality": {
+                      "type": "Optional",
+                      "value": {
+                        "type": "EachPlayer"
+                      }
+                    },
+                    "orElse": {
+                      "chooser": {
+                        "type": "EachPlayer"
+                      },
+                      "sibling": 0
+                    }
+                  },
+                  {
+                    "effects": [
+                      {
+                        "type": "Destroy",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "self"
+                          },
+                          "regenerability": {
+                            "type": "Regenerable"
+                          }
+                        }
+                      }
+                    ],
+                    "ifTaken": [
+                      0,
+                      1
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
       "typeLine": {
         "types": [
           {

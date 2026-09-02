@@ -28,7 +28,9 @@
                     "optionality": {
                       "type": "Optional"
                     },
-                    "orElse": 1
+                    "orElse": {
+                      "sibling": 1
+                    }
                   },
                   {
                     "effects": [
@@ -43,7 +45,9 @@
                     "optionality": {
                       "type": "Optional"
                     },
-                    "orElse": 0
+                    "orElse": {
+                      "sibling": 0
+                    }
                   }
                 ],
                 "targetSlots": {

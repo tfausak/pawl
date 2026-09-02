@@ -99,7 +99,9 @@
                         }
                       }
                     ],
-                    "ifTaken": 0,
+                    "ifTaken": [
+                      0
+                    ],
                     "optionality": {
                       "type": "Optional"
                     }
