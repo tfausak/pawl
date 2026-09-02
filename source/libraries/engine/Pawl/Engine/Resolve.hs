@@ -268,6 +268,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 import qualified Pawl.Types.Toughness as Toughness
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
@@ -2110,7 +2111,7 @@ resolveSpellWith runSubgame oid = do
                                     answers
                                     clause
                             else pure (False, answers)
-                        Monad.when admitted (Monad.mapM_ applyOne (Clause.effects clause))
+                        Monad.when admitted (applyClauseEffects oid applyOne (Foldable.toList (Clause.effects clause)))
                         pure (answers', picked', recordTaken admitted cIdx ran)
                     )
                     (Map.empty, Map.empty, Set.empty)
@@ -2278,7 +2279,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                       -- CR 118.12: then the cost paid on resolution, against the
                       -- START-of-resolution slots.
                       (admitted, answers') <- if taken then payGateAdmits stackId srcId effectController idx cIdx (instanceView legal) answers clause else pure (False, answers)
-                      Monad.when admitted (Monad.mapM_ applyOne (Clause.effects clause))
+                      Monad.when admitted (applyClauseEffects srcId applyOne (Foldable.toList (Clause.effects clause)))
                       pure (answers', picked', recordTaken admitted cIdx ran)
                   )
                   (Map.empty, Map.empty, Set.empty)
@@ -2286,6 +2287,51 @@ resolveModesWith runSubgame stackId srcId modes = do
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (Game.cease stackId)
+
+-- CR 608.2c: one clause's instructions, in written order, carrying the one thing
+-- a later instruction can ask about an earlier one -- whether it HAPPENED. CR
+-- 701.28e is what makes that question observable: an instruction to convert a
+-- permanent that has already converted "is ignored", so a CR 603.12 reflexive
+-- ability armed after it hangs off a trigger event that never occurred, and rule
+-- 603.12 creates it only "based on whether the trigger event or events occurred".
+--
+-- WHAT ANSWERS IT is the event log rather than the opcode: an instruction that
+-- took place recorded a game event, an ignored one recorded none. A board
+-- difference, the posture applyEffectWith's CR 607.2a filing already takes, so
+-- the rules core reads the ACT rather than which effect it was. Ratchet, Field
+-- Medic's two trigger instances are Pawl.TransformSpec's "CR 701.28e / 603.12 an
+-- ignored convert arms no reflexive", the case that proves it.
+--
+-- Not implemented: only the instruction IMMEDIATELY before the arm is asked
+-- about, and an instruction that happens without recording a game event would
+-- suppress an arm that follows it; no card in `data/cards/` writes either shape
+-- (#3057).
+applyClauseEffects ::
+  ObjectId ->
+  (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()) ->
+  [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] ->
+  Game ()
+applyClauseEffects source applyOne = Monad.foldM_ step True
+  where
+    step happened effect = do
+      skipped <- if happened then pure False else State.gets (armsReflexive source effect)
+      before <- State.gets (Seq.length . GameState.events)
+      Monad.unless skipped (applyOne effect)
+      after <- State.gets (Seq.length . GameState.events)
+      pure (after > before)
+
+-- CR 603.12: does this instruction create a REFLEXIVE triggered ability? The name
+-- is resolved exactly as the arm itself resolves it (declaredDelayedAbility, then
+-- rule 702's minted roster), and the answer is the created ability's own
+-- CLASSIFICATION -- its trigger condition -- never which card armed it.
+armsReflexive :: ObjectId -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> GameState -> Bool
+armsReflexive source effect gs = case effect of
+  Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name _ _) ->
+    maybe
+      False
+      ((== TriggerCondition.Reflexive) . TriggeredAbility.condition)
+      (declaredDelayedAbility source name gs <|> Keyword.mintedDelayedAbility name)
+  _ -> False
 
 -- CR 608.2c: does this clause's printed "If you do" hold? A clause naming no
 -- earlier one always happens; one that names an earlier clause of this mode

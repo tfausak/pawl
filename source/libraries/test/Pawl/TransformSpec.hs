@@ -1513,22 +1513,24 @@ playMedic decision wanted spellId gs =
 -- gained this turn from your graveyard to the battlefield tapped" (Oracle text
 -- re-fetched from Scryfall).
 --
--- Four limbs, and each case says which it is about: the "may" is offered and
+-- Five limbs, and each case says which it is about: the "may" is offered and
 -- declining it does nothing; taking it turns the permanent over; the reflexive's
 -- slot admits an artifact card within the life gained THIS TURN and not one
--- above it; and what comes back arrives tapped.
+-- above it; what comes back arrives tapped; and a convert CR 701.28e ignores arms
+-- no reflexive at all.
 --
 -- Celestine, the Living Saint proves the bound off a slot the engine matches at
 -- CR 601.2c; this group proves it off one CR 603.3d fills, which is a different
 -- door into Pawl.Engine.Target.slotContext.
 --
--- Not implemented: the reflexive is created whenever the CR 603.5 "may" is taken,
--- so a convert CR 701.28e would have IGNORED still arms it (#2541). Nothing in
--- `data/cards/` can turn Ratchet over in that window, so no board here tells the
--- two readings apart.
+-- CR 701.28e's ignore is the fifth limb, and Ratchet is its own producer: two
+-- instances of the trigger reach the stack together off two lifelink sources, and
+-- the second's convert is ignored. "CR 701.28e / 603.12 an ignored convert arms no
+-- reflexive" is what proves the arm hangs on the act rather than on the CR 603.5
+-- answer (Pawl.Engine.Resolve.applyClauseEffects).
 gainLifeConvertSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 gainLifeConvertSpec s registry = Spec.describe s "GainLifeConvert" $ do
-  -- THE proving case: all four limbs on one board. alice casts Blossoming Calm
+  -- THE proving case: the first four limbs on one board. alice casts Blossoming Calm
   -- ({W} instant, "you can't be the target of spells or abilities your opponents
   -- control until your next turn. You gain 2 life"), gains 2, takes the "may",
   -- and the reflexive returns the mana value 2 artifact tapped.
@@ -1626,6 +1628,43 @@ gainLifeConvertSpec s registry = Spec.describe s "GainLifeConvert" $ do
     -- The other half of the pair: the same board, the same seat, the same one
     -- white mana, a spell that gains life -- and the question IS asked.
     Spec.assertEqWith s "while the life-gaining instant on that same board asks it" gainsAsked 1
+  -- CR 701.28e's ignore, on the one board `data/cards/` reaches it with: Ratchet
+  -- attacks beside Child of Night, both lifelink, and CR 702.15e records a gain
+  -- per source (Pawl.EventTriggerSpec's lifelinkGainEventsSpec), so TWO instances
+  -- of the front face's trigger sit on the stack together. The first converts
+  -- Ratchet and its reflexive returns the Weathervane; the second's convert is
+  -- ignored, Ratchet having converted since that instance went onto the stack, so
+  -- CR 603.12's trigger event never occurred and no second reflexive is created.
+  --
+  -- TWO in-range artifact cards, which is what makes the second resolution
+  -- observable: the life gained this turn is 4, so the Jade Statue is a legal
+  -- target for a reflexive that should not exist, and a graveyard holding one
+  -- artifact would have hidden the difference behind CR 603.3d instead.
+  Spec.it s "CR 701.28e / 603.12 an ignored convert arms no reflexive" $ do
+    ratchet <- S.printingOf s registry "Ratchet, Field Medic"
+    child <- S.printingOf s registry "Child of Night"
+    weathervane <- S.printingOf s registry "Arcum's Weathervane"
+    statue <- S.printingOf s registry "Jade Statue"
+    let (board, ours, _) = S.combatBoardOf [ratchet, child] []
+        (weathervaneId, withOne) = S.addGraveyardCard weathervane S.alice board
+        (_, staged) = S.addGraveyardCard statue S.alice withOne
+        -- Takes every "may" and pins the reflexive's target at the Weathervane,
+        -- filtering the offer rather than building a recipient (CR 608.2b). A
+        -- second reflexive could only reach the Statue, the Weathervane having
+        -- left the graveyard, so the two resolutions are distinguishable to a
+        -- pure answerer.
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+          Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just weathervaneId) . Recipient.objectOf) sets
+          _ -> S.aggressiveAnswer p
+        after = S.runCombat answer staged
+    Spec.assertEqWith s "CR 701.28e the second trigger's convert was ignored, so the mana value 4 artifact stayed in the graveyard" (battlefieldAndGraveyard statue after) stillInGraveyard
+    Spec.assertEqWith s "the FIRST trigger's reflexive still returned the mana value 2 artifact tapped" (battlefieldAndGraveyard weathervane after) returnedTapped
+    -- Ratchet is the first creature combatBoardOf placed, so `take 1` names it
+    -- and a board that had lost it would read as [] rather than as somebody else.
+    Spec.assertEqWith s "Ratchet converted once and stayed on its back face" (fmap (\oid -> ratchetReadings oid after) (take 1 ours)) [ratchetBackReadings]
+    Spec.assertEqWith s "both lifelink sources connected, so alice gained 2 twice" (S.lifeOf S.alice after) (Just 24)
 
 -- CR 613.7g: "a double-faced permanent receives a new timestamp each time it
 -- transforms or converts". Rule 712.18 says the permanent is not a new object,
