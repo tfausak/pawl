@@ -4030,8 +4030,14 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
 -- by the bestow ability are evaluated to determine if it can be cast". That gate
 -- runs one step ahead of rule 601.2a's move, on the card where it lies, so
 -- Pawl.Engine.Cast.proposedFor stamps a candidate-local copy of the board there
--- and this walk is what makes the stamp visible. The library is absent because
--- nothing can cast from it (#2360).
+-- and this walk is what makes the stamp visible.
+--
+-- Not implemented: the library, which castZones leaves out and this walk
+-- therefore does not reach. Casting from it is not impossible -- Panglacial
+-- Wurm's CR 601.3 exception is Pawl.Engine.Cast.castableWhileSearching, scoped
+-- to a search in progress -- so the gap is card-driven rather than
+-- rules-enforced: no bestow card in data/cards/ carries that permission, so a
+-- stamp this walk cannot see would skip CR 702.103d with nothing red (#2920).
 --
 -- A card in one of those zones takes its OWN timestamp here, where the stack
 -- incarnation takes the new and later one CR 613.7d gives it at the move. The two
