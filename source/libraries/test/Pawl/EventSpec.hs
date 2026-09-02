@@ -23,6 +23,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -187,6 +188,44 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
         after = S.runPure S.identityAnswer gone (Event.createTokens S.bob goblinCard Nothing 2 TapState.Untapped Map.empty)
     Spec.assertEqWith s "bob's two tokens exist" (Game.objectCount after) (before + 2)
     Spec.assertEqWith s "both on the battlefield" (Set.size (GameState.battlefield after)) 2
+
+  -- The other creation funnel, one rule over. CR 800.4d: "If an object that
+  -- would be owned by a player who has left the game would be created in any
+  -- zone, it isn't created." A conjured card is owned by the conjuring player,
+  -- so neither road creates one for a departed seat -- and the rule is CR 800.4d
+  -- rather than the token case's CR 800.4b, whose remedy is that the object
+  -- remains in its current zone: a conjured card is in no zone to remain in.
+  --
+  -- Both roads on ONE departed board, because the guard is one read of one
+  -- parameter and the two funnels differ only in what they do after it.
+  Spec.it s "CR 800.4d no card is conjured under a player who has left the game" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let goblinCard = Printing.card piker
+        gone = S.departs Departure.Type.Conceded S.alice S.threePlayerGame
+        before = Game.objectCount gone
+        ontoBattlefield = S.runPure S.identityAnswer gone (Event.conjureOntoBattlefield S.alice goblinCard 2)
+        intoHand = S.runPure S.identityAnswer gone (Event.conjure S.alice goblinCard Zone.Hand LibraryPosition.defaultValue)
+    Spec.assertBool s (notElem S.alice (Game.stillPlaying gone)) "alice really has left"
+    Spec.assertEqWith s "nothing reached the battlefield" (Set.size (GameState.battlefield ontoBattlefield)) 0
+    Spec.assertEqWith s "and nothing reached her hand" (length (Game.zoneMembers Zone.Hand S.alice intoHand)) 0
+    -- Not "created and then removed": the object count never moved, which a
+    -- clean-up implementation would fail.
+    Spec.assertEqWith s "no object was ever minted, by either road" (Game.objectCount ontoBattlefield, Game.objectCount intoHand) (before, before)
+
+  -- The other half of the guard, the token pair's: on the SAME departed board,
+  -- bob is unaffected, so neither case above can pass by refusing every conjure
+  -- or by reading the wrong seat. Two independent runs off that one board, so
+  -- the hand and the battlefield counts are not a running total.
+  Spec.it s "CR 800.4d a player still in the game still gets their conjured cards" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let goblinCard = Printing.card piker
+        gone = S.departs Departure.Type.Conceded S.alice S.threePlayerGame
+        before = Game.objectCount gone
+        ontoBattlefield = S.runPure S.identityAnswer gone (Event.conjureOntoBattlefield S.bob goblinCard 2)
+        intoHand = S.runPure S.identityAnswer gone (Event.conjure S.bob goblinCard Zone.Hand LibraryPosition.defaultValue)
+    Spec.assertEqWith s "bob's two conjured cards are on the battlefield" (Set.size (GameState.battlefield ontoBattlefield)) 2
+    Spec.assertEqWith s "and the other road put one in his hand" (length (Game.zoneMembers Zone.Hand S.bob intoHand)) 1
+    Spec.assertEqWith s "minted by both roads" (Game.objectCount ontoBattlefield, Game.objectCount intoHand) (before + 2, before + 1)
 
   Spec.it s "CR 111.2 createTokens puts a token on the battlefield and emits an enters event" $ do
     piker <- S.printingOf s registry "Goblin Piker"
