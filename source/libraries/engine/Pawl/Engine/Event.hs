@@ -9080,7 +9080,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- loss of more than 0.
   --
   -- GAINING life is a different event, not a signed version of this one: one
-  -- damage event can record a loss and a lifelink gain together, and only the
+  -- lifelink source's damage can record a loss and a gain together, and only the
   -- loss fires this.
   TriggerCondition.PlayerLosesLife relation -> case event of
     GameEvent.LifeLost (LifeChange.MkLifeChange pid _) -> PlayerRelation.holds (Game.teams gs) relation you pid
