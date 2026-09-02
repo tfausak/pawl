@@ -621,8 +621,8 @@ performStateBasedActions = Event.simultaneously $ do
       pcs = Projection.projectAll gs
       -- The other two whole-board walks the pass shares, beside `pcs` and for the
       -- same CR 704.3 reason: the filtered-enchant fallthrough in fallsOff below
-      -- took a fresh gather, control-grant walk and base-pool build PER Aura
-      -- (#430). Both stay THUNKS -- a board with no filtered Aura on it forces
+      -- took a fresh gather, control-grant walk and base-pool build PER Aura --
+      -- see #430. Both stay THUNKS -- a board with no filtered Aura on it forces
       -- neither -- which is the posture Target.legalRecipientsGiven argues for.
       grants = Projection.controlGrants gs
       pools = Target.poolsGiven pcs gs

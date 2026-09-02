@@ -1038,7 +1038,7 @@ stillLegal perspective bindings source recipient slot gs =
 -- `pcs`, `grants` and `pools` are one whole-board projection, one control-grant
 -- walk and one set of base pools, and Pawl.Engine.Sba.stillLegalEnchant's CR
 -- 704.3 pre-pass has them in hand. Letting this rebuild them was one fresh gather
--- per filtered Aura per state-based-action pass (#430). It changes no answer, for
+-- per filtered Aura per state-based-action pass; see #430. It changes no answer, for
 -- the reason at Projection.projectGiven: caller and callee are pure functions of
 -- the same GameState.
 stillAdmitted :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> ObjectId -> Recipient -> TargetSlot -> GameState -> Bool

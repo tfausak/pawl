@@ -5251,7 +5251,7 @@ replacementsOf = replacementsOfGiven Map.empty
 
 -- The same rows off a board the CALLER has already projected. replacementsAffecting
 -- is why it exists: its walk asks this of every battlefield permanent, and a fresh
--- `project` apiece is one gather per permanent (#435). projectGiven is the snapshot
+-- `project` apiece was one gather per permanent; see #435. projectGiven is the snapshot
 -- argument, and the empty map above is its own fallback.
 replacementsOfGiven :: Map ObjectId ProjectedCharacteristics -> Zone.Zone -> ObjectId -> GameState -> [(ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
 replacementsOfGiven pcs zone oid gs =
@@ -5588,7 +5588,7 @@ replacementsAffecting gs =
           -- whole.
           || any (any grantsMintingType . StaticAbility.modifications) (staticAbilitiesOf oid gs)
       -- ONE whole-board projection for the whole walk rather than one gather per
-      -- permanent (#435), and a THUNK: the short-circuit below is what decides
+      -- permanent -- see #435 -- and a THUNK: the short-circuit below is what decides
       -- whether any of it is forced, so a board carrying no replacement effect
       -- still pays nothing. Same answers, for the reason at projectGiven -- this
       -- and replacementsOfGiven are pure functions of the same GameState.
