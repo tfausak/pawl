@@ -8,6 +8,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -40,6 +41,7 @@ spec s = Spec.describe s "Pawl.Codec.GrantedAbility" $ do
               (Cost.MkCost Nothing [CostComponent.TapThis])
               emptyModal
               []
+              Activator.Controller
               Nothing
               Nothing
           )

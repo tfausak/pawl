@@ -282,7 +282,7 @@ legalActions pid gs =
       activations =
         let forObject oid =
               fmap (Action.Activate oid) (filter (\ab -> Activate.activatableGiven grants pcs pools supplySources pid oid ab gs) (Activate.abilitiesForGiven pcs oid gs))
-         in concatMap forObject (Projection.controlsGiven grants pid gs <> Game.zoneMembers Zone.Hand pid gs <> Game.zoneMembers Zone.Graveyard pid gs)
+         in concatMap forObject (Activate.activationSourcesGiven grants pcs pid gs)
       -- CR 605.3a's first window -- "a player may activate an activated mana
       -- ability whenever they have priority" -- which the activation list above
       -- cannot serve: Activate.activatableGiven refuses a mana ability outright,

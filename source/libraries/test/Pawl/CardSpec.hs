@@ -65,6 +65,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
@@ -2756,6 +2757,7 @@ oneEffectActivated mana effect =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [],
+      ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
       ActivatedAbility.name = Nothing
     }
@@ -2779,6 +2781,7 @@ modalActivated modes =
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
       ActivatedAbility.modal = Modal.MkModal (Seq.fromList modes) (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [],
+      ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
       ActivatedAbility.name = Nothing
     }
@@ -9804,7 +9807,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- may carry is a separate question and is not tagged with it.
         alternatively = base {Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing sacrificeCost]}
         -- CR 602.2b, paid as the ability is activated -- after CR 601.2c too.
-        activating = base {Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility sacrificeCost (spellOf []) [] Nothing Nothing]}
+        activating = base {Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility sacrificeCost (spellOf []) [] Activator.Controller Nothing Nothing]}
         -- CR 116.2d: a special action uses no stack (CR 116.1), so no
         -- announcement could answer in any engine.
         ignoring = base {Face.specialActions = [SpecialAction.IgnoreThisUntilEndOfTurn sacrificeCost]}
