@@ -194,6 +194,18 @@ the commonest cause is a tool timeout reaping a backgrounded `cabal`. Tell
 agents to run `cabal` in the foreground with a generous timeout, and never to
 `pkill` by pattern.
 
+**Reap after every merge.** A finished unit leaves a worktree under
+`.claude/worktrees/`, its placeholder `worktree-agent-*` branch, the unit's own
+branch, and often a `cabal` process stalled on the semaphore at 0% CPU. None of
+it goes away on its own, and a stalled `cabal` keeps a build slot the live lanes
+need. Once a unit's PR is merged, from the primary checkout: `git worktree
+remove --force` its worktree (unlock first), `git worktree prune`, `git fetch
+--prune`, then delete every local branch whose upstream is `[gone]` or that has
+no commit beyond `origin/main`, skipping any branch a live worktree has checked
+out. Kill a stalled `cabal` by its PID after `lsof -p <pid> -d cwd` shows a
+finished worktree, never by pattern. Leave any branch you did not create that
+still carries commits, and say so; the owner keeps review branches.
+
 **Merging.** Arm auto-merge (squash) on each PR. The ruleset requires branches
 be up to date, so every merge invalidates every other armed PR and the queue
 drains at exactly one per CI cycle however many are open. Since PR #2794 that
