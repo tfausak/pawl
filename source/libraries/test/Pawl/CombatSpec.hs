@@ -4473,8 +4473,11 @@ storedClassAttackRestrictionSpec s registry = Spec.describe s "StoredClassAttack
     Spec.assertEqWith s "both Pikers are still offered" (Combat.legalAttackers S.bob declaring) [early, late]
     Spec.assertEqWith s "one row was stored, a class aimed at alice's seat" (fmap ActiveAttackProhibition.affected (GameState.attackProhibitions declaring)) [RestrictedCreatures.Matching (Filter.HasCardType CardType.Creature)]
   -- CR 611.2a: "until your next turn" is Expiry.AtTurnOf alice, so the row
-  -- survives bob's whole turn and carol's, and is gone as alice's begins. Through
-  -- Engine.handoffTurn, the road Pawl.Engine.Expiry.dropAtTurnOf fires on.
+  -- survives alice's own cleanup, bob's whole turn and carol's, and is gone as
+  -- alice's begins. Through Engine.handoffTurn, the road
+  -- Pawl.Engine.Expiry.dropAtTurnOf fires on, with CR 514.2's sweep run ahead of
+  -- each handoff -- which is what tells this duration from "this turn": under
+  -- Expiry.AtCleanup the row is gone before bob's turn ever begins.
   Spec.it s "CR 611.2a the restriction outlasts every other seat's turn and ends as alice's begins" $ do
     (_, late, restricted, _, _) <- escapeBoards s registry
     let carolsTurn = handoff restricted
@@ -4541,10 +4544,13 @@ bobDeclaring gs =
       GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.alice, S.carol]}
     }
 
--- CR 500.7: this turn over, the next seat's begins. Pawl.ExpirySpec's helper of
--- the same name, duplicated rather than hoisted.
+-- CR 514.2 then CR 500.7: this turn's cleanup sweep, then the next seat's turn
+-- begins. Engine.handoffTurn is the seat walk alone, so the sweep is stated --
+-- without it a "this turn" row would survive into bob's turn and every case
+-- above would be green under Expiry.AtCleanup. Pawl.ExpirySpec's helper of the
+-- same name with the sweep folded in, duplicated rather than hoisted.
 handoff :: GameState.GameState -> GameState.GameState
-handoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
+handoff gs = S.runPure S.identityAnswer (Expiry.dropAtCleanup gs) Engine.handoffTurn
 
 mainPhaseFor :: GameState.GameState -> GameState.GameState
 mainPhaseFor gs =
