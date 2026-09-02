@@ -1303,6 +1303,11 @@ processDamage events = do
   -- either way and CR 603.3b lets their controller order them; what this fixes is
   -- the canonical order the prompt indexes into.
   --
+  -- One record per APPLICATION, never per recipient: groupPreventions has already
+  -- collapsed the batch to CR 615.13's own unit, and the record carries the whole
+  -- per-recipient map so that a trigger scoped to one of them can still read its
+  -- share.
+  --
   -- And only the applications that PREVENTED something are recorded, which is CR
   -- 615.13's own condition: such an ability triggers each time a prevention
   -- effect is applied to one or more simultaneous damage events "and prevents
@@ -1317,7 +1322,7 @@ processDamage events = do
     ( \gs ->
         let marked = List.foldl' markOne gs survivors
             tallied = List.foldl' tallyOne marked survivors
-            noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (Prevention.by p) (Prevention.source p) (Prevention.recipient p) (Prevention.amount p))) g) tallied (filter (\p -> Prevention.amount p > 0) prevented)
+            noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (Prevention.by p) (Prevention.source p) (Prevention.amounts p))) g) tallied (filter (\p -> sum (Prevention.amounts p) > 0) prevented)
             dealt = List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) noted survivors
          in -- CR 119.2's life loss is recorded AFTER the damage that caused it,
             -- which is the same reasoning the prevention/damage order above

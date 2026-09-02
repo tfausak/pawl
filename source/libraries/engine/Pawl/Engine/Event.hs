@@ -54,6 +54,7 @@ import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
@@ -8879,18 +8880,28 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- count.
   --
   -- Damage prevented to a PERMANENT is silence rather than a miss: the printed
-  -- sentence says "to you", and the recipient the event carries is what
-  -- distinguishes the two.
+  -- sentence says "to you", and the recipients the event carries are what
+  -- distinguishes the two. One record can hold BOTH, a shield covering a player
+  -- and their permanents being one application (Divine Deflection), so the match
+  -- is over the map's player entries rather than over a single recipient.
+  --
+  -- ABOVE 0, which is CR 615.12's case one recipient at a time: an application
+  -- that was inert against the damage aimed at this player prevented none of it,
+  -- however much of the same batch it stopped elsewhere, and rule 615.13 fires
+  -- only where some was prevented.
   TriggerCondition.DamageToPlayerPrevented relation -> case event of
-    GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented _ _ recipient _) -> case recipient of
-      Recipient.ToPlayer pid -> PlayerRelation.holds (Game.teams gs) relation you pid
-      Recipient.ToCreature _ -> False
-      Recipient.ToPlaneswalker _ -> False
-      Recipient.ToBattle _ -> False
-      Recipient.ToObject _ -> False
-      -- Unreachable: CR 406.4's pile is a candidate at CR 601.2c and never
-      -- something damage is dealt to.
-      Recipient.ToPile _ -> False
+    GameEvent.DamagePrevented prevented ->
+      let admits (recipient, amount) =
+            amount > 0 && case recipient of
+              Recipient.ToPlayer pid -> PlayerRelation.holds (Game.teams gs) relation you pid
+              Recipient.ToCreature _ -> False
+              Recipient.ToPlaneswalker _ -> False
+              Recipient.ToBattle _ -> False
+              Recipient.ToObject _ -> False
+              -- Unreachable: CR 406.4's pile is a candidate at CR 601.2c and
+              -- never something damage is dealt to.
+              Recipient.ToPile _ -> False
+       in any admits (Map.toList (DamagePrevented.amounts prevented))
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -11583,18 +11594,32 @@ eventBindings gs bearerBecame cond event = case (cond, event) of
   -- an AMOUNT rather than a reference, read back by Quantity.InSlot off the stack
   -- object these bindings are stamped on (see Binding.eventAmount).
   --
+  -- The PLAYER share of the record, not the whole of it: one application can
+  -- cover a player and their permanents at once (Divine Deflection), and the
+  -- printed sentence this condition spells says "damage that would be dealt to
+  -- you", so what was stopped on the way to a permanent is no part of "that
+  -- many".
+  --
+  -- Not implemented: the relation is not re-asked here, so one application
+  -- covering TWO players where the relation admits only one reports both their
+  -- shares (#3079). Nothing in data/cards/ prints such a shield -- every
+  -- multi-recipient one covers its own controller and objects.
+  --
   -- The recipient is NOT bound alongside it. Every payload this CONDITION
   -- carries acts on the ability's own source (Selfless Squire counters itself),
   -- and the player the recipient names here is CR 109.5's "you", already bound.
-  (TriggerCondition.DamageToPlayerPrevented _, GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented _ _ _ amount)) ->
-    Binding.setEventAmount amount Map.empty
+  (TriggerCondition.DamageToPlayerPrevented _, GameEvent.DamagePrevented prevented) ->
+    Binding.setEventAmount (sum (Map.filterWithKey (\recipient _ -> Maybe.isJust (Target.playerOf recipient)) (DamagePrevented.amounts prevented))) Map.empty
   -- CR 615.13's "that much" once more, off the same event and into the same
   -- reserved slot: the Vindicator deals what its own prevention stopped. The
-  -- recipient is not bound alongside it for the arm above's reason -- the payload
+  -- WHOLE record here where the arm above takes the player share, this condition
+  -- being scoped to the applying instance rather than to a recipient.
+  --
+  -- The recipient is not bound alongside it for the arm above's reason -- the payload
   -- acts on a target it chooses, never on whoever the prevented damage was
   -- addressed to.
-  (TriggerCondition.SelfPreventsDamage _, GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented _ _ _ amount)) ->
-    Binding.setEventAmount amount Map.empty
+  (TriggerCondition.SelfPreventsDamage _, GameEvent.DamagePrevented prevented) ->
+    Binding.setEventAmount (sum (DamagePrevented.amounts prevented)) Map.empty
   -- CR 119.9's "that much": how much life the gain was, which CR 603.2 makes part
   -- of the event that fired the trigger -- Sanguine Bond's "target opponent loses
   -- that much life". The SAME slot the prevention arm above stamps, one printed
@@ -12781,9 +12806,10 @@ batchScoped condition = case condition of
   TriggerCondition.SpellOrAbilityCounters _ -> False
   TriggerCondition.DamageToPlayerPrevented _ -> False
   -- Per PREVENTION, which is what the record already is: groupPreventions
-  -- collapsed the batch to one entry per applying instance, so rule 615.13's "one
-  -- or more simultaneous damage events" is spent before this is asked -- the
-  -- DamageToPlayerPrevented arm above's reasoning, one identity over.
+  -- collapsed the batch to one entry per applying instance -- over recipients as
+  -- well as events -- so rule 615.13's "one or more simultaneous damage events"
+  -- is spent before this is asked; the DamageToPlayerPrevented arm above's
+  -- reasoning, one identity over.
   TriggerCondition.SelfPreventsDamage _ -> False
   TriggerCondition.PlayerGainsLife _ -> False
   -- The one True that is not about objects: "whenever one or more players gain
@@ -12957,6 +12983,13 @@ eventTriggers events gs =
       -- clause is not implemented (#2502) -- `enchantedObjectLeaves` below
       -- reads only its Aura half -- so filtering there would read the rule's
       -- first sentence without the exception that governs this arm.
+      --
+      -- The delayed map is the HOST's own face while `abilitiesOf` is the
+      -- PROJECTED list, so an ability granted by another object that arms a
+      -- delayed trigger the GRANTOR declared resolves to no name here and takes
+      -- CR 113.6's battlefield default. Nothing in data/cards/ grants an ability
+      -- that arms one; Pawl.Engine.Activate.abilitiesForGiven carries the same
+      -- pairing and the same note.
       battlefieldAbilitiesOf oid pc = filter (functionsIn (Game.delayedAbilitiesOf oid gs) Zone.Battlefield) (abilitiesOf pc)
       -- CR 603.10's first sentence, per EVENT GROUP: the permanents that existed
       -- immediately after the event, with the abilities and the CR 603.3a
@@ -14741,8 +14774,11 @@ delayedPending grouped gs =
       -- events occurred earlier during the resolution of the spell or ability
       -- that created them" -- which is a question about the resolution that is
       -- over, not about this batch's log. Pawl.Engine.Resolve appends such an
-      -- entry only from the CR 118.12 pay-gate branch that actually ran, so the
-      -- entry's EXISTENCE is the affirmative answer and no event is needed. It
+      -- entry only where that question was answered yes -- from the CR 118.12
+      -- pay-gate branch that actually ran, and from
+      -- Resolve.applyClauseEffects, which skips the arm when the preceding
+      -- instruction recorded no event (CR 603.12, 701.28e) -- so the entry's
+      -- EXISTENCE is the affirmative answer and no event is needed. It
       -- therefore fires at the first gather after it was armed, which CR 603.3
       -- makes the next time a player would receive priority.
       --

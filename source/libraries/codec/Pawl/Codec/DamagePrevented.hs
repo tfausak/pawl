@@ -17,12 +17,10 @@ codec :: Codec.Codec DamagePrevented.DamagePrevented
 codec = Fields.object $ do
   by <- Fields.required "by" CandidateId.codec DamagePrevented.by
   source <- Fields.required "source" ObjectId.codec DamagePrevented.source
-  recipient <- Fields.required "recipient" Recipient.codec DamagePrevented.recipient
-  amount <- Fields.required "amount" Common.natural DamagePrevented.amount
+  amounts <- Fields.required "amounts" (Common.multiset Recipient.codec) DamagePrevented.amounts
   pure
     DamagePrevented.MkDamagePrevented
       { DamagePrevented.by = by,
         DamagePrevented.source = source,
-        DamagePrevented.recipient = recipient,
-        DamagePrevented.amount = amount
+        DamagePrevented.amounts = amounts
       }
