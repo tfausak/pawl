@@ -4735,7 +4735,7 @@ offeredTo pid gs = Action.legalActions pid (gs {GameState.priority = Just pid})
 -- deliberately not Filter.IsInZone: that atom reads the zone the object is in
 -- NOW, which CR 601.2a has made the stack by the time CR 601.2f prices the
 -- spell, so a card written with it would have a gate and a payment that
--- disagree (#2363). The two cases below assert the OFFER and the mana TAPPED on
+-- disagree; see #2363. The two cases below assert the OFFER and the mana TAPPED on
 -- one board for exactly that reason.
 --
 -- The first sentence is the effect DSL's road out of the stack into exile: a
