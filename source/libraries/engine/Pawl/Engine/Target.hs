@@ -1141,12 +1141,21 @@ secondPass declared slot =
     || boundNamesSibling declared slot
 
 -- Does this slot's CR 202.3 computed bound read one of the announcement's OWN
--- slots? QuantitySlot.allSlots is the reading half of the rename CR 700.2d applies
--- to the same field (Pawl.Engine.Modal.instanceScope), so a bound this reports is
--- a bound that follows its mode's occurrence.
+-- slots? The Bool half of boundSiblings below, and the whole of it -- the gates
+-- want the Bool, jointlyFillableGiven's search wants the names.
 boundNamesSibling :: Set SlotName -> TargetSlot -> Bool
-boundNamesSibling declared slot =
-  not (Set.disjoint declared (foldMap QuantitySlot.allSlots (TargetSlot.amount slot)))
+boundNamesSibling declared = not . Set.null . boundSiblings declared
+
+-- WHICH of the announcement's slots this slot's bound reads. QuantitySlot.allSlots
+-- is the reading half of the rename CR 700.2d applies to the same field
+-- (Pawl.Engine.Modal.instanceScope), so a bound this reports is a bound that
+-- follows its mode's occurrence.
+--
+-- Not implemented: a Quantity.AgainstSlot bound, which this reports and the offer
+-- then cannot answer against the plural union the second pass hands it (#2967).
+boundSiblings :: Set SlotName -> TargetSlot -> Set SlotName
+boundSiblings declared slot =
+  Set.intersection declared (foldMap QuantitySlot.allSlots (TargetSlot.amount slot))
 
 -- Must this slot's answer be judged against what its SIBLING slots were answered
 -- with (CR 601.2c)? Three ways one slot depends on another, and they are the
@@ -1547,47 +1556,67 @@ jointlyCoherentGiven pcs grants pools perspective seed source slots chosen gs =
         (Map.findWithDefault Set.empty slot chosen)
         (legalRecipientsGiven pcs grants pools perspective False bindings source targetSlot gs)
 
--- CR 601.2c: is there ONE announcement that fills every slot's minimum at once,
--- rather than a minimum each slot can meet by itself? The filter half of
--- jointlyJudged is what makes the two questions differ -- Fall of the Hammer's
--- victim slot excludes whatever its dealer slot names, so a board holding one
--- creature fills each slot alone and no announcement at all.
+-- CR 601.2c: is there ONE announcement that fills every slot at once, rather than
+-- a minimum each slot can meet by itself? jointlyJudged's filter and bound halves
+-- are what make the two questions differ -- Fall of the Hammer's victim slot
+-- excludes whatever its dealer slot names, so a board holding one creature fills
+-- each slot alone and no announcement at all.
 --
 -- The POOL half is not asked here: slotCapacities already narrows a
 -- ZoneScope.InSlot slot to what one coherent answer could reach, and the caller
 -- measures against that.
 --
--- A SEARCH rather than a number: the slots some declared filter
--- names are assigned every subset of their minimum size, and an assignment
+-- TWO WAYS a slot reads a sibling reach this search, and they are the two
+-- legalSetsGiven's second pass cannot narrow by itself: the FILTER's ("another"),
+-- and the CR 202.3 computed BOUND's, which the second pass answers against the
+-- union of everything the named slot could take at once and so OVERSTATES --
+-- Synthetic Measured Refrain's victim slot measured against three creatures its
+-- "up to two" gauge slot can never all hold. Without the bound half a mode with
+-- no legal announcement is offered and every announcement reverses at CR 601.2e,
+-- which is what CR 700.2a forbids.
+--
+-- A SEARCH rather than a number: the slots a reader names are assigned every
+-- subset of every size their own count could be announced at, and an assignment
 -- passes when every reading slot then still has its own minimum available (and,
 -- where a reader was itself assigned, holds what it was assigned). A slot naming
--- nothing is left out of the enumeration, its own set already being exact. Cards
--- with such a filter are rare and their slots count one apiece, so the product is
--- a handful of re-derivations; modes with no such filter pay one Map.filter.
+-- nothing is left out of the enumeration, its own set already being exact.
 --
--- Not implemented: an announcement ABOVE a slot's minimum, which a sibling
--- reading a slot POSITIVELY (Filter.IsBound and its neighbours) could need --
--- taking two where one is demanded widens the reader rather than narrowing it,
--- so a mode fillable only at the larger announcement is refused here (#2905).
--- Every slot a sibling filter names in `data/cards/` is counted exactly one --
--- Bioshift's, Fate Transfer's and Resourceful Defense's `from`, Fall of the
--- Hammer's `dealer`, and Synthetic Hammer Refrain's `dealer` per occurrence --
--- where the minimum IS the whole range and the enumeration is therefore
--- complete.
+-- EVERY SIZE rather than just the minimum, because the two halves need opposite
+-- ends of the range: "another" is narrowest at the maximum, and a bound counting
+-- the named slot's members is widest there. The range is announcedRange's, the
+-- one chooseTargets would offer, so an assignment this search accepts is one a
+-- caster could really announce. Every slot a sibling FILTER names in
+-- `data/cards/` is counted exactly one -- Bioshift's, Fate Transfer's and
+-- Resourceful Defense's `from`, Fall of the Hammer's `dealer`, and Synthetic
+-- Hammer Refrain's `dealer` per occurrence -- so for those the range is one size
+-- and the product is a handful of re-derivations; Measured Refrain's gauge is
+-- "up to two" and pays the subsets of size zero, one and two. A named slot
+-- counted "any number" would pay every subset of its candidates, and no card in
+-- the pool writes one.
 jointlyFillableGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
 jointlyFillableGiven pcs grants pools perspective seed source slots sets gs =
   Map.null readers || any coherent assignments
   where
-    reads_ slot = Set.intersection (Map.keysSet slots) (foldMap Filter.boundSlots (TargetSlot.filter slot))
+    declared = Map.keysSet slots
+    reads_ slot =
+      Set.union
+        (Set.intersection declared (foldMap Filter.boundSlots (TargetSlot.filter slot)))
+        (boundSiblings declared slot)
     readers = Map.filter (not . Set.null . reads_) slots
     -- The slots being ENUMERATED: the ones a reader names, a reader that is
     -- itself named included.
     named = Map.restrictKeys slots (foldMap reads_ readers)
     demanded slot = TargetCount.least (SlotCount.at 0 (TargetSlot.count slot))
     legalOf name = Map.findWithDefault Set.empty name sets
+    -- The sizes ONE announcement could name this slot at, measured against
+    -- slotCapacities for that function's reason rather than against the union.
+    caps = slotCapacities 0 slots sets gs
+    sizesOf name slot =
+      let (lo, hi) = announcedRange 0 slot (Map.findWithDefault 0 name caps)
+       in [lo .. hi]
     assignments =
       List.foldr
-        (\(name, slot) rest -> [Map.insert name option m | option <- subsetsOfSize (demanded slot) (legalOf name), m <- rest])
+        (\(name, slot) rest -> [Map.insert name option m | size <- sizesOf name slot, option <- subsetsOfSize size (legalOf name), m <- rest])
         [Map.empty]
         (Map.toList named)
     coherent chosen =
@@ -1617,9 +1646,9 @@ subsetsOfSize n xs
 --
 -- Each slot is asked against slotCapacities, which is what a single coherent
 -- announcement could reach through the slot's own POOL, and then the mode as a
--- whole is asked against jointlyFillableGiven, which is the FILTER half -- Fall
--- of the Hammer is unfillable off a board holding one creature, rather than
--- fillable slot by slot and reversed at CR 601.2e.
+-- whole is asked against jointlyFillableGiven, which is the FILTER and BOUND
+-- halves -- Fall of the Hammer is unfillable off a board holding one creature,
+-- rather than fillable slot by slot and reversed at CR 601.2e.
 --
 -- `extra` is the slots EVERY mode carries in addition to its own -- CR 303.4a's
 -- enchant slot, declared by the card rather than by a mode, which castability
