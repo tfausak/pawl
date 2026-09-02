@@ -217,7 +217,7 @@ turnableFaceUp pid gs =
 --
 -- The SHOWING is not modelled. Nothing in pawl hides a face-down permanent's
 -- card from a reader in the first place, so there is no concealment for a reveal
--- to lift (#682).
+-- to lift (#1412).
 --
 -- REJECT-NOT-REPAIR, the posture Cast.castSpell and Activate.activateAbility
 -- both take: a payment that fails restores the state from before it was
@@ -274,7 +274,7 @@ turnFaceUp pid procedure oid = do
 --
 -- The REVEAL is not modelled, for the reason the procedures' showing is not:
 -- nothing in pawl hides a face-down permanent's card from a reader, so there is
--- no concealment for it to lift (#682). What is left of the rule is the second
+-- no concealment for it to lift (#1412). What is left of the rule is the second
 -- half of its first sentence, and its second sentence.
 revealsInsteadOfTurningUp :: ObjectId -> GameState -> Bool
 revealsInsteadOfTurningUp oid gs =
@@ -396,7 +396,7 @@ performTurnFaceUp procedure oid = do
 --
 -- No controller argument: the effect's controller is who resolved it, and
 -- nothing left here reads a player -- CR 701.40g's reveal is the permanent's own
--- controller's and is not modelled (#682).
+-- controller's and is not modelled (#1412).
 turnFaceUpByEffect :: ObjectId -> Game ()
 turnFaceUpByEffect oid = do
   gs <- State.get
