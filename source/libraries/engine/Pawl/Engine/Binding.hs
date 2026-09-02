@@ -573,10 +573,14 @@ attackingCreature :: SlotName
 attackingCreature = SlotName.MkSlotName (Text.pack "thatAttackingCreature")
 
 -- CR 508.3d / 508.3e: the reserved slot under which the player who DECLARED the
--- attackers is bound -- Norn's Decree's "the attacking player" and Archnemesis'
--- "that player". Stamped by Pawl.Engine.Event.eventBindings off
+-- attackers is bound. Stamped by Pawl.Engine.Event.eventBindings off
 -- GameEvent.AttackersDeclared and GameEvent.BecameAttacked as the trigger is
 -- gathered.
+--
+-- "The attacking player" (Norn's Decree) and "that player" (Archnemesis) are the
+-- printed phrases; neither printing is writable yet (#2930, #2931), so what
+-- exercises the slot is data/cards/synthetic-marauders-toll.json and
+-- data/cards/synthetic-reprisal-ledger.json.
 --
 -- Distinct from `triggerPlayer`, and that is why it exists: under CR 508.3e both
 -- players are subjects at once, and that slot already carries the ATTACKED one
@@ -746,7 +750,7 @@ setBlockedCreature oid = Map.insert blockedCreature (toObject oid)
 setAttackingCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setAttackingCreature oid = Map.insert attackingCreature (toObject oid)
 
--- Bind a player under the reserved attackingPlayer slot (CR 508.3d).
+-- Bind a player under the reserved attackingPlayer slot (CR 508.3d / 508.3e).
 setAttackingPlayer :: PlayerId -> Map SlotName Binding -> Map SlotName Binding
 setAttackingPlayer pid = Map.insert attackingPlayer (toPlayer pid)
 
