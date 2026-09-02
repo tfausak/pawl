@@ -25,6 +25,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProductionTag as ProductionTag
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
@@ -135,6 +136,18 @@ data View = MkView
     -- ability on the stack -- and for everything with no OBJECT behind it at all,
     -- so WasCastFrom is vacuously False there, `zone` above's posture.
     castFrom :: Maybe Zone.Zone,
+    -- CR 115.1: what the candidate TARGETS, for a spell or ability on the stack
+    -- -- the recipients CR 601.2c (602.2b, 603.3d) chose, read live off the
+    -- object's target-slot bindings by Pawl.Engine.Projection.targetsOfStackObject
+    -- so that CR 115.7's change-of-target is seen at once. The union over the
+    -- slots: TargetsSource and TargetsPlayer ask membership, never arity.
+    --
+    -- Empty for everything that targets nothing -- a permanent, a card at rest, a
+    -- spell with no target slot -- and for everything with no object behind it,
+    -- so both atoms are vacuously False there, `castFrom` above's posture. Empty
+    -- too for a spell read at the CASTABILITY gate, which runs before CR 601.2c
+    -- has chosen anything: Pawl.Engine.Cast.castProposed says what that costs.
+    targets :: Set.Set Recipient.Recipient,
     -- Which object this view is OF. Nothing for a printed card off the
     -- battlefield, which is not an object -- so IsSource is vacuously False
     -- there, the same posture power and controller already take.
@@ -586,6 +599,8 @@ playerView pid =
       zone = Nothing,
       -- CR 601.2a casts an OBJECT; a player was never cast either.
       castFrom = Nothing,
+      -- CR 115.1: a player is never on the stack, so targets nothing.
+      targets = Set.empty,
       identity = Nothing,
       playerIdentity = Just pid,
       -- CR 506.3: only a creature can attack, and a player is not one.
@@ -1165,6 +1180,21 @@ matches context view predicate = case predicate of
   Filter.IsSource -> case (identity view, source context) of
     (Just oid, Just src) -> oid == src
     _ -> False
+  -- CR 115.1 the other way round from IsSource: the SOURCE is among what the
+  -- candidate targets. Every object-shaped Recipient counts (Recipient.objectOf),
+  -- CR 115.4's "any target" naming a creature, planeswalker or battle by tag.
+  -- Vacuously False where no source frames the match or the candidate targets
+  -- nothing.
+  Filter.TargetsSource -> case source context of
+    Just src -> any ((== Just src) . Recipient.objectOf) (targets view)
+    Nothing -> False
+  -- CR 115.1's player target, judged against the perspective the way ControlledBy
+  -- judges a controller. ONLY a ToPlayer counts: CR 115.10a says an object is a
+  -- target only where the word names it, and a spell aimed at a creature names
+  -- the creature and not its controller.
+  Filter.TargetsPlayer relation -> case perspective context of
+    Just p -> any (\r -> case r of Recipient.ToPlayer q -> PlayerRelation.holds (teams context) relation p q; _ -> False) (targets view)
+    Nothing -> False
   -- IsSource one field over: the id the RESOLUTION bound rather than the id the
   -- evaluation is sourced at. Vacuously False for a view with no object behind
   -- it and for a slot naming nothing, which is the posture the atom above takes.
@@ -1482,6 +1512,10 @@ rewrite pairs predicate = case predicate of
   -- this atom names a player relation rather than a subtype.
   Filter.OwnedBy _ -> predicate
   Filter.IsSource -> predicate
+  -- Untouched for IsSource's reason: a target relation is not a word CR 612.1
+  -- swaps.
+  Filter.TargetsSource -> predicate
+  Filter.TargetsPlayer _ -> predicate
   Filter.IsBound _ -> predicate
   Filter.SameNameAsBound _ -> predicate
   Filter.SameControllerAsBound _ -> predicate
@@ -1903,6 +1937,10 @@ bakeBound players predicate = case predicate of
   Filter.ControlledByDefendingPlayer -> predicate
   Filter.OwnedBy _ -> predicate
   Filter.IsSource -> predicate
+  -- Untouched for IsSource's reason: both read the Context, and neither names a
+  -- slot.
+  Filter.TargetsSource -> predicate
+  Filter.TargetsPlayer _ -> predicate
   -- Untouched for the reason IsControllerOfBound below is, and one step shorter:
   -- CR 603.2's binding map holds PLAYERS and this atom names a slot holding an
   -- OBJECT. Pawl.Engine.Filter.matches answers it as it stands.
@@ -2025,6 +2063,8 @@ manaValueThresholds predicate = case predicate of
   Filter.ControlledByRecipient -> []
   Filter.OwnedBy _ -> []
   Filter.IsSource -> []
+  Filter.TargetsSource -> []
+  Filter.TargetsPlayer _ -> []
   Filter.IsBound _ -> []
   Filter.SameNameAsBound _ -> []
   Filter.SameControllerAsBound _ -> []
@@ -2142,6 +2182,10 @@ statesAQuality predicate = case predicate of
   Filter.ControlledByRecipient -> True
   Filter.OwnedBy _ -> True
   Filter.IsSource -> True
+  -- CR 701.23b for IsSource's reason, and unreachable from a search besides: a
+  -- card in a library targets nothing.
+  Filter.TargetsSource -> True
+  Filter.TargetsPlayer _ -> True
   Filter.IsBound _ -> True
   Filter.SameNameAsBound _ -> True
   Filter.SameControllerAsBound _ -> True

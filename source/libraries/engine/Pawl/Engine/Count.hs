@@ -292,6 +292,8 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.ControlledByRecipient -> predicate
   Filter.Type.OwnedBy _ -> predicate
   Filter.Type.IsSource -> predicate
+  Filter.Type.TargetsSource -> predicate
+  Filter.Type.TargetsPlayer _ -> predicate
   Filter.Type.IsBound _ -> predicate
   Filter.Type.SameNameAsBound _ -> predicate
   Filter.Type.SameControllerAsBound _ -> predicate
@@ -715,6 +717,9 @@ viewOfSnapshot mController isToken counters snapshot =
       -- CR 601.2a: a snapshot records characteristics and no zone at all, so it
       -- cannot say where a cast came from either -- `zone` above's reason.
       Filter.castFrom = Nothing,
+      -- CR 115.1: a snapshot is of an object that has left the stack or never
+      -- was on it, and records no announcement -- `zone` above's reason.
+      Filter.targets = Set.empty,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
