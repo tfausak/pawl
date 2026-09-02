@@ -4343,6 +4343,11 @@ chooseNewTargetsFor controller copyId = do
           -- -- the card it names can be one this slot refuses, and a pile is
           -- never a target that was left unchanged. An unchanged target is
           -- admitted whatever it is, which is the rule's own first sentence.
+          --
+          -- Pawl.ExileSpec's "CR 707.10c a copy's re-target keeps its old target
+          -- when the draw names a card the slot refuses" is what proves this
+          -- line: without it the copy records the illegal card and CR 608.2b
+          -- counters it, where the rule leaves it resolving on its old target.
           let stands slot picked = Set.isSubsetOf picked (Set.union (Map.findWithDefault Set.empty slot current) (Map.findWithDefault Set.empty slot fresh))
           Monad.when (and (Map.elems (Map.mapWithKey stands drawn)) && Target.jointlyCoherent (Just controller) seed copyId slots drawn gs) $ do
             let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients drawn) (Object.bindings o)}

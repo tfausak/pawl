@@ -40,6 +40,7 @@ import qualified Pawl.Engine.Foretell as Foretell
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -369,12 +370,14 @@ foretoldBoard s registry = do
 --
 -- ONE board, cast twice with the same answerer but for the draw, so the only
 -- thing that can account for the two outcomes is which card came out of the pile.
-runicRepetition :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+runicRepetition :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 runicRepetition s registry = Spec.describe s "Runic Repetition" $ do
   Spec.it s "CR 406.4 the draw reaches a card the spell's own restriction refuses, and CR 601.2e reverses the casting" $ do
     think <- S.printingOf s registry "Think Twice"
     repetition <- S.printingOf s registry "Runic Repetition"
-    (hasFlashback, hasNone, spellId, board) <- flashbackPileBoard s registry
+    twincast <- S.printingOf s registry "Twincast"
+    cancel <- S.printingOf s registry "Cancel"
+    (hasFlashback, hasNone, spellId, _, _, board) <- flashbackPileBoard s registry
     case (hasFlashback, hasNone, S.spellTargetSlot repetition) of
       (Just wanted, Just refused, Just theSlot) -> do
         let castDrawing oid = resolveAll (S.runPure (drawing oid) board (S.cast S.alice spellId))
@@ -382,12 +385,12 @@ runicRepetition s registry = Spec.describe s "Runic Repetition" $ do
           s
           "the draw named the card with no flashback, so the casting was reversed and the sorcery is back in alice's hand"
           (namesIn Zone.Hand S.alice (castDrawing refused))
-          (Set.singleton (S.printingName repetition))
+          (Set.fromList [S.printingName repetition, S.printingName twincast, S.printingName cancel])
         Spec.assertEqWith
           s
           "and the same board whose draw named the flashback card returns that card to her hand instead"
           (namesIn Zone.Hand S.alice (castDrawing wanted))
-          (Set.singleton (S.printingName think))
+          (Set.fromList [S.printingName think, S.printingName twincast, S.printingName cancel])
         -- Proxies, AFTER the behaviour so none of them can absorb a mutation:
         -- the reversed casting took nothing out of exile, the honoured one took
         -- one card, and what alice announced was the pile -- which is the pile
@@ -400,20 +403,60 @@ runicRepetition s registry = Spec.describe s "Runic Repetition" $ do
           (offerTo S.alice theSlot board)
           (Set.fromList (fmap Recipient.ToPile (pilesIn board)))
       _ -> Spec.assertFailure s "the casting should hide a card with flashback and a card without, and Runic Repetition print one target slot"
+  -- CR 707.10c's re-target is the draw's OTHER caller, and it judges the drawn
+  -- card too: "if the player chooses to change some or all of the targets, the
+  -- new targets must be legal". alice's copy of Runic Repetition is offered the
+  -- pile again, the draw hands it the Goblin Piker, and the copy is left holding
+  -- the target CR 707.10 gave it -- where recording the Piker would leave the
+  -- copy with one illegal target and CR 608.2b would counter it on resolution.
+  --
+  -- THE ORIGINAL IS CANCELLED for exactly that reason: with both spells left to
+  -- resolve, the two readings agree -- one of them returns Think Twice and the
+  -- other fizzles, whichever way round -- so the board cannot tell them apart.
+  -- Countering the original leaves the copy the only spell that can act.
+  Spec.it s "CR 707.10c a copy's re-target keeps its old target when the draw names a card the slot refuses" $ do
+    think <- S.printingOf s registry "Think Twice"
+    piker <- S.printingOf s registry "Goblin Piker"
+    (hasFlashback, hasNone, spellId, twincastId, cancelId, board) <- flashbackPileBoard s registry
+    case (hasFlashback, hasNone) of
+      (Just wanted, Just refused) -> do
+        let cast1 = S.runPure (drawing wanted) board (S.cast S.alice spellId)
+        case Maybe.listToMaybe (GameState.stack cast1) of
+          Nothing -> Spec.assertFailure s "the sorcery should reach the stack"
+          Just original -> do
+            let twincasted = S.runPure (pinTarget (Recipient.ToObject original)) cast1 (S.cast S.alice twincastId)
+                -- Twincast alone, so the re-target prompt CR 707.10c raises is
+                -- the one `drawing refused` answers and the copy is still on the
+                -- stack afterwards.
+                copied = S.runPure (drawing refused) twincasted (Stack.resolveTop >> Engine.settleForPriority)
+                after = resolveAll (S.runPure (pinTarget (Recipient.ToObject original)) copied (S.cast S.alice cancelId))
+            Spec.assertEqWith
+              s
+              "the copy kept the flashback card it was copied with and returned it, the original having been countered"
+              (namesIn Zone.Hand S.alice after)
+              (Set.singleton (S.printingName think))
+            -- Proxies, AFTER the behaviour so none of them can absorb a
+            -- mutation: the card the draw named never left exile, the copy did
+            -- resolve, and the pile it drew from held both cards.
+            Spec.assertEqWith s "the card the copy's draw named is the one still in exile" (namesOf (Set.toList (GameState.exile after)) after) (Set.singleton (S.printingName piker))
+            Spec.assertEqWith s "and nothing is left on the stack" (length (GameState.stack after)) 0
+            Spec.assertEqWith s "the pile the copy drew from held both cards" (fmap (length . membersOfPile board) (pilesIn board)) [2]
+      _ -> Spec.assertFailure s "the casting should hide a card with flashback and a card without"
 
 -- alice casts Ignorant Bliss with Think Twice (flashback {2}{U}) and Goblin Piker
 -- in hand, so ONE pile holds a card Runic Repetition's slot admits and a card it
--- refuses. Five lands, which is the {1}{R} the Bliss costs and the {2}{U} left
--- over for the sorcery, and her library is stocked so CR 104.3c never fires.
+-- refuses. Thirteen lands, which is the {1}{R} the Bliss costs plus the {2}{U},
+-- {U}{U} and {1}{U}{U} the three spells left in her hand cost however the
+-- payments fall, and her library is stocked so CR 104.3c never fires.
 --
--- Returns the exiled Think Twice, the exiled Goblin Piker and her copy of Runic
--- Repetition, still in hand -- added AFTER the Bliss resolved, the spell being
--- one of the cards that hand would otherwise have hidden.
+-- Returns the exiled Think Twice, the exiled Goblin Piker, her Runic Repetition,
+-- her Twincast and her Cancel -- the three spells added AFTER the Bliss resolved,
+-- being cards that hand would otherwise have hidden.
 flashbackPileBoard ::
   (Monad m) =>
   Spec.Spec m n ->
   Registry.Registry m ->
-  m (Maybe ObjectId.ObjectId, Maybe ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+  m (Maybe ObjectId.ObjectId, Maybe ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 flashbackPileBoard s registry = do
   bliss <- S.printingOf s registry "Ignorant Bliss"
   mountain <- S.printingOf s registry "Mountain"
@@ -422,12 +465,16 @@ flashbackPileBoard s registry = do
   piker <- S.printingOf s registry "Goblin Piker"
   sentry <- S.printingOf s registry "Ogre Sentry"
   repetition <- S.printingOf s registry "Runic Repetition"
-  let (g1, blissId) = S.handOne bliss (S.landsFor island S.alice 3 (S.landsInPlay mountain 2))
+  twincast <- S.printingOf s registry "Twincast"
+  cancel <- S.printingOf s registry "Cancel"
+  let (g1, blissId) = S.handOne bliss (S.landsFor island S.alice 10 (S.landsInPlay mountain 3))
       (_, g2) = S.addHandCard think S.alice g1
       (_, g3) = S.addHandCard piker S.alice g2
       (_, g4) = S.addLibraryCard sentry S.alice g3
       blissed = resolveAll (S.runPure S.identityAnswer g4 (S.cast S.alice blissId))
-      (spellId, g5) = S.addHandCard repetition S.alice blissed
+      (spellId, g5a) = S.addHandCard repetition S.alice blissed
+      (twincastId, g5b) = S.addHandCard twincast S.alice g5a
+      (cancelId, g5) = S.addHandCard cancel S.alice g5b
       board =
         g5
           { GameState.activePlayer = S.alice,
@@ -442,7 +489,7 @@ flashbackPileBoard s registry = do
           | oid <- faceDownExiled board,
             namesOf [oid] board == Set.singleton (S.printingName printing)
           ]
-   in pure (idOf think, idOf piker, spellId, board)
+   in pure (idOf think, idOf piker, spellId, twincastId, cancelId, board)
 
 -- throughPile, with CR 406.4's draw answered by the card NAMED rather than by
 -- position. The answer is filtered back against the pile the engine offers, so
@@ -451,6 +498,14 @@ drawing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 drawing oid p = case p of
   Prompt.RandomObject _ -> oid
   _ -> throughPile p
+
+-- Pawl.CopySpec's pinTarget: an announcement answered by FILTERING the offer down
+-- to one recipient, never by building one, since CR 608.2b re-reads what was
+-- chosen and a hand-built recipient of the same object is a different one.
+pinTarget :: Recipient.Recipient -> Prompt.Prompt r -> r
+pinTarget recipient p = case p of
+  Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (== recipient) offered) asked
+  _ -> S.identityAnswer p
 
 -- What CR 601.2c would put in front of this player: the slot's legal set with CR
 -- 406.4's substitution taken over it, which is the pair Pawl.Engine.Target's
