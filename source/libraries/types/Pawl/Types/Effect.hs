@@ -532,9 +532,10 @@ data Effect card ability
     -- permanents matching the Filter, each chosen by that player (Diabolic
     -- Edict) in APNAP order (CR 101.4b) before anything leaves the battlefield.
     PlayerSacrifices PlayerSacrifices.PlayerSacrifices
-  | -- | CR 500.7: the players the PlayerRef names each get one extra turn, added
+  | -- | CR 500.7: the players the PlayerRef names each get the payload's count
+    -- of extra turns (Ral Zarek's "for each coin that comes up heads"), added
     -- directly after the turn this resolves in. CR 500.11 / 614.1b: the
-    -- PhaseSelectors are the steps and phases that turn skips (Savor the
+    -- PhaseSelectors are the steps and phases each such turn skips (Savor the
     -- Moment).
     TakeExtraTurn TakeExtraTurn.TakeExtraTurn
   | -- | CR 701.24: the referenced objects are shuffled into their owners'

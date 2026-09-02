@@ -14563,8 +14563,8 @@ delayedPending grouped gs =
       -- batch fires the entry once. Centaur Peacemaker's "each player gains 4 life"
       -- is that batch for False Cure, and Pawl.EventTriggerSpec's three-seat board
       -- proves the count. What an OCCURRENCE is is `occurrences` above: three for
-      -- False Cure's per-seat condition, one for Synthetic Communal Reckoning's
-      -- batch one on the very same board.
+      -- False Cure's per-seat condition on that batch, one for Forth Eorlingas!'s
+      -- batch condition on a combat damage step where two of its tokens connect.
       --
       -- Without a duration, CR 603.7b's two sentences read as two steps over the
       -- GROUPED batch. The first sentence -- "the next time its trigger event
