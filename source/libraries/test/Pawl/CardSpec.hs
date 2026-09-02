@@ -3342,7 +3342,7 @@ withCountersFilters w =
 -- other kind -- so it needs no tag of its own.
 payGateFilters :: PayGate.PayGate -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 payGateFilters gate =
-  fmap ((,) SlotlessCostFramed) (costFilters (PayGate.cost gate))
+  slotlessCost (costFilters (PayGate.cost gate))
     <> concatMap counterKindFilters (Maybe.maybeToList (PayGate.perCounter gate))
 
 -- CR 122.1b: the one counter kind with a Filter under it, since it carries a
@@ -3590,9 +3590,14 @@ costFilters = concatMap costComponentFilters . Cost.Type.components
 
 -- CR 118.9: an alternative cost reaches a Filter through its components, as any
 -- Cost does, and through the Condition CR 604.2 may gate it with.
+--
+-- The COST half is SlotlessCostFramed for payGateFilters' reason: CR 118.9's
+-- alternative is paid through Pawl.Engine.Cost, whose Context comes from
+-- Pawl.Engine.Filter.contextFor and carries no slots; see #2883. The CONDITION half
+-- is a separate question and keeps whatever the quoting position frames it as.
 alternativeCostFilters :: AlternativeCost.AlternativeCost -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 alternativeCostFilters alternative =
-  unframed (costFilters (AlternativeCost.cost alternative))
+  slotlessCost (costFilters (AlternativeCost.cost alternative))
     <> concatMap conditionFilters (Maybe.maybeToList (AlternativeCost.condition alternative))
 
 -- CR 116.2: which spells a printed special action names -- only through the cost
@@ -4961,16 +4966,33 @@ data Framing
     -- reason: the candidate is an object all right, but no slot of any
     -- resolution names it.
     --
-    -- The position is CR 118.12's gate cost, paid by
-    -- Pawl.Engine.Resolve.payGatePaidBy through Pawl.Engine.Cost.canPay and
-    -- .pay. Card text reaches it -- Lithophage's "unless you sacrifice a
-    -- Mountain" -- so it is swept, and it was Unframed until #2881 said what
-    -- Unframed had quietly promised on its behalf.
+    -- FOUR positions: CR 118.12's gate cost, paid by
+    -- Pawl.Engine.Resolve.payGatePaidBy through
+    -- Pawl.Engine.Cost.canPay and .pay; CR 601.2f's additional cost and CR
+    -- 118.9's alternative cost, both paid through the same two functions as a
+    -- cast is announced; and CR 116.2d's ignore cost, paid there again by
+    -- Pawl.Engine.Ignore. The gate was tagged first, see #2881, and the other
+    -- three followed, see #2883. Card text reaches the first -- Lithophage's
+    -- "unless you sacrifice a Mountain" -- so all four are swept rather than
+    -- dropped.
     --
-    -- Not implemented: the THREE sibling positions of the same shape, which are
-    -- still Unframed and still get the promise they cannot keep --
-    -- Face.additionalCosts, Face.alternativeCosts' cost half and
-    -- Face.specialActions, all paid through the same contextFor (#2883).
+    -- CR 116.2d's is unanswerable by the RULE and not merely by this engine: a
+    -- special action uses no stack (CR 116.1), so no announcement has bound a
+    -- slot for the question to be about. The other three are unanswerable
+    -- because Pawl.Engine.Cost builds its Context with
+    -- Pawl.Engine.Filter.contextFor, which fills no slotObjects -- and for CR
+    -- 601.2f and CR 118.9 that is stricter than the rules, which fix the targets
+    -- at CR 601.2c before either cost is paid. Not implemented: threading an
+    -- announcement's bindings into cost payment, which is what a card asking the
+    -- question there would need (#2924). No printing asks it -- Scryfall
+    -- o:"additional cost" o:"other than the target", 2026-09-01, no hit.
+    --
+    -- Not implemented: the five OTHER cost positions a card can write -- an
+    -- activated ability's cost, CR 508.1h's and CR 509.1d's per-creature combat
+    -- costs, CR 116.2c's UntilPaid duration and CR 613.11's two added cost
+    -- lists. Every one is paid through the same Pawl.Engine.Cost, which has no
+    -- contextWithSlots caller at all, so each promises what this tag denies;
+    -- they are still Unframed (#2927).
     SlotlessCostFramed
   -- Bounded and Enum so the framing coverage case below enumerates
   -- [minBound .. maxBound] rather than a hand-kept list: a constructor added
@@ -5067,6 +5089,11 @@ searchFramed = fmap ((,) SearchFramed)
 -- face rather than against an object (CR 400.11c).
 outsideTheGameFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 outsideTheGameFramed = fmap ((,) OutsideTheGameFramed)
+
+-- Tag a Filter position as a COST paid through Pawl.Engine.Filter.contextFor,
+-- which fills no slots -- the four positions SlotlessCostFramed names.
+slotlessCost :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+slotlessCost = fmap ((,) SlotlessCostFramed)
 
 -- Tag a Filter position as a KEYWORD's own. The only tag applied at the leaf
 -- that produces the Filter, keywordFilters, rather than at a quoting position.
@@ -5770,10 +5797,10 @@ cardFilters card =
         <> concatMap (\(Power.MkPower quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.power card))
         <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.toughness card))
         <> concatMap targetSlotFilters (Face.enchant card)
-        <> concatMap (unframed . costComponentFilters) (Face.additionalCosts card)
+        <> concatMap (slotlessCost . costComponentFilters) (Face.additionalCosts card)
         <> concatMap (frame Unframed . alternativeCostFilters) (Face.alternativeCosts card)
         <> concatMap (quantityFilters . CostReduction.perEach) (Face.costReductions card)
-        <> concatMap (unframed . specialActionFilters) (Face.specialActions card)
+        <> concatMap (slotlessCost . specialActionFilters) (Face.specialActions card)
         <> concatMap (unframed . blockRequirementFilters) (Face.blockRequirements card)
         <> concatMap blockPermissionFilters (Face.blockPermissions card)
         <> concatMap (frame Unframed . attackRequirementFilters) (Face.attackRequirements card)
@@ -9607,6 +9634,27 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             }
     Spec.assertEqWith s "CR 118.12 a planted atom in a gate's cost is an offence" (isBoundCounts gated) (1, 0)
     Spec.assertBool s (isBoundOffends gated) "and the lint says so"
+    -- THE THREE SIBLING POSITIONS, which #2883 tagged after #2881 tagged the
+    -- gate: an additional cost, an alternative cost's own half and a special
+    -- action's cost are paid through the same Pawl.Engine.Cost, so the same
+    -- buried atom is a silent False in each. Built
+    -- over the SAME `base` face and the SAME `buried` filter as every leg above,
+    -- so they differ from the accepted leg in position and in nothing else.
+    let sacrificing = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 buried)]
+        -- CR 601.2f, paid as the cast is announced.
+        added = base {Face.additionalCosts = sacrificing}
+        -- CR 118.9, the cost half only -- the CR 604.2 condition an alternative
+        -- may carry is a separate question and is not tagged with it.
+        alternatively = base {Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) sacrificing)]}
+        -- CR 116.2d, and the one of the four that no announcement could answer
+        -- in any engine: a special action uses no stack (CR 116.1).
+        ignoring = base {Face.specialActions = [SpecialAction.IgnoreThisUntilEndOfTurn (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) sacrificing)]}
+    Spec.assertEqWith
+      s
+      "CR 601.2f / 118.9 / 116.2d a planted atom in each of the other three costs is an offence"
+      (fmap isBoundCounts [added, alternatively, ignoring])
+      [(1, 0), (1, 0), (1, 0)]
+    Spec.assertBool s (all isBoundOffends [added, alternatively, ignoring]) "and the lint says so at all three"
   -- CR 702 / CR 122.1b: a keyword's own Filter is read off a continuous effect or
   -- off the printed face, through Pawl.Engine.Filter.contextFor, which fills
   -- neither the resolution's slots nor the source's host. keywordFilters tags it
