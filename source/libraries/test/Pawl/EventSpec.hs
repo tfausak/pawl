@@ -212,8 +212,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     -- clean-up implementation would fail.
     Spec.assertEqWith s "no object was ever minted, by either road" (Game.objectCount ontoBattlefield, Game.objectCount intoHand) (before, before)
 
-  -- The other half of the guard, the token pair's: a player still in the game is
-  -- unaffected, so neither case above can pass by refusing every conjure.
+  -- The other half of the guard, the token pair's: on the SAME departed board,
+  -- bob is unaffected, so neither case above can pass by refusing every conjure
+  -- or by reading the wrong seat. Two independent runs off that one board, so
+  -- the hand and the battlefield counts are not a running total.
   Spec.it s "CR 800.4d a player still in the game still gets their conjured cards" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let goblinCard = Printing.card piker
@@ -222,7 +224,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
         ontoBattlefield = S.runPure S.identityAnswer gone (Event.conjureOntoBattlefield S.bob goblinCard 2)
         intoHand = S.runPure S.identityAnswer gone (Event.conjure S.bob goblinCard Zone.Hand LibraryPosition.defaultValue)
     Spec.assertEqWith s "bob's two conjured cards are on the battlefield" (Set.size (GameState.battlefield ontoBattlefield)) 2
-    Spec.assertEqWith s "and his third is in his hand" (length (Game.zoneMembers Zone.Hand S.bob intoHand)) 1
+    Spec.assertEqWith s "and the other road put one in his hand" (length (Game.zoneMembers Zone.Hand S.bob intoHand)) 1
     Spec.assertEqWith s "minted by both roads" (Game.objectCount ontoBattlefield, Game.objectCount intoHand) (before + 2, before + 1)
 
   Spec.it s "CR 111.2 createTokens puts a token on the battlefield and emits an enters event" $ do
