@@ -927,8 +927,20 @@ splitExcess gs event =
 -- rather than on the batch: redirectExcess above has already split any event
 -- whose effect stated where its excess goes, so what arrives here is what CR
 -- 120.4b deals. Pawl.DamageSpec's ExcessDamage group is the proof.
+--
+-- Two halves, so a caller that brackets the batch as one event can keep CR
+-- 702.15e's separate life gain events OUT of the bracket: `processDamage` is the
+-- batch, and `recordLifelinkGains` lands its gains after it. This is the
+-- unbracketed composition, and the shape every caller but dealWave wants.
 applyDamage :: [DamageEvent.DamageEvent] -> Game ()
-applyDamage events = do
+applyDamage events = processDamage events >>= recordLifelinkGains
+
+-- applyDamage minus lifelink's gain RECORDS, returning the survivors so the
+-- caller can record those where its own bracket does not reach. The gain
+-- itself -- the life total -- is written here, by `gainOne`, since CR 120.4c
+-- processes it with the damage's other results (see the note on `lost`).
+processDamage :: [DamageEvent.DamageEvent] -> Game [DamageEvent.DamageEvent]
+processDamage events = do
   (survivors, prevented) <- Event.resolveDamageBatch events
   -- The state the whole batch is read against: recipients are classified off it
   -- (damagedCardTypes), the commander tally is asked of it, and `counterResults`
@@ -1098,31 +1110,6 @@ applyDamage events = do
             losing > 0 ->
               [GameEvent.LifeLost (LifeChange.MkLifeChange pid losing)]
         _ -> []
-      -- CR 120.3f's gain, recorded for the pass `gainOne` above performs, so that
-      -- "whenever you gain life" sees lifelink (CR 702.15b) and not only an
-      -- effect that says the words. The RECORD lands here and the gain itself
-      -- earlier, which is the split `lifeLostBy` above already has.
-      --
-      -- ONE record per damage event, never per player, which is CR 702.15e in as
-      -- many words: "if multiple sources with lifelink deal damage at the same
-      -- time, they cause separate life gain events". Summing them first would be
-      -- one event, and a Pridemate would get one counter where it is owed two.
-      --
-      -- Whom the damage was dealt to is none of this function's business, exactly
-      -- as it is none of `gainOne`'s: CR 702.15b hangs the gain off the SOURCE, so
-      -- damage to a creature or a planeswalker gains life just as damage to a
-      -- player does. `lifeLostBy` above scopes to a player recipient because CR
-      -- 120.3a does; this one must not.
-      --
-      -- CR 119.9's zero guard, stated HERE rather than left to the callers, and
-      -- the same posture `lifeLostBy` above takes. No producer in the pool builds
-      -- a 0-amount event today -- CR 510.1a makes `attackerAssignment` drop a
-      -- creature assigning 0 or less, and Resolve's DealDamage arm guards its own
-      -- quantity -- so this restates the rule at the site that writes the record
-      -- instead of resting on an invariant two modules away.
-      lifeGainedBy ev = case DamageEvent.dealtByLifelink ev of
-        Just pid | DamageEvent.amount ev > 0 -> [GameEvent.LifeGained (LifeChange.MkLifeChange pid (DamageEvent.amount ev))]
-        _ -> []
       -- CR 120.3h's and CR 120.3c's counter removals, recorded so a trigger
       -- watching counters come off has an event to fire off: CR 310.12b's "when
       -- the last defense counter is removed" for the battle half, and Chandra,
@@ -1256,8 +1243,8 @@ applyDamage events = do
   --
   -- Ahead of `markOne` and `tallyOne` too, which changes nothing they can see:
   -- those write GameState.objects and Player.commanderDamage, and this writes
-  -- Player.life. The RECORDS keep their old order below -- `lifeGainedBy` still
-  -- logs the gain after the damage that caused it.
+  -- Player.life. The RECORD lands later still, in recordLifelinkGains, after
+  -- the damage that caused it.
   State.modify' (\gs -> List.foldl' gainOne gs survivors)
   -- CR 120.4c: "damage that's been dealt is processed into its results, as
   -- modified by replacement effects that interact with those results (such as
@@ -1332,27 +1319,26 @@ applyDamage events = do
             tallied = List.foldl' tallyOne marked survivors
             noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (Prevention.by p) (Prevention.source p) (Prevention.recipient p) (Prevention.amount p))) g) tallied (filter (\p -> Prevention.amount p > 0) prevented)
             dealt = List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) noted survivors
-         in -- CR 119.2's life loss and CR 120.3f's life gain are recorded AFTER
-            -- the damage that caused them, which is the same reasoning the
-            -- prevention/damage order above follows: both land inside one CR 117.5
-            -- boundary, so the triggers are gathered together either way, and this
-            -- fixes only the canonical order. Simultaneous with the damage under
-            -- CR 119.2 and CR 120.3f's "in addition", and logged after it because
-            -- a cause reads before its consequence.
+         in -- CR 119.2's life loss is recorded AFTER the damage that caused it,
+            -- which is the same reasoning the prevention/damage order above
+            -- follows: both land inside one CR 117.5 boundary, so the triggers
+            -- are gathered together either way, and this fixes only the
+            -- canonical order. Simultaneous with the damage under CR 119.2, and
+            -- logged after it because a cause reads before its consequence.
             --
-            -- Per SURVIVOR rather than two passes, so one damage event's loss and
-            -- gain sit together: a lifelink attacker's two records describe a
-            -- single event, and CR 702.15e already makes each source's gain its
-            -- own entry.
+            -- CR 120.3f's gain is NOT here: recordLifelinkGains lands it after
+            -- the whole batch, outside any bracket the caller put around it,
+            -- because CR 702.15e makes each source's gain an event of its own.
             --
-            -- CR 120.3c's and CR 310.6's counter removals join them, after the
-            -- damage and for the same reason: they are a RESULT of it (CR 120.3c,
-            -- CR 120.3h), so the cause reads first. `marked` is the board markOne left, which is what makes the
-            -- pair the removal that actually happened.
+            -- CR 120.3c's and CR 310.6's counter removals join the losses, after
+            -- the damage and for the same reason: they are a RESULT of it (CR
+            -- 120.3c, CR 120.3h), so the cause reads first. `marked` is the board
+            -- markOne left, which is what makes the pair the removal that
+            -- actually happened.
             List.foldl'
               (flip Event.recordEvent)
               dealt
-              (concatMap (\(ev, n) -> lifeLostBy ev n <> lifeGainedBy ev) (zip survivors lost) <> removalsBetween board marked)
+              (concatMap (uncurry lifeLostBy) (zip survivors lost) <> removalsBetween board marked)
     )
   -- CR 120.3's counter results, run AFTER the records above for `lifeLostBy`'s
   -- reason: putCounters records CR 122.6's own CountersPut, and a cause reads
@@ -1384,6 +1370,58 @@ applyDamage events = do
   -- Faith puts on no counter), which is the rule as well.
   State.modify' $ \gs ->
     gs {GameState.pendingPreventionRiders = GameState.pendingPreventionRiders gs <> Seq.fromList (filter (Maybe.isJust . Prevention.rider) prevented)}
+  pure survivors
+
+-- CR 120.3f's gain, RECORDED -- processDamage's `gainOne` performs it -- so that
+-- "whenever you gain life" sees lifelink (CR 702.15b) and not only an effect
+-- that says the words. The record lands here and the gain itself earlier, which
+-- is the split `lifeLostBy` there already has.
+--
+-- A function of its own, run AFTER processDamage and so after any bracket a
+-- caller puts around it, because CR 702.15e makes each lifelink source's gain a
+-- life gain EVENT of its own: "if multiple sources with lifelink deal damage at
+-- the same time, they cause separate life gain events". dealWave brackets a
+-- combat damage step as one Pawl.Types.EventGroup (CR 510.2), and a gain
+-- recorded inside that bracket shares it, which fused two attackers' gains into
+-- one trigger event for TriggerCondition.PlayersGainLife. At depth 0 -- every
+-- caller today -- each record is a group of its own; a bracket an outer caller
+-- left open would take them all, as it takes everything. Pawl.EventTriggerSpec's
+-- lifelinkGainEventsSpec is the proof, and its damage-group assertion pins that
+-- the damage stayed bracketed.
+--
+-- Logged after the damage, its loss and its counter results, which is the
+-- order a cause reads before its consequence. All of it lands inside one CR
+-- 117.5 boundary, so the triggers are gathered together either way and this
+-- fixes only the canonical order.
+--
+-- ONE record per damage event, never per player: summing two sources' gains
+-- first would be one event, and a Pridemate would get one counter where it is
+-- owed two. Not implemented: the other direction, one source dealing damage to
+-- several recipients at once being ONE life gain event, where this records one
+-- per recipient (#2950).
+--
+-- Whom the damage was dealt to is none of this function's business, exactly as
+-- it is none of `gainOne`'s: CR 702.15b hangs the gain off the SOURCE, so damage
+-- to a creature or a planeswalker gains life just as damage to a player does.
+-- `lifeLostBy` scopes to a player recipient because CR 120.3a does; this one
+-- must not.
+--
+-- CR 119.9's zero guard, stated HERE rather than left to the callers, and the
+-- same posture `lifeLostBy` takes. No producer in the pool builds a 0-amount
+-- event today -- CR 510.1a makes `attackerAssignment` drop a creature assigning
+-- 0 or less, and Resolve's DealDamage arm guards its own quantity -- so this
+-- restates the rule at the site that writes the record instead of resting on
+-- an invariant two modules away.
+recordLifelinkGains :: [DamageEvent.DamageEvent] -> Game ()
+recordLifelinkGains survivors =
+  State.modify' $ \gs ->
+    List.foldl'
+      ( \g ev -> case DamageEvent.dealtByLifelink ev of
+          Just pid | DamageEvent.amount ev > 0 -> Event.recordEvent (GameEvent.LifeGained (LifeChange.MkLifeChange pid (DamageEvent.amount ev))) g
+          _ -> g
+      )
+      gs
+      survivors
 
 -- Deal one combat damage step, returning True iff this was the FIRST of two --
 -- i.e. a second combat damage step must be spliced (CR 510.4).
@@ -1425,17 +1463,20 @@ dealCombatDamage = do
 
 -- Gather this wave's damage under `assigns` and apply it.
 --
--- ONE Pawl.Types.EventGroup for the whole wave, which is CR 510.2 in as many
--- words: "all combat damage that's been assigned is dealt simultaneously". CR
--- 603.2c's batch conditions are what a board can read that with --
--- TriggerCondition.PermanentsDealCombatDamageToPlayer fires once for the step
--- where its per-damager twin fires once per event, and Pawl.Engine.Event's
--- batchScoped is that fork. The life loss, life gain and counter removals
--- applyDamage records ride inside the bracket too: CR 120.3's results of the
--- damage, simultaneous with it. Per WAVE and not per combat: CR 510.4's second
--- combat damage step is a second step, so a double striker that connects in both
--- is two occurrences.
+-- ONE Pawl.Types.EventGroup for the whole wave's damage, which is CR 510.2 in
+-- as many words: "all combat damage that's been assigned is dealt
+-- simultaneously". CR 603.2c's batch conditions are what a board can read that
+-- with -- TriggerCondition.PermanentsDealCombatDamageToPlayer fires once for the
+-- step where its per-damager twin fires once per event, and Pawl.Engine.Event's
+-- batchScoped is that fork. The life loss and counter removals processDamage
+-- records ride inside the bracket too: CR 120.3's results of the damage,
+-- simultaneous with it. Lifelink's gains do NOT: CR 702.15e makes each source's
+-- gain a life gain event of its own, so recordLifelinkGains lands them once the
+-- bracket has closed. Per WAVE and not per combat: CR 510.4's second combat
+-- damage step is a second step, so a double striker that connects in both is
+-- two occurrences.
 dealWave :: (ObjectId -> Bool) -> Game ()
 dealWave assigns = do
   assignment <- gatherCombatDamage assigns
-  Event.simultaneously (applyDamage assignment)
+  survivors <- Event.simultaneously (processDamage assignment)
+  recordLifelinkGains survivors

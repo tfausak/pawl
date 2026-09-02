@@ -214,7 +214,7 @@ cyclingTriggerSpec s registry =
           gs = g1 {GameState.priority = Just S.alice}
           -- The same card, the same graveyard, one component over: a cost that
           -- discards a card of the player's choice rather than this one.
-          discarded = S.runPure S.identityAnswer gs (Cost.payComponent PaymentMoment.OutsideResolution S.alice S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
+          discarded = S.runPure S.identityAnswer gs (Cost.payComponent PaymentMoment.OutsideResolution Map.empty S.alice S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
           after = S.runPure S.identityAnswer discarded Engine.settleForPriority
       Spec.assertEqWith s "the Aven really did reach the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice discarded)) 1
       Spec.assertEqWith s "nothing was put on the stack" (GameState.stack after) []

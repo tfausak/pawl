@@ -299,7 +299,9 @@ battlefieldCandidates gs =
 -- Not bracketed: CR 701.21's fold over a bound group (#757), token creation and
 -- CR 508.1's attacker declaration, so the events each records are read as a
 -- sequence (see #441). CR 510.2's combat damage IS: Pawl.Engine.Damage.dealWave
--- brackets each combat damage step.
+-- brackets each combat damage step -- the damage and its CR 120.3 results, with
+-- lifelink's gains recorded after the bracket closes, since CR 702.15e makes
+-- each source's gain an event of its own.
 simultaneously :: Game a -> Game a
 simultaneously body = do
   State.modify' openEventGroup
@@ -1924,7 +1926,7 @@ apply batch candidate event =
             -- which is channel 3 of applyReplacementsIn's note and not this
             -- exclusion.
             let entering oid2 = oid2 == oid || Set.member oid2 batch
-                offered = filter (not . entering) (Replacement.sacrificeCandidates controller (Just oid) criterion gs)
+                offered = filter (not . entering) (Replacement.sacrificeCandidates Map.empty controller (Just oid) criterion gs)
             chosen <-
               -- Where the rules leave nothing to ask, don't prompt: with no
               -- candidate the empty set is the only answer. ONE candidate is
