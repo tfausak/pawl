@@ -4223,6 +4223,132 @@ luluSpec s registry =
               Spec.assertEqWith s "CR 508.1b and both Pikers really were declared at carol" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.carol), (second, AttackTarget.OfPlayer S.carol)])
             _ -> Spec.assertFailure s "fixture should give alice two Pikers and bob a Lulu"
 
+-- CR 508.3d's SUBJECT named by the payload: the player who declared the
+-- attackers, bound under Pawl.Engine.Binding.attackingPlayer.
+--
+-- Synthetic Marauder's Toll {2}{W} Enchantment
+-- (data/cards/synthetic-marauders-toll.json): "Whenever a player attacks, the
+-- attacking player loses 2 life." SYNTHETIC because both printings that name
+-- rule 508.3d's player back need a clause pawl cannot express yet: Norn's
+-- Decree {2}{W} prints "if one or more players being attacked are poisoned"
+-- (no Filter atom reads a player's poison counters) beside a GROUPED
+-- combat-damage trigger, and Mirkwood Trapper {1}{G}{U} prints "if they aren't
+-- attacking you" beside a choice made by a player who is not the ability's
+-- controller (#2930). Both are the real producers and neither is weakened
+-- here; the toll's one line is rule 508.3d's binding and nothing else.
+--
+-- THREE SEATS, because two collapse the attacker onto either the ability's
+-- controller or the attacked player: bob holds the enchantment, alice
+-- declares, and CR 506.2a's answer sends the declaration at carol. So the
+-- three readings a wrong arm could take -- the declarer, CR 109.5's "you", and
+-- CR 508.1b's announced player -- are three different life totals.
+--
+-- The ACTIVE player is not discriminated from the declarer and cannot be: CR
+-- 506.2 lets only the active player declare attackers, so the two are the same
+-- seat on every board the rules admit.
+marauderTollSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+marauderTollSpec s registry =
+  let -- Answers CR 506.2a's turn-based choice with `defender` and sends every
+      -- Piker at that player, both FILTERED out of what the engine offered
+      -- rather than built, luluSpec's reason above.
+      answering :: PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      answering defender attackers p = case p of
+        Prompt.ChooseDefender _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== defender) (NonEmpty.toList options))
+        Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
+        Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer defender) (NonEmpty.toList options))
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      sentAt gs = Combat.Type.attackers (GameState.combat gs)
+      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacks (AbilityTriggered.condition record)]
+      fixture = do
+        piker <- S.printingOf s registry "Goblin Piker"
+        toll <- S.printingOf s registry "Synthetic Marauder's Toll"
+        pure (S.threePlayerCombat [piker, piker] [toll] [])
+   in Spec.describe s "Synthetic Marauder's Toll" $ do
+        -- The proving test: alice declares, so the 2 life comes off alice --
+        -- not off bob, whose enchantment it is, and not off carol, whom the
+        -- declaration was announced at.
+        Spec.it s "CR 508.3d the declaring player is the one that pays" $ do
+          (gs, mine, theirs, _) <- fixture
+          case (mine, theirs) of
+            ([first, second], [_]) -> do
+              let after = atBlockers (answering S.carol [first, second]) gs
+              Spec.assertEqWith s "CR 119.3 alice lost the 2 life and neither other seat lost any" (lives after) (Just 18, Just 20, Just 20)
+              Spec.assertEqWith s "CR 508.3d one trigger for the one declaration, however many creatures were in it" (fired after) 1
+              Spec.assertEqWith s "CR 508.1b and both Pikers really were declared at carol" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.carol), (second, AttackTarget.OfPlayer S.carol)])
+            _ -> Spec.assertFailure s "fixture should give alice two Pikers and bob a Toll"
+        -- The same board with CR 506.2a's answer moved to bob, and nothing else
+        -- changed. The attacked player moves and the payer does not, which is
+        -- what parts this slot from the one CR 508.3e's arm stamps.
+        Spec.it s "CR 508.3d the payer does not follow who was attacked" $ do
+          (gs, mine, theirs, _) <- fixture
+          case (mine, theirs) of
+            ([first, second], [_]) -> do
+              let after = atBlockers (answering S.bob [first, second]) gs
+              Spec.assertEqWith s "CR 119.3 alice still lost the 2 life, and bob none" (lives after) (Just 18, Just 20, Just 20)
+              Spec.assertEqWith s "CR 508.3d and it fired once here too" (fired after) 1
+              Spec.assertEqWith s "CR 508.1b and both Pikers really were declared at bob" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.bob), (second, AttackTarget.OfPlayer S.bob)])
+            _ -> Spec.assertFailure s "fixture should give alice two Pikers and bob a Toll"
+
+-- CR 508.3e's TWO subjects named by one payload, which is what parts the
+-- attacking player's slot from the attacked player's.
+--
+-- Synthetic Reprisal Ledger {1}{U}{B} Enchantment
+-- (data/cards/synthetic-reprisal-ledger.json): "Whenever a player attacks
+-- another player, the attacking player loses 2 life and the attacked player
+-- loses 3 life." SYNTHETIC because Archnemesis {1}{U}{B}, the printing that
+-- names rule 508.3e's attacking player ("whenever a player attacks you, you may
+-- attach this Aura to that player"), needs CR 303.4's attaching an Aura to a
+-- PLAYER and a CR 508.3e attacked side named by attachment, neither of which
+-- pawl has (#2931). Seifer, Balamb Rival and Lulu,
+-- Stern Guardian above read the attacked player alone.
+--
+-- THREE SEATS and TWO DIFFERENT AMOUNTS, so no pair of readings agrees: bob
+-- holds the Ledger, alice declares, carol is announced. An arm binding one
+-- player under both slots takes 5 life off one seat, and an arm that swapped
+-- them takes 3 off alice.
+reprisalLedgerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+reprisalLedgerSpec s registry =
+  let answering :: PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      answering defender attackers p = case p of
+        Prompt.ChooseDefender _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== defender) (NonEmpty.toList options))
+        Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
+        Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer defender) (NonEmpty.toList options))
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      sentAt gs = Combat.Type.attackers (GameState.combat gs)
+      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacksPlayer (AbilityTriggered.condition record)]
+      fixture = do
+        piker <- S.printingOf s registry "Goblin Piker"
+        ledger <- S.printingOf s registry "Synthetic Reprisal Ledger"
+        pure (S.threePlayerCombat [piker, piker] [ledger] [])
+   in Spec.describe s "Synthetic Reprisal Ledger" $ do
+        -- The proving test: three seats, three life totals, and the two slots
+        -- land on the two players rule 508.3e names.
+        Spec.it s "CR 508.3e the attacker and the attacked player are told apart" $ do
+          (gs, mine, theirs, _) <- fixture
+          case (mine, theirs) of
+            ([first, second], [_]) -> do
+              let after = atBlockers (answering S.carol [first, second]) gs
+              Spec.assertEqWith s "CR 119.3 alice lost 2 as the attacker, carol 3 as the attacked player, bob none" (lives after) (Just 18, Just 20, Just 17)
+              Spec.assertEqWith s "CR 508.3e one trigger from the one attacked player" (fired after) 1
+              Spec.assertEqWith s "CR 508.1b and both Pikers really were declared at carol" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.carol), (second, AttackTarget.OfPlayer S.carol)])
+            _ -> Spec.assertFailure s "fixture should give alice two Pikers and bob a Ledger"
+        -- CR 506.2a's answer moved to bob, so the ability's own controller is
+        -- the attacked player: the 3 follows the announcement onto bob while
+        -- the 2 stays on alice.
+        Spec.it s "CR 508.3e the attacked player's 3 follows the announcement" $ do
+          (gs, mine, theirs, _) <- fixture
+          case (mine, theirs) of
+            ([first, second], [_]) -> do
+              let after = atBlockers (answering S.bob [first, second]) gs
+              Spec.assertEqWith s "CR 119.3 alice still lost 2, and bob lost the 3" (lives after) (Just 18, Just 17, Just 20)
+              Spec.assertEqWith s "CR 508.3e and it fired once here too" (fired after) 1
+              Spec.assertEqWith s "CR 508.1b and both Pikers really were declared at bob" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.bob), (second, AttackTarget.OfPlayer S.bob)])
+            _ -> Spec.assertFailure s "fixture should give alice two Pikers and bob a Ledger"
+
 -- CR 122.1's experience counters READ, with Ezuri, Claw of Progress {2}{G}{U}
 -- Legendary Creature -- Phyrexian Elf Warrior 3/3: "Whenever a creature you
 -- control with power 2 or less enters, you get an experience counter. At the
@@ -5918,6 +6044,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   hermesSpec s registry
   seiferSpec s registry
   luluSpec s registry
+  marauderTollSpec s registry
+  reprisalLedgerSpec s registry
   ezuriExperienceSpec s registry
   savantiRomeroSpec s registry
   youngPyromancerSpec s registry

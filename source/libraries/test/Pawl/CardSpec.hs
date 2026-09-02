@@ -2823,6 +2823,7 @@ reservedSlots =
       Binding.blockingCreature,
       Binding.blockedCreature,
       Binding.attackingCreature,
+      Binding.attackingPlayer,
       Binding.combatDamager,
       Binding.mentoredCreature
     ]

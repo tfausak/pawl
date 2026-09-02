@@ -96,11 +96,8 @@ data TriggerCondition
     -- already carries the permanent an arm for them would read (#2279).
     AttachedPlayerIsAttacked
   | -- | CR 508.3d: "whenever [a player] attacks" -- once per declaration,
-    -- against GameEvent.AttackersDeclared.
-    --
-    -- Not implemented: rule 508.3d's bound attacking player -- "that player"
-    -- and "the attacking player", which Norn's Decree and Mirkwood Trapper
-    -- print (#2154).
+    -- against GameEvent.AttackersDeclared, with the declaring player bound
+    -- under Pawl.Engine.Binding.attackingPlayer.
     PlayerAttacks PlayerRelation.PlayerRelation
   | -- | CR 508.3c: "whenever [a player] attacks with [a creature]" (Hermes,
     -- Overseer of Elpis) -- the arm above narrowed by a Filter over the
@@ -110,10 +107,8 @@ data TriggerCondition
     -- three or more creatures" needs (#2226).
     PlayerAttacksWith PlayerAttacksWith.PlayerAttacksWith
   | -- | CR 508.3e: "whenever [a player] attacks [another player]" (Seifer,
-    -- Balamb Rival), once per pair; only AttackTarget.OfPlayer matches.
-    --
-    -- Not implemented: the attacking player as a bound slot, which Archnemesis'
-    -- "attach this Aura to that player" needs (#2810).
+    -- Balamb Rival), once per pair; only AttackTarget.OfPlayer matches. Both
+    -- players are bound -- see Pawl.Engine.Event.eventBindingSlots.
     PlayerAttacksPlayer PlayerAttacksPlayer.PlayerAttacksPlayer
   | -- | CR 702.105a: dethrone -- SelfAttacks narrowed to the player with the
     -- most life, or tied for most. Only AttackTarget.OfPlayer satisfies it.

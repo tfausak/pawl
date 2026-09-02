@@ -11374,18 +11374,29 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- attacking that player" -- and Object.attachedTo is a Recipient.
   (TriggerCondition.AttachedPlayerIsAttacked, GameEvent.BecameAttacked (BecameAttacked.MkBecameAttacked _ (AttackTarget.OfPlayer attacked))) ->
     Binding.setTriggerPlayer attacked Map.empty
-  -- CR 508.3e's SECOND subject, off the same event and under the same reserved
-  -- slot: whom the declaration was aimed at, which is what "that player" means
-  -- in Seifer, Balamb Rival's "goad target creature that player controls". The
+  -- CR 508.3d's subject: the player who declared the attackers, which is the
+  -- only thing the event carries. Bound under Binding.attackingPlayer and not
+  -- under the reserved "that player" slot, for the arm below's reason -- rule
+  -- 508.3e names two players at once, and one name per role is what makes a
+  -- payload that reaches for the wrong one read a dead slot.
   --
-  -- Not implemented: the ATTACKING player the event also carries, which
-  -- Archnemesis' "attach this Aura to that player" needs (#2810).
+  -- Unconditional given a match, which is what eventBindingSlots' per-condition
+  -- promise needs: every GameEvent.AttackersDeclared carries a PlayerId, and it
+  -- is the only thing it carries.
+  (TriggerCondition.PlayerAttacks _, GameEvent.AttackersDeclared attacker) ->
+    Binding.setAttackingPlayer attacker Map.empty
+  -- CR 508.3e's TWO subjects, both off the one event. Whom the declaration was
+  -- aimed at goes under the reserved "that player" slot, which is what the
+  -- phrase means in Seifer, Balamb Rival's "goad target creature that player
+  -- controls"; the player who declared goes under Binding.attackingPlayer, the
+  -- arm above's slot, which is what it means in Archnemesis' "you may attach
+  -- this Aura to that player".
   --
   -- The narrowing to AttackTarget.OfPlayer is matchesTrigger's, re-stated here
   -- because this function is not given its answer: an event this condition
   -- rejected reaches no binding at all.
-  (TriggerCondition.PlayerAttacksPlayer {}, GameEvent.BecameAttacked (BecameAttacked.MkBecameAttacked _ (AttackTarget.OfPlayer attacked))) ->
-    Binding.setTriggerPlayer attacked Map.empty
+  (TriggerCondition.PlayerAttacksPlayer {}, GameEvent.BecameAttacked (BecameAttacked.MkBecameAttacked attacker (AttackTarget.OfPlayer attacked))) ->
+    Binding.setAttackingPlayer attacker (Binding.setTriggerPlayer attacked Map.empty)
   -- CR 509.3e's "that attacking creature", off the grouped blocking event: the
   -- attacker the event names, and again not the bearer, which is a bystander.
   -- CR 508.5's defending player rides that event too and goes unbound, the
@@ -11906,27 +11917,28 @@ eventBindingSlots cond = case cond of
   -- a set of creatures rather than one, and Curse of Vitality's payload says
   -- "that player" and nothing about them.
   TriggerCondition.AttachedPlayerIsAttacked -> Set.singleton Binding.triggerPlayer
-  -- NOTHING, and neither the attacker nor the player: rule 508.3d names a SET
-  -- of creatures, so there is no one attacker to point at. Boggart Prankster's
-  -- and Avatar Roku, Firebender's payloads target or say "you" rather than
-  -- pointing at the declarer. That is also why this condition needs no arm in
-  -- eventBindings.
+  -- The DECLARING player, and not the creatures: rule 508.3d names a SET of
+  -- them, so there is no one attacker to point at, where the player the rule
+  -- makes its subject is exactly one seat. Norn's Decree's "the attacking
+  -- player" is the phrase.
   --
-  -- Not implemented: the declaring player as a bound slot, which "that player"
-  -- and "the attacking player" need (#2154). Both must move together with
-  -- eventBindings, which Pawl.ZoneTriggerSpec pins against this.
-  TriggerCondition.PlayerAttacks _ -> Set.empty
+  -- Unconditional, as this classification has to be: every
+  -- GameEvent.AttackersDeclared carries a PlayerId.
+  TriggerCondition.PlayerAttacks _ -> Set.singleton Binding.attackingPlayer
   -- The arm above's reason verbatim: rule 508.3c's subject is a player and the
   -- Filter names a SET of creatures, so there is nothing to point at either.
   TriggerCondition.PlayerAttacksWith {} -> Set.empty
-  -- The ATTACKED player, where the two arms above bind nothing: rule 508.3e
-  -- names a second player, and that is the one the printed payloads read --
-  -- Seifer, Balamb Rival's "that player controls".
+  -- BOTH of rule 508.3e's players: the attacked one under the reserved "that
+  -- player" slot, which Seifer, Balamb Rival's "that player controls" reads, and
+  -- the attacking one under the slot the PlayerAttacks arm above uses, which
+  -- Archnemesis' "attach this Aura to that player" reads. The only condition
+  -- that promises two players, rule 508.3e being the only one whose subject is a
+  -- pair.
   --
   -- Unconditional, as this classification has to be, although matchesTrigger
   -- admits only AttackTarget.OfPlayer: every event this condition MATCHES
-  -- carries a player, and eventBindings is consulted for no other.
-  TriggerCondition.PlayerAttacksPlayer {} -> Set.singleton Binding.triggerPlayer
+  -- carries both players, and eventBindings is consulted for no other.
+  TriggerCondition.PlayerAttacksPlayer {} -> Set.fromList [Binding.triggerPlayer, Binding.attackingPlayer]
   -- NOTHING, for SelfAttacksWithAnother's reason: rule 702.105a's payload names
   -- only "this creature", so the attacked player is compared and then never
   -- pointed at. That is also why this condition needs no arm in eventBindings.
