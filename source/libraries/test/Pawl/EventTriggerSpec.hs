@@ -2537,11 +2537,12 @@ communalVigilSpec s registry =
 -- The board: alice casts it for X in her precombat main, and the hasty Knights
 -- attack bob and connect in one combat damage step -- one Pawl.Types.EventGroup,
 -- Pawl.Engine.Damage.dealWave bracketing the step (CR 510.2), which the group
--- count pins as the precondition. Becoming the monarch is idempotent (CR 725.3;
--- Monarch.crown records nothing for a player already crowned), so the COUNT of
--- firings is read off the stack as the step's turn-based action settles, the
--- reading Megrim's group takes above: one trigger for the batch, where a
--- per-member gatherer stacks two.
+-- count pins as the precondition. The monarch is a designation a player has or
+-- lacks (CR 725.1), so crowning alice twice looks exactly like crowning her
+-- once -- Monarch.crown records nothing for a player already crowned -- and the
+-- COUNT of firings is read off the stack as the step's turn-based action
+-- settles, the reading Megrim's group takes above: one trigger for the batch,
+-- where a per-member gatherer stacks two.
 --
 -- "Creatures you control": on alice's own turn no creature she does not control
 -- can deal combat damage to a player, so the ControlledBy half of the filter is
@@ -2643,6 +2644,23 @@ forthEorlingasSpec s registry =
           Spec.assertEqWith s "alice became the monarch" (GameState.monarch after) (Just S.alice)
           Spec.assertEqWith s "one trigger on the stack" (length (GameState.stack placed)) 1
           Spec.assertEqWith s "the one Knight connected, for two" (S.lifeOf S.bob after) (Just 18)
+        -- The control that separates "once per event GROUP" from a collapse
+        -- coarser than the group -- once per scan, the wrong-direction fix the
+        -- boards above cannot tell apart, each holding one group. TWO combat
+        -- damage groups reach ONE settle, and each is its own trigger event: two
+        -- triggers. A per-scan collapse stacks one.
+        --
+        -- The log is written directly, S.withEvents giving each event its own
+        -- group, because every funnel that deals a second batch also settles
+        -- between them -- and then the two groups would be two scans, which is
+        -- not the reading under test.
+        Spec.it s "CR 704.3 two combat damage groups in one scan are two trigger events" $ do
+          gs <- armed 2
+          let hit knight = GameEvent.DamageDealt (DamageEvent.MkDamageEvent knight (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat)
+              staged = S.withEvents (fmap hit (knights gs)) gs
+              placed = S.runPure S.identityAnswer staged Engine.settleForPriority
+          Spec.assertEqWith s "one trigger per group, so two" (length (GameState.stack placed)) 2
+          Spec.assertEqWith s "two damage events, in two event groups" (length (combatDamageGroups staged)) 2
         -- "This turn", differing from the proving case in exactly one thing:
         -- which turn's combat the Knights attack in. The turn that armed the
         -- entry passes with no attack, bob takes his, and on alice's next turn
