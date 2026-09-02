@@ -2919,6 +2919,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfDealsCombatDamageToPlayer -> condition
   TriggerCondition.SelfIsDealtDamage -> condition
   TriggerCondition.PermanentDealsCombatDamageToPlayer f -> TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.rewrite pairs f)
+  TriggerCondition.PermanentsDealCombatDamageToPlayer f -> TriggerCondition.PermanentsDealCombatDamageToPlayer (Filter.rewrite pairs f)
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> condition
   TriggerCondition.OpponentLostLifeDuringYourTurn -> condition
   TriggerCondition.SelfCycled -> condition

@@ -8,6 +8,7 @@
 module Pawl.KeywordTriggerSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -57,6 +58,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Modal as Modal
@@ -4323,6 +4325,69 @@ tovolarSpec s registry =
               Spec.assertEqWith s "and he drew none" (handSize S.bob after) 0
             _ -> Spec.assertFailure s "fixture should give alice a Tovolar and a Wolves, bob a Tovolar"
 
+-- CR 603.2c's FIRST sentence on the same event: "whenever ONE OR MORE artifact
+-- creatures you control deal combat damage to a player" fires once for the CR
+-- 510.2 step however many connected --
+-- TriggerCondition.PermanentsDealCombatDamageToPlayer, the batch twin of the
+-- condition tovolarSpec above proves.
+--
+-- Pia Nalaar, Chief Mechanic {G}{U}{R} Legendary Creature -- Human Artificer 2/4
+-- is the card (data/cards/pia-nalaar-chief-mechanic.json): "Whenever one or more
+-- artifact creatures you control deal combat damage to a player, you get {E}{E}."
+-- Name, cost, type line and Oracle text checked against Scryfall 2026-09-01.
+-- Not implemented: her second ability, "at the beginning of your end step, you
+-- may pay one or more {E}. If you do, create an X/X colorless Vehicle artifact
+-- token named Nalaar Aetherjet with flying and crew 2, where X is the amount of
+-- {E} paid this way" -- a token whose power is a bound amount (#2813). Omitting
+-- an optional ability leaves the card STRICTER than printed.
+--
+-- The discrimination is the energy count with two artifact creatures connecting:
+-- {E}{E} is the batch reading, {E}{E}{E}{E} is the per-damager one Tovolar's
+-- condition would give, and none is silence. Pia attacks too and is no artifact,
+-- which is the Filter doing its work inside the same batch. The pool's artifact
+-- creatures are Palladium Myr (2/2) and Spined Thopter (2/1 flying).
+--
+-- What makes the two connections ONE trigger event is Pawl.Engine.Damage.dealWave
+-- bracketing the step as one Pawl.Types.EventGroup (CR 510.2), which the group
+-- count pins as the precondition: were each DamageDealt its own group, "once per
+-- group" and "once per damager" would coincide and the {E}{E} would prove nothing.
+piaNalaarSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+piaNalaarSpec s registry =
+  let board mine = do
+        ours <- mapM (S.printingOf s registry) mine
+        let (gs, _, _) = S.combatBoardOf ours []
+        pure (S.runCombat S.aggressiveAnswer gs)
+      energy = S.playerCounterOf PlayerCounterKind.Energy S.alice
+      -- The distinct EventGroups the log's combat damage carries.
+      combatDamageGroups gs =
+        List.nub
+          ( Maybe.mapMaybe
+              ( \logged -> case LoggedEvent.event logged of
+                  GameEvent.DamageDealt ev | DamageEvent.kind ev == DamageKind.Combat -> Just (LoggedEvent.group logged)
+                  _ -> Nothing
+              )
+              (Foldable.toList (GameState.events gs))
+          )
+   in Spec.describe s "Batched combat damage" $ do
+        -- The proving test: two artifact creatures and Pia connect in one step.
+        Spec.it s "CR 603.2c two artifact creatures connecting in one step give {E}{E}, not {E}{E}{E}{E}" $ do
+          after <- board ["Pia Nalaar, Chief Mechanic", "Palladium Myr", "Spined Thopter"]
+          Spec.assertEqWith s "alice got {E}{E} for the step, not {E}{E}{E}{E}" (energy after) 2
+          Spec.assertEqWith s "all three connected, for six" (S.lifeOf S.bob after) (Just 14)
+          Spec.assertEqWith s "CR 510.2: the three damage events were one event group" (length (combatDamageGroups after)) 1
+        -- The board that differs in one artifact creature: one connecting is one
+        -- occurrence under either reading, so this is the negative half's floor
+        -- rather than a discrimination.
+        Spec.it s "CR 603.2c one artifact creature connecting gives {E}{E} too" $ do
+          after <- board ["Pia Nalaar, Chief Mechanic", "Palladium Myr"]
+          Spec.assertEqWith s "alice got {E}{E} for the one" (energy after) 2
+          Spec.assertEqWith s "both connected, for four" (S.lifeOf S.bob after) (Just 16)
+        -- The Filter: Pia alone connects, and she is no artifact.
+        Spec.it s "CR 603.2c a non-artifact connecting alone gives nothing" $ do
+          after <- board ["Pia Nalaar, Chief Mechanic"]
+          Spec.assertEqWith s "alice got no energy" (energy after) 0
+          Spec.assertEqWith s "though Pia connected, for two" (S.lifeOf S.bob after) (Just 18)
+
 -- What the filtered condition is FOR: a payload that aims at the creature that
 -- dealt the damage (Pawl.Engine.Binding.combatDamager) rather than at the bearer
 -- -- Aragorn, Hornburg Hero {1}{R}{G}{W} Legendary Creature -- Human Soldier 4/4,
@@ -5178,6 +5243,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cumulativeUpkeepSpec s registry
   modularSpec s registry
   tovolarSpec s registry
+  piaNalaarSpec s registry
   aragornSpec s registry
   shroofusSpec s registry
   afflictSpec s registry
