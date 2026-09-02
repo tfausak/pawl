@@ -2250,6 +2250,8 @@ boundSlots = Const.getConst . overBoundSlots (Const.Const . Set.singleton)
 -- its slots per occurrence, so a filter naming a SIBLING slot -- Fall of the
 -- Hammer's "another target creature" is Not (IsBound "dealer") -- would otherwise
 -- name occurrence 0's slot from occurrence 1 and read a binding that is not its
--- own.
+-- own. The function it is given is a PARTIAL rename (Modal.ownSlot): a name the
+-- mode does not declare belongs to CR 603.2's environment, which no occurrence
+-- copies, and must come back unchanged.
 renameBound :: (SlotName.SlotName -> SlotName.SlotName) -> Filter.Filter Keyword.Type.Keyword -> Filter.Filter Keyword.Type.Keyword
 renameBound rename = Identity.runIdentity . overBoundSlots (Identity.Identity . rename)
