@@ -4966,8 +4966,8 @@ data Framing
     -- reason: the candidate is an object all right, but no slot of any
     -- resolution names it.
     --
-    -- FOUR positions, every cost Pawl.Types.Face prints directly: CR 118.12's
-    -- gate cost, paid by Pawl.Engine.Resolve.payGatePaidBy through
+    -- FOUR positions: CR 118.12's gate cost, paid by
+    -- Pawl.Engine.Resolve.payGatePaidBy through
     -- Pawl.Engine.Cost.canPay and .pay; CR 601.2f's additional cost and CR
     -- 118.9's alternative cost, both paid through the same two functions as a
     -- cast is announced; and CR 116.2d's ignore cost, paid there again by
@@ -4987,12 +4987,12 @@ data Framing
     -- question there would need (#2924). No printing asks it -- Scryfall
     -- o:"additional cost" o:"other than the target", 2026-09-01, no hit.
     --
-    -- Not implemented: the FIVE cost positions a card reaches through something
-    -- other than a Face field -- an activated ability's cost, CR 508.1h's and CR
-    -- 509.1d's per-creature combat costs, CR 611.2's UntilPaid duration and CR
-    -- 613.11's two added cost lists. Every one is paid through the same
-    -- Pawl.Engine.Cost, which has no contextWithSlots caller at all, so each
-    -- promises what this tag denies; they are still Unframed (#2927).
+    -- Not implemented: the five OTHER cost positions a card can write -- an
+    -- activated ability's cost, CR 508.1h's and CR 509.1d's per-creature combat
+    -- costs, CR 116.2c's UntilPaid duration and CR 613.11's two added cost
+    -- lists. Every one is paid through the same Pawl.Engine.Cost, which has no
+    -- contextWithSlots caller at all, so each promises what this tag denies;
+    -- they are still Unframed (#2927).
     SlotlessCostFramed
   -- Bounded and Enum so the framing coverage case below enumerates
   -- [minBound .. maxBound] rather than a hand-kept list: a constructor added
@@ -9635,8 +9635,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "CR 118.12 a planted atom in a gate's cost is an offence" (isBoundCounts gated) (1, 0)
     Spec.assertBool s (isBoundOffends gated) "and the lint says so"
     -- THE THREE SIBLING POSITIONS, which #2883 tagged after #2881 tagged the
-    -- gate: every other cost a FACE can print is paid through the same
-    -- Pawl.Engine.Cost, so the same buried atom is a silent False in each. Built
+    -- gate: an additional cost, an alternative cost's own half and a special
+    -- action's cost are paid through the same Pawl.Engine.Cost, so the same
+    -- buried atom is a silent False in each. Built
     -- over the SAME `base` face and the SAME `buried` filter as every leg above,
     -- so they differ from the accepted leg in position and in nothing else.
     let sacrificing = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 buried)]
