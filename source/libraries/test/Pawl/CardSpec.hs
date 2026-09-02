@@ -7364,7 +7364,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- name CR 603.2's "that player" through a PlayerRef buried INSIDE the number --
   -- "with mana value X or less, where X is the amount of life that player gained
   -- this turn" -- and QuantitySlot.slots does not report that read, only
-  -- Quantity.nestedRefs does. Without it the pairing is invisible and a card could
+  -- QuantitySlot.nestedRefs does. Without it the pairing is invisible and a card could
   -- bound a slot by a player its condition never binds, which is the dead bound
   -- the fold exists to catch.
   Spec.it s "the lint itself catches a computed bound naming a slot through a player" $ do
@@ -7392,8 +7392,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfEnters [bounded you])))
       "where a bound naming no slot at all is accepted"
-    -- And the OTHER read QuantitySlot.slots does not report: CR 400.7j's fold, which
-    -- names a slot outright rather than through a reference. Asserted on the map
+    -- And the OTHER read QuantitySlot.slots does not report: CR 400.7j's fold,
+    -- which names a slot outright rather than through a reference. Asserted on the map
     -- itself, there being no trigger condition that binds an ordinary target slot
     -- for the lint to accept it against.
     let overBound =
@@ -8111,8 +8111,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- set, so it is no risk and no fence for the others either.
         --
         -- Not implemented: a PlayerRef NESTED IN a quantity -- Quantity's own
-        -- ControllerOfBound arm -- which QuantitySlot.slots answers empty for, so the
-        -- quantity leg cannot report it and nothing else looks there (#1079).
+        -- ControllerOfBound arm -- which QuantitySlot.slots answers empty for,
+        -- so the quantity leg cannot report it and nothing else looks there
+        -- (#1079).
         --
         -- The condition of a DELAYED ability is a singular reader too, and it is
         -- fenced on both axes: triggerConditionSlots and filterSlotsReadSingly
@@ -8431,8 +8432,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (clashes [destruction, counting (against destroyedSlot)]) "a singular read inside a number is caught"
     Spec.assertBool s (not (clashes [destruction, counting (against elsewhereSlot)])) "a singular read inside a number of another slot is left alone"
     -- The same atom under a NEST, which is the half a top-level number cannot
-    -- prove: a QuantitySlot.slots answering the empty set for Negate would pass both
-    -- assertions above.
+    -- prove: a QuantitySlot.slots answering the empty set for Negate would pass
+    -- both assertions above.
     Spec.assertBool s (clashes [destruction, counting (Quantity.Type.Negate (against destroyedSlot))]) "a singular read nested inside a number is caught"
     -- The OTHER slot-naming arm of a number, on the same board: Quantity.InSlot
     -- reads Binding.amount through Pawl.Engine.Binding.amountOf and reaches
@@ -9517,9 +9518,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       (1, 0)
     -- The pool's sixth author, jointly judged through the BOUND itself rather
     -- than through the pool beside it: Synthetic Measured Refrain's bound folds
-    -- over what a sibling slot names (Scope.OverBound), which is the read CR 700.2d's
-    -- per-occurrence rename has to follow -- Pawl.TargetSpec's "CR 700.2d a
-    -- repeated mode's computed bound measures its own occurrence's sibling slot".
+    -- over what a sibling slot names (Scope.OverBound), which is the read CR
+    -- 700.2d's per-occurrence rename has to follow -- Pawl.TargetSpec's "CR 700.2d
+    -- a repeated mode's computed bound measures its own occurrence's sibling
+    -- slot".
     measured <- S.printingOf s registry "Synthetic Measured Refrain"
     Spec.assertEqWith
       s

@@ -1073,10 +1073,11 @@ legalSets perspective seed source slots gs =
 -- TWO PASSES, because CR 601.2c makes one slot's legal set depend on another's:
 -- a ZoneScope.InSlot pool names a slot and so may a CR 202.3 computed bound, so
 -- the first pass answers every slot with no bindings at all and the second
--- re-answers only the slots that name one (secondPass), against the first pass. The rule chooses every target AT ONCE, so
--- there is no order to consult -- what a dependent slot is offered is the UNION
--- over the answers the slot it names could still take, and selectionLegal is
--- where the announcement is judged as one act.
+-- re-answers only the slots that name one (secondPass), against the first pass.
+-- The rule chooses every target AT ONCE, so there is no order to consult -- what
+-- a dependent slot is offered is the UNION over the answers the slot it names
+-- could still take, and selectionLegal is where the announcement is judged as one
+-- act.
 --
 -- The second pass reads the FIRST pass's map and not its own, which is what
 -- makes a chain of dependent slots terminate rather than recur: a slot naming
@@ -1116,21 +1117,22 @@ secondPass declared slot =
     || boundNamesSibling declared slot
 
 -- Does this slot's CR 202.3 computed bound read one of the announcement's OWN
--- slots? Quantity.allSlots is the reading half of the rename CR 700.2d applies to
--- the same field (Pawl.Engine.Modal.instanceScope), so a bound this reports is a
--- bound that follows its mode's occurrence.
+-- slots? QuantitySlot.allSlots is the reading half of the rename CR 700.2d applies
+-- to the same field (Pawl.Engine.Modal.instanceScope), so a bound this reports is
+-- a bound that follows its mode's occurrence.
 boundNamesSibling :: Set SlotName -> TargetSlot -> Bool
 boundNamesSibling declared slot =
   not (Set.disjoint declared (foldMap QuantitySlot.allSlots (TargetSlot.amount slot)))
 
 -- Must this slot's answer be judged against what its SIBLING slots were answered
--- with (CR 601.2c)? Two ways one slot depends on another, and they are the pool's
--- and the filter's:
+-- with (CR 601.2c)? Three ways one slot depends on another, and they are the
+-- pool's, the filter's and the bound's:
 --
 --   * the POOL names a slot (dependsOnSlot below), which is Dwell on the Past's
 --     "their graveyard";
 --   * the FILTER reads one, which is CR 601.2c's "another" between two slots of
---     one announcement -- Fall of the Hammer's Not (IsBound "dealer").
+--     one announcement -- Fall of the Hammer's Not (IsBound "dealer");
+--   * the CR 202.3 computed BOUND names one (boundNamesSibling above).
 --
 -- Filter.boundSlots is the read half, the same set Pawl.Engine.Resolve's dataflow
 -- lint folds over a mode's slots, so an atom that function does not report is one
@@ -1146,10 +1148,11 @@ boundNamesSibling declared slot =
 -- slot filter names a seed is on a triggered ability, and no trigger reaches
 -- selectionLegal at all (#2472), so dropping `declared` reddens nothing.
 --
--- Only the JOINT CHECK reads this, never legalSetsGiven's second pass. That pass
--- is a WIDENING -- it offers the union over what a named slot could still take --
--- and "another" is a NARROWING, so handing it every sibling candidate at once
--- would exclude every candidate and leave the slot unfillable.
+-- The FILTER half is what only the JOINT CHECK reads, never legalSetsGiven's
+-- second pass. That pass is a WIDENING -- it offers the union over what a named
+-- slot could still take -- and "another" is a NARROWING, so handing it every
+-- sibling candidate at once would exclude every candidate and leave the slot
+-- unfillable. The other two halves the second pass does read; secondPass is which.
 jointlyJudged :: Set SlotName -> TargetSlot -> Bool
 jointlyJudged declared slot =
   dependsOnSlot (TargetSlot.pool slot)

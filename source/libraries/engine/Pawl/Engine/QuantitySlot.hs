@@ -221,7 +221,7 @@ renameRefSlots rename = go
         -- quantity may hide a reference of its own.
         (\c -> (mapCount go c) {Count.Type.scope = renameScope rename (mapScope (renamePlayerRef rename) (Count.Type.scope c))})
 
--- Every read of a slot this quantity makes that QuantitySlot.slots does not report: a
+-- Every read of a slot this quantity makes that `slots` above does not report: a
 -- PlayerRef nested inside it, which names a TARGET slot rather than an amount one
 -- and which that function leaves to Resolve.slotsOf -- and slotsOf cannot see a
 -- reference buried in a quantity (#1079) -- plus CR 400.7j's Scope.OverBound,
@@ -229,12 +229,12 @@ renameRefSlots rename = go
 -- knows (Resolve.playerRefSlots); `Right` is a slot named directly.
 --
 -- Two callers want different halves of it, which is why this is the set of reads
--- rather than the Bool below: slotsAreExhaustive asks whether any of them names a
--- slot at all, and Pawl.Engine.Resolve.targetSlotSlots turns them into the slots a
+-- rather than a Bool: Pawl.Engine.Quantity.slotsAreExhaustive asks whether any of
+-- them names a slot at all, and Resolve.targetSlotSlots turns them into the slots a
 -- CR 202.3 computed bound reads, so the D4 dataflow lint can see a bound naming a
 -- slot its carrier never binds.
 --
--- One arm per constructor, no wildcard, for QuantitySlot.slots' reason: a new quantity arm
+-- One arm per constructor, no wildcard, for `slots`' reason: a new quantity arm
 -- carrying a reference must answer here rather than default to reading nothing,
 -- which would both hide a dead bound and license an unsound elision.
 nestedRefs :: Quantity -> Set (Either PlayerRef.PlayerRef SlotName)
@@ -243,7 +243,7 @@ nestedRefs quantity = case quantity of
   Quantity.ManaValue -> Set.empty
   Quantity.Power -> Set.empty
   Quantity.Toughness -> Set.empty
-  -- The amount reader, which QuantitySlot.slots reports itself.
+  -- The amount reader, which `slots` above reports itself.
   Quantity.InSlot _ -> Set.empty
   Quantity.Star -> Set.empty
   Quantity.Plus (Plus.MkPlus a b) -> Set.union (nestedRefs a) (nestedRefs b)
@@ -251,7 +251,7 @@ nestedRefs quantity = case quantity of
   -- the whole question.
   Quantity.Halved (Halved.MkHalved _ inner) -> nestedRefs inner
   Quantity.Negate a -> nestedRefs a
-  -- Both halves QuantitySlot.slots skips: the Scope's own read, and the per-member quantity
+  -- Both halves `slots` skips: the Scope's own read, and the per-member quantity
   -- of a Greatest, which may hide a reference of its own.
   Quantity.Count c -> Set.union (scopeRefs (Count.Type.scope c)) (foldCount nestedRefs c)
   Quantity.ManaCount c -> Set.singleton (Left (ManaCount.Type.player c))
@@ -285,7 +285,7 @@ nestedRefs quantity = case quantity of
   Quantity.EnteredFrom inZone -> Set.singleton (Left (InZone.player inZone))
   Quantity.WasCastFrom inZone -> Set.singleton (Left (InZone.player inZone))
   Quantity.BlockersBeyondFirst -> Set.empty
-  -- Its own slot is left out because QuantitySlot.slots DOES report it, unlike the
+  -- Its own slot is left out because `slots` above DOES report it, unlike the
   -- nested PlayerRefs; the payload is walked like any other.
   Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> nestedRefs inner
 

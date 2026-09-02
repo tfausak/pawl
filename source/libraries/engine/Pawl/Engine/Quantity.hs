@@ -900,14 +900,15 @@ containsStar quantity = case quantity of
   -- one's.
   _ -> False
 
--- Pawl.Engine.QuantitySlot.slots split by WHICH HALF of the binding the read is of: the subset it
--- reports that names an OBJECT. Exactly the AgainstSlot arms, which aim an inner
+-- QuantitySlot.slots split by WHICH HALF of the binding the read is of: the
+-- subset it reports that names an OBJECT. Exactly the AgainstSlot arms, which aim an inner
 -- number at the object a slot names and reach Filter.slotOneObject to find it --
 -- and that declines a slot naming several rather than picking one of them
 -- (Binding.onlyOne's doctrine), so such a read is damaged by a plural slot.
 --
--- The difference from QuantitySlot.slots is the InSlot arm, which reads the slot's AMOUNT
--- (Binding.amountOf, see evaluateAgainst above) and reaches slotOneObject on no
+-- The difference from QuantitySlot.slots is the InSlot arm, which reads the
+-- slot's AMOUNT (Binding.amountOf, see evaluateAgainst above) and reaches
+-- slotOneObject on no
 -- road at all. Pawl.Types.SlotName is one flat namespace, so a card MAY name an
 -- amount slot what a plural target slot is named; classifying that read as a
 -- singular OBJECT read is what would reject such a card for a reason that is not
@@ -915,7 +916,8 @@ containsStar quantity = case quantity of
 -- as presence for the D4 dataflow lint and arity for the count lint.
 --
 -- Exhaustive with no fallthrough, slotsAreExhaustive's shape and for its reason:
--- a new arm naming a slot must answer here rather than inherit QuantitySlot.slots' answer.
+-- a new arm naming a slot must answer here rather than inherit that function's
+-- answer.
 objectSlots :: Quantity -> Set SlotName
 objectSlots quantity = case quantity of
   -- The amount reader, left out for the reason above.
@@ -933,7 +935,8 @@ objectSlots quantity = case quantity of
   -- DESCENT into a Greatest's per-member number, which may aim at a slot of its
   -- own; the other two aggregations carry no number to ask.
   Quantity.Count c -> QuantitySlot.foldCount objectSlots c
-  -- Every remaining arm names no slot at all, QuantitySlot.slots saying the same of each:
+  -- Every remaining arm names no slot at all, QuantitySlot.slots saying the same
+  -- of each:
   -- the references they carry are PlayerRefs, which name a target slot neither
   -- walk reports and Resolve.slotsOf cannot recover from here (#1079).
   Quantity.ManaCount _ -> Set.empty
@@ -971,9 +974,9 @@ objectSlots quantity = case quantity of
   -- against the named object and may aim at a further slot of its own.
   Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Set.insert slot (objectSlots inner)
 
--- CR 603.3b: is QuantitySlot.slots the WHOLE of what evaluating this quantity reads
--- off the resolving object's bindings? It is not wherever QuantitySlot.nestedRefs above finds
--- a read that names a slot -- a nested PlayerRef that reads one, or a scope that
+-- CR 603.3b: is QuantitySlot.slots the WHOLE of what evaluating this quantity
+-- reads off the resolving object's bindings? It is not wherever
+-- QuantitySlot.nestedRefs finds a read that names a slot -- a nested PlayerRef that reads one, or a scope that
 -- names one outright. Resolve.slotsAreExhaustive is the sole caller and carries
 -- the whole account.
 slotsAreExhaustive :: Quantity -> Bool
@@ -1018,8 +1021,8 @@ playerRefIsSlotless ref = case ref of
 -- for it, Condition.holds collapses that to False, and CR 611.2b's duration
 -- never starts -- rather than starting on a reference nothing can resolve.
 --
--- Exhaustive, QuantitySlot.slots' posture: a new arm carrying a PlayerRef must fail to
--- compile here rather than silently keep an unbaked one -- which is what
+-- Exhaustive, QuantitySlot.slots' posture: a new arm carrying a PlayerRef must
+-- fail to compile here rather than silently keep an unbaked one -- which is what
 -- Pawl.Engine.QuantitySlot.mapPlayerRefs is, and this is one instance of it.
 bakeBound :: Map.Map SlotName PlayerId.PlayerId -> Quantity -> Quantity
 bakeBound players =
@@ -1109,17 +1112,18 @@ bakePlayerRef players ref = case ref of
 -- Does this quantity read CR 601.2b's announced X? Since #14 retired X's
 -- dedicated constructor, that read is a Quantity.InSlot naming
 -- Binding.variableX, and it can sit anywhere inside a quantity rather than only
--- at its root -- so answering needs the same recursion QuantitySlot.slots has, and an
--- equality test against a bare X does not answer it at all.
+-- at its root -- so answering needs the same recursion QuantitySlot.slots has,
+-- and an equality test against a bare X does not answer it at all.
 --
 -- Resolve.readsX is the one caller: it asks "does this card read X?" for the lint
 -- that pairs a read against the cost's {X} (CR 107.3, CR 107.3a, CR 118.4).
 -- Vitalizing Cascade's "X plus 3" is the card that distinguishes the two
 -- answers.
 --
--- Written out arm by arm rather than as a filter over QuantitySlot.slots, for the reason it
--- itself is: a new Quantity constructor must make its author answer "does this
--- read X?" explicitly, rather than inherit whatever the other function decided.
+-- Written out arm by arm rather than as a filter over QuantitySlot.slots, for
+-- that function's own reason: a new Quantity constructor must make its author
+-- answer "does this read X?" explicitly, rather than inherit whatever the other
+-- function decided.
 readsX :: Quantity -> Bool
 readsX quantity = case quantity of
   Quantity.InSlot slot -> slot == Binding.variableX
@@ -1135,7 +1139,8 @@ readsX quantity = case quantity of
   -- arm the CR 107.3 lint would call the card an unannounced-X reader on one
   -- side and an unread announcement on the other.
   Quantity.Negate a -> readsX a
-  -- Terminating for the reason QuantitySlot.overSlots' Count arm is: a Greatest's payload is a
+  -- Terminating for the reason QuantitySlot.overSlots' Count arm is: a Greatest's
+  -- payload is a
   -- strictly smaller subterm.
   Quantity.Count c -> QuantitySlot.anyCount readsX c
   -- Every remaining arm is a LEAF holding no Quantity, so none can hide an X.
