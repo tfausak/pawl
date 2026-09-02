@@ -33,10 +33,11 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- 'RandomCardInHand' carries a bare PlayerRef instead, since it holds only the
 -- one field.
 --
--- 'EachCardExiledWithSource' takes an OPTIONAL payload: the bare tag is the whole
--- linked set (CR 607.3), and a value narrows it to the cards a printing's own
--- words name. The three printings written before Karn Liberated keep the bare
--- tag, so the widening changed no card on the wire.
+-- 'EachCardExiledWithSource' and 'EachCardInYourLibrary' take an OPTIONAL
+-- payload: the bare tag is the whole set -- the linked one (CR 607.3), the whole
+-- library (CR 400.12) -- and a value narrows it to the cards a printing's own
+-- words name. Both widenings left the printings written before them on the bare
+-- tag, so neither changed a card on the wire.
 codec :: Codec.Codec ObjectRef.ObjectRef
 codec =
   Arm.tagged
@@ -45,7 +46,7 @@ codec =
       Arm.payload "EachCardInGraveyard" EachCardInGraveyard.codec ObjectRef.EachCardInGraveyard (\x -> case x of ObjectRef.EachCardInGraveyard y -> Just y; _ -> Nothing),
       Arm.nullary "EachCardInYourHand" ObjectRef.EachCardInYourHand,
       Arm.payload "EachCardInHand" EachCardInHand.codec ObjectRef.EachCardInHand (\x -> case x of ObjectRef.EachCardInHand y -> Just y; _ -> Nothing),
-      Arm.nullary "EachCardInYourLibrary" ObjectRef.EachCardInYourLibrary,
+      Arm.optionalPayload "EachCardInYourLibrary" filterCodec ObjectRef.EachCardInYourLibrary (\x -> case x of ObjectRef.EachCardInYourLibrary y -> Just y; _ -> Nothing),
       Arm.optionalPayload "EachCardExiledWithSource" filterCodec ObjectRef.EachCardExiledWithSource (\x -> case x of ObjectRef.EachCardExiledWithSource y -> Just y; _ -> Nothing),
       Arm.payload "EachSpell" filterCodec ObjectRef.EachSpell (\x -> case x of ObjectRef.EachSpell y -> Just y; _ -> Nothing),
       Arm.payload "EachOnStack" filterCodec ObjectRef.EachOnStack (\x -> case x of ObjectRef.EachOnStack y -> Just y; _ -> Nothing),
