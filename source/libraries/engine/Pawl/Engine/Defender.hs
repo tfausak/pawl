@@ -110,7 +110,7 @@ playerOf controllerOf target gs = case target of
 -- removed from combat with its protector unmoved, and the live read is still rule
 -- 802.2a's answer. An attacked player is the seat itself.
 --
--- The live arms below it answer for an attacker with no recorded seat: a combat
+-- playerOf's own live arms answer for an attacker with no recorded seat: a combat
 -- record built by hand rather than declared. In a running game both writers of
 -- Combat.attackers record one.
 playerOfAttacker :: (ObjectId -> GameState -> Maybe PlayerId) -> ObjectId -> GameState -> Maybe PlayerId
