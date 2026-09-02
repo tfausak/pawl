@@ -566,7 +566,8 @@ mayhemDevilSpec s registry =
           let (victim, gs) = trackerBoard tracker mindslaver S.alice
               after = S.runPure S.identityAnswer gs (sacrificeThen S.alice victim)
           Spec.assertEqWith s "CR 109.5: nobody's life total moved" (lives after) (Just 20, Just 20, Just 20)
-          Spec.assertBool s (not (S.onBattlefield victim after)) "though the artifact really left the battlefield"
+          Spec.assertBool s (S.onBattlefield victim gs) "the artifact was on the battlefield to begin with"
+          Spec.assertBool s (not (S.onBattlefield victim after)) "and really left it"
         -- The FILTER falsifier, one atom the other way: the same opponent, a
         -- CREATURE token instead of an artifact one.
         Spec.it s "CR 701.21a a creature is not the artifact the Tracker watches for" $ do
@@ -575,7 +576,8 @@ mayhemDevilSpec s registry =
           let (victim, gs) = trackerBoard tracker piker S.bob
               after = S.runPure S.identityAnswer gs (sacrificeThen S.bob victim)
           Spec.assertEqWith s "CR 701.21a: nobody's life total moved" (lives after) (Just 20, Just 20, Just 20)
-          Spec.assertBool s (not (S.onBattlefield victim after)) "though the creature really left the battlefield"
+          Spec.assertBool s (S.onBattlefield victim gs) "the creature was on the battlefield to begin with"
+          Spec.assertBool s (not (S.onBattlefield victim after)) "and really left it"
 
 -- Barbarian Outcast {1}{R} Creature -- Human Barbarian Beast 2/2:
 -- "When you control no Swamps, sacrifice this creature." CR 603.8's own example

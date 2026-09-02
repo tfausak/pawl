@@ -2391,7 +2391,7 @@ everyTriggerCondition =
     TriggerCondition.AttachedCreatureDies,
     TriggerCondition.AttachedCreatureBecomesTapped,
     TriggerCondition.SelfTrains,
-    -- BOTH relations, on the PlayerAttacksWith trio's reasoning above: an
+    -- ALL THREE relations, on the PlayerAttacksWith trio's reasoning above: an
     -- eventBindings arm that had cased on the relation and stamped nothing under
     -- one of them would go unseen if only one were listed. Vengeful Tracker
     -- prints the Opponent form and Mayhem Devil the AnyPlayer one.
