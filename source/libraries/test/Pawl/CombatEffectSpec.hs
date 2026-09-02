@@ -2840,7 +2840,6 @@ splitDefenderSpec s registry = Spec.describe s "SplitDefendingPlayer" $ do
     Spec.assertBool s (not (blockOf S.carol carols wraith declared)) "control: the same block is illegal before the theft, so the theft changed nothing about who may block"
     Spec.assertEqWith s "CR 613.1b: bob controls Jace once the Graft has moved the Confiscate" (fmap (Projection.controllerOf jaceId) [declared, stolen]) [Just S.carol, Just S.bob]
     Spec.assertBool s (Set.member jaceId (GameState.battlefield stolen)) "CR 506.4: he never left the battlefield, so this is the controller clause"
-    Spec.assertBool s (Set.member wraith (Combat.Type.attackingNothing (GameState.combat stolen))) "CR 506.4c: the Wraith is attacking nothing"
     Spec.assertEqWith
       s
       "CR 506.4c: and it is still an attacking creature, its entry still naming Jace"

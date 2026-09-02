@@ -1132,6 +1132,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- Maybe equality on that path, which two Nothings satisfy; the arm answers
       -- Nothing there either way.
       --
+      -- A REGRESSION FENCE rather than a proven behavior, the battle arm's
+      -- posture below: THE RECORD already answers at every moment CR 117.5
+      -- samples, so mutating this conjunct to True leaves the suite green.
+      --
       -- CARD TYPE, through `peers`, which is what makes rule 506.4's planeswalker
       -- clause reachable without Projection.isPlaneswalkerOf: that one calls project,
       -- the re-entry `peers` exists to keep out of this function, while `peers` is
