@@ -338,6 +338,14 @@ data Filter keyword
     -- relation, one spelling, rather than a parallel Exclusion field on each
     -- (#163).
     IsSource
+  | -- | CR 115.1: the candidate, a stack object, has the evaluation's source
+    -- among its CR 601.2c targets (Terror of the Peaks' "spells ... that target
+    -- this creature"); IsSource's posture, vacuously False off the stack.
+    TargetsSource
+  | -- | CR 115.1 / 115.10a: the candidate has a player in this relation to the
+    -- perspective among its targets, a ToPlayer alone counting (Shell of the
+    -- Last Kappa's "spell that targets you").
+    TargetsPlayer PlayerRelation.PlayerRelation
   | -- | The candidate IS the object the resolution bound in this slot -- Into the
     -- Wilds' "if it's a land card", where the clause before it looked at the top
     -- card of the library and bound it (Effect.LookAt).

@@ -237,6 +237,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.ReturnWatch as ReturnWatch
@@ -624,7 +625,11 @@ effectObjectRefs effect = case effect of
   -- beside this one is a PlayerRef.
   Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> [attacker]
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> [ref]
-  Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ ref) -> [ref]
+  -- One side only, and only when a ref names it: the Matching arm is a Filter
+  -- (CR 611.2c's class), and what the attack is aimed at is a PlayerScope.
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
+    RestrictedCreatures.Named ref -> [ref]
+    RestrictedCreatures.Matching _ -> []
   Effect.CreateEmblem {} -> []
   Effect.BecomeMonarch {} -> []
   Effect.Designate {} -> []
@@ -781,7 +786,7 @@ effectPlayerRefs effect = case effect of
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.PlayerSacrifices {} -> []
-  Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref _) -> [ref]
+  Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.player takeExtraTurn]
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> Maybe.maybeToList named
   Effect.Shuffle ref -> [ref]
   Effect.OfferCast (OfferCast.MkOfferCast _ caster _ _) -> [caster]
@@ -1027,7 +1032,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.RollDie rollDie -> maybe Map.empty quantitySlots (RollDie.modifier rollDie)
   -- And a DEFINITION too, on top of the slots the coin count reads.
   Effect.FlipCoin flipCoin -> quantitySlots (FlipCoin.count flipCoin)
-  Effect.TakeExtraTurn {} -> Map.empty
+  -- The slots the turn count reads (Ral Zarek's tally of heads).
+  Effect.TakeExtraTurn takeExtraTurn -> quantitySlots (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> Map.empty
   -- The arm above's library read, reported at the head; nothing is shuffled into
   -- it, so there is no ref beside it either.
@@ -1457,7 +1463,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- CantBeRegenerated's reason again.
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
-  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _) ->
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _ _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- RequireBlock's reason, one axis over.
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) ->
@@ -1489,7 +1495,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.ChooseOpponentAtRandom _ -> True
   Effect.RollDie rollDie -> all Quantity.slotsAreExhaustive (RollDie.modifier rollDie)
   Effect.FlipCoin flipCoin -> Quantity.slotsAreExhaustive (FlipCoin.count flipCoin)
-  Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> True
+  Effect.TakeExtraTurn takeExtraTurn -> Quantity.slotsAreExhaustive (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> True
   Effect.Shuffle {} -> True
   Effect.OfferCast {} -> True
@@ -1651,7 +1657,8 @@ readsX = any effectReadsX
       -- The number of coins is an ordinary Quantity, so it may be the X the
       -- caster announced (Flock of Rabid Sheep's "flip X coins").
       Effect.FlipCoin flipCoin -> Quantity.readsX (FlipCoin.count flipCoin)
-      Effect.TakeExtraTurn {} -> False
+      -- The number of turns is an ordinary Quantity too.
+      Effect.TakeExtraTurn takeExtraTurn -> Quantity.readsX (TakeExtraTurn.count takeExtraTurn)
       Effect.ShuffleIntoLibrary {} -> False
       Effect.Shuffle {} -> False
       Effect.OfferCast {} -> False
@@ -7091,31 +7098,45 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               | object <- objects
               ]
          in gs1 {GameState.blockProhibitions = stored <> GameState.blockProhibitions gs1}
-  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration ref) ->
-    -- CR 508.1c / 611.1: store one restriction per permanent the ref names.
-    -- ForbidBlock above is the model and every one of its arguments carries over:
-    -- the ref is enumerated ONCE, for the CR 608.2f simultaneity objectRefObjects
-    -- buys, and an illegal slot (CR 608.2b) stores nothing, which is Netter
-    -- en-Dal's fizzle.
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration affected aimedAt) ->
+    -- CR 508.1c / 611.1: store one restriction per permanent a Named ref names,
+    -- or ONE row for a Matching class. ForbidBlock above is the model for the
+    -- first and every one of its arguments carries over: the ref is enumerated
+    -- ONCE, for the CR 608.2f simultaneity objectRefObjects buys, and an illegal
+    -- slot (CR 608.2b) stores nothing, which is Netter en-Dal's fizzle.
+    --
+    -- The class is NOT enumerated, CR 611.2c's third sentence: a restriction on a
+    -- declaration modifies no characteristic and no controller, so it reaches
+    -- creatures that enter after this resolution, and the Filter is stored to be
+    -- re-read at each declaration. Its bound player slots are baked now,
+    -- Expiry.arm's reason for baking a ForAsLongAs condition -- the bindings that
+    -- answer them are gone once this resolution is over.
+    --
+    -- CR 109.5's controller is baked, AffectPlayers' reason: the source is a
+    -- sorcery in a graveyard by the time "you" is asked of the row.
     --
     -- Nothing is written onto the permanent itself, and nothing is projected: CR
     -- 613.11 keeps a restriction on a declaration out of the layers, so the row
-    -- is read at Pawl.Engine.CombatRestriction.attackProhibited and never by a
-    -- projection.
+    -- is read at Pawl.Engine.CombatRestriction.attackProhibited (or, aimed, at
+    -- Pawl.Engine.CombatRestriction.cantAttackPlayer) and never by a projection.
     State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
       -- CR 611.2b: the duration never started, so nothing is stored.
       Nothing -> gs
       Just expiry ->
-        let objects = objectRefObjects legal resolving controller source gs ref
+        let subjects = case affected of
+              RestrictedCreatures.Named ref -> fmap RestrictedCreatures.Named (objectRefObjects legal resolving controller source gs ref)
+              RestrictedCreatures.Matching f -> [RestrictedCreatures.Matching (Filter.bakeBound (Binding.playersIn legal) f)]
             (ts, gs1) = Game.freshTimestamp gs
             stored =
               [ ActiveAttackProhibition.MkActiveAttackProhibition
                   { ActiveAttackProhibition.source = source,
+                    ActiveAttackProhibition.controller = controller,
                     ActiveAttackProhibition.timestamp = ts,
                     ActiveAttackProhibition.expiry = expiry,
-                    ActiveAttackProhibition.object = object
+                    ActiveAttackProhibition.affected = subject,
+                    ActiveAttackProhibition.aimedAt = aimedAt
                   }
-              | object <- objects
+              | subject <- subjects
               ]
          in gs1 {GameState.attackProhibitions = stored <> GameState.attackProhibitions gs1}
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration attackerRef defenderRef) ->
@@ -8585,9 +8606,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
                         GameState.objects = foldr (Map.adjust sicken) (GameState.objects gs1) moved
                       }
-  Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref skips) -> do
+  Effect.TakeExtraTurn takeExtraTurn -> do
     gs <- State.get
-    let named = playerRefPlayers legal controller gs ref
+    let viewOf = effectViewOf source legal gs
+        context = effectContext (Game.teams gs) controller source legal (slotBindings resolving gs)
+        -- How many extra turns each named player is given, read ONCE: Ral
+        -- Zarek's "for each coin that comes up heads" is the tally the flip
+        -- before it bound. CR 107.2's posture for a quantity that cannot be
+        -- evaluated: no turns at all.
+        turns = Integer.toNaturalSaturating (Maybe.fromMaybe 0 (Quantity.evaluateFor viewOf context gs resolving source (TakeExtraTurn.count takeExtraTurn)))
+        named = playerRefPlayers legal controller gs (TakeExtraTurn.player takeExtraTurn)
         -- CR 500.7: extra turns are added one at a time in APNAP order (CR
         -- 101.4). apnapOrder supplies the ORDER and `named` the MEMBERSHIP, so a
         -- departed player gets no turn; one named through a TARGET slot can still
@@ -8602,8 +8630,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 500.11 / 113.7: the skips ride ALONG on each entry, naming that turn and
     -- no other; Engine.takeNextTurn installs them as the turn begins (see
     -- Pawl.Types.ExtraTurn).
-    let entry pid = ExtraTurn.MkExtraTurn {ExtraTurn.taker = pid, ExtraTurn.source = source, ExtraTurn.skipped = skips}
-    State.modify' (\g -> g {GameState.extraTurns = List.foldl' (\ts pid -> entry pid : ts) (GameState.extraTurns g) takers})
+    --
+    -- CR 500.7: "if a player is given multiple extra turns, the extra turns are
+    -- added one at a time" -- `turns` rounds, each pushing one turn per taker in
+    -- APNAP order. Whether the rounds nest inside the APNAP walk or around it is
+    -- observable only for an effect giving SEVERAL players SEVERAL turns each,
+    -- which no card in data/cards/ prints; Ral Zarek names one player.
+    let entry pid = ExtraTurn.MkExtraTurn {ExtraTurn.taker = pid, ExtraTurn.source = source, ExtraTurn.skipped = TakeExtraTurn.skips takeExtraTurn}
+        pushRound ts = List.foldl' (\acc pid -> entry pid : acc) ts takers
+    State.modify' (\g -> g {GameState.extraTurns = List.foldl' (\ts _ -> pushRound ts) (GameState.extraTurns g) [1 .. turns]})
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).

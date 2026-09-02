@@ -34,6 +34,7 @@ import qualified Pawl.Codec.AffectedUnlessSpec
 import qualified Pawl.Codec.AfterTurnSpec
 import qualified Pawl.Codec.AgainstSlotSpec
 import qualified Pawl.Codec.AggregationSpec
+import qualified Pawl.Codec.AimedAtSpec
 import qualified Pawl.Codec.AlternativeCostSpec
 import qualified Pawl.Codec.ArmDelayedTriggerSpec
 import qualified Pawl.Codec.AsCopySpec
@@ -319,6 +320,7 @@ import qualified Pawl.Codec.RequireAttackSpec
 import qualified Pawl.Codec.RequireBlockSpec
 import qualified Pawl.Codec.RequiredDefenderSpec
 import qualified Pawl.Codec.RestartSignalSpec
+import qualified Pawl.Codec.RestrictedCreaturesSpec
 import qualified Pawl.Codec.ResultSpec
 import qualified Pawl.Codec.ReturnPermanentsSpec
 import qualified Pawl.Codec.ReturnWatchSpec
@@ -598,6 +600,7 @@ spec s registry = do
   Pawl.Codec.AffectPlayersSpec.spec s
   Pawl.Codec.AffectedPlayersSpec.spec s
   Pawl.Codec.AffectedSpec.spec s
+  Pawl.Codec.AimedAtSpec.spec s
   Pawl.Codec.AffectedUnlessSpec.spec s
   Pawl.Codec.AfterTurnSpec.spec s
   Pawl.Codec.AgainstSlotSpec.spec s
@@ -885,6 +888,7 @@ spec s registry = do
   Pawl.Codec.ReplacementProvenanceSpec.spec s
   Pawl.Codec.RequireAttackSpec.spec s
   Pawl.Codec.RequireBlockSpec.spec s
+  Pawl.Codec.RestrictedCreaturesSpec.spec s
   Pawl.Codec.RequiredDefenderSpec.spec s
   Pawl.Codec.RestartSignalSpec.spec s
   Pawl.Codec.ResultSpec.spec s

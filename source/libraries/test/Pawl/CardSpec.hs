@@ -245,6 +245,7 @@ import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RollDie as RollDie
@@ -575,7 +576,7 @@ objectRefPositions =
     ("cant-be-regenerated", Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated Duration.UntilEndOfTurn (plantedRef "cb")), [plantedRef "cb"]),
     ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (plantedRef "ra") (PlayerRef.Relative PlayerRelation.You)), [plantedRef "ra"]),
     ("forbid-block", Effect.ForbidBlock (ForbidBlock.MkForbidBlock Duration.UntilEndOfTurn (plantedRef "fb")), [plantedRef "fb"]),
-    ("forbid-attack", Effect.ForbidAttack (ForbidAttack.MkForbidAttack Duration.UntilEndOfTurn (plantedRef "fa")), [plantedRef "fa"]),
+    ("forbid-attack", Effect.ForbidAttack (ForbidAttack.MkForbidAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "fa")) Nothing), [plantedRef "fa"]),
     ("unsuspect", Effect.Unsuspect (plantedRef "us"), [plantedRef "us"]),
     ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (plantedRef "sl")), [plantedRef "sl"]),
     ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (plantedRef "gp") ManaSpending.AsProduced), [plantedRef "gp"]),
@@ -616,7 +617,7 @@ playerRefPositions =
     ("remove-player-counters", Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "rp") PlayerCounterKind.Rad one), [plantedPlayer "rp"]),
     ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (plantedRef "ra") (plantedPlayer "ra-defender")), [plantedPlayer "ra-defender"]),
     ("blight", Effect.Blight (playerQuantity "bl"), [plantedPlayer "bl"]),
-    ("take-extra-turn", Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn (plantedPlayer "te") Set.empty), [plantedPlayer "te"]),
+    ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
     ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (plantedRef "si")), [plantedPlayer "si"]),
     ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
     ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (SlotName.MkSlotName (Text.pack "oc")) (plantedPlayer "oc-caster") CastObligation.Optional CastOffer.defaultValue), [plantedPlayer "oc-caster"])
@@ -1153,7 +1154,7 @@ ownCounts effect = case effect of
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationCounts duration
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) -> durationCounts duration
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) -> durationCounts duration
-  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _) -> durationCounts duration
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _ _) -> durationCounts duration
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationCounts duration
   Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
@@ -1178,7 +1179,8 @@ ownCounts effect = case effect of
   Effect.RollDie rollDie -> foldMap quantityCounts (RollDie.modifier rollDie)
   -- CR 705.1's number of coins is a Quantity, so its Counts are reachable here.
   Effect.FlipCoin flipCoin -> quantityCounts (FlipCoin.count flipCoin)
-  Effect.TakeExtraTurn {} -> []
+  -- CR 500.7's number of turns is a Quantity, so its Counts are reachable here.
+  Effect.TakeExtraTurn takeExtraTurn -> quantityCounts (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferCast {} -> []
@@ -1300,7 +1302,7 @@ ownQuantities effect = case effect of
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationQuantities duration
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) -> durationQuantities duration
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) -> durationQuantities duration
-  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _) -> durationQuantities duration
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _ _) -> durationQuantities duration
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationQuantities duration
   Effect.CreateEmblem _ -> []
   Effect.BecomeMonarch _ -> []
@@ -1323,7 +1325,7 @@ ownQuantities effect = case effect of
   Effect.ChooseOpponentAtRandom _ -> []
   Effect.RollDie rollDie -> Maybe.maybeToList (RollDie.modifier rollDie)
   Effect.FlipCoin flipCoin -> [FlipCoin.count flipCoin]
-  Effect.TakeExtraTurn {} -> []
+  Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.count takeExtraTurn]
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferCast {} -> []
@@ -3247,6 +3249,8 @@ canHostSubjects predicate = case predicate of
   -- PlayerRelation, which holds no Filter for a card author to reach.
   Filter.Type.OwnedBy _ -> 0
   Filter.Type.IsSource -> 0
+  Filter.Type.TargetsSource -> 0
+  Filter.Type.TargetsPlayer _ -> 0
   Filter.Type.IsPlayer _ -> 0
   Filter.Type.IsBound _ -> 0
   Filter.Type.SameNameAsBound _ -> 0
@@ -4312,6 +4316,8 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.ControlledByRecipient -> []
   Filter.Type.OwnedBy _ -> []
   Filter.Type.IsSource -> []
+  Filter.Type.TargetsSource -> []
+  Filter.Type.TargetsPlayer _ -> []
   -- Reads the whole bound set off Filter.Context, so a group is every one of its
   -- members rather than nothing -- the atom this lint must NOT report.
   Filter.Type.IsBound _ -> []
@@ -5345,7 +5351,14 @@ effectFilters effect = case effect of
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
   -- CantBeRegenerated's arm, the same one axis.
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
-  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
+  -- The Named arm is CantBeRegenerated's ref; the Matching arm's class is read
+  -- through a bare Filter.contextFor at
+  -- Pawl.Engine.CombatRestriction.storedSubjects, so it is Unframed. The AimedAt
+  -- is a PlayerScope and CR 506.3 kinds, no Filter in either.
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration affected _) ->
+    frame Unframed (durationFilters duration) <> case affected of
+      RestrictedCreatures.Named ref -> frame SourceHostFramed (objectRefFilters ref)
+      RestrictedCreatures.Matching f -> unframed [f]
   -- RequireBlock's arm one axis over. The PlayerRef carries no Filter.
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration attacker _) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters attacker)
   -- CR 114.2's emblem is a whole card too.
@@ -5372,7 +5385,8 @@ effectFilters effect = case effect of
   Effect.RollDie rollDie -> frame Unframed (foldMap quantityFilters (RollDie.modifier rollDie))
   -- CR 705.1's number of coins is a Quantity, so its filters are reachable here.
   Effect.FlipCoin flipCoin -> frame Unframed (quantityFilters (FlipCoin.count flipCoin))
-  Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> []
+  -- CR 500.7's number of turns is a Quantity, so its filters are reachable here.
+  Effect.TakeExtraTurn takeExtraTurn -> frame Unframed (quantityFilters (TakeExtraTurn.count takeExtraTurn))
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> frame SourceHostFramed (objectRefFilters ref)
   -- A PlayerRef carries no Filter, exactly as GainPlayerCounters' does not.
   Effect.Shuffle {} -> []
@@ -5592,7 +5606,9 @@ effectObjectRefs effect = case effect of
   Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> read_ [blocker, attacker]
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated _ ref) -> read_ [ref]
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> read_ [ref]
-  Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ ref) -> read_ [ref]
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
+    RestrictedCreatures.Named ref -> read_ [ref]
+    RestrictedCreatures.Matching _ -> []
   Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> read_ [attacker]
   Effect.CreateEmblem {} -> []
   Effect.BecomeMonarch {} -> []

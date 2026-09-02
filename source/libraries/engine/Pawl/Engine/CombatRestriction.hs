@@ -41,6 +41,7 @@ import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
+import qualified Pawl.Types.AimedAt as AimedAt
 import qualified Pawl.Types.AttackTargetKind as AttackTargetKind
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
@@ -58,6 +59,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 
@@ -165,10 +167,30 @@ cantBlock defending candidates gs =
 -- No CR 508.1c "unless" gate, for blockProhibited's reason: every gate in the
 -- pool is printed beside the restriction it gates, and Pawl.Types.ForbidAttack
 -- states none.
+--
+-- Only the rows naming no AimedAt: a row that does is CR 802.3a's per-seat
+-- residue, and `cantAttackPlayer` is where it lands.
 attackProhibited :: [ObjectId] -> GameState -> Set ObjectId
 attackProhibited candidates gs =
-  let stopped = Set.fromList (fmap ActiveAttackProhibition.object (GameState.attackProhibitions gs))
-   in Set.intersection (Set.fromList candidates) stopped
+  let unaimed = filter (Maybe.isNothing . ActiveAttackProhibition.aimedAt) (GameState.attackProhibitions gs)
+   in Set.fromList (concatMap (storedSubjects candidates gs) unaimed)
+
+-- Which of `candidates` a stored attack restriction covers, its
+-- Pawl.Types.RestrictedCreatures read the way CR 611.2c says: a Named row is the
+-- id the resolution froze, and a Matching row is a class re-read against the
+-- LIVE board at each declaration, so a creature that entered after the effect
+-- began is inside it. Pawl.CombatSpec's StoredClassAttackRestriction group is the
+-- proof.
+--
+-- CR 109.5's "you" in the Filter is the STORED controller, not the source's
+-- projected one: the source is a sorcery in a graveyard by now, with no
+-- controller to project (Pawl.Types.ActivePlayerEffect's argument).
+storedSubjects :: [ObjectId] -> GameState -> ActiveAttackProhibition.ActiveAttackProhibition -> [ObjectId]
+storedSubjects candidates gs active = case ActiveAttackProhibition.affected active of
+  RestrictedCreatures.Named oid -> filter (== oid) candidates
+  RestrictedCreatures.Matching f ->
+    let context = Filter.contextFor (Game.teams gs) (Just (ActiveAttackProhibition.controller active)) (Just (ActiveAttackProhibition.source active))
+     in filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) f) candidates
 
 -- CR 509.1b / 611.1: the candidates a stored, resolution-generated restriction
 -- forbids blocking. Zirda, the Dawnwaker's "target creature can't block this
@@ -742,9 +764,22 @@ cantBeBlockedBy defending blockers attackers gs =
 -- word of a printed sentence with another, and a PlayerScope prints no word a
 -- text-changing effect reaches. The affected set is rewritten as `restricted`
 -- rewrites it, both halves being words on the source's card.
+--
+-- The STORED rows naming an AimedAt are unioned in here, `attackProhibited`'s
+-- posture on the other axis: Chronomantic Escape's "until your next turn,
+-- creatures can't attack you" has outlived its source (CR 611.2a), so it opts out
+-- of the liveness checks and the CR 612.1 swap every printed row passes, and its
+-- scope is read against the controller the resolution stored (CR 109.5). One
+-- answer on this axis, so Pawl.Engine.Combat.barredAnnouncements never learns
+-- which carrier a row came from.
 cantAttackPlayer :: [ObjectId] -> [PlayerId] -> GameState -> Set (ObjectId, PlayerId, AttackTargetKind.AttackTargetKind)
 cantAttackPlayer candidates players gs =
   let rows = gathered gs
+      stored active = case ActiveAttackProhibition.aimedAt active of
+        Nothing -> []
+        Just (AimedAt.MkAimedAt scope kinds) ->
+          let barred = filter (\pid -> PlayerEffect.inScope pid (ActiveAttackProhibition.controller active) gs scope) players
+           in [(creature, pid, kind) | creature <- storedSubjects candidates gs active, pid <- barred, kind <- Set.toList kinds]
       named source affected creature =
         Projection.affects
           source
@@ -765,7 +800,7 @@ cantAttackPlayer candidates players gs =
       -- of that announcement. One gather, one gate reading per seat,
       -- cantAttackDefender's shape. No printing gates this arm today.
       forSeat player = concatMap (fromRestriction player) (filter (not . lifted (Just player) gs) rows)
-   in Set.fromList (concatMap forSeat players)
+   in Set.fromList (concatMap forSeat players <> concatMap stored (GameState.attackProhibitions gs))
 
 -- The shared walk behind the two BOUNDS above, over the restrictions `select`
 -- keeps: the tightest of them, or Nothing where none is in force.

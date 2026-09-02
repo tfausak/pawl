@@ -19,6 +19,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
@@ -44,6 +45,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -52,6 +54,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -63,6 +66,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -4323,13 +4327,13 @@ storedAttackRestrictionSpec s registry = Spec.describe s "StoredAttackRestrictio
     let after = declaringAttackers resolved
     Spec.assertEqWith s "only the twin ended up attacking" (declaredAttackers after) [twin]
     Spec.assertBool s (not (Combat.canAttack S.alice victim resolved)) "and the named creature is off CR 508.1a's candidate list"
-    Spec.assertEqWith s "one restriction was stored, over the creature named" (fmap ActiveAttackProhibition.object (GameState.attackProhibitions resolved)) [victim]
+    Spec.assertEqWith s "one restriction was stored, over the creature named" (fmap ActiveAttackProhibition.affected (GameState.attackProhibitions resolved)) [RestrictedCreatures.Named victim]
   -- The pair's other half: the same activation, aimed at bob's Piker.
   Spec.it s "CR 508.1c aimed elsewhere, both of alice's twins attack" $ do
     (victim, twin, elsewhere, resolved) <- netterResolved s registry (\_ _ e -> e)
     let after = declaringAttackers resolved
     Spec.assertEqWith s "both twins attacked" (declaredAttackers after) [victim, twin]
-    Spec.assertEqWith s "and the restriction was stored all the same, over bob's Piker" (fmap ActiveAttackProhibition.object (GameState.attackProhibitions resolved)) [elsewhere]
+    Spec.assertEqWith s "and the restriction was stored all the same, over bob's Piker" (fmap ActiveAttackProhibition.affected (GameState.attackProhibitions resolved)) [RestrictedCreatures.Named elsewhere]
   -- CR 514.2 / 611.2a: "this turn" arms Expiry.AtCleanup, so the cleanup sweep
   -- drops the row and the creature attacks again. Through the sweep directly,
   -- which is the narrowest path that shows it.
@@ -4422,6 +4426,132 @@ facingBob gs =
 
 -- Alice active with priority in her precombat main phase, which is when the
 -- activation above is made.
+-- CR 611.2c's third sentence on the stored carrier: a resolving "creatures can't
+-- attack you" modifies no characteristic and no controller, so it modifies the
+-- rules and reaches creatures that were not on the battlefield when it began --
+-- a CLASS, where Netter en-Dal's row above froze one id. Chronomantic Escape
+-- ({4}{W}{W} Sorcery, "Until your next turn, creatures can't attack you. Exile
+-- Chronomantic Escape with three time counters on it. / Suspend 3--{2}{W}" --
+-- checked against Scryfall, 2026-09-02) is the pool's producer, and the row it
+-- stores is read at Pawl.Engine.CombatRestriction.cantAttackPlayer beside the
+-- printed carrier's.
+--
+-- Not implemented, and STRICTER than printed in both places: the suspend keyword
+-- and the self-exile with time counters (#875), so pawl's card is cast for its
+-- mana cost alone and goes to the graveyard as CR 608.2n says, never returning.
+-- Neither reaches the restriction this group is about.
+--
+-- THREE SEATS with both opponents defending (CR 802.2), the only board on which
+-- "can't attack you" and a blanket "can't attack" come apart for a creature with
+-- no planeswalker to aim at, and the pair: the same board with the Escape left
+-- in alice's hand.
+storedClassAttackRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+storedClassAttackRestrictionSpec s registry = Spec.describe s "StoredClassAttackRestriction" $ do
+  Spec.it s "CR 611.2c whole cards: a creature that entered after the Escape resolved still can't attack alice" $ do
+    -- GAMEPLAY LEVEL, from bob's beginning of combat step so CR 703.4h picks
+    -- both defending players (CR 802.2) and CR 703.4i declares, under an answerer
+    -- that aims at alice wherever she is offered. The Pikers are 2/1s and nobody
+    -- has a blocker, so each life total is one creature's doing.
+    (early, late, restricted, _, control) <- escapeBoards s registry
+    let after = S.runCombat (S.attackTo S.alice) (bobsCombat restricted)
+        opened = S.runCombat (S.attackTo S.alice) (bobsCombat control)
+    Spec.assertEqWith s "alice takes nothing, the late Piker included" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "and carol takes both Pikers' 4" (S.lifeOf S.carol after) (Just 16)
+    Spec.assertEqWith s "both were declared, since carol is still attackable" (S.attackerDeclarationsOf after) [early, late]
+    Spec.assertEqWith s "with the Escape uncast, alice takes both" (S.lifeOf S.alice opened) (Just 16)
+    Spec.assertEqWith s "and carol nothing" (S.lifeOf S.carol opened) (Just 20)
+  Spec.it s "CR 802.3a the announcement, not the creature, is what the row refuses" $ do
+    (early, late, restricted, lateControl, control) <- escapeBoards s registry
+    let declaring = bobDeclaring restricted
+        open = bobDeclaring control
+    Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.bob [(late, AttackTarget.OfPlayer S.alice)] declaring)) "CR 611.2c: the Piker that entered after resolution may not be announced at alice"
+    Spec.assertBool s (Combat.legalAttackDeclarationAs S.bob [(late, AttackTarget.OfPlayer S.carol)] declaring) "and may at carol, whom the Escape names nowhere"
+    Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.bob [(early, AttackTarget.OfPlayer S.alice)] declaring)) "the Piker that was there all along may not either"
+    Spec.assertBool s (Combat.legalAttackDeclarationAs S.bob [(lateControl, AttackTarget.OfPlayer S.alice)] open) "and on the pair, alice is fair game"
+    -- CR 508.1a is untouched: the row is about the ANNOUNCEMENT, so both Pikers
+    -- stay candidates and it is the declaration that is refused.
+    Spec.assertEqWith s "both Pikers are still offered" (Combat.legalAttackers S.bob declaring) [early, late]
+    Spec.assertEqWith s "one row was stored, a class aimed at alice's seat" (fmap ActiveAttackProhibition.affected (GameState.attackProhibitions declaring)) [RestrictedCreatures.Matching (Filter.HasCardType CardType.Creature)]
+  -- CR 611.2a: "until your next turn" is Expiry.AtTurnOf alice, so the row
+  -- survives alice's own cleanup, bob's whole turn and carol's, and is gone as
+  -- alice's begins. Through Engine.handoffTurn, the road
+  -- Pawl.Engine.Expiry.dropAtTurnOf fires on, with CR 514.2's sweep run ahead of
+  -- each handoff -- which is what tells this duration from "this turn": under
+  -- Expiry.AtCleanup the row is gone before bob's turn ever begins.
+  Spec.it s "CR 611.2a the restriction outlasts every other seat's turn and ends as alice's begins" $ do
+    (_, late, restricted, _, _) <- escapeBoards s registry
+    let carolsTurn = handoff restricted
+        alicesTurn = handoff carolsTurn
+        bobsSecondTurn = handoff alicesTurn
+    Spec.assertEqWith s "carol is active" (GameState.activePlayer carolsTurn) S.carol
+    Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.bob [(late, AttackTarget.OfPlayer S.alice)] (bobDeclaring carolsTurn))) "still in force through carol's turn"
+    Spec.assertEqWith s "alice is active" (GameState.activePlayer alicesTurn) S.alice
+    Spec.assertEqWith s "and nothing is stored once her turn has begun" (GameState.attackProhibitions alicesTurn) []
+    Spec.assertEqWith s "bob is active again" (GameState.activePlayer bobsSecondTurn) S.bob
+    Spec.assertBool s (Combat.legalAttackDeclarationAs S.bob [(late, AttackTarget.OfPlayer S.alice)] (bobDeclaring bobsSecondTurn)) "and his Piker may attack alice on his next turn"
+
+-- Alice's Chronomantic Escape, cast from her hand off six Plains in her
+-- precombat main phase and resolved, then the turn handed to bob. Bob's `early`
+-- Piker was on the battlefield as the Escape resolved; his `late` one is placed
+-- AFTER the handoff, so it was nowhere when the effect began -- the fixture
+-- settles it (S.addCreature writes Sickness.Settled), standing in for haste. The
+-- pair is the same board, in the same order, with the Escape left in alice's
+-- hand -- its late Piker under its own id, since casting spends fresh ones (CR
+-- 400.7).
+escapeBoards ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId, GameState.GameState)
+escapeBoards s registry = do
+  escape <- S.printingOf s registry "Chronomantic Escape"
+  plains <- S.printingOf s registry "Plains"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (early, withEarly) = S.addCreature piker S.bob (S.landsFor plains S.alice 6 S.threePlayerGame)
+      (escapeId, withCard) = S.addHandCard escape S.alice withEarly
+      board = mainPhaseFor withCard
+      resolved = S.runPure S.identityAnswer board (S.cast S.alice escapeId >> Stack.resolveTop)
+      (late, restricted) = S.addCreature piker S.bob (handoff resolved)
+      (lateControl, control) = S.addCreature piker S.bob (handoff board)
+  Spec.assertEqWith s "the Escape resolved and stored one row" (length (GameState.attackProhibitions resolved)) 1
+  Spec.assertEqWith s "and left the pair nothing" (GameState.attackProhibitions control) []
+  pure (early, late, restricted, lateControl, control)
+
+-- Bob's turn at its beginning of combat step, with the combat phase's steps
+-- ahead of it: `handoff` leaves the board at his untap step, and S.runCombat
+-- runs only while inside the combat phase. S.threePlayerCombat's shape.
+bobsCombat :: GameState.GameState -> GameState.GameState
+bobsCombat gs =
+  gs
+    { GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+      GameState.combat = Combat.emptyCombat,
+      GameState.remaining =
+        Seq.fromList
+          [ Phase.Combat CombatStep.DeclareAttackers,
+            Phase.Combat CombatStep.DeclareBlockers,
+            Phase.Combat CombatStep.CombatDamage,
+            Phase.Combat CombatStep.EndOfCombat,
+            Phase.PostcombatMain
+          ]
+    }
+
+-- CR 506.2 / 802.2: bob in his declare attackers step with both opponents
+-- defending, stated rather than derived for `declaringAttackers`' reason.
+bobDeclaring :: GameState.GameState -> GameState.GameState
+bobDeclaring gs =
+  gs
+    { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.alice, S.carol]}
+    }
+
+-- CR 514.2 then CR 500.7: this turn's cleanup sweep, then the next seat's turn
+-- begins. Engine.handoffTurn is the seat walk alone, so the sweep is stated --
+-- without it a "this turn" row would survive into bob's turn and every case
+-- above would be green under Expiry.AtCleanup. Pawl.ExpirySpec's helper of the
+-- same name with the sweep folded in, duplicated rather than hoisted.
+handoff :: GameState.GameState -> GameState.GameState
+handoff gs = S.runPure S.identityAnswer (Expiry.dropAtCleanup gs) Engine.handoffTurn
+
 mainPhaseFor :: GameState.GameState -> GameState.GameState
 mainPhaseFor gs =
   gs
@@ -4456,6 +4586,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   keywordCounterRestrictionSpec s registry
   storedBlockRestrictionSpec s registry
   storedAttackRestrictionSpec s registry
+  storedClassAttackRestrictionSpec s registry
   suspectedAbilityRemovalSpec s registry
   conditionalCombatRestrictionSpec s registry
   defendingPlayerRestrictionSpec s registry
