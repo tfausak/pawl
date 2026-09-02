@@ -4046,6 +4046,78 @@ restrictedColorless =
       ManaUnit.rider = Nothing
     }
 
+-- CR 106.4's retention on the INLINE road (CR 605.3b), the third clause a mana
+-- ability's ManaAddition carries onto the units it adds -- the restriction above
+-- and Boseiju's rider being the other two. Shizuko, Caller of Autumn is the same
+-- clause on the stack road, and the pair is what proves the two roads agree.
+--
+-- SYNTHETIC, and by census rather than by accident: Scryfall
+-- o:"as steps and phases end" returns 30 printings on 2026-09-02, and not one
+-- puts the clause on an ACTIVATED ability -- they are player-axis statics
+-- (Upwelling, Omnath, Leyline Tyrant), triggered abilities (Savage Ventmaw,
+-- Shizuko, Branch of Vitu-Ghazi's turn-up trigger, whose own "{T}: Add {C}"
+-- carries no rider) or spells (Rousing Refrain, Tundra Fumarole, The Last Agni
+-- Kai). All of those resolve off the stack. Nothing in CR 605.1a forbids the
+-- printing: its four criteria say nothing about how long the mana lasts.
+--
+-- Synthetic Lasting Spring ({2} Artifact, "{T}: Add {C}. Until end of turn, you
+-- don't lose this mana as steps and phases end") is that card and nothing else,
+-- so the only thing the case can read is the retention.
+lastingSpringSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+lastingSpringSpec s registry = Spec.describe s "Synthetic Lasting Spring" $ do
+  -- Two boards differing in ONE permanent -- Serum Powder ({3} Artifact, "{T}:
+  -- Add {C}") is the same tap for the same one colourless with no rider on it,
+  -- and its mulligan action is unreachable from the battlefield. Both are tapped
+  -- inline (Cost.tapForMana, the narrowest path to CR 605.3b), both cross the
+  -- same upkeep step's end through Engine.runStep -- so the whole step runs,
+  -- CR 500.5's sweep included, rather than Mana.emptyManaPools being called --
+  -- and both are then asked the same cast in the same later phase.
+  --
+  -- Sol Ring ({1}) is the gameplay reading: neither board has a land or any
+  -- other mana source, so the floated {C} is the only way to pay, and the
+  -- control's False says the sweep did run at that boundary.
+  Spec.it s "CR 500.5 the inline mana survives the step's end, and an ordinary {C} does not" $ do
+    spring <- S.printingOf s registry "Synthetic Lasting Spring"
+    powder <- S.printingOf s registry "Serum Powder"
+    solRing <- S.printingOf s registry "Sol Ring"
+    let ran printing = aliceMain (S.runPure S.identityAnswer (tappedAtUpkeep printing) Engine.runStep)
+        castsRing gs =
+          let (ringId, withRing) = S.addHandCard solRing S.alice gs
+           in S.castable S.alice ringId withRing
+    Spec.assertBool s (castsRing (ran spring)) "alice casts a {1} spell in a later phase, off mana the step's end did not take"
+    Spec.assertBool s (not (castsRing (ran powder))) "and cannot off an ordinary {C}, which that same step's end took"
+    Spec.assertEqWith s "the pools say the same thing" (poolOf S.alice (ran spring), poolOf S.alice (ran powder)) ([retainedColorless], [])
+
+-- `printing`'s one mana ability activated inline during alice's upkeep. The
+-- schedule loses its head for shizukoStep's reason: Setup.emptyGame's
+-- `remaining` still begins with the upkeep step, so a runStep-driven board would
+-- otherwise advance back into the step it just ran.
+tappedAtUpkeep :: Printing.Printing -> GameState.GameState
+tappedAtUpkeep printing =
+  let (oid, board) = S.addCreature printing S.alice (Setup.emptyGame S.bothPlayers)
+      upkeep =
+        board
+          { GameState.phase = Phase.Beginning BeginningStep.Upkeep,
+            GameState.priority = Just (GameState.activePlayer board),
+            GameState.remaining = Seq.drop 1 (GameState.remaining board)
+          }
+   in S.runPure S.identityAnswer upkeep (Cost.tapForMana oid)
+
+-- carolMain one seat over: alice active with priority in her own precombat main
+-- phase, which is what a sorcery-speed cast of hers needs (CR 307.1 / 117.1a).
+aliceMain :: GameState.GameState -> GameState.GameState
+aliceMain gs =
+  gs
+    { GameState.activePlayer = S.alice,
+      GameState.phase = Phase.PrecombatMain,
+      GameState.priority = Just S.alice
+    }
+
+-- plainOf's colourless twin, differing in EXACTLY one field: what the Spring's
+-- ability adds and Serum Powder's does not.
+retainedColorless :: ManaUnit.ManaUnit
+retainedColorless = (plainOf ManaType.Colorless) {ManaUnit.retention = ManaRetention.UntilEndOfTurn}
+
 -- CR 106.6's OTHER subject, and the one no card in the pool reached before: a
 -- restriction over ACTIVATIONS rather than over casts. Omen Hawker ({U} 1/1
 -- Creature -- Octopus Advisor, "{T}: Add {C}{U}. Spend this mana only to
@@ -4764,6 +4836,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   avatarRokuSpec s registry
   geosurgeSpec s registry
   workshopSpec s registry
+  lastingSpringSpec s registry
   omenHawkerSpec s registry
   boseijuSpec s registry
   delightedHalflingSpec s registry

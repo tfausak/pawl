@@ -2168,6 +2168,7 @@ departedAttackerSpec s registry =
                       -- CR 802.2a: the seat each attack names, which is what a
                       -- declaration would have recorded.
                       Combat.Type.attackedUnder = Map.singleton attacker S.bob,
+                      Combat.Type.attackedControlledBy = Map.empty,
                       Combat.Type.joinedUnder = Map.fromList [(attacker, S.alice), (blocker, S.bob)],
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.bob),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.bob),
@@ -2245,6 +2246,7 @@ departedDefenderSpec s registry =
                       Combat.Type.blockers = Map.empty,
                       Combat.Type.struckFirst = Nothing,
                       Combat.Type.attackedUnder = Map.singleton attacker S.bob,
+                      Combat.Type.attackedControlledBy = Map.empty,
                       Combat.Type.joinedUnder = Map.singleton attacker S.alice,
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.bob),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.bob),
@@ -2300,6 +2302,7 @@ departedDefenderSpec s registry =
                       Combat.Type.blockers = Map.singleton attacker (Set.singleton blocker),
                       Combat.Type.struckFirst = Nothing,
                       Combat.Type.attackedUnder = Map.singleton attacker S.carol,
+                      Combat.Type.attackedControlledBy = Map.empty,
                       Combat.Type.joinedUnder = Map.fromList [(attacker, S.alice), (blocker, S.bob)],
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.carol),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.carol),

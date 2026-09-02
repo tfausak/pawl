@@ -18,325 +18,99 @@ import qualified Pawl.Types.Zone as Zone
 -- player, since a target may be either -- expressed as data and evaluated by one
 -- generic matcher (Pawl.Engine.Filter.matches) that never learns which effect
 -- produced it. Its atoms case on CHARACTERISTICS, and on a handful of things CR
--- 109.3 says are NOT characteristics but that the closed half owns just as
+-- 109.3 says are not characteristics but that the closed half owns just as
 -- squarely: combat status, attachment, what a permanent is represented by, and
--- what happened earlier this turn. Casing on a characteristic classification is
--- legitimate; the invariant forbids only casing on an EFFECT's identity.
+-- what happened earlier this turn.
 --
 -- Flat, not layered: the atoms and the And/Or/Not combinators are sibling arms of
--- one type, mirroring Pawl.Types.Quantity. A Simple/combinator split would buy an
--- enforceable normal form only if it also restricted the recursion (CNF/DNF).
--- `And []` is the trivial predicate, so a bare "target creature" needs no
--- separate "always" arm.
+-- one type, and `And []` is the trivial predicate.
 --
 -- PARAMETRIC in the keyword, and only to break a module cycle: HasKeyword below
--- names Pawl.Types.Keyword, and that module already names this one (CR 702.29e
--- typecycling and CR 702.14c landwalk each carry their "[type]" as a Filter).
--- Pawl.Types.Keyword ties the knot by instantiating `Filter Keyword`, the single
--- application every module but this one, Pawl.Types.Cost and
--- Pawl.Types.CostComponent writes.
+-- names Pawl.Types.Keyword, and that module already names this one.
 data Filter keyword
   = HasCardType CardType.CardType -- CR 205 / 300: the object's card types include this one.
   | HasSupertype Supertype.Supertype -- CR 205.4: the object's supertypes include this one.
   | HasColor Color.Color -- CR 105.2: the object's colours include this one.
   | HasSubtype Subtype.Subtype -- CR 205.3: the object's subtypes include this one.
-  | -- | CR 201.2: the object's names include this LITERAL one --
-    -- Asmoranomardicadaistinaculdacar's "search your library for a card named The
-    -- Underworld Cookbook". A name is a characteristic (CR 109.3 lists it first),
-    -- so this sits with the four atoms above rather than needing their defence.
-    --
-    -- MEMBERSHIP, exactly as CR 709.4a states the test: "an object has the chosen
-    -- name if one of its names is the chosen name". A split card off the stack
-    -- and a Room with both doors unlocked each show two names at once, and the
-    -- joined string they render as is not among them (see #650), so an atom that
-    -- compared to a single name would miss the halves it is spelling.
-    --
-    -- The PRINTED name, and not a chosen one -- Pawl.Types.EntryRewrite
-    -- .ChooseCardNames' as the permanent enters, or Effect.ChooseCardName's on
-    -- resolution. That machinery answers "what did a player name?", read by
-    -- PlayerEffect.CantCastChosenName and by HasChosenName below, where this is a
-    -- name another card's own text prints. The two are different questions and neither can express the
-    -- other -- a card cannot choose on the player's behalf, and a player cannot
-    -- be asked to name what a card already says.
+  | -- | CR 201.2: the object's names include this LITERAL one. Membership, as CR
+    -- 709.4a states the test -- a split card off the stack and a Room with both
+    -- doors unlocked each show two names at once. The printed name, never a
+    -- chosen one, which is HasChosenName below.
     HasName CardName.CardName
-  | -- | The object HAS this keyword ability (CR 702.1) -- Plummet's "target
-    -- creature with flying" (CR 702.9). Needs no defence like the atoms below,
-    -- since CR 109.3 lists abilities among an object's characteristics.
-    --
-    -- MEMBERSHIP, not equality of an ability list: the projection stores keywords
-    -- as a count because CR 702 instances stack, and this asks only whether the
-    -- key is present. For a parameterized keyword that makes `HasKeyword (Toxic
-    -- 2)` ask about toxic 2 SPECIFICALLY, which is the narrow question and the
-    -- right one: CR 702.14a's "[type]walk" is a written ability in its own right,
-    -- so Quagmire's "creatures with swampwalk" must not reach islandwalk. Ask the
-    -- family with HasKeywordFamily below; Pawl.FilterSpec pins the pair apart.
-    --
-    -- Read through the PROJECTION, so a creature that gains flying at CR 613.1f
-    -- layer 6 matches and a Humility'd one stops matching -- in every zone, since
-    -- CR 613.1 names none: a library search, a cost criterion, an explore's land
-    -- test and a mill tally all read a card's projected keywords rather than its
-    -- printed ones (see #1911).
+  | -- | CR 702.1: the object HAS this keyword ability. Membership of the WRITTEN
+    -- instance, so `HasKeyword (Toxic 2)` asks about toxic 2 specifically and
+    -- Quagmire's swampwalk does not reach islandwalk; HasKeywordFamily below is
+    -- the other question, and Pawl.FilterSpec pins the pair apart. Read through
+    -- the CR 613 projection, in every zone.
     HasKeyword keyword
-  | -- | The object has SOME keyword ability of this family (CR 702.1), whatever
-    -- its payload -- Flensing Raptor's "another target creature you control with
-    -- toxic", which a Phyrexian Mite with toxic 1 and a creature with toxic 3
-    -- satisfy alike (CR 702.164a).
-    --
-    -- A SIBLING of HasKeyword above rather than a widening of it, because the two
-    -- questions are both real: this one is what card text asks when it names the
-    -- ability, and that one is what it asks when it names the written instance.
-    -- Widening HasKeyword in place would have made `HasKeyword (Toxic 2)` and
-    -- `HasKeyword (Toxic 3)` observably the same value.
-    --
-    -- CONCRETE where HasKeyword is parametric, which is why the parameter above
-    -- survives: Pawl.Types.KeywordFamily is payload-free and imports nothing, so
-    -- naming it here opens no cycle. Nullary keywords have no family constructor,
-    -- so the two atoms partition rather than overlap -- there is exactly one way
-    -- to write "a creature with flying" and exactly one to write "a creature with
-    -- toxic". Answered off the PROJECTION for HasKeyword's reason.
+  | -- | CR 702.1: the object has SOME keyword ability of this family, whatever
+    -- its payload -- toxic 1 and toxic 3 alike (CR 702.164a). A sibling of
+    -- HasKeyword above rather than a widening of it, and answered off the
+    -- projection for that atom's reason.
     HasKeywordFamily KeywordFamily.KeywordFamily
   | PowerAtLeast Integer -- CR 208.1: the object's power is >= this literal.
-  | -- | CR 208.1 in the other direction: the object's power is <= this literal --
-    -- Ezuri, Claw of Progress' "a creature you control with power 2 or less".
-    --
-    -- A SIBLING of PowerAtLeast above and NOT its negation: power is a
-    -- characteristic an object may simply not have, so `Not (PowerAtLeast 3)`
-    -- admits every land, instant and player on the board, while this admits none
-    -- of them. Both arms answer False for an absent power, so neither is
-    -- reachable from the other, and Pawl.FilterSpec pins that pair apart.
-    --
-    -- Answered off the PROJECTION, in every zone: Imperial Recruiter's "creature
-    -- card with power 2 or less" reads a library card's full CR 613 projection,
-    -- Tarmogoyf's CR 208.2a power included, and so do a graveyard-exile cost
-    -- criterion and a mill tally (see #1911). CR 208.2a's characteristic-defining
-    -- power arrives at layer 7a of that same fold, which CR 604.3 runs off the
-    -- battlefield as well as on it.
+  | -- | CR 208.1 in the other direction: the object's power is <= this literal.
+    -- Not PowerAtLeast's negation -- both arms answer False for an absent power,
+    -- so neither is reachable from the other, and Pawl.FilterSpec pins that pair
+    -- apart. Answered off the projection, in every zone.
     PowerAtMost Integer
   | -- | CR 208.1 compared against the SOURCE rather than a literal: the object's
-    -- power is less than the power of the object the evaluation comes from. CR
-    -- 702.134a's "target attacking creature with power less than this creature's
-    -- power" is the one clause that asks, and Pawl.Engine.Keyword.mentor is the
-    -- only site that writes it -- Pawl.CardSpec's lint keeps it out of card data,
-    -- where it would read a source power no other Filter position supplies.
-    --
-    -- Context-relative like IsSource, and for the same reason the two power atoms
-    -- above are not: there is no literal to carry, since the bound is whatever the
-    -- source's power is when the match is made. Pawl.Engine.Filter.Context's
-    -- sourcePower is where that arrives, filled by Pawl.Engine.Target.admittedGiven
-    -- -- the one site that evaluates a target slot's Filter, at both of CR 115's
-    -- moments -- and Nothing wherever neither this atom nor
-    -- PowerGreaterThanSource below can appear.
-    --
-    -- STRICTLY less, and vacuously False when either power is absent: an object
-    -- with no power is not "a creature with lesser power", the posture PowerAtMost
-    -- takes for the same reason.
+    -- power is strictly less than the power of the object the evaluation comes
+    -- from (CR 702.134a's mentor). Read off Pawl.Engine.Filter.Context's
+    -- sourcePower, and vacuously False where either power is absent.
     PowerLessThanSource
   | -- | CR 208.1 compared against the SOURCE the other way: the object's power is
-    -- GREATER than the power of the object the evaluation comes from. CR 702.149a's
-    -- "another creature with power greater than this creature's power" is the one
-    -- clause that asks, and Pawl.Engine.Keyword.training is the only site that
-    -- writes it -- Pawl.CardSpec's lint keeps it out of card data alongside its
-    -- sibling.
-    --
-    -- A SIBLING of PowerLessThanSource rather than `Not PowerLessThanSource`: the
-    -- negation admits equal power, and admits a candidate with no power at all,
-    -- since that arm is vacuously False. Rule 702.149a's "greater" is strict and
-    -- wants neither.
-    --
-    -- Context-relative for that atom's reason, and reading the same
-    -- Pawl.Engine.Filter.Context sourcePower -- which this atom is the first to
-    -- want anywhere but a target slot: at a TRIGGER match
-    -- (Pawl.Engine.Event.matchesTrigger) and at CR 509.1b's blocking gate
-    -- (Pawl.Engine.CombatRestriction.cantBeBlockedBy), where the source is the
-    -- attacker being blocked.
+    -- strictly greater than the source's (CR 702.149a's training). Not
+    -- PowerLessThanSource's negation, which admits equal and absent power alike.
     PowerGreaterThanSource
   | -- | CR 208.1 compared against a number an earlier clause of the same
-    -- resolution BOUND, rather than against a literal or the source -- Localized
-    -- Destruction's "each creature you control with power equal to the amount of
-    -- {E} paid this way", whose bound is what
-    -- Pawl.Types.Effect.PayAnyEnergy stamped on the slot this atom names.
-    --
-    -- Carries the SlotName where ManaValueAtMostAmount carries nothing, and the
-    -- position is the whole difference: that atom lives in a target slot, which
-    -- states its own bound in Pawl.Types.TargetSlot's `amount` field, while this
-    -- one lives in an effect's sweep, where nothing but the atom can say which
-    -- slot holds the number. A SlotName is what the other reading atoms
-    -- (ControlledByBound, IsBound) carry for that reason.
-    --
-    -- EXACT equality, not a bound: the printed clause names a power rather than a
-    -- ceiling. Widening to an inequality is what a card asking for one would
-    -- earn, ManaValueAtMostAmount's own reason turned around.
-    --
-    -- Pawl.Engine.Filter.Context's boundAmounts is where the number arrives,
-    -- filled for an effect's sweep by Pawl.Engine.Resolve.effectContext.
-    -- Vacuously False where either number is absent -- a candidate with no power,
-    -- or a slot naming no amount -- the posture PowerLessThanSource takes.
+    -- resolution BOUND at this slot -- Localized Destruction's "power equal to
+    -- the amount of {E} paid this way". Exact equality, and vacuously False where
+    -- either number is absent.
     PowerIsAmountInSlot SlotName.SlotName
-  | -- | CR 202.3: the object's mana value is <= this literal -- Ojutai's
-    -- Command's "creature card with mana value 2 or less".
-    --
-    -- Only AT MOST, where power above has both directions, because that is the
-    -- direction the cards ask in: a mana value bounds what a cheap-thing effect
-    -- may reach. Nothing in the pool asks for a mana value floor, and an unused
-    -- arm is the speculative construction the project forbids.
-    --
-    -- Answerable OFF the battlefield, as the two literal power atoms above are
-    -- and for the same reason: rule 202.3 reads the printed mana cost, which exists in
-    -- every zone, and the graveyard is where the card asking is looking (CR 115.2's
-    -- other zone half, via Pool.CardsInGraveyard). No Modification writes a mana
-    -- cost, so there is nothing projected to read instead.
+  | -- | CR 202.3: the object's mana value is <= this literal. Answerable off the
+    -- battlefield, rule 202.3 reading the printed mana cost.
     ManaValueAtMost Integer
   | -- | CR 202.3 read for its PARITY rather than against a bound -- Void
-    -- Winnower's "spells with even mana values", whose own reminder text settles
-    -- the boundary case: "(Zero is even.)"
-    --
-    -- Payload-free, where the atom above carries a literal, because the printed
-    -- sentence has no number in it: the parity is the whole of the test, and
-    -- "odd" is Not of this rather than a second arm (nothing in the pool asks
-    -- for odd).
-    --
-    -- Answerable off the battlefield for ManaValueAtMost's reason, and CR 202.3e
-    -- is what makes it INTERESTING off the stack: a variable in the cost counts
-    -- as zero anywhere but the stack, so an {X}{R}{R} card has an even mana
-    -- value in a hand and either parity once X is chosen. That is the one axis a
-    -- proposal choice moves, and it is why CR 601.3a's lookahead exists --
-    -- Pawl.Engine.PlayerEffect.prohibitsCasting is where the rule is read.
+    -- Winnower's "spells with even mana values", whose reminder text settles the
+    -- boundary case: "(Zero is even.)" CR 202.3e is what makes it interesting off
+    -- the stack, where an {X} in a cost counts as zero.
     ManaValueIsEven
-  | -- | CR 202.3 compared against a COMPUTED bound rather than a literal: the
-    -- object's mana value is <= the amount the enclosing target slot names --
-    -- Celestine, the Living Saint's "target creature card with mana value X or
-    -- less from your graveyard ... where X is the amount of life you gained this
-    -- turn".
-    --
-    -- CONTEXT-RELATIVE like PowerLessThanSource, and payload-free for that atom's
-    -- reason turned around: there is no literal to carry because the bound is not
-    -- printed, and the Quantity that says what it is cannot be carried HERE --
-    -- Pawl.Types.Quantity imports Pawl.Types.Count, which imports this module.
-    -- Pawl.Types.TargetSlot's `amount` field is where the Quantity lives and why;
-    -- Pawl.Engine.Filter.Context's slotAmount is where the evaluated number
-    -- arrives, filled by Pawl.Engine.Target.slotContext -- the one site that
-    -- evaluates a target slot's Filter, at both of CR 115's moments -- so the
-    -- bound is READ AGAIN at CR 608.2b rather than frozen at announcement. Which
-    -- direction that can move is a fact about the quantities cards name rather
-    -- than about this atom: a turn's life gain only grows, so that re-read can
-    -- only widen, while a bound naming an announcement's own number -- Venerable
-    -- Warsinger's CR 603.2 event amount, Stir the Grave's CR 601.2b announced X --
-    -- cannot move at all, the announcement having fixed it.
-    --
-    -- AT MOST only, ManaValueAtMost's reason one atom over: that is the direction
-    -- the printed cards ask in.
-    --
-    -- Vacuously False where either number is absent -- a candidate with no mana
-    -- value, or a slot naming no amount -- the posture PowerLessThanSource takes.
-    -- Pawl.CardSpec's position lint is what keeps a card from writing the atom
-    -- into a slot with no amount, where it would be a silent False. The one
-    -- exception is a bound the announcement has not made yet, which states nothing
-    -- rather than an unmeetable ceiling: Pawl.Engine.Filter.Context's
-    -- boundUnannounced.
+  | -- | CR 202.3 compared against a COMPUTED bound: the object's mana value is <=
+    -- the amount the enclosing target slot names (Pawl.Types.TargetSlot's
+    -- @amount@), read again at CR 608.2b rather than frozen at announcement.
+    -- Vacuously False where either number is absent.
     ManaValueAtMostAmount
   | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
   | -- | CR 508.5: the candidate's controller is the DEFENDING PLAYER for the
-    -- object the evaluation comes from -- CR 702.39a's "target creature defending
-    -- player controls", which Pawl.Engine.Keyword.provoke is the only site to
-    -- write. Kept out of card data by Pawl.CardSpec's lint, as PowerLessThanSource
-    -- is and for the same reason.
-    --
-    -- NOT ControlledBy Opponent, and the difference is a wrong answer rather than
-    -- a nicety: CR 506.2a and CR 508.5a make exactly one opponent the defending
-    -- player, so on a
-    -- board with three seats that filter admits a creature controlled by an
-    -- opponent who is not being attacked at all.
-    --
-    -- Context-relative like PowerLessThanSource, and the same machinery: the
-    -- answer depends on the combat record rather than on the candidate, so
-    -- Pawl.Engine.Filter.Context's defendingPlayer is where it arrives, filled by
-    -- Pawl.Engine.Target.admittedGiven for a target slot and by
-    -- Pawl.Engine.CombatRestriction.inForce for a CR 508.1c gate (Armored
-    -- Galleon), and Nothing everywhere else. Vacuously
-    -- False when either player is absent -- a source that is not attacking has no
-    -- defending player.
+    -- object the evaluation comes from (CR 702.39a's provoke). Not @ControlledBy
+    -- Opponent@, which on a three-seat board admits a creature controlled by an
+    -- opponent who is not being attacked at all. Vacuously False where the source
+    -- has no defending player.
     ControlledByDefendingPlayer
   | -- | CR 603.2: the candidate's controller is the PLAYER BOUND at this slot --
-    -- Trygon Predator's "target artifact or enchantment THAT PLAYER controls",
-    -- where "that player" is the one the trigger's own event named
-    -- (Pawl.Engine.Binding.triggerPlayer). The atom card JSON writes; the arm
-    -- below is what it becomes.
-    --
-    -- NOT ControlledBy Opponent, and the difference is a wrong answer rather than
-    -- a nicety, exactly as it is for ControlledByDefendingPlayer above: CR 806.1's
-    -- free-for-all has several opponents, and only one of them is the player the
-    -- event named. The two coincide on a two-player board alone.
-    --
-    -- Answered by REWRITING rather than by a Context field
-    -- (Pawl.Engine.Filter.bakeBound): the two moments that judge a target slot --
-    -- CR 603.3d's choosing (Pawl.Engine.Engine.placeBorne) and CR 608.2b's
-    -- re-check (Pawl.Engine.Resolve.resolveModes) -- each hold the bindings and
-    -- hand Pawl.Engine.Target a slot with this atom already replaced. Vacuously
-    -- False if it survives to a match, which is a slot that named no one player.
+    -- Trygon Predator's "that player", the one the trigger's own event named.
+    -- Answered by rewriting (Pawl.Engine.Filter.bakeBound), and vacuously False
+    -- if it survives to a match.
     ControlledByBound SlotName.SlotName
-  | -- | The atom above with its player resolved: the candidate's controller IS this
-    -- player. RUNTIME-ONLY, in Modification.SetController's sense and enforced the
-    -- same way -- the codec round-trips the PlayerId, so Pawl.CardSpec lints the
-    -- pool against a card authoring one, a baked player in printed text being
-    -- meaningless (#199).
-    --
-    -- Perspective-free, unlike every other player-relating atom here: the player is
-    -- named outright, so CR 109.5's "you" does not enter into it.
+  | -- | The atom above with its player resolved: the candidate's controller IS
+    -- this player. Runtime-only -- Pawl.CardSpec lints the pool against a card
+    -- authoring one, a baked player in printed text being meaningless (#199).
     ControlledByPlayer PlayerId.PlayerId
   | -- | The candidate's controller is the player the surrounding effect is
-    -- CURRENTLY BEING APPLIED TO -- Biorhythm's "each player's life total becomes
-    -- the number of creatures THEY control", where "they" is each recipient in
-    -- turn rather than any one player.
-    --
-    -- NOT ControlledBy You, and the difference is a wrong answer rather than a
-    -- nicety: CR 109.5's "you" is the spell's controller, so that filter would hand
-    -- every seat the controller's own count. Nor ControlledBy Opponent, which names
-    -- a set rather than the one seat being looked at.
-    --
-    -- Context-relative like ControlledByDefendingPlayer above, and by the same
-    -- machinery: the answer depends on which recipient the effect has reached
-    -- rather than on the candidate, so Pawl.Engine.Filter.Context's `recipient` is
-    -- where it arrives, filled by Pawl.Engine.Resolve per recipient and Nothing
-    -- everywhere else. Vacuously False there, which is every position but a
-    -- per-recipient effect's quantity.
-    --
-    -- Deliberately NOT PlayerRef.Candidate, which is the word one type over for the
-    -- player a Scope.OverPlayers fold is looking at. A fold's candidate SHADOWS
-    -- inside the fold and this does not: Arbiter of Knollridge's "the highest life
-    -- total among all players" is a fold nested inside a per-recipient set, and one
-    -- word for both would make its inner reading ambiguous.
+    -- CURRENTLY BEING APPLIED TO -- Biorhythm's "the number of creatures THEY
+    -- control". Not CR 109.5's "you", which is the spell's controller, and
+    -- vacuously False outside a per-recipient effect's quantity.
     ControlledByRecipient
-  | -- | CR 108.3 / 110.2: the candidate's OWNER relates thus to the perspective --
-    -- Garland, Royal Kidnapper's "creatures you control but don't own", which is
-    -- `And [ControlledBy You, Not (OwnedBy You)]`.
-    --
-    -- A SIBLING of ControlledBy above and never derivable from it: CR 110.2 makes
-    -- ownership and control independent, and the whole point of the atom is the
-    -- board where they disagree. Context-relative in ControlledBy's way -- the atom
-    -- carries no PlayerId, and who "you" is comes from the Context (CR 109.5) --
-    -- and reading the same PlayerRelation, since CR 108.3's owner is a player like
-    -- any other.
-    --
-    -- ANSWERABLE IN EVERY ZONE, where ControlledBy is not, and that difference is
-    -- CR 108.3's rather than an inconsistency: an owner is fixed when the game
-    -- starts and no rule changes it, while CR 108.4 gives a card outside the
-    -- battlefield and the stack no controller at all. That is manaValue's posture
-    -- rather than power's, and Pawl.Engine.Filter.View's `owner` field says so.
-    -- Nothing off an OBJECT, though -- a printed card being matched by a search is
-    -- not an object and has no owner, so the atom is vacuously False there.
-    --
-    -- Uncharacteristic, for IsAttacking's reason: CR 109.3's characteristic list
-    -- has no owner in it, and no CR 613 layer writes one -- CR 613.1b's layer 2
-    -- changes CONTROL and rule 108.3 has no counterpart. So
-    -- Pawl.Engine.Projection.filterReads declares it as reading nothing, alongside
-    -- IsToken.
+  | -- | CR 108.3 / 110.2: the candidate's OWNER relates thus to the perspective.
+    -- A sibling of ControlledBy above and never derivable from it, and answerable
+    -- in every zone where that atom is not: an owner is fixed when the game
+    -- starts, while CR 108.4 gives a card outside the battlefield and the stack
+    -- no controller. False off an object, a printed card being none (CR 109.1).
     OwnedBy PlayerRelation.PlayerRelation
-  | -- | The candidate IS the evaluation's source object. Context-relative like
-    -- ControlledBy: the Filter carries no object id, and the answer comes from the
-    -- Context. `Not IsSource` is how CR 601.2c's "another" and a continuous
-    -- effect's own "each other" card text (Opalescence) are both written -- one
-    -- relation, one spelling, rather than a parallel Exclusion field on each
-    -- (#163).
+  | -- | The candidate IS the evaluation's source object. @Not IsSource@ is how CR
+    -- 601.2c's "another" and a continuous effect's own "each other" card text are
+    -- both written -- one relation, one spelling (#163).
     IsSource
   | -- | CR 115.1: the candidate, a stack object, has the evaluation's source
     -- among its CR 601.2c targets (Terror of the Peaks' "spells ... that target
@@ -346,850 +120,262 @@ data Filter keyword
     -- perspective among its targets, a ToPlayer alone counting (Shell of the
     -- Last Kappa's "spell that targets you").
     TargetsPlayer PlayerRelation.PlayerRelation
-  | -- | The candidate IS the object the resolution bound in this slot -- Into the
+  | -- | The candidate IS an object the resolution bound in this slot -- Into the
     -- Wilds' "if it's a land card", where the clause before it looked at the top
-    -- card of the library and bound it (Effect.LookAt).
-    --
-    -- IsSource's sibling: that atom tests the candidate against the evaluation's
-    -- source and this one against an object the RESOLUTION named, and neither
-    -- carries an id -- both read Pawl.Engine.Filter.Context, this one through
-    -- `slotObjects`. So the atom is what lets a Count NARROW a zone to one card
-    -- the resolution already named, which is what makes Into the Wilds' count
-    -- over a hidden zone (CR 400.2) a question about the card its controller was
-    -- shown rather than about the library it sits in.
-    --
-    -- NOT ControlledByBound, which asks after the bound object's CONTROLLER: CR
-    -- 108.4 gives a card in a library none at all, so that atom is vacuously
-    -- False for the very candidates this one exists to match.
-    --
-    -- MEMBERSHIP where the slot names SEVERAL objects: CR 115.10a's group binding
-    -- -- the batch a mill (CR 701.17c), a look (CR 701.20e) or a move named --
-    -- admits every one of its members, which is what "from among them" asks
-    -- (Midnight Tilling). A slot naming one object is the singleton case of the
-    -- same read.
-    --
-    -- Vacuously False where the slot names no object: the map is empty for most
-    -- readers, and an illegal target (CR 608.2b) and a multi-TARGET slot drop out
-    -- of it -- the one plural shape this does not admit, no card in data/cards/
-    -- writing the atom over a slot whose count is above one. That direction is
-    -- this atom's own call, not a rule about the type: SameControllerAsBound
-    -- below is vacuously TRUE on ITS unfilled read, for the reason its note
-    -- gives.
-    --
-    -- READABLE PAST THE RESOLUTION for the one carrier that snapshots the map:
-    -- a floating replacement row (Pawl.Types.ActiveReplacement) keeps the
-    -- installing resolution's bindings, so a pattern written with this atom names
-    -- the object the resolution named rather than a class of them, and CR 400.7h
-    -- is what moves that name onto the spell a card cast under the row's source's
-    -- permission became.
+    -- card of the library. Membership where CR 115.10a's group binding names
+    -- several, and vacuously False where the slot names no object.
     IsBound SlotName.SlotName
   | -- | CR 201.2 / 709.4a asked of TWO objects: the candidate shares a name with
     -- the object this slot holds -- Harness the Storm's "target card with the
-    -- same name as that spell", where the slot is CR 603.2's own binding of the
-    -- cast spell, made as the trigger was gathered and read at CR 601.2c.
-    --
-    -- HasName's context-relative sibling, standing to it as IsBound stands to
-    -- IsSource: that atom carries the name and this one reads it off
-    -- Pawl.Engine.Filter.Context, which is where the board-holding caller puts
-    -- the bound object's names.
-    --
-    -- SHARES A NAME, not "has the same set of names": CR 709.4a's test is
-    -- membership at both ends, so an object showing two names has the same name
-    -- as one showing either. Set INTERSECTION is that said once.
-    --
-    -- Vacuously False where the slot names no object, or where the bound object
-    -- has no name at all (CR 708.2a's face-down object) -- the posture IsBound
-    -- above takes, and the answer CR 709.4a itself gives for a nameless object.
+    -- same name as that spell". Set intersection, so an object showing two names
+    -- has the same name as one showing either; vacuously False where the slot
+    -- names no object or the bound object has no name (CR 708.2a).
     SameNameAsBound SlotName.SlotName
-  | -- | CR 110.2 asked of TWO objects: the candidate has the same controller as the
-    -- object this slot holds -- Bioshift's "another target creature with the same
-    -- controller", where the slot is the sibling target the same announcement is
-    -- choosing (CR 601.2c).
+  | -- | CR 110.2 asked of TWO objects: the candidate has the same controller as
+    -- the object this slot holds -- Bioshift's "another target creature with the
+    -- same controller".
     --
-    -- SameNameAsBound's sibling one characteristic over, and built the same way:
-    -- that atom compares the candidate's names against the bound object's and this
-    -- one compares controllers, neither carrying the value it compares against --
-    -- Pawl.Engine.Filter.Context's `slotControllers` is where the board-holding
-    -- caller puts them, as `slotNames` is for that one.
-    --
-    -- NOT ControlledByBound, whose slot holds a PLAYER: that atom is CR 603.2's
-    -- trigger binding, answered by rewriting at Pawl.Engine.Filter.bakeBound off a
-    -- map Pawl.Engine.Binding.playerSlots builds through Recipient.playerOf, so a
-    -- slot holding an OBJECT contributes nothing to it. The two would also have to
-    -- disagree about the vacuous case below, which one atom cannot do; see #2722.
-    --
-    -- VACUOUSLY TRUE where the slot names no object, which is the one atom here
-    -- that does not answer False, and the departure is CR 601.2c's rather than a
-    -- convenience: this is a RELATION between two of one announcement's targets,
-    -- and the offer is made before either is chosen. Pawl.Engine.Target
-    -- .legalSetsGiven's first pass hands every slot the seed alone, so a False here
-    -- would empty the slot and make the spell uncastable rather than unrestricted;
-    -- the pass WIDENS and Pawl.Engine.Target.selectionLegal's joint check is what
-    -- narrows, re-deriving the slot against the targets actually chosen under the
-    -- announcement's own seed, exactly as CR 608.2b will at resolution.
-    -- Filter.boundUnannounced is the same call one field over -- a bound nothing
-    -- can supply yet states no bound rather than an unmeetable one.
-    --
-    -- What keeps the atom out of the positions with no joint check behind them is
-    -- Pawl.CardSpec's "CR 110.2 no card asks SameControllerAsBound outside a mode's
-    -- target slot", which the vacuous direction makes load-bearing where
-    -- SameNameAsBound's sweep is merely tidy: an atom that widens in a position
-    -- nothing re-derives would admit candidates the card excludes.
+    -- VACUOUSLY TRUE where the slot names no object, alone among these atoms: CR
+    -- 601.2c's offer is made before either target is chosen, so
+    -- Pawl.Engine.Target.legalSetsGiven widens and selectionLegal's joint check
+    -- narrows, exactly as CR 608.2b will at resolution. Pawl.CardSpec's "CR 110.2
+    -- no card asks SameControllerAsBound outside a mode's target slot" is what
+    -- keeps the atom out of the positions with no joint check behind them.
     SameControllerAsBound SlotName.SlotName
-  | -- | CR 201.4: the candidate has a name the SOURCE has chosen -- Ancient
-    -- Vendetta's "cards with that name", where the name was chosen earlier in the
-    -- same resolution (CR 608.2c).
-    --
-    -- HasName's second context-relative sibling, standing to it as
-    -- SameNameAsBound does: that atom carries a literal and this one reads the
-    -- chosen names off Pawl.Engine.Filter.Context, which is where the
-    -- board-holding caller puts them. SameNameAsBound reads a SLOT's names and
-    -- this one the SOURCE's own, which are different questions -- a chosen name
-    -- names no object at all, so no slot can hold it.
-    --
-    -- SHARES A NAME, for CR 201.4g's reason as much as CR 709.4a's: interchangeable
-    -- names mean choosing one chooses each, so the test is membership at both ends.
-    -- Set intersection is that said once.
-    --
-    -- Vacuously False where the source has chosen no name -- this atom's call,
-    -- SameControllerAsBound above being the one that widens on its unfilled read
-    -- instead. What keeps a card out of the positions that
-    -- cannot answer is Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside
-    -- a search's filter".
+  | -- | CR 201.4: the candidate has a name the SOURCE has chosen earlier in the
+    -- same resolution (CR 608.2c) -- Ancient Vendetta's "cards with that name".
+    -- Set intersection, for CR 201.4g's interchangeable names as much as CR
+    -- 709.4a's, and vacuously False where the source has chosen no name.
     HasChosenName
-  | -- | CR 115.1: the candidate is a PLAYER who relates thus to the perspective --
-    -- "target opponent". Context-relative like ControlledBy, but separate from it
-    -- rather than a reuse, because ControlledBy asks who controls an OBJECT
-    -- candidate and this asks who the candidate IS. CR 109.1's list of what an
-    -- object is has no "player" in it, and CR 108.4 gives a controller only to a
-    -- card representing a permanent or spell, so the two are never both answerable
-    -- for one candidate.
+  | -- | CR 115.1: the candidate is a PLAYER who relates thus to the perspective
+    -- -- "target opponent". Separate from ControlledBy, which asks who controls
+    -- an object candidate rather than who the candidate is (CR 109.1, CR 108.4).
     IsPlayer PlayerRelation.PlayerRelation
   | -- | The candidate PLAYER is the controller of the object a slot names --
-    -- Spikeshell Harrier's "each OTHER player", which is `Not` of this atom over
-    -- every player, the other player being the opponent whose permanent the
-    -- ability targeted.
-    --
-    -- IsPlayer's sibling in what it asks of the candidate (who they ARE, not what
-    -- they control) and Pawl.Types.PlayerRef.ControllerOfBound's twin one type
-    -- over: that reference NAMES the player, this one tests a candidate against
-    -- them, and a card excluding them from a fold needs the second. NOT
-    -- ControlledByBound, which asks after an OBJECT candidate's controller: a
-    -- Scope.OverPlayers candidate is a player, and CR 108.4 gives a player no
-    -- controller, so that atom is vacuously False for every one of them.
-    --
-    -- Answered by REWRITING at Pawl.Engine.Count.bakePerspective, the shape
-    -- ControlsMoreThanYou above takes and for its reason: Pawl.Engine.Filter holds
-    -- no board and cannot project a controller, while the fold that supplies the
-    -- player candidates holds both the board and the view. CR 608.2h reaches it
-    -- through that view -- see ControllerOfBound, which carries the argument.
-    -- Vacuously False if it survives to Pawl.Engine.Filter.matches, which is every
-    -- position but a Scope.OverPlayers count's filter.
+    -- Spikeshell Harrier's "each OTHER player". Answered by rewriting at
+    -- Pawl.Engine.Count.bakePerspective, and vacuously False outside a
+    -- Scope.OverPlayers count's filter.
     IsControllerOfBound SlotName.SlotName
   | -- | CR 110.2: the candidate PLAYER controls strictly more permanents matching
     -- this filter than the perspective player does (CR 109.5) -- Oreskos
-    -- Explorer's "the number of players who control more lands than you", whose
-    -- nested filter is `HasCardType Land`.
+    -- Explorer's "the number of players who control more lands than you".
+    -- Answered by rewriting at Pawl.Engine.Count.bakePerspective, and vacuously
+    -- False outside a Scope.OverPlayers count's filter. Strict, which is what
+    -- lets Oreskos ask it of every player.
     --
-    -- The one atom that RE-FRAMES the perspective. Every other player-relating
-    -- atom here asks how the candidate STANDS to "you" -- a relation, answered off
-    -- the candidate alone -- while this asks a question about the candidate's own
-    -- board and compares the answer against yours. That is what CR 109.1 makes
-    -- awkward: a player is not an object, so Pawl.Engine.Filter.playerView has no
-    -- field to read this off, and a board is not a characteristic in any case.
-    --
-    -- Answered by REWRITING rather than by a View field or a Context one, the
-    -- shape ControlledByBound above has: Pawl.Engine.Count.bakePerspective holds
-    -- the game state, counts both sides for one candidate, and replaces the atom
-    -- with a trivially true or trivially false predicate before the match.
-    -- Vacuously False if it survives to Pawl.Engine.Filter.matches, which is every
-    -- position but a Pawl.Types.Scope.OverPlayers count's filter -- the only place
-    -- the candidate is a player and the only place anything bakes it.
-    --
-    -- STRICT, which is what lets Oreskos ask it of EVERY player: "more lands than
-    -- you" excludes you by arithmetic rather than by a relation, so the card's
-    -- scope is EachPlayer rather than an opponent relation, and a seat merely LEVEL
-    -- with you is not one that controls more. Not implemented:
-    -- Surveyor's Scope's "at least two more lands than you" wants a margin beside
-    -- the filter, which this atom does not carry (#2353).
-    --
-    -- CARRIES A FILTER rather than naming lands: the question is CR 110.2's
-    -- control of some described permanent, and the description is a Filter like
-    -- any other -- matched against each battlefield permanent through the same
-    -- CR 613 projection every other count reads.
+    -- Not implemented: Surveyor's Scope's "at least two more lands than you",
+    -- which wants a margin beside the filter (#2353).
     ControlsMoreThanYou (Filter keyword)
-  | -- | CR 400.1 / 404.1: the candidate PLAYER's own graveyard holds at least
-    -- this many cards -- The Master of Lake-town's "each graveyard with seven or
-    -- more cards in it", folded through Scope.OverPlayers EachPlayer.
-    --
-    -- A PLAYER atom, like the two above and unlike every characteristic atom:
-    -- rule 400.1 gives each player their own graveyard, and CR 109.3 counts no
-    -- zone among an object's characteristics, so there is nothing to ask of an
-    -- object candidate. Vacuously False if it survives to
-    -- Pawl.Engine.Filter.matches, the posture ControlsMoreThanYou takes and for
-    -- its reason: the answer is a question about the board, and that module holds
-    -- none. Pawl.Engine.Count.bakePerspective answers it.
-    --
-    -- Carries a BARE Natural rather than a Zone, a Comparison or a Count. Not a
-    -- Zone, because four of CR 400.1's seven are shared rather than per-player
-    -- and no card asks a player fold about the other two, and ManaValueAtMost's
-    -- note forbids the unused arms. Not a Count, though that would generalize
-    -- zone, comparison and filter at once, because Pawl.Types.Count already
-    -- imports this module -- naming it here closes a module cycle, and the
-    -- parametricity escape hatch is spent on `keyword`. Natural rather than
-    -- Integer because a zone's size cannot be negative:
-    -- Pawl.JsonCodec.Common.natural rejects a negative literal at decode, where
-    -- Common.integer would accept -1 and yield a vacuously true filter.
+  | -- | CR 400.1: the candidate PLAYER's own graveyard holds at least this many
+    -- cards -- The Master of Lake-town's "each graveyard with seven or more cards
+    -- in it". A player atom like the two above, answered by
+    -- Pawl.Engine.Count.bakePerspective and vacuously False if it survives to
+    -- Pawl.Engine.Filter.matches.
     CardsInGraveyardAtLeast Natural.Natural
-  | -- | CR 508.1k: the candidate is an ATTACKING creature -- declared as an
-    -- attacker this combat phase and not since removed from combat (CR 506.4).
-    -- Kill Shot's "target attacking creature".
-    --
-    -- The first atom reading something CR 109.3 says is NOT a characteristic,
-    -- which is no breach of the invariant above: combat status is a RULES concept
-    -- the closed half already owns (CR 506-511, Pawl.Types.Combat), so reading it
-    -- is the same kind of act as reading a card type.
+  | -- | CR 508.1k: the candidate is an ATTACKING creature, not since removed from
+    -- combat (CR 506.4). Reading combat status breaches nothing: it is a rules
+    -- concept the closed half owns, so the read is the same kind of act as
+    -- reading a card type.
     IsAttacking
   | -- | CR 508.1b: the candidate is an attacking creature AND the player it is
-    -- attacking stands in this relation to the perspective (CR 109.5's "you").
-    -- Flash Foliage's "target creature attacking you" is @IsAttackingPlayer You@.
-    --
-    -- STRICTLY CR 508.1b's player, never CR 508.5's defending player. Those come
-    -- apart the moment a planeswalker or a battle is attacked, and CR 509.1a and
-    -- CR 802.4a both spell the difference out by writing "attacking that player,
-    -- a planeswalker they control, or a battle they protect" as three separate
-    -- things. So a creature attacking a planeswalker you control does NOT match
-    -- @IsAttackingPlayer You@, and Pawl.Engine.Defender.playerOfAttacker -- which
-    -- answers CR 508.5 and therefore folds all three together -- is the wrong
-    -- function to answer this with.
-    --
-    -- The second of that list is IsAttackingPlaneswalker below, the third
-    -- IsAttackingBattle after it.
-    --
-    -- Carries a PlayerRelation rather than being a nullary IsAttackingYou,
-    -- because the pool wants the other direction too -- Roar of Resistance's
-    -- "creatures attacking your opponents" -- and the relation is the vocabulary
-    -- every player-relating atom is already written in (ControlledBy, OwnedBy).
-    --
-    -- PRESENT TENSE, like IsAttacking and unlike DeclaredAttackedThisCombat
-    -- below: it reads Combat.attackers, so CR 506.4's removal from combat makes
-    -- it False. CR 506.4c is the case that keeps it from becoming True by
-    -- default -- a creature whose planeswalker or battle leaves stays an
-    -- attacking creature but "is not attacking any player", which is the Nothing
-    -- Pawl.Engine.Projection already answers by keeping only AttackTarget.OfPlayer.
+    -- attacking stands in this relation to the perspective (CR 109.5). Strictly
+    -- CR 508.1b's player and never CR 508.5's defending player, which CR 509.1a
+    -- and CR 802.4a spell apart as three subjects -- a creature attacking a
+    -- planeswalker you control does not match @IsAttackingPlayer You@. Present
+    -- tense, so CR 506.4's removal from combat makes it False.
     IsAttackingPlayer PlayerRelation.PlayerRelation
   | -- | CR 508.1b: the candidate is an attacking creature AND the CONTROLLER of
     -- the planeswalker it is attacking stands in this relation to the perspective
-    -- (CR 109.5's "you"), the second subject of CR 509.1a's and CR 802.4a's list.
-    -- Soul Snare's "target creature that's attacking you or a planeswalker you
-    -- control" is @Or [IsAttackingPlayer You, IsAttackingPlaneswalker You]@.
-    --
-    -- CR 508.1b's CONTROLLER and never CR 108.3's owner, which
+    -- (CR 109.5), the second subject of CR 509.1a's and CR 802.4a's list.
     -- Pawl.CombatEffectSpec's "CR 508.1b whole card: Soul Snare reaches a creature
-    -- attacking a planeswalker you CONTROL" proves off a Confiscated planeswalker,
-    -- the two readings naming different seats there.
+    -- attacking a planeswalker you CONTROL" is what proves it reads the controller
+    -- and not CR 108.3's owner.
     IsAttackingPlaneswalker PlayerRelation.PlayerRelation
   | -- | CR 508.1b: the candidate is an attacking creature AND the PROTECTOR of
     -- the battle it is attacking stands in this relation to the perspective (CR
-    -- 109.5's "you"), the third subject of CR 509.1a's and CR 802.4a's list.
-    --
-    -- CR 310.9d's PROTECTOR and never the battle's controller, which CR 310.12a
-    -- makes different players for every Siege, and which
+    -- 109.5), the third subject of CR 509.1a's and CR 802.4a's list.
     -- Pawl.BattleSpec's "CR 310.9d whole card: Synthetic Bulwark Snare reaches a
-    -- creature attacking a battle you PROTECT" proves: the Siege's controller is
-    -- the attacking player there, so a controller-reading engine answers the
-    -- three seats the other way round.
+    -- creature attacking a battle you PROTECT" is what proves it reads CR 310.9d's
+    -- protector and not the battle's controller.
     IsAttackingBattle PlayerRelation.PlayerRelation
-  | -- | CR 508.3b / 508.1b: the candidate WAS DECLARED ATTACKED this COMBAT
-    -- PHASE -- one or more creatures were declared as attackers attacking it.
-    -- DeclaredAttackerThisCombat's mirror: that atom asks whether the candidate
-    -- was declared as an attacker, this one whether it was declared attacked BY
-    -- one, and they read the two halves of the same record
-    -- (Combat.declaredAttackers, Combat.declaredAttacked).
-    --
-    -- Answers for a PLAYER as well as for a permanent, alone among the combat
-    -- atoms, because CR 508.3b's subject list is "[a player, planeswalker, or
-    -- battle]" -- Ever-Watching Threshold's "they attacked you and/or a
-    -- planeswalker you control" is this atom asked twice, once over
-    -- Scope.OverPlayers and once over the battlefield.
-    --
-    -- DECLARED, so CR 508.4's creature put onto the battlefield attacking never
-    -- makes it True: that rule says such a creature never "attacked", for trigger
-    -- events AND effects, and Combat.declaredAttacked is the field written by the
-    -- declaration alone. A LOOK-BACK read for that reason too -- CR 506.4's
-    -- removal from combat leaves the declaration standing, exactly as it does for
-    -- DeclaredAttackerThisCombat, so this stays True for the rest of the combat
-    -- phase and CR 603.4's second check at CR 608.2a cannot disagree with its
-    -- first.
-    --
-    -- Scoped to the COMBAT PHASE and not the turn, for
-    -- DeclaredAttackerThisCombat's reason: CR 511.3 clears the record, so CR
-    -- 500.8's additional combat phase asks the question again from empty.
-    -- Uncharacteristic for IsAttacking's reason.
+  | -- | CR 508.3b: the candidate -- a player, planeswalker or battle -- was
+    -- DECLARED ATTACKED this combat phase, the mirror of
+    -- DeclaredAttackerThisCombat below. A look-back read of
+    -- Combat.declaredAttacked, so CR 508.4's creature put onto the battlefield
+    -- attacking never makes it True and CR 506.4's removal never makes it False;
+    -- CR 511.3 clears the record with the rest of the combat phase's.
     DeclaredAttackedThisCombat
-  | -- | CR 509.1g: the candidate is a BLOCKING creature -- declared as a blocker
-    -- this combat phase and not since removed under CR 506.4. Labyrinth of
-    -- Skophos' "target attacking or blocking creature" is spelled
-    -- `Or [IsAttacking, IsBlocking]` rather than given a third atom meaning "in
-    -- combat", the two roles being separate rules concepts separate cards ask
-    -- about separately. Uncharacteristic for IsAttacking's reason.
-    --
-    -- NOT the same question as "is something blocking it": Pawl.Engine.Combat.isBlocked
-    -- asks whether an ATTACKER has an entry in Combat.blockers, and this asks
-    -- whether the candidate is a MEMBER of some attacker's set. CR 509.1h keeps
-    -- them apart -- a creature remains blocked once every blocker leaves combat --
-    -- so an attacker can be blocked when nothing answers True here.
+  | -- | CR 509.1g: the candidate is a BLOCKING creature, not since removed under
+    -- CR 506.4. Not the question IsBlocked below asks: CR 509.1h keeps a creature
+    -- blocked once every blocker has left combat.
     IsBlocking
   | -- | CR 509.1h: the candidate is a BLOCKED creature -- an attacking creature
     -- one or more creatures were declared blocking, or that an effect said
-    -- becomes blocked. Curtain of Light's "target unblocked attacking creature"
-    -- is `And [IsAttacking, Not IsBlocked]`, the one-relation-one-spelling
-    -- posture IsToken and IsTapped take. Uncharacteristic for IsAttacking's
-    -- reason.
-    --
-    -- The OTHER side of IsBlocking above, and not derivable from it in either
-    -- direction: this is Pawl.Engine.Combat.isBlocked, membership of the KEY of
-    -- Combat.blockers, where IsBlocking asks about the sets. CR 509.1h is what
-    -- pulls them apart -- a creature stays blocked once every creature blocking
-    -- it has left combat, and an effect can confer the status with no blocker
-    -- ever assigned.
+    -- becomes blocked. "Unblocked" is @Not IsBlocked@ (#163).
     IsBlocked
-  | -- | CR 508.1a: the candidate was DECLARED as an attacker THIS COMBAT PHASE.
-    -- Hollow Warrior's "an untapped creature you control not declared as an
-    -- attacking or blocking creature this combat" is `Not
-    -- DeclaredAttackerThisCombat` and the atom below. Read off
-    -- Combat.declaredAttackers, which CR 511.3 clears with the rest of the
-    -- record. Uncharacteristic for IsAttacking's reason.
-    --
-    -- NOT IsAttacking, and the gap is the whole point of the atom, twice over.
-    -- CR 506.4 removes a creature from combat while CR 506.4a leaves its having
-    -- been declared standing, so a removed attacker is False there and True
-    -- here. And CR 508.1k makes the chosen creatures attacking only AFTER CR
-    -- 508.1j's payment, so during the very payment this atom exists to be read
-    -- in, IsAttacking is False for every creature in the declaration.
-    --
-    -- NOT AttackedThisTurn either: that atom reads the turn-scoped event log,
-    -- and CR 500.8's additional combat phase asks this question again from empty
-    -- (CR 506.7c is the same span read from the casting side).
+  | -- | CR 508.1a: the candidate was DECLARED as an attacker THIS COMBAT PHASE,
+    -- read off Combat.declaredAttackers, which CR 511.3 clears. Not IsAttacking:
+    -- CR 506.4a leaves a removed attacker's declaration standing, and CR 508.1k
+    -- makes the chosen creatures attacking only after CR 508.1j's payment.
     DeclaredAttackerThisCombat
-  | -- | CR 509.1a: the candidate was DECLARED as a blocker THIS COMBAT PHASE --
-    -- the other half of Hollow Warrior's criterion, and a separate atom for the
-    -- reason IsBlocking is separate from IsAttacking: attacking is CR 508 and
-    -- blocking is CR 509, two turn-based actions cards ask about separately.
-    -- Uncharacteristic for IsAttacking's reason.
-    --
-    -- NOT IsBlocking, for the atom above's two reasons with CR 509.1g in place
-    -- of CR 508.1k -- and here the ordering half is what the pool actually
-    -- reaches: CR 509.1f pays while CR 509.1g has not run, so a fellow creature
-    -- chosen in the SAME declaration is not blocking yet. CR 509 has no analogue
-    -- of CR 508.1f's tapping to hide that behind, which is why the blocking side
-    -- is where the difference is observable with no other card on the board.
+  | -- | CR 509.1a: the candidate was DECLARED as a blocker THIS COMBAT PHASE. Not
+    -- IsBlocking, for the atom above's reasons with CR 509.1g in place of CR
+    -- 508.1k -- CR 509.1f pays while CR 509.1g has not run, so a fellow creature
+    -- chosen in the same declaration is not blocking yet.
     DeclaredBlockerThisCombat
   | -- | CR 608.2i: the candidate was DECLARED as an attacker earlier this turn --
     -- Relentless Assault's "all creatures that attacked this turn". A look-back
-    -- read of the turn-scoped GameEvent log, which CR 608.2i sanctions; never a
-    -- stamp on the object. Uncharacteristic for IsAttacking's reason.
-    --
-    -- NOT a synonym for IsAttacking, and not expressible in terms of it:
-    -- Combat.attackers is wiped by Combat.clearCombat as the end of combat step
-    -- ends (CR 511.3), so a postcombat main phase resolving this spell sees no
-    -- attackers in the live record. The event log is the right footing because it
-    -- is cleared at turn handoff, exactly the span "this turn" names.
-    --
-    -- DECLARED, like TriggerCondition.SelfAttacks and for that arm's reason: CR
-    -- 508.4 says a creature put onto the battlefield attacking never attacked, and
-    -- only Combat.declareAttackers appends GameEvent.AttackerDeclared.
+    -- read of the turn-scoped GameEvent log, which outlives CR 511.3's wipe of
+    -- Combat.attackers; declared, so CR 508.4's creature put onto the battlefield
+    -- attacking never attacked.
     AttackedThisTurn
   | -- | CR 701.17a: the candidate is a card that was MILLED earlier this turn --
-    -- The Master, Transcendent's "target creature card in a graveyard that was
-    -- milled this turn". AttackedThisTurn's look-back read of the turn-scoped
-    -- GameEvent log, one event arm over (GameEvent.Milled), and uncharacteristic
-    -- for IsAttacking's reason: how a card reached the zone it is in is a rules
-    -- record the closed half owns, not a characteristic of the card (CR 109.3).
-    --
-    -- NOT expressible as "moved from a library to a graveyard this turn", which
-    -- is the reading the Moved entries would give: The Master's own ruling says a
-    -- card put into a graveyard from a library without the word "mill" -- Rowan's
-    -- Grim Search -- is not a legal target, and surveil (CR 701.25a) and explore
-    -- (CR 701.44a) each bin a card off the top of a library without milling it.
-    --
-    -- Matches the incarnation the mill LEFT the card as (CR 400.7, CR 701.17c),
-    -- so a milled card that has since moved again is no longer one this admits --
-    -- the card in the graveyard is a different object from the one that came back
-    -- to it.
+    -- The Master, Transcendent's "creature card in a graveyard that was milled
+    -- this turn". AttackedThisTurn's look-back read one event arm over
+    -- (GameEvent.Milled), and not "moved from a library to a graveyard", which
+    -- surveil (CR 701.25a) and explore (CR 701.44a) also do. Matches the
+    -- incarnation the mill left the card as (CR 400.7).
     MilledThisTurn
-  | -- | CR 120.1 / 608.2i: the candidate was DEALT DAMAGE earlier this turn --
-    -- Fatal Blow's "destroy target creature that was dealt damage this turn".
-    -- AttackedThisTurn's look-back read of the turn-scoped GameEvent log, one
-    -- event arm over (GameEvent.DamageDealt). Answered for a PLAYER candidate as
-    -- well as an object, since CR 120.1 has damage dealt to both -- Needle Drop's
-    -- "any target that was dealt damage this turn" is the printing that asks for
-    -- either. Quantity.PlayersDealtDamageThisTurn counts the seats the same
-    -- question answers True for.
-    --
-    -- The CR defines no term for the phrase: rule 702.54a (bloodthirst) is the
-    -- only place it appears, where it is ordinary English over rule 120.1's
-    -- "objects can deal damage to ... creatures" read back through rule 608.2i.
-    --
-    -- NOT expressible as Object.damage being positive, which is the reading CR
-    -- 120.3e's marks would give: CR 120.6 removes all marked damage when a
-    -- permanent regenerates, and CR 120.3d/120.3e leave a wither or infect
-    -- source marking nothing at all -- and a creature in either state was still
-    -- dealt damage this turn. Marked damage is a strict subset of the question.
+  | -- | CR 120.1 / 608.2i: the candidate -- an object or a player, since CR 120.1
+    -- has damage dealt to both -- was DEALT DAMAGE earlier this turn.
+    -- AttackedThisTurn's look-back read one event arm over
+    -- (GameEvent.DamageDealt), and not Object.damage being positive: a wither or
+    -- infect source marks nothing at all (CR 120.3d).
     DealtDamageThisTurn
   | -- | CR 303.4b / 701.3a: the candidate is ATTACHED to something the nested
-    -- Filter admits -- Crown of the Ages' "target Aura attached to a creature"
-    -- (`AttachedTo (HasCardType Creature)`), Aura Graft's "target Aura that's
-    -- attached to a permanent" (`AttachedTo (And [])`), and Miracle Worker's
-    -- "target Aura attached to a creature you control". Bride's Gown's "as long
-    -- as an Equipment named Groom's Finery is attached to a creature you
-    -- control" is the same atom in a CR 604.2 condition rather than a target
-    -- slot, which is the position the CR 613 layer fold evaluates.
-    --
-    -- Uncharacteristic for IsAttacking's reason -- attachment is a rules concept
-    -- the closed half owns (CR 301.5, 303.4, 701.3, Object.attachedTo) -- while
-    -- the nest asks about the HOST's characteristics, evaluated against the
-    -- host's own Pawl.Engine.Filter.View.
-    --
-    -- The nest reads the host and the OUTER context: CR 109.5's "you" is the
-    -- ability's controller wherever it appears, so `AttachedTo (ControlledBy
-    -- You)` is "attached to something you control" and never "attached to
-    -- something its own controller controls". A consequence worth stating:
-    -- `AttachedTo IsSource` then asks nearly what IsAttachedToSource below asks,
-    -- and differs on exactly one board -- a source that has left the battlefield,
-    -- which this atom's own narrowing excludes and that one's does not.
-    --
-    -- False for a candidate attached to a PLAYER (CR 303.4's other destination)
-    -- and for one whose host has left the battlefield (CR 110.1) -- the host
-    -- view is filled only for an object that is a permanent, which is the window
-    -- CR 704.5m closes on the next state-based-action pass.
+    -- Filter admits -- Crown of the Ages' "target Aura attached to a creature".
+    -- The nest asks about the HOST's characteristics against the OUTER context,
+    -- so @AttachedTo (ControlledBy You)@ is "attached to something you control".
+    -- False for a candidate attached to a player, and for one whose host has left
+    -- the battlefield (CR 704.5m).
     AttachedTo (Filter keyword)
   | -- | CR 303.4b's "enchanted" and CR 301.5a's "equipped", asked of the HOST:
     -- something the nested Filter admits is attached TO the candidate -- A Tale
-    -- for the Ages' "enchanted creatures you control", whose affected set is `And
-    -- [HasCardType Creature, ControlledBy You, HasAttached (HasSubtype Aura)]`.
-    -- The subtype nest is the RULE's word and not a narrowing of ours: rule
-    -- 303.4b makes only an Aura's host enchanted, so an equipped creature is not
-    -- an enchanted one, and CR 301.5a's "equipped" is this same atom nested on
-    -- `HasSubtype Equipment` (Stone Haven Outfitter).
-    --
-    -- The MIRROR of AttachedTo above, the two roles swapped: that atom asks what
-    -- the candidate is attached to, this asks what is attached to the candidate.
-    -- Neither expresses the other, because attachment is DIRECTED and a Filter is
-    -- evaluated against one candidate -- there is nowhere inside the nest to turn
-    -- the arrow around.
-    --
-    -- ANY, not all, and CR 303.4b is what settles that: a creature is enchanted
-    -- once an Aura is attached to it, whatever else is attached alongside. So the
-    -- trivial nest `HasAttached (And [])` reads "has something attached to it",
-    -- and the atom is False for a candidate carrying nothing.
-    --
-    -- Uncharacteristic for AttachedTo's reason, and the nest reads the ATTACHER's
-    -- characteristics against the OUTER context: CR 109.5's "you" stays the
-    -- ability's controller, so `HasAttached (ControlledBy You)` is Archon of the
-    -- Wild Rose's "enchanted by Auras you control" rather than a question about
-    -- the attacher's own controller.
-    --
-    -- Narrowed to attachers ON THE BATTLEFIELD, exactly as AttachedTo's host is
-    -- and for CR 110.1's reason.
+    -- for the Ages' "enchanted creatures you control". The mirror of AttachedTo
+    -- above, neither expressing the other, attachment being directed. Any, not
+    -- all (CR 303.4b), and narrowed to attachers on the battlefield.
     --
     -- Not implemented: a PLAYER candidate, whom CR 303.4b does let an Aura
     -- enchant -- the atom is False for one, since Pawl.Engine.Filter.playerView
     -- holds no board to find the attachers on (#2030).
     HasAttached (Filter keyword)
-  | -- | CR 701.3a / 301.5a: the candidate is attached to the evaluation's SOURCE -- Kemba's
-    -- Legion's "for each Equipment attached to this creature", where the Equipment
-    -- is the candidate and the creature is the source. "Equipment attached to it"
-    -- is `And [HasSubtype Equipment, IsAttachedToSource]`; the subtype conjunct is
-    -- the card's word and is not implied here.
-    --
-    -- Context-relative like IsSource, and the same comparison in the other
-    -- direction: IsSource asks whether the candidate IS the source, this whether
-    -- its host is, and IsHostOfSource below whether the SOURCE's host is the
-    -- candidate. Vacuously False where the candidate is attached to nothing or
-    -- to a player (CR 303.4's other destination), and where no source frames the
-    -- match.
-    --
-    -- Nullary rather than an arm of AttachedTo above, and not a synonym for it
-    -- either: host IDENTITY is not a host QUALITY, so this reads an ObjectId off
-    -- the candidate's own view rather than the host's, and answers without any
-    -- projection of the host at all.
+  | -- | CR 701.3a / 301.5a: the candidate is attached to the evaluation's SOURCE
+    -- -- Kemba's Legion's "for each Equipment attached to this creature". Host
+    -- IDENTITY and not a host quality, so it reads an ObjectId off the candidate's
+    -- own view; vacuously False where the candidate is attached to nothing or to
+    -- a player, and where no source frames the match.
     IsAttachedToSource
   | -- | CR 303.4b's "enchanted": the candidate is what the evaluation's SOURCE is
-    -- attached to -- Ray of Frost's "enchanted creature", where the Aura is the
-    -- source and the creature it enchants is the candidate.
-    --
-    -- The THIRD attachment direction, and the one the two atoms above cannot
-    -- say between them: IsSource asks whether the candidate is the source,
-    -- IsAttachedToSource whether the candidate's host is, and this whether the
-    -- SOURCE's host is the candidate. Vacuously False where the source is
-    -- attached to nothing or to a player (CR 303.4's other destination), and
-    -- where no source frames the match.
-    --
-    -- Nullary for IsAttachedToSource's reason, and reading the mirror-image
-    -- field: the host id comes off Pawl.Engine.Filter.Context rather than off
-    -- the candidate's view, because it is ONE reading of the source, the same
-    -- for every candidate. So this too answers with no projection of anything.
-    --
-    -- Answerable only where that field is filled, which is the CR 604.2 clause
-    -- of a static ability, the CR 603.4 intervening clause of a triggered one,
-    -- and an effect's Pawl.Types.ObjectRef; Pawl.CardSpec's position lint is
-    -- what keeps a card out of every other position.
+    -- attached to -- Ray of Frost's "enchanted creature", the third attachment
+    -- direction. Vacuously False where the source is attached to nothing or to a
+    -- player; Pawl.CardSpec's position lint keeps a card to the positions that
+    -- fill the field.
     IsHostOfSource
   | -- | CR 701.3a's last sentence: the candidate is one the SUBJECT of the
-    -- surrounding attach -- the permanent being moved -- could legally be attached
-    -- to. Aura Graft's "another permanent IT CAN ENCHANT".
-    --
-    -- Context-relative like IsSource, except that the subject arrives through
-    -- Pawl.Engine.Filter.View rather than through Context, the answer being
-    -- per-candidate and needing the game state. Vacuously False wherever no attach
-    -- frames the match.
-    --
-    -- Asks about the SUBJECT and not about the candidate, which no combination of
-    -- the atoms above can express -- a destination filter narrowed by HasCardType
-    -- would still admit a creature the Aura's enchant ability rejects. NOT a
-    -- restatement of CR 303.4j, which is the backstop for a card that does NOT say
-    -- "it can enchant" (Crown of the Ages), where the destination is offered and
-    -- the move then fails.
-    --
-    -- Writing it into any other Filter position is a FAILING TEST rather than a
-    -- quiet False: Pawl.CardSpec walks every Filter position a card has and
-    -- rejects the atom in all but an attach's destination. The mirror question --
-    -- a candidate that could be attached to a fixed host -- is CanAttachToSubject
-    -- below rather than a widening of this atom. Answered by
-    -- Pawl.Engine.Attach.attachmentFor, so it reads CR 303.4's other limits on
-    -- what a permanent can be enchanted by along with the subject's own enchant
-    -- ability -- Pawl.AuraSpec's "Aura Graft will not move an Aura onto a land
-    -- Consecrate Land protects" is what proves the two arrive together.
+    -- surrounding attach could legally be attached to -- Aura Graft's "another
+    -- permanent IT CAN ENCHANT". Answered by Pawl.Engine.Attach.attachmentFor, so
+    -- CR 303.4's other limits arrive with the subject's own enchant ability --
+    -- Pawl.AuraSpec's "Aura Graft will not move an Aura onto a land Consecrate
+    -- Land protects" is what proves the two arrive together. Pawl.CardSpec
+    -- rejects the atom outside an attach's destination.
     CanHostSubject
   | -- | CR 701.3a from the other side: could THIS CANDIDATE legally be attached
     -- to the object the surrounding instruction fixes? Auratouched Mage's "an
-    -- Aura card that could enchant it".
-    --
-    -- The mirror of CanHostSubject above, with the two roles swapped: there the
-    -- fixed object is the permanent being moved and the candidate is a would-be
-    -- host; here the fixed object is the HOST and the candidate is what would be
-    -- attached to it. "Subject" means the same thing in both -- the object the
-    -- instruction fixes, one reading per evaluation -- which is why both arrive
-    -- through Pawl.Engine.Filter.View rather than through Context: the answer is
-    -- per-candidate and needs the game state.
-    --
-    -- Not expressible with the atoms above, for CanHostSubject's reason one
-    -- direction over: a search narrowed by HasSubtype would still find an Aura
-    -- whose enchant ability rejects the host.
-    --
-    -- Answerable in a SEARCH filter and nowhere else, since
-    -- Pawl.Engine.Resolve's Effect.Search arm is the only site that fills the
-    -- field -- there the fixed object is the searching ability's own source.
-    -- Writing it into any other Filter position is a FAILING TEST rather than a
-    -- quiet False, exactly as CanHostSubject's misuse is: Pawl.CardSpec walks
-    -- every Filter position a card has and rejects the atom in all but a
-    -- search's. Answered by Pawl.Engine.Attach.attachableWithLastKnown, whose
-    -- live half is the same function that performs the move, so CR 303.4's other
-    -- limits on what a permanent can be enchanted by arrive with the candidate's
-    -- own enchant ability -- and whose other half is CR 608.2h, the fixed host
-    -- read as it most recently existed once it has left the battlefield.
+    -- Aura card that could enchant it", the mirror of CanHostSubject above.
+    -- Answered by Pawl.Engine.Attach.attachableWithLastKnown, whose other half is
+    -- CR 608.2h's last-known read of a host that has left the battlefield;
+    -- Pawl.CardSpec rejects the atom outside a search's filter.
     --
     -- Not implemented: the same question with the host fixed by anything but the
     -- searching ability's source -- Sovereigns of Lost Alara's bound creature,
     -- Bruna's, and Takklemaggot's choose-position reading of CanHostSubject
     -- (#2028).
     CanAttachToSubject
-  | -- | CR 111.6: the candidate is a token. Ashaya, Soul of the Wild's "nontoken
-    -- creatures you control" is spelled `Not IsToken` -- one relation, one
-    -- spelling, the way "another" is spelled `Not IsSource` (#163).
-    -- Uncharacteristic for IsAttacking's reason (CR 111, Pawl.Types.Source).
-    --
-    -- Unlike the other such atoms it is not merely uncharacteristic but IMMUTABLE:
-    -- CR 111.3 makes a token's effect-defined values equivalent to printed ones,
-    -- so nothing in CR 613 can turn a card into a token or back. That is what lets
+  | -- | CR 111.6: the candidate is a token; "nontoken" is @Not IsToken@ (#163).
+    -- Uncharacteristic and immutable, CR 111.3 making a token's effect-defined
+    -- values equivalent to printed ones, which is what lets
     -- Pawl.Engine.Projection.filterReads declare it as reading nothing.
     IsToken
   | -- | CR 113.3b: the candidate is an ACTIVATED ability on the stack, not CR
-    -- 113.3c's triggered one -- Squelch's "target activated ability" narrowing
-    -- Stifle's Pool.Abilities. Uncharacteristic and immutable for IsToken's
-    -- reason: the kind comes off Pawl.Types.Source, which no CR 613 layer writes.
-    --
-    -- An atom and not a Pool arm, although Pawl.Types.Pool.Abilities is the one
-    -- pool it narrows: CR 113.9 draws its line between spells and abilities and
-    -- not between the two kinds of ability, so this is a card's own restriction
-    -- -- and only a Filter composes under And/Or/Not and is reachable from
-    -- Pawl.Types.Affected.MatchingAnywhere.
+    -- 113.3c's triggered one -- Squelch's "target activated ability".
+    -- Uncharacteristic and immutable for IsToken's reason.
     IsActivatedAbility
-  | -- | CR 110.5: the candidate is tapped. Wood Elemental's "untapped Forests"
-    -- is spelled `Not IsTapped`, the one-relation-one-spelling posture IsToken's
-    -- comment states (#163).
-    --
-    -- Uncharacteristic, like IsAttacking and IsToken: CR 110.5 makes tap state a
-    -- STATUS rather than a characteristic, so nothing in CR 613 projects it and
-    -- Pawl.Engine.Projection.filterReads declares it as reading nothing. Unlike
-    -- IsToken it is not immutable -- a permanent taps and untaps constantly --
-    -- but mutability is not what filterReads asks about.
+  | -- | CR 110.5: the candidate is tapped; "untapped" is @Not IsTapped@ (#163). A
+    -- STATUS rather than a characteristic, so nothing in CR 613 projects it.
     IsTapped
   | -- | CR 110.5: the candidate is a FACE-DOWN permanent -- the other value of
-    -- the same status category IsTapped reads one of. Break Open's "target
-    -- face-down creature an opponent controls" is this atom beside a ControlledBy
-    -- Opponent conjunct, the split Transformed's comment describes. "Face up" is
-    -- spelled `Not IsFaceDown`, the one-relation-one-spelling posture IsToken's
-    -- comment states (#163).
-    --
-    -- Primal Whisperer's "+2/+2 for each face-down creature on the battlefield"
-    -- is the same atom under a Quantity.Count instead of a target slot, and the
-    -- other half of what Pawl.Engine.Count answers for it.
-    --
-    -- The battlefield conjunct is the atom's own, Transformed's posture and for
-    -- the rule's own reason rather than a caller's: CR 110.5d says only permanents
-    -- have status, and CR 708.4 turns an object face down BEFORE it is put onto
-    -- the stack, so a face-down SPELL would otherwise answer True to a Count
-    -- scoped over some other zone.
-    --
-    -- NOT face-down EXILE, which CR 110.5d rules out in as many words -- "although
-    -- an exiled card may be face down, this has no correlation to the face-down
-    -- status of a permanent". Object.exiledFaceDown is that other thing and this
-    -- atom never reads it; Pawl.Types.Facing has the rest of the distinction.
-    --
-    -- Uncharacteristic, like IsToken and IsTapped: CR 110.5a says status is not a
-    -- characteristic in as many words, so nothing in CR 613 writes it and
-    -- Pawl.Engine.Projection.filterReads declares this atom as reading nothing.
-    -- CR 708.2a's 2/2 with no name is the CONSEQUENCE of the status and is
-    -- projected normally, which is what lets a face-down permanent clear a
-    -- creature pool for this atom to narrow.
+    -- the same status category IsTapped reads one of, and "face up" is @Not
+    -- IsFaceDown@ (#163). Narrowed to the battlefield by the atom, since CR
+    -- 110.5d gives only permanents status and CR 708.4 turns an object face down
+    -- before it reaches the stack. Never CR 110.5d's face-down EXILED card, which
+    -- IsExiledFaceDown below reads.
     IsFaceDown
   | -- | CR 708.12: the CARD REPRESENTING the candidate matches the nested filter,
-    -- read off that card's printed face with nothing in CR 613 applied.
-    -- Hauntwoods Shrieker's "reveal target face-down permanent. If it's a
-    -- creature card, you may turn it face up" is the witness, and rule 708.12 is
-    -- what makes the nest necessary rather than a plain HasCardType conjunct: an
-    -- ability that reveals a face-down permanent and then needs information about
-    -- it "uses the characteristics of that object ignoring any continuous effects
-    -- that may be applying to it".
-    --
-    -- A PLAIN HasCardType WOULD BE VACUOUS HERE, which is the whole reason for a
-    -- second spelling: CR 708.2a leaves every face-down permanent a 2/2 creature,
-    -- so `HasCardType Creature` is true of a manifested land and this atom is
-    -- false of it. Pawl.FaceDownSpec's Hauntwoods Shrieker group is the pair of
+    -- read off that card's printed face with nothing in CR 613 applied
+    -- (Hauntwoods Shrieker's "if it's a creature card"). A plain HasCardType
+    -- would be vacuous, CR 708.2a leaving every face-down permanent a 2/2
+    -- creature; Pawl.FaceDownSpec's Hauntwoods Shrieker group is the pair of
     -- boards that separates them.
-    --
-    -- The same read CR 701.40b's special action already takes at
-    -- Pawl.Engine.FaceDown.manifestCostOf ("show all players that the card
-    -- representing that permanent is a creature card"), given a spelling a CARD
-    -- can write. Pawl.Engine.Projection.viewOfCard builds the nested view off
-    -- Pawl.Engine.Game.faceUpFaceOf, so a face-up permanent answers about its own
-    -- card and a face-down one about the card underneath.
-    --
-    -- Uncharacteristic in Pawl.Engine.Projection.filterReads' sense even though
-    -- it names characteristics: it reads the PRINTED card, which no continuous
-    -- effect reaches, so no layer can make it flip.
     RepresentedByCard (Filter keyword)
-  | -- | CR 406.3: the candidate is a card that was exiled FACE DOWN. Riftsweeper's
-    -- "target face-up exiled card" is spelled `Not IsExiledFaceDown`, the
-    -- one-relation-one-spelling posture IsToken's comment states (#163).
+  | -- | CR 406.3: the candidate is a card that was exiled FACE DOWN; "face-up
+    -- exiled card" is @Not IsExiledFaceDown@ (#163). A separate atom from
+    -- IsFaceDown above, which CR 110.5d says in as many words.
     --
-    -- A SEPARATE atom from IsFaceDown above rather than a second reading of it,
-    -- and CR 110.5d says so in as many words: "although an exiled card may be
-    -- face down, this has no correlation to the face-down status of a
-    -- permanent". That atom reads Object.facing and is scoped to the
-    -- battlefield; this one reads Object.exiledFaceDown and is scoped to
-    -- nothing, because the field is only ever written on the way into exile.
-    --
-    -- NOT the same question as CR 406.4's permission to look, which is why the
-    -- card carries this and the rules core carries that: rule 406.4 offers a
-    -- chooser who may not look at a face-down exiled card the PILE it sits in
-    -- instead (Pawl.Engine.Target.piledOffer, taken at the prompt rather than in
-    -- the pool), and Riftsweeper's printed qualifier narrows the candidates that
-    -- substitution runs over. A player who may look at their own foretold card
-    -- is offered it by rule 406.4 and refused it by Riftsweeper's own words,
-    -- which is what Pawl.ExileSpec's Augury Raven group proves.
-    --
-    -- Uncharacteristic, like IsToken and IsTapped: CR 406.3a leaves a face-down
-    -- exiled card no characteristics at all, so being face down in exile is not
-    -- one either and Pawl.Engine.Projection.filterReads declares this atom as
-    -- reading nothing.
+    -- Not CR 406.4's permission to look, which the rules core answers instead
+    -- (Pawl.Engine.Target.piledOffer): Pawl.ExileSpec's Augury Raven group proves
+    -- a player offered their own foretold card by that rule is still refused it
+    -- by Riftsweeper's own words.
     IsExiledFaceDown
   | -- | CR 701.27g: the candidate is a "transformed permanent" -- a double-faced
-    -- permanent on the battlefield with its back face up. Mutagen Connoisseur's
-    -- "for each transformed permanent you control", whose "you control" is a
-    -- ControlledBy You conjunct beside this atom, the split IsRingBearer's
-    -- comment describes.
+    -- permanent on the battlefield with its back face up. Both of the rule's
+    -- exclusions are in the answer: a permanent showing its front face is never
+    -- transformed however it turned before, and neither is one represented by
+    -- more than one card.
     --
-    -- BOTH of the rule's exclusions are in the answer rather than in the caller.
-    -- The first is that a permanent showing its front face is never transformed
-    -- "even if it had its back face up previously", so the answer reads the face
-    -- the object shows NOW (Pawl.Engine.Game.isFrontFaceUp, off Object.face) and
-    -- never Object.turnedOverAt beside it, which records when it last turned and
-    -- is what a history reading would consult. The second is that an object
-    -- represented by more than one card is never transformed either, "such as a
-    -- melded or merged permanent" -- Pawl.Engine.Game.componentsOf answers it
-    -- for a melded permanent, and CR 730.3's merged one is unimplemented (#874),
-    -- so that half of the exclusion is the reader's own emptiness for now.
-    --
-    -- The battlefield conjunct is the atom's own rather than the surrounding
-    -- set's, unlike IsRingBearer's: CR 701.27g states it, and a double-faced
-    -- SPELL on the stack cast with its back face up (CR 712.11a) would otherwise
-    -- answer True to a Count scoped over some other zone.
-    --
-    -- Uncharacteristic, like IsToken and IsTapped: CR 712.8d/e make which face is
-    -- up the thing a permanent's characteristics are read OFF, so it is not one
-    -- of them (CR 109.3), nothing in CR 613 writes it, and
-    -- Pawl.Engine.Projection.filterReads declares it as reading nothing.
+    -- Not implemented: CR 730.3's merged permanent, the second exclusion's other
+    -- half (#874).
     Transformed
-  | -- | CR 701.54e: the candidate "is your Ring-bearer" -- the permanent carrying
-    -- the Ring-bearer designation made for the perspective player. The Ring's own
-    -- "YOUR Ring-bearer is legendary" (CR 701.54c), which is rulebook text rather
-    -- than a card's, so Pawl.Engine.Ring mints it.
-    --
-    -- Context-relative like IsSource and ControlledBy: the atom carries no
-    -- PlayerId, and whose Ring-bearer is asked comes from the Context's
-    -- perspective (CR 109.5). It needs no PlayerRelation payload either, unlike
-    -- ControlledBy -- CR 701.54e is only ever asked as "YOUR Ring-bearer", and an
-    -- opponent-relative spelling would be an arm no rule and no card asks for.
-    --
-    -- ONE of CR 701.54e's three conjuncts, not all three: this asks only about the
-    -- designation, and the rule's "on the battlefield under your control" is
-    -- spelled by the surrounding set -- Affected.Matching's own battlefield gate
-    -- and a ControlledBy You conjunct beside this atom. Pawl.Engine.Ring's
-    -- isRingBearerOf is the same three conjuncts assembled for a caller with no
-    -- Filter in hand.
-    --
-    -- Uncharacteristic, for IsAttacking's reason: CR 701.54b makes Ring-bearer a
-    -- DESIGNATION a permanent has, which CR 109.3's characteristic list has no
-    -- room for and which the same rule says is not a copiable value. Like IsToken
-    -- it is uncharacteristic AND unwritable by any CR 613 layer, which is what
-    -- lets Pawl.Engine.Projection.filterReads declare it as reading nothing.
+  | -- | CR 701.54e: the candidate "is your Ring-bearer", asked of the Context's
+    -- perspective (CR 109.5). ONE of the rule's three conjuncts -- "on the
+    -- battlefield under your control" is spelled by the surrounding set.
+    -- Uncharacteristic, CR 701.54b making Ring-bearer a designation rather than a
+    -- copiable value.
     IsRingBearer
   | -- | Does the CANDIDATE have this designation? Aragorn, Hornburg Hero's
-    -- "whenever a renowned creature you control deals combat damage to a player"
-    -- and Rune-Brand Juggler's "sacrifice a suspected creature".
-    --
-    -- IsRingBearer's shape, and for the same rule-shaped reason: the rules behind
-    -- Pawl.Types.Designation make each mark "a designation that has no rules
-    -- meaning other than to act as a marker that ... other spells and abilities can
-    -- identify", which is what a Filter atom is for. Unlike that one it asks
-    -- nothing of the perspective -- none of those designations belongs to a player,
-    -- so "you control" is a ControlledBy conjunct beside this atom rather than
-    -- something inside it.
-    --
-    -- NOT Pawl.Types.Quantity.HasDesignation, which asks the same designation of
-    -- the object an evaluation is AIMED at (Power's position) for rule 702.112a's
-    -- intervening "if". Two readings of one designation, kept apart the way CR
-    -- 701.54b's is: a candidate side and a self side.
-    --
-    -- NOT what CR 701.60c hangs off `Suspected` either: menace and "this creature
-    -- can't block" are read off the designation by Pawl.Engine.Projection and
-    -- Pawl.Engine.CombatRestriction, and a filter asking for either of those would
-    -- match a permanent that got it elsewhere.
-    --
-    -- Uncharacteristic, for IsRingBearer's reason: each of those rules says the
-    -- designation is "neither an ability nor part of the permanent's copiable
-    -- values", so no CR 613 layer writes it and
-    -- Pawl.Engine.Projection.filterReads declares this atom as reading nothing.
+    -- "renowned creature you control" and Rune-Brand Juggler's "suspected
+    -- creature". Not Pawl.Types.Quantity.HasDesignation, which asks the same
+    -- designation of the object an evaluation is aimed at, and not what CR
+    -- 701.60c hangs off a designation. Uncharacteristic for IsRingBearer's reason.
     HasDesignation Designation.Designation
-  | -- | CR 122.1: does the CANDIDATE have one or more counters of this kind on it?
-    -- Renegade Krasis' "each other creature you control with a +1/+1 counter on
-    -- it".
-    --
-    -- "One or more" and not a count: every printing that asks reads presence, and
-    -- a threshold would have to say which comparison it meant. The KIND is a
-    -- payload because CR 122.1 makes each kind its own marker.
-    --
-    -- Uncharacteristic, for HasDesignation's reason: CR 109.3's list has no counters
-    -- in it, so no CR 613 layer writes them and
-    -- Pawl.Engine.Projection.filterReads declares this as reading nothing. The P/T
-    -- a +1/+1 counter grants is CR 613.4c's, which the projection applies over the
-    -- top of what this atom reads.
+  | -- | CR 122.1: does the CANDIDATE have one or more counters of this kind on
+    -- it? "One or more" and not a count, which is what every printing asks.
+    -- Uncharacteristic: CR 109.3's list has no counters in it, and the P/T a
+    -- +1/+1 counter grants is CR 613.4c's, applied over the top of this.
     HasCounters (CounterKind.CounterKind keyword)
   | -- | CR 122.1 again, kind-agnostic: does the CANDIDATE have one or more
-    -- counters on it of ANY kind? Razorfin Abolisher's "target creature with a
-    -- counter on it".
-    --
-    -- A SEPARATE nullary atom rather than a Maybe payload on HasCounters above,
-    -- which is the call Quantity.ObjectCountersOfAnyKind made one type over
-    -- (see #994): an absent payload standing for "every kind" makes a field's
-    -- ABSENCE the way a reader tells two questions apart, and the two questions
-    -- are asked by different printings rather than by one printing with a hole
-    -- in it. It also keeps CR 612.1's rewrite simple -- HasCounters is rewritten
-    -- THROUGH its kind, and a kind-less atom has no word to swap.
-    --
-    -- Not spellable as an Or over the kinds: CR 122.1b lets a counter be a
-    -- KEYWORD counter, so CounterKind carries a whole Keyword and is not
-    -- enumerable. There is no finite disjunction a card author could write, which
-    -- is why this atom has to exist rather than being sugar.
-    --
-    -- Uncharacteristic, for HasCounters' reason above, and
-    -- Pawl.Engine.Projection.filterReads declares it as reading nothing on the
-    -- same grounds.
+    -- counters on it of ANY kind? Not spellable as an Or over the kinds, CR
+    -- 122.1b's keyword counters making CounterKind unenumerable, and a separate
+    -- nullary atom rather than a Maybe payload on HasCounters above, see #994.
     HasCountersOfAnyKind
   | -- | CR 602.1 / 605.1a: does the CANDIDATE have one or more activated
     -- abilities that aren't mana abilities? Tsabo's Web's "each land with an
-    -- activated ability that isn't a mana ability", and Ravager Wurm's second
-    -- mode says the same words.
-    --
-    -- ONE atom for the whole clause rather than an ability atom and a mana
-    -- qualifier beside it: CR 605.1a's mana-ability test is about an ability and
-    -- not about the object, so there is nothing for a conjunct to be asked of.
-    -- Every printing that asks this question asks it with the exclusion already
-    -- attached, and the two cards that word it differently
-    -- (Magewright's Stone's "with {T} in its cost") ask about the ability's COST,
-    -- which is a third question again.
-    --
-    -- Characteristic, unlike the atoms above it: CR 109.3 counts abilities among
-    -- an object's characteristics and CR 613.1f writes them, so
-    -- Pawl.Engine.Projection.filterReads declares this atom as reading Keywords
-    -- -- Humility takes the abilities away and the atom stops matching.
-    --
-    -- The abilities it reads are the ones the object HAS, which is not the same
-    -- list as the ones it can activate here: CR 702.29b and CR 702.77b keep a
-    -- cycling or reinforce ability in existence in every zone while letting it be
-    -- activated only from a hand, and this atom is the reader those two rules
-    -- were written for.
+    -- activated ability that isn't a mana ability". The abilities it reads are
+    -- the ones the object HAS, which CR 702.29b and CR 702.77b keep in existence
+    -- outside the zone they can be activated from. Characteristic, unlike the
+    -- atoms above it: CR 613.1f writes abilities, so Humility stops it matching.
     HasNonManaActivatedAbility
-  | -- | CR 400.1: the candidate OBJECT is in this zone. Drannith Magistrate's
-    -- "your opponents can't cast spells from anywhere other than their hands" is
-    -- `Not (IsInZone Hand)` under PlayerEffect.CantCastMatching -- one relation,
-    -- one spelling, the posture IsToken's comment states (#163).
-    --
-    -- What makes it a CAST-side atom is CR 601.2's "take it from where it is":
-    -- the zone a spell is cast FROM is the zone its card is in when the cast is
-    -- proposed, and Pawl.Engine.Cast.castable gates before CR 601.2a moves the
-    -- card to the stack, so the object this atom reads is still in that zone. A
-    -- prohibition asked after the move would read Stack, which is neither card's
-    -- zone: Grafdigger's Cage would then catch nothing and Drannith Magistrate
-    -- everything.
-    --
-    -- NAMES A ZONE AND NOT WHOSE, where Pawl.Types.InZone names both: CR 400.1
-    -- gives four of its seven zones no per-player copy, so a shared zone has no
-    -- owner to name, and the two per-player readings a card wants -- "in your
-    -- graveyard", "in an opponent's hand" -- are an OwnedBy conjunct beside this
-    -- atom rather than a payload inside it. Pawl.Types.InZone carries the
-    -- PlayerRef because a COUNT has to be told which pile to size; a predicate
-    -- about one candidate does not.
-    --
-    -- Uncharacteristic, for IsTapped's reason: CR 109.3 counts no zone among an
-    -- object's characteristics, so nothing in CR 613 writes it and
-    -- Pawl.Engine.Projection.filterReads declares this atom as reading nothing.
-    --
-    -- Vacuously False where there is no OBJECT to ask -- a player view, an event
-    -- snapshot, and a printed card being matched by a library search, which CR
-    -- 109.1 makes an object of nothing -- the posture ControlledBy and IsSource
-    -- already take.
+  | -- | CR 400.1: the candidate OBJECT is in this zone; "from anywhere other than
+    -- their hands" is @Not (IsInZone Hand)@ (#163). A cast gate reads it before
+    -- CR 601.2a moves the card to the stack, which is what CR 601.2's "take it
+    -- from where it is" asks for. Names a zone and not whose -- "in your
+    -- graveyard" is an OwnedBy conjunct beside this atom. Vacuously False where
+    -- there is no OBJECT to ask (CR 109.1).
     IsInZone Zone.Zone
   | -- | CR 601.2a: which zone the candidate SPELL was moved to the stack from --
-    -- Aven Interrupter's "spells your opponents cast from graveyards or from
-    -- exile", Patrician Geist's "spells you cast from your graveyard".
-    --
-    -- NOT IsInZone above, and the two can never stand in for each other. That
-    -- atom reads where the object is NOW, which CR 601.2a has already made the
-    -- stack by the time CR 601.2f prices the spell; this one reads the zone the
-    -- cast came out of, which Pawl.Types.Object.castFrom remembers precisely
-    -- because CR 400.7 leaves the spell no memory of it. Writing a cost filter
-    -- with IsInZone gave a card a gate and a payment that disagreed; see #2363.
-    --
-    -- NAMES A ZONE AND NOT WHOSE, IsInZone's posture verbatim: "from your
-    -- graveyard" is an OwnedBy conjunct beside this atom, which CR 400.3 makes
-    -- exact for the three per-player zones.
-    --
-    -- Vacuously False for everything that was never cast -- a card at rest, a
-    -- token, an ability on the stack -- since Object.castFrom is Nothing there.
+    -- Patrician Geist's "spells you cast from your graveyard". Remembered in
+    -- Pawl.Types.Object.castFrom precisely because CR 400.7 leaves the spell no
+    -- memory of it, so it is never IsInZone above, which reads where the object
+    -- is now. Vacuously False for everything that was never cast.
     WasCastFrom Zone.Zone
   | And [Filter keyword]
   | Or [Filter keyword]

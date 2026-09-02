@@ -63,6 +63,7 @@ emptyCombat =
       Combat.struckFirst = Nothing,
       Combat.joinedUnder = Map.empty,
       Combat.attackedUnder = Map.empty,
+      Combat.attackedControlledBy = Map.empty,
       Combat.attacked = Set.empty,
       Combat.declaredAttacked = Set.empty,
       Combat.declaredAttackedThisStep = Set.empty,
@@ -298,15 +299,26 @@ stillAttacked oid gs =
 --
 -- The list also asks who protects the battle, so a protector moved to a third
 -- player mid-combat (CR 310.9f) reads here as removed from combat, which is what
--- rule 506.4 says. Not implemented: any effect that moves a designation (#853).
+-- rule 506.4 says. Not implemented: any effect that moves a designation (#2980).
 --
--- Not implemented: rule 506.4's CONTROLLER clause for a battle, whose protector a
--- control change leaves where it was, so this list still finds it (#2965). The
--- planeswalker twin above reads that clause off Pawl.Types.Combat's attackedUnder,
--- which for a battle records the protector and cannot see it.
+-- Rule 506.4's CONTROLLER clause is NOT here, because this list cannot see it: a
+-- control change leaves the protector where it was, so every candidate list still
+-- finds the battle. noteAttackingNothing asks it separately, against
+-- Pawl.Types.Combat's attackedControlledBy.
 stillAttackedBattle :: ObjectId -> GameState -> Bool
 stillAttackedBattle oid gs =
   List.any (\defender -> List.elem oid (attackableBattles defender gs)) (Defender.defendingPlayers gs)
+
+-- CR 506.4's comparand for a CR 508.1b announcement that named a BATTLE: who
+-- controls that battle. Nothing for a player or a planeswalker --
+-- Pawl.Types.Combat's attackedControlledBy says why the planeswalker needs none.
+--
+-- One function so that the two writers of `attackers` cannot record the seat
+-- differently, which is what Defender.playerOf is for attackedUnder beside it.
+attackedBattleController :: AttackTarget.AttackTarget -> GameState -> Maybe PlayerId
+attackedBattleController target gs = case target of
+  AttackTarget.OfBattle battle -> Projection.controllerOf battle gs
+  _ -> Nothing
 
 isCreatureObject :: ObjectId -> GameState -> Bool
 isCreatureObject = isCreatureObjectGiven Map.empty
@@ -1251,12 +1263,20 @@ noteAttackingNothing gs =
       seatMoved attacker pw = case Map.lookup attacker (Combat.attackedUnder c) of
         Nothing -> False
         Just seat -> Projection.controllerOf pw gs /= Just seat
+      -- CR 506.4's controller clause for a BATTLE, which stillAttackedBattle
+      -- cannot answer: the rule names the controller and the protector
+      -- separately, and only the protector moves a battle off the candidate
+      -- lists. Read against the seat recorded as this creature joined combat,
+      -- for seatMoved's reason above.
+      battleSeatMoved attacker battle = case Map.lookup attacker (Combat.attackedControlledBy c) of
+        Nothing -> False
+        Just seat -> Projection.controllerOf battle gs /= Just seat
       removed attacker target = case target of
         -- CR 800.4e, not CR 506.4: a departed player is still being attacked, and
         -- Damage.combatRecipient is where the damage goes missing.
         AttackTarget.OfPlayer _ -> False
         AttackTarget.OfPlaneswalker pw -> not (stillAttacked pw gs) || seatMoved attacker pw
-        AttackTarget.OfBattle battle -> not (stillAttackedBattle battle gs)
+        AttackTarget.OfBattle battle -> not (stillAttackedBattle battle gs) || battleSeatMoved attacker battle
       gone = Map.keysSet (Map.filterWithKey removed (Combat.attackers c))
    in gs {GameState.combat = c {Combat.attackingNothing = Set.union gone (Combat.attackingNothing c)}}
 
@@ -1501,6 +1521,14 @@ attemptAttackDeclaration pid rejected = do
                           Map.union
                             (Map.mapMaybe (\target -> Defender.playerOf Projection.controllerWithLastKnown target g) recorded)
                             (Combat.attackedUnder (GameState.combat g)),
+                        -- CR 506.4's controller clause for a battle, taken at the
+                        -- same moment and off the battle itself: the seat above is
+                        -- its protector (CR 310.9b), which that rule names
+                        -- separately.
+                        Combat.attackedControlledBy =
+                          Map.union
+                            (Map.mapMaybe (\target -> attackedBattleController target g) recorded)
+                            (Combat.attackedControlledBy (GameState.combat g)),
                         -- CR 508.8's first clause. Never cleared, so a CR 506.4
                         -- removal later in the step cannot un-declare these
                         -- creatures, and never narrowed to the targets still being
@@ -1734,6 +1762,15 @@ putOntoBattlefieldAttacking oid = do
                           (Combat.attackedUnder c)
                           (\seat -> Map.insert oid seat (Combat.attackedUnder c))
                           (Defender.playerOf Projection.controllerWithLastKnown target gs),
+                      -- CR 506.4's controller clause for a battle, on the CR
+                      -- 508.4 road: THIS creature joins combat now, so the seat
+                      -- it compares against is who controls the battle now --
+                      -- whatever seat an earlier attacker recorded for it.
+                      Combat.attackedControlledBy =
+                        Maybe.maybe
+                          (Combat.attackedControlledBy c)
+                          (\seat -> Map.insert oid seat (Combat.attackedControlledBy c))
+                          (attackedBattleController target gs),
                       -- CR 508.8's SECOND clause, written inside the guards rather
                       -- than in Resolve's Create arm: CR 506.3a-c and CR 508.4a
                       -- each let the permanent enter without ever becoming an
