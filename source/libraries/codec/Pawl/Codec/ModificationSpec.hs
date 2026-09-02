@@ -11,6 +11,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
@@ -257,6 +258,7 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
                   (Cost.MkCost Nothing [CostComponent.TapThis])
                   (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
                   []
+                  Activator.Controller
                   Nothing
                   Nothing
               )

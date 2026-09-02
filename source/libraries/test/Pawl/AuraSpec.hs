@@ -2598,9 +2598,10 @@ cloudformBoard island piker cloudform =
 -- ability makes of the spell rather than on the creature it prints: Thalia,
 -- Guardian of Thraben ("noncreature spells cost {1} more to cast", CR 601.2f and
 -- CR 118.9d) and Aether Storm ({3}{U} Enchantment, "Creature spells can't be
--- cast", CR 601.3a). Not implemented: Aether Storm's second ability is written
--- without "Any player may activate this ability" (#2213), which leaves pawl's
--- card stricter than printed -- only its controller can destroy it.
+-- cast", CR 601.3a). Aether Storm's second ability carries its printed "Any
+-- player may activate this ability" (ActivatedAbility.activator); nothing in
+-- these cases activates it, and Pawl.ActivateSpec's "Any player may activate"
+-- group is where an opponent does.
 --
 -- CR 702.103c's copy of a bestowed Aura spell is Pawl.CopySpec's (Lithoform
 -- Engine copying a bestowed Rollicker).

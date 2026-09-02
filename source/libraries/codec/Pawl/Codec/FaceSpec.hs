@@ -13,6 +13,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
@@ -238,7 +239,7 @@ populatedFace =
   baseFace
     { Face.keywords = Set.singleton Keyword.Deathtouch,
       Face.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing Set.empty Nothing (NonEmpty.singleton Modification.LoseAllAbilities)],
-      Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) minimalModal [] Nothing (Just (AbilityName.MkAbilityName (Text.pack "activated")))],
+      Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) minimalModal [] Activator.Controller Nothing (Just (AbilityName.MkAbilityName (Text.pack "activated")))],
       Face.replacementEffects = [PrintedReplacement.MkPrintedReplacement Nothing (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.AsCopy (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [] False)))) Set.empty Nothing],
       Face.triggeredAbilities = [minimalTriggeredAbility],
       Face.castingPermissions = [CastingPermission.CastFromLibraryWhileSearching],

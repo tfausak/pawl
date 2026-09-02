@@ -1587,6 +1587,12 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
         -- CR 109.4a makes `pid` the rider's "you": a mana ability's controller is
         -- the permanent's controller (CR 110.2), which is who Mana.manaSourcesGiven
         -- and Cost.tapForMana each ask about.
+        --
+        -- Not implemented: CR 602.1b's other activation instruction, the one
+        -- Pawl.Types.Activator carries. Mana.manaSourcesGiven offers a
+        -- permanent's routes to its controller alone, so a mana ability printing
+        -- "any player may activate this ability" would run stricter than printed
+        -- (#3087).
         && ActivationRestriction.restrictionsOk pid restrictions gs
         then
           Activations.MkActivations
@@ -2110,9 +2116,10 @@ canPayComponent slots pid oid component gs = case component of
   -- Deliberately NOT gated on control, unlike the loyalty arms above and like
   -- PutPlusOneCountersOnThis below: CR 122 qualifies a counter by the object it
   -- sits on and by nothing else, and CR 602.1a already fixes the payer as the
-  -- player activating the ability. Unobservable either way on this pool, CR 602.2
-  -- letting only an object's controller activate its activated ability -- a
-  -- declared reading rather than a tested one.
+  -- player activating the ability. Unobservable either way on this pool: no
+  -- ability in `data/cards/` pairs this component with an Activator.AnyPlayer
+  -- clause, and without one CR 602.2's default makes the payer the controller --
+  -- a declared reading rather than a tested one.
   CostComponent.RemovePlusOneCountersFromThis n ->
     Set.member oid (GameState.battlefield gs)
       && countersOn CounterKind.PlusOnePlusOne oid gs >= n
