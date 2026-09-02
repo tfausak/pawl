@@ -40,7 +40,7 @@
             "type": "Compares",
             "value": {
               "comparison": {
-                "type": "Exactly"
+                "type": "AtLeast"
               },
               "measured": {
                 "type": "Speed",
