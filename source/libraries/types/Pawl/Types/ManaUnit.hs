@@ -39,10 +39,10 @@ data ManaUnit = MkManaUnit
     tags :: Set.Set ProductionTag.ProductionTag,
     -- | CR 106.4: whether the player loses this mana as a step or phase ends.
     -- Read off the ADDITION (Pawl.Types.ManaAddition) rather than off the
-    -- source. Not implemented: the inline producer reading it --
-    -- Pawl.Engine.Mana.manaOptionsOfGiven stamps Ordinary whatever the
-    -- instruction says, so only Pawl.Engine.Resolve's arm honours a retaining
-    -- clause today (#1808).
+    -- source, and by BOTH producers -- Pawl.Engine.Mana.manaOptionsOfGiven for
+    -- a mana ability paid inline (Synthetic Lasting Spring) and
+    -- Pawl.Engine.Resolve's Effect.AddMana arm for one that resolves off the
+    -- stack (Shizuko, Caller of Autumn).
     retention :: ManaRetention.ManaRetention,
     -- | CR 106.6: what this mana may be spent on -- Nothing for mana that may
     -- be spent on anything, which is almost every mana. @Just r@ names the

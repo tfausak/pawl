@@ -107,8 +107,8 @@ data Effect card ability
     -- chooses (CR 105.4).
     --
     -- Not implemented: a mana ability's payment route (Cost.tapForMana, CR
-    -- 605.3b) reads the production and both of CR 106.6's clauses and ignores
-    -- the recipient (#1673) and the retention (#1808); everything else resolves
+    -- 605.3b) reads the production, the retention and both of CR 106.6's
+    -- clauses, and ignores the recipient (#1673); everything else resolves
     -- through Resolve.applyEffect, which reads the whole record.
     AddMana ManaAddition.ManaAddition
   | -- | CR 701.23: the players Search.searcher names each search the
