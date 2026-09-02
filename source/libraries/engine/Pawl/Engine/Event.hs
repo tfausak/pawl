@@ -905,61 +905,81 @@ conjureOntoBattlefield controller card count = do
 -- what makes Projection.defaultControllerOf answer the owner, which is CR
 -- 109.4c and so CR 114.2's last sentence.
 --
--- Not implemented: CR 800.4d's roster read, which the two conjure funnels above
--- and createTokens below all make before minting (#2914). Unobservable while
--- both roads here hand it the resolving controller, who by CR 800.4a controls no
--- resolving spell or ability once they have left.
-createEmblem :: PlayerId -> Card -> Game ObjectId
+-- CR 800.4d's roster read, the conjure funnels above and createTokens below
+-- make the same one. An emblem is an object (CR 109.1) owned by the player who
+-- gets it (CR 114.2), so a departed one gets nothing -- and the check is ahead
+-- of Game.intern, since a printing interned for an emblem that is never minted
+-- is a row nothing points at. Not CR 800.4b's third sentence, which the token
+-- funnel cites: that rule speaks of the battlefield and the stack, and an
+-- emblem goes to the command zone.
+--
+-- Nothing is this funnel's word for an emblem that was not created, `conjure`'s
+-- above; both callers already discarded the id. Inline rather than delegating
+-- the mint to a second top-level name, which is conjureOntoBattlefield's reason:
+-- the project writes no export lists, so that name would be a public door past
+-- the check.
+--
+-- Both roads into this funnel hand it the resolving controller, who by CR 800.4a
+-- controls no resolving spell or ability once they have left, so the guard is
+-- reachable only by driving the funnel -- which is what Pawl.EventSpec's "CR
+-- 800.4d no emblem is created for a player who has left the game" does, as the
+-- conjure and token cases beside it do. Gameplay reaches it the day an effect
+-- names a recipient other than the resolving controller.
+createEmblem :: PlayerId -> Card -> Game (Maybe ObjectId)
 createEmblem pid card = do
-  -- An emblem's characteristics are effect-defined (CR 114.3), so its entry is
-  -- minted here rather than coming from a deck -- interned once for the one
-  -- object it backs, and carrying no print-level data because an emblem is not
-  -- a card (CR 114.5).
-  emblemId <- State.state (Game.intern (Printing.MkPrinting card))
-  let mkObj ts =
-        Object.MkObject
-          { Object.owner = pid,
-            Object.enteredUnder = Nothing,
-            Object.source = Source.OfEmblem emblemId,
-            Object.zone = Zone.Command,
-            Object.tapped = TapState.Untapped,
-            Object.facing = Facing.FaceUp,
-            Object.exiledFaceDown = False,
-            Object.damage = 0,
-            Object.sickness = Sickness.Settled pid,
-            Object.bindings = Map.empty,
-            Object.counters = Map.empty,
-            Object.counterTimestamps = Map.empty,
-            Object.attachedTo = Nothing,
-            Object.chosenColor = Nothing,
-            Object.chosenSubtype = Nothing,
-            Object.chosenNames = Set.empty,
-            Object.chosenPlayer = Nothing,
-            Object.timestamp = ts,
-            Object.face = Nothing,
-            Object.turnedOverAt = Nothing,
-            Object.worldSince = Nothing,
-            Object.playableFromExile = Nothing,
-            Object.plotted = Nothing,
-            Object.foretold = Nothing,
-            Object.ringBearerFor = Nothing,
-            Object.protector = Nothing,
-            Object.ventureRoom = Nothing,
-            Object.classLevel = Nothing,
-            Object.unlockedHalves = Set.empty,
-            Object.designations = Set.empty,
-            Object.kicked = Map.empty,
-            Object.bestowed = False,
-            Object.phyrexianLifePaid = 0,
-            Object.manaSpent = Mana.MkMana [],
-            Object.announcedX = Nothing,
-            Object.castFrom = Nothing,
-            Object.detainedUntil = Set.empty,
-            Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
-          }
-  placeObject pid mkObj Zone.Command LibraryPosition.defaultValue
+  gs <- State.get
+  if List.notElem pid (Game.stillPlaying gs)
+    then pure Nothing
+    else do
+      -- An emblem's characteristics are effect-defined (CR 114.3), so its entry is
+      -- minted here rather than coming from a deck -- interned once for the one
+      -- object it backs, and carrying no print-level data because an emblem is not
+      -- a card (CR 114.5).
+      emblemId <- State.state (Game.intern (Printing.MkPrinting card))
+      let mkObj ts =
+            Object.MkObject
+              { Object.owner = pid,
+                Object.enteredUnder = Nothing,
+                Object.source = Source.OfEmblem emblemId,
+                Object.zone = Zone.Command,
+                Object.tapped = TapState.Untapped,
+                Object.facing = Facing.FaceUp,
+                Object.exiledFaceDown = False,
+                Object.damage = 0,
+                Object.sickness = Sickness.Settled pid,
+                Object.bindings = Map.empty,
+                Object.counters = Map.empty,
+                Object.counterTimestamps = Map.empty,
+                Object.attachedTo = Nothing,
+                Object.chosenColor = Nothing,
+                Object.chosenSubtype = Nothing,
+                Object.chosenNames = Set.empty,
+                Object.chosenPlayer = Nothing,
+                Object.timestamp = ts,
+                Object.face = Nothing,
+                Object.turnedOverAt = Nothing,
+                Object.worldSince = Nothing,
+                Object.playableFromExile = Nothing,
+                Object.plotted = Nothing,
+                Object.foretold = Nothing,
+                Object.ringBearerFor = Nothing,
+                Object.protector = Nothing,
+                Object.ventureRoom = Nothing,
+                Object.classLevel = Nothing,
+                Object.unlockedHalves = Set.empty,
+                Object.designations = Set.empty,
+                Object.kicked = Map.empty,
+                Object.bestowed = False,
+                Object.phyrexianLifePaid = 0,
+                Object.manaSpent = Mana.MkMana [],
+                Object.announcedX = Nothing,
+                Object.castFrom = Nothing,
+                Object.detainedUntil = Set.empty,
+                Object.goadedBy = Set.empty,
+                Object.doesNotUntapNext = False,
+                Object.exertedBy = Set.empty
+              }
+      Just <$> placeObject pid mkObj Zone.Command LibraryPosition.defaultValue
 
 -- CR 614: settle a proposed zone change. Nothing means the move does not happen.
 -- The typed door changeZoneAttaching below uses, so the funnel itself never cases
